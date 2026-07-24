@@ -1,0 +1,6 @@
+# Deny-by-default repository root.
+# Existing workspace material is intentionally not versioned until audited.
+*
+!/.gitignore
+!/GOVERNANCE.md
+!/EVIDENCE-INDEX.md
