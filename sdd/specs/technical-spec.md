@@ -5,7 +5,7 @@
 **Estado:** HISTÓRICO — el rótulo “APROBADO” es registro de 2026-05-15, no gate vivo  
 **Fuente:** Consolidado de docs/01, docs/04, docs/05, docs/07
 
-> **NO IMPLEMENTAR.** Documento legado. El baseline vigente es `sdd/wip/20260921-single-tenant-installation-baseline/`. El WIP `20260819-store-tenancy-and-profiles` también está **superseded**. Companion vivo: BlackStore `blackstore-pilot` + YAML StoreCore `storecore-pos-integration-contract-v1`.
+> **NO IMPLEMENTAR.** Documento legado. El baseline vigente está archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. El WIP `20260819-store-tenancy-and-profiles` también está **superseded**. Companion vivo: BlackStore `blackstore-pilot` + YAML StoreCore `storecore-pos-integration-contract-v1`.
 
 ---
 

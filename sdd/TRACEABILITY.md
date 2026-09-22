@@ -1,6 +1,6 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
-**Estado:** implementación en `e7b4efe` / `feature/storecore-core-v1.0.0`. Contratos vigentes; refetch ML vivo es TODO-041.
+**Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. Refetch ML vivo es TODO-041.
 
 | Capacidad | Core/tarea o feature | Gate |
 |---|---|---|
@@ -14,6 +14,7 @@
 | fulfillment manual/returns | TASK-010 | state machine e inspección antes de restock |
 | profile/fixture prototype/fleet docs | TASK-012 | no mezcla de prototype con producción |
 | quality/release | TASK-013..015 | dependencias completas + Sol GO/NO-GO |
+| frontend UX Stitch | `docs/agent/frontend/` | DS-00/P-01 en código; P-02…U-10 siguiente carril |
 | `ml-competition-insights` | TODO-030 deferred | señales oficiales read-only; no scraping/top-5 |
 | `ml-price-automation-management` | TODO-031 deferred | opt-in, min/max/margin/cooldown/audit/kill switch; writer exclusivo |
 | `ml-promotion-orchestrator` | TODO-032 deferred | oferta oficial, eligibility/preflight, approval/preauth, rollback/reconcile |

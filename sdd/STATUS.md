@@ -1,26 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
 **Validado:** 2026-09-22  
-**Madurez:** baseline core en `feature/storecore-core-v1.0.0`. Must-fix de Grok 4.7 (security/backend) y Astra/high están implementados en working tree; falta re-review y PR merge. No existe TASK-011.  
-**Sol GO:** `sdd/reviews/20260922-sol-go-core.md` (mirror `docs/agent/20260922-sol-go-core.md`).  
-**Git:** commit exists on the feature branch. No tag, deploy or publish.
+**Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
+**Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
+**Git:** feature branch + finish en el PR. No tag, deploy o publish.
 
 ## Residuales honestos
 
-- TASK-008/014: inbox persist-before-ACK done. Live ML refetch/canonical sale is **TODO-041**, not claimed in CI.
-- TASK-013: architecture GO; Playwright/axe/Stitch not automated.
-- TODO-003: fleet runbook draft at `2-technical/fleet-operations.md`.
+- TASK-008/014: inbox persist-before-ACK done. Live ML refetch/canonical sale is **TODO-041**.
+- TASK-013: Playwright/axe/Stitch not automated.
+- TODO-003: fleet runbook draft at `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
 
 ## Precedencia
 
-1. `sdd/wip/20260921-single-tenant-installation-baseline/`.
+1. Feature archivado: `sdd/features/20260921-single-tenant-installation-baseline/`.
 2. `sdd/PROJECT.md`, `sdd/PATTERNS.md`, `sdd/TRACEABILITY.md`, `sdd/RELEASE.md`.
-3. `docs/agent/` is a derived mirror; Sol GO durable record is `sdd/reviews/20260922-sol-go-core.md`.
+3. `docs/agent/` es espejo; Company Brain canónico vive en `Novastra/company brain`.
 4. `20260819-store-tenancy-and-profiles` y `sdd/specs/*` son históricos/superseded.
 
 ## Gate actual
 
-Sol GO autorizó construir el baseline core. `/sdd.finish` espera PR + re-review sin P0/P1 abiertos. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy, DEMO-as-production, deploy ni Mercado Pago en el browser.
+Siguiente carril: **frontend UX** (`docs/agent/frontend/ux-handoff.md`). DS-00 y P-01 están en código; P-02…U-10 pendientes. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production, deploy ni Mercado Pago en el browser.
 
 ## WIP POS (paralelo, no es el baseline)
 

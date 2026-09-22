@@ -14,7 +14,7 @@ Una instalación es un merchant/VM/base/dominio. `storecore-core-v1.0.0` es core
 - technical: `approved`
 - data_model: `approved`
 - tasks: `approved`
-- implementation: `complete` (14-task graph; residual TODO-041 ML refetch, TASK-013 a11y)
+- implementation: `archived` (14-task graph; residual TODO-041 ML refetch, TASK-013 a11y)
 
 Sol GO 2026-09-22: `sdd/reviews/20260922-sol-go-core.md` (mirror `docs/agent/20260922-sol-go-core.md`).
 

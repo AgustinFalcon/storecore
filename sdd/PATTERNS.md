@@ -20,6 +20,10 @@ SKU es la identidad canónica. WEB reserva/consume/libera mediante operation key
 
 Precio base, desired, observed y effective promo son valores distintos. Sólo un writer local de precio puede estar `ACTIVE` por listing; automatización ML y writer manual son mutuamente excluyentes. Market intelligence usa únicamente señales oficiales/read-only permitidas; no scraping, elusión de términos ni supuesto “top 5”. Campañas requieren vigencia, prioridad, margen, auditoría, aprobación y rollback. Black Friday es un evento configurable, no una regla hardcodeada.
 
+## Frontend production path
+
+Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. El siguiente carril visual es Stitch (`docs/agent/frontend/ux-handoff.md`): DS-00 y P-01 ya están en código.
+
 ## Compliance boundary
 
 No ocultar ventas, alterar montos, evadir ni bypass fiscal. El adapter fiscal no se implementa en StoreCore core: queda como integración/biblioteca externa diferida y auditable.
