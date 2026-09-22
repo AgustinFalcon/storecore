@@ -2,6 +2,9 @@
 # Inherited material stays ignored until audited. Explicit allowlist below.
 *
 !/.gitignore
+!/.github/
+!/.github/workflows/
+!/.github/workflows/verify.yml
 !/GOVERNANCE.md
 !/EVIDENCE-INDEX.md
 !/GOVERNANCE-BACKLOG.md
