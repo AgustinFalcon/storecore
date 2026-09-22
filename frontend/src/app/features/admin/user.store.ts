@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { EMPTY, exhaustMap, filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
 import { HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
@@ -252,31 +252,33 @@ export class UserStore extends ComponentStore<UserState> {
 
   readonly mergeProfile = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => {
+      exhaustMap(() => {
         const { preview, previewManifest, manifest } = this.snapshot;
         if (!preview || previewManifest !== manifest) {
           this.patchState({ loading: false, errorMessage: 'Previsualizá el manifiesto actual antes del merge.' });
-          return;
+          return EMPTY;
         }
         if (!preview.compatible) {
           this.patchState({ loading: false, errorMessage: 'Perfil incompatible. Merge cerrado.' });
-          return;
+          return EMPTY;
         }
+        const generation = this.previewGeneration;
         this.patchState({ loading: true, errorMessage: '' });
-      }),
-      filter(() => Boolean(
-        this.snapshot.preview &&
-        this.snapshot.previewManifest === this.snapshot.manifest &&
-        this.snapshot.preview.compatible,
-      )),
-      switchMap(() =>
-        this.importer.merge(this.snapshot.manifest).pipe(
+        return this.importer.merge(manifest).pipe(
           tapResponse({
-            next: (preview) => this.patchState({ preview, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            next: (result) => {
+              if (generation === this.previewGeneration && manifest === this.snapshot.manifest && this.snapshot.preview === preview) {
+                this.patchState({ preview: result, loading: false });
+              }
+            },
+            error: (err: unknown) => {
+              if (generation === this.previewGeneration && manifest === this.snapshot.manifest) {
+                this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
+              }
+            },
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
 }

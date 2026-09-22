@@ -43,6 +43,42 @@ describe('UserStore profile preview', () => {
     store.mergeProfile();
     expect(merge).toHaveBeenCalledTimes(1);
   });
+
+  it('does not let an old merge response replace an incompatible preview for a new manifest', () => {
+    const oldMerge = new Subject<ProfilePreview>();
+    const preview = vi.fn((manifest: string) => of({ compatible: manifest === 'manifest A', version: manifest, diff: '' }));
+    const merge = vi.fn(() => oldMerge.asObservable());
+    const store = createStore({ preview, merge } as unknown as ImportProfileUseCase);
+
+    store.setManifest('manifest A');
+    store.previewProfile();
+    store.mergeProfile();
+    store.setManifest('manifest B');
+    store.previewProfile();
+    oldMerge.next({ compatible: true, version: 'stale A', diff: '' });
+    store.mergeProfile();
+
+    expect(store.snapshot.preview).toEqual({ compatible: false, version: 'manifest B', diff: '' });
+    expect(store.snapshot.previewManifest).toBe('manifest B');
+    expect(merge).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start two merge requests for repeated clicks while one is pending', () => {
+    const oldMerge = new Subject<ProfilePreview>();
+    const preview = vi.fn(() => of({ compatible: true, version: '1', diff: '' }));
+    const merge = vi.fn(() => oldMerge.asObservable());
+    const store = createStore({ preview, merge } as unknown as ImportProfileUseCase);
+
+    store.setManifest('manifest A');
+    store.previewProfile();
+    store.mergeProfile();
+    store.mergeProfile();
+
+    expect(merge).toHaveBeenCalledTimes(1);
+    oldMerge.next({ compatible: true, version: 'merged', diff: '' });
+    oldMerge.complete();
+    expect(store.snapshot.loading).toBe(false);
+  });
 });
 
 function createStore(importer: ImportProfileUseCase): UserStore {
