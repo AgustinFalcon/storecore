@@ -6,7 +6,7 @@
       <a class="chrome__brand" routerLink="/user/content">StoreCore <span>Consola</span></a>
       <p class="chrome__hint">Operador · no es la cuenta que compra</p>
       <a class="chrome__text" routerLink="/">Ver tienda</a>
-      <a class="chrome__text" routerLink="/user/session">{{ user.authenticated() ? 'Sesión operador' : 'Entrar operador' }}</a>
+      <a class="chrome__text" routerLink="/user/session">{{ user.authenticated() ? 'Sesión user' : 'Entrar user' }}</a>
     </header>
   } @else {
     <header class="chrome">

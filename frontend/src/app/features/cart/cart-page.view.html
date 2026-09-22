@@ -30,9 +30,9 @@
               </td>
               <td>
                 <div class="sc-stepper">
-                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity - 1 })">−</button>
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity - 1 })" [attr.aria-label]="'Quitar una unidad de ' + line.name">−</button>
                   <span>{{ line.quantity }}</span>
-                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })">+</button>
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })" [attr.aria-label]="'Agregar una unidad de ' + line.name">+</button>
                 </div>
               </td>
               <td>{{ line.originalUnitPrice }}</td>

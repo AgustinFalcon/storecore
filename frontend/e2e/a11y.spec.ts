@@ -11,8 +11,9 @@ const publicScreens = [
 
 for (const screen of publicScreens) {
   test(`axe has no serious violations on ${screen.path}`, async ({ page }) => {
-    await page.goto(screen.path, { waitUntil: 'networkidle' });
+    await page.goto(screen.path, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('h1')).toHaveCount(1);
+    await expect(page.locator('h1')).toHaveText(screen.heading);
     await expect(page.getByRole('link', { name: 'Saltar al contenido' })).toBeAttached();
     const results = await new AxeBuilder({ page }).analyze();
     const blocking = results.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical');

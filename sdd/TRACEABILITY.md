@@ -1,6 +1,6 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
-**Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. Refetch ML vivo es TODO-041.
+**Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. TODO-041 in-repo: official refetch port + CI fake. Live vendor HTTP is installation-configured, never in CI.
 
 | Capacidad | Core/tarea o feature | Gate |
 |---|---|---|

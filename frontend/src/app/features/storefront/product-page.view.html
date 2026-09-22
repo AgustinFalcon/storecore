@@ -54,9 +54,9 @@
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
           <label>Cantidad
             <span class="sc-stepper">
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1">−</button>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
               <input type="number" name="quantity" min="1" required [(ngModel)]="quantity" />
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)">+</button>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" aria-label="Agregar una unidad">+</button>
             </span>
           </label>
           @if (signedIn) {

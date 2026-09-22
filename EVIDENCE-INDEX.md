@@ -9,5 +9,5 @@
 - Plan: TASK-001..010 y TASK-012..015 (no existe TASK-011).
 - Residual closed in-repo: TODO-003 fleet runbook; TODO-041 worker with official refetch port (CI fake); TASK-013 `npm run test:a11y`. POS/fiscal still blocked.
 - Integration: https://github.com/AgustinFalcon/storecore/pull/14
-- Validation: targeted backend review-fix + frontend 42 tests. No autoriza deploy, tag, POS adapter ni fiscal.
+- Validation: frontend 42 unit tests + `npm run test:a11y`; `InboxApplicationWorkerTest` + unconfigured RECEIVED. No autoriza deploy, tag, POS adapter ni fiscal.
 - Next: features with Sol GO (POS contract, fiscal). No live vendor credentials in CI.
