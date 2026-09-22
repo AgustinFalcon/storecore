@@ -2,7 +2,7 @@
 
 - **Feature id:** `20260922-storecore-mp-live-checkout-v1`
 - **Status:** `documented_deferred`
-- **Maturity:** contrato aprobado; MP-LIVE-03/04 implementados fail-closed bajo CONDITIONAL_GO. No autoriza sandbox, credenciales, producción ni emisión fiscal.
+- **Maturity:** contrato aprobado; MP-LIVE-03/04 fail-closed APPROVED. No autoriza sandbox, credenciales, producción ni emisión fiscal.
 - **Related:** `20260921-single-tenant-installation-baseline`, `20260921-arca-storecore-adapter-contract`.
 
 ## Objetivo
@@ -15,7 +15,7 @@ El comprador saldrá de StoreCore hacia **Checkout Pro con redirección en la mi
 
 ## Gate
 
-MP-LIVE-02 aprobado. MP-LIVE-03/04 tienen CONDITIONAL_GO de código (`sdd/reviews/20260922-sol-mp-live-03-go.md`) e implementación fail-closed con correcciones de `20260922-sol-mp-live-03-code-review.md`. Falta re-review Sol del código y MP-LIVE-05.
+MP-LIVE-02 aprobado. MP-LIVE-03/04 fail-closed **APPROVED** (`sdd/reviews/20260922-sol-mp-live-03-code-rereview.md`). MP-LIVE-05 y la activación siguen NO-GO.
 
 La revisión de código de MP-LIVE-02A permanece válida para la política pura. MP-LIVE-05 y la activación siguen NO-GO. Ver `sdd/reviews/20260922-sol-mp-live-03-go.md`.
 
