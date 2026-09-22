@@ -56,7 +56,29 @@ class CapabilityController(
         }
         return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mapOf("id" to mutation.value)))
     }
+
+    @PostMapping("/{module}/kills/{id}/remove")
+    fun removeKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: KillCloseRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        auth.requireSameOrigin(http)
+        val actor = auth.admin(http)
+        val mutation = mutations.execute(actor, csrf) {
+            capabilities.removeKill(actor, id, request.reason, request.correlationId)
+            mapOf("id" to id, "removed" to true)
+        }
+        return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mutation.value))
+    }
+
+    @PostMapping("/{module}/kills/{id}/replace")
+    fun replaceKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        auth.requireSameOrigin(http)
+        val actor = auth.admin(http)
+        val mutation = mutations.execute(actor, csrf) {
+            capabilities.replaceKill(actor, id, request.owner, request.reason, Instant.parse(request.expiresAt), request.ticket, request.correlationId)
+        }
+        return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mapOf("id" to mutation.value)))
+    }
 }
 
 data class CapabilityStateRequest(@field:NotBlank val state: String, val expectedConfigVersion: Int? = null, val reason: String = "ADMIN_STATE_CHANGE", val correlationId: UUID? = null)
 data class KillRequest(@field:NotBlank val action: String, @field:NotBlank val owner: String, @field:NotBlank val reason: String, @field:NotBlank val expiresAt: String, @field:NotBlank val ticket: String, val correlationId: UUID)
+data class KillCloseRequest(@field:NotBlank val reason: String, val correlationId: UUID)

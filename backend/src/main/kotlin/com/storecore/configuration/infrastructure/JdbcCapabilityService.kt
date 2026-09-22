@@ -40,15 +40,14 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
                FOR SHARE""",
             module, action,
         )
-        if (kills.size > 1) throw CapabilityKillSwitchInvalid()
-        val kill = kills.singleOrNull()
-        if (kill != null) {
+        val live = kills.filter { kill ->
             val expires = kill["expires_at"] as? Instant ?: (kill["expires_at"] as? java.sql.Timestamp)?.toInstant()
-            if (expires == null || !expires.isAfter(Instant.now()) || kill["owner"]?.toString().isNullOrBlank() || kill["reason"]?.toString().isNullOrBlank()) {
-                throw CapabilityKillSwitchInvalid()
-            }
-            throw CapabilityKillSwitchActive()
+            expires != null && expires.isAfter(Instant.now()) &&
+                !kill["owner"]?.toString().isNullOrBlank() &&
+                !kill["reason"]?.toString().isNullOrBlank()
         }
+        if (live.size > 1) throw CapabilityKillSwitchInvalid()
+        if (live.isNotEmpty()) throw CapabilityKillSwitchActive()
         val configs = jdbc.queryForList(
             """SELECT state, config, config_schema_version FROM module_configurations
                WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT' FOR SHARE""",

@@ -37,21 +37,23 @@ class JdbcCartService(
 
     fun checkout(customer: CustomerPrincipal, idempotencyKey: UUID, addressId: Long, currency: String): CheckoutReceipt {
         capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
-        val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
         if (currency != "ARS") throw CommerceValidation("UNSUPPORTED_CURRENCY")
         val cart = snapshot(ensureCart(customer.customerId))
         val hash = sha256("$addressId|$currency|${cart.lines}")
         val existing = jdbc.query("SELECT id,request_hash,checkout_snapshot FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", { rs, _ -> Triple(rs.getLong("id"), rs.getString("request_hash"), rs.getString("checkout_snapshot")) }, customer.customerId, idempotencyKey).firstOrNull()
         if (existing != null) {
+            val original = mapper.readTree(existing.third)
+            if (original.path("addressId").asLong() != addressId || original.path("currency").asText() != currency) throw CheckoutConflict()
             if (cart.lines.isNotEmpty() && existing.second != hash) throw CheckoutConflict()
             val replayed = jdbc.query("SELECT o.id,o.status,p.status payment FROM orders o LEFT JOIN payments p ON p.order_id=o.id WHERE o.checkout_claim_id=?", { rs, _ -> CheckoutReceipt(rs.getLong("id").toString(), rs.getString("payment") ?: "PENDING", rs.getString("status")) }, existing.first).firstOrNull()
             if (replayed != null) return replayed
             throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
+        val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
         if (cart.lines.isEmpty()) throw CommerceValidation("CART_EMPTY")
         val saga = UUID.randomUUID()
         val lineKeys = cart.lines.associate { it.sku to UUID.randomUUID() }
-        val payload = mapper.createObjectNode().put("addressId", addressId).put("currency", currency).put("reservationSagaKey", saga.toString()).set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
+        val payload = mapper.createObjectNode().put("addressId", addressId).put("currency", currency).put("reservationSagaKey", saga.toString()).set<com.fasterxml.jackson.databind.node.ObjectNode>("address", mapper.valueToTree(address)).set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
         lineKeys.forEach { (sku, key) -> payload.with("lineKeys").put(sku, key.toString()) }
         val claimId = try {
             jdbc.queryForObject("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) VALUES (?,?,?,?::jsonb,'PENDING') RETURNING id", Long::class.java, customer.customerId, idempotencyKey, hash, payload.toString())!!
@@ -66,7 +68,7 @@ class JdbcCartService(
             inventory.reserve(saga, lineKeys.getValue(line.sku), variantId, line.quantity, "CUSTOMER:${customer.customerId}")
         }
         val subtotal = cart.lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
-        val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("addressId", addressId).put("street", address["street"]).put("city", address["city"])
+        val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("addressId", addressId).put("street", address["street"]).put("number", address["number"]).put("city", address["city"]).put("province", address["province"]).put("postalCode", address["postalCode"])
         val orderId = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT',?::jsonb,?::jsonb,?,0,?,?) RETURNING id", Long::class.java, "SC-$claimId", claimId, idempotencyKey, hash, customer.customerId, buyer.toString(), payload.toString(), subtotal, subtotal, "ARS")!!
         cart.lines.forEach { line ->
             val variantId = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, line.sku)!!

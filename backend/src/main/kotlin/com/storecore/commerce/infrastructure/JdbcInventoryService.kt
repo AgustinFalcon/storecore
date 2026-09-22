@@ -1,14 +1,18 @@
 package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.InsufficientInventory
+import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.domain.InventoryRow
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.scheduling.annotation.EnableScheduling
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.transaction.support.TransactionTemplate
 import java.util.UUID
 
 @Service
+@EnableScheduling
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate) {
     fun list(): List<InventoryRow> = jdbc.query(
@@ -29,6 +33,7 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         }
     }!!
 
+    @Scheduled(fixedDelayString = "\${storecore.inventory.expiry-delay-ms:60000}")
     fun expireOverdue() {
         transactions.executeWithoutResult {
             val overdue = jdbc.query("SELECT id,variant_id,quantity FROM inventory_reservations WHERE status='ACTIVE' AND expires_at<=clock_timestamp() FOR UPDATE", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity")) })
@@ -41,8 +46,42 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         }
     }
 
-    fun adjust(variantId: Long, quantity: Int, actor: String): Long = transactions.execute {
+    fun adjust(variantId: Long, quantity: Int, actor: String, reason: String): Long = transactions.execute {
+        if (quantity == 0) throw CommerceValidation("INVENTORY_ADJUSTMENT_MUST_BE_NON_ZERO")
+        val normalizedReason = normalizeReason(reason)
+        val balance = lockBalance(variantId)
+        if (balance.first + quantity < 0) throw CommerceValidation("INVENTORY_ADJUSTMENT_WOULD_MAKE_AVAILABLE_NEGATIVE")
         jdbc.update("UPDATE inventory_balances SET available_quantity=available_quantity+?,updated_at=now() WHERE variant_id=?", quantity, variantId)
-        jdbc.queryForObject("INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,'ADJUSTMENT','INTERNAL',?,?) RETURNING id", Long::class.java, variantId, distinctKeys(1).single(), quantity, actor)!!
+        appendAdjustment(variantId, quantity, actor, normalizedReason)
     }!!
+
+    /** Sets the available (already reservation-netted) quantity, preserving reservations and safety stock. */
+    fun setAvailableQuantity(variantId: Long, target: Int, actor: String, reason: String?): Long? = transactions.execute {
+        if (target < 0) throw CommerceValidation("INVENTORY_AVAILABLE_QUANTITY_MUST_BE_NON_NEGATIVE")
+        val current = lockBalance(variantId).first
+        val delta = target - current
+        if (delta == 0) return@execute null
+        val normalizedReason = normalizeReason(reason ?: "")
+        jdbc.update("UPDATE inventory_balances SET available_quantity=?,updated_at=now() WHERE variant_id=?", target, variantId)
+        appendAdjustment(variantId, delta, actor, normalizedReason)
+    }
+
+    private fun lockBalance(variantId: Long): Pair<Int, Int> {
+        jdbc.update("INSERT INTO inventory_balances(variant_id) VALUES (?) ON CONFLICT (variant_id) DO NOTHING", variantId)
+        return jdbc.query("SELECT available_quantity,reserved_quantity FROM inventory_balances WHERE variant_id=? FOR UPDATE", { rs, _ -> rs.getInt("available_quantity") to rs.getInt("reserved_quantity") }, variantId).firstOrNull()
+            ?: throw CommerceValidation("INVENTORY_BALANCE_NOT_FOUND")
+    }
+
+    private fun appendAdjustment(variantId: Long, delta: Int, actor: String, reason: String): Long {
+        val ledgerId = jdbc.queryForObject("INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,'ADJUSTMENT','INTERNAL',?,?) RETURNING id", Long::class.java, variantId, distinctKeys(1).single(), delta, actor)!!
+        jdbc.update(
+            "INSERT INTO audit_events(actor_type,actor_id,event_type,aggregate_type,aggregate_id,payload_redacted) VALUES ('USER',?,'INVENTORY_ADJUSTED','INVENTORY_VARIANT',?,jsonb_build_object('ledgerId',?,'quantityDelta',?,'reason',?))",
+            actor.removePrefix("USER:"), variantId, ledgerId, delta, reason,
+        )
+        return ledgerId
+    }
+
+    private fun normalizeReason(reason: String): String = reason.trim().also {
+        if (it.isEmpty() || it.length > 500) throw CommerceValidation("INVENTORY_ADJUSTMENT_REASON_REQUIRED")
+    }
 }

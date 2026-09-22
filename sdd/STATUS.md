@@ -1,7 +1,7 @@
 # Estado canónico del SDD — StoreCore
 
 **Validado:** 2026-09-22  
-**Madurez:** implementation of the 14-task graph (TASK-001..010, TASK-012..015) is on `feature/storecore-core-v1.0.0` at `e7b4efe`. There is no TASK-011.  
+**Madurez:** baseline core en `feature/storecore-core-v1.0.0`. Must-fix de Grok 4.7 (security/backend) y Astra/high están implementados en working tree; falta re-review y PR merge. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md` (mirror `docs/agent/20260922-sol-go-core.md`).  
 **Git:** commit exists on the feature branch. No tag, deploy or publish.
 
@@ -20,7 +20,7 @@
 
 ## Gate actual
 
-Sol GO autorizó el baseline core. No autoriza POS/BlackStore adapter, fiscal/ARCA, tenancy, DEMO-as-production, deploy ni Mercado Pago en el browser. `/sdd.finish` espera reviews Grok 4.7 sin P0.
+Sol GO autorizó construir el baseline core. `/sdd.finish` espera PR + re-review sin P0/P1 abiertos. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy, DEMO-as-production, deploy ni Mercado Pago en el browser.
 
 ## WIP POS (paralelo, no es el baseline)
 

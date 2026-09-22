@@ -58,7 +58,7 @@ export class CartStore extends ComponentStore<CartState> {
   readonly canPay$ = this.select((s) => !s.loading && s.cart.lines.length > 0 && s.addressId.length > 0 && s.currency.length > 0);
 
   readonly setAddressId = this.updater((s, addressId: string) => ({ ...s, addressId }));
-  readonly setCurrency = this.updater((s, _currency: string) => ({ ...s, currency: 'ARS' }));
+  readonly setCurrency = this.updater((s, currency: string) => ({ ...s, currency: currency === 'ARS' ? currency : 'ARS' }));
 
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(

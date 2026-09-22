@@ -32,8 +32,8 @@ class MercadoLibreController(private val mercadoLibre: JdbcMercadoLibreService, 
     }
 
     @PostMapping("/api/v1/integrations/mercadolibre/notifications")
-    fun notify(@RequestParam(required = false) topic: String?, @RequestParam(required = false) resource: String?, @RequestHeader(value = "x-signature", required = false) signature: String?, @RequestBody(required = false) body: Map<String, Any?>?) =
-        BaseResponse.ok(mercadoLibre.notify(topic, resource, body, signature))
+    fun notify(http: HttpServletRequest, @RequestParam(required = false) topic: String?, @RequestParam(required = false) resource: String?, @RequestHeader(value = "x-signature", required = false) signature: String?, @RequestBody(required = false) body: Map<String, Any?>?) =
+        BaseResponse.ok(mercadoLibre.notify(http.remoteAddr, topic, resource, body, signature))
 }
 
 data class ListingRequest(val listingId: String = "", val variationId: String = "", @field:NotBlank val sku: String)

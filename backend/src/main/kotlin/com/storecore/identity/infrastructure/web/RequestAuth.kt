@@ -40,14 +40,8 @@ class RequestAuth(
 
     fun requireSameOrigin(request: HttpServletRequest) {
         val origin = request.getHeader(HttpHeaders.ORIGIN) ?: throw CsrfInvalid()
-        if (installationOrigin.accepts(origin) || sameRequestOrigin(request, origin)) return
+        if (installationOrigin.accepts(origin)) return
         throw CsrfInvalid()
-    }
-
-    private fun sameRequestOrigin(request: HttpServletRequest, origin: String): Boolean {
-        val parsed = runCatching { java.net.URI(origin) }.getOrNull() ?: return false
-        val originPort = if (parsed.port >= 0) parsed.port else if (parsed.scheme == "https") 443 else 80
-        return parsed.scheme == request.scheme && parsed.host == request.serverName && originPort == request.serverPort
     }
 
     /** Returns the current session when present; revoked/expired sessions are already logged out. */

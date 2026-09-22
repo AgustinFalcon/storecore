@@ -28,6 +28,16 @@ class IdentityTask004EvidenceTest {
     fun `bootstrap is once-only and concurrent callers leave one admin and one immutable marker`() {
         val transactions = TransactionTemplate(Companion.transactionManager)
         val runner = BootstrapAdminRunner(jdbc, passwords, transactions)
+        val rollbackEmail = "bootstrap-rollback@example.com"
+        assertThrows(IllegalStateException::class.java) {
+            transactions.executeWithoutResult {
+                runner.bootstrap(rollbackEmail, "a-strong-bootstrap-password".toCharArray())
+                throw IllegalStateException("force outer transaction rollback")
+            }
+        }
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM users WHERE email=?", Int::class.java, rollbackEmail))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM installation_bootstrap_markers", Int::class.java))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE event_type='BOOTSTRAP_ADMIN_CREATED'", Int::class.java))
         val executor = Executors.newFixedThreadPool(2)
         try {
             val futures = (1..2).map { index ->
@@ -124,8 +134,10 @@ class IdentityTask004EvidenceTest {
             val results = (1..2).map {
                 executor.submit<Throwable?> {
                     try {
-                        identity.verifyCsrf(principal, issued.csrfToken)
-                        identity.rotateCsrf(principal)
+                        TransactionTemplate(transactionManager).executeWithoutResult {
+                            identity.verifyCsrf(principal, issued.csrfToken)
+                            identity.rotateCsrf(principal)
+                        }
                         null
                     } catch (failure: Throwable) {
                         failure

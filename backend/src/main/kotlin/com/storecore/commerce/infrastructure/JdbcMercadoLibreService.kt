@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val capabilities: CapabilityDecisionPort) {
+class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val capabilities: CapabilityDecisionPort, private val limiter: WebhookInboxLimiter) {
     fun account(actor: InternalUserPrincipal): MercadoLibreAccountView {
         capabilities.decide("MARKETPLACE_ML", "READ", CapabilityActor.Internal(actor))
         val row = jdbc.query("SELECT account_key,state FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1", { rs, _ -> rs.getString("account_key") to rs.getString("state") }).firstOrNull()
@@ -34,7 +34,7 @@ class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper
         return MercadoLibreListingView(listingId, variationId, sku)
     }
 
-    fun notify(topic: String?, resource: String?, body: Map<String, Any?>?, signature: String?): Map<String, Any?> {
+    fun notify(sourceIp: String, topic: String?, resource: String?, body: Map<String, Any?>?, signature: String?): Map<String, Any?> {
         capabilities.decide("MARKETPLACE_ML", "SYNC", CapabilityActor.System)
         val account = jdbc.query("SELECT id,oauth_secret_reference,state FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1", { rs, _ -> Triple(rs.getLong("id"), rs.getString("oauth_secret_reference"), rs.getString("state")) }).firstOrNull() ?: throw MercadoLibreAccountMissing()
         val resolvedTopic = topic ?: body?.get("topic")?.toString() ?: "unknown"
@@ -42,6 +42,7 @@ class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper
         if (resolvedTopic.isBlank() || resolvedResource.isBlank()) throw com.storecore.commerce.application.CommerceValidation("ML_NOTIFICATION_CONTRACT_INVALID")
         val notificationId = body?.get("id")?.toString() ?: "$resolvedTopic:$resolvedResource"
         val envelope = mapper.writeValueAsString(body ?: mapOf("topic" to resolvedTopic, "resource" to resolvedResource))
+        limiter.admit("MERCADO_LIBRE", sourceIp, envelope)
         val inserted = jdbc.query("INSERT INTO ml_notification_inbox(account_id,notification_id,topic,resource,payload_redacted) VALUES (?,?,?,?,?::jsonb) ON CONFLICT (account_id,notification_id) DO NOTHING RETURNING id", { rs, _ -> rs.getLong("id") }, account.first, notificationId, resolvedTopic, resolvedResource, envelope).firstOrNull()
         val inboxId = inserted ?: jdbc.queryForObject("SELECT id FROM ml_notification_inbox WHERE account_id=? AND notification_id=?", Long::class.java, account.first, notificationId)!!
         jdbc.update("INSERT INTO ml_notification_processing(inbox_id,status) VALUES (?,'RECEIVED') ON CONFLICT (inbox_id) DO NOTHING", inboxId)

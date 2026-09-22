@@ -1,4 +1,4 @@
-package com.storecore.identity.infrastructure.persistence
+﻿package com.storecore.identity.infrastructure.persistence
 
 import com.storecore.identity.application.AuthenticationFailed
 import com.storecore.identity.application.AuthorizationDenied
@@ -110,16 +110,24 @@ open class JdbcIdentityService(
 
     @Transactional
     override fun rotateCsrf(principal: AuthenticatedPrincipal): String {
-        val active = jdbc.queryForList(
-            """SELECT t.id, t.generation FROM identity_session_csrf_tokens t
-               JOIN identity_sessions s ON s.id=t.session_id
-               WHERE t.session_id=? AND t.retired_at IS NULL AND t.expires_at>clock_timestamp()
-                 AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp() AND s.absolute_expires_at>clock_timestamp()
+        // Lock the live session first so renewal works after CSRF expiry and concurrent rotations serialize.
+        jdbc.queryForList(
+            """SELECT id FROM identity_sessions
+               WHERE id=? AND revoked_at IS NULL AND idle_expires_at>clock_timestamp() AND absolute_expires_at>clock_timestamp()
                FOR UPDATE""",
             principal.sessionId,
         ).singleOrNull() ?: throw AuthenticationFailed()
-        jdbc.update("UPDATE identity_session_csrf_tokens SET retired_at=clock_timestamp() WHERE id=?", active.requiredLong("id"))
-        return insertCsrf(principal.sessionId, active.requiredLong("generation").toInt() + 1)
+        val active = jdbc.queryForList(
+            "SELECT id, generation FROM identity_session_csrf_tokens WHERE session_id=? AND retired_at IS NULL FOR UPDATE",
+            principal.sessionId,
+        ).singleOrNull()
+        val generation = if (active == null) {
+            jdbc.queryForObject("SELECT COALESCE(MAX(generation),0)+1 FROM identity_session_csrf_tokens WHERE session_id=?", Int::class.java, principal.sessionId)!!
+        } else {
+            jdbc.update("UPDATE identity_session_csrf_tokens SET retired_at=clock_timestamp() WHERE id=?", active.requiredLong("id"))
+            active.requiredLong("generation").toInt() + 1
+        }
+        return insertCsrf(principal.sessionId, generation)
     }
 
     @Transactional
@@ -240,6 +248,8 @@ open class JdbcIdentityService(
         )
     }
     private fun issueSession(realm: IdentityRealm, subjectId: Long): IssuedCredentials {
+        val roles = if (realm == IdentityRealm.USER) loadRoles(subjectId) else emptySet()
+        if (realm == IdentityRealm.USER && roles.isEmpty()) throw AuthenticationFailed()
         val sessionId = UUID.randomUUID()
         val rawSession = tokens.nextRawToken()
         jdbc.update(
@@ -250,7 +260,7 @@ open class JdbcIdentityService(
         val csrf = insertCsrf(sessionId, 1)
         val principal: AuthenticatedPrincipal = when (realm) {
             IdentityRealm.CUSTOMER -> CustomerPrincipal(sessionId, subjectId)
-            IdentityRealm.USER -> InternalUserPrincipal(sessionId, subjectId, loadRoles(subjectId))
+            IdentityRealm.USER -> InternalUserPrincipal(sessionId, subjectId, roles)
         }
         return IssuedCredentials(principal, rawSession, csrf)
     }

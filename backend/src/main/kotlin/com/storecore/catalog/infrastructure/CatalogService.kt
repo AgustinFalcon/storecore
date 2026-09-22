@@ -3,6 +3,8 @@ package com.storecore.catalog.infrastructure
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
+import com.storecore.commerce.infrastructure.JdbcInventoryService
+import com.storecore.commerce.application.CommerceValidation
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -16,7 +18,7 @@ data class HomeDraft(val title: String, val body: String)
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) : CatalogQueryPort {
+class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val inventory: JdbcInventoryService) : CatalogQueryPort {
     override fun searchActive(query: String): List<CatalogSearchResult> = jdbc.query("""SELECT v.sku,p.name FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE p.status='ACTIVE' AND v.active AND (lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?) OR lower(coalesce(b.name,'')) LIKE lower(?) OR lower(coalesce(c.name,'')) LIKE lower(?)) ORDER BY p.name LIMIT 100""", { rs, _ -> CatalogSearchResult(com.storecore.catalog.domain.ProductSku(rs.getString("sku")), rs.getString("name")) }, "%$query%", "%$query%", "%$query%", "%$query%")
     fun facets(kind: String): List<CatalogFacet> = jdbc.query("SELECT id,name FROM ${if (kind == "brands") "brands" else "categories"} WHERE active ORDER BY name", { rs, _ -> CatalogFacet(rs.getLong("id"), rs.getString("name")) })
     fun search(query: String, brand: Long?, category: Long?, offers: Boolean): List<Map<String, Any?>> {
@@ -29,7 +31,7 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
     fun product(sku: String, admin: Boolean = false): CatalogProduct? {
         val visibility = if (admin) "v.sku=?" else "v.sku=? AND p.status='ACTIVE' AND v.active"
         val row = jdbc.query("SELECT p.id,p.name,p.description,b.name brand,c.name category,p.base_price,p.status FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE $visibility", { rs, _ -> mapOf("id" to rs.getLong("id"), "name" to rs.getString("name"), "description" to (rs.getString("description") ?: ""), "brand" to (rs.getString("brand") ?: ""), "category" to (rs.getString("category") ?: ""), "base" to rs.getBigDecimal("base_price"), "status" to rs.getString("status")) }, sku).firstOrNull() ?: return null
-        val variants = jdbc.query("SELECT v.id,v.sku,v.label,v.active,COALESCE(i.available_quantity,0) available FROM product_variants v LEFT JOIN inventory_balances i ON i.variant_id=v.id JOIN products p ON p.id=v.product_id WHERE p.id=? ${if (admin) "" else "AND v.active"} ORDER BY v.id", { rs, _ -> mapOf("id" to rs.getLong("id").toString(), "sku" to rs.getString("sku"), "name" to rs.getString("label"), "availableQuantity" to rs.getInt("available")) }, row["id"] as Long)
+        val variants = jdbc.query("SELECT v.id,v.sku,v.label,v.active,CASE WHEN ? THEN COALESCE(i.available_quantity,0) ELSE GREATEST(0,COALESCE(i.available_quantity,0)-COALESCE(i.safety_stock,0)) END available FROM product_variants v LEFT JOIN inventory_balances i ON i.variant_id=v.id JOIN products p ON p.id=v.product_id WHERE p.id=? ${if (admin) "" else "AND v.active"} ORDER BY v.id", { rs, _ -> mapOf("id" to rs.getLong("id").toString(), "sku" to rs.getString("sku"), "name" to rs.getString("label"), "availableQuantity" to rs.getInt("available")) }, admin, row["id"] as Long)
         val images = jdbc.query("SELECT url FROM product_images WHERE product_id=? ORDER BY sort_order,id", { rs, _ -> rs.getString("url") }, row["id"] as Long); val base = row["base"] as BigDecimal
         return CatalogProduct(sku, row["name"] as String, row["description"] as String, row["brand"] as String, row["category"] as String, images, variants, mapOf("base" to base, "desired" to null, "observed" to null, "effective" to base, "priceVersion" to "catalog-${row["id"]}"), null, row["status"] == "ACTIVE")
     }
@@ -52,11 +54,24 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         }
         jdbc.update("DELETE FROM product_images WHERE product_id=?", productId)
         images.filter { it.startsWith("https://") }.forEachIndexed { index, url -> jdbc.update("INSERT INTO product_images(product_id,url,sort_order,is_primary) VALUES (?,?,?,?)", productId, url, index, index == 0) }
-        val qty = variants.firstOrNull()?.get("availableQuantity")?.let { number(it)?.toInt() }
-        if (qty != null) jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity) VALUES (?,?) ON CONFLICT (variant_id) DO UPDATE SET available_quantity=excluded.available_quantity,updated_at=now()", variantId, qty)
-        variants.drop(1).forEach { extra ->
-            val extraSku = extra["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: return@forEach
-            jdbc.update("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,?) ON CONFLICT (sku) DO UPDATE SET label=excluded.label,active=excluded.active,updated_at=now()", productId, extraSku, extra["name"]?.toString() ?: extraSku, extra["active"] != false)
+        variants.forEachIndexed { index, variant ->
+            val variantSku = variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if (index == 0) sku else return@forEachIndexed
+            val (targetVariantId, createdVariant) = if (variantSku == sku) variantId to (existing == null) else {
+                val existingVariant = jdbc.query("SELECT id,product_id FROM product_variants WHERE sku=?", { rs, _ -> rs.getLong("id") to rs.getLong("product_id") }, variantSku).firstOrNull()
+                if (existingVariant != null && existingVariant.second != productId) throw CommerceValidation("CATALOG_VARIANT_SKU_ALREADY_BELONGS_TO_ANOTHER_PRODUCT")
+                if (existingVariant == null) {
+                    jdbc.queryForObject("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,?) RETURNING id", Long::class.java, productId, variantSku, variant["name"]?.toString() ?: variantSku, variant["active"] != false)!! to true
+                } else {
+                    jdbc.update("UPDATE product_variants SET label=?,active=?,updated_at=now() WHERE id=?", variant["name"]?.toString() ?: variantSku, variant["active"] != false, existingVariant.first)
+                    existingVariant.first to false
+                }
+            }
+            val rawQuantity = variant["availableQuantity"]
+            if (rawQuantity != null) {
+                val quantity = number(rawQuantity)?.intValueExact() ?: throw CommerceValidation("CATALOG_AVAILABLE_QUANTITY_INVALID")
+                val reason = variant["stockAdjustmentReason"]?.toString() ?: if (createdVariant) "INITIAL_CATALOG_STOCK" else null
+                inventory.setAvailableQuantity(targetVariantId, quantity, "USER:$actor", reason)
+            }
         }
         audit(actor, "CATALOG_PRODUCT_SAVED", "products", sku)
         return product(sku, admin = true)!!

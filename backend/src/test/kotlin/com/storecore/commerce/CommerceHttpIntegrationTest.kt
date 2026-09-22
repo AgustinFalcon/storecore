@@ -86,6 +86,10 @@ class CommerceHttpIntegrationTest(
         assertTrue(conflict.statusCode.value() == 400 || conflict.statusCode.value() == 409, conflict.body)
         assertTrue(conflict.body!!.contains("CHECKOUT_IDEMPOTENCY_CONFLICT") || conflict.body!!.contains("UNSUPPORTED_CURRENCY"))
         customer = customer.copy(csrf = conflict.headers.getFirst("X-CSRF-Token") ?: customer.csrf)
+        customer = addAddress(customer)
+        val changedAddress = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(409, changedAddress.statusCode.value())
+        assertTrue(changedAddress.body!!.contains("CHECKOUT_IDEMPOTENCY_CONFLICT"))
         val addedAgain = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
         customer = customer.copy(csrf = addedAgain.headers.getFirst("X-CSRF-Token")!!)
         val hashConflict = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
@@ -119,6 +123,10 @@ class CommerceHttpIntegrationTest(
         assertEquals(200, replay.statusCode.value())
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-88'", Int::class.java))
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-88')", Int::class.java))
+        val oversized = exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-big", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-big"},"pad":"${"x".repeat(20_000)}"}""")
+        assertEquals(400, oversized.statusCode.value())
+        assertTrue(oversized.body!!.contains("WEBHOOK_PAYLOAD_TOO_LARGE"))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-big'", Int::class.java))
     }
 
     @Test
@@ -130,6 +138,7 @@ class CommerceHttpIntegrationTest(
         val promo = """{"listingSku":"$sku","currency":"ARS","validFrom":"$from","validTo":"$to","priority":10,"margin":15,"approvedBy":"${adminUserId()}","approvedAt":"${Instant.now()}","writer":"MANUAL"}"""
         val created = exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie, admin.csrf)
         assertEquals(200, created.statusCode.value())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM offers WHERE name=?", Int::class.java, "manual-$sku"))
         admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
         val overlap = exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie, admin.csrf)
         assertEquals(409, overlap.statusCode.value())
@@ -140,6 +149,8 @@ class CommerceHttpIntegrationTest(
         customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
         val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
         val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
+        val skipped = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"DELIVERED","tracking":null}""", admin.cookie, admin.csrf)
+        assertEquals(400, skipped.statusCode.value())
         val packed = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"PACKED","tracking":null}""", admin.cookie, admin.csrf)
         assertEquals(200, packed.statusCode.value())
         assertTrue(packed.body!!.contains("PREPARING"))
@@ -150,19 +161,23 @@ class CommerceHttpIntegrationTest(
         val delivered = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"DELIVERED","tracking":"TRK-1"}""", admin.cookie, admin.csrf)
         assertTrue(delivered.body!!.contains("DELIVERED"))
         admin = admin.copy(csrf = delivered.headers.getFirst("X-CSRF-Token")!!)
+        val regressed = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"PACKED","tracking":null}""", admin.cookie, admin.csrf)
+        assertEquals(400, regressed.statusCode.value())
         val early = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"ADJUSTED"}""", admin.cookie, admin.csrf)
         assertEquals(400, early.statusCode.value())
         admin = admin.copy(csrf = early.headers.getFirst("X-CSRF-Token") ?: admin.csrf)
         val received = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"RECEIVED"}""", admin.cookie, admin.csrf)
         assertEquals(200, received.statusCode.value())
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=? AND ri.adjustment_ledger_id IS NOT NULL", Int::class.java, orderId.toLong()))
         admin = admin.copy(csrf = received.headers.getFirst("X-CSRF-Token")!!)
         val inspected = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"INSPECTED"}""", admin.cookie, admin.csrf)
         admin = admin.copy(csrf = inspected.headers.getFirst("X-CSRF-Token")!!)
         val adjusted = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"ADJUSTED"}""", admin.cookie, admin.csrf)
         assertEquals(200, adjusted.statusCode.value())
         assertTrue(adjusted.body!!.contains("CLOSED") || jdbc.queryForObject("SELECT status FROM returns WHERE order_id=?", String::class.java, orderId.toLong()) == "CLOSED")
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=? AND ri.adjustment_ledger_id IS NOT NULL", Int::class.java, orderId.toLong()))
     }
 
     @Test
@@ -226,7 +241,7 @@ class CommerceHttpIntegrationTest(
         URI("http://localhost:$port$path"), method,
         HttpEntity(body, HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
-            set(HttpHeaders.ORIGIN, "http://localhost:$port")
+            set(HttpHeaders.ORIGIN, "http://localhost:4200")
             cookie?.let { set(HttpHeaders.COOKIE, it) }
             csrf?.let { set("X-CSRF-Token", it) }
         }), String::class.java,

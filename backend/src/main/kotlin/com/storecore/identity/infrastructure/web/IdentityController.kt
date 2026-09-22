@@ -74,7 +74,7 @@ class IdentityController(
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.updateCustomerProfile(principal, request.email, request.firstName, request.lastName, request.phone) }
         val profile = mutation.value
-        return ResponseEntity.ok().header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(CustomerProfileView(profile.id, profile.email, profile.firstName, profile.lastName, profile.phone)))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(CustomerProfileView(profile.id, profile.email, profile.firstName, profile.lastName, profile.phone)))
     }
 
     @GetMapping("/customer/me/addresses")
@@ -88,7 +88,7 @@ class IdentityController(
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.addCustomerAddress(principal, request.street, request.number, request.city, request.province, request.postalCode, request.isDefault) }
         val address = mutation.value
-        return ResponseEntity.ok().header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
     }
 
     @PutMapping("/customer/me/addresses/{addressId}")
@@ -97,15 +97,15 @@ class IdentityController(
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.updateCustomerAddress(principal, addressId, request.street, request.number, request.city, request.province, request.postalCode, request.isDefault) }
         val address = mutation.value
-        return ResponseEntity.ok().header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
     }
 
     @DeleteMapping("/customer/me/addresses/{addressId}")
-    fun deleteAddress(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable addressId: Long): ResponseEntity<Void> {
+    fun deleteAddress(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable addressId: Long): ResponseEntity<BaseResponse<Unit>> {
         auth.requireSameOrigin(http)
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.deleteCustomerAddress(principal, addressId) }
-        return ResponseEntity.noContent().header(CSRF_HEADER, mutation.nextCsrf).build()
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(Unit))
     }
 
     @PostMapping("/internal/admin/sessions/{sessionId}/revoke")
@@ -113,7 +113,7 @@ class IdentityController(
         auth.requireSameOrigin(http)
         val principal = auth.admin(http)
         val mutation = mutations.execute(principal, csrf) { identity.revokeAsAdmin(principal, sessionId, request.reason, request.correlationId) }
-        return ResponseEntity.ok().header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(Unit))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(Unit))
     }
 
     private fun csrfResponse(principal: com.storecore.identity.domain.AuthenticatedPrincipal): ResponseEntity<BaseResponse<Unit>> =
@@ -122,7 +122,7 @@ class IdentityController(
     private fun logout(http: HttpServletRequest, csrf: String, realm: IdentityRealm): ResponseEntity<Void> {
         auth.requireSameOrigin(http)
         auth.logoutCandidate(http, realm)?.let { mutations.logout(it, csrf) }
-        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, expiredCookie(realm).toString()).build()
+        return ResponseEntity.noContent().cacheControl(org.springframework.http.CacheControl.noStore()).header(HttpHeaders.SET_COOKIE, expiredCookie(realm).toString()).build()
     }
 
     private fun issuedResponse(issued: com.storecore.identity.domain.IssuedCredentials, status: HttpStatus, explicitCustomer: CustomerView? = null): ResponseEntity<BaseResponse<PrincipalView>> {

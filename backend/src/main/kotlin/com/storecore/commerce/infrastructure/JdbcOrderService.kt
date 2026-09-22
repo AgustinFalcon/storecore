@@ -33,6 +33,8 @@ class JdbcOrderService(
                 jdbc.queryForObject("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING') RETURNING id", Long::class.java, orderId)?.let { mapOf("id" to it, "status" to "PENDING", "tracking" to null, "shipped" to null) }
             } ?: throw ResourceNotFound()
         val mapped = when (status) { "PACKED" -> "PREPARING"; "SHIPPED" -> "SHIPPED"; "DELIVERED" -> "DELIVERED"; else -> throw FulfillmentRejected() }
+        val expected = when (mapped) { "PREPARING" -> "PENDING"; "SHIPPED" -> "PREPARING"; else -> "SHIPPED" }
+        if (shipment["status"] != expected) throw FulfillmentRejected()
         val now = Instant.now()
         val shippedAt = when (mapped) {
             "SHIPPED", "DELIVERED" -> shipment["shipped"] ?: java.sql.Timestamp.from(now)
@@ -70,7 +72,7 @@ class JdbcOrderService(
 
     private fun restock(returnId: Long, actor: Long) {
         jdbc.query("SELECT ri.id,ri.quantity,oi.variant_id FROM return_items ri JOIN order_items oi ON oi.id=ri.order_item_id WHERE ri.return_id=? AND ri.adjustment_ledger_id IS NULL", { rs, _ -> Triple(rs.getLong("id"), rs.getInt("quantity"), rs.getLong("variant_id")) }, returnId).forEach { (itemId, qty, variantId) ->
-            val ledgerId = inventory.adjust(variantId, qty, "USER:$actor")
+            val ledgerId = inventory.adjust(variantId, qty, "USER:$actor", "RMA_RESTOCK:$returnId")
             jdbc.update("UPDATE return_items SET adjustment_ledger_id=? WHERE id=?", ledgerId, itemId)
         }
     }

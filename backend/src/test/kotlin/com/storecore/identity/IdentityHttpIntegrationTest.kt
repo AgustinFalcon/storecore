@@ -53,18 +53,27 @@ class IdentityHttpIntegrationTest(
         assertEquals(200, address.statusCode.value())
         val nextCsrf = address.headers.getFirst("X-CSRF-Token")
         assertNotNull(nextCsrf)
+        assertEquals("no-store", address.headers.cacheControl)
 
         val replay = exchange("/api/v1/customer/me/addresses", HttpMethod.POST, """{"street":"Main","number":"2","city":"City","province":"Province","postalCode":"1000","isDefault":false}""", cookie.substringBefore(';'), csrf)
         assertEquals(403, replay.statusCode.value())
         val addresses = exchange("/api/v1/customer/me/addresses", HttpMethod.GET, null, cookie.substringBefore(';'))
         assertEquals(200, addresses.statusCode.value())
         assertEquals(true, addresses.body!!.contains("Main"))
+        val addressId = jdbc.queryForObject("SELECT a.id FROM customer_addresses a JOIN customers c ON c.id=a.customer_id WHERE c.email=?", Long::class.java, "person@example.com")!!
+        val deleted = exchange("/api/v1/customer/me/addresses/$addressId", HttpMethod.DELETE, null, cookie.substringBefore(59.toChar()), nextCsrf)
+        assertEquals(200, deleted.statusCode.value())
+        assertEquals("no-store", deleted.headers.cacheControl)
+        assertNotNull(deleted.body)
+        val afterDeleteCsrf = deleted.headers.getFirst("X-CSRF-Token")
+        assertNotNull(afterDeleteCsrf)
 
         val wrongRealm = exchange("/api/v1/internal/me", HttpMethod.GET, null, cookie.substringBefore(';'))
         assertEquals(401, wrongRealm.statusCode.value())
 
-        val logout = exchange("/api/v1/customer/auth/logout", HttpMethod.POST, null, cookie.substringBefore(';'), nextCsrf)
+        val logout = exchange("/api/v1/customer/auth/logout", HttpMethod.POST, null, cookie.substringBefore(';'), afterDeleteCsrf)
         assertEquals(204, logout.statusCode.value())
+        assertEquals("no-store", logout.headers.cacheControl)
         assertEquals(true, logout.headers.getFirst(HttpHeaders.SET_COOKIE)!!.contains("Max-Age=0"))
     }
 
@@ -176,17 +185,98 @@ class IdentityHttpIntegrationTest(
         assertNotNull(sessionId)
     }
 
+    @Test
+    fun expiredCsrfCanBeRenewedWhileSessionIsLive() {
+        val email = "csrf-expired-${System.nanoTime()}@example.com"
+        val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Csrf","lastName":"Expired"}""")
+        val cookie = registered.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(59.toChar())
+        val sessionId = jdbc.queryForObject("SELECT s.id FROM identity_sessions s JOIN customers c ON c.id=s.customer_id WHERE c.email=? ORDER BY s.issued_at DESC LIMIT 1", java.util.UUID::class.java, email)!!
+        jdbc.update("UPDATE identity_session_csrf_tokens SET retired_at=clock_timestamp() WHERE session_id=?::uuid AND retired_at IS NULL", sessionId)
+        val staleToken = "stale-csrf-${System.nanoTime()}"
+        val generation = jdbc.queryForObject("SELECT COALESCE(MAX(generation),0)+1 FROM identity_session_csrf_tokens WHERE session_id=?::uuid", Int::class.java, sessionId)!!
+        jdbc.update("INSERT INTO identity_session_csrf_tokens(session_id,token_hash,generation,issued_at,expires_at) VALUES(?::uuid,?,?,clock_timestamp()-interval '2 hours',clock_timestamp()-interval '1 hour')", sessionId, com.storecore.identity.infrastructure.security.OpaqueTokenFactory().sha256(staleToken), generation)
+        val renewed = exchange("/api/v1/customer/auth/csrf", HttpMethod.GET, null, cookie)
+        assertEquals(200, renewed.statusCode.value())
+        assertEquals("no-store", renewed.headers.cacheControl)
+        val freshToken = renewed.headers.getFirst("X-CSRF-Token")
+        assertNotNull(freshToken)
+        org.junit.jupiter.api.Assertions.assertNotEquals(staleToken, freshToken)
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM identity_session_csrf_tokens WHERE session_id=?::uuid AND retired_at IS NULL AND expires_at>clock_timestamp()", Int::class.java, sessionId))
+    }
+
+    @Test
+    fun requestHostIsNotAcceptedAsCsrfOriginFallback() {
+        val email = "origin-${System.nanoTime()}@example.com"
+        val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Origin","lastName":"Test"}""")
+        val cookie = registered.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(59.toChar())
+        val csrf = registered.headers.getFirst("X-CSRF-Token")!!
+        val forged = exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"changed@example.com","firstName":"Changed","lastName":"Test","phone":null}""", cookie, csrf, "http://localhost:$port")
+        assertEquals(403, forged.statusCode.value())
+        assertEquals(true, forged.body!!.contains("CSRF_INVALID"))
+    }
+
+    @Test
+    fun adminCanRemoveAndReplaceExpiredCapabilityKills() {
+        val email = "kill-admin-${System.nanoTime()}@example.com"
+        provisionAdmin(email)
+        val login = exchange("/api/v1/internal/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        val cookie = login.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';')
+        var csrf = login.headers.getFirst("X-CSRF-Token")!!
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='STOREFRONT'", Int::class.java)
+        val userId = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long::class.java, email)
+        jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, userId, "STOREFRONT", version, "ACTIVE", "{}", java.util.UUID.randomUUID(), "test")
+        val expires = java.time.Instant.now().plusSeconds(3600)
+        val created = exchange(
+            "/api/v1/user/capabilities/STOREFRONT/kills",
+            HttpMethod.POST,
+            """{"action":"SERVE","owner":"ops","reason":"freeze","expiresAt":"$expires","ticket":"TICKET-HTTP-1","correlationId":"11111111-1111-4111-8111-111111111111"}""",
+            cookie,
+            csrf,
+        )
+        assertEquals(200, created.statusCode.value(), created.body)
+        csrf = created.headers.getFirst("X-CSRF-Token")!!
+        val killId = Regex(""""id"\s*:\s*(\d+)""").find(created.body!!)!!.groupValues[1]
+        val replaced = exchange(
+            "/api/v1/user/capabilities/STOREFRONT/kills/$killId/replace",
+            HttpMethod.POST,
+            """{"action":"SERVE","owner":"ops-2","reason":"replace","expiresAt":"$expires","ticket":"TICKET-HTTP-2","correlationId":"22222222-2222-4222-8222-222222222222"}""",
+            cookie,
+            csrf,
+        )
+        assertEquals(200, replaced.statusCode.value(), replaced.body)
+        csrf = replaced.headers.getFirst("X-CSRF-Token")!!
+        val nextId = Regex(""""id"\s*:\s*(\d+)""").find(replaced.body!!)!!.groupValues[1]
+        val removed = exchange(
+            "/api/v1/user/capabilities/STOREFRONT/kills/$nextId/remove",
+            HttpMethod.POST,
+            """{"reason":"thaw","correlationId":"33333333-3333-4333-8333-333333333333"}""",
+            cookie,
+            csrf,
+        )
+        assertEquals(200, removed.statusCode.value(), removed.body)
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE module_code='STOREFRONT' AND action_code='SERVE' AND active", Int::class.java))
+    }
+
+    @Test
+    fun internalLoginWithoutRoleDoesNotIssueSessionCookie() {
+        val email = "no-role-${System.nanoTime()}@example.com"
+        jdbc.update("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'No','Role')", email, passwords.hash("a-very-long-password".toCharArray()))
+        val response = exchange("/api/v1/internal/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        assertEquals(401, response.statusCode.value())
+        assertEquals("no-store", response.headers.cacheControl)
+        assertEquals(null, response.headers.getFirst(HttpHeaders.SET_COOKIE))
+    }
     private fun provisionAdmin(email: String) {
         val hash = passwords.hash("a-very-long-password".toCharArray())
         val userId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, email, hash)
         jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code='ADMIN'", userId)
     }
 
-    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null) = http.exchange(
+    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null, origin: String = "http://localhost:4200") = http.exchange(
         URI("http://localhost:$port$path"), method,
         HttpEntity(body, HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
-            set(HttpHeaders.ORIGIN, "http://localhost:4200")
+            set(HttpHeaders.ORIGIN, origin)
             cookie?.let { set(HttpHeaders.COOKIE, it) }
             csrf?.let { set("X-CSRF-Token", it) }
         }), String::class.java,

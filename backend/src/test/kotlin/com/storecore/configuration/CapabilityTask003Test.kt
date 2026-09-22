@@ -7,7 +7,6 @@ import com.storecore.configuration.application.CapabilityConfigVersionConflict
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.application.CapabilityErrorState
 import com.storecore.configuration.application.CapabilityKillSwitchActive
-import com.storecore.configuration.application.CapabilityKillSwitchInvalid
 import com.storecore.configuration.application.CapabilityPaused
 import com.storecore.configuration.application.CapabilityReadOnly
 import com.storecore.configuration.domain.CapabilityActor
@@ -76,7 +75,7 @@ class CapabilityTask003Test {
         jdbc.update("UPDATE capability_kill_switches SET created_at=now()-interval '2 minutes', expires_at=now()-interval '1 minute' WHERE id=?", expired)
         jdbc.update("ALTER TABLE capability_kill_switches ENABLE TRIGGER trg_enforce_kill_switch_lifecycle")
         setState("PROFILE_CONTENT", CapabilityState.ACTIVE)
-        assertThrows(CapabilityKillSwitchInvalid::class.java) { capabilities.decide("PROFILE_CONTENT", "READ", CapabilityActor.Internal(admin())) }
+        capabilities.decide("PROFILE_CONTENT", "READ", CapabilityActor.Internal(admin()))
         assertThrows(CapabilityConfigInvalid::class.java) { capabilities.changeState(admin(), "FAVORITES", CapabilityState.ACTIVE, jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='FAVORITES'", Int::class.java), "nope", UUID.randomUUID()) }
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='FAVORITES'", String::class.java))
     }

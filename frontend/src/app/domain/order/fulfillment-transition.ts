@@ -2,7 +2,7 @@ import { RmaTransition, ShipmentTransition } from './order.entity';
 
 export function nextShipment(status: string): ShipmentTransition | null {
   switch (status) {
-    case 'PACKED':
+    case 'PREPARING':
       return 'SHIPPED';
     case 'SHIPPED':
       return 'DELIVERED';
@@ -15,11 +15,11 @@ export function nextShipment(status: string): ShipmentTransition | null {
 
 export function nextRma(status: string | null): RmaTransition | null {
   switch (status) {
-    case 'RECEIVED':
+    case 'RETURN_RECEIVED':
       return 'INSPECTED';
     case 'INSPECTED':
       return 'ADJUSTED';
-    case 'ADJUSTED':
+    case 'CLOSED':
       return null;
     default:
       return 'RECEIVED';

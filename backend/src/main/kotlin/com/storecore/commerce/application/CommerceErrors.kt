@@ -8,3 +8,5 @@ class CommerceValidation(code: String = "REQUEST_VALIDATION_FAILED") : CommerceE
 class InsufficientInventory : CommerceException("INSUFFICIENT_INVENTORY")
 class ProfileRejected(code: String = "PROFILE_REJECTED") : CommerceException(code)
 class FulfillmentRejected : CommerceException("FULFILLMENT_TRANSITION_REJECTED")
+class WebhookRateLimited(val retryAfterSeconds: Long) : CommerceException("WEBHOOK_RATE_LIMITED", retryable = true)
+class WebhookPayloadTooLarge : CommerceException("WEBHOOK_PAYLOAD_TOO_LARGE")
