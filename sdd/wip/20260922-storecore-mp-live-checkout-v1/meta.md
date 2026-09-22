@@ -15,7 +15,7 @@ El comprador saldrá de StoreCore hacia **Checkout Pro con redirección en la mi
 
 ## Gate
 
-La selección de producto está cerrada. Permanecen abiertos el mapeo verificable del webhook, la política comercial de reversos, el modelo físico/ADR y un GO específico de Sol para la integración. Las credenciales no bloquean código con doubles después de ese GO; sí bloquean sandbox/E2E. **Sólo MP-LIVE-02A** tiene GO de código aislado; no se conecta al checkout ni habilita pagos.
+La selección de producto y la propuesta de contrato MP-LIVE-02 están cerradas documentalmente (`ready_for_sol_review`). Falta Sol GO de código para MP-LIVE-03 y muestra sandbox de webhook. Las credenciales no bloquean doubles después de ese GO; sí MP-LIVE-05. **Sólo MP-LIVE-02A** tiene GO de código aislado.
 
 MP-LIVE-02A fue implementado y revisado con 10/10 tests focalizados; la suite general de 80 tests sigue roja por 3 fallos + 1 error de pricing/identidad no relacionados. Ver `sdd/reviews/20260922-sol-mp-live-02a-code-review.md`. El GO aislado no amplía el gate de integración.
 

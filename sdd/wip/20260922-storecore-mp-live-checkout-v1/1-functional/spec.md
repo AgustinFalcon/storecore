@@ -10,11 +10,11 @@ La venta StoreCore sólo cambia a pagada cuando el producto Mercado Pago aprobad
 
 V1 usa **Checkout Pro vía Orders API** con redirección en la misma ventana. El comprador ve «Pagar con Mercado Pago», sale al `checkout_url` provisto por Mercado Pago y vuelve a StoreCore por una URL de éxito, rechazo o pendiente (`auto_return=all`). Crédito y débito se eligen en Mercado Pago. No habrá formulario de tarjeta embebido en StoreCore; Checkout API/Bricks y Preferences API quedan fuera de v1. La vuelta sólo presenta el estado local o «Estamos confirmando tu pago»: no acredita una venta.
 
-## Decisiones todavía abiertas
+## Decisiones propuestas (MP-LIVE-02) y residual Sol
 
-- Forma/tópico real de webhook de Orders API y normalización de identidad, sujeto a evidencia simulada/sandbox por contradicción entre páginas oficiales.
-- Política comercial de reembolsos totales/parciales, contracargos y alertas de fraude: estados de orden, fulfillment, RMA, stock y revisión administrativa.
-- Política fiscal que eventualmente consume un evento comercial verificado; no forma parte de este checkout.
+- Webhook: validador oficial + IDs separados; `order`/`orders_v2` no son aliases hasta muestra sandbox. Ver `2-technical/webhook-identity-policy.md`.
+- Reversos/stock: `UNDER_REVIEW` sin restock/fiscal; `PAID_STOCK_REVIEW` si falta stock. Ver `2-technical/reversal-and-stock-policy.md`.
+- Fiscal: sigue fuera; consume sólo `VerifiedBusinessEvent` con gates D-01..D-07.
 
 Un pedido local admite **a lo sumo un intento de pago remoto activo**. Repetir el mismo checkout reutiliza el intento y la misma clave de idempotencia. No se abre otro intento mientras la creación o el estado del anterior sean ambiguos. Sólo se habilita uno nuevo tras verificar que el anterior terminó sin posibilidad de acreditación según contrato; si aparece una acreditación tardía o duplicada, se bloquean nuevos efectos comerciales, se registra el incidente para conciliación y un admin resuelve la devolución financiera según el procedimiento aprobado. La unicidad de la venta local no implica que dos cargos remotos se cancelen solos.
 
