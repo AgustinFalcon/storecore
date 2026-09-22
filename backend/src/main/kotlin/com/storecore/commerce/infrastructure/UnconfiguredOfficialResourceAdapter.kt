@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 
 /** Default: no live vendor call. CI and unconfigured installations leave inbox in RECEIVED. */
 @Component
-@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = ["storecore.integrations.official-resource-adapter"], havingValue = "unconfigured", matchIfMissing = true)
 class UnconfiguredOfficialResourceAdapter : OfficialResourceQueryPort {
     override fun configured(): Boolean = false
     override fun payment(providerEventId: String): OfficialPaymentResource? = null

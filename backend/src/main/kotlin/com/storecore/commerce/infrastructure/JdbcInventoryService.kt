@@ -2,6 +2,7 @@ package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.CommerceValidation
+import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.domain.InventoryRow
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
@@ -14,7 +15,7 @@ import java.util.UUID
 @Service
 @EnableScheduling
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate) {
+class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate) : InventoryConsumePort {
     fun list(): List<InventoryRow> = jdbc.query(
         """SELECT v.sku,b.available_quantity,b.reserved_quantity,b.safety_stock
            FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id ORDER BY v.sku""",
@@ -33,7 +34,7 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         }
     }!!
 
-    fun consumeSaga(saga: UUID, actor: String): Int = transactions.execute {
+    override fun consumeSaga(saga: UUID, actor: String): Int = transactions.execute {
         val rows = jdbc.query(
             "SELECT id,variant_id,quantity FROM inventory_reservations WHERE reservation_saga_key=? AND status='ACTIVE' FOR UPDATE",
             { rs, _ -> Triple(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity")) },
@@ -51,7 +52,7 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         rows.size
     } ?: 0
 
-    fun consumeChannelSale(
+    override fun consumeChannelSale(
         variantId: Long,
         quantity: Int,
         actor: String,

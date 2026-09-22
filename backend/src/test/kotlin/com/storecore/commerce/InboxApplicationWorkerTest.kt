@@ -31,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = ["storecore.installation-guard.enabled=false", "storecore.integrations.refetch-delay-ms=3600000"],
+    properties = ["storecore.installation-guard.enabled=false", "storecore.integrations.refetch-delay-ms=3600000", "storecore.integrations.official-resource-adapter=fake"],
 )
 @Import(InboxApplicationWorkerTest.FakeOfficialResources::class)
 class InboxApplicationWorkerTest(
@@ -69,8 +69,8 @@ class InboxApplicationWorkerTest(
         assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
         assertEquals("PAID", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
         assertEquals("CONSUMED", jdbc.queryForObject("SELECT status FROM inventory_reservations WHERE reservation_saga_key=(SELECT (checkout_snapshot->>'reservationSagaKey')::uuid FROM orders WHERE id=?)", String::class.java, orderId.toLong()))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_applications", Int::class.java))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM integration_outbox WHERE kind='PAYMENT_STATUS_APPLIED'", Int::class.java))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_applications WHERE payment_id=(SELECT id FROM payments WHERE order_id=?)", Int::class.java, orderId.toLong()))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM integration_outbox WHERE kind='PAYMENT_STATUS_APPLIED' AND source_inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-apply')", Int::class.java))
         assertEquals(0, worker.processPayments())
     }
 
@@ -99,6 +99,61 @@ class InboxApplicationWorkerTest(
         assertEquals(1, worker.processMercadoLibre())
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_sales WHERE external_order_id='900'", Int::class.java))
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='SALE' AND channel='MERCADO_LIBRE' AND external_order_id='900'", Int::class.java))
+    }
+
+    @Test
+    fun `non-terminal official payment stays received until approved`() {
+        val sku = "SKU-PEND-${UUID.randomUUID()}"
+        putProduct(sku, "Pending Item", available = 3)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
+        val reference = jdbc.queryForObject("SELECT external_reference FROM payments WHERE order_id=?", String::class.java, orderId.toLong())
+        FakeOfficialResources.payments["mp-pend"] = OfficialPaymentResource("mp-pend", reference, "pending")
+        exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-pend", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-pend"}}""")
+        assertEquals(0, worker.processPayments())
+        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-pend')", String::class.java))
+        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
+        assertEquals("PENDING_PAYMENT", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
+        FakeOfficialResources.payments["mp-pend"] = OfficialPaymentResource("mp-pend", reference, "approved")
+        assertEquals(1, worker.processPayments())
+        assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
+        assertEquals("PAID", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
+        assertEquals("PROCESSED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-pend')", String::class.java))
+    }
+
+    @Test
+    fun `ml inventory failure isolates the other inbox row`() {
+        val tight = "SKU-ML-TIGHT-${UUID.randomUUID()}"
+        val ok = "SKU-ML-OK-${UUID.randomUUID()}"
+        putProduct(tight, "Tight Item", available = 1)
+        putProduct(ok, "Ok Item", available = 4)
+        jdbc.update("INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state) VALUES ('ml-iso','MERCADO_LIBRE','ref:ml-iso','ACTIVE') ON CONFLICT (account_key) DO NOTHING")
+        val accountId = jdbc.queryForObject(
+            "SELECT id FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1",
+            Long::class.java,
+        )!!
+        jdbc.update(
+            """INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,state)
+               SELECT ?, 'MLA-TIGHT','VAR-T',v.id,'ACTIVE' FROM product_variants v WHERE v.sku=?""",
+            accountId, tight,
+        )
+        jdbc.update(
+            """INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,state)
+               SELECT ?, 'MLA-OK','VAR-O',v.id,'ACTIVE' FROM product_variants v WHERE v.sku=?""",
+            accountId, ok,
+        )
+        FakeOfficialResources.ml["orders_v2:/orders/901"] = OfficialMlResource("901", listOf(OfficialMlItem("MLA-TIGHT", "VAR-T", "901-1", 5, 0)))
+        FakeOfficialResources.ml["orders_v2:/orders/902"] = OfficialMlResource("902", listOf(OfficialMlItem("MLA-OK", "VAR-O", "902-1", 1, 2)))
+        exchange("/api/v1/integrations/mercadolibre/notifications?topic=orders_v2&resource=/orders/901", HttpMethod.POST, """{"id":"ml-901","topic":"orders_v2","resource":"/orders/901"}""")
+        exchange("/api/v1/integrations/mercadolibre/notifications?topic=orders_v2&resource=/orders/902", HttpMethod.POST, """{"id":"ml-902","topic":"orders_v2","resource":"/orders/902"}""")
+        assertEquals(1, worker.processMercadoLibre())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_sales WHERE external_order_id='901'", Int::class.java))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_sales WHERE external_order_id='902'", Int::class.java))
+        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM ml_notification_processing WHERE inbox_id=(SELECT id FROM ml_notification_inbox WHERE resource='/orders/901')", String::class.java))
+        assertEquals("PROCESSED", jdbc.queryForObject("SELECT status FROM ml_notification_processing WHERE inbox_id=(SELECT id FROM ml_notification_inbox WHERE resource='/orders/902')", String::class.java))
     }
 
     private fun putProduct(sku: String, name: String, available: Int) {
