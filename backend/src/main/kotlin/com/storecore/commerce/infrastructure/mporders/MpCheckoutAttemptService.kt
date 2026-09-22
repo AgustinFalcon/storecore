@@ -35,6 +35,19 @@ class MpCheckoutAttemptService(
     private val properties: MpOrdersProperties,
     private val mapper: ObjectMapper,
 ) {
+    fun startForLocalOrder(orderId: Long): String? {
+        val existing = jdbc.query(
+            "SELECT checkout_url FROM mp_checkout_attempts WHERE order_id=? AND checkout_url IS NOT NULL AND state IN ('READY_FOR_REDIRECT','AWAITING_RESULT') ORDER BY attempt_no DESC LIMIT 1",
+            { rs, _ -> rs.getString(1) },
+            orderId,
+        ).firstOrNull()
+        if (existing != null && properties.allowlistedCheckoutUrl(existing)) return existing
+        val attemptId = prepare(orderId, UUID.randomUUID())
+        val bound = postAndBind(attemptId)
+        val url = bound["checkoutUrl"] as? String
+        return url?.takeIf { properties.allowlistedCheckoutUrl(it) }
+    }
+
     fun prepare(orderId: Long, idempotencyKey: UUID): Long {
         if (!commands.configured() && properties.adapter != "fake") throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
         return transactions.execute {

@@ -1,4 +1,4 @@
-import { mapCart, mapCustomerSession, mapProductDetail } from './http-mappers';
+import { mapCart, mapCustomerSession, mapProductDetail, mapReceipt } from './http-mappers';
 
 describe('http-mappers', () => {
   it('maps a customer session without a token', () => {
@@ -22,5 +22,22 @@ describe('http-mappers', () => {
 
   it('maps a cart with no lines as empty', () => {
     expect(mapCart({})).toEqual({ lines: [], currency: '' });
+  });
+
+  it('maps an optional allowlisted checkout url without treating it as payment proof', () => {
+    expect(
+      mapReceipt({
+        orderId: '9',
+        paymentStatus: 'PENDING',
+        orderStatus: 'PENDING_PAYMENT',
+        checkoutUrl: 'https://www.mercadopago.com.ar/checkout/ORD-1',
+      }),
+    ).toEqual({
+      orderId: '9',
+      paymentStatus: 'PENDING',
+      orderStatus: 'PENDING_PAYMENT',
+      checkoutUrl: 'https://www.mercadopago.com.ar/checkout/ORD-1',
+    });
+    expect(mapReceipt({ orderId: '9', paymentStatus: 'PENDING', orderStatus: 'PENDING_PAYMENT' }).checkoutUrl).toBeNull();
   });
 });

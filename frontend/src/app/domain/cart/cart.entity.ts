@@ -24,4 +24,5 @@ export interface CheckoutReceipt {
   readonly orderId: string;
   readonly paymentStatus: string;
   readonly orderStatus: string;
+  readonly checkoutUrl?: string | null;
 }

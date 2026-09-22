@@ -14,9 +14,13 @@ import com.storecore.commerce.domain.RemoteOrderCandidate
 import com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService
 import com.storecore.commerce.infrastructure.mporders.MpOrderApplicationWorker
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -158,6 +162,68 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals("RECOVERY_REQUIRED", multi["state"])
     }
 
+    @Test
+    fun `customer checkout returns allowlisted remote url`() {
+        val sku = "SKU-URL-${UUID.randomUUID()}"
+        val providerOrderId = "ORD-URL-${UUID.randomUUID()}"
+        val checkoutUrl = "https://www.mercadopago.com.ar/checkout/$providerOrderId"
+        Fakes.createResult.set(CreationObservation.VerifiedSuccess(providerOrderId, checkoutUrl))
+        putProduct(sku, "Paid Item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        assertTrue(checkout.body!!.contains(checkoutUrl), checkout.body)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
+        assertEquals("READY_FOR_REDIRECT", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
+        assertEquals(providerOrderId, jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
+    }
+
+    @Test
+    fun `refetched official order id different from claimed query is quarantined`() {
+        val orderId = checkout("SKU-MIS-${UUID.randomUUID()}")
+        val claimed = "ORD-CLAIM-${UUID.randomUUID()}"
+        bindRemote(orderId, claimed)
+        val official = Fakes.orders.getValue(claimed)
+        Fakes.orders[claimed] = official.copy(providerOrderId = "ORD-OTHER-${UUID.randomUUID()}")
+        notify(claimed, "evt-mis", "req-mis")
+        assertEquals(0, worker.process())
+        assertEquals("QUARANTINED", jdbc.queryForObject("SELECT status FROM mp_order_notification_processing p JOIN mp_order_notification_inbox i ON i.id=p.inbox_id WHERE i.query_data_id=?", String::class.java, claimed))
+        assertEquals("REFETCHED_ORDER_ID_MISMATCH", jdbc.queryForObject("SELECT last_error FROM mp_order_notification_processing p JOIN mp_order_notification_inbox i ON i.id=p.inbox_id WHERE i.query_data_id=?", String::class.java, claimed))
+        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mp_order_commercial_applications WHERE order_id=?", Int::class.java, orderId))
+    }
+
+    @Test
+    fun `two remotes and concurrent workers accredit once and record duplicate`() {
+        val orderId = checkout("SKU-DUP-${UUID.randomUUID()}")
+        val first = "ORD-DUP-A-${UUID.randomUUID()}"
+        val second = "ORD-DUP-B-${UUID.randomUUID()}"
+        bindRemote(orderId, first)
+        jdbc.update("UPDATE mp_checkout_attempts SET state='SUPERSEDED' WHERE order_id=?", orderId)
+        bindRemote(orderId, second)
+        assertNotEquals(first, second)
+        notify(first, "evt-dup-a", "req-dup-a")
+        notify(second, "evt-dup-b", "req-dup-b")
+        val start = CountDownLatch(1)
+        val done = CountDownLatch(2)
+        val pool = Executors.newFixedThreadPool(2)
+        repeat(2) {
+            pool.submit {
+                start.await()
+                runCatching { worker.process() }
+                done.countDown()
+            }
+        }
+        start.countDown()
+        assertTrue(done.await(20, TimeUnit.SECONDS))
+        pool.shutdownNow()
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mp_order_commercial_applications WHERE order_id=? AND transition='PAYMENT_ACCREDITED'", Int::class.java, orderId))
+        assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mp_order_incidents WHERE order_id=? AND kind='DUPLICATE_REMOTE_CREDIT'", Int::class.java, orderId))
+    }
+
     private fun checkout(sku: String): Long {
         putProduct(sku, "Paid Item", available = 5)
         customer = addAddress(customer)
@@ -176,18 +242,21 @@ class MpOrdersCheckoutIntegrationTest(
     ) {
         val amount = jdbc.queryForObject("SELECT total FROM orders WHERE id=?", BigDecimal::class.java, orderId)!!
         val paidAmount = paid ?: amount
-        val reference = jdbc.query(
-            "SELECT external_reference FROM mp_checkout_attempts WHERE order_id=?",
-            { rs, _ -> rs.getString(1) },
+        val existing = jdbc.query(
+            "SELECT id,external_reference,provider_order_id FROM mp_checkout_attempts WHERE order_id=? ORDER BY attempt_no DESC LIMIT 1",
+            { rs, _ -> Triple(rs.getLong(1), rs.getString(2), rs.getString(3)) },
             orderId,
-        ).firstOrNull() ?: run {
+        ).firstOrNull()
+        val reference = if (existing == null || existing.third.isNullOrBlank() || existing.third != providerOrderId) {
             Fakes.createResult.set(
                 CreationObservation.VerifiedSuccess(providerOrderId, "https://www.mercadopago.com.ar/checkout/$providerOrderId"),
             )
-            val attemptId = attempts.prepare(orderId, UUID.randomUUID())
+            val attemptId = if (existing != null && existing.third.isNullOrBlank()) existing.first else attempts.prepare(orderId, UUID.randomUUID())
             val bound = attempts.postAndBind(attemptId)
             assertEquals("READY_FOR_REDIRECT", bound["state"], bound.toString())
             jdbc.queryForObject("SELECT external_reference FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId)!!
+        } else {
+            existing.second
         }
         Fakes.orders[providerOrderId] = OfficialOrderResource(
             providerOrderId = providerOrderId,

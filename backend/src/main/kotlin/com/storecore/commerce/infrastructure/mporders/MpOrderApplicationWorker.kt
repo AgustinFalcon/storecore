@@ -9,6 +9,7 @@ import com.storecore.commerce.domain.OfficialOrderResource
 import com.storecore.commerce.domain.OfficialOrderStatusInput
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -61,7 +62,11 @@ class MpOrderApplicationWorker(
                 retry(inboxId, "OFFICIAL_ORDER_NOT_FOUND")
                 return@count false
             }
-            runCatching { transactions.execute { apply(inboxId, official) } ?: false }
+            if (official.providerOrderId != queryDataId) {
+                quarantine(inboxId, "REFETCHED_ORDER_ID_MISMATCH")
+                return@count false
+            }
+            runCatching { transactions.execute { apply(inboxId, queryDataId, official) } ?: false }
                 .getOrElse { error ->
                     retry(inboxId, error.message ?: "ORDER_APPLY_FAILED")
                     false
@@ -69,9 +74,9 @@ class MpOrderApplicationWorker(
         }
     }
 
-    private fun apply(inboxId: Long, official: OfficialOrderResource): Boolean {
-        if (official.providerOrderId != official.providerOrderId.trim() || official.providerOrderId.isBlank()) {
-            retry(inboxId, "PROVIDER_ORDER_ID_BLANK")
+    private fun apply(inboxId: Long, claimedQueryDataId: String, official: OfficialOrderResource): Boolean {
+        if (official.providerOrderId.isBlank() || official.providerOrderId != claimedQueryDataId) {
+            quarantine(inboxId, "REFETCHED_ORDER_ID_MISMATCH")
             return false
         }
         val attempt = jdbc.query(
@@ -119,6 +124,7 @@ class MpOrderApplicationWorker(
     }
 
     private fun accredit(inboxId: Long, attempt: AttemptRow, official: OfficialOrderResource): Boolean {
+        jdbc.query("SELECT id FROM orders WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, attempt.orderId)
         val already = jdbc.query(
             "SELECT 1 FROM mp_order_commercial_applications WHERE order_id=? AND transition='PAYMENT_ACCREDITED'",
             { _, _ -> 1 },
@@ -155,16 +161,38 @@ class MpOrderApplicationWorker(
                 mapper.createObjectNode().put("providerOrderId", official.providerOrderId).toString(),
             )
         }
-        val applicationId = jdbc.queryForObject(
-            """INSERT INTO mp_order_commercial_applications(
-                 inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency
-               ) VALUES (?,?,?,?,'PAYMENT_ACCREDITED',?,'ARS') RETURNING id""",
-            Long::class.java,
-            inboxId, attempt.id, attempt.orderId, official.providerOrderId, official.paidAmount,
-        )!!
-        if (stock) emitVerified(applicationId, official, "PAYMENT_ACCREDITED")
+        val applicationId = try {
+            jdbc.queryForObject(
+                """INSERT INTO mp_order_commercial_applications(
+                     inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency
+                   ) VALUES (?,?,?,?,'PAYMENT_ACCREDITED',?,'ARS') RETURNING id""",
+                Long::class.java,
+                inboxId, attempt.id, attempt.orderId, official.providerOrderId, official.paidAmount,
+            )
+        } catch (_: DataIntegrityViolationException) {
+            recordDuplicate(attempt, official)
+            markProcessed(inboxId)
+            return true
+        }
+        if (applicationId != null && stock) emitVerified(applicationId, official, "PAYMENT_ACCREDITED")
         markProcessed(inboxId)
         return true
+    }
+
+    private fun recordDuplicate(attempt: AttemptRow, official: OfficialOrderResource) {
+        val exists = jdbc.query(
+            "SELECT 1 FROM mp_order_incidents WHERE order_id=? AND kind='DUPLICATE_REMOTE_CREDIT' AND evidence_redacted->>'providerOrderId'=?",
+            { _, _ -> 1 },
+            attempt.orderId, official.providerOrderId,
+        ).isNotEmpty()
+        if (!exists) {
+            jdbc.update(
+                """INSERT INTO mp_order_incidents(attempt_id,order_id,kind,review_status,evidence_redacted)
+                   VALUES (?,?,'DUPLICATE_REMOTE_CREDIT','OPEN',?::jsonb)""",
+                attempt.id, attempt.orderId,
+                mapper.createObjectNode().put("providerOrderId", official.providerOrderId).toString(),
+            )
+        }
     }
 
     private fun consumeOrReview(orderId: Long): Boolean {

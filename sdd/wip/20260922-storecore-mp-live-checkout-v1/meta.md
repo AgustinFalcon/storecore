@@ -15,7 +15,7 @@ El comprador saldrá de StoreCore hacia **Checkout Pro con redirección en la mi
 
 ## Gate
 
-MP-LIVE-02 aprobado. MP-LIVE-03/04 tienen CONDITIONAL_GO de código (`sdd/reviews/20260922-sol-mp-live-03-go.md`) e implementación fail-closed. Falta review Sol del código y MP-LIVE-05.
+MP-LIVE-02 aprobado. MP-LIVE-03/04 tienen CONDITIONAL_GO de código (`sdd/reviews/20260922-sol-mp-live-03-go.md`) e implementación fail-closed con correcciones de `20260922-sol-mp-live-03-code-review.md`. Falta re-review Sol del código y MP-LIVE-05.
 
 La revisión de código de MP-LIVE-02A permanece válida para la política pura. MP-LIVE-05 y la activación siguen NO-GO. Ver `sdd/reviews/20260922-sol-mp-live-03-go.md`.
 

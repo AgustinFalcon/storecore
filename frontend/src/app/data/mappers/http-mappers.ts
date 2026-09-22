@@ -188,6 +188,7 @@ export function mapReceipt(value: unknown): CheckoutReceipt {
     orderId: text(row['orderId']),
     paymentStatus: text(row['paymentStatus']),
     orderStatus: text(row['orderStatus']),
+    checkoutUrl: text(row['checkoutUrl']) || null,
   };
 }
 

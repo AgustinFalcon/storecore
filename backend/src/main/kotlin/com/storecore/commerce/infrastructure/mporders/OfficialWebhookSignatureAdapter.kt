@@ -11,12 +11,17 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty(name = ["storecore.integrations.mp-orders.adapter"], havingValue = "official")
 class OfficialWebhookSignatureAdapter(
     private val properties: MpOrdersProperties,
+    private val secrets: InstallationSecretLookup,
 ) : OfficialWebhookSignaturePort {
-    override fun configured(): Boolean = properties.signatureReady()
+    override fun configured(): Boolean =
+        properties.adapter == "official" &&
+            properties.identityReady() &&
+            properties.webhookSecretRef.isNotBlank() &&
+            secrets.read(properties.webhookSecretRef) != null
 
     override fun validate(xSignature: String?, xRequestId: String?, queryDataId: String?): WebhookSignatureDecision {
         if (!configured()) return WebhookSignatureDecision.Rejected("UNCONFIGURED")
-        val secret = properties.resolveWebhookSecret() ?: return WebhookSignatureDecision.Rejected("SECRET_UNRESOLVED")
+        val secret = secrets.read(properties.webhookSecretRef) ?: return WebhookSignatureDecision.Rejected("SECRET_UNRESOLVED")
         return try {
             WebhookSignatureValidator.validate(xSignature, xRequestId, queryDataId, secret)
             WebhookSignatureDecision.Accepted

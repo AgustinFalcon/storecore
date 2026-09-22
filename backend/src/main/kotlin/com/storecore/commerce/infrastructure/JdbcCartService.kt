@@ -6,10 +6,12 @@ import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.domain.CartLineView
 import com.storecore.commerce.domain.CartView
 import com.storecore.commerce.domain.CheckoutReceipt
+import com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.application.ResourceNotFound
 import com.storecore.identity.domain.CustomerPrincipal
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -24,6 +26,7 @@ class JdbcCartService(
     private val mapper: ObjectMapper,
     private val inventory: JdbcInventoryService,
     private val capabilities: CapabilityDecisionPort,
+    private val mpAttempts: ObjectProvider<MpCheckoutAttemptService>,
 ) {
     fun read(customer: CustomerPrincipal): CartView = snapshot(ensureCart(customer.customerId))
 
@@ -46,7 +49,7 @@ class JdbcCartService(
             if (original.path("addressId").asLong() != addressId || original.path("currency").asText() != currency) throw CheckoutConflict()
             if (cart.lines.isNotEmpty() && existing.second != hash) throw CheckoutConflict()
             val replayed = jdbc.query("SELECT o.id,o.status,p.status payment FROM orders o LEFT JOIN payments p ON p.order_id=o.id WHERE o.checkout_claim_id=?", { rs, _ -> CheckoutReceipt(rs.getLong("id").toString(), rs.getString("payment") ?: "PENDING", rs.getString("status")) }, existing.first).firstOrNull()
-            if (replayed != null) return replayed
+            if (replayed != null) return withRemoteCheckout(replayed)
             throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
         val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
@@ -61,7 +64,7 @@ class JdbcCartService(
             val raced = jdbc.query("SELECT id,request_hash FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", { rs, _ -> rs.getLong("id") to rs.getString("request_hash") }, customer.customerId, idempotencyKey).firstOrNull() ?: throw CheckoutConflict()
             if (raced.second != hash) throw CheckoutConflict()
             val replayed = jdbc.query("SELECT o.id,o.status,p.status payment FROM orders o LEFT JOIN payments p ON p.order_id=o.id WHERE o.checkout_claim_id=?", { rs, _ -> CheckoutReceipt(rs.getLong("id").toString(), rs.getString("payment") ?: "PENDING", rs.getString("status")) }, raced.first).firstOrNull()
-            return replayed ?: throw CheckoutConflict()
+            return replayed?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
         }
         cart.lines.forEach { line ->
             val variantId = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, line.sku)!!
@@ -80,7 +83,13 @@ class JdbcCartService(
         jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING')", orderId)
         jdbc.update("UPDATE checkout_idempotency_claims SET state='COMPLETED',updated_at=now() WHERE id=?", claimId)
         jdbc.update("DELETE FROM cart_items WHERE cart_id=?", ensureCart(customer.customerId))
-        return CheckoutReceipt(orderId.toString(), "PENDING", "PENDING_PAYMENT")
+        return withRemoteCheckout(CheckoutReceipt(orderId.toString(), "PENDING", "PENDING_PAYMENT"))
+    }
+
+    private fun withRemoteCheckout(receipt: CheckoutReceipt): CheckoutReceipt {
+        val starter = mpAttempts.ifAvailable ?: return receipt
+        val url = runCatching { starter.startForLocalOrder(receipt.orderId.toLong()) }.getOrNull()
+        return if (url.isNullOrBlank()) receipt else receipt.copy(checkoutUrl = url)
     }
 
     private fun ensureCart(customerId: Long): Long = jdbc.queryForObject("INSERT INTO carts(customer_id,session_id,expires_at) VALUES (?,? ,now()+interval '7 days') ON CONFLICT (session_id) DO UPDATE SET updated_at=now(),expires_at=now()+interval '7 days' RETURNING id", Long::class.java, customerId, "customer-$customerId")!!
