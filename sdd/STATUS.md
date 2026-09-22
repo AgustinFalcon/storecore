@@ -1,0 +1,33 @@
+# Estado canónico del SDD — StoreCore
+
+**Validado:** 2026-09-22  
+**Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
+**Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
+**Git:** feature branch + finish en el PR. No tag, deploy o publish.
+
+## Residuales honestos
+
+- TASK-008/014: inbox persist-before-ACK done. Live ML refetch/canonical sale is **TODO-041**.
+- TASK-013: Playwright/axe/Stitch not automated.
+- TODO-003: fleet runbook draft at `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
+
+## Precedencia
+
+1. Feature archivado: `sdd/features/20260921-single-tenant-installation-baseline/`.
+2. `sdd/PROJECT.md`, `sdd/PATTERNS.md`, `sdd/TRACEABILITY.md`, `sdd/RELEASE.md`.
+3. `docs/agent/` es espejo; Company Brain canónico vive en `Novastra/company brain`.
+4. `20260819-store-tenancy-and-profiles` y `sdd/specs/*` son históricos/superseded.
+
+## Gate actual
+
+Siguiente carril: **frontend UX** (`docs/agent/frontend/ux-handoff.md`). DS-00 y P-01 están en código; P-02…U-10 pendientes. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production, deploy ni Mercado Pago en el browser.
+
+## WIP POS (paralelo, no es el baseline)
+
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado.
+- `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
+- `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
+
+## Fiscal externo
+
+- `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Sin código, DDL, worker ni secretos.

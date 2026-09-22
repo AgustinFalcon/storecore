@@ -1,0 +1,223 @@
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 3;
+  padding: 0.5rem 0.75rem;
+  background: var(--sc-color-ink);
+  color: var(--sc-color-surface);
+}
+
+.skip-link:focus {
+  top: 0.75rem;
+}
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sc-color-canvas);
+}
+
+.chrome {
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 40rem) auto;
+  align-items: center;
+  gap: var(--sc-space-5);
+  min-height: 4rem;
+  padding: 0.75rem var(--sc-space-6);
+  background: var(--sc-color-theme);
+  color: var(--sc-color-theme-ink);
+}
+
+.chrome--console {
+  grid-template-columns: auto 1fr auto auto;
+}
+
+.chrome__brand {
+  margin: 0;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+  font-size: 1.25rem;
+}
+
+.chrome__brand span {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.chrome__hint,
+.chrome__text {
+  margin: 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: var(--sc-text-sm);
+  opacity: 0.78;
+}
+
+.chrome__search {
+  display: flex;
+  min-width: 0;
+  height: 2.75rem;
+  background: var(--sc-color-surface);
+  border-radius: 2rem;
+  overflow: hidden;
+}
+
+.chrome__search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.chrome__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  padding: 0 1rem;
+  font: inherit;
+  color: var(--sc-color-ink);
+  background: transparent;
+}
+
+.chrome__lupa {
+  width: 2.75rem;
+  border: 0;
+  background: var(--sc-color-accent);
+  color: var(--sc-color-accent-ink);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.chrome__lupa svg,
+.chrome__icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.chrome__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chrome__icon,
+.chrome__account {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  color: inherit;
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.chrome__account {
+  padding: 0 0.7rem;
+  font-size: var(--sc-text-sm);
+  font-weight: 650;
+}
+
+.chrome__badge {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--sc-color-danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.05rem;
+  text-align: center;
+}
+
+.chrome__cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  padding: 0.55rem var(--sc-space-6);
+  background: var(--sc-color-surface);
+  border-bottom: 1px solid var(--sc-color-line);
+}
+
+.chrome__cats a {
+  color: var(--sc-color-ink);
+  text-decoration: none;
+  font-size: var(--sc-text-sm);
+  font-weight: 600;
+}
+
+.chrome__cats-quiet {
+  margin-left: auto;
+  color: var(--sc-color-faint-ink) !important;
+  font-weight: 500 !important;
+}
+
+.shell__status,
+.shell__main {
+  width: min(var(--sc-max-wide), calc(100% - 2rem));
+  margin: 0 auto;
+}
+
+.shell__status {
+  padding-top: var(--sc-space-4);
+}
+
+.shell__main {
+  flex: 1;
+  padding: var(--sc-space-6) 0 var(--sc-space-8);
+}
+
+.status {
+  margin: 0;
+  padding: var(--sc-space-3) var(--sc-space-4);
+  border-radius: var(--sc-radius);
+}
+
+.status--loading {
+  background: var(--sc-color-muted);
+}
+
+.status--error {
+  background: var(--sc-color-danger-soft);
+}
+
+.status__retry {
+  margin-left: var(--sc-space-3);
+  border: 1px solid var(--sc-color-ink);
+  background: var(--sc-color-surface);
+  color: inherit;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .chrome {
+    grid-template-columns: 1fr auto;
+    padding: var(--sc-space-4);
+  }
+
+  .chrome__search {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .chrome__cats {
+    padding: 0.5rem var(--sc-space-4);
+  }
+}

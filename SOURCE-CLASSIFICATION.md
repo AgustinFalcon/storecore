@@ -2,20 +2,15 @@
 
 ## Current Classification
 
-- Source: StoreCore
-- Maturity: pre-coding documentation
-- Sensitivity policy: deny-by-default for inherited material.
-- Versioned inherited content: none in this branch.
+- Source: StoreCore baseline SDD, audited locally on 2026-09-21.
+- Maturity: pre-coding documentation; no runtime or deployment artifact.
+- Sensitivity policy: deny-by-default remains for any file outside the explicit local allowlist.
+- Allowlisted baseline material: `AGENTS.md`, `README.md`, `GOVERNANCE.md`, `SOURCE-CLASSIFICATION.md`, `EVIDENCE-INDEX.md`, `sdd/**` and `docs/agent/**` after redaction review.
 
 ## Evidence Boundary
 
-Only new governance documents created for this Git initialization are versioned. Existing files and directories remain local workspace material until each file is explicitly audited and allowlisted.
+The allowlisted corpus was reviewed for secrets, credentials, private hosts, personal data and actionable access procedures. Runtime runbooks, environments, dumps and any operational document remain excluded until independently redacted and classified.
 
 ## Promotion Criteria
 
-A file or claim can move into version control or Knowledge only when it has:
-
-- a named source and maturity classification;
-- no secrets, credentials, private infrastructure details, personal data or actionable operational access details;
-- a clear owner or source folder;
-- validation evidence that can be shared without exposing sensitive values.
+A file or claim can move into version control or Knowledge only when it has a named source/maturity, no sensitive content, clear ownership and shareable validation evidence. The allowlist authorizes local staging only; it does not authorize a commit, tag, push or GitHub Release.

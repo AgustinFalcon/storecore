@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: storecore-backend
+  datasource:
+    url: ${STORECORE_DB_URL:jdbc:postgresql://localhost:5434/storecore}
+    username: ${STORECORE_DB_USERNAME:storecore}
+    password: ${STORECORE_DB_PASSWORD:storecore}
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+storecore:
+  installation:
+    origin: ${STORECORE_INSTALLATION_ORIGIN:http://localhost:4200}

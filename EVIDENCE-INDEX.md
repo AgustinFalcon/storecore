@@ -1,21 +1,13 @@
 # Evidence Index
 
-## Root Baseline
+## SDD Baseline Audit — 2026-09-22
 
-- Status: initialized as a local Git repository on master.
-- Root commit scope: .gitignore, GOVERNANCE.md, EVIDENCE-INDEX.md only.
-- Existing workspace material: excluded from version control until audited.
-
-## Redaction Rules
-
-Do not add values or files containing secrets, credentials, private network details, personal data, operational access procedures, dumps, local-only artifacts or environment files.
-
-## Pending Audit
-
-- Review inherited documentation and classify each file as safe, sensitive, obsolete or requires redaction.
-- Create an explicit allowlist before staging any inherited file.
-- Record validation evidence without exposing sensitive values.
-
-## Falcon Monitoring Readiness - 2026-07-25
-
-Status: planned/no-code product readiness only. The repo contains governance/docs/SDD material and no buildable backend, frontend, mobile app, Dockerfile, Maven/Gradle/npm project, or runtime entrypoint. Shared-service StoreCore mail/notification contracts do not prove a StoreCore runtime implementation here. Do not add Monitoring code until a Git-backed implementation repo and supported SDK target exist. Keep Falcon credentials, tenant/project/environment identifiers, and ingestion endpoints out of source/docs.
+- Scope: `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`.
+- State: 14-task graph implemented. `/sdd.finish` archivó el WIP. `sdd-v1.0.0` sigue siendo baseline documental, no tag/release.
+- Sol GO durable: `sdd/reviews/20260922-sol-go-core.md`.
+- Must-fix closure: `sdd/reviews/20260922-review-mustfix-closure.md`.
+- Plan: TASK-001..010 y TASK-012..015 (no existe TASK-011).
+- Residual: TODO-041 live ML refetch/sale; TASK-013 a11y no automatizado; TODO-003 fleet runbook.
+- Integration: https://github.com/AgustinFalcon/storecore/pull/14
+- Validation: targeted backend review-fix + frontend 42 tests. No autoriza deploy, tag, POS adapter ni fiscal.
+- Next: frontend UX `docs/agent/frontend/ux-handoff.md`.

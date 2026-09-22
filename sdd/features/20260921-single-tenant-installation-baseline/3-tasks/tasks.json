@@ -1,0 +1,494 @@
+{
+  "feature": "storecore-core-v1.0.0",
+  "stack_profile": "fullstack",
+  "project_type": "production",
+  "execution_strategy": "batched",
+  "stats": {
+    "total": 14,
+    "done": 14,
+    "by_layer": {
+      "1": 11,
+      "2": 0,
+      "3": 3
+    }
+  },
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Create production architecture skeleton",
+      "description": "Create Kotlin hexagonal and Angular clean-architecture boundaries for the production core. Keep fixture prototype isolated from storefront production.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [],
+      "files": [
+        "backend/",
+        "frontend/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: domain has no framework imports",
+        "AC-2: production storefront repository is HTTP-bound, not fixture-bound",
+        "GATE: architecture scan passes"
+      ],
+      "references": [
+        "AC-1"
+      ],
+      "design_decisions": [
+        "DD-HEXAGON",
+        "DD-PRODUCTION-STOREFRONT"
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "title": "Create core single-tenant Flyway schema",
+      "description": "Create the documented core schema for one merchant installation. Exclude deferred business/integration persistence except typed DISABLED capability registry/configuration rows. This task contains zero BlackStore persistence, API, adapter or service identity; the separate producer-contract WIP cannot satisfy this task.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "files": [
+        "backend/src/main/resources/db/migration/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: schema has zero store_id/store_hosts and zero deferred business/integration objects except typed DISABLED capability registry/configuration rows",
+        "AC-2: installation_settings permits only installation_id=1 and startup fails closed when it is absent",
+        "AC-3: checkout PENDING claim holds immutable snapshot before an order; composite claim/order reference preserves customer/key/request hash and replay/ownership checks are testable",
+        "AC-4: immutable envelopes are separated from worker processing/delivery projections",
+        "AC-5: reservation saga/line keys differ from ledger event idempotency keys and expiry is transactionally testable",
+        "GATE: Flyway/Testcontainers migration passes",
+        "AC-6: startup fails closed/unready with INSTALLATION_NOT_PROVISIONED when the sole row id=1 is absent",
+        "AC-7: database triggers reject protected fact/envelope UPDATE/DELETE and checkout evidence mutation while lifecycle and processing/delivery updates remain permitted",
+        "GATE: Testcontainers asserts singleton absence, immutable triggers and grouped OR constraints",
+        "AC-8: checkout claim identity/snapshot and order-item evidence are immutable in the database; only the claim state and order lifecycle can transition"
+      ],
+      "references": [
+        "AC-9"
+      ],
+      "design_decisions": [
+        "DD-INSTALLATION",
+        "ADR-001"
+      ]
+    },
+    {
+      "id": "TASK-003",
+      "title": "Implement configuration and capability states",
+      "description": "Implement merchant-local typed configuration, capability states and bounded kill switches. Do not introduce generic permanent feature flags.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-002",
+        "TASK-004"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/configuration/",
+        "backend/src/main/resources/db/migration/V3__capability_administration.sql",
+        "backend/src/test/kotlin/**/configuration/",
+        "backend/src/test/kotlin/**/schema/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: decision precedence is kill switch → module state → typed action allowlist → internal actor authorization; every missing/malformed/expired dependency fails closed before effects.",
+        "AC-2: states have exact semantics: DISABLED denies all; READ_ONLY admits only typed non-write; ACTIVE only typed/authorized actions; PAUSED and ERROR admit only explicit READ_STATUS/HEALTH and no publish/side effect.",
+        "AC-3: every current module schema v1 accepts exactly {}; unknown key/type/version, generic flag and any secret reference/value are rejected; future_optional remains DISABLED/schema-1/{}.",
+        "AC-4: config update uses expected config_version CAS, increments exactly one, cannot delete, and writes immutable internal actor/correlation/reason/target/transition/version/before-after audit atomically.",
+        "AC-5: kill create/remove/replacement serializes by module/action/scope; active expired/malformed kill denies; remove/replacement leaves history and no now()-dependent index exists.",
+        "AC-6: registry is migration-owned/runtime-read-only and protected against UPDATE/DELETE; configuration/kill lifecycle DB guards reject bypasses.",
+        "GATE: unit + Testcontainers tests cover each state/action matrix, all precedence short circuits, malformed/expired kill, config CAS race, invalid schemas, future_optional downgrade/activation, registry/config deletion attempts, kill lifecycle/replacement and immutable audit."
+      ],
+      "references": [
+        "AC-9"
+      ],
+      "design_decisions": [
+        "ADR-001"
+      ]
+    },
+    {
+      "id": "TASK-004",
+      "title": "Implement internal and customer identity",
+      "description": "Implement separate USER/CUSTOMER realms, opaque revocable sessions, Argon2id, owned customer profile/address and local one-time admin bootstrap. No commercial administration.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-002"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/auth/",
+        "backend/src/main/kotlin/**/identity/",
+        "backend/src/main/resources/db/migration/V2__identity_and_access_control.sql",
+        "backend/src/test/kotlin/**/auth/",
+        "backend/src/test/kotlin/**/identity/",
+        "backend/src/test/kotlin/**/schema/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: USER and CUSTOMER are separate realms; the same email never crosses realm or role.",
+        "AC-2: Argon2id only; raw session token/password/hash never persists or appears in response, URL, audit or logs; invalid login is indistinguishable.",
+        "AC-3: opaque session has idle/absolute expiry and durable revocation; logout/revoke are atomic/audited and next request rejects inactive subject or removed ADMIN role.",
+        "AC-4: profile/address use cases derive customer ownership exclusively from CustomerPrincipal; foreign resources are 404 and concurrent default selection preserves at most one default address.",
+        "AC-5: local interactive bootstrap creates exactly one first ADMIN under lock and audit, then fails closed; no HTTP/env/argv bootstrap credential exists.",
+        "GATE: clean Testcontainers/Flyway V1→V2 covers Argon precheck/constraint names, session and CSRF trigger mutation rules, CSRF rotation/replay/concurrency, idle/absolute/revoked no-revival and CAS touch, USER/CUSTOMER realm/role/ownership/default-address concurrency, two bootstrap races + immutable marker/rollback, exactly-one SELF|ADMIN|SYSTEM revoke audit with target/correlation/redaction, cookie attributes/clear, Origin/CORS, rate-limit and uniform auth errors. Frontend UI is separately owned and is not evidence."
+      ],
+      "references": [
+        "AC-3"
+      ],
+      "design_decisions": [
+        "DD-IDENTITY-SEPARATION"
+      ]
+    },
+    {
+      "id": "TASK-005",
+      "title": "Implement production storefront catalog and content",
+      "description": "Implement catalog/search, brands, categories, variants, offers and configurable home content for the production storefront. Do not satisfy this scope with the fixture prototype.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-002"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/catalog/",
+        "frontend/src/app/**/storefront/",
+        "frontend/src/app/**/admin/content/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: active catalog supports search, brand/category filters, offers and product details",
+        "AC-2: authorized admin changes catalog and home content with audit",
+        "GATE: storefront HTTP integration and accessibility tests pass"
+      ],
+      "references": [
+        "AC-1",
+        "AC-2"
+      ],
+      "design_decisions": [
+        "DD-PRODUCTION-STOREFRONT"
+      ]
+    },
+    {
+      "id": "TASK-006",
+      "title": "Implement cart checkout payment and orders",
+      "description": "Implement cart snapshots, idempotent checkout, officially contracted Mercado Pago webhook/event inbox, customer Orders UI and only-own order authorization. Preserve independent order and payment state machines.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-004",
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/checkout/",
+        "frontend/src/app/**/cart/",
+        "frontend/src/app/**/checkout/",
+        "frontend/src/app/**/orders/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: retry cannot create duplicate order, payment event application or outbox effect",
+        "AC-2: cart and order item snapshot preserve original price, discount, offer/campaign reference and effective price",
+        "AC-3: authenticated customer Orders UI/API returns only that customer's orders; admin access is separately authorized",
+        "GATE: official-contract payment event replay and authorization tests pass",
+        "GATE: customer-scoped replay/ownership and active-reservation expiry invariants pass where applicable"
+      ],
+      "references": [
+        "AC-3",
+        "AC-4"
+      ],
+      "design_decisions": [
+        "DD-ORDER-SNAPSHOT"
+      ]
+    },
+    {
+      "id": "TASK-007",
+      "title": "Implement WEB inventory authority",
+      "description": "Implement WEB reservation, consumption and release over canonical SKU and append-only ledger. Enforce derived availability and safety stock.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-005",
+        "TASK-006"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/inventory/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: every checkout uses one reservation_saga_key plus one reservation_line_key per variant; RESERVATION, SALE and RELEASE facts use distinct event_idempotency_key values, and expiry atomically releases only overdue ACTIVE reservations",
+        "AC-2: no write bypasses immutable ledger or safety stock",
+        "GATE: saga/line/event-key separation and expiry race tests pass"
+      ],
+      "references": [
+        "AC-5"
+      ],
+      "design_decisions": [
+        "DD-LEDGER"
+      ]
+    },
+    {
+      "id": "TASK-008",
+      "title": "Implement authorized Mercado Libre sync",
+      "description": "Implement authorized ML account/listing mapping and a durable notification inbox validated by the official contract. Live refetch, canonical sale apply, outbox and reconcile workers are residual TODO-041 (no secrets, no invented HMAC).",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-005",
+        "TASK-007"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/mercadolibre/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: validate ML notification only by applicable official contract and configured authorized account; commit durable envelope before ACK",
+        "AC-2: topic+resource duplicates produce one inbox row; ACK does not invent SALE or mutate balances; signature only where official docs require it",
+        "GATE: persist-before-ACK, unauthorized 409 retryable, and inbox replay tests pass. Live refetch/reconcile is TODO-041, not this GATE"
+      ],
+      "references": [
+        "AC-6"
+      ],
+      "design_decisions": [
+        "DD-ML-AUTHORIZED-SYNC"
+      ]
+    },
+    {
+      "id": "TASK-009",
+      "title": "Implement admin manual promos and content",
+      "description": "Implement authorized manual catalog/content/promo administration with margin, validity, priority and audit. Keep it as the only active price writer in core.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-003",
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/admin/",
+        "frontend/src/app/**/admin/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: manual promo enforces validity, priority, margin, approver and approval timestamp",
+        "AC-2: active policy windows cannot overlap by listing/currency/scope; one manual writer is enforced and audited",
+        "GATE: promo temporal-overlap and authorization tests pass"
+      ],
+      "references": [
+        "AC-2",
+        "AC-8"
+      ],
+      "design_decisions": [
+        "DD-MANUAL-PRICE-WRITER"
+      ]
+    },
+    {
+      "id": "TASK-010",
+      "title": "Implement manual fulfillment and returns",
+      "description": "Implement manual fulfillment status transitions, tracking information, RMA and inspection-gated restock behavior. Real carrier adapters remain out of scope.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-006",
+        "TASK-007"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/fulfillment/",
+        "frontend/src/app/**/admin/orders/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: only valid order/shipment transitions are accepted",
+        "AC-2: refund never restocks before receipt, inspection and adjustment",
+        "GATE: fulfillment state-machine tests pass"
+      ],
+      "references": [
+        "AC-7"
+      ],
+      "design_decisions": [
+        "DD-MANUAL-FULFILLMENT"
+      ]
+    },
+    {
+      "id": "TASK-012",
+      "title": "Implement profile import and fleet boundaries",
+      "description": "Implement version-compatible Universal Tools profile preview/explicit merge/audit boundaries and document fleet/prototype separation. No profile may rewrite history or carry secrets.",
+      "status": "complete",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-003",
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/main/kotlin/**/profiles/",
+        "sdd/",
+        "docs/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: incompatible profile is rejected and compatible import previews diff before merge",
+        "AC-2: profile cannot overwrite history, merchant identity or secret references",
+        "GATE: import contract tests and fleet documentation review pass"
+      ],
+      "references": [
+        "AC-10"
+      ],
+      "design_decisions": [
+        "ADR-002",
+        "DD-PROFILE-IMPORT"
+      ]
+    },
+    {
+      "id": "TASK-013",
+      "title": "Review production architecture and UX quality",
+      "description": "Review all production architecture boundaries, storefront behavior and accessibility evidence after implementation tasks complete.",
+      "status": "complete",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-012"
+      ],
+      "files": [
+        "sdd/reviews/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: architecture and prototype separation findings are resolved",
+        "AC-2: storefront production HTTP evidence is complete; accessibility/Playwright residual is documented, not claimed automated",
+        "GATE: Sol quality review has no P0"
+      ],
+      "references": [
+        "AC-1",
+        "AC-2"
+      ],
+      "design_decisions": [
+        "DD-QUALITY-GATES"
+      ]
+    },
+    {
+      "id": "TASK-014",
+      "title": "Review data, stock and ML reconciliation",
+      "description": "Review schema integrity, stock concurrency, authorized ML replay and reconciliation evidence after data-changing work completes.",
+      "status": "complete",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-002",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-012"
+      ],
+      "files": [
+        "sdd/reviews/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: checkout/payment inbox and ML inbox replay deterministically; live vendor refetch/drift workers are residual TODO-041",
+        "AC-2: temporal price windows, capability states and manual-writer safety constraints are evidenced",
+        "GATE: data and reconciliation review passes"
+      ],
+      "references": [
+        "AC-4",
+        "AC-5",
+        "AC-6",
+        "AC-8",
+        "AC-9"
+      ],
+      "design_decisions": [
+        "DD-LEDGER",
+        "ADR-001"
+      ]
+    },
+    {
+      "id": "TASK-015",
+      "title": "Review security scope and release gate",
+      "description": "Review authorization, secret references, official-source boundaries, profile import evidence and release criteria. Deferred features must remain unimplemented.",
+      "status": "complete",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-012",
+        "TASK-013",
+        "TASK-014"
+      ],
+      "files": [
+        "sdd/reviews/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: no secret, authorization, scope-boundary or unauthorized-source finding remains",
+        "AC-2: every deferred feature and fiscal boundary remains intact",
+        "GATE: Sol GO/NO-GO is recorded"
+      ],
+      "references": [
+        "AC-6",
+        "AC-9",
+        "AC-10"
+      ],
+      "design_decisions": [
+        "DD-SECURITY",
+        "DD-SCOPE-BOUNDARY"
+      ]
+    }
+  ],
+  "dependency_graph": {
+    "by_layer": {
+      "1": {
+        "level_0": [
+          "TASK-001"
+        ],
+        "level_1": [
+          "TASK-002"
+        ],
+        "level_2": [
+          "TASK-004",
+          "TASK-005"
+        ],
+        "level_3": [
+          "TASK-003",
+          "TASK-006"
+        ],
+        "level_4": [
+          "TASK-007",
+          "TASK-009",
+          "TASK-012"
+        ],
+        "level_5": [
+          "TASK-008",
+          "TASK-010"
+        ]
+      },
+      "2": {},
+      "3": {
+        "level_6": [
+          "TASK-013",
+          "TASK-014"
+        ],
+        "level_7": [
+          "TASK-015"
+        ]
+      }
+    }
+  },
+  "notes": [
+    "storecore-core-v1.0.0 graph is 14 tasks: TASK-001..010, TASK-012..015. There is no TASK-011.",
+    "universal-tools-profile@1.0.0 is versioned config/fixture import only.",
+    "ML live refetch/sale apply is TODO-041. Fiscal and BlackStore companion remain deferred and non-executable."
+  ]
+}

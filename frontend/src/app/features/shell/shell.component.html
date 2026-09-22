@@ -1,0 +1,75 @@
+<a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
+
+<div class="shell" [attr.aria-busy]="store.loading$ | async">
+  @if (consoleMode$ | async) {
+    <header class="chrome chrome--console">
+      <a class="chrome__brand" routerLink="/user/content">StoreCore <span>Consola</span></a>
+      <p class="chrome__hint">Operador · no es la cuenta que compra</p>
+      <a class="chrome__text" routerLink="/">Ver tienda</a>
+      <a class="chrome__text" routerLink="/user/session">{{ user.authenticated() ? 'Sesión operador' : 'Entrar operador' }}</a>
+    </header>
+  } @else {
+    <header class="chrome">
+      <a class="chrome__brand" routerLink="/">StoreCore</a>
+      <form class="chrome__search" (submit)="$event.preventDefault(); search()">
+        <label class="chrome__search-label" for="chrome-search">Buscar en el catálogo</label>
+        <input
+          id="chrome-search"
+          name="q"
+          type="search"
+          [(ngModel)]="query"
+          placeholder="Buscá productos, marcas o SKU"
+        />
+        <button type="submit" class="chrome__lupa" aria-label="Buscar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15.5 15.5 21 21" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+      </form>
+      <div class="chrome__actions">
+        <button type="button" class="chrome__icon" [attr.aria-label]="'Favoritos, ' + favorites.count()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.4-9.2-8.2C1 9.2 2.4 6 5.6 6c1.8 0 3 1.2 3.4 1.8C9.4 7.2 10.6 6 12.4 6c3.2 0 4.6 3.2 2.8 5.8C13 15.6 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          @if (favorites.count() > 0) {
+            <span class="chrome__badge">{{ favorites.count() }}</span>
+          }
+        </button>
+        @if (cart.cart$ | async; as snapshot) {
+          <a class="chrome__icon" routerLink="/cart" [attr.aria-label]="'Carrito, ' + snapshot.lines.length + ' líneas'">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2l1.2 9h11.3L20 8H7" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+            @if (snapshot.lines.length > 0) {
+              <span class="chrome__badge">{{ snapshot.lines.length }}</span>
+            }
+          </a>
+        } @else {
+          <a class="chrome__icon" routerLink="/cart" aria-label="Carrito">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2l1.2 9h11.3L20 8H7" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
+          </a>
+        }
+        <a class="chrome__account" routerLink="/customer/session">
+          {{ customer.authenticated() ? 'Mi cuenta' : 'Ingresá' }}
+        </a>
+      </div>
+    </header>
+    <nav class="chrome__cats" aria-label="Categorías">
+      <a routerLink="/catalog">Catálogo</a>
+      <a routerLink="/catalog" [queryParams]="{ offers: '1' }">Ofertas</a>
+      @for (category of store.categories$ | async; track category.id) {
+        <a routerLink="/catalog" [queryParams]="{ category: category.id }">{{ category.name }}</a>
+      }
+      <a class="chrome__cats-quiet" routerLink="/user/session">Operar</a>
+    </nav>
+  }
+
+  <div class="shell__status" aria-live="polite">
+    @if (store.loading$ | async) {
+      <p class="status status--loading">Comprobando el API de esta instalación…</p>
+    } @else if (store.errorMessage$ | async; as errorMessage) {
+      <p class="status status--error" role="alert">
+        {{ errorMessage }}
+        <button type="button" class="status__retry" (click)="retry()">Reintentar</button>
+      </p>
+    }
+  </div>
+
+  <main id="contenido-principal" class="shell__main" tabindex="-1">
+    <router-outlet />
+  </main>
+</div>

@@ -1,0 +1,251 @@
+{
+  "feature": "storecore-pos-integration-contract-v1",
+  "stack_profile": "backend",
+  "project_type": "production",
+  "execution_strategy": "batched",
+  "status": "ready_for_sol_review",
+  "stats": {
+    "total": 12,
+    "done": 0,
+    "by_layer": { "1": 8, "2": 1, "3": 3 }
+  },
+  "tasks": [
+    {
+      "id": "TASK-PIC-001",
+      "title": "Capability BLACKSTORE_INTEGRATION and companion 0..1",
+      "description": "Add future_optional module, typed config, scopes including price:override, DISABLED default, kill switches. Partial unique live companion. Credential child table. Do not add POS module or store_id.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [],
+      "files": ["backend/src/main/resources/db/migration/", "backend/src/main/kotlin/**/companion/"],
+      "acceptance_criteria": [
+        "AC-ID-1: second live companion or identity mismatch fails closed 403",
+        "AC-ID-2: one ACTIVE secret_ref; TLS + service bearer scopes",
+        "GATE: capability scan passes"
+      ],
+      "references": ["AC-ID-1", "AC-ID-2"],
+      "design_decisions": ["ADR-001"]
+    },
+    {
+      "id": "TASK-PIC-002",
+      "title": "DDL delta companions, operations UNIQUE quadruple, ledger pairing",
+      "description": "Apply sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/data-model-v1.md only. Channel EXTERNAL_BLACKSTORE. Named CHECKs. Per-line UUIDv5 keys. Never POS. Never overwrite balances.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-001"],
+      "files": [
+        "backend/src/main/resources/db/migration/",
+        "sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/data-model-v1.md"
+      ],
+      "acceptance_criteria": [
+        "AC-STK-2: UNIQUE (client_instance_id, device_id, sale_id, operation_id)",
+        "AC-STK-4: SALE forbidden on EXTERNAL_BLACKSTORE; STOCK_COMMIT_EXTERNAL only on that channel",
+        "GATE: Testcontainers migration passes"
+      ],
+      "references": ["AC-STK-2", "AC-STK-4"],
+      "design_decisions": ["ADR-003"]
+    },
+    {
+      "id": "TASK-PIC-003",
+      "title": "Catalog cursor read model HTTP and stock:read",
+      "description": "GET /blackstore-integration/v1/catalog with opaque cursor/ETag/validUntil/pageSize 200. GET /blackstore-integration/v1/stock/variants/{id}. availableQuantity always nets safety_stock.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-002"],
+      "files": ["backend/src/main/kotlin/**/catalog/", "backend/src/main/kotlin/**/stock/"],
+      "acceptance_criteria": [
+        "AC-CAT-1: sku/variant/barcode/priceVersion/images/active/validUntil",
+        "AC-CAT-2: stale priceVersion -> 422 CATALOG_VERSION_STALE; includeCost without scope -> 403",
+        "AC-STK-6: availableQuantity = GREATEST(0, available_quantity - safety_stock); available already nets reserved",
+        "GATE: catalog contract tests pass"
+      ],
+      "references": ["AC-CAT-1", "AC-CAT-2", "AC-STK-6", "AC-OFF-1"],
+      "design_decisions": ["ADR-004", "ADR-005"]
+    },
+    {
+      "id": "TASK-PIC-004",
+      "title": "Reserve two-phase Tx-A/Tx-B with header idempotency",
+      "description": "POST /blackstore-integration/v1/reservations. Header quadruple. Tx-A PENDING+request_hash COMMIT; Tx-B lock saga then inventory_balances ORDER BY variant_id ASC. Error matrix AC-STK-7. AC-STK-1 is BlackStore precondition.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-002"],
+      "files": ["backend/src/main/kotlin/**/stock/"],
+      "acceptance_criteria": [
+        "AC-STK-2: concurrent identical headers return one receipt",
+        "AC-STK-3: Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s",
+        "AC-STK-6: INSUFFICIENT_STOCK lineFailures sellable qty; available already nets reserved",
+        "AC-STK-7: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; mismatch/EXPIRED keep row",
+        "GATE: reserve tests pass"
+      ],
+      "references": ["AC-STK-2", "AC-STK-3", "AC-STK-6", "AC-STK-7"],
+      "design_decisions": ["ADR-002", "ADR-003"]
+    },
+    {
+      "id": "TASK-PIC-005",
+      "title": "Commit, release, expiry job",
+      "description": "Same quadruple UPDATE. Expiry worker 30s batch 100 FOR UPDATE SKIP LOCKED. Commit-vs-expire exclusive. Commit/release CONFLICT rolls back and preserves the prior durable state (normally RESERVED or COMMITTED), never PENDING. STOCK_COMMIT_EXTERNAL not SALE.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-004"],
+      "files": ["backend/src/main/kotlin/**/stock/"],
+      "acceptance_criteria": [
+        "AC-STK-4: commit/release/expiry mutually exclusive; commit/release CONFLICT preserves the prior durable state (normally RESERVED/COMMITTED), never PENDING",
+        "GATE: state machine tests pass"
+      ],
+      "references": ["AC-STK-3", "AC-STK-4"],
+      "design_decisions": ["ADR-003"]
+    },
+    {
+      "id": "TASK-PIC-006",
+      "title": "GET operation, reconcile read-only, and terminal purge recovery",
+      "description": "Timeout recovery via GET same headers. Reconcile returns present/unknownReceipts; never writes ledger or SET available. Purge terminal sagas atomically: INSERT immutable tombstone then DELETE saga in the same transaction; retain tombstone seven years or a per-installation policy >=7 years. Tombstone or unknown reconcile evidence never authorizes re-POST.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-005"],
+      "files": ["backend/src/main/kotlin/**/stock/"],
+      "acceptance_criteria": [
+        "AC-STK-3: GET windows include 404/PENDING/RESERVED/COMMITTED/EXPIRED/mismatch/CONFLICT and tombstone 410 OPERATION_RETIRED retryable=false",
+        "AC-STK-5: reconcile intersection of <=500 knownReceipts; read-only; no server-only discovery; unknown receipt never alone authorizes re-POST",
+        "AC-STK-8: terminal purge atomically INSERTs tombstone then DELETEs saga; tombstone retention is >=7 years (or per-installation policy >=7 years); GET tombstone returns 410 OPERATION_RETIRED and BlackStore never re-POSTs it",
+        "GATE: reconcile, tombstone retention, and GET-recovery tests pass"
+      ],
+      "references": ["AC-STK-3", "AC-STK-5", "AC-STK-7", "AC-SEC-1"],
+      "design_decisions": ["ADR-003", "ADR-006"]
+    },
+    {
+      "id": "TASK-PIC-007",
+      "title": "Error wire, rate limit, redacted logs",
+      "description": "AssistTime BaseResponse+HttpCode envelope on every JSON response. GlobalExceptionHandler maps 400/401/403/404/409/410/422/429/500. Retry-After. No PAN/PII/fiscal/secrets in logs or payloads.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": ["TASK-PIC-004"],
+      "files": ["backend/src/main/kotlin/**/web/"],
+      "acceptance_criteria": [
+        "AC-SEC-1: every JSON non-304 envelope requires code,data,errorCode,retryable,message,traceId; status-specific schema uses code const so HTTP==code; success has explicit null errorCode/retryable/message; error has data=null and non-null errorCode/retryable/message/traceId; errorCode discriminates 409; 30 reserve/s burst 10; catalog/stock-read 60/s; reconcile 5/s; Retry-After",
+        "GATE: log redaction tests pass"
+      ],
+      "references": ["AC-SEC-1"],
+      "design_decisions": ["ADR-005", "ADR-006"]
+    },
+    {
+      "id": "TASK-PIC-008",
+      "title": "OpenAPI adapter and version header",
+      "description": "Serve contract 1.0.0-draft until GO. Breaking changes require major bump. Do not implement BlackStore client here.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": ["TASK-PIC-003", "TASK-PIC-004", "TASK-PIC-005", "TASK-PIC-006"],
+      "files": ["backend/src/main/resources/openapi/"],
+      "acceptance_criteria": [
+        "AC-CMP-1: published spec matches this WIP YAML",
+        "GATE: openapi diff additive-only vs 1.0.0-draft"
+      ],
+      "references": ["AC-CMP-1"],
+      "design_decisions": ["ADR-002"]
+    },
+    {
+      "id": "TASK-PIC-009",
+      "title": "ML desired_quantity after EXTERNAL_BLACKSTORE commit",
+      "description": "Outbox listing stock after commit/release. Observed remote never writes ledger.",
+      "status": "pending",
+      "layer": 2,
+      "complexity": "Medium",
+      "depends_on": ["TASK-PIC-005"],
+      "files": ["backend/src/main/kotlin/**/ml/"],
+      "acceptance_criteria": [
+        "AC-STK-4: ML reflects ledger after commit",
+        "GATE: outbox tests pass"
+      ],
+      "references": ["AC-STK-4"],
+      "design_decisions": ["ADR-003"]
+    },
+    {
+      "id": "TASK-L3-001",
+      "title": "Review concurrent idempotency, expiry, commit/release, crash/retry",
+      "description": "Layer-3 review: two parallel reserves same headers; expire vs commit race; timeout GET; no double decrement; per-line UUIDv5 keys.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-004", "TASK-PIC-005", "TASK-PIC-006"],
+      "files": ["sdd/reviews/"],
+      "acceptance_criteria": [
+        "AC-STK-2: concurrent identical quadruple -> one receipt",
+        "AC-STK-3: expire and commit are exclusive",
+        "AC-STK-3: crash/retry uses GET not a new operation_id",
+        "AC-STK-7: stock/stale/validation GET 404 + new operation_id; reserve CONFLICT preserves PENDING and retries same quadruple; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; tombstone GET 410 OPERATION_RETIRED retryable=false is never re-POSTed",
+        "GATE: saga review passes"
+      ],
+      "references": ["AC-STK-2", "AC-STK-3", "AC-CMP-2"],
+      "design_decisions": ["ADR-002", "ADR-003"]
+    },
+    {
+      "id": "TASK-L3-002",
+      "title": "Review service permissions, offline contract, and no cross-database access",
+      "description": "Layer-3 review: scopes, cashier tokens must not carry cost:read/price:override, no JDBC to BlackStore, secrets redacted, AC-OFF-1 documented as BlackStore obligation (validUntil + block new sales).",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-001", "TASK-PIC-003", "TASK-PIC-007"],
+      "files": ["sdd/reviews/"],
+      "acceptance_criteria": [
+        "AC-ID-2: service identity + scopes only; actor headers audit-only",
+        "AC-CAT-2: costs hidden without cost:read",
+        "AC-OFF-1: validUntil required; BlackStore blocks new sales when unreachable",
+        "AC-SEC-1: no DSN/cross-db and no PAN in logs",
+        "GATE: security review passes"
+      ],
+      "references": ["AC-ID-1", "AC-ID-2", "AC-OFF-1", "AC-SEC-1"],
+      "design_decisions": ["ADR-001", "ADR-004", "ADR-005"]
+    },
+    {
+      "id": "TASK-L3-003",
+      "title": "Review OpenAPI compatibility and reconcile semantics",
+      "description": "Layer-3 review: YAML StoreCore 1.0.0-draft is the only contract YAML; BlackStore pointer is Markdown; reconcile intersection; path /blackstore-integration/v1.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-006", "TASK-PIC-008", "TASK-PIC-009"],
+      "files": ["sdd/reviews/", "sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/cross-repo-gaps.md"],
+      "acceptance_criteria": [
+        "AC-STK-5: reconcile present/unknownReceipts; zero ledger writes",
+        "AC-CMP-1: OpenAPI 1.0.0-draft canonical; /blackstore-integration/v1; no second YAML",
+        "GATE: contract compatibility review passes"
+      ],
+      "references": ["AC-STK-5", "AC-CMP-1", "AC-CMP-2"],
+      "design_decisions": ["ADR-003"]
+    }
+  ],
+  "dependency_graph": {
+    "by_layer": {
+      "1": {
+        "level_0": ["TASK-PIC-001"],
+        "level_1": ["TASK-PIC-002"],
+        "level_2": ["TASK-PIC-003", "TASK-PIC-004", "TASK-PIC-007"],
+        "level_3": ["TASK-PIC-005"],
+        "level_4": ["TASK-PIC-006", "TASK-PIC-008"]
+      },
+      "2": {
+        "level_0": ["TASK-PIC-009"]
+      },
+      "3": {
+        "level_0": ["TASK-L3-001", "TASK-L3-002"],
+        "level_1": ["TASK-L3-003"]
+      }
+    }
+  },
+  "notes": [
+    "No code, Flyway or Luna until Sol GO of this feature. Status remains ready_for_sol_review, never approved in this WIP.",
+    "Does not alter the 14 executable tasks of storecore-core-v1.0.0.",
+    "AC-STK-1 is a BlackStore-side precondition (persist intent+outbox before HTTP).",
+    "AC-OFF-1 is a BlackStore-side obligation; StoreCore only supplies validUntil.",
+    "D-TTL=900s, D-CURSOR=200/7d, D-RATE=30 reserve/s, D-PATH=/blackstore-integration/v1 are closed.",
+    "AC-STK-7 error matrix: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; tombstone 410 is never re-POSTed."
+  ]
+}

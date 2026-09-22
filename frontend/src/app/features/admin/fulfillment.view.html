@@ -1,0 +1,49 @@
+<section class="sc-page sc-console" aria-labelledby="fulfillment-title">
+  <h1 id="fulfillment-title">Fulfillment</h1>
+  <p class="sc-page__lede">Sólo la siguiente transición. Tracking informativo. RMA no repone hasta ADJUSTED. Sin carrier real.</p>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && orders.length === 0"
+    emptyText="No hay órdenes pendientes."
+  />
+  @if (orders.length) {
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>Orden</th>
+          <th>Envío</th>
+          <th>Tracking</th>
+          <th>RMA</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (order of orders; track order.id) {
+          <tr>
+            <td><a [routerLink]="['/user/orders', order.id]">{{ order.id }}</a></td>
+            <td><span class="sc-badge sc-badge--warn">{{ order.shipmentStatus }}</span></td>
+            <td>
+              @if (nextShip(order); as next) {
+                <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
+              } @else {
+                {{ order.tracking || '—' }}
+              }
+            </td>
+            <td><span class="sc-badge">{{ order.rmaStatus || '—' }}</span></td>
+            <td class="sc-table__actions">
+              @if (nextShip(order); as next) {
+                <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking[order.id] || null })">
+                  {{ shipLabel(next) }}
+                </button>
+              }
+              @if (nextReturn(order); as next) {
+                <button type="button" class="sc-btn sc-btn--ghost" (click)="rma.emit({ orderId: order.id, status: next })">{{ returnLabel(next) }}</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>

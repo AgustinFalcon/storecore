@@ -1,0 +1,719 @@
+{
+  "feature": "store-tenancy-and-profiles",
+  "strategy": "batched",
+  "local_config": {
+    "postgres": "container",
+    "redis": "optional",
+    "mysql": null,
+    "kvs": null,
+    "bigqueue": null
+  },
+  "stats": {
+    "total": 21,
+    "done": 0,
+    "by_layer": {
+      "1": 18,
+      "2": 0,
+      "3": 3
+    }
+  },
+  "note": "Plan SDD Kit compatible: 21 tareas implementables, sin layer 0 y con tres revisiones layer 3. Los meta-gates documentales se resuelven antes del build y requieren GO explícito de Sol.",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Skeleton backend Kotlin hexagonal",
+      "description": "Crear backend Kotlin sobre JDK 21 y Spring Boot 3.5.7 con domain/application/infrastructure/presentation. Domain no importa Spring, JPA, HTTP, Page ni Pageable.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [],
+      "files": [
+        "backend/pom.xml",
+        "backend/src/main/kotlin/com/novastra/storecore/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: Paquetes hexagonales con domain libre de framework",
+        "AC-2: Prueba de arquitectura falla ante dependencias invertidas",
+        "GATE: backend compile y test de arquitectura"
+      ],
+      "references": [
+        "US-4",
+        "AC-16"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ],
+      "github_issue": 12
+    },
+    {
+      "id": "TASK-002",
+      "title": "Flyway V1 schema tenant-aware (20 tablas)",
+      "description": "Migración V1 según data-model-v1.md: 20 tablas, incluida store_hosts; store_id NOT NULL en negocio, roles globales, FKs compuestas e índices. Prohibido copiar uniques/hosts globales de docs/04.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "files": [
+        "backend/src/main/resources/db/migration/V1__tenant_aware_schema.sql"
+      ],
+      "acceptance_criteria": [
+        "AC-1: 20 tablas + seed ADMIN/OPERATOR; store_hosts UNIQUE(host_normalized) + UNIQUE(store_id,surface); uniques tenant-aware",
+        "AC-2: no existen stores.primary_host/admin_host ni is_canonical; FKs cross-tenant se rechazan por DB",
+        "GATE: Flyway migrate limpio contra PostgreSQL 16/Testcontainers"
+      ],
+      "references": [
+        "AC-18",
+        "RN-T01"
+      ],
+      "design_decisions": [
+        "DD-1",
+        "DD-2"
+      ],
+      "github_issue": 3
+    },
+    {
+      "id": "TASK-003",
+      "title": "TenantFilter y TenantContext request-scoped",
+      "description": "Host / X-Forwarded-Host confiable de Nginx MAIN → lookup store_hosts.host_normalized → store_id + surface. Skip webhook/platform/actuator. 404 STORE_HOST_UNKNOWN. Puertos reciben storeId; JPA siempre WHERE store_id.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-002"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/infrastructure/web/TenantFilter.kt",
+        "backend/src/main/kotlin/com/novastra/storecore/application/tenant/TenantContext.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: fila STOREFRONT → STOREFRONT; fila ADMIN → ADMIN; ausencia ADMIN + /admin → ADMIN",
+        "AC-2: Host desconocido 404 JSON; nunca tienda default; mismatch JWT 401 AUTH_STORE_MISMATCH",
+        "GATE: resolver con host duplicado/fallback y tests negativos"
+      ],
+      "references": [
+        "US-2",
+        "AC-8",
+        "AC-9",
+        "RN-T02",
+        "RN-T07"
+      ],
+      "design_decisions": [
+        "DD-1",
+        "DD-6"
+      ],
+      "github_issue": 4
+    },
+    {
+      "id": "TASK-004",
+      "title": "CLI provision + POST /platform/stores",
+      "description": "Misma lógica CLI/API: crea store, filas store_hosts STOREFRONT/ADMIN y USER ADMIN; imprime password una vez. Header X-Platform-Key. No CREATE TABLE.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-003"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/application/service/ProvisionStoreService.kt",
+        "backend/src/main/kotlin/com/novastra/storecore/presentation/controller/PlatformStoreController.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: Args name, slug, primary_host, admin_host, catalog_profile, admin email; inputs crean filas store_hosts; 409 HOST_SLUG_CONFLICT",
+        "AC-2: Password nunca logueada; 0 DDL; templates CLOTHING/HARDWARE/FOOD/GENERIC",
+        "GATE: provision de dos stores en la misma DB"
+      ],
+      "references": [
+        "US-1",
+        "AC-1",
+        "AC-6"
+      ],
+      "design_decisions": [
+        "DD-2",
+        "DD-3"
+      ],
+      "github_issue": 5
+    },
+    {
+      "id": "TASK-005",
+      "title": "Security chains y validación común JWT",
+      "description": "Definir chains ordenadas para webhook, platform, admin y storefront. Centralizar issuer, audience, token_use y validación de store_id sin overlap.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-003"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/infrastructure/config/SecurityConfig.kt",
+        "backend/src/main/kotlin/com/novastra/storecore/application/service/TokenService.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: webhook/platform/admin/storefront tienen matchers excluyentes",
+        "AC-2: mismatch token-store/Host devuelve 401 AUTH_STORE_MISMATCH",
+        "GATE: tests de filter chain sin overlap"
+      ],
+      "references": [
+        "US-6",
+        "AC-22",
+        "AC-23"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ],
+      "github_issue": 10
+    },
+    {
+      "id": "TASK-006",
+      "title": "Bootstrap público host-scoped",
+      "description": "Implementar GET /api/v1/store/bootstrap con schema cerrado y 404 de host desconocido. No expone host admin, CUIT, tokens MP ni flags internos.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-003"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/presentation/controller/StoreBootstrapController.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: Bootstrap JSON igual al spec; homepageSections enum de 3 tipos",
+        "AC-2: Host unknown recibe 404 sin tienda default",
+        "GATE: contrato OpenAPI bootstrap"
+      ],
+      "references": [
+        "US-3",
+        "AC-11",
+        "AC-12",
+        "AC-13",
+        "AC-14",
+        "AC-15"
+      ],
+      "design_decisions": [
+        "DD-2",
+        "DD-5",
+        "DD-6"
+      ],
+      "github_issue": 6
+    },
+    {
+      "id": "TASK-007",
+      "title": "POST /admin/media proxy Cloudinary (branding)",
+      "description": "Multipart → Cloudinary folder storecore/{storeId}/ → URL. Solo branding en este feature. Credenciales nunca al browser.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-022"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/application/service/MediaUploadService.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: Path /api/v1/admin/media; no /api/v1/media/upload",
+        "AC-2: Validación tipo/tamaño; URL usable en PUT settings logo/banner/favicon",
+        "GATE: test con Cloudinary stub"
+      ],
+      "references": [
+        "RN-T08",
+        "AC-12"
+      ],
+      "design_decisions": [
+        "DD-5"
+      ],
+      "github_issue": 7
+    },
+    {
+      "id": "TASK-008",
+      "title": "Webhook MP durable e idempotente",
+      "description": "Implementar callback key, manifest HMAC MP e inbox durable. Firma inválida 401, key desconocida 404, duplicado 200 y fallo previo al commit 5xx.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": [
+        "TASK-005",
+        "TASK-022"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/presentation/controller/MpWebhookController.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: manifest HMAC MP usa data.id, x-request-id y ts con comparación constante",
+        "AC-2: firma inválida 401, key desconocida 404, duplicado 200 y fallo de commit 5xx",
+        "GATE: fixtures e integración PostgreSQL/Testcontainers de webhook"
+      ],
+      "references": [
+        "AC-24",
+        "RN-T11"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ],
+      "github_issue": 11
+    },
+    {
+      "id": "TASK-009",
+      "title": "Admin SPA: Settings NgRx (tabs AC-11)",
+      "description": "Módulo settings container/presentational. Preview branding. Upload media + PUT. Copy AC-14 al cambiar perfil. Sin editor de producto ni shipment.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-016",
+        "TASK-022",
+        "TASK-007"
+      ],
+      "files": [
+        "admin/src/app/features/settings/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: tabs Identidad, Branding, Catálogo, Envíos, Pagos, Políticas, Dominio",
+        "AC-2: container select/dispatch; presentacionales OnPush Input/Output; OPERATOR no edita Pagos/Dominio",
+        "GATE: strict/test/build/budget/a11y admin"
+      ],
+      "references": [
+        "US-3",
+        "AC-11"
+      ],
+      "design_decisions": [
+        "DD-6",
+        "DD-5"
+      ],
+      "github_issue": 12
+    },
+    {
+      "id": "TASK-010",
+      "title": "Storefront SPA: bootstrap CSS vars y 404 de tienda",
+      "description": "Implementar shell storefront que consume bootstrap, CSS vars y 404 de tienda. No registra repositorio in-memory: la maqueta visual vive en feature SDD prototype separada.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-017",
+        "TASK-006"
+      ],
+      "files": [
+        "storefront/src/app/core/bootstrap/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: CSS variables desde bootstrap; no Material",
+        "AC-2: Host unknown → página 404 tienda, no tienda default",
+        "GATE: strict/test/build/budget/a11y/smoke responsive storefront"
+      ],
+      "references": [
+        "US-2",
+        "AC-8"
+      ],
+      "design_decisions": [
+        "DD-6"
+      ],
+      "github_issue": 13
+    },
+    {
+      "id": "TASK-011",
+      "title": "Matriz IDOR crítica (MVP tests)",
+      "description": "Pruebas negativas del kernel: token de tienda A con host B devuelve 401; host desconocido 404; bootstrap A no filtra datos de B. Los recursos con id quedan en sus tareas de catálogo/media futuras.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-006",
+        "TASK-007",
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/test/kotlin/com/novastra/storecore/idor/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: token/Host cruzados son 401 AUTH_STORE_MISMATCH",
+        "AC-2: bootstrap host A no expone settings de B; host desconocido es 404",
+        "GATE: matriz negativa integrada"
+      ],
+      "references": [
+        "AC-9",
+        "RN-T07"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ],
+      "github_issue": 4
+    },
+    {
+      "id": "TASK-012",
+      "title": "Compose local, Dockerfile, health",
+      "description": "docker-compose api+postgres(+redis opcional)+admin+storefront. .env.example con tabla de vars del spec. GET /actuator/health sin datos de tenant. No task de deploy a MAIN.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-001",
+        "TASK-016",
+        "TASK-017",
+        "TASK-018"
+      ],
+      "files": [
+        "docker-compose.yml",
+        "backend/Dockerfile",
+        ".env.example"
+      ],
+      "acceptance_criteria": [
+        "AC-1: Compose levanta API contra Postgres; health 200",
+        "AC-2: .env.example sin STORE_ADMIN_* ni CATALOG_PROFILE; incluye PLATFORM_API_KEY y JWT RSA",
+        "GATE: docker compose up healthcheck"
+      ],
+      "references": [
+        "P-04"
+      ],
+      "design_decisions": [
+        "DD-4"
+      ],
+      "github_issue": 2
+    },
+    {
+      "id": "TASK-013",
+      "title": "Code review del kernel",
+      "description": "Revisión hexagonal, naming, sin ifs de vertical, sin secrets en logs. Invocar SDD-code-reviewer sobre el diff del feature.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "Low",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-011",
+        "TASK-012",
+        "TASK-016",
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020",
+        "TASK-022"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "AC-1: Hallazgos de capa domain/application documentados o resueltos",
+        "GATE: review registrada en el PR"
+      ],
+      "references": [],
+      "design_decisions": []
+    },
+    {
+      "id": "TASK-014",
+      "title": "Performance review índices V1",
+      "description": "Verificar índices (store_id, slug), orders(store_id, created_at DESC), carts.expires_at. Sin GIN attributes.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "Low",
+      "depends_on": [
+        "TASK-002",
+        "TASK-011"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "AC-1: Índices del spec Performance existen",
+        "GATE: explain de lookup por host y por slug de producto no seq-scan full table multi-store"
+      ],
+      "references": [],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-015",
+      "title": "Security review IDOR, JWT, webhook, secrets",
+      "description": "OWASP: IDOR, JWT mismatch, webhook 200, cifrado MP, PLATFORM_API_KEY no en browser, cookies host-only.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-001",
+        "TASK-002",
+        "TASK-003",
+        "TASK-004",
+        "TASK-005",
+        "TASK-006",
+        "TASK-007",
+        "TASK-008",
+        "TASK-009",
+        "TASK-010",
+        "TASK-011",
+        "TASK-012",
+        "TASK-016",
+        "TASK-017",
+        "TASK-018",
+        "TASK-019",
+        "TASK-020",
+        "TASK-022"
+      ],
+      "files": [],
+      "acceptance_criteria": [
+        "AC-1: Checklist Security del spec cubierta",
+        "GATE: SDD-security-expert o equivalente sin blockers",
+        "AC-2: Nunca 403 en IDOR; tokens no en logs"
+      ],
+      "references": [
+        "RN-T07"
+      ],
+      "design_decisions": [
+        "DD-1",
+        "DD-6"
+      ]
+    },
+    {
+      "id": "TASK-016",
+      "title": "Scaffold Angular 22 admin",
+      "description": "Crear SPA admin Angular 22 con strict templates y composición limpia. No agrega feature ni HTTP directo en componentes.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "files": [
+        "admin/package.json",
+        "admin/src/app/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: estructura domain/application/infrastructure/presentation",
+        "AC-2: NgRx target lane y contratos readonly",
+        "GATE: strict/test/build admin"
+      ],
+      "references": [
+        "US-4"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-017",
+      "title": "Scaffold Angular 22 storefront",
+      "description": "Crear SPA storefront Angular 22 con strict templates y composición limpia. Mantiene Material fuera y prepara composition root para adapters.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-001"
+      ],
+      "files": [
+        "storefront/package.json",
+        "storefront/src/app/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: estructura domain/application/infrastructure/presentation",
+        "AC-2: NgRx target lane, modelos readonly y OnPush",
+        "GATE: strict/test/build storefront"
+      ],
+      "references": [
+        "US-4"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-018",
+      "title": "CI y quality gates separados",
+      "description": "Definir checks separados para SDD, backend, integración Flyway, admin, storefront, secretos y dependencias. No publica ni despliega.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-001",
+        "TASK-016",
+        "TASK-017"
+      ],
+      "files": [
+        ".github/workflows/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: backend unit/architecture/coverage y Flyway/Testcontainers son jobs separados",
+        "AC-2: ambas SPAs validan test/build/budget/a11y y hay secret/dependency scan",
+        "GATE: workflows sintácticamente válidos"
+      ],
+      "references": [
+        "AC-16"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-019",
+      "title": "Autenticación USER host-scoped",
+      "description": "Implementar login USER en superficie ADMIN tomando store_id del Host. No acepta store_id en body ni reintroduce rutas legado.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/application/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: email de tienda B en host A devuelve 401 genérico",
+        "AC-2: token USER aud=admin y store_id correctos",
+        "GATE: unit/integration auth USER"
+      ],
+      "references": [
+        "AC-22"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-020",
+      "title": "Autenticación CUSTOMER host-scoped",
+      "description": "Implementar register/login CUSTOMER tomando store_id exclusivamente del Host storefront. La identidad CUSTOMER permanece separada de USER.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-005"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/application/"
+      ],
+      "acceptance_criteria": [
+        "AC-1: email se permite entre tiendas y se rechaza dentro de la misma",
+        "AC-2: token CUSTOMER aud=store y store_id correctos",
+        "GATE: unit/integration auth CUSTOMER"
+      ],
+      "references": [
+        "AC-23"
+      ],
+      "design_decisions": [
+        "DD-1"
+      ]
+    },
+    {
+      "id": "TASK-022",
+      "title": "Settings admin y secretos write-only",
+      "description": "Implementar GET/PUT settings host-scoped con pagos y dominio protegidos. Separa Settings del bootstrap público y nunca devuelve secretos.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [
+        "TASK-019"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/novastra/storecore/presentation/controller/AdminSettingsController.kt"
+      ],
+      "acceptance_criteria": [
+        "AC-1: cubre Identidad, Branding, Catálogo, Envíos, Pagos, Políticas y Dominio read-only",
+        "AC-2: MP access token es write-only y OPERATOR no edita Pagos/Dominio",
+        "GATE: contrato OpenAPI settings y tests de autorización"
+      ],
+      "references": [
+        "US-3",
+        "AC-11",
+        "AC-15"
+      ],
+      "design_decisions": [
+        "DD-2",
+        "DD-5",
+        "DD-6"
+      ]
+    }
+  ],
+  "dependency_graph": {
+    "by_layer": {
+      "1": {
+        "level_0": [
+          "TASK-001"
+        ],
+        "level_1": [
+          "TASK-002",
+          "TASK-016",
+          "TASK-017"
+        ],
+        "level_2": [
+          "TASK-003",
+          "TASK-018"
+        ],
+        "level_3": [
+          "TASK-004",
+          "TASK-005",
+          "TASK-006"
+        ],
+        "level_4": [
+          "TASK-019",
+          "TASK-020"
+        ],
+        "level_5": [
+          "TASK-022"
+        ],
+        "level_6": [
+          "TASK-007",
+          "TASK-008",
+          "TASK-010"
+        ],
+        "level_7": [
+          "TASK-009",
+          "TASK-011",
+          "TASK-012"
+        ]
+      },
+      "2": {
+        "level_0": []
+      },
+      "3": {
+        "level_0": [
+          "TASK-013",
+          "TASK-014",
+          "TASK-015"
+        ]
+      }
+    }
+  },
+  "review_status": "superseded",
+  "meta_gates": [
+    {
+      "id": "SDD-GATE-01",
+      "title": "Contrato de modelo y host",
+      "status": "superseded",
+      "evidence": [
+        "data-model-v1.md",
+        "functional spec",
+        "technical spec"
+      ],
+      "gate": "PostgreSQL 16 + Sol"
+    },
+    {
+      "id": "SDD-GATE-02",
+      "title": "Contratos HTTP/webhook y trazabilidad",
+      "status": "superseded",
+      "evidence": [
+        "technical spec",
+        "TRACEABILITY.md"
+      ],
+      "gate": "Sol"
+    },
+    {
+      "id": "SDD-GATE-03",
+      "title": "Release SDD local deny-by-default",
+      "status": "superseded",
+      "evidence": [
+        "RELEASE.md"
+      ],
+      "gate": "allowlist + Sol"
+    }
+  ],
+  "notes": [
+    "Pre-gates Sol SDD-GATE-01..03 bloquean toda tarea; no son tareas de implementación.",
+    "TASK-016/017 permiten scaffolds separados; TASK-010 es shell productivo. La maqueta in-memory requiere `storefront-prototype` separado.",
+    "No tag, commit, publicación ni GitHub Release durante la baseline documental."
+  ],
+  "superseded": true,
+  "superseded_by": "20260921-single-tenant-installation-baseline"
+}

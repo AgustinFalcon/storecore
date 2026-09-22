@@ -1,0 +1,106 @@
+{
+  "feature": "pos-sales-ingestion",
+  "stack_profile": "backend",
+  "project_type": "production",
+  "execution_strategy": "batched",
+  "status": "superseded",
+  "notes": [
+    "Superseded for BlackStore companion by storecore-pos-integration-contract-v1. Do not implement ISSUE/REVERSAL. Mutually exclusive DDL with contract v1."
+  ],
+  "stats": {
+    "total": 8,
+    "done": 0,
+    "by_layer": { "1": 6, "2": 1, "3": 1 }
+  },
+  "tasks": [
+    {
+      "id": "TASK-PSI-001",
+      "title": "Capability EXTERNAL_INVENTORY_INGESTION + secret_ref",
+      "description": "Add future_optional module, INGEST and READ_BALANCE actions, DISABLED default, kill switch. No generic flags.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Medium",
+      "depends_on": [],
+      "files": ["backend/src/main/resources/db/migration/", "backend/src/main/kotlin/**/capability/"],
+      "acceptance_criteria": ["AC-12"]
+    },
+    {
+      "id": "TASK-PSI-002",
+      "title": "DDL delta ledger business_key, EXTERNAL types, oversell_open",
+      "description": "Apply data-model-delta.md. Keep UUID operation_key. Allow negative available only with oversell_open.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PSI-001"],
+      "files": ["backend/src/main/resources/db/migration/"],
+      "acceptance_criteria": ["AC-6", "AC-9"],
+      "references": ["2-technical/data-model-delta.md"]
+    },
+    {
+      "id": "TASK-PSI-003",
+      "title": "Port InventoryExternalIssue + pessimistic lock",
+      "description": "Hexagonal use case ISSUE/REVERSAL, lock variant_id ASC, all-or-nothing, envelope idempotency.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PSI-002"],
+      "files": ["backend/src/main/kotlin/**/inventory/"],
+      "acceptance_criteria": ["AC-1", "AC-3", "AC-4", "AC-5", "AC-10"]
+    },
+    {
+      "id": "TASK-PSI-004",
+      "title": "HTTP POST external-operations + Bearer installation",
+      "description": "Map result to 200/400/409/422. Duplicate returns original body. Payload mismatch same key = 400.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PSI-003"],
+      "files": ["backend/src/main/kotlin/**/web/"],
+      "acceptance_criteria": ["AC-12"]
+    },
+    {
+      "id": "TASK-PSI-005",
+      "title": "GET balances/{variant_id}",
+      "description": "Return available_quantity, reserved_quantity, oversell_open. 404 unknown variant. READ_BALANCE.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "Low",
+      "depends_on": ["TASK-PSI-002"],
+      "files": ["backend/src/main/kotlin/**/web/"],
+      "acceptance_criteria": ["AC-13"]
+    },
+    {
+      "id": "TASK-PSI-006",
+      "title": "next_web_delivery_at + NO_STOCK line payload",
+      "description": "Earliest promised WEB/ML pending fulfillment. If fields missing in baseline, oversell_allowed true with null date when a pending candidate exists.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PSI-003"],
+      "files": ["backend/src/main/kotlin/**/inventory/"],
+      "acceptance_criteria": ["AC-8"]
+    },
+    {
+      "id": "TASK-PSI-007",
+      "title": "ML desired_quantity outbox after ISSUE/REVERSAL",
+      "description": "GREATEST(0, available - safety_stock). Remote observed never writes ledger.",
+      "status": "pending",
+      "layer": 2,
+      "complexity": "Medium",
+      "depends_on": ["TASK-PSI-003"],
+      "files": ["backend/src/main/kotlin/**/ml/"],
+      "acceptance_criteria": ["AC-11"]
+    },
+    {
+      "id": "TASK-PSI-008",
+      "title": "Tests: idempotency, races, oversell, reversal, SALE reports ignore EXTERNAL",
+      "description": "Mandatory tests from technical spec. No invoice branch on reversal.",
+      "status": "pending",
+      "layer": 3,
+      "complexity": "High",
+      "depends_on": ["TASK-PSI-004", "TASK-PSI-005", "TASK-PSI-006", "TASK-PSI-007"],
+      "files": ["backend/src/test/"],
+      "acceptance_criteria": ["AC-3", "AC-5", "AC-6", "AC-7", "AC-9", "AC-10"]
+    }
+  ]
+}

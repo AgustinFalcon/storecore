@@ -1,0 +1,94 @@
+<section class="sc-page sc-console" aria-labelledby="admin-catalog-title">
+  <h1 id="admin-catalog-title">Catálogo operador</h1>
+  <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra effective. Base, desired y observed no se mezclan.</p>
+  <sc-feature-status
+    [loading]="state.loading"
+    [error]="state.errorMessage"
+    [empty]="!state.loading && state.products.length === 0"
+    emptyText="No hay productos en esta instalación."
+  />
+
+  <h2>Productos</h2>
+  @if (state.products.length) {
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Nombre</th>
+          <th>Estado</th>
+          <th>Effective</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (product of state.products; track product.sku) {
+          <tr>
+            <td>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(product)">{{ product.sku }}</button>
+            </td>
+            <td>{{ product.name }}</td>
+            <td>
+              @if (product.active) {
+                <span class="sc-badge sc-badge--ok">activo</span>
+              } @else {
+                <span class="sc-badge sc-badge--warn">inactivo</span>
+              }
+            </td>
+            <td class="sc-price">{{ product.price.effective }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+  <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
+    <label>SKU <input required name="sku" [ngModel]="state.draft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
+    <label>Nombre <input required name="name" [ngModel]="state.draft.name" (ngModelChange)="patch({ name: $event })" /></label>
+    <label>Descripción <textarea name="description" [ngModel]="state.draft.description" (ngModelChange)="patch({ description: $event })"></textarea></label>
+    <label>Marca <input name="brand" [ngModel]="state.draft.brand" (ngModelChange)="patch({ brand: $event })" /></label>
+    <label>Categoría <input name="category" [ngModel]="state.draft.category" (ngModelChange)="patch({ category: $event })" /></label>
+    <label>Imágenes
+      <textarea name="images" [ngModel]="imagesText" (ngModelChange)="setImages($event)"></textarea>
+    </label>
+    <label>Variantes (id|sku|nombre|qty)
+      <textarea name="variants" [ngModel]="variantsText" (ngModelChange)="setVariants($event)"></textarea>
+    </label>
+    <label>Precio base
+      <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
+    </label>
+    <label>Desired
+      <input type="number" name="desired" [ngModel]="state.draft.price.desired" (ngModelChange)="patchPrice({ desired: $event === '' ? null : +$event })" />
+    </label>
+    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Effective {{ state.draft.price.effective }}</p>
+    <label>Price version <input name="priceVersion" [ngModel]="state.draft.price.priceVersion" (ngModelChange)="patchPrice({ priceVersion: $event })" /></label>
+    <label>Oferta <input name="offerRef" [ngModel]="state.draft.offerRef" (ngModelChange)="patch({ offerRef: $event || null })" /></label>
+    <label>
+      <input type="checkbox" name="active" [ngModel]="state.draft.active" (ngModelChange)="patch({ active: $event })" />
+      Activo
+    </label>
+    <button type="submit" class="sc-btn sc-btn--primary">Guardar producto</button>
+  </form>
+
+  <div class="sc-console__pair">
+    <form class="sc-panel" (submit)="$event.preventDefault(); saveBrand.emit()">
+      <h2>Marcas</h2>
+      <ul class="sc-chip-list">
+        @for (brand of state.brands; track brand.id) {
+          <li><button type="button" class="sc-btn sc-btn--ghost" (click)="brandDraftChange.emit(brand)">{{ brand.name }}</button></li>
+        }
+      </ul>
+      <label>Id <input required name="brandId" [ngModel]="state.brandDraft.id" (ngModelChange)="brandDraftChange.emit({ ...state.brandDraft, id: $event })" /></label>
+      <label>Nombre <input required name="brandName" [ngModel]="state.brandDraft.name" (ngModelChange)="brandDraftChange.emit({ ...state.brandDraft, name: $event })" /></label>
+      <button type="submit" class="sc-btn sc-btn--primary">Guardar marca</button>
+    </form>
+    <form class="sc-panel" (submit)="$event.preventDefault(); saveCategory.emit()">
+      <h2>Categorías</h2>
+      <ul class="sc-chip-list">
+        @for (category of state.categories; track category.id) {
+          <li><button type="button" class="sc-btn sc-btn--ghost" (click)="categoryDraftChange.emit(category)">{{ category.name }}</button></li>
+        }
+      </ul>
+      <label>Id <input required name="categoryId" [ngModel]="state.categoryDraft.id" (ngModelChange)="categoryDraftChange.emit({ ...state.categoryDraft, id: $event })" /></label>
+      <label>Nombre <input required name="categoryName" [ngModel]="state.categoryDraft.name" (ngModelChange)="categoryDraftChange.emit({ ...state.categoryDraft, name: $event })" /></label>
+      <button type="submit" class="sc-btn sc-btn--primary">Guardar categoría</button>
+    </form>
+  </div>
+</section>

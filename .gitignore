@@ -1,6 +1,30 @@
 # Deny-by-default repository root.
-# Existing workspace material is intentionally not versioned until audited.
+# Inherited material stays ignored until audited. Explicit allowlist below.
 *
 !/.gitignore
 !/GOVERNANCE.md
 !/EVIDENCE-INDEX.md
+!/GOVERNANCE-BACKLOG.md
+!/SOURCE-CLASSIFICATION.md
+
+# SDD baseline allowlist, sin stage/push automático
+!sdd/
+!sdd/**
+!/docs/
+!/docs/agent/
+!/docs/agent/**
+!/backend/
+!/backend/**
+!/frontend/
+!/frontend/**
+!AGENTS.md
+!README.md
+!GOVERNANCE.md
+!SOURCE-CLASSIFICATION.md
+!EVIDENCE-INDEX.md
+
+# Build and dependency outputs stay out of the allowlist
+backend/target/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
