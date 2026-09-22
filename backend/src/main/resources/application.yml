@@ -17,3 +17,5 @@ management:
 storecore:
   installation:
     origin: ${STORECORE_INSTALLATION_ORIGIN:http://localhost:4200}
+  integrations:
+    refetch-delay-ms: 30000

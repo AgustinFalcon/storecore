@@ -7,7 +7,6 @@ import { CustomerSession } from '../../core/auth/customer-session';
 import { UserSession } from '../../core/auth/user-session';
 import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/probe-customer-session.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
-import { FavoritesMemory } from '../../core/shopper/favorites-memory';
 import { ThemeAppearance } from '../../core/theme/theme-appearance';
 import { CartStore } from '../cart/cart.store';
 import { ShellStore } from './shell.store';
@@ -34,7 +33,6 @@ export class ShellComponent implements OnInit {
     readonly cart: CartStore,
     readonly customer: CustomerSession,
     readonly user: UserSession,
-    readonly favorites: FavoritesMemory,
     private readonly theme: ThemeAppearance,
     private readonly probeCustomer: ProbeCustomerSessionUseCase,
     private readonly probeUser: ProbeUserSessionUseCase,

@@ -23,8 +23,9 @@
             <td>
               <span
                 class="sc-badge"
+                [class.sc-badge--info]="item.state === 'READ_ONLY'"
                 [class.sc-badge--ok]="item.state === 'ACTIVE'"
-                [class.sc-badge--warn]="item.state === 'PAUSED' || item.state === 'READ_ONLY'"
+                [class.sc-badge--warn]="item.state === 'PAUSED'"
                 [class.sc-badge--err]="item.state === 'ERROR'"
               >{{ item.state }}</span>
             </td>

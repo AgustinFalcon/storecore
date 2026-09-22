@@ -8,39 +8,50 @@
   />
   @if (state.cart.lines.length > 0) {
     <div class="sc-bag__layout">
-      <ul class="sc-bag__lines">
-        @for (line of state.cart.lines; track line.sku) {
-          <li class="sc-bag__line">
-            <div>
-              <strong>{{ line.name }}</strong>
-              <p class="sc-price__meta">{{ line.sku }}</p>
-              @if (line.offerRef) {
-                <span class="sc-off">OFF</span>
-              }
-            </div>
-            <div class="sc-stepper">
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity - 1 })">−</button>
-              <span>{{ line.quantity }}</span>
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })">+</button>
-            </div>
-            <div class="sc-bag__prices">
-              <p class="sc-price">{{ line.effectiveUnitPrice }}</p>
-              <p class="sc-price__meta">
-                original {{ line.originalUnitPrice }}
-                · dto {{ line.discountAmount }}
-                · campaña {{ line.campaignRef || '—' }}
-              </p>
-            </div>
-          </li>
-        }
-      </ul>
+      <table class="sc-table">
+        <thead>
+          <tr>
+            <th>SKU / nombre</th>
+            <th>Cant.</th>
+            <th>Original</th>
+            <th>Dto</th>
+            <th>Oferta</th>
+            <th>Campaña</th>
+            <th>Effective</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of state.cart.lines; track line.sku) {
+            <tr>
+              <td>
+                <strong>{{ line.name }}</strong>
+                <p class="sc-price__meta">{{ line.sku }}</p>
+              </td>
+              <td>
+                <div class="sc-stepper">
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity - 1 })">−</button>
+                  <span>{{ line.quantity }}</span>
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })">+</button>
+                </div>
+              </td>
+              <td>{{ line.originalUnitPrice }}</td>
+              <td>{{ line.discountAmount }}</td>
+              <td>{{ line.offerRef || '—' }}</td>
+              <td>{{ line.campaignRef || '—' }}</td>
+              <td class="sc-price">{{ line.effectiveUnitPrice }}</td>
+              <td class="sc-price">{{ lineSubtotal(line) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
       <aside class="sc-summary">
-        <p class="sc-summary__label">Total efectivo</p>
+        <p class="sc-summary__label">Total effective</p>
         <p class="sc-price sc-price--hero">{{ total }}</p>
         @if (state.cart.currency) {
           <p class="sc-price__meta">{{ state.cart.currency }}</p>
         }
-        <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/checkout">Ir a pagar</a>
+        <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/checkout">Checkout</a>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/catalog">Seguir comprando</a>
       </aside>
     </div>

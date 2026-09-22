@@ -12,6 +12,6 @@
 
 - Adapter BlackStore y `/blackstore-integration/v1`.
 - Fiscal / ARCA.
-- Inventario WEB ledger y sync ML (TASK-007 / 008).
+- Inventario WEB ledger write y sync/refetch ML vivo (TODO-041). La UI U-07/U-08 es read-only + mapping.
 - Marketplace, feature flags, `store_id`.
 - Prototype fixture. Si aparece, build `storefront-prototype` y banner DEMO.

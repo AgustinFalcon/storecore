@@ -24,7 +24,7 @@
             <td><a [routerLink]="['/user/orders', order.id]">{{ order.id }}</a></td>
             <td><span class="sc-badge sc-badge--warn">{{ order.shipmentStatus }}</span></td>
             <td>
-              @if (nextShip(order); as next) {
+              @if (nextShip(order) === 'SHIPPED') {
                 <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
               } @else {
                 {{ order.tracking || '—' }}

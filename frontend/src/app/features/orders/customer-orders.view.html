@@ -4,28 +4,25 @@
     [loading]="loading"
     [error]="error"
     [empty]="!loading && orders.length === 0"
-    emptyText="Aún no hay órdenes."
+    emptyText="Este customer no tiene órdenes."
   />
   @if (orders.length) {
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>Orden</th>
-          <th>Pago</th>
-          <th>Estado</th>
-          <th>Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (order of orders; track order.id) {
-          <tr>
-            <td><a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a></td>
-            <td><span class="sc-badge sc-badge--info">{{ order.paymentStatus }}</span></td>
-            <td><span class="sc-badge">{{ order.orderStatus }}</span></td>
-            <td class="sc-price">{{ order.total }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+    <ul class="sc-order-list">
+      @for (order of orders; track order.id) {
+        <li class="sc-card sc-order-card">
+          <p>
+            <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
+            <span class="sc-badge">orden {{ order.orderStatus }}</span>
+            <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+          </p>
+          <p class="sc-price">{{ order.total }}</p>
+          <ul class="sc-order-card__lines">
+            @for (line of order.lines; track line.sku) {
+              <li>{{ line.name }} × {{ line.quantity }} · {{ line.effectiveUnitPrice }}</li>
+            }
+          </ul>
+        </li>
+      }
+    </ul>
   }
 </section>

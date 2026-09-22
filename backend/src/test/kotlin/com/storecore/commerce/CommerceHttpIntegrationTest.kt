@@ -1,5 +1,6 @@
 package com.storecore.commerce
 
+import com.storecore.commerce.infrastructure.InboxApplicationWorker
 import com.storecore.commerce.infrastructure.JdbcInventoryService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -29,6 +30,7 @@ class CommerceHttpIntegrationTest(
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
     @Autowired private val inventory: JdbcInventoryService,
+    @Autowired private val inboxWorker: InboxApplicationWorker,
     @LocalServerPort private val port: Int,
 ) {
     private lateinit var admin: Session
@@ -127,6 +129,8 @@ class CommerceHttpIntegrationTest(
         assertEquals(400, oversized.statusCode.value())
         assertTrue(oversized.body!!.contains("WEBHOOK_PAYLOAD_TOO_LARGE"))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-big'", Int::class.java))
+        assertEquals(0, inboxWorker.processPayments())
+        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-88')", String::class.java))
     }
 
     @Test

@@ -7,7 +7,7 @@
     emptyText="Orden no disponible."
   />
   @if (order) {
-    <h1 id="admin-order-title">Orden {{ order.id }}</h1>
+    <h1 id="admin-order-title">Fulfillment {{ order.id }}</h1>
     <p>
       <span class="sc-badge">orden {{ order.orderStatus }}</span>
       <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
@@ -35,9 +35,11 @@
     </table>
     @if (nextShip(order); as next) {
       <form class="sc-panel" (submit)="$event.preventDefault()">
-        <label>Tracking
-          <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
-        </label>
+        @if (next === 'SHIPPED') {
+          <label>Tracking
+            <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
+          </label>
+        }
         <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
           {{ shipmentLabel(next) }}
         </button>

@@ -1,6 +1,6 @@
 <section class="sc-page sc-checkout" aria-labelledby="checkout-title">
   <h1 id="checkout-title">Checkout</h1>
-  <p class="sc-page__lede">El pago se inicia en el servidor. Reintentar reusa la misma clave, entrega y moneda. El browser no habla con Mercado Pago.</p>
+  <p class="sc-page__lede">El pago se inicia en el servidor. Reintentar reusa la misma clave. El browser no habla con Mercado Pago.</p>
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
   <div class="sc-checkout__layout">
     <form class="sc-panel" (submit)="$event.preventDefault(); pay.emit()">
@@ -13,9 +13,9 @@
         </select>
       </label>
       <label>Moneda
-        <input required name="currency" [ngModel]="'ARS'" readonly />
+        <input required name="currency" [ngModel]="state.currency" (ngModelChange)="currencyChange.emit($event)" />
       </label>
-      <p class="sc-mono">Clave {{ state.idempotencyKey }}</p>
+      <p class="sc-mono sc-price__meta">Clave {{ state.idempotencyKey }}</p>
       <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay">Pagar</button>
       @if (state.errorMessage) {
         <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="pay.emit()">Reintentar</button>

@@ -23,6 +23,7 @@ export interface UserState {
   readonly promoDraft: ManualPromo;
   readonly manifest: string;
   readonly preview: ProfilePreview | null;
+  readonly previewManifest: string | null;
 }
 
 const emptyPromo: ManualPromo = {
@@ -60,6 +61,7 @@ export class UserStore extends ComponentStore<UserState> {
       promoDraft: emptyPromo,
       manifest: '',
       preview: null,
+      previewManifest: null,
     });
   }
 
@@ -78,7 +80,12 @@ export class UserStore extends ComponentStore<UserState> {
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
   readonly setHome = this.updater((s, home: HomeContentDraft) => ({ ...s, home }));
   readonly setPromoDraft = this.updater((s, promoDraft: ManualPromo) => ({ ...s, promoDraft }));
-  readonly setManifest = this.updater((s, manifest: string) => ({ ...s, manifest }));
+  private previewGeneration = 0;
+
+  readonly setManifest = (manifest: string): void => {
+    this.previewGeneration += 1;
+    this.patchState({ manifest, preview: null, previewManifest: null, loading: false });
+  };
 
   readonly submitSignIn = this.effect<void>((trigger$) =>
     trigger$.pipe(
@@ -222,27 +229,46 @@ export class UserStore extends ComponentStore<UserState> {
         this.patchState({ loading: true, errorMessage: '' });
       }),
       filter(() => Boolean(this.snapshot.manifest.trim())),
-      switchMap(() =>
-        this.importer.preview(this.snapshot.manifest).pipe(
+      switchMap(() => {
+        const manifest = this.snapshot.manifest;
+        const generation = this.previewGeneration;
+        return this.importer.preview(manifest).pipe(
           tapResponse({
-            next: (preview) => this.patchState({ preview, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            next: (preview) => {
+              if (generation === this.previewGeneration && manifest === this.snapshot.manifest) {
+                this.patchState({ preview, previewManifest: manifest, loading: false });
+              }
+            },
+            error: (err: unknown) => {
+              if (generation === this.previewGeneration) {
+                this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
+              }
+            },
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
 
   readonly mergeProfile = this.effect<void>((trigger$) =>
     trigger$.pipe(
       tap(() => {
-        if (this.snapshot.preview && !this.snapshot.preview.compatible) {
+        const { preview, previewManifest, manifest } = this.snapshot;
+        if (!preview || previewManifest !== manifest) {
+          this.patchState({ loading: false, errorMessage: 'Previsualizá el manifiesto actual antes del merge.' });
+          return;
+        }
+        if (!preview.compatible) {
           this.patchState({ loading: false, errorMessage: 'Perfil incompatible. Merge cerrado.' });
           return;
         }
         this.patchState({ loading: true, errorMessage: '' });
       }),
-      filter(() => !(this.snapshot.preview && !this.snapshot.preview.compatible)),
+      filter(() => Boolean(
+        this.snapshot.preview &&
+        this.snapshot.previewManifest === this.snapshot.manifest &&
+        this.snapshot.preview.compatible,
+      )),
       switchMap(() =>
         this.importer.merge(this.snapshot.manifest).pipe(
           tapResponse({

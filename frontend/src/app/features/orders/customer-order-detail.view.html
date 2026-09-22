@@ -4,7 +4,7 @@
     [loading]="loading"
     [error]="error"
     [empty]="!loading && order === null"
-    emptyText="No encontramos esa orden."
+    emptyText="Orden no disponible para este customer."
   />
   @if (order) {
     <h1 id="order-detail-title">Orden {{ order.id }}</h1>

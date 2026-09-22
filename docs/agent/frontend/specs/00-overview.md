@@ -10,7 +10,7 @@ Plan frontend del core `storecore-core-v1.0.0`. Patrón AssistTime `release/1.4`
 | TASK-004 | Registro/sesión/perfil/direcciones customer; sesión user | Hecho |
 | TASK-005 | Home, búsqueda, filtros, detalle; admin catálogo+marcas+categorías+imágenes+contenido | Hecho |
 | TASK-006 | Carrito snapshot, qty, checkout con entrega/moneda + Reintentar, órdenes | Hecho |
-| TASK-007 / 008 | Inventario WEB y ML | Estructura UI hecha; API pendiente |
+| TASK-007 / 008 | Inventario WEB read-only y mapa ML | Hecho en UI (HTTP). Refetch/sale ML vivo = TODO-041 |
 | TASK-009 | Promos manuales admin (currency, vigencia, prioridad, margen, aprobador) | Hecho |
 | TASK-010 | Fulfillment / RMA sin saltos + tracking | Hecho |
 | TASK-012 | Preview/merge de perfil versionado; secretos bloqueados | Hecho |

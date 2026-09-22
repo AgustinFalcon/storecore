@@ -7,9 +7,9 @@
 
 ## Residuales honestos
 
-- TASK-008/014: inbox persist-before-ACK done. Live ML refetch/canonical sale is **TODO-041**.
-- TASK-013: Playwright/axe/Stitch not automated.
-- TODO-003: fleet runbook draft at `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
+- TASK-008/014 inbox persist-before-ACK done. TODO-041 worker applies only after official refetch (fake in CI; live credentials per installation, never in repo).
+- TASK-013: Playwright/axe on public screens (`frontend` `npm run test:a11y`). Stitch is a visual reference, not a pixel baseline.
+- TODO-003: fleet runbook complete at `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
 
 ## Precedencia
 
@@ -20,7 +20,9 @@
 
 ## Gate actual
 
-Siguiente carril: **frontend UX** (`docs/agent/frontend/ux-handoff.md`). DS-00 y P-01 están en código; P-02…U-10 pendientes. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production, deploy ni Mercado Pago en el browser.
+Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado**: DS-00…U-10 en código, sin favoritos ni Mercado Pago en el browser. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+
+Siguiente carril: features con Sol GO (POS contrato, fiscal externo, automatizaciones ML). No autoriza live vendor credentials en CI.
 
 ## WIP POS (paralelo, no es el baseline)
 

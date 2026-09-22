@@ -1,6 +1,5 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { FavoritesMemory } from '../core/shopper/favorites-memory';
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
@@ -9,16 +8,6 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
-      <button
-        type="button"
-        class="sc-tile__fav"
-        [class.is-on]="favorites.has(product.sku)"
-        [attr.aria-pressed]="favorites.has(product.sku)"
-        [attr.aria-label]="favorites.has(product.sku) ? 'Sacar de favoritos' : 'Guardar en favoritos'"
-        (click)="favorites.toggle(product.sku)"
-      >
-        ♥
-      </button>
       @if (offer) {
         <span class="sc-off">OFF</span>
       }
@@ -37,6 +26,4 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
   @Input() offer = false;
-
-  constructor(readonly favorites: FavoritesMemory) {}
 }

@@ -5,29 +5,29 @@ Cuando llegue un diseño, pegar ID + HTML. El agente lo vuelca en el `*.view.htm
 | ID | Archivo | Estado diseño |
 |---|---|---|
 | DS-00 | shell + tokens | En código (theme header + CTA azul + aire) |
-| P-01 | `storefront-home.view.html` | En código (layout P-01, datos HTTP, sin ferretería) |
-| P-02 | `catalog-page.view.html` | Pendiente |
-| P-03 | `product-page.view.html` | Pendiente |
-| C-01 | `customer-session.view.html` | Pendiente |
-| C-02 | `customer-register.view.html` | Pendiente |
-| C-03 | `customer-profile.view.html` | Pendiente |
-| C-04 | `customer-addresses.view.html` | Pendiente |
-| C-05 | `cart-page.view.html` | Pendiente |
-| C-06 | `checkout-page.view.html` | Pendiente |
-| C-07 | `checkout-result.view.html` | Pendiente |
-| C-08 | `customer-orders.view.html` | Pendiente |
-| C-09 | `customer-order-detail.view.html` | Pendiente |
-| U-01 | `user-session.view.html` | Pendiente |
-| U-02 | `user-content.view.html` | Pendiente |
-| U-03 | `user-catalog.view.html` | Pendiente |
-| U-04 | `user-promos.view.html` | Pendiente |
-| U-05 | `fulfillment.view.html` | Pendiente |
-| U-06 | `user-order-detail.view.html` | Pendiente |
-| U-07 | `user-inventory.view.html` | Pendiente |
-| U-08 | `user-mercadolibre.view.html` | Pendiente |
-| U-09 | `user-capabilities.view.html` | Pendiente |
-| U-10 | `profile-import.view.html` | Pendiente |
+| P-01 | `storefront-home.view.html` | En código |
+| P-02 | `catalog-page.view.html` | En código |
+| P-03 | `product-page.view.html` | En código |
+| C-01 | `customer-session.view.html` | En código |
+| C-02 | `customer-register.view.html` | En código |
+| C-03 | `customer-profile.view.html` | En código |
+| C-04 | `customer-addresses.view.html` | En código |
+| C-05 | `cart-page.view.html` | En código |
+| C-06 | `checkout-page.view.html` | En código |
+| C-07 | `checkout-result.view.html` | En código |
+| C-08 | `customer-orders.view.html` | En código |
+| C-09 | `customer-order-detail.view.html` | En código |
+| U-01 | `user-session.view.html` | En código |
+| U-02 | `user-content.view.html` | En código |
+| U-03 | `user-catalog.view.html` | En código |
+| U-04 | `user-promos.view.html` | En código |
+| U-05 | `fulfillment.view.html` | En código |
+| U-06 | `user-order-detail.view.html` | En código |
+| U-07 | `user-inventory.view.html` | En código |
+| U-08 | `user-mercadolibre.view.html` | En código |
+| U-09 | `user-capabilities.view.html` | En código |
+| U-10 | `profile-import.view.html` | En código |
 
-Orden de pedido a la IA de diseño: DS-00 → P-01…P-03 → C-01…C-09 → U-01…U-10.
+Plan cerrado 2026-09-22. Favoritos no van en chrome ni PDP (TODO-036). Stitch de P-02…U-10 no es bloqueante: las views usan tokens DS-00.
 
 Prompt canónico: `docs/agent/frontend/ux-design-prompt.md`.

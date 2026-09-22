@@ -24,6 +24,7 @@ export interface CustomerState {
   readonly lastName: string;
   readonly password: string;
   readonly profile: CustomerProfile;
+  readonly saved: boolean;
   readonly addresses: readonly CustomerAddress[];
   readonly addressDraft: CustomerAddress;
 }
@@ -48,6 +49,7 @@ const INITIAL: CustomerState = {
   lastName: '',
   password: '',
   profile: emptyProfile,
+  saved: false,
   addresses: [],
   addressDraft: emptyAddress,
 };
@@ -83,7 +85,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   readonly setFirstName = this.updater((s, firstName: string) => ({ ...s, firstName }));
   readonly setLastName = this.updater((s, lastName: string) => ({ ...s, lastName }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
-  readonly setProfile = this.updater((s, profile: CustomerProfile) => ({ ...s, profile }));
+  readonly setProfile = this.updater((s, profile: CustomerProfile) => ({ ...s, profile, saved: false }));
   readonly setAddressDraft = this.updater((s, addressDraft: CustomerAddress) => ({ ...s, addressDraft }));
   readonly clearAddressDraft = this.updater((s) => ({ ...s, addressDraft: emptyAddress }));
 
@@ -148,7 +150,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       switchMap(() =>
         this.getProfile.execute().pipe(
           tapResponse({
-            next: (profile) => this.patchState({ profile, loading: false }),
+            next: (profile) => this.patchState({ profile, loading: false, saved: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
@@ -171,8 +173,8 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       switchMap(() =>
         this.saveProfile.execute(this.snapshot.profile).pipe(
           tapResponse({
-            next: (profile) => this.patchState({ profile, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            next: (profile) => this.patchState({ profile, loading: false, saved: true, errorMessage: '' }),
+            error: (err: unknown) => this.patchState({ loading: false, saved: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
       ),

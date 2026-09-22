@@ -486,21 +486,6 @@ pre {
   text-decoration: none;
 }
 
-.sc-tile__fav {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.55rem;
-  z-index: 1;
-  width: 2rem;
-  height: 2rem;
-  border: 0;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.92);
-  color: var(--sc-color-faint-ink);
-  cursor: pointer;
-}
-
-.sc-tile__fav.is-on,
 .sc-btn.is-on {
   color: var(--sc-color-danger);
 }
@@ -524,7 +509,6 @@ pre {
   justify-self: start;
 }
 
-.sc-plp__layout,
 .sc-pdp__layout {
   display: grid;
   gap: var(--sc-space-6);
@@ -537,7 +521,71 @@ pre {
   padding: var(--sc-space-5);
   background: var(--sc-color-surface);
   border: 1px solid var(--sc-color-line);
-  border-radius: 1rem;
+  border-radius: var(--sc-radius);
+}
+
+.sc-filters--toolbar {
+  margin: 0 0 var(--sc-space-6);
+}
+
+.sc-price__was {
+  margin: 0;
+  color: var(--sc-color-faint-ink);
+  text-decoration: line-through;
+}
+
+.sc-price-stack {
+  display: grid;
+  gap: var(--sc-space-1);
+}
+
+.sc-banner {
+  margin: 0;
+  padding: var(--sc-space-3) var(--sc-space-4);
+  border-radius: var(--sc-radius);
+}
+
+.sc-banner--ok {
+  background: var(--sc-color-success-soft);
+  color: var(--sc-color-success);
+}
+
+.sc-order-list,
+.sc-order-card__lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--sc-space-4);
+}
+
+.sc-order-card p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sc-space-3);
+  align-items: center;
+}
+
+.sc-order-card__lines {
+  gap: var(--sc-space-2);
+  color: var(--sc-color-muted-ink);
+  font-size: var(--sc-text-sm);
+}
+
+.sc-address-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  margin: 0 0 var(--sc-space-3);
+}
+
+.sc-address-card.is-on {
+  outline: 2px solid var(--sc-color-focus);
+}
+
+.sc-manifest {
+  min-height: 12rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .sc-filters__check {
@@ -807,6 +855,7 @@ pre {
   border: 1px solid var(--sc-color-line);
   border-radius: 1rem;
   overflow: hidden;
+  overflow-x: auto;
 }
 
 .sc-table th,
@@ -854,8 +903,9 @@ pre {
 }
 
 @media (min-width: 768px) {
-  .sc-plp__layout {
-    grid-template-columns: 16rem minmax(0, 1fr);
+  .sc-filters--toolbar {
+    grid-template-columns: minmax(10rem, 1.4fr) repeat(2, minmax(8rem, 1fr)) auto auto;
+    align-items: end;
   }
 
   .sc-pdp__layout,

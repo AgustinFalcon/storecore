@@ -4,7 +4,7 @@
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
   <form class="sc-panel" (submit)="$event.preventDefault(); preview.emit()">
     <label>Manifiesto
-      <textarea required name="manifest" class="sc-mono" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
+      <textarea required name="manifest" class="sc-mono sc-manifest" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
     </label>
     <div class="sc-table__actions">
       <button type="submit" class="sc-btn sc-btn--primary">Previsualizar</button>
