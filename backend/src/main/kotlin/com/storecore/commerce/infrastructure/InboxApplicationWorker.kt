@@ -5,7 +5,6 @@ import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.application.port.output.OfficialResourceQueryPort
 import com.storecore.commerce.domain.OfficialMlResource
-import com.storecore.commerce.domain.OfficialPaymentResource
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -34,34 +33,10 @@ class InboxApplicationWorker(
     @Scheduled(initialDelayString = "\${storecore.integrations.refetch-delay-ms:30000}", fixedDelayString = "\${storecore.integrations.refetch-delay-ms:30000}")
     fun tick() {
         if (!resources.configured()) return
-        runCatching { processPayments() }
         runCatching { processMercadoLibre() }
     }
 
-    fun processPayments(): Int {
-        capabilities.decide("PAYMENTS_MP", "PROCESS_WEBHOOK", CapabilityActor.System)
-        if (!resources.configured()) return 0
-        return claim(
-            """SELECT i.id,i.provider_event_id FROM payment_event_processing p
-               JOIN payment_event_inbox i ON i.id=p.inbox_id
-               WHERE (p.status='RECEIVED' OR (p.status='PROCESSING' AND (p.lease_expires_at IS NULL OR p.lease_expires_at < clock_timestamp())))
-               ORDER BY i.id LIMIT 20 FOR UPDATE OF p SKIP LOCKED""",
-            PAYMENT_PROCESSING,
-        ).count { (inboxId, eventId) ->
-            val official = runCatching { resources.payment(eventId) }.getOrElse { error ->
-                retry(PAYMENT_PROCESSING, inboxId, error.message ?: "OFFICIAL_REFETCH_FAILED")
-                return@count false
-            } ?: run {
-                fail(PAYMENT_PROCESSING, inboxId, "OFFICIAL_RESOURCE_NOT_FOUND")
-                return@count false
-            }
-            runCatching { transactions.execute { applyPayment(inboxId, eventId, official) } ?: false }
-                .getOrElse { error ->
-                    retry(PAYMENT_PROCESSING, inboxId, error.message ?: "PAYMENT_APPLY_FAILED")
-                    false
-                }
-        }
-    }
+    fun processPayments(): Int = 0
 
     fun processMercadoLibre(): Int {
         capabilities.decide("MARKETPLACE_ML", "SYNC", CapabilityActor.System)
@@ -88,40 +63,6 @@ class InboxApplicationWorker(
                         false
                     }
             }
-    }
-
-    private fun applyPayment(inboxId: Long, eventId: String, official: OfficialPaymentResource): Boolean {
-        val status = mapPaymentStatus(official.status) ?: run {
-            fail(PAYMENT_PROCESSING, inboxId, "OFFICIAL_PAYMENT_STATUS_UNSUPPORTED")
-            return false
-        }
-        val payment = findPayment(official, eventId)
-        if (!isTerminal(status)) {
-            if (payment != null) {
-                jdbc.update("UPDATE payments SET provider_payment_id=?,status=?,updated_at=now() WHERE id=?", official.providerPaymentId, status, payment.first)
-            }
-            release(PAYMENT_PROCESSING, inboxId)
-            return false
-        }
-        if (payment == null) {
-            markProcessed(PAYMENT_PROCESSING, inboxId)
-            return true
-        }
-        jdbc.update("UPDATE payments SET provider_payment_id=?,status=?,updated_at=now() WHERE id=?", official.providerPaymentId, status, payment.first)
-        if (status == "APPROVED") {
-            jdbc.update("UPDATE orders SET status='PAID',updated_at=now() WHERE id=? AND status='PENDING_PAYMENT'", payment.second)
-            consumeCheckoutSaga(payment.second)
-        }
-        if (status == "REJECTED" || status == "CANCELLED") {
-            jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=now() WHERE id=? AND status='PENDING_PAYMENT'", payment.second)
-        }
-        jdbc.update(
-            "INSERT INTO payment_event_applications(inbox_id,payment_id,resulting_status) VALUES (?,?,?) ON CONFLICT (inbox_id) DO NOTHING",
-            inboxId, payment.first, status,
-        )
-        emitPaymentOutbox(inboxId, official, status)
-        markProcessed(PAYMENT_PROCESSING, inboxId)
-        return true
     }
 
     private fun applyMercadoLibre(row: MlInbox, official: OfficialMlResource): Boolean {
@@ -176,56 +117,6 @@ class InboxApplicationWorker(
         )
     }
 
-    private fun findPayment(official: OfficialPaymentResource, eventId: String): Pair<Long, Long>? {
-        val byProvider = jdbc.query(
-            "SELECT id,order_id FROM payments WHERE provider_payment_id=?",
-            { rs, _ -> rs.getLong("id") to rs.getLong("order_id") },
-            official.providerPaymentId,
-        ).firstOrNull()
-        if (byProvider != null) return byProvider
-        val reference = official.externalReference ?: eventId
-        return jdbc.query(
-            "SELECT id,order_id FROM payments WHERE external_reference=?",
-            { rs, _ -> rs.getLong("id") to rs.getLong("order_id") },
-            reference,
-        ).firstOrNull()
-    }
-
-    private fun consumeCheckoutSaga(orderId: Long) {
-        val snapshot = jdbc.queryForObject("SELECT checkout_snapshot::text FROM orders WHERE id=?", String::class.java, orderId) ?: return
-        val saga = mapper.readTree(snapshot).path("reservationSagaKey").asText(null) ?: return
-        if (saga.isBlank()) return
-        inventory.consumeSaga(UUID.fromString(saga), "PAYMENT:$orderId")
-    }
-
-    private fun emitPaymentOutbox(inboxId: Long, official: OfficialPaymentResource, status: String) {
-        val outboxId = jdbc.query(
-            """INSERT INTO integration_outbox(provider,source_inbox_id,idempotency_key,kind,payload_redacted)
-               VALUES ('MERCADO_PAGO',?,?,'PAYMENT_STATUS_APPLIED',?::jsonb)
-               ON CONFLICT (provider,source_inbox_id,kind) DO NOTHING RETURNING id""",
-            { rs, _ -> rs.getLong(1) },
-            inboxId, deterministicId("mp:$inboxId:$status"),
-            mapper.createObjectNode().put("providerPaymentId", official.providerPaymentId).put("status", status).toString(),
-        ).firstOrNull() ?: return
-        jdbc.update("INSERT INTO integration_outbox_delivery(outbox_id,status) VALUES (?,'PENDING') ON CONFLICT (outbox_id) DO NOTHING", outboxId)
-    }
-
-    private fun mapPaymentStatus(raw: String): String? = when (raw.lowercase()) {
-        "approved" -> "APPROVED"
-        "rejected" -> "REJECTED"
-        "cancelled", "canceled" -> "CANCELLED"
-        "refunded" -> "REFUNDED"
-        "charged_back", "charged-back" -> "CHARGED_BACK"
-        "pending", "in_process", "in_mediation" -> "PENDING"
-        else -> raw.takeIf { it in TERMINAL + NON_TERMINAL }
-    }
-
-    private fun isTerminal(status: String) = status in TERMINAL
-
-    private fun claim(sql: String, table: String): List<Pair<Long, String>> = claim(sql, table) { rs ->
-        rs.getLong("id") to rs.getString("provider_event_id")
-    }
-
     private fun <T> claim(sql: String, table: String, mapper: (java.sql.ResultSet) -> T): List<T> = transactions.execute {
         val safeTable = processingTable(table)
         val rows = jdbc.query(sql, { rs, _ -> mapper(rs) })
@@ -264,13 +155,6 @@ class InboxApplicationWorker(
         )
     }
 
-    private fun release(table: String, inboxId: Long) {
-        jdbc.update(
-            "UPDATE ${processingTable(table)} SET status='RECEIVED',locked_by=NULL,lease_expires_at=NULL,updated_at=now() WHERE inbox_id=?",
-            inboxId,
-        )
-    }
-
     private fun processingTable(table: String): String {
         check(table in PROCESSING_TABLES) { "unsupported processing table" }
         return table
@@ -281,10 +165,7 @@ class InboxApplicationWorker(
     private data class MlInbox(val id: Long, val topic: String, val resource: String, val accountId: Long)
 
     private companion object {
-        const val PAYMENT_PROCESSING = "payment_event_processing"
         const val ML_PROCESSING = "ml_notification_processing"
-        val PROCESSING_TABLES = setOf(PAYMENT_PROCESSING, ML_PROCESSING)
-        val TERMINAL = setOf("APPROVED", "REJECTED", "CANCELLED", "REFUNDED", "CHARGED_BACK")
-        val NON_TERMINAL = setOf("PENDING")
+        val PROCESSING_TABLES = setOf(ML_PROCESSING)
     }
 }

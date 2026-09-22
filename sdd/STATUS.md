@@ -22,7 +22,7 @@
 
 Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado**: DS-00…U-10 en código, sin favoritos ni Mercado Pago en el browser. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Siguiente carril: Sol review de MP-LIVE-02 (`ready_for_sol_review`) y, si hay GO, MP-LIVE-03. POS y fiscal siguen documentales. No autoriza live vendor credentials en CI.
+Siguiente carril: Sol review del código MP-LIVE-03/04. MP-LIVE-05, POS y fiscal siguen bloqueados. No autoriza live vendor credentials en CI.
 
 ## WIP POS (paralelo, no es el baseline)
 
@@ -37,4 +37,4 @@ Siguiente carril: Sol review de MP-LIVE-02 (`ready_for_sol_review`) y, si hay GO
 ## Mercado Pago Checkout Pro (WIP separado)
 
 - `sdd/wip/20260922-storecore-mp-live-checkout-v1/`: Checkout Pro externo en la misma ventana mediante Orders API, `documented_deferred`.
-- MP-LIVE-02A cerrado in-repo (política pura). MP-LIVE-02 propuesto y `ready_for_sol_review`. MP-LIVE-03/04/05, pagos reales y fiscal siguen NO-GO.
+- MP-LIVE-02A cerrado. MP-LIVE-02 aprobado. MP-LIVE-03/04 implementados con CONDITIONAL_GO (adapter OFF, doubles, sin credenciales). MP-LIVE-05, pagos reales y fiscal siguen NO-GO.

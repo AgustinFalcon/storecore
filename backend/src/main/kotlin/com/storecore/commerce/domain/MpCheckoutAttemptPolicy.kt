@@ -142,6 +142,8 @@ enum class CheckoutAttemptState(val blocksAnotherAttempt: Boolean) {
     READY_FOR_REDIRECT(true),
     AWAITING_RESULT(true),
     QUARANTINED(true),
+    ACCREDITED(true),
+    SUPERSEDED(false),
     TERMINAL_UNPAID_VERIFIED(false),
 }
 

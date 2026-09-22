@@ -118,19 +118,14 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
-    fun `payment webhook persists inbox before ack and replays`() {
+    fun `legacy payment webhook is retired without inbox`() {
         val first = exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-88", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-88"}}""")
-        assertEquals(200, first.statusCode.value())
+        assertEquals(410, first.statusCode.value())
+        assertTrue(first.body!!.contains("LEGACY_MP_NOTIFICATION_RETIRED"))
         val replay = exchange("/api/v1/payments/mercadopago/notifications", HttpMethod.POST, """{"action":"payment.updated","data":{"id":"mp-88"}}""")
-        assertEquals(200, replay.statusCode.value())
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-88'", Int::class.java))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-88')", Int::class.java))
-        val oversized = exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-big", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-big"},"pad":"${"x".repeat(20_000)}"}""")
-        assertEquals(400, oversized.statusCode.value())
-        assertTrue(oversized.body!!.contains("WEBHOOK_PAYLOAD_TOO_LARGE"))
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-big'", Int::class.java))
+        assertEquals(410, replay.statusCode.value())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-88'", Int::class.java))
         assertEquals(0, inboxWorker.processPayments())
-        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-88')", String::class.java))
     }
 
     @Test

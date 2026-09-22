@@ -54,23 +54,10 @@ class InboxApplicationWorkerTest(
     }
 
     @Test
-    fun `official payment refetch applies status and consumes reservation`() {
-        val sku = "SKU-PAY-${UUID.randomUUID()}"
-        putProduct(sku, "Paid Item", available = 5)
-        customer = addAddress(customer)
-        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
-        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
-        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
-        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
-        val reference = jdbc.queryForObject("SELECT external_reference FROM payments WHERE order_id=?", String::class.java, orderId.toLong())
-        FakeOfficialResources.payments["mp-apply"] = OfficialPaymentResource("mp-apply", reference, "approved")
-        exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-apply", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-apply"}}""")
-        assertEquals(1, worker.processPayments())
-        assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
-        assertEquals("PAID", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
-        assertEquals("CONSUMED", jdbc.queryForObject("SELECT status FROM inventory_reservations WHERE reservation_saga_key=(SELECT (checkout_snapshot->>'reservationSagaKey')::uuid FROM orders WHERE id=?)", String::class.java, orderId.toLong()))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_applications WHERE payment_id=(SELECT id FROM payments WHERE order_id=?)", Int::class.java, orderId.toLong()))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM integration_outbox WHERE kind='PAYMENT_STATUS_APPLIED' AND source_inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-apply')", Int::class.java))
+    fun `legacy unsigned payment notify is retired and v1 worker does not apply`() {
+        val retired = exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-apply", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-apply"}}""")
+        assertEquals(410, retired.statusCode.value())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM payment_event_inbox WHERE provider_event_id='mp-apply'", Int::class.java))
         assertEquals(0, worker.processPayments())
     }
 
@@ -102,26 +89,16 @@ class InboxApplicationWorkerTest(
     }
 
     @Test
-    fun `non-terminal official payment stays received until approved`() {
-        val sku = "SKU-PEND-${UUID.randomUUID()}"
-        putProduct(sku, "Pending Item", available = 3)
-        customer = addAddress(customer)
-        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
-        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
-        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
-        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
-        val reference = jdbc.queryForObject("SELECT external_reference FROM payments WHERE order_id=?", String::class.java, orderId.toLong())
-        FakeOfficialResources.payments["mp-pend"] = OfficialPaymentResource("mp-pend", reference, "pending")
-        exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-pend", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-pend"}}""")
+    fun `legacy payment inbox rows are never applied by the v1 worker`() {
+        jdbc.update(
+            "INSERT INTO payment_event_inbox(provider_event_id,resource_reference,envelope_redacted) VALUES ('mp-legacy','payment','{}')",
+        )
+        jdbc.update(
+            "INSERT INTO payment_event_processing(inbox_id,status) SELECT id,'RECEIVED' FROM payment_event_inbox WHERE provider_event_id='mp-legacy'",
+        )
+        FakeOfficialResources.payments["mp-legacy"] = OfficialPaymentResource("mp-legacy", "SC-legacy", "approved")
         assertEquals(0, worker.processPayments())
-        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-pend')", String::class.java))
-        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
-        assertEquals("PENDING_PAYMENT", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
-        FakeOfficialResources.payments["mp-pend"] = OfficialPaymentResource("mp-pend", reference, "approved")
-        assertEquals(1, worker.processPayments())
-        assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId.toLong()))
-        assertEquals("PAID", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId.toLong()))
-        assertEquals("PROCESSED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-pend')", String::class.java))
+        assertEquals("RECEIVED", jdbc.queryForObject("SELECT status FROM payment_event_processing WHERE inbox_id=(SELECT id FROM payment_event_inbox WHERE provider_event_id='mp-legacy')", String::class.java))
     }
 
     @Test
