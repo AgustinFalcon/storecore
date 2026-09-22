@@ -1,0 +1,15 @@
+package com.storecore.configuration.application
+
+sealed class CapabilityException(message: String) : RuntimeException(message)
+class CapabilityKillSwitchActive : CapabilityException("CAPABILITY_KILL_SWITCH_ACTIVE")
+class CapabilityKillSwitchInvalid : CapabilityException("CAPABILITY_KILL_SWITCH_INVALID")
+class CapabilityConfigurationMissing : CapabilityException("CAPABILITY_CONFIGURATION_MISSING")
+class CapabilityDisabled : CapabilityException("CAPABILITY_DISABLED")
+class CapabilityReadOnly : CapabilityException("CAPABILITY_READ_ONLY")
+class CapabilityPaused : CapabilityException("CAPABILITY_PAUSED")
+class CapabilityErrorState : CapabilityException("CAPABILITY_ERROR")
+class CapabilityActionNotAllowed : CapabilityException("CAPABILITY_ACTION_NOT_ALLOWED")
+class CapabilityActorNotAuthorized : CapabilityException("CAPABILITY_ACTOR_NOT_AUTHORIZED")
+class CapabilityConfigInvalid : CapabilityException("CAPABILITY_CONFIG_INVALID")
+class CapabilityConfigVersionConflict : CapabilityException("CAPABILITY_CONFIG_VERSION_CONFLICT")
+class CapabilityKillSwitchVersionConflict : CapabilityException("CAPABILITY_KILL_SWITCH_VERSION_CONFLICT")

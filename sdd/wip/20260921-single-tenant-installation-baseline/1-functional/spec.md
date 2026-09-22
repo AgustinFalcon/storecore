@@ -1,0 +1,46 @@
+# Functional Spec — `storecore-core-v1.0.0`
+
+**Status:** `ready_for_sol_review` · **Fecha:** 2026-09-21
+
+## Objetivo y alcance
+
+Core de producción para un merchant por VM/base/dominio. Incluye storefront productivo con catálogo, búsqueda, marca, categoría, ofertas y home configurable; carrito, checkout, customer profile/address, órdenes, pago, fulfillment manual básico; stock WEB, sync ML autorizado y admin de catálogo/contenido/promos manuales. No hay shared runtime, `store_id`, `store_hosts` ni persistencia de integraciones diferidas.
+
+## Casos y criterios de aceptación
+
+- AC-1: storefront HTTP productivo navega home configurable, categorías, marcas, búsqueda, detalle, ofertas y variantes activas; prototype fixture-only no se presenta como producción.
+- AC-2: admin autorizado gestiona catálogo, SKU, categorías, marcas, imágenes, contenido home y promos manuales con auditoría.
+- AC-3: customer separado de user interno puede registrarse/autenticarse, editar perfil/direcciones y ver únicamente sus órdenes.
+- AC-4: cart conserva snapshot de producto, precio original, descuento, oferta/campaña y precio efectivo. Al iniciar checkout se crea un claim durable `PENDING` del customer autenticado y se congela allí un `checkout_snapshot` completo (líneas, cantidades, precios, descuentos, moneda, customer y entrega elegida) antes de crear la orden; ninguna mutación posterior del carrito puede modificarlo. Una clave de idempotencia pertenece al customer autenticado y un reintento con igual payload devuelve el mismo resultado, mientras que un payload distinto se rechaza. Orden, pago y su procesamiento permanecen en estados independientes.
+- AC-5: WEB reserva al checkout, consume al pago y libera por expiración/cancelación. Cada línea usa una clave de saga/reserva y cada hecho de ledger una clave de idempotencia de evento distinta; sólo una reserva `ACTIVE` y no vencida puede consumirse. Ledger append-only y safety stock evitan oversell.
+- AC-6: ML se conecta sólo a la aplicación/cuenta merchant configurada y autorizada. Listing/variation mapea a SKU; autenticación/validación sigue el contrato oficial vigente, envelope durable→ACK→refetch oficial→ledger/outbox/reconciliación. Una venta ML se registra exactamente una vez. Una firma sólo se verifica si la documentación oficial aplicable la exige.
+- AC-7: fulfillment manual opera estados y tracking informativo; devolución no repone físicamente hasta RMA, recepción, inspección y ajuste.
+- AC-8: precio base/desired/observed/effective promo se separan. Política activa no se solapa por listing/currency/scope; oferta activa exige aprobador y fecha de aprobación. Promo manual exige vigencia, prioridad, margen, auditoría y writer local exclusivo por listing.
+- AC-9: la configuración merchant-local se limita a módulos y acciones tipados. Toda invocación se decide, en este orden y dentro de la misma operación, por (1) kill switch efectivo, (2) estado de capacidad, (3) acción allowlisted y (4) autorización del actor interno; cualquier falta, expiración, corrupción o estado no permitido deniega sin efectos. Los únicos estados son `DISABLED|READ_ONLY|ACTIVE|PAUSED|ERROR`. DISABLED deniega todo; READ_ONLY permite sólo acciones allowlisted no-write; ACTIVE permite sólo acciones allowlisted tras autorización; PAUSED permite sólo status/health explícitos; ERROR permite sólo health/status y nunca side effects ni publish. Configuración es tipada y versionada por módulo; claves desconocidas, tipos/esquema/version inválidos, secretos o flags libres se rechazan. Un future_optional permanece DISABLED con configuración vacía. Kill switches son estrechos por módulo/acción, expirables, auditados y fail-closed. No existen feature flags genéricos/permanentes ni bypasses.
+- AC-10: `universal-tools-profile@1.0.0` se previsualiza e importa por merge explícito, conserva histórico y declara compatibilidad core 1.x; jamás define identidad merchant, secretos o reglas hardcodeadas.
+- AC-11: el backend no sirve tráfico si falta la única fila `installation_settings(installation_id=1)`; evidencia/ledger/inbox/outbox son inmutables por base de datos y una transición normal sólo modifica lifecycle o proyecciones de worker.
+
+## Identidad y sesiones (TASK-004)
+
+`USER` interno y `CUSTOMER` storefront son realms separados: el mismo email puede existir en ambos y jamás causa búsqueda, rol o sesión cruzada. CUSTOMER sólo opera `/me` y sus direcciones; el `customer_id` se deriva siempre del principal autenticado, nunca de body/header/path. Un recurso ajeno devuelve 404. USER inicia sesión sólo en el realm interno; ADMIN y OPERATOR son roles internos y CUSTOMER no accede rutas internas. Las sesiones son opacas, revocables, con expiración idle y absoluta; tokens nunca aparecen en JSON, URL, logs ni auditoría. Las cookies por realm son distintas, `__Host-`, Secure, HttpOnly, SameSite=Lax y Path=/; CSRF es obligatorio en mutaciones autenticadas. Passwords use Argon2id with a 12..128 code-point policy and salt >=16 bytes; no JWT durable, refresh token or password reset is in scope. Logout CUSTOMER is a SELF revocation auditable without a fictitious USER; ADMIN and SYSTEM revocations retain their distinct actor kind.
+### Contrato de interacción de identidad
+
+El login/registro CUSTOMER y login USER crean sólo una sesión opaca por cookie `__Host-` del realm y entregan CSRF por header; nunca devuelven una credencial reutilizable en JSON. Logout es una mutación CSRF protegida, idempotente para el usuario (204 y cookie borrada) y audita una sola transición cuando aún había sesión viva. CUSTOMER registra con `{ email, password, firstName, lastName }` y edita perfil con `{ email, firstName, lastName, phone }`; las direcciones usan `{ street, number, city, province, postalCode, isDefault }`; cambiar la default es atómico y sólo puede quedar una. Una dirección ajena no confirma existencia: responde 404. USER no se registra por web; el primer ADMIN aparece una única vez por bootstrap local, interactivo y auditable. Para ambos realms, credenciales inexistentes, incorrectas, inactivas o cruzadas responden igual; los intentos están rate-limited sin almacenar email crudo. El origin de writes debe ser el origin exacto de la instalación y el navegador no guarda token de sesión/CSRF de forma persistente.
+## Administración de capacidades
+
+TASK-003 depende de TASK-004: sólo un `USER` interno autenticado con rol `ADMIN` puede configurar una capacidad o crear, remover o reemplazar un kill switch; un `CUSTOMER` nunca puede hacerlo. No existe usuario, password ni actor provisioner oculto. Cada cambio de configuración exige `expected_config_version`, `reason` no vacío y `correlation_id`; un conflicto no modifica nada. Cada operación de kill exige `reason`, `correlation_id` y, para remove/reemplazo, `expected_active_kill_switch_id`. El reemplazo es una única transacción serial: bloquea la acción registrada, confirma el ID activo esperado, cierra auditadamente ese switch y crea el nuevo con el mismo `correlation_id`; jamás borra historial. Un kill expirado que aún está activo deniega hasta su remoción o reemplazo explícito.
+## Capacidades diferidas
+
+1. `ml-competition-insights`: rechaza premisa top-5 y scraping; sólo señales oficiales/licenciadas, read-only y trazables.
+2. `ml-price-automation-management`: opt-in por listing, min/max/margen/cooldown/auditoría/kill switch y exclusión mutua con writer manual/local.
+3. `ml-promotion-orchestrator`: ofertas oficiales, eligibility/preflight, aprobación humana o preautorización acotada, margen, rollback/reconciliación; jamás por scraping.
+4. `web-cross-sell-discounts`: relations, eligibility, discount, stacking/priority/margin, snapshot/reversal. ML virtual kits queda separado.
+5. `commercial-calendar`: merchant define eventos/campañas; timezone, preflight, activación, kill switch y rollback. Black Friday es configurable, no automatismo.
+6. Fiscal externo, favorites, loyalty ledger, carriers reales y ML virtual kits están fuera del core. Fiscal no oculta/evasiona ventas.
+7. Companion BlackStore: `storecore-pos-integration-contract-v1` es un WIP productor separado; su pre-adapter PIC-001 puede tener código contractual bajo su propio GO, pero no es módulo POS interno, no aprueba adapter y no satisface ni altera ninguna acceptance criteria de estas 14 tasks core.
+
+## Límites de persistencia y reintentos
+
+- La instalación tiene un único merchant dentro de su propia VM/base/dominio. No existe selección de merchant ni de customer por header, host alternativo o payload: el merchant es el singleton local y el customer es siempre el sujeto autenticado.
+- Los envelopes recibidos y los mensajes de outbox son hechos durables inmutables. El worker puede modificar únicamente su registro de procesamiento/entrega, lease, contador de intentos y diagnóstico; no puede reemplazar el payload, identificador externo, clave de idempotencia ni resultado aplicado.
+- El checkout no reutiliza el carrito mutable como evidencia de una orden: la orden conserva sus snapshots aunque el carrito, producto, oferta o dirección cambien después. Una misma `Idempotency-Key` puede existir para customers distintos, pero nunca se resuelve fuera del customer autenticado.

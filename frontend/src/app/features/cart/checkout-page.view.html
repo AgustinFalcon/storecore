@@ -1,0 +1,43 @@
+<section class="sc-page sc-checkout" aria-labelledby="checkout-title">
+  <h1 id="checkout-title">Checkout</h1>
+  <p class="sc-page__lede">El pago se inicia en el servidor. Reintentar reusa la misma clave, entrega y moneda. El browser no habla con Mercado Pago.</p>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+  <div class="sc-checkout__layout">
+    <form class="sc-panel" (submit)="$event.preventDefault(); pay.emit()">
+      <label>Entrega
+        <select required name="addressId" [ngModel]="state.addressId" (ngModelChange)="addressChange.emit($event)">
+          <option value="">Elegí una dirección</option>
+          @for (address of state.addresses; track address.id) {
+            <option [value]="address.id">{{ address.street }} {{ address.number }} · {{ address.city }}</option>
+          }
+        </select>
+      </label>
+      <label>Moneda
+        <input required name="currency" [ngModel]="'ARS'" readonly />
+      </label>
+      <p class="sc-mono">Clave {{ state.idempotencyKey }}</p>
+      <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay">Pagar</button>
+      @if (state.errorMessage) {
+        <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="pay.emit()">Reintentar</button>
+      }
+    </form>
+    <aside class="sc-summary">
+      <p class="sc-summary__label">Pedido</p>
+      <ul class="sc-summary__lines">
+        @for (line of state.cart.lines; track line.sku) {
+          <li>
+            <span>{{ line.name }} × {{ line.quantity }}</span>
+            <strong>{{ line.effectiveUnitPrice }}</strong>
+          </li>
+        }
+      </ul>
+      @if (state.receipt) {
+        <p>
+          Orden {{ state.receipt.orderId }}
+          · <span class="sc-badge sc-badge--info">pago {{ state.receipt.paymentStatus }}</span>
+          · <span class="sc-badge">orden {{ state.receipt.orderStatus }}</span>
+        </p>
+      }
+    </aside>
+  </div>
+</section>

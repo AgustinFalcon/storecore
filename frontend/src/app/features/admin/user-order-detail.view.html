@@ -1,0 +1,52 @@
+<section class="sc-page sc-console" aria-labelledby="admin-order-title">
+  <p class="sc-pdp__crumb"><a routerLink="/user/orders">Volver a fulfillment</a></p>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && order === null"
+    emptyText="Orden no disponible."
+  />
+  @if (order) {
+    <h1 id="admin-order-title">Orden {{ order.id }}</h1>
+    <p>
+      <span class="sc-badge">orden {{ order.orderStatus }}</span>
+      <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+      <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+      <span class="sc-badge">rma {{ order.rmaStatus || '—' }}</span>
+    </p>
+    <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cant.</th>
+          <th>Efectivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of order.lines; track line.sku) {
+          <tr>
+            <td>{{ line.name }}</td>
+            <td>{{ line.quantity }}</td>
+            <td class="sc-price">{{ line.effectiveUnitPrice }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    @if (nextShip(order); as next) {
+      <form class="sc-panel" (submit)="$event.preventDefault()">
+        <label>Tracking
+          <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
+        </label>
+        <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
+          {{ shipmentLabel(next) }}
+        </button>
+      </form>
+    }
+    @if (nextReturn(order); as next) {
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="rma.emit({ orderId: order.id, status: next })">
+        {{ rmaLabel(next) }}
+      </button>
+    }
+  }
+</section>

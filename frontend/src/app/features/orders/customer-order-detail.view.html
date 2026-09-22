@@ -1,0 +1,39 @@
+<section class="sc-page" aria-labelledby="order-detail-title">
+  <p class="sc-pdp__crumb"><a routerLink="/customer/orders">Volver a órdenes</a></p>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && order === null"
+    emptyText="No encontramos esa orden."
+  />
+  @if (order) {
+    <h1 id="order-detail-title">Orden {{ order.id }}</h1>
+    <p>
+      <span class="sc-badge">orden {{ order.orderStatus }}</span>
+      <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+      <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+    </p>
+    <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
+    <p class="sc-price sc-price--hero">Total {{ order.total }}</p>
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Cant.</th>
+          <th>Efectivo</th>
+          <th>Original</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of order.lines; track line.sku) {
+          <tr>
+            <td>{{ line.name }}</td>
+            <td>{{ line.quantity }}</td>
+            <td class="sc-price">{{ line.effectiveUnitPrice }}</td>
+            <td class="sc-price__meta">{{ line.originalUnitPrice }} · dto {{ line.discountAmount }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
