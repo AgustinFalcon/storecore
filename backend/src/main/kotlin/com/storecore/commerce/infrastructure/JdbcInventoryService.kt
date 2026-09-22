@@ -2,6 +2,7 @@ package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.CommerceValidation
+import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.domain.InventoryRow
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
@@ -14,7 +15,7 @@ import java.util.UUID
 @Service
 @EnableScheduling
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate) {
+class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate) : InventoryConsumePort {
     fun list(): List<InventoryRow> = jdbc.query(
         """SELECT v.sku,b.available_quantity,b.reserved_quantity,b.safety_stock
            FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id ORDER BY v.sku""",
@@ -31,6 +32,49 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         jdbc.update("INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'RESERVATION','WEB',?,?)", variantId, reservationId, distinctKeys(1).single(), -quantity, actor)
             reservationId
         }
+    }!!
+
+    override fun consumeSaga(saga: UUID, actor: String): Int = transactions.execute {
+        val rows = jdbc.query(
+            "SELECT id,variant_id,quantity FROM inventory_reservations WHERE reservation_saga_key=? AND status='ACTIVE' FOR UPDATE",
+            { rs, _ -> Triple(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity")) },
+            saga,
+        )
+        rows.forEach { (id, variantId, quantity) ->
+            jdbc.query("SELECT variant_id FROM inventory_balances WHERE variant_id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, variantId)
+            jdbc.update("UPDATE inventory_balances SET reserved_quantity=reserved_quantity-?,updated_at=now() WHERE variant_id=?", quantity, variantId)
+            jdbc.update(
+                "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'SALE','WEB',?,?)",
+                variantId, id, distinctKeys(1).single(), -quantity, actor,
+            )
+            jdbc.update("UPDATE inventory_reservations SET status='CONSUMED' WHERE id=?", id)
+        }
+        rows.size
+    } ?: 0
+
+    override fun consumeChannelSale(
+        variantId: Long,
+        quantity: Int,
+        actor: String,
+        externalOrderId: String,
+        externalOrderItemId: String,
+        variationId: String?,
+    ): Long = transactions.execute {
+        val existing = jdbc.query(
+            "SELECT id FROM inventory_ledger WHERE channel='MERCADO_LIBRE' AND external_order_id=? AND external_order_item_id=? AND variation_id IS NOT DISTINCT FROM ?",
+            { rs, _ -> rs.getLong(1) },
+            externalOrderId, externalOrderItemId, variationId,
+        ).firstOrNull()
+        if (existing != null) return@execute existing
+        val balance = lockBalance(variantId)
+        if (balance.first < quantity) throw InsufficientInventory()
+        jdbc.update("UPDATE inventory_balances SET available_quantity=available_quantity-?,updated_at=now() WHERE variant_id=?", quantity, variantId)
+        jdbc.queryForObject(
+            """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,external_order_id,external_order_item_id,variation_id,quantity_delta,actor)
+               VALUES (?,?,'SALE','MERCADO_LIBRE',?,?,?,?,?) RETURNING id""",
+            Long::class.java,
+            variantId, distinctKeys(1).single(), externalOrderId, externalOrderItemId, variationId, -quantity, actor,
+        )!!
     }!!
 
     @Scheduled(fixedDelayString = "\${storecore.inventory.expiry-delay-ms:60000}")

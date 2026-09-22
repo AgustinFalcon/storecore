@@ -1,4 +1,4 @@
-<section class="sc-page sc-pdp" aria-labelledby="product-title">
+<section class="sc-page sc-pdp" aria-labelledby="product-title" [attr.aria-busy]="loading">
   <sc-feature-status
     [loading]="loading"
     [error]="error"
@@ -32,11 +32,17 @@
         <p class="sc-buybox__meta">{{ product.brand }} · {{ product.category }}</p>
         <h1 id="product-title">{{ product.name }}</h1>
         <p>{{ product.description }}</p>
-        <p class="sc-price sc-price--hero">{{ product.price.effective }}</p>
+        <div class="sc-price-stack">
+          @if (hasDiscount) {
+            <p class="sc-price__was">{{ product.price.base }}</p>
+          }
+          <p class="sc-price sc-price--hero">{{ product.price.effective }}</p>
+        </div>
         @if (product.offerRef) {
-          <span class="sc-off">OFF</span>
+          <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>
+        } @else {
+          <span class="sc-badge">sin oferta</span>
         }
-        <p class="sc-price__meta">versión {{ product.price.priceVersion }}</p>
         @if (!product.active) {
           <span class="sc-badge sc-badge--warn">Inactivo</span>
         }
@@ -48,9 +54,9 @@
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
           <label>Cantidad
             <span class="sc-stepper">
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1">−</button>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
               <input type="number" name="quantity" min="1" required [(ngModel)]="quantity" />
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)">+</button>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" aria-label="Agregar una unidad">+</button>
             </span>
           </label>
           @if (signedIn) {
@@ -59,14 +65,7 @@
             <p><a routerLink="/customer/session">Entrá para agregar al carrito</a></p>
           }
         </form>
-        <button
-          type="button"
-          class="sc-btn sc-btn--ghost sc-btn--block"
-          [class.is-on]="favorites.has(product.sku)"
-          (click)="favorites.toggle(product.sku)"
-        >
-          {{ favorites.has(product.sku) ? 'En favoritos' : 'Guardar en favoritos' }}
-        </button>
+        <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>
       </div>
     </div>
   }

@@ -1,6 +1,6 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
-**Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. Refetch ML vivo es TODO-041.
+**Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. TODO-041 in-repo: official refetch port + CI fake. Live vendor HTTP is installation-configured, never in CI.
 
 | Capacidad | Core/tarea o feature | Gate |
 |---|---|---|
@@ -9,12 +9,12 @@
 | customer/profile/address/auth | TASK-004 | identidad y autorización separadas |
 | cart/checkout/pago/order | TASK-006 | snapshots, idempotencia y estados |
 | stock WEB | TASK-007 | reserve/consume/release y ledger append-only |
-| ML autorizado | TASK-008 | contrato oficial, cuenta autorizada, inbox durable→ACK; refetch/sale apply = TODO-041 |
+| ML autorizado | TASK-008 + TODO-041 | contrato oficial, cuenta autorizada, inbox durable→ACK; refetch/apply via port (CI fake) |
 | admin catálogo/contenido/promo manual | TASK-009 | roles, auditoría, margen y único writer |
 | fulfillment manual/returns | TASK-010 | state machine e inspección antes de restock |
 | profile/fixture prototype/fleet docs | TASK-012 | no mezcla de prototype con producción |
 | quality/release | TASK-013..015 | dependencias completas + Sol GO/NO-GO |
-| frontend UX Stitch | `docs/agent/frontend/` | DS-00/P-01 en código; P-02…U-10 siguiente carril |
+| frontend UX Stitch | `docs/agent/frontend/` | DS-00…U-10 en código; axe en `npm run test:a11y` |
 | `ml-competition-insights` | TODO-030 deferred | señales oficiales read-only; no scraping/top-5 |
 | `ml-price-automation-management` | TODO-031 deferred | opt-in, min/max/margin/cooldown/audit/kill switch; writer exclusivo |
 | `ml-promotion-orchestrator` | TODO-032 deferred | oferta oficial, eligibility/preflight, approval/preauth, rollback/reconcile |

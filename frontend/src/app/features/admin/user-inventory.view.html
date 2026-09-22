@@ -1,11 +1,11 @@
 <section class="sc-page sc-console" aria-labelledby="inv-title">
   <h1 id="inv-title">Inventario WEB</h1>
-  <p class="sc-page__lede">Sólo lectura. Esta vista no edita stock.</p>
+  <p class="sc-page__lede">Disponibilidad derivada. Esta pantalla no escribe stock.</p>
   <sc-feature-status
     [loading]="loading"
     [error]="error"
     [empty]="!loading && rows.length === 0"
-    emptyText="Sin disponibilidad WEB."
+    emptyText="No hay filas de inventario."
   />
   @if (rows.length) {
     <table class="sc-table">

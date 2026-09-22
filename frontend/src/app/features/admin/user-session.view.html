@@ -1,7 +1,7 @@
 <section class="sc-page sc-auth" aria-labelledby="user-session-title">
   <div class="sc-auth__card">
-    <h1 id="user-session-title">Sesión operador</h1>
-    <p class="sc-page__lede">Identidad de operador. No es la cuenta customer.</p>
+    <h1 id="user-session-title">Sesión user</h1>
+    <p class="sc-page__lede">Operadores internos. No comparte sesión con customer.</p>
     <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
     @if (authenticated) {
       <p>Sesión user activa en esta instalación.</p>

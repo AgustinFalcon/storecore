@@ -46,7 +46,7 @@ Identidades: **customer** (compra) y **user** (operador). No se mezclan.
 
 ## Chrome compartido (no es pantalla)
 
-Shell: skip-link, nav Storefront / Catálogo / Carrito / Customer / User, estado de API, sesión customer vs user.
+Shell: skip-link, nav Storefront / Catálogo / Carrito / Customer / User, estado de API, sesión customer vs user. Sin favoritos.
 
 ## No pedir a UX ahora
 

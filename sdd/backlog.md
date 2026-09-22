@@ -4,8 +4,8 @@
 
 - TODO-001 [critical] [done] Sol GO de `storecore-core-v1.0.0` (`sdd/reviews/20260922-sol-go-core.md`).
 - TODO-002 [critical] [done] Flyway/Testcontainers V1–V3 del schema core single-tenant.
-- TODO-003 [critical] Fleet inventory, backup/restore y rollback por VM. Draft: `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
-- TODO-041 [high] [residual] ML/MP live refetch + canonical sale apply + outbox/reconcile worker. Requires official credentials configured per installation. No invented HMAC. Not in core v1 CI.
+- TODO-003 [critical] [done] Fleet inventory, backup/restore y rollback por VM. Runbook: `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`.
+- TODO-041 [high] [done] Inbox application worker: official refetch port + payment/ML apply + outbox. Unconfigured installations stay RECEIVED. CI uses a fake official resource. No live vendor call and no invented HMAC.
 
 ## Features diferidos (no ejecutables en core 1.0.0)
 

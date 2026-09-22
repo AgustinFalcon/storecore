@@ -1,8 +1,11 @@
 <section class="sc-page sc-auth" aria-labelledby="profile-title">
   <div class="sc-auth__card">
-    <h1 id="profile-title">Perfil</h1>
+    <h1 id="profile-title">Perfil customer</h1>
     <p class="sc-page__lede">Datos de la cuenta customer.</p>
     <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    @if (state.saved) {
+      <p class="sc-banner sc-banner--ok" role="status">Perfil actualizado</p>
+    }
     <form class="sc-auth__form" (submit)="$event.preventDefault(); save.emit()">
       <label>Nombre
         <input required name="firstName" [ngModel]="state.profile.firstName" (ngModelChange)="patch({ firstName: $event })" />

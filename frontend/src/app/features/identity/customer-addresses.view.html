@@ -10,13 +10,19 @@
   <div class="sc-split">
     <ul class="sc-address-list">
       @for (address of state.addresses; track address.id) {
-        <li class="sc-panel" [class.is-on]="state.addressDraft.id === address.id">
-          <strong>{{ address.street }} {{ address.number }}</strong>
-          <p>{{ address.city }} · {{ address.province }} · {{ address.postalCode }}</p>
-          @if (address.isDefault) {
-            <p class="sc-price__meta">Predeterminada</p>
-          }
-          <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(address)">Editar</button>
+        <li>
+          <button
+            type="button"
+            class="sc-card sc-address-card"
+            [class.is-on]="state.addressDraft.id === address.id"
+            (click)="draftChange.emit(address)"
+          >
+            <strong>{{ address.street }} {{ address.number }}</strong>
+            <p>{{ address.city }} · {{ address.province }} · {{ address.postalCode }}</p>
+            @if (address.isDefault) {
+              <p class="sc-price__meta">Predeterminada</p>
+            }
+          </button>
           <button type="button" class="sc-btn sc-btn--ghost" (click)="remove.emit(address.id)">Quitar</button>
         </li>
       }

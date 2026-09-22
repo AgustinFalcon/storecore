@@ -2,6 +2,9 @@
 # Inherited material stays ignored until audited. Explicit allowlist below.
 *
 !/.gitignore
+!/.github/
+!/.github/workflows/
+!/.github/workflows/verify.yml
 !/GOVERNANCE.md
 !/EVIDENCE-INDEX.md
 !/GOVERNANCE-BACKLOG.md
@@ -19,6 +22,7 @@
 !/frontend/**
 !AGENTS.md
 !README.md
+!CHANGELOG.md
 !GOVERNANCE.md
 !SOURCE-CLASSIFICATION.md
 !EVIDENCE-INDEX.md
@@ -28,3 +32,5 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 frontend/.angular/
+frontend/playwright-report/
+frontend/test-results/

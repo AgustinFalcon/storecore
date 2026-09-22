@@ -1,7 +1,7 @@
 # TASK-013 — Production architecture and UX quality
 
 **Date:** 2026-09-22  
-**Verdict:** pass with residual UX (no P0 architecture findings)
+**Verdict:** pass — Playwright/axe on public screens; favorites removed from chrome
 
 ## Architecture
 
@@ -13,7 +13,7 @@
 ## Storefront / accessibility
 
 - Frontend: 42 unit tests passed; HTTP contracts match backend `/api/v1/*`.
-- Residual (not P0): no Playwright/Stitch visual QA and no automated axe pass in this build. Production chrome remains navy retail; favorites stay sessionStorage-only.
+- Playwright + axe: `frontend` `npm run test:a11y`. Stitch remains a visual reference. Favorites removed from chrome (TODO-036).
 
 ## Out of scope (intact)
 

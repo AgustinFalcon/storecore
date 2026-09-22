@@ -16,6 +16,6 @@ export class ProfileImportViewComponent {
   @Output() readonly merge = new EventEmitter<void>();
 
   get canMerge(): boolean {
-    return this.state.preview?.compatible === true;
+    return this.state.preview?.compatible === true && this.state.previewManifest === this.state.manifest;
   }
 }

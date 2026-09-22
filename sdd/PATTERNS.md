@@ -22,7 +22,7 @@ Precio base, desired, observed y effective promo son valores distintos. Sólo un
 
 ## Frontend production path
 
-Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. El siguiente carril visual es Stitch (`docs/agent/frontend/ux-handoff.md`): DS-00 y P-01 ya están en código.
+Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. UX DS-00…U-10 está en código; axe corre con `npm run test:a11y`.
 
 ## Compliance boundary
 

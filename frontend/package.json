@@ -9,9 +9,10 @@
     "start": "ng serve",
     "build": "ng build",
     "test": "ng test --watch=false",
+    "test:a11y": "playwright test",
     "lint": "eslint src",
     "check:architecture": "node scripts/check-architecture.mjs",
-    "verify": "npm run check:architecture && npm run lint && npm run test && npm run build"
+    "verify": "npm run check:architecture && npm run lint && npm run test && npm run build && npm run test:a11y"
   },
   "dependencies": {
     "@angular/animations": "~22.0.0",
@@ -33,6 +34,8 @@
     "@angular/compiler-cli": "~22.0.0",
     "angular-eslint": "^22.0.0",
     "eslint": "^9.0.0",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.55.0",
     "jsdom": "^26.0.0",
     "typescript": "~6.0.0",
     "typescript-eslint": "^8.0.0",

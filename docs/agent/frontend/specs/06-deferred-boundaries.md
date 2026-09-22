@@ -12,6 +12,6 @@
 
 - Adapter BlackStore y `/blackstore-integration/v1`.
 - Fiscal / ARCA.
-- Inventario WEB ledger y sync ML (TASK-007 / 008).
+- Live vendor HTTP (credenciales MP/ML). TODO-041 worker+fake está in-repo; la UI U-07/U-08 sigue read-only + mapping.
 - Marketplace, feature flags, `store_id`.
 - Prototype fixture. Si aparece, build `storefront-prototype` y banner DEMO.

@@ -1,5 +1,7 @@
 package com.storecore.commerce.infrastructure
 
+import com.storecore.configuration.application.CapabilityDecisionPort
+import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.infrastructure.web.BaseResponse
 import com.storecore.identity.infrastructure.web.IdentityMutationCoordinator
 import com.storecore.identity.infrastructure.web.RequestAuth
@@ -20,11 +22,19 @@ import javax.sql.DataSource
 @RestController
 @RequestMapping("/api/v1")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class OrderController(private val orders: JdbcOrderService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator) {
+class OrderController(private val orders: JdbcOrderService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator, private val capabilities: CapabilityDecisionPort) {
     @GetMapping("/customer/orders") fun mine(http: HttpServletRequest) = BaseResponse.ok(orders.customerOrders(auth.customer(http)).map { it.copy(rmaStatus = null) })
     @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long) = BaseResponse.ok(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = null))
-    @GetMapping("/user/orders") fun admin(http: HttpServletRequest): BaseResponse<Any?> { auth.operatorOrAdmin(http); return BaseResponse.ok(orders.adminOrders()) }
-    @GetMapping("/user/orders/{id}") fun adminOne(http: HttpServletRequest, @PathVariable id: Long): BaseResponse<Any?> { auth.operatorOrAdmin(http); return BaseResponse.ok(orders.adminOrder(id)) }
+    @GetMapping("/user/orders") fun admin(http: HttpServletRequest): BaseResponse<Any?> {
+        val actor = auth.operatorOrAdmin(http)
+        capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
+        return BaseResponse.ok(orders.adminOrders())
+    }
+    @GetMapping("/user/orders/{id}") fun adminOne(http: HttpServletRequest, @PathVariable id: Long): BaseResponse<Any?> {
+        val actor = auth.operatorOrAdmin(http)
+        capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
+        return BaseResponse.ok(orders.adminOrder(id))
+    }
 
     @PostMapping("/user/orders/{id}/shipments")
     fun ship(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: ShipmentRequest): ResponseEntity<BaseResponse<Any?>> {

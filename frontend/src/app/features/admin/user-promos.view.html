@@ -15,6 +15,7 @@
           <th>Vigencia</th>
           <th>Prio</th>
           <th>Margen</th>
+          <th>Moneda</th>
           <th>Aprobador</th>
         </tr>
       </thead>
@@ -24,7 +25,8 @@
             <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
             <td>{{ promo.validFrom }} – {{ promo.validTo }}</td>
             <td>{{ promo.priority }}</td>
-            <td>{{ promo.margin }} {{ promo.currency }}</td>
+            <td>{{ promo.margin }}</td>
+            <td>{{ promo.currency }}</td>
             <td>{{ promo.approvedBy }}</td>
           </tr>
         }
