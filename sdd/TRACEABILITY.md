@@ -1,6 +1,6 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
-**Estado:** `ready_for_sol_review`; contratos y alcance, no implementación aprobada.
+**Estado:** implementación en `e7b4efe` / `feature/storecore-core-v1.0.0`. Contratos vigentes; refetch ML vivo es TODO-041.
 
 | Capacidad | Core/tarea o feature | Gate |
 |---|---|---|
@@ -9,7 +9,7 @@
 | customer/profile/address/auth | TASK-004 | identidad y autorización separadas |
 | cart/checkout/pago/order | TASK-006 | snapshots, idempotencia y estados |
 | stock WEB | TASK-007 | reserve/consume/release y ledger append-only |
-| ML autorizado | TASK-008 | validación según contrato oficial/inbox durable/ACK/refetch/reconcile, cuenta autorizada |
+| ML autorizado | TASK-008 | contrato oficial, cuenta autorizada, inbox durable→ACK; refetch/sale apply = TODO-041 |
 | admin catálogo/contenido/promo manual | TASK-009 | roles, auditoría, margen y único writer |
 | fulfillment manual/returns | TASK-010 | state machine e inspección antes de restock |
 | profile/fixture prototype/fleet docs | TASK-012 | no mezcla de prototype con producción |

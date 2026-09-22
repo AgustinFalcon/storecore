@@ -16,5 +16,5 @@
 
 ## Release
 
-- Sol implementation GO remains `docs/agent/20260922-sol-go-core.md`.
-- This review is a quality GO to mark TASK-013/014/015 complete. Git deny-by-default: no commit, tag, deploy or secret publication from this session.
+- Sol implementation GO: `sdd/reviews/20260922-sol-go-core.md`.
+- Feature-branch commit `e7b4efe` exists. Still no tag, deploy or secret publication.

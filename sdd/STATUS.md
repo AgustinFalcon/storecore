@@ -1,30 +1,33 @@
 # Estado canónico del SDD — StoreCore
 
 **Validado:** 2026-09-22  
-**Madurez:** implementation complete for `storecore-core-v1.0.0` (TASK-001..015). Sol GO scoped remains `docs/agent/20260922-sol-go-core.md`. Quality reviews in `sdd/reviews/20260922-task-013-architecture-ux.md`, `20260922-task-014-data-reconciliation.md`, `20260922-task-015-security-release.md`.  
-**Git:** deny-by-default; sin commit, tag, publicación ni release.
+**Madurez:** implementation of the 14-task graph (TASK-001..010, TASK-012..015) is on `feature/storecore-core-v1.0.0` at `e7b4efe`. There is no TASK-011.  
+**Sol GO:** `sdd/reviews/20260922-sol-go-core.md` (mirror `docs/agent/20260922-sol-go-core.md`).  
+**Git:** commit exists on the feature branch. No tag, deploy or publish.
+
+## Residuales honestos
+
+- TASK-008/014: inbox persist-before-ACK done. Live ML refetch/canonical sale is **TODO-041**, not claimed in CI.
+- TASK-013: architecture GO; Playwright/axe/Stitch not automated.
+- TODO-003: fleet runbook draft at `2-technical/fleet-operations.md`.
 
 ## Precedencia
 
 1. `sdd/wip/20260921-single-tenant-installation-baseline/`.
 2. `sdd/PROJECT.md`, `sdd/PATTERNS.md`, `sdd/TRACEABILITY.md`, `sdd/RELEASE.md`.
-3. `docs/agent/` sólo como guía derivada.
+3. `docs/agent/` is a derived mirror; Sol GO durable record is `sdd/reviews/20260922-sol-go-core.md`.
 4. `20260819-store-tenancy-and-profiles` y `sdd/specs/*` son históricos/superseded.
 
 ## Gate actual
 
-Sol GO 2026-09-22 autorizó el baseline core. El grafo TASK-001..015 está complete con evidencia en `sdd/wip/20260921-single-tenant-installation-baseline/evidence/`. No autoriza POS/BlackStore adapter, fiscal/ARCA, tenancy, DEMO-as-production, deploy ni Mercado Pago en el browser.
+Sol GO autorizó el baseline core. No autoriza POS/BlackStore adapter, fiscal/ARCA, tenancy, DEMO-as-production, deploy ni Mercado Pago en el browser. `/sdd.finish` espera reviews Grok 4.7 sin P0.
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico `/blackstore-integration/v1`. Documentary PIC GO separado; conector real bloqueado.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
-Estos WIP no se mezclan con `storecore-core-v1.0.0`.
+## Fiscal externo
 
-## Fiscal externo — trazabilidad canónica
-
-- `20260921-arca-fiscal-discovery`: `documented_deferred`.
-- `20260921-arca-storecore-adapter-contract`: `documented_deferred`.
-- Ningún estado fiscal autoriza código, DDL, worker ni secretos.
+- `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Sin código, DDL, worker ni secretos.

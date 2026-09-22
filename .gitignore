@@ -10,8 +10,9 @@
 # SDD baseline allowlist, sin stage/push automático
 !sdd/
 !sdd/**
-!docs/agent/
-!docs/agent/**
+!/docs/
+!/docs/agent/
+!/docs/agent/**
 !/backend/
 !/backend/**
 !/frontend/

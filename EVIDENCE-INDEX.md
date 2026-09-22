@@ -1,10 +1,10 @@
 # Evidence Index
 
-## SDD Baseline Audit — 2026-09-21
+## SDD Baseline Audit — 2026-09-22
 
-- Scope: `storecore-core-v1.0.0` en `sdd/wip/20260921-single-tenant-installation-baseline/`, gobierno y docs agent derivados.
-- State: core single-tenant `ready_for_sol_review`; `sdd-v1.0.0` es baseline documental, no tag/release.
-- Capability evidence: storefront productivo, catálogo/search/brand/category/offers/home, cart/checkout, customer/profile/address, orders/manual fulfillment, stock WEB, ML autorizado y administración manual están en scope. Prototype es separado.
-- Plan evidence: 14 tareas ejecutables: 11 L1 y exactamente 3 gates L3; POS, fiscal, intelligence, price automation, promotions, cross-sell, calendar, favorites, loyalty, carriers y virtual kits están diferidos.
-- Data evidence: sin `store_id`, `store_hosts`, POS ni persistencia fiscal; secretos son referencias opacas.
-- Validation evidence: valida estructura/conflictos, no Sol GO. No autoriza código, import, ML write, emisión fiscal, release o tag.
+- Scope: `storecore-core-v1.0.0` en `sdd/wip/20260921-single-tenant-installation-baseline/`.
+- State: 14-task graph implemented on `feature/storecore-core-v1.0.0` (`e7b4efe`). `sdd-v1.0.0` sigue siendo baseline documental, no tag/release.
+- Sol GO durable: `sdd/reviews/20260922-sol-go-core.md`.
+- Plan: TASK-001..010 y TASK-012..015 (no existe TASK-011).
+- Residual: TODO-041 live ML refetch/sale; TASK-013 a11y no automatizado; TODO-003 fleet runbook.
+- Validation: `mvn test` y frontend 42 tests verdes el 2026-09-22. No autoriza deploy, tag, POS adapter ni fiscal.

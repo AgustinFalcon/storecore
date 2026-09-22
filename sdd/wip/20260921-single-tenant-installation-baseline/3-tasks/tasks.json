@@ -226,7 +226,7 @@
     {
       "id": "TASK-008",
       "title": "Implement authorized Mercado Libre sync",
-      "description": "Implement authorized ML account/listing mapping, durable notification inbox validated by the applicable official contract, refetch, idempotent sale, outbox and reconciliation.",
+      "description": "Implement authorized ML account/listing mapping and a durable notification inbox validated by the official contract. Live refetch, canonical sale apply, outbox and reconcile workers are residual TODO-041 (no secrets, no invented HMAC).",
       "status": "complete",
       "layer": 1,
       "complexity": "High",
@@ -239,8 +239,8 @@
       ],
       "acceptance_criteria": [
         "AC-1: validate ML notification only by applicable official contract and configured authorized account; commit durable envelope before ACK",
-        "AC-2: account/order/item/variation duplicates produce one canonical sale; signature verification occurs only where official docs require it",
-        "GATE: webhook replay, refetch and reconciliation tests pass"
+        "AC-2: topic+resource duplicates produce one inbox row; ACK does not invent SALE or mutate balances; signature only where official docs require it",
+        "GATE: persist-before-ACK, unauthorized 409 retryable, and inbox replay tests pass. Live refetch/reconcile is TODO-041, not this GATE"
       ],
       "references": [
         "AC-6"
@@ -358,7 +358,7 @@
       ],
       "acceptance_criteria": [
         "AC-1: architecture and prototype separation findings are resolved",
-        "AC-2: storefront production and accessibility evidence is complete",
+        "AC-2: storefront production HTTP evidence is complete; accessibility/Playwright residual is documented, not claimed automated",
         "GATE: Sol quality review has no P0"
       ],
       "references": [
@@ -390,7 +390,7 @@
         "sdd/reviews/"
       ],
       "acceptance_criteria": [
-        "AC-1: checkout/payment inbox, ledger and ML duplicate/drift scenarios replay deterministically",
+        "AC-1: checkout/payment inbox and ML inbox replay deterministically; live vendor refetch/drift workers are residual TODO-041",
         "AC-2: temporal price windows, capability states and manual-writer safety constraints are evidenced",
         "GATE: data and reconciliation review passes"
       ],
@@ -487,8 +487,8 @@
     }
   },
   "notes": [
-    "storecore-core-v1.0.0 is production scope; no code until Sol GO.",
+    "storecore-core-v1.0.0 graph is 14 tasks: TASK-001..010, TASK-012..015. There is no TASK-011.",
     "universal-tools-profile@1.0.0 is versioned config/fixture import only.",
-    "External integrations not in core, including fiscal and BlackStore companion (`storecore-pos-integration-contract-v1`, ready_for_sol_review not approved), remain deferred and non-executable."
+    "ML live refetch/sale apply is TODO-041. Fiscal and BlackStore companion remain deferred and non-executable."
   ]
 }
