@@ -10,9 +10,9 @@ Mismas tablas WEB de stock. Channel `EXTERNAL_BLACKSTORE`. Event types `RESERVAT
 
 Transiciones: reserve `available -= q, reserved += q`; commit `reserved -= q`; release/expiry `available += q, reserved -= q`.
 
-Locks orden global: (1) fila de saga `FOR UPDATE`; (2) todos los balances `ORDER BY variant_id ASC`. All-or-nothing.
+Locks orden global (también Tx-A, Tx-B, commit, release): (0) advisory lock de la cuádruple + tombstone (ADR-007); (1) fila de saga `FOR UPDATE`; (2) todos los balances `ORDER BY variant_id ASC`. All-or-nothing.
 
-Tx-A: PENDING + hash COMMIT. Tx-B: lock saga, validar hash, locks, reserva+ledger+receipt+RESERVED.
+Tx-A: advisory lock + tombstone, luego PENDING + hash COMMIT. Tx-B: mismo advisory lock, reconsultar tombstone, lock saga, validar hash, locks, reserva+ledger+receipt+RESERVED. Commit/release toman el mismo advisory lock y consultan tombstone antes de resolver la saga.
 
 D-TTL: 900s default (60–3600). Expiry worker 30s, batch 100, `FOR UPDATE SKIP LOCKED` sobre RESERVED vencidas. Cleanup PENDING > 60s sin ledger. Commit-vs-expire: lock de la fila de saga; el primero gana.
 

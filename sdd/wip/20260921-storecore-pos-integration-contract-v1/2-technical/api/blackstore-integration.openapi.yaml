@@ -9,7 +9,7 @@ info:
     Reservation TTL default 900s (D-TTL). Catalog pageSize default/max 200, cursor retention 7d (D-CURSOR).
     Rate: 30 reserve/s per identity, catalog/stock-read 60/s, reconcile 5/s (D-RATE).
     availableQuantity = GREATEST(0, available_quantity - safety_stock). available_quantity already nets reserved_quantity; do not subtract reserved again.
-    Reserve is two transactions: Tx-A PENDING+request_hash COMMIT; Tx-B saga lock, hash check, variant locks, reserve+ledger+receipt+RESERVED.
+    Reserve is two transactions. Mutating routes take the quadruple advisory lock and consult tombstone first (ADR-007). Tx-A PENDING+request_hash COMMIT; Tx-B re-check tombstone, saga lock, hash check, variant locks, reserve+ledger+receipt+RESERVED. CONFLICT is retryable deadlock. OPERATION_STATE_CONFLICT is retryable=false on a live terminal row and is never re-POSTed.
     Uniform JSON envelope is AssistTime BaseResponse: HTTP status == body.code (HttpCode), enforced by each status schema's code const.
     Every JSON envelope requires code,data,errorCode,retryable,message,traceId. Success has data payload and explicit null errorCode/retryable/message.
     Error has data null and non-null errorCode/retryable/message/traceId. Multiple 409s are distinguished by errorCode, not by message.
@@ -365,7 +365,8 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse429' }
     ConflictReserve:
       description: |
-        Reserve-only 409 as ErrorResponse. CONFLICT rolls back Tx-B and keeps PENDING+hash.
+        Reserve-only 409 as ErrorResponse. CONFLICT is a retryable deadlock: rolls back Tx-B, keeps PENDING+hash, GET returns PENDING, caller re-POSTs the same quadruple.
+        OPERATION_STATE_CONFLICT is not that code: incompatible command on a live terminal row, retryable=false, GET returns the terminal state, never re-POST (new sale = new operation_id). After purge the same POST is 410 OPERATION_RETIRED.
         INSUFFICIENT_STOCK deletes claim in Tx-B. IDEMPOTENCY and EXPIRED keep durable row.
       x-error-codes: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT]
       content:
@@ -373,7 +374,9 @@ components:
           schema: { $ref: '#/components/schemas/ErrorResponse409Reserve' }
     ConflictCommitRelease:
       description: |
-        Commit/release 409 as ErrorResponse. CONFLICT rolls back the mutation and keeps the prior durable state (usually RESERVED or COMMITTED), not PENDING.
+        Commit/release 409 as ErrorResponse. Commit and release take the quadruple advisory lock and consult tombstone before resolving the saga.
+        CONFLICT is a retryable deadlock: rolls back the mutation, keeps the prior durable state (usually RESERVED or COMMITTED, never PENDING), GET returns that state, caller re-POSTs the same quadruple.
+        OPERATION_STATE_CONFLICT is not that code: incompatible command on a live terminal row, retryable=false, GET returns the terminal state, never re-POST (new sale = new operation_id). After purge the same POST is 410 OPERATION_RETIRED.
         Valid errorCodes: EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT. No INSUFFICIENT_STOCK.
       x-error-codes: [EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT]
       content:

@@ -42,8 +42,8 @@ Una service identity. Autorización **solo por scopes**. Cajeros: BlackStore no 
 - AC-CAT-2: Validación de schema **antes** de Tx-A. 422 `CATALOG_VERSION_STALE` en Tx-B: DELETE claim PENDING en la misma tx; GET 404; nuevo `X-Operation-Id`. Override = scope `price:override` + `X-Override-Reason`. Receipts no-PENDING incluyen `acceptedPriceVersions[]` (min 1). Cada línea de reserve **exige** `priceVersion`.
 - AC-STK-1: BlackStore persiste intención + cuádruple + outbox **antes** del HTTP.
 - AC-STK-2: Identidad wire = `(client_instance_id, device_id, sale_id, operation_id)`. Reserve/commit/release/GET usan el **mismo** `X-Operation-Id`. Body sin operation key.
-- AC-STK-3: Reserve en **dos transacciones**. Tx-A: persistir PENDING + `request_hash` canónico y COMMIT (GET ya lo ve) sólo si no hay tombstone. Tx-B: advisory lock de la cuádruple, reconsultar tombstone, lock saga, validar hash, locks stock, reserva+ledger+receipt+RESERVED. Re-POST misma cuádruple retoma Tx-B. Locks: **advisory de cuádruple**, **después** la fila de saga, luego `inventory_balances` por `variant_id ASC`. TTL 900s (60–3600). Estados durables `PENDING|RESERVED|COMMITTED|RELEASED|EXPIRED`. `CONFLICT` = 409 deadlock no durable. Tombstone → 410 `OPERATION_RETIRED`.
-- AC-STK-4: Commit/release/expiry mutuamente exclusivos (`FOR UPDATE SKIP LOCKED`). Ledger `EXTERNAL_BLACKSTORE` + `RESERVATION`/`RELEASE`/`STOCK_COMMIT_EXTERNAL`. Nunca `SALE`.
+- AC-STK-3: Reserve en **dos transacciones**. Toda ruta mutante (Tx-A, Tx-B, commit, release, purge) toma **primero** el advisory transaction lock de la cuádruple (ADR-007) y consulta tombstone; si existe → 410 `OPERATION_RETIRED`. Tx-A: persistir PENDING + `request_hash` canónico y COMMIT (GET ya lo ve). Tx-B: mismo advisory lock, reconsultar tombstone, lock saga `FOR UPDATE`, validar hash, locks stock, reserva+ledger+receipt+RESERVED. Re-POST misma cuádruple retoma Tx-B. Orden único: **advisory de cuádruple**, **después** saga, **después** `inventory_balances` por `variant_id ASC`. TTL 900s (60–3600). Estados durables `PENDING|RESERVED|COMMITTED|RELEASED|EXPIRED`. `CONFLICT` = 409 deadlock retryable, no durable. Tombstone → 410 `OPERATION_RETIRED`.
+- AC-STK-4: Commit/release/expiry mutuamente exclusivos. Commit y release toman el mismo advisory lock y consultan tombstone **antes** de resolver la saga (`FOR UPDATE`). Expiry usa `FOR UPDATE SKIP LOCKED` sobre RESERVED vencidas. Ledger `EXTERNAL_BLACKSTORE` + `RESERVATION`/`RELEASE`/`STOCK_COMMIT_EXTERNAL`. Nunca `SALE`.
 - AC-STK-5: Reconcile read-only, max 500 `knownReceipts`. `present` = intersección enviados∩existentes. `unknownReceipts` = enviados no existentes. No descubre ops server-only. Investigación individual = GET cuádruple.
 - AC-STK-6: `available_quantity` **ya es neta de** `reserved_quantity` (on_hand = available + reserved). Sellable = `GREATEST(0, available_quantity - safety_stock)`. Prohibido restar `reserved_quantity` de nuevo. Reserve: `available -= q`, `reserved += q` si `q <= sellable`. Commit: `reserved -= q`. Release/expiry: `available += q`, `reserved -= q`. 409 `INSUFFICIENT_STOCK` + `lineFailures[]`. Sin oversell.
 - AC-STK-7: **Sin REJECTED.** Matriz:
@@ -70,8 +70,9 @@ Una service identity. Autorización **solo por scopes**. Cajeros: BlackStore no 
 | e) Expirada | 200 EXPIRED | Nueva saga (nuevo operation_id) |
 | f) Recibió INSUFFICIENT_STOCK / CATALOG_VERSION_STALE / VALIDATION | 404 | Resync + **nuevo** operation_id, mismo sale_id |
 | g) Recibió IDEMPOTENCY_PAYLOAD_MISMATCH | 200 estado original | Corregir body con **nuevo** operation_id |
-| h) Recibió CONFLICT | 200 estado durable previo | Re-POST misma cuádruple |
-| i) Saga purgada (tombstone retenido >=7 años o política por instalación >=7 años) | 410 OPERATION_RETIRED (`retryable=false`) | **Nunca** re-POST; nueva venta = nuevo operation_id |
+| h) Recibió CONFLICT (deadlock retryable) | 200 estado durable previo | Re-POST **misma** cuádruple |
+| i) Recibió OPERATION_STATE_CONFLICT | 200 estado terminal vivo | **Nunca** re-POST; nueva venta = nuevo operation_id |
+| j) Saga purgada (tombstone retenido >=7 años o política por instalación >=7 años) | 410 OPERATION_RETIRED (`retryable=false`) | **Nunca** re-POST; nueva venta = nuevo operation_id |
 
 Worker: DELETE `PENDING AND created_at < now()-60s` sin ledger. Purge terminales sigue **sólo** AC-STK-8 (INSERT tombstone → DELETE líneas → DELETE saga). No hay una segunda secuencia de purge.
 

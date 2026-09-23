@@ -76,7 +76,7 @@
       "files": ["backend/src/main/kotlin/**/stock/"],
       "acceptance_criteria": [
         "AC-STK-2: concurrent identical headers return one receipt",
-        "AC-STK-3: Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s",
+        "AC-STK-3: advisory lock + tombstone before Tx-A and again in Tx-B; Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s",
         "AC-STK-6: INSUFFICIENT_STOCK lineFailures sellable qty; available already nets reserved",
         "AC-STK-7: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT",
         "GATE: reserve tests pass"
@@ -87,17 +87,18 @@
     {
       "id": "TASK-PIC-005",
       "title": "Commit, release, expiry job",
-      "description": "Same quadruple UPDATE. Expiry worker 30s batch 100 FOR UPDATE SKIP LOCKED. Commit-vs-expire exclusive. Commit/release CONFLICT rolls back and preserves the prior durable state (normally RESERVED or COMMITTED), never PENDING. STOCK_COMMIT_EXTERNAL not SALE.",
+      "description": "Same quadruple UPDATE. Advisory tombstone lock (ADR-007) before commit/release resolve the saga; consult tombstone first (410 OPERATION_RETIRED). Expiry worker 30s batch 100 FOR UPDATE SKIP LOCKED. Commit-vs-expire exclusive. Commit/release CONFLICT is retryable deadlock and preserves the prior durable state (normally RESERVED or COMMITTED), never PENDING. Live terminal incompatible command is 409 OPERATION_STATE_CONFLICT retryable=false (never re-POST). STOCK_COMMIT_EXTERNAL not SALE.",
       "status": "pending",
       "layer": 1,
       "complexity": "High",
       "depends_on": ["TASK-PIC-004"],
       "files": ["backend/src/main/kotlin/**/stock/"],
       "acceptance_criteria": [
-        "AC-STK-4: commit/release/expiry mutually exclusive; commit/release CONFLICT preserves the prior durable state (normally RESERVED/COMMITTED), never PENDING",
+        "AC-STK-4: commit/release/expiry mutually exclusive; commit/release acquire the quadruple advisory lock and consult tombstone before saga FOR UPDATE; CONFLICT preserves the prior durable state (normally RESERVED/COMMITTED), never PENDING",
+        "AC-STK-7: live terminal incompatible command is 409 OPERATION_STATE_CONFLICT retryable=false (GET returns terminal; never re-POST); tombstone is 410 OPERATION_RETIRED",
         "GATE: state machine tests pass"
       ],
-      "references": ["AC-STK-3", "AC-STK-4"],
+      "references": ["AC-STK-3", "AC-STK-4", "AC-STK-7"],
       "design_decisions": ["ADR-003", "ADR-007"]
     },
     {
@@ -110,7 +111,7 @@
       "depends_on": ["TASK-PIC-005"],
       "files": ["backend/src/main/kotlin/**/stock/"],
       "acceptance_criteria": [
-        "AC-STK-3: GET windows include 404/PENDING/RESERVED/COMMITTED/EXPIRED/mismatch/CONFLICT and tombstone 410 OPERATION_RETIRED retryable=false",
+        "AC-STK-3: GET windows include 404/PENDING/RESERVED/COMMITTED/EXPIRED/mismatch/CONFLICT (retryable re-POST) / OPERATION_STATE_CONFLICT (200 terminal, never re-POST) and tombstone 410 OPERATION_RETIRED retryable=false",
         "AC-STK-5: reconcile intersection of <=500 knownReceipts; read-only; no server-only discovery; unknown receipt never alone authorizes re-POST",
         "AC-STK-8: one-tx purge INSERT tombstone (retention_until >= retired_at+7y) then DELETE lines then DELETE saga; GET tombstone returns 410 OPERATION_RETIRED; BlackStore never re-POSTs it",
         "GATE: reconcile, tombstone retention, and GET-recovery tests pass"

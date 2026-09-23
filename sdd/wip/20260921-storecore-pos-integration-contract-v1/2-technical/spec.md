@@ -17,6 +17,7 @@ BlackStore --TLS--> StoreCore HTTP /blackstore-integration/v1
   Bearer + scopes; X-Client-Instance-Id bound to token
   saga headers: X-Device-Id, X-Sale-Id, X-Operation-Id
         --> port BlackStoreIntegration
+        --> advisory lock of quadruple + tombstone (ADR-007)
         --> lock saga row FOR UPDATE
         --> lock inventory_balances FOR UPDATE ORDER BY variant_id ASC
         --> inventory_reservations (same as WEB)
@@ -24,7 +25,7 @@ BlackStore --TLS--> StoreCore HTTP /blackstore-integration/v1
 Sin JDBC a BlackStore. Sin store_id. Sin módulo POS interno.
 ```
 
-Capability `BLACKSTORE_INTEGRATION` nace `DISABLED`. Config:
+Capability `BLACKSTORE_INTEGRATION` nace `DISABLED`. Config **schema v2** (exactamente trece números contractuales; sólo `reservation_ttl_seconds` puede cambiar en `[60,3600]`). V4/`TASK-PIC-001` es dueño de este JSON. El resto de módulos conserva schema v1 `{}`. CAS/audit `changeState` reenvía este schema v2, nunca `{}`. V6/`TASK-PIC-010` no vive aquí: sólo el flip documental de `future_optional`.
 
 ```json
 {
@@ -88,9 +89,9 @@ Transiciones (q > 0, `q <= sellable` en reserve):
 
 Una cuádruple = una fila `blackstore_integration_operations`. Mismo `X-Operation-Id` en reserve/commit/release/GET. Path `operationId` = header `X-Operation-Id`. Body **sin** operation key. `priceVersion` de envelope es **required**; la línea puede overridear; cada línea debe resolver una versión. Receipts no-PENDING **requieren** `acceptedPriceVersions`.
 
-**Tx-A (COMMIT visible):** validación de schema **antes** de Tx-A. INSERT PENDING + `request_hash` canónico. `receipt` y `reservation_ref` NULL. COMMIT. **No es revertible** después del COMMIT.
+**Tx-A (COMMIT visible):** advisory lock de la cuádruple + consulta de tombstone (410 si existe). Validación de schema **antes** de Tx-A. INSERT PENDING + `request_hash` canónico. `receipt` y `reservation_ref` NULL. COMMIT. **No es revertible** después del COMMIT.
 
-**Tx-B:** `SELECT FOR UPDATE` saga → validar hash → locks `inventory_balances` `ORDER BY variant_id ASC` → reserva+ledger+receipt+RESERVED, **o** errores de negocio que **DELETE** el claim PENDING en la **misma** transacción Tx-B.
+**Tx-B:** mismo advisory lock → reconsultar tombstone → `SELECT FOR UPDATE` saga → validar hash → locks `inventory_balances` `ORDER BY variant_id ASC` → reserva+ledger+receipt+RESERVED, **o** errores de negocio que **DELETE** el claim PENDING en la **misma** transacción Tx-B.
 
 Re-POST con la misma cuádruple y el mismo hash **retoma Tx-B** (idempotente). Hash distinto sobre fila existente → 409 `IDEMPOTENCY_PAYLOAD_MISMATCH` (no borra).
 
@@ -109,7 +110,7 @@ Sin estado durable `REJECTED`. Worker: `DELETE FROM blackstore_integration_opera
 
 ## Locks (P1)
 
-Orden global **único**: (0) advisory transaction lock de la cuádruple (ADR-007) y consulta de tombstone; (1) fila de saga `FOR UPDATE`; (2) **todos** los `inventory_balances` de las líneas `ORDER BY variant_id ASC` `FOR UPDATE`. Tombstone → 410 `OPERATION_RETIRED` antes de mutar. All-or-nothing: si una línea falla, rollback de Tx-B. `lineFailures` sólo en 409 `INSUFFICIENT_STOCK`, nunca un 200 parcial.
+Orden global **único**, también en Tx-A, Tx-B, commit y release: (0) advisory transaction lock de la cuádruple (ADR-007) y consulta de tombstone; (1) fila de saga `FOR UPDATE`; (2) **todos** los `inventory_balances` de las líneas `ORDER BY variant_id ASC` `FOR UPDATE`. Tombstone → 410 `OPERATION_RETIRED` antes de mutar. All-or-nothing: si una línea falla, rollback de Tx-B. `lineFailures` sólo en 409 `INSUFFICIENT_STOCK`, nunca un 200 parcial.
 
 ## Expiry worker (P1)
 
