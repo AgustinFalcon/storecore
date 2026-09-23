@@ -21,6 +21,7 @@
 - TODO-038 [medium] [deferred] Integraciones reales de carrier.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
 - TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: OpenAPI canónico en `sdd/wip/20260921-storecore-pos-integration-contract-v1/`. `ready_for_sol_review`, no approved. Sin conector real ni Flyway hasta Sol GO. No altera las 14 tasks de core 1.0.0.
+- TODO-042 [high] [blocked] `storecore-mp-live-checkout-v1`: 01/02/02A/03/04 in-repo fail-closed. 05 y pagos reales NO-GO hasta cuenta sandbox + Sol GO de activación.
 
 ## Histórico
 

@@ -21,7 +21,7 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
            FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id ORDER BY v.sku""",
     ) { rs, _ -> InventoryRow(rs.getString("sku"), rs.getInt("available_quantity"), rs.getInt("reserved_quantity"), rs.getInt("safety_stock")) }
 
-    fun reserve(saga: UUID, lineKey: UUID, variantId: Long, quantity: Int, actor: String): Long = transactions.execute {
+    override fun reserve(saga: UUID, lineKey: UUID, variantId: Long, quantity: Int, actor: String): Long = transactions.execute {
         val existing = jdbc.query("SELECT id FROM inventory_reservations WHERE reservation_line_key=? OR (reservation_saga_key=? AND variant_id=?)", { rs, _ -> rs.getLong("id") }, lineKey, saga, variantId).firstOrNull()
         if (existing != null) existing else {
         val balance = jdbc.query("SELECT available_quantity,safety_stock FROM inventory_balances WHERE variant_id=? FOR UPDATE", { rs, _ -> rs.getInt("available_quantity") to rs.getInt("safety_stock") }, variantId).firstOrNull()

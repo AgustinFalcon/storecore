@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Validado:** 2026-09-22  
+**Validado:** 2026-09-23  
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** feature branch + finish en el PR. No tag, deploy o publish.
@@ -20,9 +20,9 @@
 
 ## Gate actual
 
-Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado**: DS-00…U-10 en código, sin favoritos ni Mercado Pago en el browser. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado**: DS-00…U-10 en código, sin favoritos ni SDK/credenciales de Mercado Pago en el browser. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Siguiente carril: features con Sol GO (POS contrato, fiscal externo, automatizaciones ML). No autoriza live vendor credentials en CI.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. POS y fiscal siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
 
 ## WIP POS (paralelo, no es el baseline)
 
@@ -33,3 +33,8 @@ Siguiente carril: features con Sol GO (POS contrato, fiscal externo, automatizac
 ## Fiscal externo
 
 - `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Sin código, DDL, worker ni secretos.
+
+## Mercado Pago Checkout Pro (WIP separado)
+
+- `sdd/wip/20260922-storecore-mp-live-checkout-v1/`: Checkout Pro externo en la misma ventana mediante Orders API, `documented_deferred`.
+- MP-LIVE-01–04 fail-closed cerrados (Sol + dual Grok APPROVED). MP-LIVE-05, pagos reales y fiscal siguen NO-GO.

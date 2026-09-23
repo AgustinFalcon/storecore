@@ -8,6 +8,7 @@
 | storefront producción, catálogo/search/brand/category/offers/home | TASK-005 | HTTP repository, contenido configurable y búsquedas verificables |
 | customer/profile/address/auth | TASK-004 | identidad y autorización separadas |
 | cart/checkout/pago/order | TASK-006 | snapshots, idempotencia y estados |
+| Mercado Pago live checkout | `20260922-storecore-mp-live-checkout-v1` | 01–04 fail-closed cerrado (Sol + dual Grok); 05 NO-GO; WIP no archivado |
 | stock WEB | TASK-007 | reserve/consume/release y ledger append-only |
 | ML autorizado | TASK-008 + TODO-041 | contrato oficial, cuenta autorizada, inbox durable→ACK; refetch/apply via port (CI fake) |
 | admin catálogo/contenido/promo manual | TASK-009 | roles, auditoría, margen y único writer |

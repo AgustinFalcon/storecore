@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ArchitectureBoundaryTest {
     private val mainRoot = Path.of("src/main/kotlin/com/storecore")
-    private val forbiddenDomainImports = listOf("org.springframework", "jakarta.", "javax.persistence")
+    private val forbiddenDomainImports = listOf("org.springframework", "jakarta.", "javax.persistence", "com.mercadopago")
 
     @Test
     fun `core domain source does not import frameworks`() {

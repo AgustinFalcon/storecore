@@ -10,3 +10,5 @@ class ProfileRejected(code: String = "PROFILE_REJECTED") : CommerceException(cod
 class FulfillmentRejected : CommerceException("FULFILLMENT_TRANSITION_REJECTED")
 class WebhookRateLimited(val retryAfterSeconds: Long) : CommerceException("WEBHOOK_RATE_LIMITED", retryable = true)
 class WebhookPayloadTooLarge : CommerceException("WEBHOOK_PAYLOAD_TOO_LARGE")
+class InvalidWebhookSignature : CommerceException("INVALID_WEBHOOK_SIGNATURE")
+class LegacyMpNotificationRetired : CommerceException("LEGACY_MP_NOTIFICATION_RETIRED")

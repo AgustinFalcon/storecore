@@ -28,6 +28,9 @@ class JdbcOrderService(
 
     fun ship(actor: InternalUserPrincipal, orderId: Long, status: String, tracking: String?): OrderView {
         capabilities.decide("MANUAL_FULFILLMENT", "MANAGE", CapabilityActor.Internal(actor))
+        val orderStatus = jdbc.query("SELECT status FROM orders WHERE id=?", { rs, _ -> rs.getString("status") }, orderId).firstOrNull()
+            ?: throw ResourceNotFound()
+        if (orderStatus == "PAID_STOCK_REVIEW") throw FulfillmentRejected()
         val shipment = jdbc.query("SELECT id,status,tracking_code,shipped_at FROM shipments WHERE order_id=? FOR UPDATE", { rs, _ -> mapOf("id" to rs.getLong("id"), "status" to rs.getString("status"), "tracking" to rs.getString("tracking_code"), "shipped" to rs.getTimestamp("shipped_at")) }, orderId).firstOrNull()
             ?: jdbc.query("SELECT id FROM orders WHERE id=?", { rs, _ -> rs.getLong("id") }, orderId).firstOrNull()?.let {
                 jdbc.queryForObject("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING') RETURNING id", Long::class.java, orderId)?.let { mapOf("id" to it, "status" to "PENDING", "tracking" to null, "shipped" to null) }
@@ -49,7 +52,9 @@ class JdbcOrderService(
 
     fun rma(actor: InternalUserPrincipal, orderId: Long, status: String): OrderView {
         capabilities.decide("MANUAL_FULFILLMENT", "MANAGE", CapabilityActor.Internal(actor))
-        jdbc.query("SELECT id FROM orders WHERE id=?", { rs, _ -> rs.getLong("id") }, orderId).firstOrNull() ?: throw ResourceNotFound()
+        val orderStatus = jdbc.query("SELECT status FROM orders WHERE id=?", { rs, _ -> rs.getString("status") }, orderId).firstOrNull()
+            ?: throw ResourceNotFound()
+        if (orderStatus == "PAID_STOCK_REVIEW") throw FulfillmentRejected()
         val current = jdbc.query("SELECT id,status FROM returns WHERE order_id=? ORDER BY id DESC LIMIT 1 FOR UPDATE", { rs, _ -> rs.getLong("id") to rs.getString("status") }, orderId).firstOrNull()
         val mapped = when (status) { "RECEIVED" -> "RETURN_RECEIVED"; "INSPECTED" -> "INSPECTED"; "ADJUSTED" -> "CLOSED"; else -> throw FulfillmentRejected() }
         val next = when {

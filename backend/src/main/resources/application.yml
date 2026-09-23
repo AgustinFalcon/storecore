@@ -19,3 +19,12 @@ storecore:
     origin: ${STORECORE_INSTALLATION_ORIGIN:http://localhost:4200}
   integrations:
     refetch-delay-ms: 30000
+    mp-orders:
+      adapter: unconfigured
+      accepted-topic: ""
+      expected-user-id: ""
+      expected-application-id: ""
+      checkout-url-hosts: []
+      api-base-url: ""
+      access-token-ref: ""
+      webhook-secret-ref: ""

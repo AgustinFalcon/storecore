@@ -131,6 +131,10 @@ export class CartStore extends ComponentStore<CartState> {
             tapResponse({
               next: (receipt) => {
                 this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS' });
+                if (receipt.checkoutUrl?.startsWith('https://')) {
+                  window.location.assign(receipt.checkoutUrl);
+                  return;
+                }
                 void this.router.navigate(['/checkout/result', receipt.orderId]);
               },
               error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),

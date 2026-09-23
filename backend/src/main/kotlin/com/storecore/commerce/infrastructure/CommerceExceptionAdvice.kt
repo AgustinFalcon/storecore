@@ -5,6 +5,8 @@ import com.storecore.commerce.application.CommerceException
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.FulfillmentRejected
 import com.storecore.commerce.application.InsufficientInventory
+import com.storecore.commerce.application.InvalidWebhookSignature
+import com.storecore.commerce.application.LegacyMpNotificationRetired
 import com.storecore.commerce.application.MercadoLibreAccountMissing
 import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.application.PromoWindowOverlap
@@ -18,6 +20,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class CommerceExceptionAdvice {
+    @ExceptionHandler(InvalidWebhookSignature::class)
+    fun invalidSignature() =
+        ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(BaseResponse<Nothing>(401, null, "Request rejected", "INVALID_WEBHOOK_SIGNATURE", false, null))
+
+    @ExceptionHandler(LegacyMpNotificationRetired::class)
+    fun legacyNotificationRetired() =
+        ResponseEntity.status(HttpStatus.GONE)
+            .body(BaseResponse<Nothing>(410, null, "Gone", "LEGACY_MP_NOTIFICATION_RETIRED", false, null))
+
     @ExceptionHandler(WebhookRateLimited::class)
     fun rateLimited(exception: WebhookRateLimited) =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
