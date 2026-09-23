@@ -76,7 +76,7 @@
       "files": ["backend/src/main/kotlin/**/stock/"],
       "acceptance_criteria": [
         "AC-STK-2: concurrent identical headers return one receipt",
-        "AC-STK-3: advisory lock + tombstone before Tx-A and again in Tx-B; Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s",
+        "AC-STK-3: advisory lock + tombstone before Tx-A and again in Tx-B; Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s; POST reserve with tombstone is 410 OPERATION_RETIRED retryable=false (never re-POST)",
         "AC-STK-6: INSUFFICIENT_STOCK lineFailures sellable qty; available already nets reserved",
         "AC-STK-7: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT",
         "GATE: reserve tests pass"
@@ -94,7 +94,7 @@
       "depends_on": ["TASK-PIC-004"],
       "files": ["backend/src/main/kotlin/**/stock/"],
       "acceptance_criteria": [
-        "AC-STK-4: commit/release/expiry mutually exclusive; commit/release acquire the quadruple advisory lock and consult tombstone before saga FOR UPDATE; CONFLICT preserves the prior durable state (normally RESERVED/COMMITTED), never PENDING",
+        "AC-STK-4: commit/release/expiry mutually exclusive; commit/release acquire the quadruple advisory lock and consult tombstone before saga FOR UPDATE; CONFLICT preserves the prior durable state (normally RESERVED/COMMITTED), never PENDING; POST commit/release with tombstone is 410 OPERATION_RETIRED",
         "AC-STK-7: live terminal incompatible command is 409 OPERATION_STATE_CONFLICT retryable=false (GET returns terminal; never re-POST); tombstone is 410 OPERATION_RETIRED",
         "GATE: state machine tests pass"
       ],
@@ -161,7 +161,7 @@
       "depends_on": ["TASK-PIC-003", "TASK-PIC-004", "TASK-PIC-005", "TASK-PIC-006"],
       "files": ["backend/src/main/resources/openapi/"],
       "acceptance_criteria": [
-        "AC-CMP-1: published spec matches this WIP YAML",
+        "AC-CMP-1: published spec matches this WIP YAML; POST reserve/commit/release declare 410 OperationRetired",
         "GATE: openapi diff additive-only vs 1.0.0-draft"
       ],
       "references": ["AC-CMP-1"],
