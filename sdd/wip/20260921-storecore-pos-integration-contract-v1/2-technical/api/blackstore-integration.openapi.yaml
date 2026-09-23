@@ -19,7 +19,7 @@ info:
   x-approval-gate:
     required: true
     status: ready_for_sol_review
-    consequence: BlackStore may implement ports/DTOs/fixtures only until GO.
+    consequence: Until a separate Sol implementation GO, only documentation may change. Ports, DTOs, fixtures, Flyway, endpoints, and runtime code are not authorized.
 servers:
   - url: https://storecore-installation.example
 security:
@@ -367,15 +367,15 @@ components:
       description: |
         Reserve-only 409 as ErrorResponse. CONFLICT rolls back Tx-B and keeps PENDING+hash.
         INSUFFICIENT_STOCK deletes claim in Tx-B. IDEMPOTENCY and EXPIRED keep durable row.
-      x-error-codes: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT]
+      x-error-codes: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT]
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse409Reserve' }
     ConflictCommitRelease:
       description: |
         Commit/release 409 as ErrorResponse. CONFLICT rolls back the mutation and keeps the prior durable state (usually RESERVED or COMMITTED), not PENDING.
-        Valid errorCodes: EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT. No INSUFFICIENT_STOCK.
-      x-error-codes: [EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT]
+        Valid errorCodes: EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT. No INSUFFICIENT_STOCK.
+      x-error-codes: [EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT]
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse409CommitRelease' }
@@ -427,6 +427,7 @@ components:
         - NOT_FOUND
         - CURSOR_EXPIRED
         - OPERATION_RETIRED
+        - OPERATION_STATE_CONFLICT
         - INTERNAL
       description: Machine-readable business code. Distinct from HttpCode. BlackStore branches on this, never on message.
     BaseResponse:
@@ -494,14 +495,14 @@ components:
         - type: object
           properties:
             code: { const: 409 }
-            errorCode: { enum: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT] }
+            errorCode: { enum: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT] }
     ErrorResponse409CommitRelease:
       allOf:
         - $ref: '#/components/schemas/ErrorResponse'
         - type: object
           properties:
             code: { const: 409 }
-            errorCode: { enum: [IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT] }
+            errorCode: { enum: [IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT] }
     ErrorResponse410:
       allOf:
         - $ref: '#/components/schemas/ErrorResponse'

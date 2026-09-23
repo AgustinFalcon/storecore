@@ -103,18 +103,19 @@ Re-POST con la misma cuádruple y el mismo hash **retoma Tx-B** (idempotente). H
 | `CONFLICT` (lock/deadlock) | 409 retryable | rollback mutación; **conserva estado durable previo** (PENDING en reserve; RESERVED/COMMITTED en commit/release) | 200 estado previo | misma cuádruple |
 | `IDEMPOTENCY_PAYLOAD_MISMATCH` | 409 | conserva fila original | 200 original | corrección = nuevo ID |
 | `EXPIRED` | 409 | conserva `EXPIRED` | 200 EXPIRED | nueva venta = nuevo ID |
+| `OPERATION_STATE_CONFLICT` | 409 `retryable=false` | conserva fila terminal viva | 200 estado terminal | no re-POST; nueva venta = nuevo ID. Si ya hay tombstone → 410 |
 
 Sin estado durable `REJECTED`. Worker: `DELETE FROM blackstore_integration_operations WHERE state='PENDING' AND receipt IS NULL AND created_at < now()-60s` (claim Tx-A vencido **sin** ledger). No toca `RESERVED` (eso es expiry con `RELEASE`).
 
 ## Locks (P1)
 
-Orden global **único**: (1) fila de saga `FOR UPDATE`; (2) **todos** los `inventory_balances` de las líneas `ORDER BY variant_id ASC` `FOR UPDATE`. All-or-nothing: si una línea falla, rollback de Tx-B. `lineFailures` sólo en 409 `INSUFFICIENT_STOCK`, nunca un 200 parcial.
+Orden global **único**: (0) advisory transaction lock de la cuádruple (ADR-007) y consulta de tombstone; (1) fila de saga `FOR UPDATE`; (2) **todos** los `inventory_balances` de las líneas `ORDER BY variant_id ASC` `FOR UPDATE`. Tombstone → 410 `OPERATION_RETIRED` antes de mutar. All-or-nothing: si una línea falla, rollback de Tx-B. `lineFailures` sólo en 409 `INSUFFICIENT_STOCK`, nunca un 200 parcial.
 
 ## Expiry worker (P1)
 
 Cadencia 30s. Batch 100 filas `state='RESERVED' AND expires_at <= now()` con `FOR UPDATE SKIP LOCKED`. Por cada fila: si un commit concurrente ya tomó el lock y cambió a COMMITTED, skip. Si gana expire: ledger `RELEASE`, reservations `EXPIRED`, saga `EXPIRED`. Reintentos: 5 con backoff; poison → `audit_events` y skip.
 
-**Retención/purge (90 días):** el job borra filas terminales (`COMMITTED|RELEASED|EXPIRED`) **después** de insertar un tombstone inmutable en `blackstore_integration_operation_tombstones` (cuádruple, `request_hash`, `final_state`, `receipt`, `reservation_ref`, `retired_at`). El tombstone **no** se purga con la saga (retención mínima 7 años o política de instalación). Nunca reescribe ledger.
+**Retención/purge (90 días, AC-STK-8 / ADR-007):** una sola transacción, mismo advisory lock + lock de saga: (1) INSERT tombstone inmutable con `retention_until >= retired_at + 7 years`; (2) DELETE líneas `blackstore_integration_reservation_lines`; (3) DELETE saga. `ON DELETE RESTRICT` prohíbe borrar la saga antes de las líneas. El tombstone **no** se purga con la saga. Ledger intacto. No hay otra secuencia de purge.
 
 **GET cuádruple:** fila viva → 200 receipt. Sin fila viva + tombstone → **410 `OPERATION_RETIRED`** (`retryable=false`). Sin fila ni tombstone → 404. BlackStore **nunca** re-POSTea una saga retirada; `unknownReceipts` en reconcile tampoco autoriza re-POST.
 

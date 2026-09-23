@@ -5,15 +5,15 @@
   "execution_strategy": "batched",
   "status": "ready_for_sol_review",
   "stats": {
-    "total": 12,
+    "total": 13,
     "done": 0,
-    "by_layer": { "1": 8, "2": 1, "3": 3 }
+    "by_layer": { "1": 9, "2": 1, "3": 3 }
   },
   "tasks": [
     {
       "id": "TASK-PIC-001",
       "title": "Capability BLACKSTORE_INTEGRATION and companion 0..1",
-      "description": "Add future_optional module, typed config, scopes including price:override, DISABLED default, kill switches. Partial unique live companion. Credential child table. Do not add POS module or store_id.",
+      "description": "V4-only owner of BLACKSTORE_INTEGRATION registry/config/companion/credentials (ADR-008). future_optional=true, DISABLED, schema v2 with action_kind and allowed_when_paused on every action. CAS/audit changeState re-sends current v2 config, never {}. Partial unique live companion. Credential child table. Do not add POS module or store_id. Design only until a separate implementation GO.",
       "status": "pending",
       "layer": 1,
       "complexity": "High",
@@ -25,12 +25,12 @@
         "GATE: capability scan passes"
       ],
       "references": ["AC-ID-1", "AC-ID-2"],
-      "design_decisions": ["ADR-001"]
+      "design_decisions": ["ADR-001", "ADR-008"]
     },
     {
       "id": "TASK-PIC-002",
       "title": "DDL delta companions, operations UNIQUE quadruple, ledger pairing",
-      "description": "Apply sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/data-model-v1.md only. Channel EXTERNAL_BLACKSTORE. Named CHECKs. Per-line UUIDv5 keys. Never POS. Never overwrite balances.",
+      "description": "V5-only owner of saga, tombstone (retention_until >= retired_at+7y), lines, cursor and delta ledger (ADR-007/008). Does not seed registry/companion/credentials. Channel EXTERNAL_BLACKSTORE. Named CHECKs. Per-line UUIDv5 keys. Never POS. Never overwrite balances. Design only until a separate implementation GO.",
       "status": "pending",
       "layer": 1,
       "complexity": "High",
@@ -45,7 +45,7 @@
         "GATE: Testcontainers migration passes"
       ],
       "references": ["AC-STK-2", "AC-STK-4"],
-      "design_decisions": ["ADR-003"]
+      "design_decisions": ["ADR-003", "ADR-007", "ADR-008"]
     },
     {
       "id": "TASK-PIC-003",
@@ -68,7 +68,7 @@
     {
       "id": "TASK-PIC-004",
       "title": "Reserve two-phase Tx-A/Tx-B with header idempotency",
-      "description": "POST /blackstore-integration/v1/reservations. Header quadruple. Tx-A PENDING+request_hash COMMIT; Tx-B lock saga then inventory_balances ORDER BY variant_id ASC. Error matrix AC-STK-7. AC-STK-1 is BlackStore precondition.",
+      "description": "POST /blackstore-integration/v1/reservations. Header quadruple. Advisory tombstone lock (ADR-007) before Tx-A/Tx-B. Tx-A PENDING+request_hash COMMIT; Tx-B re-check tombstone, lock saga then inventory_balances ORDER BY variant_id ASC. Error matrix AC-STK-7 including OPERATION_STATE_CONFLICT. AC-STK-1 is BlackStore precondition.",
       "status": "pending",
       "layer": 1,
       "complexity": "High",
@@ -78,11 +78,11 @@
         "AC-STK-2: concurrent identical headers return one receipt",
         "AC-STK-3: Tx-A PENDING visible to GET; Tx-B all-or-nothing; RESERVED+expiresAt 900s",
         "AC-STK-6: INSUFFICIENT_STOCK lineFailures sellable qty; available already nets reserved",
-        "AC-STK-7: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; mismatch/EXPIRED keep row",
+        "AC-STK-7: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT",
         "GATE: reserve tests pass"
       ],
       "references": ["AC-STK-2", "AC-STK-3", "AC-STK-6", "AC-STK-7"],
-      "design_decisions": ["ADR-002", "ADR-003"]
+      "design_decisions": ["ADR-002", "ADR-003", "ADR-007"]
     },
     {
       "id": "TASK-PIC-005",
@@ -98,12 +98,12 @@
         "GATE: state machine tests pass"
       ],
       "references": ["AC-STK-3", "AC-STK-4"],
-      "design_decisions": ["ADR-003"]
+      "design_decisions": ["ADR-003", "ADR-007"]
     },
     {
       "id": "TASK-PIC-006",
       "title": "GET operation, reconcile read-only, and terminal purge recovery",
-      "description": "Timeout recovery via GET same headers. Reconcile returns present/unknownReceipts; never writes ledger or SET available. Purge terminal sagas atomically: INSERT immutable tombstone then DELETE saga in the same transaction; retain tombstone seven years or a per-installation policy >=7 years. Tombstone or unknown reconcile evidence never authorizes re-POST.",
+      "description": "Timeout recovery via GET same headers. Reconcile returns present/unknownReceipts; never writes ledger or SET available. Purge follows AC-STK-8/ADR-007 only: advisory lock, INSERT tombstone with retention_until >= retired_at+7y, DELETE reservation lines, DELETE saga. Tombstone or unknown reconcile evidence never authorizes re-POST.",
       "status": "pending",
       "layer": 1,
       "complexity": "High",
@@ -112,11 +112,11 @@
       "acceptance_criteria": [
         "AC-STK-3: GET windows include 404/PENDING/RESERVED/COMMITTED/EXPIRED/mismatch/CONFLICT and tombstone 410 OPERATION_RETIRED retryable=false",
         "AC-STK-5: reconcile intersection of <=500 knownReceipts; read-only; no server-only discovery; unknown receipt never alone authorizes re-POST",
-        "AC-STK-8: terminal purge atomically INSERTs tombstone then DELETEs saga; tombstone retention is >=7 years (or per-installation policy >=7 years); GET tombstone returns 410 OPERATION_RETIRED and BlackStore never re-POSTs it",
+        "AC-STK-8: one-tx purge INSERT tombstone (retention_until >= retired_at+7y) then DELETE lines then DELETE saga; GET tombstone returns 410 OPERATION_RETIRED; BlackStore never re-POSTs it",
         "GATE: reconcile, tombstone retention, and GET-recovery tests pass"
       ],
-      "references": ["AC-STK-3", "AC-STK-5", "AC-STK-7", "AC-SEC-1"],
-      "design_decisions": ["ADR-003", "ADR-006"]
+      "references": ["AC-STK-3", "AC-STK-5", "AC-STK-7", "AC-STK-8", "AC-SEC-1"],
+      "design_decisions": ["ADR-003", "ADR-006", "ADR-007"]
     },
     {
       "id": "TASK-PIC-007",
@@ -133,6 +133,22 @@
       ],
       "references": ["AC-SEC-1"],
       "design_decisions": ["ADR-005", "ADR-006"]
+    },
+    {
+      "id": "TASK-PIC-010",
+      "title": "V6 documentary promotion of future_optional only",
+      "description": "Design-only V6 after green API/stock/worker evidence and a separate implementation GO (ADR-008). storecore_migrator briefly disables the capability_modules immutability trigger, flips BLACKSTORE_INTEGRATION.future_optional true→false, re-enables ALWAYS. Does not activate the module or change config/actions. TASK-PIC-007 remains the error-envelope task and is not this migration.",
+      "status": "pending",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["TASK-PIC-001", "TASK-PIC-006", "TASK-PIC-008", "TASK-L3-001"],
+      "files": ["sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/adr/ADR-008-v3-capability-compatibility-and-promotion.md"],
+      "acceptance_criteria": [
+        "ADR-008: only future_optional changes; module stays DISABLED; no runtime DML/DDL privilege",
+        "GATE: documentary only until a separate Sol implementation GO"
+      ],
+      "references": ["AC-ID-1"],
+      "design_decisions": ["ADR-008"]
     },
     {
       "id": "TASK-PIC-008",
@@ -179,7 +195,8 @@
         "AC-STK-2: concurrent identical quadruple -> one receipt",
         "AC-STK-3: expire and commit are exclusive",
         "AC-STK-3: crash/retry uses GET not a new operation_id",
-        "AC-STK-7: stock/stale/validation GET 404 + new operation_id; reserve CONFLICT preserves PENDING and retries same quadruple; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; tombstone GET 410 OPERATION_RETIRED retryable=false is never re-POSTed",
+        "AC-STK-7: stock/stale/validation GET 404 + new operation_id; reserve CONFLICT preserves PENDING and retries same quadruple; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT; tombstone GET 410 OPERATION_RETIRED retryable=false is never re-POSTed",
+        "AC-STK-8: purge is INSERT tombstone then DELETE lines then DELETE saga",
         "GATE: saga review passes"
       ],
       "references": ["AC-STK-2", "AC-STK-3", "AC-CMP-2"],
@@ -229,7 +246,8 @@
         "level_1": ["TASK-PIC-002"],
         "level_2": ["TASK-PIC-003", "TASK-PIC-004", "TASK-PIC-007"],
         "level_3": ["TASK-PIC-005"],
-        "level_4": ["TASK-PIC-006", "TASK-PIC-008"]
+        "level_4": ["TASK-PIC-006", "TASK-PIC-008"],
+        "level_5": ["TASK-PIC-010"]
       },
       "2": {
         "level_0": ["TASK-PIC-009"]
@@ -246,6 +264,8 @@
     "AC-STK-1 is a BlackStore-side precondition (persist intent+outbox before HTTP).",
     "AC-OFF-1 is a BlackStore-side obligation; StoreCore only supplies validUntil.",
     "D-TTL=900s, D-CURSOR=200/7d, D-RATE=30 reserve/s, D-PATH=/blackstore-integration/v1 are closed.",
-    "AC-STK-7 error matrix: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; tombstone 410 is never re-POSTed."
+    "AC-STK-7 error matrix: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT; tombstone 410 is never re-POSTed.",
+    "AC-STK-8 purge sequence is unique: INSERT tombstone (retention_until >= retired_at+7y) → DELETE lines → DELETE saga.",
+    "V4=PIC-001 registry, V5=PIC-002 saga/tombstone, V6=PIC-010 future_optional flip. PIC-007 is error envelope only."
   ]
 }

@@ -18,7 +18,7 @@ D-TTL: 900s default (60–3600). Expiry worker 30s, batch 100, `FOR UPDATE SKIP 
 
 Reconcile: compare caller-supplied receipts; zero writes.
 
-Purge (90d): INSERT tombstone → DELETE saga row. GET tombstone without live row → 410 OPERATION_RETIRED (no re-POST).
+Purge (90d, AC-STK-8 / ADR-007): INSERT tombstone (`retention_until >= retired_at + 7 years`) → DELETE reservation lines → DELETE saga row, one transaction. GET tombstone without live row → 410 OPERATION_RETIRED (no re-POST). Incompatible command on a live terminal row → 409 OPERATION_STATE_CONFLICT.
 
 409 CONFLICT: reserve keeps PENDING; commit/release keep prior durable state (not PENDING).
 

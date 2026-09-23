@@ -1,6 +1,6 @@
 # DDL delta — BlackStore integration contract v1
 
-**Status:** `ready_for_sol_review`. No reemplaza el data-model del baseline. Sin `store_id`. **No aplicar Flyway hasta Sol GO.**
+**Status:** `ready_for_sol_review`. No reemplaza el data-model del baseline. Sin `store_id`. **No aplicar Flyway hasta Sol GO.** El SQL de este archivo es diseño no ejecutable: no autoriza migrations, ports ni runtime.
 
 Este delta asume que `pos-sales-ingestion` **no** se aplicó (mutuamente excluyentes). No reintroduce ISSUE/REVERSAL ni channel `EXTERNAL`.
 
@@ -15,15 +15,17 @@ ALTER TABLE capability_modules ADD CONSTRAINT ck_capability_modules_module_code 
   'COMMERCIAL_CALENDAR','FAVORITES','LOYALTY','CARRIERS','ML_VIRTUAL_KITS',
   'BLACKSTORE_INTEGRATION'
 ));
+-- V4 / TASK-PIC-001 is the only owner of this registry. Each action must declare
+-- action_kind and allowed_when_paused. Do not insert (module_code, action_code, allows_write) alone.
 INSERT INTO capability_modules(module_code, future_optional) VALUES ('BLACKSTORE_INTEGRATION', TRUE);
-INSERT INTO capability_actions(module_code, action_code, allows_write) VALUES
-  ('BLACKSTORE_INTEGRATION','CATALOG_READ', FALSE),
-  ('BLACKSTORE_INTEGRATION','STOCK_RESERVE', TRUE),
-  ('BLACKSTORE_INTEGRATION','STOCK_COMMIT', TRUE),
-  ('BLACKSTORE_INTEGRATION','STOCK_RELEASE', TRUE),
-  ('BLACKSTORE_INTEGRATION','STOCK_READ', FALSE),
-  ('BLACKSTORE_INTEGRATION','COST_READ', FALSE),
-  ('BLACKSTORE_INTEGRATION','PRICE_OVERRIDE', TRUE);
+INSERT INTO capability_actions(module_code, action_code, allows_write, action_kind, allowed_when_paused) VALUES
+  ('BLACKSTORE_INTEGRATION','CATALOG_READ', FALSE, 'READ', FALSE),
+  ('BLACKSTORE_INTEGRATION','STOCK_RESERVE', TRUE, 'WRITE', FALSE),
+  ('BLACKSTORE_INTEGRATION','STOCK_COMMIT', TRUE, 'WRITE', FALSE),
+  ('BLACKSTORE_INTEGRATION','STOCK_RELEASE', TRUE, 'WRITE', FALSE),
+  ('BLACKSTORE_INTEGRATION','STOCK_READ', FALSE, 'READ', FALSE),
+  ('BLACKSTORE_INTEGRATION','COST_READ', FALSE, 'READ', FALSE),
+  ('BLACKSTORE_INTEGRATION','PRICE_OVERRIDE', TRUE, 'WRITE', FALSE);
 INSERT INTO module_configurations(module_code, state, config) VALUES (
   'BLACKSTORE_INTEGRATION',
   'DISABLED',
@@ -125,8 +127,10 @@ CREATE TABLE blackstore_integration_operation_tombstones (
   receipt VARCHAR(128) NOT NULL,
   reservation_ref UUID NOT NULL,
   retired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  retention_until TIMESTAMPTZ NOT NULL,
   UNIQUE (client_instance_id, device_id, sale_id, operation_id),
-  CHECK (final_state IN ('COMMITTED','RELEASED','EXPIRED'))
+  CHECK (final_state IN ('COMMITTED','RELEASED','EXPIRED')),
+  CHECK (retention_until >= retired_at + INTERVAL '7 years')
 );
 
 CREATE TABLE blackstore_integration_reservation_lines (
@@ -189,10 +193,10 @@ Namespace `6f1c2a10-9b3e-4d71-9c0a-4c58a7c724b4`.
 
 ## Semántica
 
-- Locks: **primero** saga `FOR UPDATE`; **después** todos los `inventory_balances` `ORDER BY variant_id ASC`.
+- Locks: advisory transaction lock de la cuádruple (ADR-007) en reserve/commit/release/purge; **después** saga `FOR UPDATE`; **después** todos los `inventory_balances` `ORDER BY variant_id ASC`. Tombstone existente → 410 `OPERATION_RETIRED`.
 - `available_quantity` ya es neta de `reserved_quantity`. Sellable = `GREATEST(0, available_quantity - safety_stock)`. No volver a descontar reserved.
 - Transiciones: reserve `available -= q, reserved += q`; commit `reserved -= q`; release/expiry `available += q, reserved -= q`.
 - PENDING durable = Tx-A COMMIT con `request_hash` NOT NULL, receipt/ref NULL. Worker DELETE PENDING > 60s sin ledger.
-- Purge terminales (90d): INSERT tombstone → DELETE saga. GET sin fila + tombstone → 410 OPERATION_RETIRED (no re-POST).
-- Matriz 409: INSUFFICIENT_STOCK/STALE/VALIDATION borran claim en Tx-B; CONFLICT conserva estado previo; IDEMPOTENCY y EXPIRED conservan fila.
+- Purge terminales (90d), una sola transacción (ADR-007): advisory lock + lock de saga; INSERT tombstone (`retention_until >= retired_at + 7 years`); DELETE `blackstore_integration_reservation_lines`; DELETE `blackstore_integration_operations`. Ledger no se borra. GET sin fila + tombstone → 410 `OPERATION_RETIRED` (no re-POST).
+- Matriz 409: INSUFFICIENT_STOCK/STALE/VALIDATION borran claim en Tx-B; CONFLICT (deadlock) conserva estado previo; `OPERATION_STATE_CONFLICT` es comando incompatible sobre fila terminal viva (`retryable=false`); IDEMPOTENCY y EXPIRED conservan fila.
 - `receipt` UNIQUE para reconcile por intersección. Reconcile no escribe.

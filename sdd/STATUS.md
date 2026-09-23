@@ -26,7 +26,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado. ADR-007/008 `proposed for Sol`.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado. ADR-007/008 propuestos y reconciliados en spec/OpenAPI/tasks. Review Sol `20260923-sol-pos-contract-review.md` (CHANGES_REQUIRED → correcciones docs).
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
