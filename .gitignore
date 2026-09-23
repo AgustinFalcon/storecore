@@ -21,6 +21,9 @@
 !/frontend/
 !/frontend/**
 !AGENTS.md
+!/.cursor/
+!/.cursor/rules/
+!/.cursor/rules/**
 !README.md
 !CHANGELOG.md
 !GOVERNANCE.md

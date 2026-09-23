@@ -1,6 +1,6 @@
 # Plan — Mercado Pago live checkout
 
-**Estado:** `documented_deferred` para activación; MP-LIVE-03/04 fail-closed **APPROVED** (`sdd/reviews/20260922-sol-mp-live-03-code-rereview.md`). MP-LIVE-05 sigue NO-GO.
+**Estado:** `documented_deferred` para activación. Tramo implementable 01–04 cerrado (Sol + dual Grok APPROVED). MP-LIVE-05 sigue NO-GO; el WIP no se archiva.
 
 | ID | Trabajo | Estado | Salida requerida |
 | --- | --- | --- | --- |
