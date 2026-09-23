@@ -41,6 +41,10 @@ class BlackStoreFailClosedHttpTest(
             assertEquals(403, response.statusCode.value(), path)
             assertTrue(response.body!!.contains("CAPABILITY_DISABLED"), path)
             assertTrue(response.body!!.contains("\"code\":403"), path)
+            assertFalse(response.headers.containsKey("Retry-After"), path)
+            listOf("4111111111111111", "sk_live_", "cvv", "password=").forEach { secret ->
+                assertFalse(response.body!!.contains(secret), "$path leaked $secret")
+            }
         }
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM blackstore_integration_operations", Int::class.java))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE channel='EXTERNAL_BLACKSTORE'", Int::class.java))
@@ -48,7 +52,7 @@ class BlackStoreFailClosedHttpTest(
         assertEquals(0, worker.purgeTerminal())
         assertFalse(mlListing.enqueueDesiredQuantityAfterBlackStore("any"))
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
-        assertEquals(true, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))
+        assertEquals(false, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))
     }
 
     @Test

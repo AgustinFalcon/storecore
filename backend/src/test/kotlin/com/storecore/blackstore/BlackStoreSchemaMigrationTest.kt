@@ -1,6 +1,5 @@
 package com.storecore.blackstore
 
-import com.storecore.configuration.application.CapabilityConfigInvalid
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityState
@@ -43,7 +42,7 @@ class BlackStoreSchemaMigrationTest {
     @Test
     fun `blackstore module is future optional disabled schema v2`() {
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
-        assertEquals(true, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))
+        assertEquals(false, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))
         assertEquals(2, jdbc.queryForObject("SELECT config_schema_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java))
         assertEquals(9, jdbc.queryForObject("SELECT COUNT(*) FROM capability_actions WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java))
         assertThrows(CapabilityDisabled::class.java) {
@@ -55,17 +54,28 @@ class BlackStoreSchemaMigrationTest {
         )!!
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        assertThrows(CapabilityConfigInvalid::class.java) {
-            capabilities.changeState(
-                InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-                "BLACKSTORE_INTEGRATION",
-                CapabilityState.ACTIVE,
-                version,
-                "must stay disabled",
-                UUID.randomUUID(),
-            )
-        }
+        capabilities.changeState(
+            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
+            "BLACKSTORE_INTEGRATION",
+            CapabilityState.ACTIVE,
+            version,
+            "testcontainers temporary active",
+            UUID.randomUUID(),
+        )
+        capabilities.decide("BLACKSTORE_INTEGRATION", "STOCK_RESERVE", CapabilityActor.System)
+        val activeVersion = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
+        capabilities.changeState(
+            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
+            "BLACKSTORE_INTEGRATION",
+            CapabilityState.DISABLED,
+            activeVersion,
+            "restore disabled baseline",
+            UUID.randomUUID(),
+        )
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
+        assertThrows(CapabilityDisabled::class.java) {
+            capabilities.decide("BLACKSTORE_INTEGRATION", "STOCK_RESERVE", CapabilityActor.System)
+        }
     }
 
     @Test

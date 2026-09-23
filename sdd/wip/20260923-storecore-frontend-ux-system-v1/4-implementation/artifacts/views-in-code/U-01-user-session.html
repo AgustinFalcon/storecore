@@ -1,0 +1,22 @@
+<section class="sc-page sc-auth" aria-labelledby="user-session-title">
+  <div class="sc-auth__card">
+    <h1 id="user-session-title">Sesión user</h1>
+    <p class="sc-page__lede">Operadores internos. No comparte sesión con customer.</p>
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    @if (authenticated) {
+      <p>Sesión user activa en esta instalación.</p>
+      <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="signOut.emit()">Cerrar sesión</button>
+      <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/user/content">Ir a contenido</a>
+    } @else {
+      <form class="sc-auth__form" (submit)="$event.preventDefault(); submitSignIn.emit()">
+        <label>Email
+          <input type="email" required autocomplete="email" name="userEmail" [ngModel]="state.email" (ngModelChange)="emailChange.emit($event)" />
+        </label>
+        <label>Contraseña
+          <input type="password" required autocomplete="current-password" name="userPassword" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" />
+        </label>
+        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Entrar</button>
+      </form>
+    }
+  </div>
+</section>

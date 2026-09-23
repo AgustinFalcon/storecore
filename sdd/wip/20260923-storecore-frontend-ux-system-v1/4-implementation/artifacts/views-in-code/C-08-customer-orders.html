@@ -1,0 +1,28 @@
+<section class="sc-page" aria-labelledby="orders-title">
+  <h1 id="orders-title">Mis órdenes</h1>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && orders.length === 0"
+    emptyText="Este customer no tiene órdenes."
+  />
+  @if (orders.length) {
+    <ul class="sc-order-list">
+      @for (order of orders; track order.id) {
+        <li class="sc-card sc-order-card">
+          <p>
+            <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
+            <span class="sc-badge">orden {{ order.orderStatus }}</span>
+            <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+          </p>
+          <p class="sc-price">{{ order.total }}</p>
+          <ul class="sc-order-card__lines">
+            @for (line of order.lines; track line.sku) {
+              <li>{{ line.name }} × {{ line.quantity }} · {{ line.effectiveUnitPrice }}</li>
+            }
+          </ul>
+        </li>
+      }
+    </ul>
+  }
+</section>

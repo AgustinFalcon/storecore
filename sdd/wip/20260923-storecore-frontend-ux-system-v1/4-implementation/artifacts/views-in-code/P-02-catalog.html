@@ -1,0 +1,45 @@
+<section class="sc-page sc-plp" aria-labelledby="catalog-title" [attr.aria-busy]="state.loading">
+  <div class="sc-plp__intro">
+    <h1 id="catalog-title">Catálogo</h1>
+    <p class="sc-page__lede">Búsqueda, marca, categoría y ofertas activas de esta instalación.</p>
+  </div>
+  <form class="sc-card sc-filters sc-filters--toolbar" (submit)="$event.preventDefault(); searchSubmit.emit()">
+    <label>Búsqueda
+      <input name="query" [ngModel]="state.query.query" (ngModelChange)="queryChange.emit($event)" />
+    </label>
+    <label>Marca
+      <select name="brand" [ngModel]="state.query.brand" (ngModelChange)="brandChange.emit($event)">
+        <option value="">Todas</option>
+        @for (brand of state.brands; track brand.id) {
+          <option [value]="brand.id">{{ brand.name }}</option>
+        }
+      </select>
+    </label>
+    <label>Categoría
+      <select name="category" [ngModel]="state.query.category" (ngModelChange)="categoryChange.emit($event)">
+        <option value="">Todas</option>
+        @for (category of state.categories; track category.id) {
+          <option [value]="category.id">{{ category.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="sc-filters__check">
+      <input type="checkbox" [ngModel]="state.query.offersOnly" (ngModelChange)="offersChange.emit($event)" />
+      Sólo ofertas
+    </label>
+    <button type="submit" class="sc-btn sc-btn--primary">Buscar</button>
+  </form>
+  <sc-feature-status
+    [loading]="state.loading"
+    [error]="state.errorMessage"
+    [empty]="!state.loading && state.products.length === 0"
+    emptyText="No hay productos activos para estos filtros."
+  />
+  <ul class="sc-grid sc-grid--tiles">
+    @for (product of state.products; track product.sku) {
+      <li>
+        <sc-product-tile [product]="product" [offer]="state.query.offersOnly" />
+      </li>
+    }
+  </ul>
+</section>

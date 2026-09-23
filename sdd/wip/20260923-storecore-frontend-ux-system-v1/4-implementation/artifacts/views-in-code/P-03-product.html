@@ -1,0 +1,72 @@
+<section class="sc-page sc-pdp" aria-labelledby="product-title" [attr.aria-busy]="loading">
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && product === null"
+    emptyText="Producto no disponible."
+  />
+  @if (product) {
+    <p class="sc-pdp__crumb">
+      <a routerLink="/">Inicio</a> / <a routerLink="/catalog">Catálogo</a> / {{ product.name }}
+    </p>
+    <div class="sc-pdp__layout">
+      <div class="sc-pdp__gallery">
+        @if (product.images.length > 0) {
+          <div class="sc-zoom" tabindex="0">
+            <img [src]="activeImage || product.images[0]" [alt]="product.name" />
+          </div>
+          <ul class="sc-pdp__thumbs">
+            @for (image of product.images; track image) {
+              <li>
+                <button type="button" (click)="activeImage = image" [class.is-on]="(activeImage || product.images[0]) === image">
+                  <img [src]="image" [alt]="product.name" />
+                </button>
+              </li>
+            }
+          </ul>
+        } @else {
+          <div class="sc-zoom sc-zoom--empty" aria-hidden="true"></div>
+        }
+      </div>
+      <div class="sc-buybox">
+        <p class="sc-buybox__meta">{{ product.brand }} · {{ product.category }}</p>
+        <h1 id="product-title">{{ product.name }}</h1>
+        <p>{{ product.description }}</p>
+        <div class="sc-price-stack">
+          @if (hasDiscount) {
+            <p class="sc-price__was">{{ product.price.base }}</p>
+          }
+          <p class="sc-price sc-price--hero">{{ product.price.effective }}</p>
+        </div>
+        @if (product.offerRef) {
+          <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>
+        } @else {
+          <span class="sc-badge">sin oferta</span>
+        }
+        @if (!product.active) {
+          <span class="sc-badge sc-badge--warn">Inactivo</span>
+        }
+        <ul class="sc-pdp__variants">
+          @for (variant of product.variants; track variant.id) {
+            <li>{{ variant.name }} · disponible {{ variant.availableQuantity }}</li>
+          }
+        </ul>
+        <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
+          <label>Cantidad
+            <span class="sc-stepper">
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
+              <input type="number" name="quantity" min="1" required [(ngModel)]="quantity" />
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" aria-label="Agregar una unidad">+</button>
+            </span>
+          </label>
+          @if (signedIn) {
+            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
+          } @else {
+            <p><a routerLink="/customer/session">Entrá para agregar al carrito</a></p>
+          }
+        </form>
+        <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>
+      </div>
+    </div>
+  }
+</section>

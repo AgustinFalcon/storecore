@@ -1,0 +1,44 @@
+<section class="sc-page sc-console" aria-labelledby="cap-title">
+  <h1 id="cap-title">Capabilities</h1>
+  <p class="sc-page__lede">Estados tipados DISABLED | READ_ONLY | ACTIVE | PAUSED | ERROR. Sin feature flags genéricos.</p>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && items.length === 0"
+    emptyText="No hay módulos configurados en esta instalación."
+  />
+  @if (items.length) {
+    <table class="sc-table">
+      <thead>
+        <tr>
+          <th>Módulo</th>
+          <th>Estado</th>
+          <th>Cambiar</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of items; track item.module) {
+          <tr>
+            <td>{{ item.module }}</td>
+            <td>
+              <span
+                class="sc-badge"
+                [class.sc-badge--info]="item.state === 'READ_ONLY'"
+                [class.sc-badge--ok]="item.state === 'ACTIVE'"
+                [class.sc-badge--warn]="item.state === 'PAUSED'"
+                [class.sc-badge--err]="item.state === 'ERROR'"
+              >{{ item.state }}</span>
+            </td>
+            <td class="sc-table__actions">
+              @for (state of states; track state) {
+                <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state === item.state" (click)="changeState.emit({ module: item.module, state })">
+                  {{ state }}
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</section>
