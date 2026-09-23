@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-03 StoreCore User Catalog</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-fixed": "#1b1b1e",
+            "on-primary-container": "#cad3ff",
+            "surface-container-high": "#e8e7f1",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary-container": "#d6d3d7",
+            "primary": "#0037b0",
+            "outline-variant": "#c4c5d7",
+            "tertiary-container": "#5c5b5f",
+            "surface-container-highest": "#e3e1ec",
+            "surface-bright": "#fbf8ff",
+            "on-tertiary-fixed-variant": "#47464a",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-secondary": "#ffffff",
+            "inverse-on-surface": "#f1effa",
+            "on-error-container": "#93000a",
+            "error": "#ba1a1a",
+            "on-surface": "#1a1b22",
+            "tertiary": "#444447",
+            "background": "#fbf8ff",
+            "surface-dim": "#dad9e3",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-container": "#eeedf7",
+            "tertiary-fixed": "#e4e1e6",
+            "surface": "#fbf8ff",
+            "on-background": "#1a1b22",
+            "inverse-surface": "#2f3038",
+            "on-surface-variant": "#434655",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "secondary-container": "#dae2fd",
+            "primary-container": "#1d4ed8",
+            "error-container": "#ffdad6",
+            "outline": "#747686",
+            "on-error": "#ffffff",
+            "on-secondary-fixed": "#131b2e",
+            "on-primary": "#ffffff",
+            "secondary-fixed": "#dae2fd",
+            "secondary": "#565e74",
+            "on-primary-fixed-variant": "#0039b5",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-container": "#5c647a",
+            "surface-variant": "#e3e1ec",
+            "surface-container-low": "#f4f2fd",
+            "inverse-primary": "#b7c4ff",
+            "on-tertiary": "#ffffff",
+            "on-primary-fixed": "#001551",
+            "surface-tint": "#2151da"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.25rem",
+            "space-sm": "0.5rem",
+            "space-md": "0.75rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "body-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "label-sm": ["Inter"],
+            "body-sm": ["Inter"],
+            "label-md": ["Inter"]
+          },
+          "fontSize": {
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-body-md text-on-surface bg-[#f4f4f5] antialiased selection:bg-primary-container selection:text-white">
+<!-- TopNavBar (Shared Component: docked full-width top-0, Deep Navy #0f172a / inverse-surface) -->
+<header class="w-full px-margin flex items-center justify-between h-14 bg-[#0f172a] text-[#f8fafc] border-b border-outline-variant/20 sticky top-0 z-50">
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-surface">StoreCore</span>
+<span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-surface-container-lowest/10 text-primary-fixed border border-white/10 ml-1">OS</span>
+</div>
+<!-- Operator Status Pill -->
+<div class="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded bg-white/5 border border-white/10 text-label-sm font-label-sm text-surface-container-high">
+<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+<span>Operando · Salón Belgrano</span>
+<span class="text-outline-variant/60">|</span>
+<span class="font-mono text-[10px] text-emerald-300">HTTP 200 OK</span>
+</div>
+</div>
+<!-- Navigation links from Shared Components JSON -->
+<nav class="hidden md:flex items-center gap-space-md">
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Contenido</a>
+<a class="border-b-2 border-primary-container text-surface font-label-md text-label-md pb-1" href="#">Catálogo</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Promos</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Órdenes</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Inventario</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Mercado Libre</a>
+</nav>
+<!-- Trailing Actions from Shared Components JSON -->
+<div class="flex items-center gap-space-sm">
+<button class="hidden sm:flex items-center gap-1.5 px-space-md py-1.5 rounded bg-surface-container-lowest/10 hover:bg-surface-container-lowest/20 border border-white/15 text-surface font-label-md text-label-md transition-colors">
+<span class="material-symbols-outlined" data-icon="file_download">file_download</span>
+<span>Importar perfil</span>
+</button>
+<div class="flex items-center gap-1 border-l border-white/10 pl-2 ml-1">
+<button class="p-1.5 rounded hover:bg-tertiary-container/30 text-surface-variant hover:text-surface transition-colors" title="Ajustes de sistema">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+</button>
+<button class="p-1.5 rounded hover:bg-tertiary-container/30 text-surface-variant hover:text-surface transition-colors relative" title="Notificaciones operativas">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1 right-1 w-1.5 h-1.5 bg-primary-container rounded-full"></span>
+</button>
+<div class="flex items-center gap-2 ml-2 pl-2 border-l border-white/10">
+<div class="w-7 h-7 rounded bg-primary-container text-white flex items-center justify-center font-bold text-xs">
+            MR
+          </div>
+<div class="hidden xl:flex flex-col text-left leading-none">
+<span class="font-label-md text-label-md text-surface">Martín Rossi</span>
+<span class="text-[10px] text-surface-variant">Operador Activo</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Contextual Subheader & Architecture Notice -->
+<div class="bg-surface-container-lowest border-b border-[#e4e4e7] px-margin py-3">
+<div class="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-mono text-label-sm font-label-sm bg-[#eeedf7] text-on-surface-variant px-2 py-0.5 rounded border border-[#c4c5d7]/50">
+            Ruta: /user/catalog
+          </span>
+<span class="text-outline text-xs">·</span>
+<span class="text-xs text-on-surface-variant font-medium">Instancia StoreCore Nodo #01</span>
+</div>
+<h1 class="font-headline-sm text-headline-sm text-[#18181b] tracking-tight">Catálogo operador</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">
+          SKU, marcas, categorías. El storefront muestra effective. Observed y effective son de solo lectura.
+        </p>
+</div>
+<!-- Quick Summary Stats Bar -->
+<div class="flex items-center gap-4 text-xs font-mono bg-[#f4f4f5] px-3 py-2 rounded border border-[#e4e4e7]">
+<div>
+<span class="text-on-surface-variant">SKUs activos:</span>
+<span class="font-bold text-[#18181b] ml-1">42</span>
+</div>
+<span class="text-[#c4c5d7]">|</span>
+<div>
+<span class="text-on-surface-variant">Marcas:</span>
+<span class="font-bold text-[#18181b] ml-1">4</span>
+</div>
+<span class="text-[#c4c5d7]">|</span>
+<div>
+<span class="text-on-surface-variant">Categorías:</span>
+<span class="font-bold text-[#18181b] ml-1">5</span>
+</div>
+<span class="text-[#c4c5d7]">|</span>
+<div class="flex items-center text-emerald-700 font-sans font-medium gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="sync">sync</span>
+<span>Reglas en tiempo real</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Workstation Layout (Dense Operator Grid) -->
+<main class="flex-1 max-w-[1600px] w-full mx-auto p-margin space-y-4">
+<!-- Architecture Banner: Decoupled Rules Engine -->
+<div class="bg-surface-container-low border border-outline-variant/60 rounded-lg p-3 px-4 flex items-start gap-3 text-body-sm shadow-sm">
+<span class="material-symbols-outlined text-primary-container mt-0.5" data-icon="hub">hub</span>
+<div class="flex-1">
+<strong class="font-semibold text-on-surface">Motor de reglas desacoplado:</strong>
+<span class="text-on-surface-variant">
+          'effective' es calculado dinámicamente según la regla comercial del nodo. Los valores 
+          <span class="font-mono font-medium text-on-surface bg-white px-1 py-0.2 rounded border border-outline-variant/40">Observed</span> (ML/externo) y 
+          <span class="font-mono font-medium text-on-surface bg-white px-1 py-0.2 rounded border border-outline-variant/40">Effective</span> (mostrador/público) 
+          nunca admiten sobreescritura manual en formulario.
+        </span>
+</div>
+</div>
+<!-- Grid Container: 68% Left Main Column, 32% Right Panels -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT / CENTER COLUMN (approx 68% = 8 cols on xl) -->
+<section class="xl:col-span-8 space-y-4">
+<!-- Table Card -->
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg shadow-sm overflow-hidden">
+<!-- Table Header / Filter Toolbar -->
+<div class="p-3 border-b border-[#e4e4e7] bg-white flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div class="flex items-center gap-2 flex-1 max-w-md">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-2.5 top-2.5 text-outline text-[18px]" data-icon="search">search</span>
+<input class="w-full pl-9 pr-3 py-1.5 text-body-sm font-body-sm border border-[#d4d4d8] rounded bg-white focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" placeholder="Buscar por SKU o descripción..." type="text" value=""/>
+</div>
+</div>
+<!-- Filter Controls -->
+<div class="flex items-center gap-2 flex-wrap">
+<select class="py-1.5 px-2.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option value="">Todas las marcas</option>
+<option value="aurora">Aurora</option>
+<option value="philco">Philco</option>
+<option value="oster">Oster</option>
+<option value="storecore">StoreCore Studio</option>
+</select>
+<select class="py-1.5 px-2.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option value="">Todas las categorías</option>
+<option value="iluminacion">Iluminación y Lámparas</option>
+<option value="bazar">Bazar y Cocina</option>
+<option value="hogar">Hogar y Estudio</option>
+</select>
+<div class="flex items-center border border-[#d4d4d8] rounded overflow-hidden">
+<button class="px-2.5 py-1.5 text-label-sm font-label-sm bg-surface-container-low text-on-surface font-medium border-r border-[#d4d4d8]">
+                  Todos
+                </button>
+<button class="px-2.5 py-1.5 text-label-sm font-label-sm hover:bg-[#f4f4f5] text-on-surface-variant transition-colors">
+                  Activos
+                </button>
+</div>
+</div>
+</div>
+<!-- Backoffice Dense Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse text-body-sm">
+<thead>
+<tr class="bg-[#f4f4f5] border-b border-[#e4e4e7] text-on-surface-variant font-label-md text-label-md">
+<th class="py-2.5 px-3 font-semibold">SKU</th>
+<th class="py-2.5 px-3 font-semibold">Nombre del Producto</th>
+<th class="py-2.5 px-3 font-semibold">Marca</th>
+<th class="py-2.5 px-3 font-semibold">Categoría</th>
+<th class="py-2.5 px-3 font-semibold">Estado</th>
+<th class="py-2.5 px-3 font-semibold text-right">Precio Base</th>
+<th class="py-2.5 px-3 font-semibold text-right">Observed (Sync)</th>
+<th class="py-2.5 px-3 font-semibold text-right">Effective (Público)</th>
+<th class="py-2.5 px-3 font-semibold text-center">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#e4e4e7]">
+<!-- Row 1: SKU-100 (Active Selection) -->
+<tr class="bg-secondary-container/30 border-l-4 border-primary-container hover:bg-secondary-container/40 transition-colors">
+<td class="py-2 px-3 font-mono text-label-md font-bold text-primary">SKU-100</td>
+<td class="py-2 px-3 font-medium text-on-surface">
+<div class="flex items-center gap-1.5">
+<span>Lámpara de escritorio articulada mate</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-primary-container" title="Seleccionado para edición"></span>
+</div>
+</td>
+<td class="py-2 px-3 text-on-surface-variant">Aurora</td>
+<td class="py-2 px-3 text-on-surface-variant">Iluminación</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-emerald-50 text-emerald-700 border border-emerald-300">
+                      ACTIVE
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right text-on-surface">$14.900</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right">
+<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant/50 text-[11px]">
+                      $14.900
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right font-bold text-[#18181b]">
+<span class="inline-block px-2 py-0.5 rounded bg-primary-fixed text-on-primary-fixed border border-primary-container/20">
+                      $12.500 ARS
+                    </span>
+</td>
+<td class="py-2 px-3 text-center">
+<button class="px-2 py-1 text-label-sm font-label-sm rounded bg-primary-container text-white hover:bg-primary transition-colors">
+                      Editando
+                    </button>
+</td>
+</tr>
+<!-- Row 2: SKU-102 -->
+<tr class="hover:bg-[#fbf8ff] transition-colors">
+<td class="py-2 px-3 font-mono text-label-md text-on-surface">SKU-102</td>
+<td class="py-2 px-3 font-medium text-on-surface">Lámpara de mesa cerámica nórdica</td>
+<td class="py-2 px-3 text-on-surface-variant">StoreCore Studio</td>
+<td class="py-2 px-3 text-on-surface-variant">Iluminación</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-emerald-50 text-emerald-700 border border-emerald-300">
+                      ACTIVE
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right text-on-surface">$22.400</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right">
+<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant/50 text-[11px]">
+                      $22.400
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right font-bold text-[#18181b]">
+<span class="inline-block px-2 py-0.5 rounded bg-surface-container-high text-on-surface border border-outline-variant/40">
+                      $22.400 ARS
+                    </span>
+</td>
+<td class="py-2 px-3 text-center">
+<button class="px-2 py-1 text-label-sm font-label-sm rounded border border-[#e4e4e7] bg-white hover:bg-[#f4f4f5] text-on-surface transition-colors">
+                      Editar
+                    </button>
+</td>
+</tr>
+<!-- Row 3: SKU-105 -->
+<tr class="hover:bg-[#fbf8ff] transition-colors">
+<td class="py-2 px-3 font-mono text-label-md text-on-surface">SKU-105</td>
+<td class="py-2 px-3 font-medium text-on-surface">Luminaria task LED de aluminio</td>
+<td class="py-2 px-3 text-on-surface-variant">Aurora</td>
+<td class="py-2 px-3 text-on-surface-variant">Iluminación</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-50 text-amber-800 border border-amber-300">
+                      READ_ONLY
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right text-on-surface">$18.150</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right">
+<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant/50 text-[11px]">
+                      $19.000
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right font-bold text-[#18181b]">
+<span class="inline-block px-2 py-0.5 rounded bg-surface-container-high text-on-surface border border-outline-variant/40">
+                      $18.150 ARS
+                    </span>
+</td>
+<td class="py-2 px-3 text-center">
+<button class="px-2 py-1 text-label-sm font-label-sm rounded border border-[#e4e4e7] bg-white hover:bg-[#f4f4f5] text-on-surface transition-colors">
+                      Editar
+                    </button>
+</td>
+</tr>
+<!-- Row 4: SKU-108 -->
+<tr class="hover:bg-[#fbf8ff] transition-colors">
+<td class="py-2 px-3 font-mono text-label-md text-on-surface">SKU-108</td>
+<td class="py-2 px-3 font-medium text-on-surface">Set de iluminación ambiental cálida</td>
+<td class="py-2 px-3 text-on-surface-variant">Philco</td>
+<td class="py-2 px-3 text-on-surface-variant">Hogar y Estudio</td>
+<td class="py-2 px-3">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-rose-50 text-rose-800 border border-rose-300">
+                      PAUSED
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right text-on-surface">$31.000</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right">
+<span class="inline-block px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant border border-outline-variant/50 text-[11px]">
+                      $31.000
+                    </span>
+</td>
+<td class="py-2 px-3 font-mono tabular-nums text-right font-bold text-[#18181b]">
+<span class="inline-block px-2 py-0.5 rounded bg-surface-container-high text-on-surface border border-outline-variant/40">
+                      $31.000 ARS
+                    </span>
+</td>
+<td class="py-2 px-3 text-center">
+<button class="px-2 py-1 text-label-sm font-label-sm rounded border border-[#e4e4e7] bg-white hover:bg-[#f4f4f5] text-on-surface transition-colors">
+                      Editar
+                    </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Pagination -->
+<div class="px-3 py-2 border-t border-[#e4e4e7] bg-[#f4f4f5] flex items-center justify-between text-body-sm text-on-surface-variant">
+<span>Mostrando 4 de 42 productos cargados</span>
+<div class="flex items-center gap-1">
+<button class="px-2 py-1 rounded bg-white border border-[#e4e4e7] text-label-sm hover:bg-gray-50 disabled:opacity-50" disabled="">Anterior</button>
+<button class="px-2.5 py-1 rounded bg-primary-container text-white text-label-sm font-semibold">1</button>
+<button class="px-2.5 py-1 rounded bg-white border border-[#e4e4e7] text-label-sm hover:bg-gray-50">2</button>
+<button class="px-2.5 py-1 rounded bg-white border border-[#e4e4e7] text-label-sm hover:bg-gray-50">3</button>
+<button class="px-2 py-1 rounded bg-white border border-[#e4e4e7] text-label-sm hover:bg-gray-50">Siguiente</button>
+</div>
+</div>
+</div>
+<!-- Selected Product Edit Card (SKU-100) -->
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg shadow-sm p-4 space-y-4">
+<div class="flex items-center justify-between border-b border-[#e4e4e7] pb-3">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" data-icon="edit_note">edit_note</span>
+<h2 class="font-headline-sm text-headline-sm text-[#18181b]">Edición de SKU seleccionado (SKU-100)</h2>
+<span class="px-2 py-0.5 rounded font-mono text-[11px] bg-secondary-container text-on-secondary-fixed border border-primary-container/30">
+                Modo edición: SKU-100
+              </span>
+</div>
+<div class="text-label-sm font-label-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="history">history</span>
+<span>Última sincronización: Hoy 17:42 hs</span>
+</div>
+</div>
+<!-- Edit Form Fields Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Código SKU</label>
+<input class="w-full px-3 py-1.5 font-mono text-body-sm border border-[#d4d4d8] rounded bg-[#f4f4f5] text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" type="text" value="SKU-100"/>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Nombre del producto</label>
+<input class="w-full px-3 py-1.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" type="text" value="Lámpara de escritorio articulada mate"/>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Marca asociada</label>
+<select class="w-full px-3 py-1.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option selected="" value="aurora">Aurora</option>
+<option value="storecore">StoreCore Essentials</option>
+<option value="bazar">Bazar</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Categoría asignada</label>
+<select class="w-full px-3 py-1.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none">
+<option selected="" value="iluminacion">Iluminación</option>
+<option value="hogar">Hogar</option>
+<option value="escritorio">Escritorio</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Precio Base (ARS)</label>
+<div class="relative">
+<span class="absolute left-3 top-1.5 text-on-surface-variant font-mono">$</span>
+<input class="w-full pl-7 pr-3 py-1.5 font-mono tabular-nums text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" type="text" value="14.900"/>
+</div>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-on-surface mb-1">Desired / Precio objetivo (ARS)</label>
+<div class="relative">
+<span class="absolute left-3 top-1.5 text-on-surface-variant font-mono">$</span>
+<input class="w-full pl-7 pr-3 py-1.5 font-mono tabular-nums text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" type="text" value="12.500"/>
+</div>
+</div>
+</div>
+<!-- Crucial Architecture Section: Computed Values by Engine (Read-Only) -->
+<div class="bg-surface-container border border-outline-variant/70 rounded-lg p-3.5 space-y-3">
+<div class="flex items-center gap-2 text-primary font-semibold text-label-md">
+<span class="material-symbols-outlined text-[16px]" data-icon="lock">lock</span>
+<span>Valores computados por el motor (Solo lectura)</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+<!-- Observed Read-Only Display -->
+<div class="bg-white p-2.5 rounded border border-[#e4e4e7] flex flex-col gap-1">
+<div class="flex items-center justify-between text-label-sm font-label-sm text-on-surface-variant">
+<span>Valor Observed</span>
+<span class="text-[10px] font-mono uppercase bg-[#eeedf7] px-1 rounded">Webhook /api/v1</span>
+</div>
+<div class="font-mono text-body-lg font-bold text-on-surface flex items-baseline gap-1">
+<span>$14.900 ARS</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-tight">
+                  Sincronizado vía webhook /api/v1/catalog desde sistema central.
+                </p>
+</div>
+<!-- Effective Read-Only Display -->
+<div class="bg-secondary-container/40 p-2.5 rounded border border-primary-container/30 flex flex-col gap-1">
+<div class="flex items-center justify-between text-label-sm font-label-sm text-primary">
+<span class="font-bold">Valor Effective Resultante</span>
+<span class="text-[10px] font-mono uppercase bg-primary-container text-white px-1.5 rounded">Storefront &amp; Mostrador</span>
+</div>
+<div class="font-mono text-headline-sm font-bold text-primary flex items-baseline gap-1">
+<span>$12.500 ARS</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-tight">
+                  Precio público resultante para mostrador y storefront según regla comercial de nodo.
+                </p>
+</div>
+</div>
+<p class="text-[11px] text-on-surface-variant italic">
+              Observed y effective son de solo lectura. Se calculan automáticamente a partir del precio base, reglas promocionales activas y condiciones comerciales del local.
+            </p>
+</div>
+<!-- Form CTAs (Voseo rioplatense) -->
+<div class="flex items-center justify-end gap-3 pt-2">
+<button class="px-space-md py-1.5 rounded border border-[#e4e4e7] bg-white hover:bg-[#f4f4f5] text-on-surface font-label-md text-label-md transition-colors" type="button">
+              Descartar cambios
+            </button>
+<button class="px-4 py-1.5 rounded bg-[#1d4ed8] hover:bg-blue-700 text-white font-label-md text-label-md transition-colors shadow-sm flex items-center gap-1.5" type="button">
+<span class="material-symbols-outlined text-[16px]" data-icon="save">save</span>
+<span>Guardá cambios de SKU</span>
+</button>
+</div>
+</div>
+</section>
+<!-- RIGHT COLUMN (approx 32% = 4 cols on xl) -->
+<aside class="xl:col-span-4 space-y-4">
+<!-- Panel 1: Marcas del catálogo -->
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg shadow-sm p-4 space-y-3">
+<div class="flex items-center justify-between border-b border-[#e4e4e7] pb-2.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" data-icon="branding_watermark">branding_watermark</span>
+<h3 class="font-headline-sm text-headline-sm text-[#18181b]">Marcas del catálogo</h3>
+</div>
+<span class="font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded text-on-surface-variant font-medium">
+              4 activas
+            </span>
+</div>
+<p class="text-body-sm text-on-surface-variant">
+            Administrá el catálogo de fabricantes admitidos para las reglas de nodo.
+          </p>
+<!-- List of Brands -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<input checked="" class="rounded border-[#d4d4d8] text-primary-container focus:ring-primary-container w-4 h-4" type="checkbox"/>
+<span class="font-medium text-body-sm text-[#18181b]">Aurora</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-body-sm text-on-surface-variant font-mono">12 artículos</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono">Activa</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<input checked="" class="rounded border-[#d4d4d8] text-primary-container focus:ring-primary-container w-4 h-4" type="checkbox"/>
+<span class="font-medium text-body-sm text-[#18181b]">Philco</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-body-sm text-on-surface-variant font-mono">8 artículos</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono">Activa</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<input checked="" class="rounded border-[#d4d4d8] text-primary-container focus:ring-primary-container w-4 h-4" type="checkbox"/>
+<span class="font-medium text-body-sm text-[#18181b]">Oster</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-body-sm text-on-surface-variant font-mono">6 artículos</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono">Activa</span>
+</div>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<input checked="" class="rounded border-[#d4d4d8] text-primary-container focus:ring-primary-container w-4 h-4" type="checkbox"/>
+<span class="font-medium text-body-sm text-[#18181b]">StoreCore Studio</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-body-sm text-on-surface-variant font-mono">4 artículos</span>
+<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-300 font-mono">Activa</span>
+</div>
+</div>
+</div>
+<!-- Quick Add Brand -->
+<div class="pt-2 border-t border-[#e4e4e7] space-y-2">
+<div class="flex items-center gap-2">
+<input class="flex-1 px-3 py-1.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" placeholder="Nueva marca..." type="text"/>
+<button class="px-3 py-1.5 rounded bg-[#1d4ed8] hover:bg-blue-700 text-white font-label-md text-label-md transition-colors whitespace-nowrap" type="button">
+                Guardá marcas
+              </button>
+</div>
+</div>
+</div>
+<!-- Panel 2: Categorías del catálogo -->
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg shadow-sm p-4 space-y-3">
+<div class="flex items-center justify-between border-b border-[#e4e4e7] pb-2.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" data-icon="category">category</span>
+<h3 class="font-headline-sm text-headline-sm text-[#18181b]">Categorías del catálogo</h3>
+</div>
+<span class="font-mono text-label-sm bg-surface-container px-2 py-0.5 rounded text-on-surface-variant font-medium">
+              5 categorías
+            </span>
+</div>
+<p class="text-body-sm text-on-surface-variant">
+            Estructura de árbol de productos con herencia para el mostrador.
+          </p>
+<!-- List of Categories -->
+<div class="space-y-1.5">
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="lightbulb">lightbulb</span>
+<span class="font-medium text-body-sm text-[#18181b]">Iluminación y Lámparas</span>
+</div>
+<span class="font-mono text-body-sm text-on-surface-variant">14 SKUs</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="skillet">skillet</span>
+<span class="font-medium text-body-sm text-[#18181b]">Bazar y Cocina</span>
+</div>
+<span class="font-mono text-body-sm text-on-surface-variant">9 SKUs</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="chair">chair</span>
+<span class="font-medium text-body-sm text-[#18181b]">Hogar y Estudio</span>
+</div>
+<span class="font-mono text-body-sm text-on-surface-variant">7 SKUs</span>
+</div>
+<div class="flex items-center justify-between p-2 rounded border border-[#e4e4e7] bg-[#fbf8ff] hover:bg-white transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="microwave">microwave</span>
+<span class="font-medium text-body-sm text-[#18181b]">Electrodomésticos</span>
+</div>
+<span class="font-mono text-body-sm text-on-surface-variant">5 SKUs</span>
+</div>
+</div>
+<!-- Quick Add Category -->
+<div class="pt-2 border-t border-[#e4e4e7] space-y-2">
+<div class="flex items-center gap-2">
+<input class="flex-1 px-3 py-1.5 text-body-sm border border-[#d4d4d8] rounded bg-white text-on-surface focus:border-primary-container focus:ring-1 focus:ring-primary-container outline-none" placeholder="Nueva categoría..." type="text"/>
+<button class="px-3 py-1.5 rounded bg-[#1d4ed8] hover:bg-blue-700 text-white font-label-md text-label-md transition-colors whitespace-nowrap" type="button">
+                Guardá categorías
+              </button>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- StoreCore OS Standard Operational Footer -->
+<footer class="mt-auto border-t border-[#e4e4e7] bg-surface-container-lowest py-3 px-margin text-body-sm text-on-surface-variant">
+<div class="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-between gap-2 text-center md:text-left">
+<div class="flex items-center gap-1.5">
+<span class="font-semibold text-[#18181b]">StoreCore OS</span>
+<span>— Todos los derechos reservados. Sistema operativo de tienda única.</span>
+</div>
+<div class="flex items-center gap-4 text-label-sm font-label-sm">
+<a class="hover:text-[#18181b] transition-colors" href="#">Estado del sistema</a>
+<span class="text-outline-variant">·</span>
+<a class="hover:text-[#18181b] transition-colors" href="#">Documentación de API</a>
+<span class="text-outline-variant">·</span>
+<a class="hover:text-[#18181b] transition-colors" href="#">Soporte técnico</a>
+<span class="text-outline-variant">·</span>
+<a class="hover:text-[#18181b] transition-colors" href="#">Términos de servicio</a>
+</div>
+</div>
+</footer>
+</body></html>

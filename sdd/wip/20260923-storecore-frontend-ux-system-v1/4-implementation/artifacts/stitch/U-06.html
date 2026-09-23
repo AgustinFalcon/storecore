@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-06 StoreCore User Order Detail — ord-1042</title>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-container": "#dae2fd",
+            "primary-container": "#1d4ed8",
+            "surface-container": "#eeedf7",
+            "on-primary-fixed-variant": "#0039b5",
+            "tertiary-fixed": "#e4e1e6",
+            "surface": "#fbf8ff",
+            "primary-fixed": "#dce1ff",
+            "secondary": "#565e74",
+            "tertiary": "#444447",
+            "surface-variant": "#e3e1ec",
+            "on-tertiary-fixed-variant": "#47464a",
+            "secondary-fixed-dim": "#bec6e0",
+            "inverse-on-surface": "#f1effa",
+            "surface-container-lowest": "#ffffff",
+            "on-primary-container": "#cad3ff",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "background": "#fbf8ff",
+            "error": "#ba1a1a",
+            "on-tertiary-fixed": "#1b1b1e",
+            "surface-container-high": "#e8e7f1",
+            "outline": "#747686",
+            "on-secondary-container": "#5c647a",
+            "surface-tint": "#2151da",
+            "secondary-fixed": "#dae2fd",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-error-container": "#93000a",
+            "on-secondary-fixed": "#131b2e",
+            "on-background": "#1a1b22",
+            "inverse-surface": "#0f172a",
+            "on-tertiary-container": "#d6d3d7",
+            "error-container": "#ffdad6",
+            "on-primary-fixed": "#001551",
+            "on-primary": "#ffffff",
+            "surface-container-highest": "#e3e1ec",
+            "outline-variant": "#c4c5d7",
+            "surface-dim": "#dad9e3",
+            "on-surface": "#1a1b22",
+            "surface-bright": "#fbf8ff",
+            "primary": "#0037b0",
+            "on-tertiary": "#ffffff",
+            "on-secondary": "#ffffff",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-container-low": "#f4f2fd",
+            "inverse-primary": "#b7c4ff",
+            "tertiary-container": "#5c5b5f",
+            "on-surface-variant": "#434655",
+            "on-error": "#ffffff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.25rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-xs": "0.25rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Inter", "sans-serif"],
+            "headline-md": ["Inter", "sans-serif"],
+            "label-md": ["Inter", "sans-serif"],
+            "body-sm": ["Inter", "sans-serif"],
+            "body-md": ["Inter", "sans-serif"],
+            "headline-sm": ["Inter", "sans-serif"],
+            "label-sm": ["Inter", "sans-serif"],
+            "headline-lg": ["Inter", "sans-serif"]
+          },
+          "fontSize": {
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="min-h-full bg-[#f4f4f5] text-[#18181b] font-body-md text-body-md flex flex-col antialiased">
+<!-- MASTER TOPBAR (Shared Components JSON Anchor) -->
+<header class="w-full px-margin flex items-center justify-between h-14 bg-inverse-surface border-b border-[#334155] select-none sticky top-0 z-50">
+<!-- Brand Anchor & Cluster -->
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-white">StoreCore</span>
+<!-- Operator Instance Pill -->
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#1e293b] text-[#38bdf8] border border-[#334155]">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          Salón Belgrano · HTTP 200 OK
+        </span>
+</div>
+<!-- Navigation Links from Shared Components -->
+<nav class="hidden md:flex items-center gap-6 ml-4">
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Contenido</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Catálogo</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Promos</a>
+<!-- Active link: Órdenes (Strictly mapped and executed via style_active_navigation) -->
+<a class="border-b-2 border-primary-container text-white font-label-md text-label-md pb-1 font-semibold" href="#">Órdenes</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Inventario</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Mercado Libre</a>
+</nav>
+</div>
+<!-- Trailing Actions Cluster -->
+<div class="flex items-center gap-space-md">
+<!-- Search bar on right -->
+<div class="relative hidden lg:block w-56">
+<span class="material-symbols-outlined absolute left-2.5 top-1.5 text-slate-400 text-[18px]">search</span>
+<input class="w-full bg-[#1e293b] border border-[#334155] text-slate-100 placeholder-slate-400 pl-8 pr-2.5 py-1 text-xs rounded focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container" placeholder="Buscar orden o SKU..." type="text"/>
+</div>
+<!-- Trailing Secondary Action -->
+<button class="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-200 bg-[#1e293b] border border-[#334155] rounded hover:bg-[#334155] transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+        Importar perfil
+      </button>
+<!-- Trailing Icon Actions -->
+<div class="flex items-center gap-1 text-slate-300">
+<button class="p-1 rounded hover:bg-[#1e293b] transition-colors" title="Ajustes" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="tune">tune</span>
+</button>
+<button class="p-1 rounded hover:bg-[#1e293b] transition-colors relative" title="Notificaciones" type="button">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-blue-500"></span>
+</button>
+</div>
+<!-- Active Operator Avatar Pill -->
+<div class="flex items-center gap-2 pl-2 border-l border-[#334155]">
+<span class="material-symbols-outlined text-slate-300 text-[26px]" data-icon="account_circle">account_circle</span>
+<div class="text-left leading-tight hidden xl:block">
+<div class="text-xs font-semibold text-white">Martín Rossi</div>
+<div class="text-[10px] text-slate-400">Operador Activo</div>
+</div>
+</div>
+</div>
+</header>
+<!-- SUBNAV / CONTEXT BAR (Fulfillment Operator Breadcrumb) -->
+<section class="w-full bg-white border-b border-[#e4e4e7] px-margin py-2.5 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+<div class="flex items-center gap-3">
+<a class="inline-flex items-center gap-1 text-xs font-medium text-[#1d4ed8] hover:text-[#0037b0] transition-colors" href="#">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+        Volver a fulfillment
+      </a>
+<span class="text-[#c4c5d7]">/</span>
+<div class="flex items-center gap-1.5 text-xs text-[#565e74]">
+<span>Ruta:</span>
+<code class="px-1.5 py-0.5 bg-[#f4f4f5] border border-[#e4e4e7] text-[#18181b] rounded font-mono text-[11px]">/user/orders/ord-1042</code>
+</div>
+</div>
+<div class="flex items-center gap-3 text-[11px] text-[#747686]">
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        Entorno Local Belgrano
+      </span>
+<span>•</span>
+<span class="font-mono">PostgreSQL 16.2</span>
+</div>
+</section>
+<!-- MAIN OPERATOR CANVAS -->
+<main class="flex-1 max-w-7xl w-full mx-auto p-margin space-y-space-lg">
+<!-- FULFILLMENT HEADER & ATOMIC STATUS STRIP -->
+<div class="bg-white border border-[#e4e4e7] rounded-lg p-5 shadow-sm space-y-4">
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+<div>
+<div class="flex items-center gap-2.5">
+<h1 class="font-headline-md text-headline-md text-[#18181b] tracking-tight">Fulfillment ord-1042</h1>
+<span class="px-2 py-0.5 rounded text-[11px] font-mono font-medium bg-[#f4f4f5] text-[#565e74] border border-[#e4e4e7]">
+              ID: 018fa7b2-9a01
+            </span>
+</div>
+<p class="font-body-sm text-body-sm text-[#565e74] mt-0.5">
+            Transición atómica de despacho para la orden seleccionada. Sin carrier externo simulado.
+          </p>
+</div>
+<!-- Badges Bar -->
+<div class="flex flex-wrap items-center gap-2 text-xs">
+<!-- Orden Badge -->
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe] font-medium font-mono text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#1d4ed8]"></span>
+            orden CREATED
+          </div>
+<!-- Pago Badge -->
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#fffbeb] text-[#b45309] border border-[#fde68a] font-medium font-mono text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#f59e0b]"></span>
+            pago PENDING
+          </div>
+<!-- Envío Badge -->
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#ecfdf5] text-[#047857] border border-[#a7f3d0] font-medium font-mono text-[11px]">
+<span class="w-1.5 h-1.5 rounded-full bg-[#10b981]"></span>
+            envío READY
+          </div>
+<!-- RMA Badge -->
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#f1f5f9] text-[#475569] border border-[#cbd5e1] font-mono text-[11px]">
+            rma none
+          </div>
+<!-- Tracking Reference -->
+<div class="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-white text-[#18181b] border border-[#e4e4e7] font-mono text-[11px]">
+<span class="text-[#747686]">TRK:</span>
+<span class="font-semibold">TRK-1042-LOC</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 2-COLUMN OPERATOR GRID -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT COLUMN: Items, Reception details, Architecture Notice (8 Cols) -->
+<div class="lg:col-span-8 space-y-space-lg">
+<!-- CARD 1: Artículos en la orden (Line Table) -->
+<section class="bg-white border border-[#e4e4e7] rounded-lg overflow-hidden shadow-sm">
+<div class="px-5 py-3.5 border-b border-[#e4e4e7] flex items-center justify-between bg-[#fafafa]">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#565e74]">inventory_2</span>
+<h2 class="font-headline-sm text-headline-sm text-[#18181b]">Artículos en la orden</h2>
+</div>
+<span class="text-xs font-mono text-[#565e74]">1 ítem registrado</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs border-collapse">
+<thead>
+<tr class="border-b border-[#e4e4e7] bg-[#f8fafc] text-[#565e74] font-medium uppercase tracking-wider text-[11px]">
+<th class="py-2.5 px-5 font-semibold">Producto</th>
+<th class="py-2.5 px-4 font-semibold text-center w-24">Cant.</th>
+<th class="py-2.5 px-5 font-semibold text-right w-40">Efectivo</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#e4e4e7]">
+<tr class="hover:bg-[#fcfcfd] transition-colors">
+<!-- Product Column with Real Thumbnail -->
+<td class="py-4 px-5 align-top">
+<div class="flex items-start gap-3.5">
+<div class="w-16 h-16 rounded border border-[#e4e4e7] bg-white overflow-hidden shrink-0 p-1 flex items-center justify-center">
+<img alt="Lámpara de escritorio articulada mate" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1XgqnfflQKQUKubsl7F-Xk3IjJpr0cA3_VT6XivhKuQN4dPs4fIc6Z2e1ziSatXkje-bqI1fCxiS2MerIU3w1Z_IlKc-pBhu3rMIScBz2udco4UAzMpmv1FZwssGHVE2c18UbJ0h2-fadhiyIDvioSsTL4nyaOcQPot16CmtV6Zf6apLrAANEJ0IP7-kBwRm-nNR5WjBUBNHq0MleBxbfpwGVafICQHjZJVWZfXkEi4TSD11150KmtUiqI"/>
+</div>
+<div class="space-y-1">
+<div class="font-semibold text-sm text-[#18181b]">
+                          Lámpara de escritorio articulada mate
+                        </div>
+<div class="flex flex-wrap items-center gap-2 text-[11px] text-[#565e74]">
+<span class="font-mono bg-[#f4f4f5] px-1.5 py-0.5 rounded border border-[#e4e4e7]">SKU-100</span>
+<span>·</span>
+<span>Acabado negro mate / bronce</span>
+<span>·</span>
+<span class="text-emerald-700 font-medium">En stock físico</span>
+</div>
+<div class="text-[11px] text-[#565e74]">
+                          Ubicación interna: <span class="font-mono font-medium text-[#18181b]">Sector A4 · Estante 02</span>
+</div>
+</div>
+</div>
+</td>
+<!-- Quantity Column -->
+<td class="py-4 px-4 align-top text-center">
+<span class="inline-block font-mono font-semibold px-2 py-1 bg-[#f4f4f5] border border-[#e4e4e7] rounded text-[#18181b]">
+                      1 unidad
+                    </span>
+</td>
+<!-- Cash Settlement Column with Strikethrough Discount -->
+<td class="py-4 px-5 align-top text-right">
+<div class="space-y-0.5">
+<div class="font-mono font-bold text-sm text-[#18181b]">
+                        $12.500 ARS
+                      </div>
+<div class="text-[11px] text-[#747686] line-through font-mono">
+                        $14.900 ARS
+                      </div>
+<div class="inline-block text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-200">
+                        Bonificación $2.400 ARS aplicada
+                      </div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-5 py-2.5 bg-[#f8fafc] border-t border-[#e4e4e7] flex items-center justify-between text-xs text-[#565e74]">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
+              Verificación de empaque físico aprobada por depósito
+            </span>
+<span class="font-mono text-[11px]">Código barra: 7791234567890</span>
+</div>
+</section>
+<!-- CARD 2: Datos de entrega y receptor -->
+<section class="bg-white border border-[#e4e4e7] rounded-lg p-5 shadow-sm space-y-4">
+<div class="flex items-center gap-2 pb-2 border-b border-[#e4e4e7]">
+<span class="material-symbols-outlined text-[18px] text-[#565e74]">storefront</span>
+<h2 class="font-headline-sm text-headline-sm text-[#18181b]">Datos de entrega y receptor</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Método -->
+<div class="bg-[#f8fafc] border border-[#e4e4e7] rounded p-3 space-y-1">
+<div class="text-[11px] font-semibold text-[#565e74] uppercase tracking-wider">Método acordado</div>
+<div class="font-semibold text-xs text-[#18181b] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-blue-700">front_hand</span>
+                Retiro en mostrador
+              </div>
+<div class="text-[11px] text-[#565e74] leading-relaxed pt-1">
+                Sucursal Central Belgrano<br/>
+<span class="text-[#18181b] font-medium">Av. Cabildo 2040, Belgrano</span><br/>
+                CABA (C1428)
+              </div>
+</div>
+<!-- Titular -->
+<div class="bg-[#f8fafc] border border-[#e4e4e7] rounded p-3 space-y-1">
+<div class="text-[11px] font-semibold text-[#565e74] uppercase tracking-wider">Titular que retira</div>
+<div class="font-semibold text-xs text-[#18181b] flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-[#565e74]">person</span>
+                Martín Palermo
+              </div>
+<div class="text-[11px] text-[#565e74] leading-relaxed pt-1">
+                Identificación física requerida:<br/>
+<span class="text-[#18181b] font-medium">DNI terminación 412</span><br/>
+                Constancia digital validada
+              </div>
+</div>
+<!-- Ventana operativa -->
+<div class="bg-[#f8fafc] border border-[#e4e4e7] rounded p-3 space-y-1">
+<div class="text-[11px] font-semibold text-[#565e74] uppercase tracking-wider">Ventana operativa</div>
+<div class="font-semibold text-xs text-emerald-800 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-emerald-600">schedule</span>
+                Entrega inmediata
+              </div>
+<div class="text-[11px] text-[#565e74] leading-relaxed pt-1">
+                Habilitada tras percepción de efectivo en caja de salón.<br/>
+                Turno: <span class="font-mono text-[#18181b]">Sin espera</span>
+</div>
+</div>
+</div>
+</section>
+<!-- CARD 3: Caja informativa de auditoría de arquitectura -->
+<div class="rounded-lg border border-blue-200 bg-blue-50/60 p-4 flex items-start gap-3">
+<span class="material-symbols-outlined text-blue-700 text-[20px] mt-0.5 shrink-0">terminal</span>
+<div class="space-y-1 text-xs">
+<div class="font-semibold text-blue-950 flex items-center gap-2">
+<span>Máquina de estados estricta</span>
+<span class="font-mono text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded border border-blue-200">
+                TRANSITION: READY ➔ DISPATCHED
+              </span>
+</div>
+<p class="text-blue-900 leading-relaxed">
+              Esta orden se encuentra en estado <strong>READY</strong> para entrega. La confirmación del operador transiciona el envío a <strong>DISPATCHED / ENTREGADO</strong> de forma sincrónica con persistencia inmediata en el cluster local.
+            </p>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN: Resumen de liquidación y panel de transición (4 Cols) -->
+<div class="lg:col-span-4 space-y-space-lg">
+<!-- RESUMEN Y LIQUIDACIÓN -->
+<section class="bg-white border border-[#e4e4e7] rounded-lg p-5 shadow-sm space-y-4">
+<div class="flex items-center justify-between pb-3 border-b border-[#e4e4e7]">
+<h3 class="font-headline-sm text-headline-sm text-[#18181b]">Resumen y liquidación</h3>
+<span class="material-symbols-outlined text-[18px] text-[#565e74]">receipt</span>
+</div>
+<div class="space-y-2.5 text-xs">
+<div class="flex justify-between items-center text-[#565e74]">
+<span>Subtotal lista (1 producto):</span>
+<span class="font-mono text-[#18181b]">$14.900 ARS</span>
+</div>
+<div class="flex justify-between items-center text-emerald-700">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">local_offer</span>
+                Bonificación aplicada:
+              </span>
+<span class="font-mono font-medium">-$2.400 ARS</span>
+</div>
+<div class="flex justify-between items-center text-[#565e74]">
+<span>Cargo de empaque y logística local:</span>
+<span class="font-mono text-[#18181b]">$0 ARS</span>
+</div>
+<div class="pt-3 mt-2 border-t border-[#e4e4e7] flex justify-between items-baseline">
+<div>
+<div class="text-xs font-bold uppercase tracking-wider text-[#18181b]">Total a cobrar / liquidar</div>
+<div class="text-[11px] text-[#565e74]">Cobro en mostrador (Efectivo)</div>
+</div>
+<div class="text-right">
+<div class="font-mono text-xl font-bold tracking-tight text-[#18181b] tabular-nums">
+                  $12.500 ARS
+                </div>
+</div>
+</div>
+</div>
+<!-- Metadata de idempotencia -->
+<div class="pt-3 border-t border-[#f4f4f5] text-[11px] text-[#747686] space-y-1">
+<div class="flex items-center justify-between">
+<span>Token de Idempotencia:</span>
+<code class="font-mono text-[#18181b] bg-[#f4f4f5] px-1 py-0.5 rounded border border-[#e4e4e7]">idem-7f3a-992a</code>
+</div>
+<div class="flex items-center gap-1 text-[10px] text-emerald-700">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              Verificada en nodo local #01
+            </div>
+</div>
+<!-- OPERATOR ACTIONS BLOCK -->
+<div class="pt-4 border-t border-[#e4e4e7] space-y-2.5">
+<!-- Single Primary Action Button (#1d4ed8) -->
+<button class="w-full flex items-center justify-center gap-2 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-medium py-2.5 px-4 rounded transition-all focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 active:scale-[0.99] shadow-sm text-sm" onclick="alert('Transición atómica ejecutada: Orden ord-1042 transicionó a DISPATCHED.');" type="button">
+<span class="material-symbols-outlined text-[18px]">local_shipping</span>
+              Marcá despachado / Confirmá entrega
+            </button>
+<!-- Ghost / Outline Secondary Action -->
+<button class="w-full flex items-center justify-center gap-1.5 bg-white hover:bg-[#f4f4f5] text-[#18181b] border border-[#e4e4e7] font-medium py-2 px-3 rounded text-xs transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-[#565e74]">assignment_return</span>
+              Abrir RMA (Excepción o rechazo)
+            </button>
+</div>
+</section>
+<!-- CAJA DE ASISTENCIA OPERATIVA LOCAL -->
+<div class="bg-white border border-[#e4e4e7] rounded-lg p-4 shadow-sm text-xs space-y-2">
+<div class="font-semibold text-[#18181b] flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-[#565e74]">support_agent</span>
+            Protocolo de caja y ventanilla
+          </div>
+<p class="text-[#565e74] text-[11px] leading-relaxed">
+            Verificá que el billete recibido sea de curso legal antes de confirmar la entrega definitiva en el sistema. Una vez asentado el estado <strong>DISPATCHED</strong>, se emite el comprobante no fiscal interno automáticamente.
+          </p>
+<div class="pt-2 border-t border-[#f4f4f5] flex items-center justify-between text-[10px] text-[#747686]">
+<span>Operador asignado: M. Rossi</span>
+<span>Estación: CAJA-01</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- STORECORE RIGOROUS STANDARD FOOTER -->
+<footer class="w-full bg-white border-t border-[#e4e4e7] py-3 px-margin mt-auto text-[11px] text-[#747686] flex flex-col sm:flex-row items-center justify-between gap-2">
+<div class="flex items-center gap-2">
+<span class="font-semibold text-[#18181b]">StoreCore OS v2.4 Retail</span>
+<span>·</span>
+<span>Salón Central Belgrano</span>
+<span>·</span>
+<code class="font-mono text-[10px] text-[#565e74]">/api/v1/orders/fulfillment</code>
+</div>
+<div class="flex items-center gap-3 font-mono text-[10px]">
+<span class="inline-flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        Modo transaccional desacoplado
+      </span>
+<span>·</span>
+<span>Latencia: 11ms</span>
+</div>
+</footer>
+</body></html>

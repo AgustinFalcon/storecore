@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>C-05 StoreCore Cart — StoreCore</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;family=JetBrains+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-tertiary": "#ffffff",
+            "on-tertiary-container": "#d6d3d7",
+            "on-tertiary-fixed": "#1b1b1e",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "surface-dim": "#dad9e3",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-primary-fixed": "#001551",
+            "outline-variant": "#c4c5d7",
+            "on-secondary-fixed": "#131b2e",
+            "tertiary": "#444447",
+            "secondary-container": "#dae2fd",
+            "inverse-on-surface": "#f1effa",
+            "on-surface-variant": "#434655",
+            "error-container": "#ffdad6",
+            "secondary-fixed": "#dae2fd",
+            "surface": "#fbf8ff",
+            "inverse-primary": "#b7c4ff",
+            "inverse-surface": "#2f3038",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-container-low": "#f4f2fd",
+            "on-primary": "#ffffff",
+            "background": "#fbf8ff",
+            "surface-container-highest": "#e3e1ec",
+            "tertiary-fixed": "#e4e1e6",
+            "primary-fixed": "#dce1ff",
+            "surface-variant": "#e3e1ec",
+            "surface-container": "#eeedf7",
+            "on-tertiary-fixed-variant": "#47464a",
+            "on-error-container": "#93000a",
+            "on-secondary-container": "#5c647a",
+            "on-background": "#1a1b22",
+            "surface-container-high": "#e8e7f1",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-secondary": "#ffffff",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-error": "#ffffff",
+            "tertiary-container": "#5c5b5f",
+            "surface-container-lowest": "#ffffff",
+            "primary": "#0037b0",
+            "error": "#ba1a1a",
+            "on-surface": "#1a1b22",
+            "surface-bright": "#fbf8ff",
+            "outline": "#747686",
+            "on-primary-container": "#cad3ff",
+            "surface-tint": "#2151da",
+            "secondary": "#565e74",
+            "primary-container": "#1d4ed8"
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          spacing: {
+            "space-xl": "2rem",
+            "margin": "1.5rem",
+            "space-lg": "1.25rem",
+            "space-xs": "0.25rem",
+            "gutter": "1rem",
+            "space-sm": "0.5rem",
+            "space-md": "0.75rem"
+          },
+          fontFamily: {
+            "body-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-lg": ["Inter"],
+            "body-sm": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "label-sm": ["Inter"],
+            "mono": ["JetBrains Mono", "ui-monospace", "monospace"]
+          },
+          fontSize: {
+            "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+            "headline-lg": ["30px", { lineHeight: "36px", fontWeight: "700" }],
+            "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+            "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }],
+            "label-md": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+            "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+            "headline-sm": ["18px", { lineHeight: "26px", fontWeight: "600" }],
+            "label-sm": ["11px", { lineHeight: "14px", fontWeight: "500" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col bg-[#f4f4f5] text-[#18181b] antialiased selection:bg-[#1d4ed8] selection:text-white">
+<!-- TopNavBar (Shared Component) -->
+<header class="sticky top-0 w-full z-50 bg-[#0f172a] border-b border-slate-800 shadow-sm">
+<div class="flex items-center justify-between h-16 px-6 max-w-7xl mx-auto w-full">
+<!-- Left: Brand Logo & Navigation Cluster -->
+<div class="flex items-center space-x-8">
+<a class="font-headline text-lg font-bold tracking-tight text-white flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded" href="#">
+<span class="material-symbols-outlined text-[#1d4ed8]" style="font-variation-settings: 'FILL' 1;">warehouse</span>
+<span>StoreCore</span>
+</a>
+<nav class="hidden md:flex items-center space-x-6 font-body text-sm font-medium">
+<!-- Storefront -->
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded px-1" href="#">
+            Storefront
+          </a>
+<!-- Catálogo -->
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded px-1" href="#">
+            Catálogo
+          </a>
+<!-- Carrito (ACTIVE) -->
+<a class="text-white font-semibold border-b-2 border-[#1d4ed8] pb-1 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            Carrito
+          </a>
+<!-- Customer -->
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded px-1" href="#">
+            Customer
+          </a>
+<!-- User -->
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded px-1" href="#">
+            User
+          </a>
+</nav>
+</div>
+<!-- Right: System Trailing Status / Actions -->
+<div class="flex items-center space-x-4">
+<div class="flex items-center space-x-3 text-xs">
+<span class="inline-flex items-center text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700/60 font-mono">
+<span class="material-symbols-outlined text-[14px] text-slate-400 mr-1.5">person_outline</span>
+            Customer sin sesión
+          </span>
+<span class="inline-flex items-center text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700/60 font-mono">
+<span class="material-symbols-outlined text-[14px] text-slate-400 mr-1.5">badge</span>
+            User sin sesión
+          </span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Canvas Container -->
+<main class="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<!-- Breadcrumb Hierarchy -->
+<nav aria-label="Breadcrumb" class="flex items-center text-xs font-medium text-zinc-500 mb-4 space-x-1">
+<span class="hover:text-zinc-800">StoreCore</span>
+<span class="material-symbols-outlined text-[14px] text-zinc-400">chevron_right</span>
+<span class="text-zinc-900 font-semibold">Carrito</span>
+<span class="text-zinc-400 font-mono ml-2 text-[11px]">(/cart)</span>
+</nav>
+<!-- Header Section -->
+<div class="mb-6 pb-4 border-b border-zinc-200">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-zinc-900 tracking-tight">Carrito</h1>
+<p class="font-body-md text-body-md text-zinc-600 mt-1">
+            Revisá los artículos seleccionados y avanzá al checkout de la sucursal.
+          </p>
+</div>
+<div class="flex items-center space-x-2 text-xs text-zinc-500 bg-white border border-zinc-200 px-3 py-1.5 rounded-lg shadow-xs">
+<span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Sucursal Central — Stock en tiempo real</span>
+</div>
+</div>
+</div>
+<!-- Layout Grid: Table Left (col-span-8), Summary Right (col-span-4) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Cart Table Container -->
+<section class="lg:col-span-8 bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-xs">
+<div class="px-5 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-zinc-700 text-lg">shopping_cart</span>
+<h2 class="font-label-md text-label-md text-zinc-900 uppercase tracking-wide">Artículos en orden (2)</h2>
+</div>
+<span class="text-xs text-zinc-500 font-mono">ID Registro: #ORD-7749</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-xs border-collapse">
+<thead>
+<tr class="bg-zinc-100/75 border-b border-zinc-200 text-zinc-600 font-label-sm uppercase tracking-wider">
+<th class="py-3 px-4 font-semibold text-zinc-700">SKU / nombre</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-center">Cant.</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-right">Original</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-right">Dto</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-center">Oferta</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-center">Campaña</th>
+<th class="py-3 px-3 font-semibold text-zinc-700 text-right">Effective</th>
+<th class="py-3 px-4 font-semibold text-zinc-900 text-right">Subtotal</th>
+<th class="py-3 px-3 text-center"><span class="sr-only">Acciones</span></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-zinc-200 font-body-sm">
+<!-- Item Row 1 -->
+<tr class="hover:bg-zinc-50/75 transition-colors group">
+<!-- SKU / nombre -->
+<td class="py-4 px-4 align-middle">
+<div class="flex items-center space-x-3.5">
+<div class="w-14 h-14 rounded-lg bg-zinc-100 border border-zinc-200 shrink-0 overflow-hidden flex items-center justify-center p-0.5">
+<img alt="Lámpara articulada mate" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1XgqnfflQKQUKubsl7F-Xk3IjJpr0cA3_VT6XivhKuQN4dPs4fIc6Z2e1ziSatXkje-bqI1fCxiS2MerIU3w1Z_IlKc-pBhu3rMIScBz2udco4UAzMpmv1FZwssGHVE2c18UbJ0h2-fadhiyIDvioSsTL4nyaOcQPot16CmtV6Zf6apLrAANEJ0IP7-kBwRm-nNR5WjBUBNHq0MleBxbfpwGVafICQHjZJVWZfXkEi4TSD11150KmtUiqI"/>
+</div>
+<div>
+<div class="font-mono text-[11px] font-semibold text-zinc-500">SKU-100</div>
+<div class="font-medium text-zinc-900 text-[13px] leading-snug">Lámpara de escritorio articulada mate</div>
+<div class="text-[11px] text-zinc-400 mt-0.5">Negro mate / Bronce cepillado</div>
+</div>
+</div>
+</td>
+<!-- Cant. -->
+<td class="py-4 px-3 align-middle text-center">
+<div class="inline-flex items-center border border-zinc-300 rounded-lg bg-white overflow-hidden shadow-xs">
+<button aria-label="Disminuir cantidad" class="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors focus:outline-none" type="button">
+<span class="material-symbols-outlined text-[14px]">remove</span>
+</button>
+<span class="w-8 text-center font-mono font-medium text-zinc-900 tabular-nums text-xs">1</span>
+<button aria-label="Aumentar cantidad" class="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors focus:outline-none" type="button">
+<span class="material-symbols-outlined text-[14px]">add</span>
+</button>
+</div>
+</td>
+<!-- Original -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="line-through text-zinc-400 tabular-nums text-xs">$14.900</span>
+</td>
+<!-- Dto -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="text-emerald-700 font-semibold tabular-nums text-xs bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">-$2.400 (-16%)</span>
+</td>
+<!-- Oferta -->
+<td class="py-4 px-3 align-middle text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    OF-21
+                  </span>
+</td>
+<!-- Campaña -->
+<td class="py-4 px-3 align-middle text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-100 text-zinc-700 border border-zinc-300">
+                    BF-MANUAL
+                  </span>
+</td>
+<!-- Effective -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="font-semibold text-zinc-800 tabular-nums text-xs">$12.500 ARS</span>
+</td>
+<!-- Subtotal -->
+<td class="py-4 px-4 align-middle text-right whitespace-nowrap">
+<span class="font-bold tabular-nums text-zinc-900 text-sm">$12.500 ARS</span>
+</td>
+<!-- Quitar -->
+<td class="py-4 px-3 align-middle text-center">
+<button class="p-1.5 text-zinc-400 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none" title="Quitar artículo" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Item Row 2 -->
+<tr class="hover:bg-zinc-50/75 transition-colors group">
+<!-- SKU / nombre -->
+<td class="py-4 px-4 align-middle">
+<div class="flex items-center space-x-3.5">
+<div class="w-14 h-14 rounded-lg bg-zinc-100 border border-zinc-200 shrink-0 overflow-hidden flex items-center justify-center p-0.5">
+<img alt="Luminaria task LED" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1WzzeKSm4kaRZc-ouYa8Ave-XQ0HMBtM0ij4UprEZIMyK9jsvnxxOnaOHMXF1YjOoMbHvf6bVFeG82uAXGL-JoQM9n6lbgtJF1OkTlS_1nWPHXivKVDZ8mf7xJCz05ddtx9kiUeGc02JnkMEOI_szdVKYVp0r0ba8tZLGJQ_go8jRLUKHM9MLSuEVjC5lJzAjHN6SCfsry_rRY8sNsd_Ve5VypUsrt6taqJDysWNOaj_EdecAnjXt-qBSc"/>
+</div>
+<div>
+<div class="font-mono text-[11px] font-semibold text-zinc-500">SKU-105</div>
+<div class="font-medium text-zinc-900 text-[13px] leading-snug">Luminaria task LED de aluminio</div>
+<div class="text-[11px] text-zinc-400 mt-0.5">Aluminio anodizado plateado</div>
+</div>
+</div>
+</td>
+<!-- Cant. -->
+<td class="py-4 px-3 align-middle text-center">
+<div class="inline-flex items-center border border-zinc-300 rounded-lg bg-white overflow-hidden shadow-xs">
+<button aria-label="Disminuir cantidad" class="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors focus:outline-none" type="button">
+<span class="material-symbols-outlined text-[14px]">remove</span>
+</button>
+<span class="w-8 text-center font-mono font-medium text-zinc-900 tabular-nums text-xs">2</span>
+<button aria-label="Aumentar cantidad" class="w-7 h-7 flex items-center justify-center text-zinc-600 hover:bg-zinc-100 active:bg-zinc-200 transition-colors focus:outline-none" type="button">
+<span class="material-symbols-outlined text-[14px]">add</span>
+</button>
+</div>
+</td>
+<!-- Original -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="line-through text-zinc-400 tabular-nums text-xs">$29.000</span>
+</td>
+<!-- Dto -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="text-emerald-700 font-semibold tabular-nums text-xs bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">-$4.100 (-14%)</span>
+</td>
+<!-- Oferta -->
+<td class="py-4 px-3 align-middle text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                    OF-21
+                  </span>
+</td>
+<!-- Campaña -->
+<td class="py-4 px-3 align-middle text-center whitespace-nowrap">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-zinc-100 text-zinc-700 border border-zinc-300">
+                    BF-MANUAL
+                  </span>
+</td>
+<!-- Effective -->
+<td class="py-4 px-3 align-middle text-right whitespace-nowrap">
+<span class="font-semibold text-zinc-800 tabular-nums text-xs">$24.900 ARS</span>
+</td>
+<!-- Subtotal -->
+<td class="py-4 px-4 align-middle text-right whitespace-nowrap">
+<span class="font-bold tabular-nums text-zinc-900 text-sm">$49.800 ARS</span>
+</td>
+<!-- Quitar -->
+<td class="py-4 px-3 align-middle text-center">
+<button class="p-1.5 text-zinc-400 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none" title="Quitar artículo" type="button">
+<span class="material-symbols-outlined text-[18px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Utility Toolbar -->
+<div class="px-5 py-3 bg-zinc-50 border-t border-zinc-200 flex flex-wrap items-center justify-between text-xs text-zinc-500 gap-3">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-[16px] text-zinc-400">lock_outline</span>
+<span>Modificá cantidades libremente antes de formalizar la orden</span>
+</div>
+<button class="text-zinc-600 hover:text-zinc-900 font-medium underline underline-offset-2 flex items-center space-x-1" type="button">
+<span class="material-symbols-outlined text-[15px]">refresh</span>
+<span>Recalcular tarifas</span>
+</button>
+</div>
+</section>
+<!-- Aside Order Summary -->
+<aside class="lg:col-span-4">
+<div class="bg-white border border-zinc-200 rounded-xl p-6 shadow-xs sticky top-24">
+<h2 class="font-headline-sm text-headline-sm text-zinc-900 pb-3 border-b border-zinc-200">
+            Resumen de compra
+          </h2>
+<!-- Breakdown List -->
+<div class="py-4 space-y-3 text-sm">
+<div class="flex justify-between items-center text-zinc-600">
+<span class="font-body-md text-body-md">Subtotal lista</span>
+<span class="font-mono text-zinc-800 tabular-nums font-medium">$72.900 ARS</span>
+</div>
+<div class="flex justify-between items-center text-zinc-600">
+<span class="font-body-md text-body-md flex items-center">
+<span>Bonificación total</span>
+<span class="ml-1 text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-semibold">DESC</span>
+</span>
+<span class="font-mono text-emerald-700 font-medium tabular-nums">-$10.600 ARS</span>
+</div>
+<div class="flex justify-between items-center text-zinc-600">
+<span class="font-body-md text-body-md">Retiro en mostrador</span>
+<span class="font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-xs border border-emerald-200/60">Sin costo</span>
+</div>
+</div>
+<div class="border-t border-zinc-200 pt-4 pb-2">
+<div class="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Total effective</div>
+<div class="flex items-baseline justify-between mt-1">
+<span class="text-3xl font-extrabold text-zinc-900 tracking-tight font-mono tabular-nums">
+                $62.300 <span class="text-base font-semibold text-zinc-600 font-body-md">ARS</span>
+</span>
+</div>
+<p class="text-xs text-zinc-500 mt-2 leading-relaxed">
+              Precios finales expresados en Pesos Argentinos (ARS). Pago en efectivo o transferencia bancaria en mostrador.
+            </p>
+</div>
+<!-- Checkout CTA Section -->
+<div class="mt-5 space-y-2">
+<a class="w-full bg-[#1d4ed8] hover:bg-blue-800 text-white font-medium py-3 px-6 rounded-lg text-center shadow-sm block transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 text-sm font-label-md" href="#">
+              Checkout
+            </a>
+<a class="w-full text-center text-zinc-600 hover:text-zinc-900 text-sm font-medium py-2.5 transition-colors block border border-transparent hover:border-zinc-200 rounded-lg" href="#">
+              Seguir comprando
+            </a>
+</div>
+<!-- Security and Stock Guarantee Note -->
+<div class="mt-6 pt-4 border-t border-zinc-100 flex items-start space-x-2 text-[11px] text-zinc-400">
+<span class="material-symbols-outlined text-[16px] text-zinc-500 shrink-0 mt-0.5">verified_user</span>
+<span class="leading-normal">
+              Idempotencia transaccional y sincronización de stock de sucursal garantizada por StoreCore OS.
+            </span>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Utilitarian Operational Footer -->
+<footer class="w-full border-t border-zinc-200 bg-white py-6 mt-12">
+<div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
+<div class="flex items-center space-x-2">
+<span class="font-bold text-zinc-800">StoreCore</span>
+<span>•</span>
+<span>Terminal de Carrito Operativo</span>
+<span>•</span>
+<span class="font-mono text-zinc-400">v4.12.0</span>
+</div>
+<div class="flex items-center space-x-6 text-zinc-500">
+<span>Soporte Sucursal</span>
+<span>Políticas de Retiro</span>
+<span>Términos y Facturación</span>
+</div>
+</div>
+</footer>
+</body></html>

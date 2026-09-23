@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-04 StoreCore User Promos</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-error": "#ffffff",
+            "secondary": "#565e74",
+            "primary-fixed-dim": "#b7c4ff",
+            "error": "#ba1a1a",
+            "surface-container-highest": "#e3e1ec",
+            "tertiary-container": "#5c5b5f",
+            "on-surface": "#1a1b22",
+            "on-primary-container": "#cad3ff",
+            "tertiary": "#444447",
+            "surface-container-low": "#f4f2fd",
+            "surface-container-high": "#e8e7f1",
+            "on-surface-variant": "#434655",
+            "inverse-surface": "#0f172a",
+            "on-tertiary-container": "#d6d3d7",
+            "error-container": "#ffdad6",
+            "secondary-container": "#dae2fd",
+            "outline-variant": "#e4e4e7",
+            "on-tertiary-fixed-variant": "#47464a",
+            "surface-dim": "#dad9e3",
+            "primary": "#1d4ed8",
+            "background": "#f4f4f5",
+            "surface": "#ffffff",
+            "secondary-fixed": "#dae2fd",
+            "on-primary": "#ffffff",
+            "surface-bright": "#ffffff",
+            "on-error-container": "#93000a",
+            "on-background": "#18181b",
+            "surface-tint": "#1d4ed8",
+            "outline": "#71717a",
+            "on-primary-fixed-variant": "#0039b5",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary-fixed": "#1b1b1e",
+            "on-primary-fixed": "#001551",
+            "inverse-primary": "#b7c4ff",
+            "primary-container": "#1d4ed8",
+            "surface-container-lowest": "#ffffff",
+            "surface-container": "#eeedf7",
+            "on-tertiary": "#ffffff",
+            "on-secondary-container": "#5c647a",
+            "tertiary-fixed": "#e4e1e6",
+            "on-secondary-fixed": "#131b2e",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "secondary-fixed-dim": "#bec6e0",
+            "inverse-on-surface": "#f8fafc",
+            "surface-variant": "#f4f4f5",
+            "on-secondary": "#ffffff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xl": "2rem",
+            "space-sm": "0.5rem",
+            "space-md": "0.75rem",
+            "gutter": "1rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.25rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter"],
+            "headline-sm": ["Inter"],
+            "headline-md": ["Inter"],
+            "body-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-sm": ["Inter"]
+          },
+          "fontSize": {
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 18px;
+      line-height: 1;
+      display: inline-block;
+      text-transform: none;
+      letter-spacing: normal;
+      word-wrap: normal;
+      white-space: nowrap;
+      direction: ltr;
+      vertical-align: middle;
+    }
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      cursor: pointer;
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-body-md text-on-background bg-background antialiased selection:bg-primary selection:text-white">
+<!-- TOP APP BAR -->
+<header class="w-full px-margin flex items-center justify-between h-14 bg-inverse-surface text-inverse-on-surface sticky top-0 z-50 shadow-sm border-b border-outline-variant/20">
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-surface">StoreCore</span>
+<span class="text-surface-variant/40 font-body-sm px-1">|</span>
+<div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface/10 border border-surface/15">
+<span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+<span class="font-label-sm text-label-sm text-surface tracking-normal">Operando · Salón Belgrano | HTTP 200 OK</span>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav aria-label="Navegación principal" class="hidden md:flex items-center gap-6 ml-4">
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#contenido">Contenido</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#catalogo">Catálogo</a>
+<!-- Active link: Promos -->
+<a aria-current="page" class="border-b-2 border-primary-container text-surface font-label-md text-label-md pb-1" href="#promos">Promos</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#ordenes">Órdenes</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#inventario">Inventario</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#mercadolibre">Mercado Libre</a>
+</nav>
+</div>
+<!-- Right Utility Cluster -->
+<div class="flex items-center gap-space-md">
+<button class="hidden sm:inline-flex items-center gap-1 px-space-md py-1 rounded text-surface text-label-sm font-label-sm bg-surface/10 hover:bg-surface/20 border border-surface/20 transition-colors" type="button">
+<span class="material-symbols-outlined" data-icon="file_upload">file_upload</span>
+<span>Importar perfil</span>
+</button>
+<div class="flex items-center gap-2 border-l border-surface/20 pl-space-md">
+<button class="p-1 rounded text-surface-variant hover:text-surface transition-colors" title="Ajustes" type="button">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+</button>
+<button class="p-1 rounded text-surface-variant hover:text-surface transition-colors relative" title="Notificaciones" type="button">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+</button>
+<div class="flex items-center gap-2 pl-2">
+<div class="w-7 h-7 rounded-full bg-primary-container text-white flex items-center justify-center font-label-sm text-label-sm font-bold ring-1 ring-white/30">
+            MR
+          </div>
+<div class="hidden xl:flex flex-col text-left">
+<span class="font-label-sm text-label-sm text-surface font-medium leading-none">Martín Rossi</span>
+<span class="font-body-sm text-[10px] text-surface-variant/80 mt-0.5 leading-none">Operador Activo</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- BREADCRUMB CONSOLE SUB-BAR -->
+<aside class="w-full bg-[#ebecef] border-b border-outline-variant px-margin py-1 text-on-surface-variant font-label-sm text-label-sm flex items-center justify-between">
+<div class="flex items-center gap-2 font-mono text-[11px]">
+<span class="text-outline font-semibold">Ruta:</span>
+<span class="text-primary font-medium">/user/promos</span>
+<span class="text-outline">·</span>
+<span>Instancia StoreCore Nodo #01</span>
+<span class="text-outline">·</span>
+<span class="text-on-surface">Entorno Local Belgrano</span>
+</div>
+<div class="flex items-center gap-4 text-[11px] text-outline">
+<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Desacoplado</span>
+<span>PostgreSQL 16.2</span>
+</div>
+</aside>
+<!-- WORKSPACE CONTENT CANVAS -->
+<main class="flex-1 w-full max-w-[1600px] mx-auto px-margin py-space-md flex flex-col gap-space-md">
+<!-- PAGE HEADER BLOCK & OPERATIONAL CHIPS -->
+<section class="bg-surface rounded border border-outline-variant p-space-md shadow-sm">
+<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
+<div>
+<div class="flex items-center gap-2 mb-1">
+<h1 class="font-headline-md text-headline-md font-bold text-on-surface tracking-tight">Promos MANUAL</h1>
+<span class="px-2 py-0.5 bg-neutral-100 border border-neutral-300 rounded text-[11px] font-mono font-semibold text-neutral-700">WRITER MANUAL</span>
+</div>
+<p class="font-body-sm text-body-sm text-outline">Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización.</p>
+</div>
+<!-- Metric Badges / Chips -->
+<div class="flex flex-wrap items-center gap-2">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#f8fafc] border border-outline-variant">
+<span class="material-symbols-outlined text-primary text-[16px]" data-icon="sell">sell</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">SKUs con promo activa:</span>
+<span class="font-mono text-xs font-bold text-primary">1</span>
+</div>
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#f8fafc] border border-outline-variant">
+<span class="material-symbols-outlined text-emerald-600 text-[16px]" data-icon="verified">verified</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Solapes detectados:</span>
+<span class="font-mono text-xs font-bold text-emerald-700">0</span>
+</div>
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#f8fafc] border border-outline-variant">
+<span class="material-symbols-outlined text-outline text-[16px]" data-icon="policy">policy</span>
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">Reglas de validación:</span>
+<span class="font-mono text-xs font-bold text-on-surface">Estrictas</span>
+</div>
+</div>
+</div>
+</section>
+<!-- ARCHITECTURAL BANNER / CALLOUT BOX -->
+<div class="rounded border-l-4 border-l-primary bg-blue-50/70 border border-outline-variant p-3.5 flex items-start gap-3 shadow-none">
+<span class="material-symbols-outlined text-primary mt-0.5 flex-shrink-0" data-icon="info">info</span>
+<div class="flex flex-col gap-0.5">
+<span class="font-label-md text-label-md text-on-surface font-bold">Motor de promociones desacoplado</span>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+          Toda bonificación manual se aplica sobre el precio base y requiere aprobación explícita de operador. El backend rechaza solapes de fechas <span class="font-mono text-[11px] font-semibold text-primary">ACTIVE</span> para un mismo SKU.
+        </p>
+</div>
+</div>
+<!-- DENSE OPERATOR WORKSPACE: TABLE + PANEL -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-md items-start">
+<!-- LEFT / MAIN: RULES DATA GRID -->
+<section class="lg:col-span-8 bg-surface rounded border border-outline-variant shadow-sm flex flex-col">
+<!-- Table Header & Filter Bar -->
+<div class="p-space-md border-b border-outline-variant flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#fafafa]">
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Reglas promocionales registradas</h2>
+<p class="font-body-sm text-body-sm text-outline">Listado canónico de asignaciones manuales vigentes y programadas.</p>
+</div>
+<div class="relative w-full sm:w-72">
+<span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline text-[16px]" data-icon="search">search</span>
+<input class="w-full pl-8 pr-3 py-1.5 text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-all" placeholder="Buscar por SKU o aprobador..." type="text"/>
+</div>
+</div>
+<!-- Table Container (Horizontal Scroll Safe) -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse text-body-sm font-body-sm">
+<thead>
+<tr class="bg-[#f4f4f5] border-b border-outline-variant font-label-md text-label-md text-on-surface-variant">
+<th class="py-2.5 px-3 font-semibold">SKU</th>
+<th class="py-2.5 px-3 font-semibold">Vigencia</th>
+<th class="py-2.5 px-3 font-semibold text-center">Prioridad</th>
+<th class="py-2.5 px-3 font-semibold text-right">Margen</th>
+<th class="py-2.5 px-3 font-semibold text-center">Moneda</th>
+<th class="py-2.5 px-3 font-semibold">Aprobador</th>
+<th class="py-2.5 px-3 font-semibold text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<!-- ROW 1 -->
+<tr class="hover:bg-blue-50/30 transition-colors">
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-xs font-bold text-on-surface">SKU-100</span>
+<span class="px-1.5 py-0.2 bg-zinc-200 text-zinc-800 text-[10px] font-mono rounded font-medium border border-zinc-300">MANUAL</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate max-w-[200px]" title="Lámpara de escritorio articulada mate">Lámpara de escritorio articulada mate</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col">
+<span class="font-mono text-xs font-medium text-on-surface">18/02/2025 al 28/02/2025</span>
+<span class="font-label-sm text-[10px] text-emerald-700 font-medium">En curso (Vigente)</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-center">
+<span class="inline-block px-2 py-0.5 rounded bg-blue-100 border border-blue-200 text-primary font-mono text-xs font-bold">10</span>
+</td>
+<td class="py-3 px-3 align-top text-right">
+<div class="flex flex-col items-end">
+<span class="font-mono text-xs font-bold text-error">-16%</span>
+<span class="font-mono text-[11px] text-outline">($2.400 ARS)</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-center">
+<span class="font-mono text-xs text-on-surface font-medium">ARS</span>
+</td>
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Martín Rossi</span>
+<span class="font-body-sm text-[11px] text-outline">Operador</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-right">
+<div class="inline-flex items-center gap-1 justify-end">
+<button class="px-2 py-1 rounded text-label-sm font-label-sm bg-white hover:bg-neutral-100 text-on-surface border border-outline-variant transition-colors" title="Modificar regla" type="button">
+                      Editar
+                    </button>
+<button class="px-2 py-1 rounded text-label-sm font-label-sm bg-white hover:bg-red-50 text-error border border-outline-variant hover:border-error/40 transition-colors" title="Suspender regla temporalmente" type="button">
+                      Pausar
+                    </button>
+</div>
+</td>
+</tr>
+<!-- ROW 2 -->
+<tr class="hover:bg-blue-50/30 transition-colors bg-[#fafafa]/50">
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5">
+<span class="font-mono text-xs font-bold text-on-surface">SKU-105</span>
+<span class="px-1.5 py-0.2 bg-zinc-200 text-zinc-800 text-[10px] font-mono rounded font-medium border border-zinc-300">MANUAL</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate max-w-[200px]" title="Luminaria task LED">Luminaria task LED</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col">
+<span class="font-mono text-xs font-medium text-on-surface">15/02/2025 al 01/03/2025</span>
+<span class="font-label-sm text-[10px] text-emerald-700 font-medium">En curso (Vigente)</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-center">
+<span class="inline-block px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-zinc-700 font-mono text-xs font-bold">05</span>
+</td>
+<td class="py-3 px-3 align-top text-right">
+<div class="flex flex-col items-end">
+<span class="font-mono text-xs font-bold text-error">-14%</span>
+<span class="font-mono text-[11px] text-outline">($4.100 ARS)</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-center">
+<span class="font-mono text-xs text-on-surface font-medium">ARS</span>
+</td>
+<td class="py-3 px-3 align-top">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface">Martín Rossi</span>
+<span class="font-body-sm text-[11px] text-outline">Operador</span>
+</div>
+</td>
+<td class="py-3 px-3 align-top text-right">
+<div class="inline-flex items-center gap-1 justify-end">
+<button class="px-2 py-1 rounded text-label-sm font-label-sm bg-white hover:bg-neutral-100 text-on-surface border border-outline-variant transition-colors" title="Modificar regla" type="button">
+                      Editar
+                    </button>
+<button class="px-2 py-1 rounded text-label-sm font-label-sm bg-white hover:bg-red-50 text-error border border-outline-variant hover:border-error/40 transition-colors" title="Suspender regla temporalmente" type="button">
+                      Pausar
+                    </button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination Notice -->
+<div class="p-space-sm bg-[#f8fafc] border-t border-outline-variant flex items-center justify-between text-label-sm font-label-sm text-outline">
+<span>Mostrando reglas activas de la sucursal (2 registros)</span>
+<div class="flex items-center gap-2">
+<span class="font-mono text-[11px]">Página 1 de 1</span>
+<div class="inline-flex rounded border border-outline-variant bg-white">
+<button class="px-2 py-0.5 text-zinc-300 cursor-not-allowed" disabled="">«</button>
+<button class="px-2 py-0.5 text-zinc-300 border-l border-outline-variant cursor-not-allowed" disabled="">»</button>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT: OPERATOR CREATION PANEL -->
+<section class="lg:col-span-4 bg-surface rounded border border-outline-variant shadow-sm flex flex-col">
+<div class="p-space-md border-b border-outline-variant bg-[#fafafa]">
+<h2 class="font-headline-sm text-headline-sm text-on-surface font-semibold">Crear promo manual</h2>
+<p class="font-body-sm text-body-sm text-outline mt-0.5">Ingresá los parámetros de la bonificación directa. Verificá que no existan solapes para el SKU seleccionado.</p>
+</div>
+<form class="p-space-md flex flex-col gap-3.5" id="promoForm" onsubmit="event.preventDefault();">
+<!-- Field 1: SKU -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold flex items-center justify-between" for="skuSelect">
+<span>SKU Objetivo</span>
+<span class="font-body-sm text-[11px] text-primary">Obligatorio</span>
+</label>
+<select class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="skuSelect">
+<option value="SKU-102">SKU-102 - Lámpara de mesa cerámica nórdica</option>
+<option value="SKU-108">SKU-108 - Aplique bidireccional aluminio negro</option>
+<option value="SKU-112">SKU-112 - Plafón de techo suspendido texturado</option>
+<option value="SKU-120">SKU-120 - Tira LED flexible cálida 24V 5m</option>
+</select>
+</div>
+<!-- Field 2: Moneda -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold" for="currencySelect">
+              Moneda
+            </label>
+<select class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="currencySelect">
+<option value="ARS">ARS (Pesos Argentinos)</option>
+<option value="USD">USD (Dólares Estadounidenses)</option>
+</select>
+</div>
+<!-- Dates Grid: Desde / Hasta -->
+<div class="grid grid-cols-2 gap-2.5">
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold" for="startDate">
+                Desde
+              </label>
+<input class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="startDate" type="date" value="2025-02-20"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold" for="endDate">
+                Hasta
+              </label>
+<input class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" id="endDate" type="date" value="2025-02-28"/>
+</div>
+</div>
+<!-- Field 5: Prioridad -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold flex items-center justify-between" for="priorityInput">
+<span>Prioridad de ejecución</span>
+<span class="font-mono text-[11px] text-outline">Rango: 1 - 99</span>
+</label>
+<input class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary font-mono" id="priorityInput" max="99" min="1" type="number" value="10"/>
+<span class="font-body-sm text-[11px] text-outline">Valor 1 a 99. Mayor número tiene precedencia ante empates.</span>
+</div>
+<!-- Field 6: Margen / Descuento -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold" for="marginInput">
+              Margen / Descuento bonificado
+            </label>
+<div class="relative">
+<input class="w-full text-body-sm font-body-sm bg-white border border-[#d4d4d8] rounded py-1.5 px-2.5 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary font-mono" id="marginInput" placeholder="ej. 15% o $3.300 ARS" type="text" value="15%"/>
+</div>
+<span class="font-body-sm text-[11px] text-outline">Acepta porcentaje (ej. 15%) o valor nominal fijo (ej. $3.300 ARS).</span>
+</div>
+<!-- Field 7: Aprobador (Read-only) -->
+<div class="flex flex-col gap-1">
+<label class="font-label-md text-label-md text-on-surface font-semibold flex items-center justify-between" for="approverInput">
+<span>Aprobador asignado</span>
+<span class="font-body-sm text-[10px] text-outline uppercase font-mono">Sesión actual</span>
+</label>
+<input class="w-full text-body-sm font-body-sm bg-neutral-100 border border-[#d4d4d8] rounded py-1.5 px-2.5 text-on-surface-variant font-mono cursor-not-allowed" id="approverInput" readonly="" type="text" value="Martín Rossi (DNI 32.140.892)"/>
+</div>
+<!-- Validation Warning Notice -->
+<div class="p-2.5 rounded bg-amber-50 border border-amber-200 text-amber-900 text-body-sm font-body-sm flex items-start gap-2">
+<span class="material-symbols-outlined text-amber-700 text-[16px] mt-0.5" data-icon="warning">warning</span>
+<p class="text-[11px] leading-tight">
+<strong>Atención:</strong> Si se detecta solape de fechas con una regla <span class="font-mono font-semibold">ACTIVE</span> existente, el servicio <span class="font-mono font-bold">HTTP 409 Conflict</span> abortará la transacción.
+            </p>
+</div>
+<!-- Action Buttons -->
+<div class="pt-2 flex flex-col gap-2">
+<button class="w-full py-2 px-space-md rounded bg-[#1d4ed8] hover:bg-blue-700 text-white font-label-md text-label-md font-semibold tracking-wide transition-colors focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99]" type="submit">
+<span class="material-symbols-outlined text-[16px]" data-icon="add_circle">add_circle</span>
+<span>Crear promo</span>
+</button>
+<button class="w-full py-1.5 px-space-md rounded bg-white hover:bg-zinc-100 text-on-surface border border-outline-variant font-label-md text-label-md transition-colors text-center" onclick="document.getElementById('promoForm').reset();" type="button">
+              Limpiar formulario
+            </button>
+</div>
+</form>
+</section>
+</div>
+</main>
+<!-- BOTTOM AUDIT STRIP -->
+<footer class="w-full bg-white border-t border-outline-variant px-margin py-2.5 text-outline font-label-sm text-label-sm flex flex-col md:flex-row items-center justify-between gap-2 mt-auto">
+<div class="flex items-center gap-2">
+<span class="font-mono text-[11px] text-on-surface font-semibold">StoreCore OS v2.4 Retail</span>
+<span>·</span>
+<span>Salón Central Belgrano</span>
+<span>·</span>
+<span class="font-mono text-[11px] text-primary">API Promos /api/v1/promos/manual</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="px-2 py-0.5 rounded bg-zinc-100 text-zinc-700 font-mono text-[10px] border border-zinc-200">Modo transaccional desacoplado</span>
+<span class="text-emerald-700 font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> Latencia: 14ms
+      </span>
+</div>
+</footer>
+</body></html>

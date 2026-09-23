@@ -20,7 +20,7 @@
 
 ## WIP frontend UX (doc + Stitch, sin código)
 
-- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` — sistema visual canónico. Stitch `projects/6473866243657965808`. P-01 retail recupera banner carousel + tira de ofertas del mock viejo, sin piel ML. Reviews UX/PO/comprador: el P-01 “sparse” no es vidriera. Sin implementación Angular en este WIP.
+- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` — sistema visual canónico. Stitch `projects/6473866243657965808`. P-01 retail recupera banner carousel + tira de ofertas del mock viejo, sin piel ML. Reviews UX/PO/comprador: el P-01 “sparse” no es vidriera. Stitch C-01…C-09 y U-01…U-10 tienen screen id en el proyecto canónico; Angular sigue sin tocarse en este WIP.
 
 ## Gate actual
 

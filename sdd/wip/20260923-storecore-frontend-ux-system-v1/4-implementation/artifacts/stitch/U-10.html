@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+
+<html class="h-full" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>StoreCore - Importar perfil</title>
+<!-- Fonts & Material Symbols -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-container": "#dae2fd",
+            "surface-container-low": "#f4f2fd",
+            "surface-tint": "#2151da",
+            "inverse-on-surface": "#f1effa",
+            "surface-dim": "#dad9e3",
+            "on-primary-container": "#cad3ff",
+            "secondary": "#565e74",
+            "on-tertiary": "#ffffff",
+            "tertiary": "#444447",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "tertiary-container": "#5c5b5f",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary": "#ffffff",
+            "on-background": "#1a1b22",
+            "primary": "#0037b0",
+            "on-secondary-fixed-variant": "#3f465c",
+            "secondary-fixed": "#dae2fd",
+            "background": "#fbf8ff",
+            "on-tertiary-fixed": "#1b1b1e",
+            "surface-container": "#eeedf7",
+            "primary-fixed-dim": "#b7c4ff",
+            "on-tertiary-fixed-variant": "#47464a",
+            "on-tertiary-container": "#d6d3d7",
+            "error": "#ba1a1a",
+            "outline": "#747686",
+            "on-surface-variant": "#434655",
+            "surface": "#fbf8ff",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-secondary-container": "#5c647a",
+            "inverse-surface": "#2f3038",
+            "primary-container": "#1d4ed8",
+            "error-container": "#ffdad6",
+            "tertiary-fixed": "#e4e1e6",
+            "on-primary": "#ffffff",
+            "on-error-container": "#93000a",
+            "outline-variant": "#c4c5d7",
+            "on-primary-fixed": "#001551",
+            "surface-variant": "#e3e1ec",
+            "surface-bright": "#fbf8ff",
+            "surface-container-highest": "#e3e1ec",
+            "on-primary-fixed-variant": "#0039b5",
+            "inverse-primary": "#b7c4ff",
+            "primary-fixed": "#dce1ff",
+            "on-error": "#ffffff",
+            "on-surface": "#1a1b22",
+            "on-secondary-fixed": "#131b2e",
+            "surface-container-high": "#e8e7f1"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-lg": "1.25rem",
+            "space-xs": "0.25rem",
+            "gutter": "1rem",
+            "margin": "1.5rem",
+            "space-md": "0.75rem",
+            "space-sm": "0.5rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "body-md": ["Inter", "sans-serif"],
+            "label-md": ["Inter", "sans-serif"],
+            "body-sm": ["Inter", "sans-serif"],
+            "headline-lg": ["Inter", "sans-serif"],
+            "headline-sm": ["Inter", "sans-serif"],
+            "body-lg": ["Inter", "sans-serif"],
+            "label-sm": ["Inter", "sans-serif"],
+            "headline-md": ["Inter", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          "fontSize": {
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="bg-[#f4f4f5] text-[#18181b] min-h-screen flex flex-col font-body-md text-body-md antialiased selection:bg-blue-100 selection:text-blue-900">
+<!-- TOP SHELL: StoreCore Web Header (Corporate Navy #0f172a) -->
+<header class="bg-[#0f172a] text-[#f8fafc] w-full border-b border-slate-800 shrink-0 z-30">
+<div class="max-w-[1440px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+<!-- Brand & Node Status -->
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-3">
+<span class="font-headline-sm text-headline-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+<span class="material-symbols-outlined text-blue-500 text-[20px]" data-icon="deployed_code">deployed_code</span>
+            StoreCore
+          </span>
+<span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono border border-slate-700">OS v2.4</span>
+</div>
+<div class="hidden lg:flex items-center gap-2 text-xs text-slate-400 pl-4 border-l border-slate-700/80">
+<span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span>Salón Belgrano #01</span>
+<span class="text-slate-600">·</span>
+<span class="font-mono text-emerald-400">HTTP 200 OK</span>
+</div>
+</div>
+<!-- Quick Context & Operator User Badge -->
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 text-slate-400">
+<button class="p-1.5 rounded hover:bg-slate-800 hover:text-slate-200 transition-colors" title="Notificaciones del sistema">
+<span class="material-symbols-outlined text-[20px]" data-icon="notifications">notifications</span>
+</button>
+<button class="p-1.5 rounded hover:bg-slate-800 hover:text-slate-200 transition-colors" title="Documentación y mesa de ayuda">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+</button>
+</div>
+<div class="h-6 w-px bg-slate-800"></div>
+<div class="flex items-center gap-2.5 pl-1">
+<div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-xs border border-blue-400/40">
+            MR
+          </div>
+<div class="flex flex-col text-left">
+<span class="text-xs font-medium text-slate-200 leading-tight">Martín Rossi</span>
+<span class="text-[10px] text-emerald-400 font-mono leading-tight">Operador Activo</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary Navigation Bar (Exact labels per spec, Importar perfil active) -->
+<div class="bg-[#0b1120] border-t border-slate-800/80 px-4 sm:px-6">
+<div class="max-w-[1440px] mx-auto flex items-center gap-1 overflow-x-auto text-xs py-1">
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#contenido">Contenido</a>
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#catalogo">Catálogo</a>
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#promos">Promos</a>
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#ordenes">Órdenes</a>
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#inventario">Inventario</a>
+<a class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 font-medium transition-colors whitespace-nowrap" href="#capabilities">Capabilities</a>
+<a class="px-3 py-1.5 rounded bg-blue-600/20 text-blue-400 border border-blue-500/40 font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5" href="#importar-perfil">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+          Importar perfil
+        </a>
+</div>
+</div>
+</header>
+<!-- Technical Route / Breadcrumb Ribbon -->
+<section class="bg-white border-b border-zinc-200 py-2 px-4 sm:px-6 shrink-0 shadow-sm">
+<div class="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between text-xs text-zinc-600 gap-2">
+<div class="flex items-center gap-2 font-mono">
+<span class="text-zinc-400">Ruta:</span>
+<span class="text-zinc-900 font-semibold bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">/user/profile-import</span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-600">Instancia StoreCore Nodo #01</span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-800 font-medium">Salón Belgrano</span>
+</div>
+<div class="flex items-center gap-3 text-zinc-500 text-[11px]">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-zinc-400" data-icon="lock">lock</span>
+          Cifrado local AES-256
+        </span>
+<span class="text-zinc-300">|</span>
+<span>Aislamiento perimetral activo</span>
+</div>
+</div>
+</section>
+<!-- MAIN OPERATOR WORKBENCH -->
+<main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
+<!-- Title & Subtitle Banner -->
+<header class="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-zinc-200 pb-4">
+<div>
+<h1 class="font-headline-lg text-headline-lg font-bold text-zinc-900 tracking-tight flex items-center gap-3">
+          Importar perfil
+          <span class="text-xs font-mono font-normal text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">Entorno de validación</span>
+</h1>
+<p class="font-body-md text-body-md text-zinc-600 mt-1">
+          Preview y merge explícito. El diff no muestra secretos.
+        </p>
+</div>
+<div class="flex items-center gap-2 text-xs text-zinc-500">
+<span class="material-symbols-outlined text-[16px] text-zinc-400" data-icon="verified_user">verified_user</span>
+        Modo de seguridad: Inspección canónica
+      </div>
+</header>
+<!-- Two-Column Workbench Layout (45% / 55%) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- COLUMN 1: Left (~45% / col-span-5) - Manifiesto de configuración -->
+<section class="lg:col-span-5 flex flex-col gap-4">
+<div class="bg-white rounded-lg border border-zinc-200 p-6 shadow-sm flex flex-col">
+<div class="flex items-center justify-between mb-2">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-zinc-900 flex items-center gap-2">
+<span class="material-symbols-outlined text-zinc-600 text-[20px]" data-icon="data_object">data_object</span>
+              Manifiesto de configuración
+            </h2>
+<span class="text-[11px] font-mono bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded border border-zinc-200">FORMATO JSON</span>
+</div>
+<p class="font-body-sm text-body-sm text-zinc-600 mb-4 leading-relaxed">
+            Pegá el JSON del manifiesto del perfil exportado. Los tokens y credenciales sensibles son filtrados y encriptados en reposo antes de la evaluación de compatibilidad.
+          </p>
+<!-- Label & Action inside header -->
+<div class="flex items-center justify-between text-xs mb-1.5">
+<label class="font-label-md text-label-md font-semibold text-zinc-700" for="json-manifest-input">
+              Manifiesto JSON
+            </label>
+<button class="text-blue-700 hover:text-blue-900 font-medium hover:underline text-[12px] flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[14px]" data-icon="restart_alt">restart_alt</span>
+              Cargar plantilla base
+            </button>
+</div>
+<!-- Code Editor Area -->
+<div class="relative rounded-lg overflow-hidden border border-zinc-300 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+<div class="bg-zinc-100 px-3 py-1.5 border-b border-zinc-200 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
+<span>manifest_eval.json</span>
+<span>UTF-8 · 362 bytes</span>
+</div>
+<textarea class="w-full bg-zinc-50 font-mono text-xs p-4 text-zinc-900 leading-5 resize-y focus:outline-none border-0" id="json-manifest-input" rows="14" spellcheck="false">{
+  "manifest_version": "0.9.4",
+  "store_schema": "StoreCore-Retail-2024",
+  "target_node": "sal-belgrano-01",
+  "modules": [
+    { "id": "catalog_tree", "action": "upsert", "items_count": 42 },
+    { "id": "display_hero", "action": "replace", "headline": "Luminaria y equipamiento" }
+  ],
+  "checksum": "sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}</textarea>
+</div>
+<!-- Editor Actions -->
+<div class="mt-4 pt-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-3">
+<div class="flex items-center gap-2">
+<button class="bg-[#1d4ed8] text-white hover:bg-[#1e40af] active:bg-blue-900 font-medium px-5 py-2.5 rounded-lg flex items-center gap-2 text-xs transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-700 focus:ring-offset-2" type="button">
+<span class="material-symbols-outlined text-[16px]" data-icon="play_arrow">play_arrow</span>
+                Previsualizar
+              </button>
+<button class="border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200 font-medium px-4 py-2.5 rounded-lg text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2" type="button">
+                Limpiar editor
+              </button>
+</div>
+<span class="text-[11px] text-zinc-400 flex items-center gap-1 font-mono">
+<span class="material-symbols-outlined text-[14px]" data-icon="shield">shield</span> Sanitizado
+            </span>
+</div>
+</div>
+<!-- Operator Advisory Card -->
+<div class="bg-zinc-50 border border-zinc-200 rounded-lg p-4 text-xs text-zinc-600 flex items-start gap-3">
+<span class="material-symbols-outlined text-zinc-500 text-[18px] shrink-0 mt-0.5" data-icon="info">info</span>
+<div>
+<span class="font-semibold text-zinc-800">Directiva de soberanía de datos:</span>
+            Los manifiestos se ejecutan exclusivamente en memoria de nodo. No se despachan metadatos ni configuraciones a servidores de terceros ni pasarelas externas.
+          </div>
+</div>
+</section>
+<!-- COLUMN 2: Right (~55% / col-span-7) - Diff de Esquema & Resultado -->
+<section class="lg:col-span-7 flex flex-col gap-4">
+<div class="bg-white rounded-lg border border-zinc-200 p-6 shadow-sm flex flex-col">
+<!-- Card Header -->
+<div class="flex items-center justify-between mb-4 pb-3 border-b border-zinc-100">
+<div>
+<h2 class="font-headline-sm text-headline-sm font-semibold text-zinc-900 flex items-center gap-2">
+<span class="material-symbols-outlined text-zinc-600 text-[20px]" data-icon="compare_arrows">compare_arrows</span>
+                Resultado del análisis y diff de esquema
+              </h2>
+<p class="text-xs text-zinc-500 mt-0.5">Evaluación estática de árbol de dependencias e integridad relacional.</p>
+</div>
+<span class="text-xs font-mono font-semibold px-2.5 py-1 rounded bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-rose-600"></span>
+              2 Conflictos
+            </span>
+</div>
+<!-- Status Alert Banner: INCOMPATIBLE -->
+<div class="bg-rose-50 border border-rose-200 text-rose-900 p-4 rounded-lg flex items-start gap-3 mb-6">
+<span class="material-symbols-outlined text-rose-700 text-[22px] shrink-0 mt-0.5" data-icon="cancel">cancel</span>
+<div class="flex-1">
+<div class="flex items-center gap-2 mb-1">
+<span class="bg-rose-700 text-white font-label-sm text-[10px] font-bold px-1.5 py-0.5 rounded tracking-wide">BLOQUEANTE</span>
+<h3 class="font-headline-sm text-sm font-bold text-rose-900 leading-tight">
+                  Merge cerrado: Incompatibilidad de versión de esquema
+                </h3>
+</div>
+<p class="font-body-sm text-body-sm text-rose-800 leading-relaxed">
+                El manifiesto suministrado pertenece a la especificación <code class="bg-rose-100 px-1 py-0.5 rounded font-mono text-rose-950 font-semibold">v0.9.4</code>, incompatible con el motor <strong class="text-rose-950">StoreCore OS v2.4</strong> activo en Salón Belgrano. Se detectaron 2 conflictos de migración estructural en la jerarquía de catálogo que bloquean la aplicación atómica.
+              </p>
+</div>
+</div>
+<!-- Diff Inspection Table (Non-secret inspection panel) -->
+<div class="mb-6">
+<div class="flex items-center justify-between mb-2">
+<h4 class="font-label-md text-label-md font-semibold text-zinc-800 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-zinc-500 text-[16px]" data-icon="policy">policy</span>
+                Inspección de diferencias (Sin secretos ni credenciales)
+              </h4>
+<span class="text-[11px] text-zinc-400 font-mono">Motor de saneamiento v1.2</span>
+</div>
+<!-- Table Container -->
+<div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+<table class="w-full text-left text-xs border-collapse">
+<thead>
+<tr class="bg-zinc-100 text-zinc-600 font-semibold border-b border-zinc-200">
+<th class="py-2.5 px-3">Propiedad destino</th>
+<th class="py-2.5 px-3">Nodo Local</th>
+<th class="py-2.5 px-3">Manifiesto</th>
+<th class="py-2.5 px-3 text-right">Diagnóstico</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-zinc-200 font-mono text-[12px]">
+<!-- Row 1: schema_version -->
+<tr class="hover:bg-zinc-50/80 transition-colors">
+<td class="py-3 px-3 font-semibold text-zinc-800">
+<code>schema_version</code>
+</td>
+<td class="py-3 px-3 text-emerald-700 bg-emerald-50/50">
+                      2.4.0
+                    </td>
+<td class="py-3 px-3 text-rose-700 bg-rose-50/50 font-medium">
+                      0.9.4
+                    </td>
+<td class="py-3 px-3 text-right font-sans">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-200">
+<span class="material-symbols-outlined text-[12px]" data-icon="error">error</span>
+                        Conflicto crítico
+                      </span>
+</td>
+</tr>
+<!-- Row 2: catalog_tree -->
+<tr class="hover:bg-zinc-50/80 transition-colors">
+<td class="py-3 px-3 font-semibold text-zinc-800">
+<code>catalog_tree</code>
+</td>
+<td class="py-3 px-3 text-zinc-700">
+                      v2.4_tree
+                    </td>
+<td class="py-3 px-3 text-amber-800 bg-amber-50/50 font-medium">
+                      legacy_tree_flat
+                    </td>
+<td class="py-3 px-3 text-right font-sans">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+<span class="material-symbols-outlined text-[12px]" data-icon="warning">warning</span>
+                        Migración requerida
+                      </span>
+</td>
+</tr>
+<!-- Row 3: auth_tokens -->
+<tr class="bg-zinc-50/50 hover:bg-zinc-50 transition-colors">
+<td class="py-3 px-3 font-semibold text-zinc-500">
+<code>auth_tokens</code>
+</td>
+<td class="py-3 px-3 text-zinc-400 italic">
+                      [Omitido / Filtrado]
+                    </td>
+<td class="py-3 px-3 text-zinc-400 italic">
+                      [Omitido / Filtrado]
+                    </td>
+<td class="py-3 px-3 text-right font-sans">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-600 border border-zinc-200">
+<span class="material-symbols-outlined text-[12px] text-zinc-500" data-icon="check_circle">check_circle</span>
+                        Seguro (Sin secretos)
+                      </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Structural Migration Hint -->
+<div class="mt-3 p-3 bg-zinc-50 border border-zinc-200 rounded text-xs text-zinc-600 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-zinc-500" data-icon="code_blocks">code_blocks</span>
+<span>Resolución sugerida: Ejecutá el script de migración <code class="font-mono bg-zinc-200 px-1 py-0.2 rounded text-zinc-800">storecore migrate:schema --from 0.9.4</code> en la consola local del nodo.</span>
+</div>
+<button class="text-blue-700 hover:text-blue-900 font-semibold shrink-0 text-xs hover:underline ml-2">
+                Copiar comando
+              </button>
+</div>
+</div>
+<!-- Bottom Action Panel (Merge & Blocked State) -->
+<div class="pt-4 border-t border-zinc-200 flex flex-col gap-3">
+<div class="flex flex-wrap items-center justify-between gap-3">
+<!-- Visibly Disabled Apply Merge Button -->
+<div class="relative group">
+<button class="opacity-50 cursor-not-allowed bg-zinc-200 text-zinc-500 font-medium px-5 py-2.5 rounded-lg flex items-center gap-2 text-xs border border-zinc-300 select-none shadow-none" disabled="" title="El manifiesto es incompatible con la versión del nodo local. Corregí los conflictos antes de intentar el merge." type="button">
+<span class="material-symbols-outlined text-[16px]" data-icon="merge_type">merge_type</span>
+                  Aplicar merge
+                </button>
+</div>
+<!-- Secondary Diagnostic Action -->
+<button class="border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-100 active:bg-zinc-200 font-medium px-4 py-2.5 rounded-lg text-xs flex items-center gap-2 transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px] text-zinc-500" data-icon="download">download</span>
+                Descargar reporte de conflictos (JSON)
+              </button>
+</div>
+<!-- Explicit Lock Explanation -->
+<div class="flex items-start gap-2 text-[11px] text-zinc-500 mt-1">
+<span class="material-symbols-outlined text-[15px] text-rose-600 shrink-0 mt-0.5" data-icon="lock_clock">lock_clock</span>
+<span>
+<strong class="text-zinc-700">Acción bloqueada:</strong> El manifiesto es incompatible. El motor transaccional prohíbe la persistencia de manifiestos con esquema deprecado para evitar corrupción de inventario y colisión en registros fiscales locales.
+              </span>
+</div>
+</div>
+</div>
+<!-- Telemetry & Consistency Card -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+<div class="bg-white border border-zinc-200 p-3 rounded-lg">
+<div class="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">Integridad de esquema</div>
+<div class="text-xs font-mono font-bold text-rose-700 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="close">close</span> Discrepancia detectada
+            </div>
+</div>
+<div class="bg-white border border-zinc-200 p-3 rounded-lg">
+<div class="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">Auditoría de secretos</div>
+<div class="text-xs font-mono font-bold text-emerald-700 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="check">check</span> 0 credenciales en diff
+            </div>
+</div>
+<div class="bg-white border border-zinc-200 p-3 rounded-lg">
+<div class="text-[11px] text-zinc-500 uppercase tracking-wider font-semibold">Modo de transacción</div>
+<div class="text-xs font-mono font-bold text-zinc-700 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-zinc-400" data-icon="memory">memory</span> Dry-Run / En memoria
+            </div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- FOOTER: StoreCore standard operator status bar & Legal Links -->
+<footer class="mt-auto bg-white border-t border-zinc-200 text-xs text-zinc-600 shrink-0">
+<div class="max-w-[1440px] mx-auto px-4 sm:px-6 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
+<!-- System Telemetry Status -->
+<div class="flex flex-wrap items-center gap-3 text-[11px] font-mono">
+<span class="text-zinc-800 font-semibold flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+          StoreCore OS v2.4 Retail
+        </span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-600">Salón Central Belgrano</span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-500">Latencia: 11ms</span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-500">Modo transaccional desacoplado</span>
+<span class="text-zinc-300">·</span>
+<span class="text-zinc-500">Bitácora inmutable</span>
+</div>
+<!-- Compliance & Shared Component Links -->
+<div class="flex items-center gap-4 text-[11px] text-zinc-500">
+<a class="hover:text-blue-700 transition-colors" href="#estado">Estado del sistema</a>
+<a class="hover:text-blue-700 transition-colors" href="#api">Documentación de API</a>
+<a class="hover:text-blue-700 transition-colors" href="#soporte">Soporte técnico</a>
+<a class="hover:text-blue-700 transition-colors" href="#terminos">Términos de servicio</a>
+</div>
+</div>
+<!-- Sub-bottom copyright strip -->
+<div class="bg-zinc-50 border-t border-zinc-100 py-1.5 px-4 text-center text-[10px] text-zinc-400">
+      © StoreCore OS. Todos los derechos reservados. Sistema operativo de tienda única.
+    </div>
+</footer>
+</body></html>
