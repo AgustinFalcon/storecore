@@ -25,5 +25,5 @@
 | favorites/loyalty/carriers | TODO-036..038 deferred | sin DDL/tarea core |
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
-| Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`; D-TTL/D-CURSOR/D-RATE/D-PATH cerrados; `ready_for_sol_review` no approved |
+| Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`; ADR-007/008 propuestos; dual Grok APPROVED PR #17 (docs); `ready_for_sol_review` no approved; implementación bloqueada |
 | POS BlackStore | repo `BlackStore` WIP `blackstore-pilot` | ticket/caja; conector real bloqueado hasta GO del contrato v1 |

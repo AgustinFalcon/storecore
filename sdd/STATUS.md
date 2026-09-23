@@ -22,17 +22,17 @@
 
 Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado**: DS-00…U-10 en código, sin favoritos ni SDK/credenciales de Mercado Pago en el browser. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. POS y fiscal siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. POS y fiscal siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16 y #17 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado. ADR-007/008 propuestos y reconciliados. Dual Grok APPROVED en PR #17 (docs only). Sol documentary review `20260923-sol-pos-contract-review.md` (CHANGES_REQUIRED → correcciones). Implementación `blocked_by_sol_gate`. No archive.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
 ## Fiscal externo
 
-- `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Sin código, DDL, worker ni secretos.
+- `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Addendum 2026-09-22 de pago/fiscal es propuesta Open. Sin código, DDL, worker ni secretos.
 
 ## Mercado Pago Checkout Pro (WIP separado)
 
