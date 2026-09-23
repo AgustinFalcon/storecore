@@ -26,7 +26,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato HTTP canónico. Documentary only; conector real bloqueado. Sol r3 `20260923-sol-pos-contract-review-r3.md` APPROVED (docs). Dual Grok APPROVED en PR #17 y #18. Implementación `blocked_by_sol_gate`. No archive. Sol post-#17 `20260923-sol-after-pr17-next-work.md` = NO_GO de implementación.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — contrato documental APPROVED. Sol `20260923-sol-pos-impl-go.md` = CONDITIONAL_GO PIC-001..009 fail-closed (`DISABLED`, `future_optional=true`). PIC-010, companion live, fiscal y MP-LIVE-05 siguen NO-GO. No archive.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 

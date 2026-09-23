@@ -260,7 +260,7 @@
     }
   },
   "notes": [
-    "No code, Flyway or Luna until Sol GO of this feature. Status remains ready_for_sol_review, never approved in this WIP.",
+    "Sol CONDITIONAL_GO 20260923-sol-pos-impl-go.md authorizes PIC-001..009 fail-closed only. PIC-010 remains forbidden. Module stays DISABLED and future_optional=true.",
     "Does not alter the 14 executable tasks of storecore-core-v1.0.0.",
     "AC-STK-1 is a BlackStore-side precondition (persist intent+outbox before HTTP).",
     "AC-OFF-1 is a BlackStore-side obligation; StoreCore only supplies validUntil.",

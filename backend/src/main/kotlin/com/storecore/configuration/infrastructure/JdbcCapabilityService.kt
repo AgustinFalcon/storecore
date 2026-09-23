@@ -56,7 +56,12 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         if (configs.size != 1) throw CapabilityConfigurationMissing()
         val config = configs.single()
         val schema = (config["config_schema_version"] as? Number)?.toInt() ?: 0
-        if (schema != 1 || config["config"]?.toString() != "{}") throw CapabilityConfigInvalid()
+        val configJson = configJson(config["config"])
+        if (module == BLACKSTORE_MODULE) {
+            if (schema != 2 || !blackstoreSchemaV2Valid(configJson)) throw CapabilityConfigInvalid()
+        } else if (schema != 1 || configJson != "{}") {
+            throw CapabilityConfigInvalid()
+        }
         val state = CapabilityState.valueOf(config["state"].toString())
         val actionRow = jdbc.queryForList(
             "SELECT action_kind, allows_write, allowed_when_paused FROM capability_actions WHERE module_code=? AND action_code=? FOR SHARE",
@@ -94,8 +99,17 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "SELECT config_version FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
             Int::class.java, module,
         ) ?: throw CapabilityConfigurationMissing()
+        val configPayload = if (module == BLACKSTORE_MODULE) {
+            jdbc.queryForObject(
+                "SELECT config::text FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
+                String::class.java,
+                module,
+            ) ?: throw CapabilityConfigurationMissing()
+        } else {
+            "{}"
+        }
         try {
-            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.name, "{}", correlation, reason.trim())
+            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.name, configPayload, correlation, reason.trim())
         } catch (exception: Exception) {
             throw mapAdminError(exception)
         }
@@ -140,5 +154,36 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             text.contains("unsupported capability configuration schema") || text.contains("secret") || text.contains("flag") -> CapabilityConfigInvalid()
             else -> CapabilityConfigInvalid()
         }
+    }
+
+    private fun configJson(raw: Any?): String {
+        val value = raw?.toString() ?: return ""
+        val start = value.indexOf('{')
+        return if (start >= 0) value.substring(start) else value
+    }
+
+    private fun blackstoreSchemaV2Valid(json: String): Boolean {
+        val keys = SCHEMA_V2_KEYS
+        val found = keys.filter { json.contains("\"$it\"") }
+        return found.size == keys.size && json.contains("\"reservation_ttl_seconds\"")
+    }
+
+    companion object {
+        const val BLACKSTORE_MODULE = "BLACKSTORE_INTEGRATION"
+        private val SCHEMA_V2_KEYS = listOf(
+            "catalog_page_size",
+            "catalog_rate_limit_rps",
+            "cursor_retention_days",
+            "expiry_worker_batch_size",
+            "expiry_worker_interval_seconds",
+            "pending_claim_max_seconds",
+            "reconcile_rate_limit_rps",
+            "reservation_ttl_max_seconds",
+            "reservation_ttl_min_seconds",
+            "reservation_ttl_seconds",
+            "reserve_burst",
+            "reserve_rate_limit_rps",
+            "stock_read_rate_limit_rps",
+        )
     }
 }

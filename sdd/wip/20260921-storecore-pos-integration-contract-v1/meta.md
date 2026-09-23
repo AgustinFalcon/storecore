@@ -3,8 +3,8 @@
 - **Feature Name:** `storecore-pos-integration-contract-v1`
 - **Feature ID:** `feat-20260921-storecore-pos-integration-contract-v1`
 - **Feature UUID:** `4fabd36a-20c5-45ce-8487-5d690bc05473`
-- **Status:** `ready_for_sol_review` (not approved)
-- **Maturity:** contrato HTTP futuro; **no** autoriza conector real, DDL en baseline core, ni código Luna.
+- **Status:** `implementation_conditional_go` (PIC-001..009 fail-closed; not live)
+- **Maturity:** contrato HTTP documental APPROVED. Implementación in-repo inactiva bajo `sdd/reviews/20260923-sol-pos-impl-go.md`. PIC-010 prohibido.
 - **Related:**
   - `20260921-single-tenant-installation-baseline` (ledger a extender por delta; no editar plan 14 tasks salvo dependencia futura)
   - `20260921-pos-sales-ingestion` (**superseded**; ISSUE/REVERSAL histórico)
@@ -20,7 +20,7 @@
 - technical: `ready_for_sol_review`
 - data_model: `ready_for_sol_review`
 - tasks: `ready_for_sol_review`
-- implementation: `blocked_by_sol_gate`
+- implementation: `conditional_go_pic_001_009`
 
 ## Relationship check
 
