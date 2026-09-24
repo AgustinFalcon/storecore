@@ -21,6 +21,7 @@ export class ProductPageViewComponent {
   activeImage = '';
 
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   get hasDiscount(): boolean {
     return !!this.product && this.product.price.base > this.product.price.effective;

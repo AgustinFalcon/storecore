@@ -14,6 +14,7 @@ export class UserPromosViewComponent {
   @Input({ required: true }) state!: UserState;
   @Output() readonly draftChange = new EventEmitter<ManualPromo>();
   @Output() readonly save = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   patch(partial: Partial<ManualPromo>): void {
     this.draftChange.emit({ ...this.state.promoDraft, ...partial });

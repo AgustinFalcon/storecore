@@ -14,6 +14,7 @@ import { UserMercadoLibreViewComponent } from './user-mercadolibre.view';
         [state]="state"
         (draftChange)="store.setListingDraft($event)"
         (save)="store.persistListing()"
+        (retry)="store.loadMercadoLibre()"
       />
     }
   `,

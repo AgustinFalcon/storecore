@@ -13,6 +13,7 @@ import { CustomerOrdersStore } from './customer-orders.store';
       [orders]="(store.orders$ | async) ?? []"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
+      (retry)="store.load()"
     />
   `,
 })

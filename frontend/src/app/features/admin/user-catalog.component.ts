@@ -18,6 +18,7 @@ import { UserCatalogViewComponent } from './user-catalog.view';
         (saveProduct)="store.persist()"
         (saveBrand)="store.persistBrand()"
         (saveCategory)="store.persistCategory()"
+        (retry)="reload()"
       />
     }
   `,
@@ -26,6 +27,10 @@ export class UserCatalogComponent implements OnInit {
   constructor(readonly store: AdminCatalogStore) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.load();
     this.store.loadFacets();
   }

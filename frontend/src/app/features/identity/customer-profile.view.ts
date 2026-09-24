@@ -14,6 +14,7 @@ export class CustomerProfileViewComponent {
   @Input({ required: true }) state!: CustomerState;
   @Output() readonly profileChange = new EventEmitter<CustomerProfile>();
   @Output() readonly save = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   patch(partial: Partial<CustomerProfile>): void {
     this.profileChange.emit({ ...this.state.profile, ...partial });

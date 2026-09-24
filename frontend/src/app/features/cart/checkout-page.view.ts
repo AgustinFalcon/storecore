@@ -14,6 +14,7 @@ export class CheckoutPageViewComponent {
   @Output() readonly addressChange = new EventEmitter<string>();
   @Output() readonly currencyChange = new EventEmitter<string>();
   @Output() readonly pay = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   get canPay(): boolean {
     return !this.state.loading && this.state.cart.lines.length > 0 && this.state.addressId.length > 0 && this.state.currency.length > 0;

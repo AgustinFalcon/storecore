@@ -4,6 +4,7 @@
     [error]="error"
     [empty]="!loading && product === null"
     emptyText="Producto no disponible."
+    (retry)="retry.emit()"
   />
   @if (product) {
     <p class="sc-pdp__crumb">
@@ -36,7 +37,7 @@
           @if (hasDiscount) {
             <p class="sc-price__was">{{ product.price.base }}</p>
           }
-          <p class="sc-price sc-price--hero">{{ product.price.effective }}</p>
+          <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</p>
         </div>
         @if (product.offerRef) {
           <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>

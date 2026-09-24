@@ -5,35 +5,48 @@
     [error]="error"
     [empty]="!loading && order === null"
     emptyText="Orden no disponible para este customer."
+    (retry)="retry.emit()"
   />
   @if (order) {
-    <h1 id="order-detail-title">Orden {{ order.id }}</h1>
-    <p>
-      <span class="sc-badge">orden {{ order.orderStatus }}</span>
-      <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-      <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
-    </p>
-    <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
-    <p class="sc-price sc-price--hero">Total {{ order.total }}</p>
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Cant.</th>
-          <th>Efectivo</th>
-          <th>Original</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (line of order.lines; track line.sku) {
-          <tr>
-            <td>{{ line.name }}</td>
-            <td>{{ line.quantity }}</td>
-            <td class="sc-price">{{ line.effectiveUnitPrice }}</td>
-            <td class="sc-price__meta">{{ line.originalUnitPrice }} · dto {{ line.discountAmount }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+    <header class="sc-page-head">
+      <p class="sc-kicker">Snapshot</p>
+      <h1 id="order-detail-title">Orden {{ order.id }}</h1>
+      <p>
+        <span class="sc-badge">orden {{ order.orderStatus }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+      </p>
+    </header>
+    <div class="sc-workbench">
+      <div class="sc-table-wrap">
+        <table class="sc-table">
+          <caption>Artículos de la orden</caption>
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th>Cant.</th>
+              <th>Efectivo</th>
+              <th>Original</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of order.lines; track line.sku) {
+              <tr>
+                <td>{{ line.name }}</td>
+                <td>{{ line.quantity }}</td>
+                <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
+                <td class="sc-price__meta">{{ line.originalUnitPrice }} · dto {{ line.discountAmount }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <aside class="sc-summary">
+        <h2>Entrega</h2>
+        <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
+        <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+        <p class="sc-callout">Lectura solamente. Esta orden no se edita desde acá.</p>
+      </aside>
+    </div>
   }
 </section>

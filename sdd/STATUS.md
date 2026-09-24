@@ -18,9 +18,9 @@
 3. `docs/agent/` es espejo; Company Brain canónico vive en `Novastra/company brain`.
 4. `20260819-store-tenancy-and-profiles` y `sdd/specs/*` son históricos/superseded.
 
-## WIP frontend UX (doc + Stitch, sin código)
+## WIP frontend UX (doc + Stitch + volcado de tokens)
 
-- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` — sistema visual canónico. Stitch `projects/6473866243657965808`. P-01 retail recupera banner carousel + tira de ofertas del mock viejo, sin piel ML. Reviews UX/PO/comprador: el P-01 “sparse” no es vidriera. Stitch C-01…C-09 y U-01…U-10 tienen screen id en el proyecto canónico; Angular sigue sin tocarse en este WIP.
+- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` — sistema visual canónico. Stitch `projects/6473866243657965808`. UX-ANG aplicado en las 22 rutas existentes (tokens navy/canvas/accent). No había HTML Stitch archivado para P-01/P-02/P-03; esas tres se alinearon al DS y a las views previas. No es pixel-complete ni archive. Sin SDK MP.
 
 ## Gate actual
 
@@ -30,7 +30,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — Sol next-go `20260923-sol-pos-next-go.md` = CONDITIONAL_GO PIC-010 + ACTIVE temporal Testcontainers. En rama: PIC-001/002/008/010 done (V7 flip; módulo sigue DISABLED). PIC-003..007 y PIC-009 in_progress (HTTP 403 baseline; catalog/stock 200 sólo en test CAS temporal). Companion live, fiscal y MP-LIVE-05 NO-GO. No archive.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox ML local en Testcontainers; módulo vuelve a DISABLED. BlackStore ADP-001..010 + L3-001..003 locales done; dual Grok r4 y L3 APPROVED. Release disabled. Fiscal/live/`/sdd.finish` NO-GO.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 

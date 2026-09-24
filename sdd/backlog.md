@@ -20,7 +20,7 @@
 - TODO-037 [medium] [deferred] Loyalty ledger.
 - TODO-038 [medium] [deferred] Integraciones reales de carrier.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
-- TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..009 fail-closed en rama (HTTP 403; facade capability-first; dual Grok r4 APPROVED). PIC-010, companion live y activación siguen NO-GO. No altera las 14 tasks de core 1.0.0.
+- TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..010 + L3 locales done; módulo vuelve a DISABLED. Companion live y activación siguen NO-GO. BlackStore ADP-001..010 + L3 locales done; dual Grok APPROVED; release disabled. No altera las 14 tasks de core 1.0.0.
 - TODO-042 [high] [blocked] `storecore-mp-live-checkout-v1`: 01/02/02A/03/04 in-repo fail-closed. 05 y pagos reales NO-GO hasta cuenta sandbox + Sol GO de activación.
 
 ## Histórico

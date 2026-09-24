@@ -4,6 +4,7 @@
     [error]="error"
     [empty]="false"
     emptyText=""
+    (retry)="retry.emit()"
   />
 
   @if (carouselSlides.length) {

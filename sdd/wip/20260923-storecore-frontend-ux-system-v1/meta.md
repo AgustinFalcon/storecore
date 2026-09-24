@@ -3,7 +3,7 @@
 - **Feature Name:** `storecore-frontend-ux-system-v1`
 - **Feature ID:** `feat-20260923-storecore-frontend-ux-system-v1`
 - **Feature UUID:** `7c2e1a90-4b3d-4f11-9e6a-0d8f2c5a91b4`
-- **Status:** `documented` (specs/plan/HTML views y Stitch C-01…C-09 + U-01…U-10; **sin código Angular/Kotlin**)
+- **Status:** `documented` (specs/plan/Stitch + UX-ANG tokens/layout en views existentes; **sin archive ni Kotlin**)
 - **Mode:** standard · **Project type:** production · **Platform:** frontend-web · **Language:** es
 - **spec_language:** es
 - **Related:** `20260921-single-tenant-installation-baseline` (views Angular ya existen; este WIP es el sistema visual canónico)

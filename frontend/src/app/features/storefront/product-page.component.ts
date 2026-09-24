@@ -19,6 +19,7 @@ import { ProductPageViewComponent } from './product-page.view';
       [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || ''"
       [signedIn]="session.authenticated()"
       (add)="cart.add($event)"
+      (retry)="reload()"
     />
   `,
 })
@@ -31,6 +32,10 @@ export class ProductPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.loadProduct(this.route.snapshot.paramMap.get('sku') ?? '');
     if (this.session.authenticated()) {
       this.cart.load();

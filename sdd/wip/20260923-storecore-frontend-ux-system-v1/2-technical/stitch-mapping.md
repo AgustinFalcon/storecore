@@ -35,4 +35,4 @@ HTML de referencia visual: `4-implementation/artifacts/stitch/{ID}.html`. No ree
 | U-09 | `c186b2841f9b4781abf46e6759562609` | U-09 StoreCore Capabilities |
 | U-10 | `5b4ae6fba2614d8b85e066ad948a384e` | U-10 StoreCore Profile Import |
 
-C-01…C-09 y U-01…U-10 tienen screen id y HTML. Angular sigue bloqueado hasta Sol GO.
+C-01…C-09 y U-01…U-10 tienen screen id y HTML en `artifacts/stitch/`. P-01, P-02 y P-03 no tenían HTML archivado ahí; UX-ANG las alineó al design system. No es paridad pixel.

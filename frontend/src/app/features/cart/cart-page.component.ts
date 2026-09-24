@@ -9,7 +9,7 @@ import { CartStore } from './cart.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (store.state$ | async; as state) {
-      <sc-cart-page-view [state]="state" (quantityChange)="changeQty($event)" />
+      <sc-cart-page-view [state]="state" (quantityChange)="changeQty($event)" (retry)="store.load()" />
     }
   `,
 })

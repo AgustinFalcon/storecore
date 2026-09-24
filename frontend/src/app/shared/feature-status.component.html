@@ -1,7 +1,10 @@
 @if (loading) {
   <p class="status status--loading">{{ loadingText }}</p>
 } @else if (error) {
-  <p class="status status--error" role="alert">{{ error }}</p>
+  <p class="status status--error" role="alert">
+    {{ error }}
+    <button type="button" class="status__retry" (click)="retry.emit()">Reintentar</button>
+  </p>
 } @else if (empty) {
   <p class="status status--empty">{{ emptyText }}</p>
 }

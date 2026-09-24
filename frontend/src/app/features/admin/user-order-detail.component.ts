@@ -16,6 +16,7 @@ import { UserOrderDetailStore } from './user-order-detail.store';
       [error]="(store.errorMessage$ | async) ?? ''"
       (ship)="store.ship($event)"
       (rma)="store.rma($event)"
+      (retry)="reload()"
     />
   `,
 })
@@ -26,6 +27,10 @@ export class UserOrderDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.load(this.route.snapshot.paramMap.get('id') ?? '');
   }
 }

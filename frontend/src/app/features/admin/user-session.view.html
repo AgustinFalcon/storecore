@@ -1,8 +1,9 @@
 <section class="sc-page sc-auth" aria-labelledby="user-session-title">
   <div class="sc-auth__card">
+    <p class="sc-kicker">Consola</p>
     <h1 id="user-session-title">Sesión user</h1>
-    <p class="sc-page__lede">Operadores internos. No comparte sesión con customer.</p>
-    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    <p class="sc-page__lede">Operadores internos. No comparte sesión con customer. No hay alta automática.</p>
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="submitSignIn.emit()" />
     @if (authenticated) {
       <p>Sesión user activa en esta instalación.</p>
       <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="signOut.emit()">Cerrar sesión</button>
@@ -18,5 +19,7 @@
         <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Entrar</button>
       </form>
     }
+    <p class="sc-callout">Esta puerta no crea customers ni comparte la cookie de compra.</p>
+    <p><a routerLink="/customer/session">¿Comprás? Ir a sesión customer</a></p>
   </div>
 </section>

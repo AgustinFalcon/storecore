@@ -19,6 +19,7 @@ export class FulfillmentViewComponent {
 
   @Output() readonly ship = new EventEmitter<{ orderId: string; status: ShipmentTransition; tracking: string | null }>();
   @Output() readonly rma = new EventEmitter<{ orderId: string; status: RmaTransition }>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   trackingOf(orderId: string): string {
     return this.tracking[orderId] || '';

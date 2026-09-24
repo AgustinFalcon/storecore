@@ -14,6 +14,7 @@ import { CustomerOrderDetailStore } from './customer-order-detail.store';
       [order]="store.order$ | async"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
+      (retry)="reload()"
     />
   `,
 })
@@ -24,6 +25,10 @@ export class CustomerOrderDetailComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.load(this.route.snapshot.paramMap.get('id') ?? '');
   }
 }

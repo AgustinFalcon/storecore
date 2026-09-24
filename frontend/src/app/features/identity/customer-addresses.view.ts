@@ -16,6 +16,7 @@ export class CustomerAddressesViewComponent {
   @Output() readonly save = new EventEmitter<void>();
   @Output() readonly remove = new EventEmitter<string>();
   @Output() readonly clearDraft = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   patch(partial: Partial<CustomerAddress>): void {
     this.draftChange.emit({ ...this.state.addressDraft, ...partial });

@@ -1,22 +1,39 @@
 <section class="sc-page sc-console" aria-labelledby="import-title">
-  <h1 id="import-title">Importar perfil</h1>
-  <p class="sc-page__lede">Preview y merge explícito. El diff no muestra secretos.</p>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
-  <form class="sc-panel" (submit)="$event.preventDefault(); preview.emit()">
-    <label>Manifiesto
-      <textarea required name="manifest" class="sc-mono sc-manifest" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
-    </label>
-    <div class="sc-table__actions">
-      <button type="submit" class="sc-btn sc-btn--primary">Previsualizar</button>
-      <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!canMerge" (click)="merge.emit()">Aplicar merge</button>
-    </div>
-  </form>
-  @if (state.preview) {
-    @if (state.preview.compatible) {
-      <p><span class="sc-badge sc-badge--ok">Compatible</span> · {{ state.preview.version }}</p>
-      <pre>{{ state.preview.diff }}</pre>
-    } @else {
-      <p class="status status--error" role="alert">Incompatible {{ state.preview.version }}. Merge cerrado.</p>
-    }
-  }
+  <header class="sc-page-head">
+    <p class="sc-kicker">Consola</p>
+    <h1 id="import-title">Importar perfil</h1>
+    <p class="sc-page__lede">Preview y merge explícito. El diff no muestra secretos.</p>
+  </header>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="preview.emit()" />
+  <div class="sc-workbench sc-workbench--even">
+    <form class="sc-panel" (submit)="$event.preventDefault(); preview.emit()">
+      <h2>Manifiesto</h2>
+      <label>JSON
+        <textarea required name="manifest" class="sc-mono sc-manifest" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
+      </label>
+      <div class="sc-table__actions">
+        <button type="submit" class="sc-btn sc-btn--primary">Previsualizar</button>
+        <button
+          type="button"
+          class="sc-btn sc-btn--ghost"
+          [disabled]="!canMerge"
+          [attr.title]="canMerge ? null : 'El merge queda cerrado si el manifiesto es incompatible'"
+          (click)="merge.emit()"
+        >Aplicar merge</button>
+      </div>
+    </form>
+    <aside class="sc-panel">
+      <h2>Resultado</h2>
+      @if (state.preview) {
+        @if (state.preview.compatible) {
+          <p><span class="sc-badge sc-badge--ok">Compatible</span> · {{ state.preview.version }}</p>
+          <pre>{{ state.preview.diff }}</pre>
+        } @else {
+          <p class="status status--error" role="alert">Incompatible {{ state.preview.version }}. Merge cerrado.</p>
+        }
+      } @else {
+        <p class="sc-callout">Todavía no hay diff. Previsualizá el manifiesto para ver compatibilidad.</p>
+      }
+    </aside>
+  </div>
 </section>

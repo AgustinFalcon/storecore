@@ -1,8 +1,9 @@
 <section class="sc-page sc-auth" aria-labelledby="customer-session-title">
   <div class="sc-auth__card">
+    <p class="sc-kicker">Acceso comprador</p>
     <h1 id="customer-session-title">Sesión customer</h1>
     <p class="sc-page__lede">Identidad de compra. No es el acceso de operadores.</p>
-    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="submitSignIn.emit()" />
     @if (authenticated) {
       <p>Sesión customer activa en esta instalación.</p>
       <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="signOut.emit()">Cerrar sesión</button>
@@ -17,7 +18,9 @@
         </label>
         <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Entrar</button>
       </form>
-      <p><a routerLink="/customer/register">Crear cuenta</a></p>
+      <p>¿No tenés cuenta? <a routerLink="/customer/register">Crear cuenta</a></p>
     }
+    <p class="sc-callout">La sesión customer no abre la consola. Cada identidad conserva su cookie.</p>
+    <p><a routerLink="/user/session">¿Operás la tienda? Ir al acceso de personal</a></p>
   </div>
 </section>

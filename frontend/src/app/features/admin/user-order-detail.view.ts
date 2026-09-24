@@ -19,6 +19,7 @@ export class UserOrderDetailViewComponent {
 
   @Output() readonly ship = new EventEmitter<{ orderId: string; status: ShipmentTransition; tracking: string | null }>();
   @Output() readonly rma = new EventEmitter<{ orderId: string; status: RmaTransition }>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   readonly shipmentLabel = shipmentLabel;
   readonly rmaLabel = rmaLabel;

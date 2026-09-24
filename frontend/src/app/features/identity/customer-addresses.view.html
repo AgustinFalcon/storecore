@@ -1,33 +1,41 @@
 <section class="sc-page" aria-labelledby="addresses-title">
-  <h1 id="addresses-title">Direcciones</h1>
-  <p class="sc-page__lede">Entregas de esta cuenta.</p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">Cuenta customer</p>
+    <h1 id="addresses-title">Direcciones</h1>
+    <p class="sc-page__lede">Entregas de esta cuenta.</p>
+  </header>
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
     [empty]="!state.loading && state.addresses.length === 0"
     emptyText="No hay direcciones para este customer."
+    (retry)="retry.emit()"
   />
-  <div class="sc-split">
-    <ul class="sc-address-list">
-      @for (address of state.addresses; track address.id) {
-        <li>
-          <button
-            type="button"
-            class="sc-card sc-address-card"
-            [class.is-on]="state.addressDraft.id === address.id"
-            (click)="draftChange.emit(address)"
-          >
-            <strong>{{ address.street }} {{ address.number }}</strong>
-            <p>{{ address.city }} · {{ address.province }} · {{ address.postalCode }}</p>
-            @if (address.isDefault) {
-              <p class="sc-price__meta">Predeterminada</p>
-            }
-          </button>
-          <button type="button" class="sc-btn sc-btn--ghost" (click)="remove.emit(address.id)">Quitar</button>
-        </li>
-      }
-    </ul>
+  <div class="sc-workbench sc-workbench--even">
+    <div class="sc-workbench__main">
+      <h2>Guardadas</h2>
+      <ul class="sc-address-list">
+        @for (address of state.addresses; track address.id) {
+          <li>
+            <button
+              type="button"
+              class="sc-card sc-address-card"
+              [class.is-on]="state.addressDraft.id === address.id"
+              (click)="draftChange.emit(address)"
+            >
+              <strong>{{ address.street }} {{ address.number }}</strong>
+              <p>{{ address.city }} · {{ address.province }} · {{ address.postalCode }}</p>
+              @if (address.isDefault) {
+                <p class="sc-price__meta">Predeterminada</p>
+              }
+            </button>
+            <button type="button" class="sc-btn sc-btn--danger" (click)="remove.emit(address.id)">Quitar</button>
+          </li>
+        }
+      </ul>
+    </div>
     <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+      <h2>{{ state.addressDraft.id ? 'Editar dirección' : 'Agregar dirección' }}</h2>
       <label>Calle
         <input required name="street" [ngModel]="state.addressDraft.street" (ngModelChange)="patch({ street: $event })" />
       </label>
@@ -37,13 +45,15 @@
       <label>Ciudad
         <input required name="city" [ngModel]="state.addressDraft.city" (ngModelChange)="patch({ city: $event })" />
       </label>
-      <label>Provincia
-        <input required name="province" [ngModel]="state.addressDraft.province" (ngModelChange)="patch({ province: $event })" />
-      </label>
-      <label>CP
-        <input required name="postalCode" [ngModel]="state.addressDraft.postalCode" (ngModelChange)="patch({ postalCode: $event })" />
-      </label>
-      <label>
+      <div class="sc-fields-2">
+        <label>Provincia
+          <input required name="province" [ngModel]="state.addressDraft.province" (ngModelChange)="patch({ province: $event })" />
+        </label>
+        <label>CP
+          <input required name="postalCode" [ngModel]="state.addressDraft.postalCode" (ngModelChange)="patch({ postalCode: $event })" />
+        </label>
+      </div>
+      <label class="sc-filters__check">
         <input type="checkbox" name="isDefault" [ngModel]="state.addressDraft.isDefault" (ngModelChange)="patch({ isDefault: $event })" />
         Predeterminada
       </label>

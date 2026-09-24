@@ -19,6 +19,7 @@ export class UserCatalogViewComponent {
   @Output() readonly saveProduct = new EventEmitter<void>();
   @Output() readonly saveBrand = new EventEmitter<void>();
   @Output() readonly saveCategory = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');

@@ -1,8 +1,9 @@
 <section class="sc-page sc-plp" aria-labelledby="catalog-title" [attr.aria-busy]="state.loading">
-  <div class="sc-plp__intro">
+  <header class="sc-page-head">
+    <p class="sc-kicker">Tienda</p>
     <h1 id="catalog-title">Catálogo</h1>
     <p class="sc-page__lede">Búsqueda, marca, categoría y ofertas activas de esta instalación.</p>
-  </div>
+  </header>
   <form class="sc-card sc-filters sc-filters--toolbar" (submit)="$event.preventDefault(); searchSubmit.emit()">
     <label>Búsqueda
       <input name="query" [ngModel]="state.query.query" (ngModelChange)="queryChange.emit($event)" />
@@ -34,6 +35,7 @@
     [error]="state.errorMessage"
     [empty]="!state.loading && state.products.length === 0"
     emptyText="No hay productos activos para estos filtros."
+    (retry)="searchSubmit.emit()"
   />
   <ul class="sc-grid sc-grid--tiles">
     @for (product of state.products; track product.sku) {

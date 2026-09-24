@@ -4,7 +4,7 @@
   "project_type": "production",
   "execution_strategy": "docs_only",
   "status": "documented",
-  "stats": { "total": 6, "done": 5 },
+  "stats": { "total": 6, "done": 6 },
   "tasks": [
     {
       "id": "UX-DOC-01",
@@ -47,10 +47,10 @@
     {
       "id": "UX-ANG",
       "title": "Volcar Stitch a Angular views",
-      "status": "blocked",
+      "status": "done",
       "layer": 1,
       "depends_on": [],
-      "acceptance_criteria": ["Requiere Sol GO. No es este tramo."]
+      "acceptance_criteria": ["Sol CONDITIONAL_GO 2026-09-23: tokens y layout Stitch en las rutas P/C/U existentes. Sin rutas, endpoints ni SDK nuevos."]
     }
   ]
 }
