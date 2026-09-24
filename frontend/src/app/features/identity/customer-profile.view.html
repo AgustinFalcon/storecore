@@ -1,18 +1,23 @@
 <section class="sc-page sc-auth" aria-labelledby="profile-title">
   <div class="sc-auth__card">
-    <h1 id="profile-title">Perfil customer</h1>
-    <p class="sc-page__lede">Datos de la cuenta customer.</p>
-    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    <header class="sc-page-head">
+      <p class="sc-kicker">Cuenta customer</p>
+      <h1 id="profile-title">Perfil customer</h1>
+      <p class="sc-page__lede">Datos de la cuenta customer.</p>
+    </header>
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
     @if (state.saved) {
       <p class="sc-banner sc-banner--ok" role="status">Perfil actualizado</p>
     }
     <form class="sc-auth__form" (submit)="$event.preventDefault(); save.emit()">
-      <label>Nombre
-        <input required name="firstName" [ngModel]="state.profile.firstName" (ngModelChange)="patch({ firstName: $event })" />
-      </label>
-      <label>Apellido
-        <input required name="lastName" [ngModel]="state.profile.lastName" (ngModelChange)="patch({ lastName: $event })" />
-      </label>
+      <div class="sc-fields-2">
+        <label>Nombre
+          <input required name="firstName" [ngModel]="state.profile.firstName" (ngModelChange)="patch({ firstName: $event })" />
+        </label>
+        <label>Apellido
+          <input required name="lastName" [ngModel]="state.profile.lastName" (ngModelChange)="patch({ lastName: $event })" />
+        </label>
+      </div>
       <label>Email
         <input type="email" required name="profileEmail" [ngModel]="state.profile.email" (ngModelChange)="patch({ email: $event })" />
       </label>

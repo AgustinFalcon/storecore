@@ -10,7 +10,12 @@ import { UserStore } from './user.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (store.state$ | async; as state) {
-      <sc-user-content-view [state]="state" (homeChange)="store.setHome($event)" (save)="store.persistHome()" />
+      <sc-user-content-view
+        [state]="state"
+        (homeChange)="store.setHome($event)"
+        (save)="store.persistHome()"
+        (retry)="store.loadHome()"
+      />
     }
   `,
 })

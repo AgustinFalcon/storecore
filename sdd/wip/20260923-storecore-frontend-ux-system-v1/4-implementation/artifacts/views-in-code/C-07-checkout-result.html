@@ -1,0 +1,21 @@
+<section class="sc-page sc-result" aria-labelledby="result-title">
+  <h1 id="result-title">Pedido iniciado</h1>
+  <p class="sc-page__lede">Orden y pago son estados independientes. Esta pantalla no confirma Mercado Pago.</p>
+  <sc-feature-status
+    [loading]="loading"
+    [error]="error"
+    [empty]="!loading && order === null"
+    emptyText="Todavía no hay orden para mostrar."
+  />
+  @if (order) {
+    <div class="sc-panel sc-result__card">
+      <p class="sc-result__id">Orden {{ order.id }}</p>
+      <p>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus }}</span>
+      </p>
+      <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>
+      <a class="sc-btn sc-btn--ghost" routerLink="/catalog">Seguir comprando</a>
+    </div>
+  }
+</section>

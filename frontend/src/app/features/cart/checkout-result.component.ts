@@ -14,6 +14,7 @@ import { CheckoutResultViewComponent } from './checkout-result.view';
       [order]="store.order$ | async"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
+      (retry)="reload()"
     />
   `,
 })
@@ -24,6 +25,10 @@ export class CheckoutResultComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.load(this.route.snapshot.paramMap.get('orderId') ?? '');
   }
 }

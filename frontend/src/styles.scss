@@ -736,7 +736,7 @@ pre {
 .sc-panel {
   width: min(28rem, 100%);
   display: grid;
-  gap: var(--sc-space-4);
+  gap: var(--sc-space-5);
   padding: var(--sc-space-6);
   background: var(--sc-color-surface);
   border: 1px solid var(--sc-color-line);
@@ -748,7 +748,12 @@ pre {
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
-.sc-auth__form,
+.sc-auth__form {
+  display: grid;
+  gap: var(--sc-space-5);
+}
+
+.sc-auth__form label,
 .sc-panel label,
 .sc-filters label {
   display: grid;
@@ -866,6 +871,15 @@ pre {
   vertical-align: top;
 }
 
+.sc-table caption {
+  caption-side: top;
+  text-align: left;
+  padding: 0.75rem 1rem 0;
+  font-size: var(--sc-text-sm);
+  font-weight: 650;
+  color: var(--sc-color-faint-ink);
+}
+
 .sc-table th {
   font-size: var(--sc-text-sm);
   color: var(--sc-color-faint-ink);
@@ -927,6 +941,181 @@ pre {
 @media (min-width: 1280px) {
   .sc-home__tiles {
     grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+.sc-page {
+  display: grid;
+  gap: var(--sc-space-7);
+}
+
+.sc-page-head {
+  display: grid;
+  gap: var(--sc-space-3);
+}
+
+.sc-page-head h1,
+.sc-page-head .sc-page__lede {
+  margin: 0;
+}
+
+.sc-console h1 {
+  font-size: var(--sc-text-xl);
+  font-weight: 650;
+}
+
+.sc-kicker {
+  margin: 0;
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--sc-radius-sm);
+  background: var(--sc-color-focus-soft);
+  color: var(--sc-color-accent);
+  border: 1px solid color-mix(in srgb, var(--sc-color-accent) 25%, transparent);
+  font-size: var(--sc-text-xs);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sc-callout {
+  margin: 0;
+  padding: var(--sc-space-4);
+  border-radius: var(--sc-radius);
+  background: var(--sc-color-muted);
+  color: var(--sc-color-muted-ink);
+  font-size: var(--sc-text-sm);
+}
+
+.sc-callout--info {
+  background: var(--sc-color-info-soft);
+  color: var(--sc-color-info);
+}
+
+.sc-workbench,
+.sc-fields-2 {
+  display: grid;
+  gap: var(--sc-space-5);
+  align-items: start;
+}
+
+.sc-checkout__layout > .sc-panel,
+.sc-workbench .sc-panel,
+.sc-workbench__aside > .sc-panel {
+  width: 100%;
+}
+
+.sc-workbench__main,
+.sc-workbench__aside {
+  display: grid;
+  gap: var(--sc-space-5);
+  align-content: start;
+  min-width: 0;
+}
+
+.sc-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: var(--sc-space-4);
+}
+
+.sc-metric {
+  display: grid;
+  gap: var(--sc-space-1);
+  padding: var(--sc-space-4);
+  background: var(--sc-color-surface);
+  border: 1px solid var(--sc-color-line);
+  border-radius: var(--sc-radius);
+}
+
+.sc-metric span {
+  color: var(--sc-color-faint-ink);
+  font-size: var(--sc-text-sm);
+}
+
+.sc-metric strong {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--sc-text-xl);
+}
+
+.sc-table-wrap {
+  overflow-x: auto;
+  background: var(--sc-color-surface);
+  border: 1px solid var(--sc-color-line);
+  border-radius: 1rem;
+}
+
+.sc-table-wrap .sc-table {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+}
+
+.sc-price__kind {
+  display: block;
+  font-size: var(--sc-text-xs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sc-color-faint-ink);
+}
+
+.sc-btn--danger {
+  border: 1px solid var(--sc-color-danger);
+  background: var(--sc-color-danger);
+  color: #fff;
+  text-decoration: none;
+}
+
+.sc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sc-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.status--empty {
+  background: var(--sc-color-surface);
+  border: 1px dashed var(--sc-color-line);
+  color: var(--sc-color-muted-ink);
+}
+
+.sc-shell-foot {
+  margin-top: auto;
+  padding: var(--sc-space-5) var(--sc-space-6);
+  border-top: 1px solid var(--sc-color-line);
+  background: var(--sc-color-surface);
+  color: var(--sc-color-faint-ink);
+  font-size: var(--sc-text-xs);
+}
+
+.sc-shell-foot p {
+  width: min(var(--sc-max-wide), 100%);
+  margin: 0 auto;
+  color: inherit;
+}
+
+@media (min-width: 640px) {
+  .sc-fields-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (min-width: 768px) {
+  .sc-workbench {
+    grid-template-columns: minmax(0, 1.45fr) minmax(16rem, 0.75fr);
+  }
+
+  .sc-workbench--even {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .sc-summary {
+    position: sticky;
+    top: var(--sc-space-4);
   }
 }
 

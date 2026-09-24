@@ -14,6 +14,7 @@ export class UserContentViewComponent {
   @Input({ required: true }) state!: UserState;
   @Output() readonly homeChange = new EventEmitter<HomeContentDraft>();
   @Output() readonly save = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   patch(partial: Partial<HomeContentDraft>): void {
     this.homeChange.emit({ ...this.state.home, ...partial });

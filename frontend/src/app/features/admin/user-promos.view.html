@@ -1,47 +1,62 @@
 <section class="sc-page sc-console" aria-labelledby="promos-title">
-  <h1 id="promos-title">Promos MANUAL</h1>
-  <p class="sc-page__lede">Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización ML.</p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">MANUAL</p>
+    <h1 id="promos-title">Promos MANUAL</h1>
+    <p class="sc-page__lede">Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización ML.</p>
+  </header>
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
     [empty]="!state.loading && state.promos.length === 0"
     emptyText="No hay promos MANUAL."
+    (retry)="retry.emit()"
   />
-  @if (state.promos.length) {
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>SKU</th>
-          <th>Vigencia</th>
-          <th>Prio</th>
-          <th>Margen</th>
-          <th>Moneda</th>
-          <th>Aprobador</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (promo of state.promos; track promo.id) {
-          <tr>
-            <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
-            <td>{{ promo.validFrom }} – {{ promo.validTo }}</td>
-            <td>{{ promo.priority }}</td>
-            <td>{{ promo.margin }}</td>
-            <td>{{ promo.currency }}</td>
-            <td>{{ promo.approvedBy }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  }
-  <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); save.emit()">
-    <label>SKU <input required name="sku" [ngModel]="state.promoDraft.listingSku" (ngModelChange)="patch({ listingSku: $event })" /></label>
-    <label>Moneda <input required name="currency" [ngModel]="state.promoDraft.currency" (ngModelChange)="patch({ currency: $event })" /></label>
-    <label>Desde <input required type="date" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label>
-    <label>Hasta <input required type="date" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
-    <label>Prioridad <input type="number" name="priority" [ngModel]="state.promoDraft.priority" (ngModelChange)="patch({ priority: +$event })" /></label>
-    <label>Margen <input type="number" name="margin" [ngModel]="state.promoDraft.margin" (ngModelChange)="patch({ margin: +$event })" /></label>
-    <label>Aprobador <input name="approvedBy" [ngModel]="state.promoDraft.approvedBy" (ngModelChange)="patch({ approvedBy: $event })" /></label>
-    <label>Aprobado <input type="datetime-local" name="approvedAt" [ngModel]="state.promoDraft.approvedAt" (ngModelChange)="patch({ approvedAt: $event })" /></label>
-    <button type="submit" class="sc-btn sc-btn--primary">Crear promo</button>
-  </form>
+  <div class="sc-workbench">
+    <div class="sc-workbench__main">
+      <h2>Reglas registradas</h2>
+      @if (state.promos.length) {
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Vigencia</th>
+                <th>Prio</th>
+                <th>Margen</th>
+                <th>Moneda</th>
+                <th>Aprobador</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (promo of state.promos; track promo.id) {
+                <tr>
+                  <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
+                  <td>{{ promo.validFrom }} – {{ promo.validTo }}</td>
+                  <td>{{ promo.priority }}</td>
+                  <td>{{ promo.margin }}</td>
+                  <td>{{ promo.currency }}</td>
+                  <td>{{ promo.approvedBy }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+    <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+      <h2>Crear promo manual</h2>
+      <label>SKU <input required name="sku" [ngModel]="state.promoDraft.listingSku" (ngModelChange)="patch({ listingSku: $event })" /></label>
+      <label>Moneda <input required name="currency" [ngModel]="state.promoDraft.currency" (ngModelChange)="patch({ currency: $event })" /></label>
+      <div class="sc-fields-2">
+        <label>Desde <input required type="date" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label>
+        <label>Hasta <input required type="date" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
+      </div>
+      <label>Prioridad <input type="number" name="priority" [ngModel]="state.promoDraft.priority" (ngModelChange)="patch({ priority: +$event })" /></label>
+      <label>Margen <input type="number" name="margin" [ngModel]="state.promoDraft.margin" (ngModelChange)="patch({ margin: +$event })" /></label>
+      <label>Aprobador <input name="approvedBy" [ngModel]="state.promoDraft.approvedBy" (ngModelChange)="patch({ approvedBy: $event })" /></label>
+      <label>Aprobado <input type="datetime-local" name="approvedAt" [ngModel]="state.promoDraft.approvedAt" (ngModelChange)="patch({ approvedAt: $event })" /></label>
+      <p class="sc-callout">El aprobador queda en el registro. Esta pantalla no dispara Mercado Libre.</p>
+      <button type="submit" class="sc-btn sc-btn--primary">Crear promo</button>
+    </form>
+  </div>
 </section>

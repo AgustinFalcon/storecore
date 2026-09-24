@@ -1,0 +1,25 @@
+<section class="sc-page sc-auth" aria-labelledby="profile-title">
+  <div class="sc-auth__card">
+    <h1 id="profile-title">Perfil customer</h1>
+    <p class="sc-page__lede">Datos de la cuenta customer.</p>
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    @if (state.saved) {
+      <p class="sc-banner sc-banner--ok" role="status">Perfil actualizado</p>
+    }
+    <form class="sc-auth__form" (submit)="$event.preventDefault(); save.emit()">
+      <label>Nombre
+        <input required name="firstName" [ngModel]="state.profile.firstName" (ngModelChange)="patch({ firstName: $event })" />
+      </label>
+      <label>Apellido
+        <input required name="lastName" [ngModel]="state.profile.lastName" (ngModelChange)="patch({ lastName: $event })" />
+      </label>
+      <label>Email
+        <input type="email" required name="profileEmail" [ngModel]="state.profile.email" (ngModelChange)="patch({ email: $event })" />
+      </label>
+      <label>Teléfono
+        <input name="phone" [ngModel]="state.profile.phone" (ngModelChange)="patch({ phone: $event })" />
+      </label>
+      <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Guardar</button>
+    </form>
+  </div>
+</section>

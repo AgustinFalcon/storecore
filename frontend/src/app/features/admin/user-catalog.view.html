@@ -1,14 +1,20 @@
 <section class="sc-page sc-console" aria-labelledby="admin-catalog-title">
-  <h1 id="admin-catalog-title">Catálogo operador</h1>
-  <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra effective. Base, desired y observed no se mezclan.</p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">Consola</p>
+    <h1 id="admin-catalog-title">Catálogo operador</h1>
+    <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra efectivo. Base, desired y observed no se mezclan.</p>
+  </header>
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
     [empty]="!state.loading && state.products.length === 0"
     emptyText="No hay productos en esta instalación."
+    (retry)="retry.emit()"
   />
 
-  <h2>Productos</h2>
+  <div class="sc-workbench">
+    <div class="sc-workbench__main">
+      <h2>Productos</h2>
   @if (state.products.length) {
     <table class="sc-table">
       <thead>
@@ -16,7 +22,7 @@
           <th>SKU</th>
           <th>Nombre</th>
           <th>Estado</th>
-          <th>Effective</th>
+          <th>Efectivo</th>
         </tr>
       </thead>
       <tbody>
@@ -33,7 +39,7 @@
                 <span class="sc-badge sc-badge--warn">inactivo</span>
               }
             </td>
-            <td class="sc-price">{{ product.price.effective }}</td>
+            <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
           </tr>
         }
       </tbody>
@@ -57,7 +63,7 @@
     <label>Desired
       <input type="number" name="desired" [ngModel]="state.draft.price.desired" (ngModelChange)="patchPrice({ desired: $event === '' ? null : +$event })" />
     </label>
-    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Effective {{ state.draft.price.effective }}</p>
+    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Efectivo {{ state.draft.price.effective }}</p>
     <label>Price version <input name="priceVersion" [ngModel]="state.draft.price.priceVersion" (ngModelChange)="patchPrice({ priceVersion: $event })" /></label>
     <label>Oferta <input name="offerRef" [ngModel]="state.draft.offerRef" (ngModelChange)="patch({ offerRef: $event || null })" /></label>
     <label>
@@ -66,8 +72,9 @@
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Guardar producto</button>
   </form>
+    </div>
 
-  <div class="sc-console__pair">
+  <div class="sc-workbench__aside">
     <form class="sc-panel" (submit)="$event.preventDefault(); saveBrand.emit()">
       <h2>Marcas</h2>
       <ul class="sc-chip-list">
@@ -90,5 +97,6 @@
       <label>Nombre <input required name="categoryName" [ngModel]="state.categoryDraft.name" (ngModelChange)="categoryDraftChange.emit({ ...state.categoryDraft, name: $event })" /></label>
       <button type="submit" class="sc-btn sc-btn--primary">Guardar categoría</button>
     </form>
+  </div>
   </div>
 </section>

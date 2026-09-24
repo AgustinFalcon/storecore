@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface-container-low" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-07 StoreCore User Inventory</title>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed-dim": "#c8c5ca",
+            "on-surface": "#1a1b22",
+            "on-primary-container": "#cad3ff",
+            "inverse-primary": "#b7c4ff",
+            "on-error-container": "#93000a",
+            "primary": "#0037b0",
+            "surface": "#fbf8ff",
+            "surface-tint": "#2151da",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-error": "#ffffff",
+            "on-primary": "#ffffff",
+            "surface-variant": "#e3e1ec",
+            "secondary": "#565e74",
+            "secondary-fixed": "#dae2fd",
+            "surface-container-low": "#f4f2fd",
+            "surface-container": "#eeedf7",
+            "surface-bright": "#fbf8ff",
+            "outline-variant": "#c4c5d7",
+            "on-tertiary-container": "#d6d3d7",
+            "on-background": "#1a1b22",
+            "surface-container-lowest": "#ffffff",
+            "inverse-surface": "#0f172a",
+            "outline": "#747686",
+            "tertiary-fixed": "#e4e1e6",
+            "on-tertiary-fixed": "#1b1b1e",
+            "error-container": "#ffdad6",
+            "primary-container": "#1d4ed8",
+            "on-tertiary": "#ffffff",
+            "tertiary-container": "#5c5b5f",
+            "tertiary": "#444447",
+            "primary-fixed-dim": "#b7c4ff",
+            "background": "#fbf8ff",
+            "surface-container-high": "#e8e7f1",
+            "on-primary-fixed": "#001551",
+            "on-secondary": "#ffffff",
+            "secondary-fixed-dim": "#bec6e0",
+            "primary-fixed": "#dce1ff",
+            "on-secondary-fixed-variant": "#3f465c",
+            "inverse-on-surface": "#f8fafc",
+            "on-tertiary-fixed-variant": "#47464a",
+            "on-surface-variant": "#434655",
+            "error": "#ba1a1a",
+            "surface-dim": "#dad9e3",
+            "on-secondary-container": "#5c647a",
+            "surface-container-highest": "#e3e1ec",
+            "on-secondary-fixed": "#131b2e",
+            "secondary-container": "#dae2fd"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-md": "0.75rem",
+            "space-xl": "2rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "space-lg": "1.25rem",
+            "gutter": "1rem",
+            "space-sm": "0.5rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter", "sans-serif"],
+            "body-sm": ["Inter", "sans-serif"],
+            "label-md": ["Inter", "sans-serif"],
+            "headline-lg": ["Inter", "sans-serif"],
+            "body-lg": ["Inter", "sans-serif"],
+            "headline-sm": ["Inter", "sans-serif"],
+            "headline-md": ["Inter", "sans-serif"],
+            "body-md": ["Inter", "sans-serif"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          "fontSize": {
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col font-body-md text-on-surface bg-[#f4f4f5] antialiased selection:bg-primary-container selection:text-white">
+<!-- Top Navigation (JSON TopNavBar Anchor) -->
+<header class="w-full px-margin flex items-center justify-between h-14 bg-inverse-surface border-b border-slate-800 text-inverse-on-surface sticky top-0 z-50">
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-white select-none">StoreCore</span>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-emerald-400 border border-slate-700">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          Salón Belgrano · HTTP 200 OK
+        </span>
+</div>
+<nav class="hidden md:flex items-center gap-space-md ml-space-sm">
+<a class="text-slate-400 font-label-md text-label-md hover:text-white pb-1 transition-colors" href="#">Contenido</a>
+<a class="text-slate-400 font-label-md text-label-md hover:text-white pb-1 transition-colors" href="#">Catálogo</a>
+<a class="text-slate-400 font-label-md text-label-md hover:text-white pb-1 transition-colors" href="#">Promos</a>
+<a class="text-slate-400 font-label-md text-label-md hover:text-white pb-1 transition-colors" href="#">Órdenes</a>
+<!-- Active Nav: Inventario -->
+<a class="border-b-2 border-primary-container text-white font-label-md text-label-md pb-1" href="/user/inventory">Inventario</a>
+<a class="text-slate-400 font-label-md text-label-md hover:text-white pb-1 transition-colors" href="#">Mercado Libre</a>
+</nav>
+</div>
+<div class="flex items-center gap-space-md">
+<div class="hidden lg:flex items-center gap-2 text-slate-300 font-mono text-[11px] bg-slate-800/80 px-2.5 py-1 rounded border border-slate-700">
+<span class="material-symbols-outlined text-[16px] text-slate-400">database</span>
+<span>PostgreSQL 16.2</span>
+</div>
+<div class="h-4 w-px bg-slate-800 hidden sm:block"></div>
+<!-- Trailing Action: Importar perfil -->
+<button class="hidden sm:inline-flex items-center gap-1 text-slate-300 hover:text-white font-label-sm text-label-sm px-2 py-1 rounded transition-colors hover:bg-slate-800" type="button">
+<span class="material-symbols-outlined text-[16px]">file_download</span>
+        Importar perfil
+      </button>
+<div class="flex items-center gap-space-xs text-slate-400">
+<button aria-label="Ajustes técnicos" class="p-1.5 hover:text-white hover:bg-slate-800 rounded transition-colors" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+<button aria-label="Notificaciones del sistema" class="p-1.5 hover:text-white hover:bg-slate-800 rounded transition-colors relative" type="button">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container absolute top-1 right-1"></span>
+</button>
+</div>
+<div class="flex items-center gap-2 pl-space-xs border-l border-slate-800">
+<div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-white font-label-sm text-label-sm font-semibold border border-slate-600">
+          MR
+        </div>
+<div class="hidden xl:flex flex-col text-left">
+<span class="text-white font-label-sm text-label-sm leading-tight">Martín Rossi</span>
+<span class="text-slate-400 text-[10px] leading-tight">Operador Activo</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Technical Node Context / Secondary Status Strip -->
+<div class="bg-surface-container-lowest border-b border-outline-variant/40 px-margin py-2">
+<div class="max-w-[1280px] mx-auto flex flex-wrap items-center justify-between gap-y-2 text-[11px] font-mono text-on-surface-variant">
+<div class="flex items-center gap-2 flex-wrap">
+<span class="inline-flex items-center gap-1 font-semibold text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-primary-container">dns</span>
+          Instancia StoreCore Nodo #01
+        </span>
+<span class="text-outline-variant">/</span>
+<span class="text-on-surface-variant">Entorno Local Belgrano</span>
+<span class="text-outline-variant">/</span>
+<span class="text-primary-container font-medium">Route: /user/inventory</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="inline-flex items-center gap-1 text-slate-600">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          Esquema: Transaccional Aislado
+        </span>
+<span class="text-outline-variant">|</span>
+<span class="text-slate-500">Nodo réplica sincrónica</span>
+</div>
+</div>
+</div>
+<!-- Main Canvas -->
+<main class="flex-1 w-full max-w-[1280px] mx-auto px-margin py-space-lg flex flex-col gap-space-lg">
+<!-- Page Header (Strictly read-only, NO write CTA buttons) -->
+<section class="flex flex-col md:flex-row md:items-start justify-between gap-space-md border-b border-outline-variant/50 pb-space-md">
+<div>
+<div class="flex items-center gap-space-sm mb-1">
+<h1 class="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">Inventario WEB</h1>
+<span class="px-2 py-0.5 rounded text-[11px] font-label-sm text-label-sm font-semibold bg-slate-200 text-slate-700 border border-slate-300">
+            SOLO LECTURA
+          </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+          Disponibilidad derivada. Esta pantalla no escribe stock; calculada a partir de saldos de góndola, reservas transaccionales y colas de despacho.
+        </p>
+</div>
+<!-- System Verification Pills -->
+<div class="flex flex-wrap items-center gap-space-xs md:self-end">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono border border-outline-variant/60">
+<span class="material-symbols-outlined text-[14px] text-secondary">memory</span>
+          Cálculo en memoria de nodo
+        </div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono border border-outline-variant/60">
+<span class="material-symbols-outlined text-[14px] text-secondary">lock</span>
+          Modo: Solo Lectura (Derivado)
+        </div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-50 text-emerald-800 text-[11px] font-mono border border-emerald-200">
+<span class="material-symbols-outlined text-[14px] text-emerald-600">sync_saved_locally</span>
+          Sincronización: Activa (12ms)
+        </div>
+</div>
+</section>
+<!-- Contextual Technical Notice / Info Banner -->
+<aside aria-label="Aviso de disponibilidad" class="bg-blue-50/70 border border-blue-200/80 rounded-lg p-space-md flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-primary-container text-[20px] mt-0.5 select-none">info</span>
+<div class="flex-1 text-on-surface">
+<h2 class="font-label-md text-label-md font-semibold text-primary">Aviso técnico de cálculo derivado</h2>
+<p class="font-body-sm text-body-sm text-slate-700 mt-0.5 leading-relaxed">
+          Las cantidades exhibidas corresponden a la disponibilidad web neta calculada en tiempo real. Este cálculo deduce del inventario físico local las reservas temporales de carritos activos, las órdenes en cola de empaque y el margen de seguridad preestablecido por política de salón. Para conciliaciones físicas o ingresos de remito, remitirse a la consola de depósito central.
+        </p>
+</div>
+</aside>
+<!-- Summary Metric Cards (Read-only Bento Strip) -->
+<section aria-label="Métricas del inventario" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant mb-2">
+<span class="font-label-sm text-label-sm font-semibold tracking-wide uppercase text-slate-500">SKUs Monitoreados</span>
+<span class="material-symbols-outlined text-slate-400 text-[18px]">list_alt</span>
+</div>
+<div>
+<div class="text-2xl font-bold font-headline-md text-headline-md text-on-surface tabular-nums">3</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">ítems activos en escaparate</p>
+</div>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+<span>Catálogo WEB activo</span>
+<span class="text-emerald-700 font-semibold">100% mapeado</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant mb-2">
+<span class="font-label-sm text-label-sm font-semibold tracking-wide uppercase text-slate-500">Unidades Disponibles</span>
+<span class="material-symbols-outlined text-primary-container text-[18px]">check_circle</span>
+</div>
+<div>
+<div class="text-2xl font-bold font-headline-md text-headline-md text-primary-container tabular-nums">19</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">unidades netas para venta</p>
+</div>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+<span>Suma neta derivados</span>
+<span class="text-slate-700">Auditado</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant mb-2">
+<span class="font-label-sm text-label-sm font-semibold tracking-wide uppercase text-slate-500">Reserva Transaccional</span>
+<span class="material-symbols-outlined text-amber-600 text-[18px]">lock_clock</span>
+</div>
+<div>
+<div class="text-2xl font-bold font-headline-md text-headline-md text-slate-800 tabular-nums">5</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">unidades comprometidas</p>
+</div>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+<span>Checkout holds activos</span>
+<span class="text-amber-700 font-medium">Transitorio</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 rounded-lg p-space-md flex flex-col justify-between">
+<div class="flex items-center justify-between text-on-surface-variant mb-2">
+<span class="font-label-sm text-label-sm font-semibold tracking-wide uppercase text-slate-500">Safety Stock Global</span>
+<span class="material-symbols-outlined text-slate-500 text-[18px]">shield</span>
+</div>
+<div>
+<div class="text-2xl font-bold font-headline-md text-headline-md text-on-surface tabular-nums">5</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">margen de seguridad de salón</p>
+</div>
+<div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-mono text-slate-500">
+<span>Política física</span>
+<span class="text-slate-700">Protección piso</span>
+</div>
+</div>
+</section>
+<!-- Main Table Container (Operator Internal Dense Grid) -->
+<section class="bg-surface-container-lowest border border-outline-variant/60 rounded-lg overflow-hidden flex flex-col shadow-xs">
+<!-- Table Functional Bar -->
+<div class="px-space-md py-space-sm bg-slate-50/70 border-b border-outline-variant/40 flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-2">
+<span class="font-label-md text-label-md font-semibold text-on-surface">Detalle de existencias reconciliadas</span>
+<span class="text-xs text-on-surface-variant font-mono">· Vista de operador</span>
+</div>
+<div class="flex items-center gap-3 text-[11px] font-mono text-slate-500">
+<span class="flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            Filtro de visibilidad: Todo el escaparate
+          </span>
+<span class="text-outline-variant">|</span>
+<span>Actualización sincrónica continua</span>
+</div>
+</div>
+<!-- Read-Only Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant/40 bg-surface-container/50 text-[11px] font-semibold text-slate-600 font-label-sm tracking-wider uppercase">
+<th class="py-space-sm px-space-md w-2/5" scope="col">SKU / Producto &amp; Ubicación</th>
+<th class="py-space-sm px-space-md text-right w-1/7" scope="col">Disponible Web</th>
+<th class="py-space-sm px-space-md text-right w-1/7" scope="col">Reservado</th>
+<th class="py-space-sm px-space-md text-right w-1/7" scope="col">Safety Buffer</th>
+<th class="py-space-sm px-space-md text-center w-1/5" scope="col">Estado / Derivación</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant/30 text-on-surface font-body-sm text-body-sm">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50/80 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-mono text-xs font-semibold bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                      SKU-100
+                    </span>
+<span class="font-medium text-on-surface font-body-md text-body-md">
+                      Lámpara de escritorio articulada mate
+                    </span>
+</div>
+<div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+<span class="material-symbols-outlined text-[13px] text-slate-400">shelves</span>
+                    Sector A4 · Estante 02
+                    <span class="text-slate-300">·</span>
+<span class="text-slate-600">Almacén Central</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right">
+<span class="tabular-nums font-semibold text-primary-container text-base">8</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">2</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">2</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-300">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                  Óptimo (Verificado)
+                </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50/80 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-mono text-xs font-semibold bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                      SKU-102
+                    </span>
+<span class="font-medium text-on-surface font-body-md text-body-md">
+                      Lámpara de mesa cerámica nórdica
+                    </span>
+</div>
+<div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+<span class="material-symbols-outlined text-[13px] text-slate-400">shelves</span>
+                    Sector B1 · Estante 01
+                    <span class="text-slate-300">·</span>
+<span class="text-slate-600">Showroom Belgrano</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right">
+<span class="tabular-nums font-semibold text-primary-container text-base">5</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">1</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">2</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-300">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                  Normal (Verificado)
+                </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50/80 transition-colors">
+<td class="py-space-md px-space-md">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<span class="font-mono text-xs font-semibold bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200">
+                      SKU-105
+                    </span>
+<span class="font-medium text-on-surface font-body-md text-body-md">
+                      Luminaria task LED de aluminio
+                    </span>
+</div>
+<div class="flex items-center gap-1.5 text-[11px] text-slate-500 font-mono">
+<span class="material-symbols-outlined text-[13px] text-slate-400">shelves</span>
+                    Sector A2 · Estante 05
+                    <span class="text-slate-300">·</span>
+<span class="text-slate-600">Almacén Central</span>
+</div>
+</div>
+</td>
+<td class="py-space-md px-space-md text-right">
+<span class="tabular-nums font-semibold text-primary-container text-base">6</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">2</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-right text-slate-700">
+<span class="tabular-nums font-medium text-sm">1</span>
+<span class="text-xs text-slate-500 ml-1">un.</span>
+</td>
+<td class="py-space-md px-space-md text-center">
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-amber-50 text-amber-900 border border-amber-300">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                  En cota de safety
+                </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Bottom Metadata -->
+<div class="px-space-md py-space-sm bg-surface-container-low/60 border-t border-outline-variant/40 flex flex-wrap items-center justify-between text-xs text-on-surface-variant font-mono">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[15px] text-slate-400">lock</span>
+<span>Interfase cerrada para escritura. Parámetros de safety definidos por StoreCore Engine.</span>
+</div>
+<div>
+<span>3 registros listados</span>
+</div>
+</div>
+</section>
+<!-- Formula Clarification Drawer (Read-only System Logic) -->
+<section class="bg-surface-container-lowest border border-outline-variant/50 rounded-lg p-space-md">
+<h3 class="font-label-md text-label-md font-semibold text-slate-800 mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary-container">functions</span>
+        Ecuación de derivación en runtime
+      </h3>
+<div class="bg-slate-50 border border-slate-200 rounded p-space-sm font-mono text-xs text-slate-700 overflow-x-auto">
+<code>Disponible_Web = Físico_Góndola - (Órdenes_Pendientes + Carritos_Comprometidos + Safety_Buffer)</code>
+</div>
+<p class="font-body-sm text-body-sm text-slate-500 mt-2">
+        Cualquier intento de alteración manual desde esta vista es rechazado por el bus de eventos de la tienda (403 Forbidden - ReadOnly Viewport).
+      </p>
+</section>
+</main>
+<!-- Footer / Audit Strip -->
+<footer class="mt-auto border-t border-slate-300 bg-white py-3 px-margin">
+<div class="max-w-[1280px] mx-auto flex flex-col md:flex-row items-center justify-between gap-2 text-[11px] font-mono text-slate-600">
+<div class="flex items-center gap-2 flex-wrap text-center md:text-left">
+<span class="font-semibold text-slate-900">StoreCore OS v2.4 Retail</span>
+<span>·</span>
+<span>Salón Central Belgrano</span>
+<span>·</span>
+<span class="text-primary-container">/api/v1/inventory/derived</span>
+</div>
+<div class="flex items-center gap-3">
+<span class="flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Modo transaccional desacoplado
+        </span>
+<span class="text-slate-400">·</span>
+<span class="text-slate-700 font-medium">Latencia: 11ms</span>
+</div>
+</div>
+</footer>
+</body></html>

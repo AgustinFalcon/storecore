@@ -14,6 +14,7 @@ export class UserMercadoLibreViewComponent {
   @Input({ required: true }) state!: InstallationState;
   @Output() readonly draftChange = new EventEmitter<MercadoLibreListing>();
   @Output() readonly save = new EventEmitter<void>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   patch(partial: Partial<MercadoLibreListing>): void {
     this.draftChange.emit({ ...this.state.listingDraft, ...partial });

@@ -14,6 +14,7 @@ import { CartStore } from './cart.store';
         (addressChange)="store.setAddressId($event)"
         (currencyChange)="store.setCurrency($event)"
         (pay)="store.submitCheckout()"
+        (retry)="reload()"
       />
     }
   `,
@@ -22,6 +23,10 @@ export class CheckoutPageComponent implements OnInit {
   constructor(readonly store: CartStore) {}
 
   ngOnInit(): void {
+    this.reload();
+  }
+
+  reload(): void {
     this.store.load();
     this.store.loadAddresses();
   }

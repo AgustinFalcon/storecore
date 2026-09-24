@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-01 StoreCore User Session</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "secondary-fixed": "#dae2fd",
+            "on-secondary": "#ffffff",
+            "surface-bright": "#fbf8ff",
+            "on-error-container": "#93000a",
+            "surface-container-highest": "#e3e1ec",
+            "surface-container": "#eeedf7",
+            "primary-container": "#1d4ed8",
+            "on-secondary-container": "#5c647a",
+            "surface-tint": "#2151da",
+            "inverse-on-surface": "#f1effa",
+            "outline": "#747686",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-tertiary": "#ffffff",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary-fixed": "#1b1b1e",
+            "inverse-primary": "#b7c4ff",
+            "surface-container-lowest": "#ffffff",
+            "on-surface-variant": "#434655",
+            "surface-dim": "#dad9e3",
+            "secondary": "#565e74",
+            "on-secondary-fixed": "#131b2e",
+            "background": "#fbf8ff",
+            "tertiary-fixed": "#e4e1e6",
+            "primary-fixed-dim": "#b7c4ff",
+            "secondary-container": "#dae2fd",
+            "on-primary": "#ffffff",
+            "tertiary-container": "#5c5b5f",
+            "on-primary-fixed": "#001551",
+            "surface": "#fbf8ff",
+            "on-primary-fixed-variant": "#0039b5",
+            "surface-container-low": "#f4f2fd",
+            "secondary-fixed-dim": "#bec6e0",
+            "outline-variant": "#c4c5d7",
+            "primary": "#0037b0",
+            "on-error": "#ffffff",
+            "tertiary": "#444447",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "surface-container-high": "#e8e7f1",
+            "on-surface": "#1a1b22",
+            "on-tertiary-fixed-variant": "#47464a",
+            "inverse-surface": "#2f3038",
+            "surface-variant": "#e3e1ec",
+            "error": "#ba1a1a",
+            "on-primary-container": "#cad3ff",
+            "on-tertiary-container": "#d6d3d7",
+            "on-background": "#1a1b22",
+            "error-container": "#ffdad6"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-lg": "1.25rem",
+            "margin": "1.5rem",
+            "space-xs": "0.25rem",
+            "gutter": "1rem",
+            "space-xl": "2rem",
+            "space-md": "0.75rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Inter"],
+            "body-lg": ["Inter"],
+            "label-sm": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "label-md": ["Inter"]
+          },
+          "fontSize": {
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full flex flex-col font-['Inter'] text-[#18181b] bg-[#f4f4f5] antialiased">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-[#0f172a] sticky top-0 w-full z-50 border-b border-slate-800 shadow-sm">
+<div class="flex items-center justify-between h-16 px-6 max-w-7xl mx-auto w-full">
+<div class="flex items-center gap-8">
+<a class="font-bold text-lg tracking-tight text-white flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] rounded" href="/storefront">
+<span class="w-2.5 h-2.5 bg-[#1d4ed8] rounded-full inline-block"></span>
+          StoreCore
+        </a>
+<nav class="hidden md:flex items-center gap-6 font-['Inter'] text-sm font-medium">
+<a class="text-slate-300 hover:text-white transition-colors" href="/storefront">Storefront</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/catalogo">Catálogo</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/carrito">Carrito</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/customer">Customer</a>
+<a aria-current="page" class="text-white font-semibold border-b-2 border-[#1d4ed8] pb-1" href="/user/session">User</a>
+</nav>
+</div>
+<div class="flex items-center gap-3">
+<div class="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded bg-slate-800/80 border border-slate-700/80 text-xs font-medium text-slate-300">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+<span>User sin sesión</span>
+</div>
+<div class="text-xs text-slate-400 font-medium px-2 py-1">
+          Customer sin sesión
+        </div>
+</div>
+</div>
+</header>
+<!-- Main Canvas Section -->
+<main class="flex-1 flex flex-col items-center justify-center px-4 py-12 min-h-[calc(100vh-8rem)]">
+<!-- Meta Context Pill -->
+<div class="mb-5 flex items-center justify-center">
+<span class="inline-flex items-center gap-1.5 bg-slate-100 text-slate-700 border border-slate-200 text-xs px-2.5 py-1 rounded font-medium tracking-wide">
+<span class="material-symbols-outlined text-[14px] leading-none text-slate-500">terminal</span>
+        U-01 · ACCESO DE OPERADORES
+      </span>
+</div>
+<!-- Auth Card -->
+<div class="bg-[#ffffff] border border-slate-200 rounded-xl shadow-sm max-w-md w-full p-8 transition-all">
+<div class="mb-6">
+<h1 class="font-semibold text-2xl tracking-tight text-[#18181b]">Sesión user</h1>
+<p class="text-slate-600 text-sm mt-1">Operadores internos. No comparte sesión con customer.</p>
+</div>
+<form class="space-y-4" onsubmit="event.preventDefault();">
+<!-- Field: Email -->
+<div>
+<label class="block text-sm font-medium text-[#18181b] mb-1.5" for="operator-email">Email</label>
+<div class="relative">
+<input autocomplete="username" class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-[#18181b] bg-white placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8] outline-none transition-colors" id="operator-email" name="email" placeholder="operador@tienda.com" required="" type="email"/>
+</div>
+</div>
+<!-- Field: Password -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="text-sm font-medium text-[#18181b]" for="operator-password">Contraseña</label>
+<a class="text-xs text-[#1d4ed8] hover:underline font-medium focus:outline-none focus:ring-1 focus:ring-[#1d4ed8] rounded" href="#recuperar">¿Olvidaste tu contraseña?</a>
+</div>
+<div class="relative">
+<input autocomplete="current-password" class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-[#18181b] bg-white placeholder:text-slate-400 focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8] outline-none transition-colors" id="operator-password" name="password" placeholder="••••••••••••" required="" type="password"/>
+</div>
+</div>
+<!-- Submit Button -->
+<div class="pt-2">
+<button class="w-full bg-[#1d4ed8] hover:bg-blue-800 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1d4ed8] active:bg-blue-900" type="submit">
+            Entrar
+          </button>
+</div>
+</form>
+<!-- Security Notice Card -->
+<div class="mt-6 flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500">
+<span class="material-symbols-outlined text-[18px] leading-none text-slate-400 shrink-0 mt-0.5">security</span>
+<p class="leading-relaxed">
+          Acceso exclusivo para personal de salón y caja. Todas las operaciones en la consola quedan registradas bajo auditoría con IP de terminal.
+        </p>
+</div>
+</div>
+<!-- External Customer Escape Hatch -->
+<div class="mt-6 text-center">
+<a class="text-xs text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1 focus:outline-none focus:underline" href="/customer">
+<span>¿Sos cliente de la tienda?</span>
+<span class="text-[#1d4ed8] font-medium">Ir al portal customer →</span>
+</a>
+</div>
+</main>
+<!-- Institutional Footer -->
+<footer class="border-t border-slate-200 bg-white py-6 mt-auto">
+<div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500 font-['Inter']">
+<div class="flex items-center gap-2">
+<span class="font-semibold text-slate-700">StoreCore</span>
+<span>—</span>
+<span>Sistema Operativo de Tienda Unificada</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="hover:text-slate-800 transition-colors" href="#terminos">Términos del servicio</a>
+<a class="hover:text-slate-800 transition-colors" href="#auditoria">Seguridad y auditoría</a>
+<a class="hover:text-slate-800 transition-colors" href="#soporte">Soporte interno</a>
+</div>
+</div>
+</footer>
+</body></html>

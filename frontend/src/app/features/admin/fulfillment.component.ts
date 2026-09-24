@@ -15,6 +15,7 @@ import { FulfillmentStore } from './fulfillment.store';
       [error]="(store.errorMessage$ | async) ?? ''"
       (ship)="store.ship($event)"
       (rma)="store.rma($event)"
+      (retry)="store.load()"
     />
   `,
 })

@@ -1,0 +1,56 @@
+{
+  "feature": "storecore-frontend-ux-system-v1",
+  "stack_profile": "frontend-web",
+  "project_type": "production",
+  "execution_strategy": "docs_only",
+  "status": "documented",
+  "stats": { "total": 6, "done": 6 },
+  "tasks": [
+    {
+      "id": "UX-DOC-01",
+      "title": "Spec funcional + inventario + decisión P-01 carruseles",
+      "status": "done",
+      "layer": 1,
+      "depends_on": [],
+      "acceptance_criteria": ["AC-UX-1", "AC-UX-3"]
+    },
+    {
+      "id": "UX-DOC-02",
+      "title": "Spec técnica + mapping Stitch + HTML views archivado",
+      "status": "done",
+      "layer": 2,
+      "depends_on": ["UX-DOC-01"],
+      "files": ["4-implementation/artifacts/views-in-code/"]
+    },
+    {
+      "id": "UX-STITCH-DS",
+      "title": "Design system + DS-00/04/05/06 en Stitch",
+      "status": "done",
+      "layer": 1,
+      "depends_on": []
+    },
+    {
+      "id": "UX-STITCH-P",
+      "title": "P-01/P-02/P-03 + auth/cart Stitch",
+      "status": "done",
+      "layer": 1,
+      "depends_on": ["UX-STITCH-DS"]
+    },
+    {
+      "id": "UX-STITCH-CU",
+      "title": "C-01..C-09 y U-01..U-10 una pieza Stitch por ruta",
+      "status": "done",
+      "layer": 1,
+      "depends_on": ["UX-STITCH-P"],
+      "acceptance_criteria": ["HTML de views ya archivado; Stitch restante no bloquea BlackStore"]
+    },
+    {
+      "id": "UX-ANG",
+      "title": "Volcar Stitch a Angular views",
+      "status": "done",
+      "layer": 1,
+      "depends_on": [],
+      "acceptance_criteria": ["Sol CONDITIONAL_GO 2026-09-23: tokens y layout Stitch en las rutas P/C/U existentes. Sin rutas, endpoints ni SDK nuevos."]
+    }
+  ]
+}

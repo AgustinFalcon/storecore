@@ -18,7 +18,7 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
         <h3>
           <a [routerLink]="['/catalog', product.sku]">{{ product.name }}</a>
         </h3>
-        <p class="sc-price">{{ product.price }}</p>
+        <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price }}</p>
       </div>
     </article>
   `,

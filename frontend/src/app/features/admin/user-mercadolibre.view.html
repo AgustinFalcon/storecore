@@ -1,44 +1,59 @@
 <section class="sc-page sc-console" aria-labelledby="ml-title">
-  <h1 id="ml-title">Mercado Libre</h1>
-  <p class="sc-page__lede">Cuenta autorizada y mapa listing/variation → SKU. Sin secretos.</p>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+  <header class="sc-page-head">
+    <p class="sc-kicker">Canal</p>
+    <h1 id="ml-title">Mercado Libre</h1>
+    <p class="sc-page__lede">Cuenta autorizada y mapa listing/variation → SKU. Sin secretos.</p>
+  </header>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
   @if (state.mlAccount) {
-    <p class="sc-panel">
-      Cuenta {{ state.mlAccount.accountRef || '—' }}
-      @if (state.mlAccount.authorized) {
-        <span class="sc-badge sc-badge--ok">AUTHORIZED</span>
-      } @else {
-        <span class="sc-badge sc-badge--warn">no autorizada</span>
-      }
-      · {{ state.mlAccount.status }}
-    </p>
-  }
-  @if (state.listings.length) {
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>Listing</th>
-          <th>Variation</th>
-          <th>SKU</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (listing of state.listings; track listing.listingId + listing.variationId) {
-          <tr>
-            <td>
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(listing)">{{ listing.listingId }}</button>
-            </td>
-            <td>{{ listing.variationId }}</td>
-            <td class="sc-mono">{{ listing.sku }}</td>
-          </tr>
+    <article class="sc-panel" aria-labelledby="ml-account-title">
+      <h2 id="ml-account-title">Cuenta vinculada</h2>
+      <p>
+        {{ state.mlAccount.accountRef || '—' }}
+        @if (state.mlAccount.authorized) {
+          <span class="sc-badge sc-badge--ok">AUTHORIZED</span>
+        } @else {
+          <span class="sc-badge sc-badge--warn">no autorizada</span>
         }
-      </tbody>
-    </table>
+        · {{ state.mlAccount.status }}
+      </p>
+    </article>
   }
-  <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); save.emit()">
-    <label>Listing <input required name="listingId" [ngModel]="state.listingDraft.listingId" (ngModelChange)="patch({ listingId: $event })" /></label>
-    <label>Variation <input name="variationId" [ngModel]="state.listingDraft.variationId" (ngModelChange)="patch({ variationId: $event })" /></label>
-    <label>SKU <input required name="sku" [ngModel]="state.listingDraft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
-    <button type="submit" class="sc-btn sc-btn--primary">Mapear</button>
-  </form>
+  <div class="sc-workbench">
+    <div class="sc-workbench__main">
+      <h2>Mapa listing → SKU</h2>
+      @if (state.listings.length) {
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <thead>
+              <tr>
+                <th>Listing</th>
+                <th>Variation</th>
+                <th>SKU</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (listing of state.listings; track listing.listingId + listing.variationId) {
+                <tr>
+                  <td>
+                    <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(listing)">{{ listing.listingId }}</button>
+                  </td>
+                  <td>{{ listing.variationId }}</td>
+                  <td class="sc-mono">{{ listing.sku }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+    <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+      <h2>Nuevo mapeo</h2>
+      <label>Listing <input required name="listingId" [ngModel]="state.listingDraft.listingId" (ngModelChange)="patch({ listingId: $event })" /></label>
+      <label>Variation <input name="variationId" [ngModel]="state.listingDraft.variationId" (ngModelChange)="patch({ variationId: $event })" /></label>
+      <label>SKU <input required name="sku" [ngModel]="state.listingDraft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
+      <p class="sc-callout">No se pegan tokens ni credenciales. Sólo el identificador público del listing y el SKU local.</p>
+      <button type="submit" class="sc-btn sc-btn--primary">Mapear</button>
+    </form>
+  </div>
 </section>

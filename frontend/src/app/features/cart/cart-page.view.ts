@@ -13,6 +13,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
 export class CartPageViewComponent {
   @Input({ required: true }) state!: CartState;
   @Output() readonly quantityChange = new EventEmitter<{ sku: string; quantity: number }>();
+  @Output() readonly retry = new EventEmitter<void>();
 
   get total(): number {
     return this.state.cart.lines.reduce((sum, line) => sum + this.lineSubtotal(line), 0);

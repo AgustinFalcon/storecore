@@ -1,0 +1,792 @@
+openapi: 3.1.0
+info:
+  title: StoreCore BlackStore Integration Contract v1
+  version: 1.0.0-draft
+  description: |
+    Canonical StoreCore API for the optional BlackStore companion (0..1).
+    Not approved. No connector, Flyway or Luna implementation without Sol GO.
+    Base path is exclusively /blackstore-integration/v1 (D-PATH; no trailing slash on the prefix).
+    Reservation TTL default 900s (D-TTL). Catalog pageSize default/max 200, cursor retention 7d (D-CURSOR).
+    Rate: 30 reserve/s per identity, catalog/stock-read 60/s, reconcile 5/s (D-RATE).
+    availableQuantity = GREATEST(0, available_quantity - safety_stock). available_quantity already nets reserved_quantity; do not subtract reserved again.
+    Reserve is two transactions. Mutating routes take the quadruple advisory lock and consult tombstone first (ADR-007). Tx-A PENDING+request_hash COMMIT; Tx-B re-check tombstone, saga lock, hash check, variant locks, reserve+ledger+receipt+RESERVED. CONFLICT is retryable deadlock. OPERATION_STATE_CONFLICT is retryable=false on a live terminal row and is never re-POSTed.
+    Uniform JSON envelope is AssistTime BaseResponse: HTTP status == body.code (HttpCode), enforced by each status schema's code const.
+    Every JSON envelope requires code,data,errorCode,retryable,message,traceId. Success has data payload and explicit null errorCode/retryable/message.
+    Error has data null and non-null errorCode/retryable/message/traceId. Multiple 409s are distinguished by errorCode, not by message.
+    Fiscal, PAN/CVV/track and acquirer secrets are out of this contract.
+    Ledger channel is EXTERNAL_BLACKSTORE, never POS.
+  x-canonical: true
+  x-approval-gate:
+    required: true
+    status: ready_for_sol_review
+    consequence: Until a separate Sol implementation GO, only documentation may change. Ports, DTOs, fixtures, Flyway, endpoints, and runtime code are not authorized.
+servers:
+  - url: https://storecore-installation.example
+security:
+  - BlackStoreServiceIdentity: []
+tags:
+  - name: Catalog
+  - name: Stock
+  - name: Operations
+paths:
+  /blackstore-integration/v1/catalog:
+    get:
+      tags: [Catalog]
+      summary: Cursor/versioned catalog read model
+      operationId: getCatalogPage
+      security:
+        - BlackStoreServiceIdentity: [catalog:read]
+      x-required-scope: catalog:read
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 160 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 200 }
+          description: Opaque cursor page size. Default and maximum 200 (D-CURSOR). Offset pagination is forbidden.
+        - name: includeCost
+          in: query
+          schema: { type: boolean, default: false }
+          description: Requires additional scope cost:read. Cashier identities must not send true.
+      responses:
+        '200':
+          description: Catalog page. HTTP 200 is used for first fetch and idempotent cache refresh (not 201).
+          headers:
+            ETag:
+              required: true
+              schema: { type: string, maxLength: 64 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CatalogPageResponse' }
+        '304':
+          description: Unchanged catalog page
+          headers:
+            ETag:
+              required: true
+              schema: { type: string, maxLength: 64 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '410': { $ref: '#/components/responses/CursorExpired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/stock/variants/{variantId}:
+    get:
+      tags: [Stock]
+      summary: Read sellable balance for one variant (scope stock:read)
+      operationId: getVariantStock
+      security:
+        - BlackStoreServiceIdentity: [stock:read]
+      x-required-scope: stock:read
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - name: variantId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Current sellable quantity
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VariantStockResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/reservations:
+    post:
+      tags: [Stock]
+      summary: Atomic multi-line reserve
+      operationId: createReservation
+      security:
+        - BlackStoreServiceIdentity: [stock:reserve]
+      x-required-scope: stock:reserve
+      x-optional-scope: price:override
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/SaleId'
+        - $ref: '#/components/parameters/OperationId'
+        - $ref: '#/components/parameters/ActorRole'
+        - $ref: '#/components/parameters/OverrideReason'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReservationRequest' }
+      responses:
+        '200':
+          description: |
+            Durable reservation receipt. 200 (not 201) because replay of the same
+            quadruple returns the same stored receipt.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationReceiptResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ConflictReserve' }
+        '410': { $ref: '#/components/responses/OperationRetired' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/reservations/{reservationRef}/commit:
+    post:
+      tags: [Stock]
+      summary: Commit reserved stock (same quadruple as the reserve)
+      operationId: commitReservation
+      security:
+        - BlackStoreServiceIdentity: [stock:commit]
+      x-required-scope: stock:commit
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/SaleId'
+        - $ref: '#/components/parameters/OperationId'
+        - name: reservationRef
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Commit receipt for the existing saga row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationReceiptResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ConflictCommitRelease' }
+        '410': { $ref: '#/components/responses/OperationRetired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/reservations/{reservationRef}/release:
+    post:
+      tags: [Stock]
+      summary: Release reserved stock (same quadruple as the reserve)
+      operationId: releaseReservation
+      security:
+        - BlackStoreServiceIdentity: [stock:release]
+      x-required-scope: stock:release
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/SaleId'
+        - $ref: '#/components/parameters/OperationId'
+        - name: reservationRef
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Release receipt for the existing saga row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationReceiptResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ConflictCommitRelease' }
+        '410': { $ref: '#/components/responses/OperationRetired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/operations/{operationId}:
+    get:
+      tags: [Operations]
+      summary: Read durable saga row (timeout recovery)
+      operationId: getOperation
+      security:
+        - BlackStoreServiceIdentity: [stock:read]
+      x-required-scope: stock:read
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/SaleId'
+        - $ref: '#/components/parameters/OperationId'
+        - name: operationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: MUST equal X-Operation-Id. Timeout recovery uses the same headers as the mutating call.
+      responses:
+        '200':
+          description: Durable saga state (never CONFLICT)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OperationReceiptResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '410': { $ref: '#/components/responses/OperationRetired' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /blackstore-integration/v1/operations/reconcile:
+    post:
+      tags: [Operations]
+      summary: Compare caller-supplied receipts; perform zero writes
+      operationId: reconcileOperations
+      security:
+        - BlackStoreServiceIdentity: [stock:read]
+      x-required-scope: stock:read
+      parameters:
+        - $ref: '#/components/parameters/ClientInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReconcileRequest' }
+      responses:
+        '200':
+          description: Read-only present vs unknownReceipts; zero ledger writes
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReconcileResultResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '500': { $ref: '#/components/responses/InternalError' }
+components:
+  securitySchemes:
+    BlackStoreServiceIdentity:
+      type: http
+      scheme: bearer
+      bearerFormat: service-identity
+      description: |
+        Opaque service token bound to exactly one StoreCore installation.
+        X-Client-Instance-Id is checked against that binding; it is not a tenant
+        selector and MUST NOT be treated as store_id.
+        Scopes live in the token. cost:read is never issued to cashier identities.
+      x-scopes:
+        catalog:read: Cursor catalog
+        stock:reserve: Create reservation
+        stock:commit: Commit reservation
+        stock:release: Release reservation
+        stock:read: Balance and operation read / reconcile
+        cost:read: Include authorizedCost on catalog items
+        price:override: Waive 422 CATALOG_VERSION_STALE; never changes StoreCore price; never authorizes cost
+  parameters:
+    ClientInstanceId:
+      in: header
+      name: X-Client-Instance-Id
+      required: true
+      description: |
+        Companion instance UUID. Validated against the bearer binding.
+        Mismatch → 403 FORBIDDEN. Never used as installation/tenant selector.
+      schema: { type: string, format: uuid }
+    DeviceId:
+      in: header
+      name: X-Device-Id
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 80 }
+    SaleId:
+      in: header
+      name: X-Sale-Id
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 80 }
+    OperationId:
+      in: header
+      name: X-Operation-Id
+      required: true
+      description: |
+        Stable saga id for one BlackStore sale. Body MUST NOT repeat it.
+        Reserve, commit, release and GET share this same quadruple
+        (client_instance_id, device_id, sale_id, operation_id) and mutate ONE row.
+      schema: { type: string, format: uuid }
+    IfNoneMatch:
+      in: header
+      name: If-None-Match
+      required: false
+      schema: { type: string, maxLength: 64 }
+    ActorRole:
+      in: header
+      name: X-Actor-Role
+      required: false
+      description: |
+        Audit-only claim of the BlackStore operator. NEVER authorizes by itself.
+        StoreCore authorizes exclusively via token scopes. For a stale-price
+        override, X-Override-Reason is required; this header is persisted as
+        audit metadata and MUST be SUPERVISOR or OWNER if sent on that path.
+      schema: { type: string, enum: [CASHIER, SUPERVISOR, OWNER, SERVICE] }
+    OverrideReason:
+      in: header
+      name: X-Override-Reason
+      required: false
+      description: Required to accept a stale priceVersion. Audit trail only; no cost override.
+      schema: { type: string, minLength: 3, maxLength: 500 }
+  responses:
+    BadRequest:
+      description: Missing/invalid header or body (code VALIDATION)
+      x-error-codes: [VALIDATION]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse400' }
+    Unauthorized:
+      description: Invalid service identity (code UNAUTHORIZED)
+      x-error-codes: [UNAUTHORIZED]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse401' }
+    Forbidden:
+      description: |
+        Scope missing, companion mismatch, cashier cost:read, or capability
+        DISABLED/kill switch (codes FORBIDDEN, CAPABILITY_DISABLED). Fail closed.
+      x-error-codes: [FORBIDDEN, CAPABILITY_DISABLED]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse403' }
+    NotFound:
+      description: Unknown operation/reservation/variant (code NOT_FOUND)
+      x-error-codes: [NOT_FOUND]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse404' }
+    CursorExpired:
+      description: Catalog cursor expired (code CURSOR_EXPIRED). Caller must GET catalog without cursor.
+      x-error-codes: [CURSOR_EXPIRED]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse410' }
+    RateLimited:
+      description: Rate limited per service identity (code RATE_LIMITED)
+      x-error-codes: [RATE_LIMITED]
+      headers:
+        Retry-After:
+          required: true
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse429' }
+    ConflictReserve:
+      description: |
+        Reserve-only 409 as ErrorResponse. CONFLICT is a retryable deadlock: rolls back Tx-B, keeps PENDING+hash, GET returns PENDING, caller re-POSTs the same quadruple.
+        OPERATION_STATE_CONFLICT is not that code: incompatible command on a live terminal row, retryable=false, GET returns the terminal state, never re-POST (new sale = new operation_id). After purge the same POST is 410 OPERATION_RETIRED.
+        INSUFFICIENT_STOCK deletes claim in Tx-B. IDEMPOTENCY and EXPIRED keep durable row.
+      x-error-codes: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse409Reserve' }
+    ConflictCommitRelease:
+      description: |
+        Commit/release 409 as ErrorResponse. Commit and release take the quadruple advisory lock and consult tombstone before resolving the saga.
+        CONFLICT is a retryable deadlock: rolls back the mutation, keeps the prior durable state (usually RESERVED or COMMITTED, never PENDING), GET returns that state, caller re-POSTs the same quadruple.
+        OPERATION_STATE_CONFLICT is not that code: incompatible command on a live terminal row, retryable=false, GET returns the terminal state, never re-POST (new sale = new operation_id). After purge the same POST is 410 OPERATION_RETIRED.
+        Valid errorCodes: EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT. No INSUFFICIENT_STOCK.
+      x-error-codes: [EXPIRED, IDEMPOTENCY_PAYLOAD_MISMATCH, CONFLICT, OPERATION_STATE_CONFLICT]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse409CommitRelease' }
+    OperationRetired:
+      description: |
+        Saga row was purged but tombstone remains (errorCode OPERATION_RETIRED). Not retryable.
+        Never re-POST the original operation. Start a new sale with a new operation_id.
+      x-error-codes: [OPERATION_RETIRED]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/OperationRetiredResponse' }
+    Unprocessable:
+      description: |
+        Stale catalog/price version (code CATALOG_VERSION_STALE). Claim deleted; GET 404; caller uses a new operation_id.
+      x-error-codes: [CATALOG_VERSION_STALE]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse422' }
+    InternalError:
+      description: Unexpected failure (code INTERNAL). Retryable.
+      x-error-codes: [INTERNAL]
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse500' }
+  schemas:
+    DecimalAmount:
+      type: string
+      pattern: '^[0-9]+(\.[0-9]{1,4})?$'
+      description: Decimal string. Never IEEE-754 number.
+    HttpCode:
+      type: integer
+      enum: [200, 400, 401, 403, 404, 409, 410, 422, 429, 500]
+      description: |
+        Same integer as the HTTP status (AssistTime/GoodLife HttpCode).
+        This API does not use 201. 304 catalog has no JSON body.
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION
+        - UNAUTHORIZED
+        - FORBIDDEN
+        - CAPABILITY_DISABLED
+        - RATE_LIMITED
+        - INSUFFICIENT_STOCK
+        - CATALOG_VERSION_STALE
+        - IDEMPOTENCY_PAYLOAD_MISMATCH
+        - CONFLICT
+        - EXPIRED
+        - NOT_FOUND
+        - CURSOR_EXPIRED
+        - OPERATION_RETIRED
+        - OPERATION_STATE_CONFLICT
+        - INTERNAL
+      description: Machine-readable business code. Distinct from HttpCode. BlackStore branches on this, never on message.
+    BaseResponse:
+      type: object
+      additionalProperties: false
+      required: [code, data, errorCode, retryable, message, traceId]
+      description: |
+        Complete JSON envelope for every non-304 response. Each response status schema
+        fixes code with const, which enforces HTTP status == body.code on the wire.
+      properties:
+        code: { $ref: '#/components/schemas/HttpCode' }
+        data: {}
+        message: { type: [string, 'null'], maxLength: 500, description: Human text. Not authoritative. }
+        errorCode:
+          oneOf:
+            - $ref: '#/components/schemas/ErrorCode'
+            - type: 'null'
+        retryable: { type: [boolean, 'null'] }
+        traceId: { type: string, format: uuid }
+        lineFailures:
+          type: array
+          description: Present on INSUFFICIENT_STOCK. One entry per failing line.
+          maxItems: 200
+          items: { $ref: '#/components/schemas/LineFailure' }
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data: { const: null }
+            message: { type: string, minLength: 1, maxLength: 500 }
+            errorCode: { $ref: '#/components/schemas/ErrorCode' }
+            retryable: { type: boolean }
+    ErrorResponse400:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 400 }
+            errorCode: { const: VALIDATION }
+    ErrorResponse401:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 401 }
+            errorCode: { const: UNAUTHORIZED }
+    ErrorResponse403:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 403 }
+            errorCode: { enum: [FORBIDDEN, CAPABILITY_DISABLED] }
+    ErrorResponse404:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 404 }
+            errorCode: { const: NOT_FOUND }
+    ErrorResponse409Reserve:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 409 }
+            errorCode: { enum: [INSUFFICIENT_STOCK, IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT] }
+    ErrorResponse409CommitRelease:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 409 }
+            errorCode: { enum: [IDEMPOTENCY_PAYLOAD_MISMATCH, EXPIRED, CONFLICT, OPERATION_STATE_CONFLICT] }
+    ErrorResponse410:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 410 }
+    OperationRetiredResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse410'
+        - type: object
+          properties:
+            code: { const: 410 }
+            data: { const: null }
+            errorCode: { const: OPERATION_RETIRED }
+            retryable: { const: false }
+    ErrorResponse422:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 422 }
+            errorCode: { const: CATALOG_VERSION_STALE }
+    ErrorResponse429:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 429 }
+            errorCode: { const: RATE_LIMITED }
+    ErrorResponse500:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            code: { const: 500 }
+            errorCode: { const: INTERNAL }
+    CatalogPageResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          description: Complete success envelope. code=200; error fields and message are explicit nulls.
+          properties:
+            code: { const: 200 }
+            data: { $ref: '#/components/schemas/CatalogPage' }
+            message: { const: null }
+            errorCode: { const: null }
+            retryable: { const: null }
+    VariantStockResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            code: { const: 200 }
+            data: { $ref: '#/components/schemas/VariantStock' }
+            message: { const: null }
+            errorCode: { const: null }
+            retryable: { const: null }
+    OperationReceiptResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            code: { const: 200 }
+            data: { $ref: '#/components/schemas/OperationReceipt' }
+            message: { const: null }
+            errorCode: { const: null }
+            retryable: { const: null }
+    ReconcileResultResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            code: { const: 200 }
+            data: { $ref: '#/components/schemas/ReconcileResult' }
+            message: { const: null }
+            errorCode: { const: null }
+            retryable: { const: null }
+    LineFailure:
+      type: object
+      additionalProperties: false
+      required: [variantId, sku, requested, availableQuantity]
+      properties:
+        variantId: { type: integer, format: int64 }
+        sku: { type: string, maxLength: 64 }
+        requested: { type: integer, minimum: 1 }
+        availableQuantity:
+          type: integer
+          minimum: 0
+          description: |
+            Sellable quantity only. GREATEST(0, available_quantity - safety_stock).
+            available_quantity already nets reserved_quantity; do not subtract reserved again.
+            Never the raw physical on-hand. Reserve compares requested against this value.
+    CatalogPage:
+      type: object
+      additionalProperties: false
+      required: [catalogVersion, generatedAt, validUntil, etag, items]
+      properties:
+        catalogVersion: { type: string, maxLength: 64 }
+        generatedAt: { type: string, format: date-time }
+        validUntil:
+          type: string
+          format: date-time
+          description: Offline cache expiry for BlackStore (ADR-004).
+        etag: { type: string, maxLength: 64 }
+        nextCursor:
+          type: [string, 'null']
+          maxLength: 160
+        items:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/CatalogItem' }
+    CatalogItem:
+      type: object
+      additionalProperties: false
+      required: [productId, variantId, sku, barcode, name, images, unitPrice, priceVersion, currency, availableQuantity, active]
+      properties:
+        productId: { type: integer, format: int64 }
+        variantId: { type: integer, format: int64 }
+        sku: { type: string, maxLength: 64 }
+        barcode:
+          type: [string, 'null']
+          maxLength: 64
+        name: { type: string, maxLength: 255 }
+        images:
+          type: array
+          maxItems: 20
+          items: { type: string, format: uri, maxLength: 2048 }
+        unitPrice: { $ref: '#/components/schemas/DecimalAmount' }
+        priceVersion: { type: string, maxLength: 64 }
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+          description: Installation currency from StoreCore profile. Not hardcoded.
+        availableQuantity:
+          type: integer
+          minimum: 0
+          description: |
+            Sellable quantity only. GREATEST(0, available_quantity - safety_stock).
+            available_quantity already nets reserved_quantity; do not subtract reserved again.
+            Never expose raw physical on-hand. Reserve fails with 409 if requested > this value.
+        active: { type: boolean }
+        authorizedCost:
+          $ref: '#/components/schemas/DecimalAmount'
+          description: Omitted unless cost:read. Never for cashier identity.
+    VariantStock:
+      type: object
+      additionalProperties: false
+      required: [variantId, sku, availableQuantity, catalogVersion]
+      properties:
+        variantId: { type: integer, format: int64 }
+        sku: { type: string, maxLength: 64 }
+        availableQuantity:
+          type: integer
+          minimum: 0
+          description: |
+            Sellable quantity only. GREATEST(0, available_quantity - safety_stock).
+            available_quantity already nets reserved_quantity; do not subtract reserved again.
+            Never the raw physical on-hand.
+        catalogVersion: { type: string, maxLength: 64 }
+    ReservationRequest:
+      type: object
+      required: [catalogVersion, priceVersion, lines]
+      additionalProperties: false
+      properties:
+        catalogVersion: { type: string, maxLength: 64 }
+        priceVersion:
+          type: string
+          maxLength: 64
+          description: Required envelope default. Line.priceVersion wins when both are set. Every line must resolve to a priceVersion.
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/ReservationLine' }
+    ReservationLine:
+      type: object
+      required: [variantId, sku, quantity]
+      additionalProperties: false
+      properties:
+        variantId: { type: integer, format: int64 }
+        sku: { type: string, maxLength: 64 }
+        quantity: { type: integer, minimum: 1 }
+        priceVersion:
+          type: string
+          maxLength: 64
+          description: Overrides envelope priceVersion when present. Envelope priceVersion is required if omitted here.
+    OperationReceiptPending:
+      type: object
+      additionalProperties: false
+      required: [state, contractVersion]
+      properties:
+        state: { const: PENDING }
+        contractVersion: { type: string, maxLength: 32 }
+        catalogVersion:
+          type: [string, 'null']
+          maxLength: 64
+    OperationReceiptDurable:
+      type: object
+      additionalProperties: false
+      required: [state, contractVersion, receipt, reservationRef, acceptedPriceVersions]
+      properties:
+        state:
+          type: string
+          enum: [RESERVED, COMMITTED, RELEASED, EXPIRED]
+        receipt: { type: string, minLength: 1, maxLength: 128 }
+        reservationRef: { type: string, format: uuid }
+        contractVersion: { type: string, maxLength: 32 }
+        expiresAt:
+          type: [string, 'null']
+          format: date-time
+        catalogVersion:
+          type: [string, 'null']
+          maxLength: 64
+        acceptedPriceVersions:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [variantId, sku, priceVersion]
+            properties:
+              variantId: { type: integer, format: int64 }
+              sku: { type: string, maxLength: 64 }
+              priceVersion: { type: string, maxLength: 64 }
+        availableAfter:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            additionalProperties: false
+            required: [variantId, availableQuantity]
+            properties:
+              variantId: { type: integer, format: int64 }
+              availableQuantity: { type: integer, minimum: 0 }
+    OperationReceipt:
+      description: |
+        oneOf by state. PENDING has no receipt/reservationRef/acceptedPriceVersions.
+        RESERVED|COMMITTED|RELEASED|EXPIRED require non-null receipt, reservationRef and acceptedPriceVersions (min 1).
+      oneOf:
+        - $ref: '#/components/schemas/OperationReceiptPending'
+        - $ref: '#/components/schemas/OperationReceiptDurable'
+      discriminator:
+        propertyName: state
+        mapping:
+          PENDING: '#/components/schemas/OperationReceiptPending'
+          RESERVED: '#/components/schemas/OperationReceiptDurable'
+          COMMITTED: '#/components/schemas/OperationReceiptDurable'
+          RELEASED: '#/components/schemas/OperationReceiptDurable'
+          EXPIRED: '#/components/schemas/OperationReceiptDurable'
+    ReconcileRequest:
+      type: object
+      required: [knownReceipts]
+      additionalProperties: false
+      properties:
+        knownReceipts:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items: { type: string, minLength: 1, maxLength: 128 }
+          description: Receipts BlackStore already holds. StoreCore never invents extra ops.
+    ReconcileResult:
+      type: object
+      additionalProperties: false
+      required: [present, unknownReceipts]
+      description: |
+        Read-only. present = intersection(knownReceipts, receipts StoreCore stores).
+        unknownReceipts = knownReceipts StoreCore does not store.
+        Does not list server-only operations. Investigate a single saga via GET quadruple.
+        Zero ledger/saga/stock writes. Scope stock:read. Rate 5 rps.
+      properties:
+        present:
+          type: array
+          maxItems: 500
+          items: { $ref: '#/components/schemas/OperationReceipt' }
+        unknownReceipts:
+          type: array
+          maxItems: 500
+          items: { type: string, maxLength: 128 }

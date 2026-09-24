@@ -16,6 +16,7 @@ import { CustomerStore } from './customer.store';
         (save)="store.persistAddress()"
         (remove)="store.removeAddress($event)"
         (clearDraft)="store.clearAddressDraft()"
+        (retry)="store.loadAddresses()"
       />
     }
   `,

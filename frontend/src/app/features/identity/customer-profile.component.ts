@@ -14,6 +14,7 @@ import { CustomerStore } from './customer.store';
         [state]="state"
         (profileChange)="store.setProfile($event)"
         (save)="store.persistProfile()"
+        (retry)="store.loadProfile()"
       />
     }
   `,

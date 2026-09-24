@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>StoreCore — Checkout</title>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-primary-fixed": "#001551",
+            "on-surface": "#1a1b22",
+            "secondary-container": "#dae2fd",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-secondary-fixed": "#131b2e",
+            "surface-bright": "#fbf8ff",
+            "surface-container-low": "#f4f2fd",
+            "surface-tint": "#2151da",
+            "tertiary": "#444447",
+            "surface-container-highest": "#e3e1ec",
+            "on-primary": "#ffffff",
+            "secondary-fixed": "#dae2fd",
+            "on-surface-variant": "#434655",
+            "on-background": "#1a1b22",
+            "tertiary-fixed": "#e4e1e6",
+            "outline": "#747686",
+            "on-error-container": "#93000a",
+            "secondary": "#565e74",
+            "on-secondary": "#ffffff",
+            "surface": "#fbf8ff",
+            "primary-container": "#1d4ed8",
+            "on-error": "#ffffff",
+            "inverse-surface": "#2f3038",
+            "background": "#fbf8ff",
+            "error-container": "#ffdad6",
+            "surface-dim": "#dad9e3",
+            "on-secondary-fixed-variant": "#3f465c",
+            "tertiary-container": "#5c5b5f",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-tertiary-fixed": "#1b1b1e",
+            "on-tertiary": "#ffffff",
+            "surface-container": "#eeedf7",
+            "primary-fixed-dim": "#b7c4ff",
+            "error": "#ba1a1a",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-high": "#e8e7f1",
+            "primary": "#0037b0",
+            "on-tertiary-container": "#d6d3d7",
+            "on-primary-container": "#cad3ff",
+            "inverse-primary": "#b7c4ff",
+            "inverse-on-surface": "#f1effa",
+            "on-secondary-container": "#5c647a",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "outline-variant": "#c4c5d7",
+            "on-tertiary-fixed-variant": "#47464a",
+            "surface-variant": "#e3e1ec",
+            "primary-fixed": "#dce1ff"
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          spacing: {
+            "space-sm": "0.5rem",
+            "space-xl": "2rem",
+            "gutter": "1rem",
+            "space-md": "0.75rem",
+            "margin": "1.5rem",
+            "space-lg": "1.25rem",
+            "space-xs": "0.25rem"
+          },
+          fontFamily: {
+            "label-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "mono": ["JetBrains Mono", "monospace"]
+          },
+          fontSize: {
+            "label-sm": ["11px", { lineHeight: "14px", fontWeight: "500" }],
+            "body-lg": ["16px", { lineHeight: "24px", fontWeight: "400" }],
+            "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+            "body-sm": ["12px", { lineHeight: "16px", fontWeight: "400" }],
+            "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+            "headline-sm": ["18px", { lineHeight: "26px", fontWeight: "600" }],
+            "label-md": ["12px", { lineHeight: "16px", fontWeight: "600" }],
+            "headline-lg": ["30px", { lineHeight: "36px", fontWeight: "700" }]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#f4f4f5] text-[#18181b] min-h-screen antialiased flex flex-col font-body-md text-body-md">
+<!-- TopNavBar (Shared Component) -->
+<header class="sticky top-0 w-full z-50 bg-[#0f172a] border-b border-slate-800 shadow-sm">
+<div class="flex items-center justify-between h-16 px-6 max-w-7xl mx-auto w-full">
+<!-- Brand & Navigation cluster -->
+<div class="flex items-center gap-8">
+<a class="font-headline text-lg font-bold tracking-tight text-white flex items-center gap-2" href="#">
+<span>StoreCore</span>
+</a>
+<nav class="hidden md:flex items-center gap-6 font-body text-sm font-medium">
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">Storefront</a>
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">Catálogo</a>
+<a class="text-white font-semibold border-b-2 border-[#1d4ed8] pb-1 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">Carrito</a>
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">Customer</a>
+<a class="text-slate-300 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">User</a>
+</nav>
+</div>
+<!-- Trailing contextual actions -->
+<div class="flex items-center gap-3 font-body text-sm">
+<span class="text-xs text-slate-400 font-medium px-2.5 py-1 rounded bg-slate-800/60 border border-slate-700/50">
+          Customer sin sesión
+        </span>
+<span class="text-xs text-slate-400 font-medium px-2.5 py-1 rounded bg-slate-800/60 border border-slate-700/50">
+          User sin sesión
+        </span>
+</div>
+</div>
+</header>
+<!-- Main Content Container -->
+<main class="flex-1 w-full max-w-6xl mx-auto py-10 px-6">
+<!-- Encabezado de página & Breadcrumb -->
+<div class="mb-8">
+<nav aria-label="Ruta de navegación" class="flex items-center gap-2 font-label-md text-label-md text-slate-500 mb-3">
+<span class="hover:text-slate-700 cursor-pointer">StoreCore</span>
+<span class="material-symbols-outlined text-[14px] text-slate-400">chevron_right</span>
+<span class="hover:text-slate-700 cursor-pointer">Carrito</span>
+<span class="material-symbols-outlined text-[14px] text-slate-400">chevron_right</span>
+<span aria-current="page" class="text-slate-900 font-semibold">Checkout</span>
+</nav>
+<h1 class="font-headline-lg text-headline-lg tracking-tight text-slate-900 mb-2">
+        Checkout
+      </h1>
+<p class="font-body-md text-body-md text-slate-600 max-w-3xl leading-relaxed">
+        El pago se inicia en el servidor. Reintentar reusa la misma clave. El browser no habla con Mercado Pago.
+      </p>
+</div>
+<!-- 2 Column Layout (7/12 & 5/12) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Columna Izquierda: Formulario Operativo (7/12) -->
+<div class="lg:col-span-7 space-y-6">
+<div class="bg-white border border-slate-200 rounded-lg p-6 sm:p-8 shadow-sm">
+<!-- Sección Entrega -->
+<div class="pb-6 border-b border-slate-200">
+<div class="flex items-center justify-between mb-3">
+<label class="font-headline-sm text-headline-sm text-slate-900" for="delivery-address">
+                Entrega / Dirección de recepción
+              </label>
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                Dirección verificada
+              </span>
+</div>
+<p class="font-body-sm text-body-sm text-slate-500 mb-3">
+              Elegí la ubicación donde querés recibir el paquete o el punto de retiro acordado.
+            </p>
+<div class="relative">
+<select class="w-full bg-white border border-slate-300 rounded text-slate-900 font-body-md text-body-md p-3 pr-10 appearance-none focus:outline-none focus:border-[#1d4ed8] focus:ring-1 focus:ring-[#1d4ed8]" id="delivery-address">
+<option value="caba-cabildo">Av. Cabildo 2040, 4° B, Belgrano, CABA (Domicilio habitual de retiro/entrega)</option>
+</select>
+<div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+<span class="material-symbols-outlined text-[20px]">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Sección Parámetros de Cobro -->
+<div class="py-6 border-b border-slate-200">
+<h2 class="font-headline-sm text-headline-sm text-slate-900 mb-4">
+              Parámetros de cobro
+            </h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end mb-4">
+<!-- Input Moneda -->
+<div>
+<label class="block font-label-md text-label-md text-slate-700 mb-1.5" for="currency-field">
+                  Moneda
+                </label>
+<div class="relative">
+<input class="w-full bg-slate-100 border border-slate-300 rounded font-body-md text-body-md text-slate-700 py-2.5 px-3 cursor-not-allowed select-none" disabled="" id="currency-field" readonly="" type="text" value="ARS"/>
+<span class="absolute right-3 top-2.5 font-label-sm text-label-sm text-slate-500">Pesos Argentinos</span>
+</div>
+</div>
+<!-- Indicador Clave Idempotencia -->
+<div>
+<label class="block font-label-md text-label-md text-slate-700 mb-1.5">
+                  Clave de idempotencia
+                </label>
+<div class="flex items-center">
+<span class="font-mono text-xs text-slate-600 bg-slate-100 px-3 py-2 rounded border border-slate-200 w-full flex items-center justify-between">
+<span>Clave idem-7f3a</span>
+<span class="material-symbols-outlined text-[16px] text-slate-400" title="Identificador único del intento">lock</span>
+</span>
+</div>
+</div>
+</div>
+<!-- Bloque explicativo de idempotencia -->
+<div class="bg-slate-50 rounded border border-slate-200 p-3.5 flex items-start gap-3 mt-4">
+<span class="material-symbols-outlined text-slate-500 text-[18px] shrink-0 mt-0.5">verified_user</span>
+<p class="font-body-sm text-body-sm text-slate-600 leading-normal">
+                Esta operación está resguardada por la clave <strong class="font-mono font-medium text-slate-800">idem-7f3a</strong>. En caso de microcortes de conexión o demoras, podés reintentar con total tranquilidad: la transacción no se cobrará dos veces.
+              </p>
+</div>
+</div>
+<!-- Acciones de confirmación -->
+<div class="pt-6 space-y-4">
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+<!-- Botón Primario Pagar -->
+<button class="flex-1 bg-[#1d4ed8] hover:bg-blue-800 text-white font-body-md text-body-md font-semibold py-3 px-6 rounded transition-colors text-center shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2" type="button">
+                Pagar
+              </button>
+<!-- Botón Secundario Reintentar -->
+<button class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-body-md text-body-md font-medium py-3 px-5 rounded transition-colors text-center focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2" title="Reusa la clave idem-7f3a" type="button">
+                Reintentar
+              </button>
+</div>
+<div class="flex items-center justify-between pt-2">
+<a class="inline-flex items-center gap-1 font-body-sm text-body-sm text-[#1d4ed8] hover:underline focus:outline-none focus:ring-1 focus:ring-[#1d4ed8] rounded" href="#">
+<span class="material-symbols-outlined text-[16px]">arrow_back</span>
+<span>Volver al carrito</span>
+</a>
+<span class="font-label-sm text-label-sm text-slate-500">
+                Revisá los datos antes de confirmar
+              </span>
+</div>
+</div>
+</div>
+</div>
+<!-- Columna Derecha: Aside "Pedido" (5/12) -->
+<aside class="lg:col-span-5 sticky top-24">
+<div class="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+<div class="flex items-center justify-between pb-4 border-b border-slate-200">
+<h2 class="font-headline-md text-headline-md text-slate-900">
+              Pedido
+            </h2>
+<span class="font-label-sm text-label-sm text-slate-500 font-mono">1 Ítem</span>
+</div>
+<!-- Ítem de línea único -->
+<div class="py-5 border-b border-slate-200">
+<div class="flex items-start justify-between gap-4">
+<div class="space-y-1">
+<h3 class="font-body-md text-body-md font-semibold text-slate-900 leading-snug">
+                  Lámpara de escritorio articulada mate
+                </h3>
+<p class="font-mono text-xs text-slate-500">SKU-100</p>
+<div class="font-body-sm text-body-sm text-slate-600 pt-1">
+                  1 unidad × $12.500 ARS
+                </div>
+</div>
+<div class="font-headline-sm text-headline-sm text-slate-900 tabular-nums text-right">
+                $12.500
+              </div>
+</div>
+</div>
+<!-- Desglose Conciso -->
+<div class="py-4 space-y-3 font-body-md text-body-md">
+<div class="flex items-center justify-between text-slate-600">
+<span>Subtotal efectivo</span>
+<span class="tabular-nums font-medium text-slate-800">$12.500 ARS</span>
+</div>
+<div class="flex items-center justify-between text-slate-600">
+<span>Entrega en punto / domicilio</span>
+<span class="font-medium text-emerald-700">Sin costo adicional</span>
+</div>
+</div>
+<div class="border-t border-slate-200 pt-4 pb-2">
+<div class="flex items-baseline justify-between">
+<div>
+<span class="block font-headline-sm text-headline-sm text-slate-900">Total a cobrar</span>
+<span class="font-label-sm text-label-sm text-slate-500">Pago único en moneda local</span>
+</div>
+<span class="font-headline-lg text-headline-lg font-bold text-slate-900 tabular-nums">
+                $12.500 <span class="text-sm font-semibold text-slate-600">ARS</span>
+</span>
+</div>
+</div>
+<!-- Nota de seguridad en pie de tarjeta -->
+<div class="mt-6 pt-4 border-t border-slate-100 flex items-start gap-2.5 text-slate-500">
+<span class="material-symbols-outlined text-[18px] shrink-0 text-slate-400 mt-0.5">terminal</span>
+<p class="font-body-sm text-body-sm leading-snug text-slate-500">
+              Procesamiento desacoplado directo en servidor sin intermediarios de terceros. Los eventos se validan directamente vía StoreCore Core API.
+            </p>
+</div>
+</div>
+</aside>
+</div>
+</main>
+<!-- Footer Utilitario Corporativo -->
+<footer class="mt-auto border-t border-slate-200 bg-white py-6">
+<div class="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 font-body-sm text-body-sm text-slate-500">
+<div>
+<span>StoreCore OS — Entorno de despacho operativo y checkout desacoplado.</span>
+</div>
+<div class="flex items-center gap-6">
+<span class="flex items-center gap-1 font-mono text-xs">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          Gateway: Conectado
+        </span>
+<span>Revisá los términos de servicio antes de procesar</span>
+</div>
+</div>
+</footer>
+</body></html>

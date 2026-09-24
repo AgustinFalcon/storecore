@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>C-04 StoreCore Customer Addresses</title>
+<!-- Google Fonts: Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-tertiary-container": "#d6d3d7",
+            "primary-container": "#1d4ed8",
+            "surface-tint": "#2151da",
+            "surface-container-low": "#f4f2fd",
+            "on-secondary-fixed": "#131b2e",
+            "on-primary-container": "#cad3ff",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-variant": "#e3e1ec",
+            "outline-variant": "#c4c5d7",
+            "tertiary-container": "#5c5b5f",
+            "error": "#ba1a1a",
+            "on-primary-fixed": "#001551",
+            "error-container": "#ffdad6",
+            "surface-container-highest": "#e3e1ec",
+            "on-primary-fixed-variant": "#0039b5",
+            "on-background": "#1a1b22",
+            "inverse-surface": "#2f3038",
+            "on-tertiary": "#ffffff",
+            "secondary": "#565e74",
+            "surface-container-lowest": "#ffffff",
+            "secondary-fixed": "#dae2fd",
+            "primary": "#0037b0",
+            "on-tertiary-fixed-variant": "#47464a",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-surface": "#1a1b22",
+            "tertiary-fixed": "#e4e1e6",
+            "on-tertiary-fixed": "#1b1b1e",
+            "secondary-container": "#dae2fd",
+            "on-secondary-container": "#5c647a",
+            "surface-bright": "#fbf8ff",
+            "on-error": "#ffffff",
+            "tertiary": "#444447",
+            "background": "#fbf8ff",
+            "surface-container": "#eeedf7",
+            "inverse-primary": "#b7c4ff",
+            "outline": "#747686",
+            "primary-fixed": "#dce1ff",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "surface": "#fbf8ff",
+            "on-primary": "#ffffff",
+            "inverse-on-surface": "#f1effa",
+            "surface-container-high": "#e8e7f1",
+            "on-secondary": "#ffffff",
+            "surface-dim": "#dad9e3",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-error-container": "#93000a",
+            "on-surface-variant": "#434655"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-lg": "1.25rem",
+            "space-xs": "0.25rem",
+            "space-sm": "0.5rem",
+            "space-md": "0.75rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-xl": "2rem"
+          },
+          "fontFamily": {
+            "label-md": ["Inter"],
+            "headline-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "headline-sm": ["Inter"],
+            "body-md": ["Inter"],
+            "label-sm": ["Inter"]
+          },
+          "fontSize": {
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col font-body-md text-body-md text-[#18181b] antialiased bg-[#f4f4f5]">
+<!-- TopNavBar (Shared Component) -->
+<header class="sticky top-0 w-full z-50 bg-[#0f172a] border-b border-slate-800 shadow-sm">
+<div class="flex items-center justify-between h-16 px-6 max-w-7xl mx-auto w-full">
+<!-- Left: Brand Logo & Main Nav -->
+<div class="flex items-center gap-8">
+<a class="flex items-center gap-2 text-white font-headline text-lg font-bold tracking-tight" href="/storefront">
+<span class="w-2.5 h-2.5 rounded-full bg-[#1d4ed8]"></span>
+          StoreCore
+        </a>
+<nav class="hidden md:flex items-center space-x-6 font-body text-sm font-medium">
+<a class="text-slate-300 hover:text-white transition-colors" href="/storefront">Storefront</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/catalogo">Catálogo</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/carrito">Carrito</a>
+<a class="text-white font-semibold border-b-2 border-[#1d4ed8] pb-1" href="/customer/addresses">Customer</a>
+<a class="text-slate-300 hover:text-white transition-colors" href="/user">User</a>
+</nav>
+</div>
+<!-- Right: Active Customer Session Profile -->
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-2.5 bg-slate-800/70 border border-slate-700/60 rounded-full py-1.5 px-3">
+<div class="w-6 h-6 rounded-full bg-[#1d4ed8] text-white flex items-center justify-center font-bold text-xs">
+            MP
+          </div>
+<div class="text-xs">
+<span class="font-medium text-slate-200">Martín Palermo</span>
+<span class="text-slate-400 hidden sm:inline text-[11px] ml-1">(comprador@ejemplo.com.ar)</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Sub-header Breadcrumb and Navigation Bar -->
+<div class="bg-white border-b border-slate-200">
+<div class="max-w-6xl mx-auto px-6">
+<!-- Breadcrumb -->
+<div class="py-3 flex items-center gap-2 font-body-sm text-body-sm text-slate-500">
+<a class="hover:text-slate-900 transition-colors" href="/">StoreCore</a>
+<span class="material-symbols-outlined text-[14px] text-slate-400">chevron_right</span>
+<a class="hover:text-slate-900 transition-colors" href="/customer">Portal de Compradores</a>
+<span class="material-symbols-outlined text-[14px] text-slate-400">chevron_right</span>
+<span class="text-slate-900 font-medium">Direcciones de Entrega</span>
+</div>
+<!-- Portal Contextual Tabs -->
+<div class="flex items-center gap-8 border-t border-slate-100 -mb-px">
+<a class="py-3 font-body-md text-body-md text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors" href="/customer/profile">
+          Mis Datos
+        </a>
+<a class="py-3 font-body-md text-body-md text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors" href="/customer/orders">
+          Mis Pedidos
+        </a>
+<a class="py-3 font-body-md text-body-md font-semibold text-[#1d4ed8] border-b-2 border-[#1d4ed8] transition-colors" href="/customer/addresses">
+          Direcciones de Entrega
+        </a>
+<a class="py-3 font-body-md text-body-md text-slate-500 hover:text-slate-900 border-b-2 border-transparent transition-colors" href="/customer/security">
+          Seguridad
+        </a>
+</div>
+</div>
+</div>
+<!-- Main Content Container -->
+<main class="flex-1 max-w-6xl mx-auto w-full py-8 px-6">
+<!-- Header Title Block -->
+<div class="mb-6">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-slate-200 bg-white text-slate-600 font-label-sm text-label-sm tracking-wide uppercase font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-[#1d4ed8]"></span>
+        C-04 · CUENTA CUSTOMER
+      </div>
+<h1 class="mt-2 font-headline-lg text-headline-lg text-[#18181b] tracking-tight">Direcciones</h1>
+<p class="text-slate-600 font-body-md text-body-md mt-1">Entregas de esta cuenta.</p>
+</div>
+<!-- Two-Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Left Column: Address List -->
+<div class="lg:col-span-7 space-y-4">
+<div class="flex items-center justify-between pb-2 border-b border-slate-200">
+<h2 class="font-headline-sm text-headline-sm text-[#18181b] flex items-center gap-2">
+            Tus direcciones guardadas
+            <span class="inline-flex items-center justify-center bg-slate-200/80 text-slate-700 text-xs font-semibold px-2 py-0.5 rounded-full">
+              2
+            </span>
+</h2>
+<span class="font-body-sm text-body-sm text-slate-500">Prioridad para envíos</span>
+</div>
+<!-- Address Cards List -->
+<div class="space-y-4">
+<!-- Card 1: Default Address -->
+<div class="rounded-lg border-2 border-blue-200 bg-white p-5 shadow-sm transition-all hover:shadow">
+<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="bg-blue-50 text-[#1d4ed8] border border-blue-200 font-label-md text-label-md px-2.5 py-0.5 rounded-full flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                  Predeterminada
+                </span>
+<span class="bg-slate-50 text-slate-600 border border-slate-200 font-label-sm text-label-sm px-2 py-0.5 rounded">
+                  Entrega habitual
+                </span>
+</div>
+<span class="text-xs text-slate-400 font-mono">CP C1428AAJ</span>
+</div>
+<div class="mt-3.5 space-y-1.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">home</span>
+<h3 class="font-headline-sm text-headline-sm text-[#18181b]">Domicilio particular</h3>
+</div>
+<p class="text-slate-700 font-body-md text-body-md pl-6">
+                Av. Cabildo 2040, 4° B, Belgrano, Ciudad Autónoma de Buenos Aires
+              </p>
+<p class="text-slate-500 font-body-sm text-body-sm pl-6 flex items-center gap-1.5 pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-slate-400">person</span>
+                Destinatario: Martín Palermo · Tel: +54 11 4892-0012
+              </p>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+<span class="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                Zona de despacho directo
+              </span>
+<div class="flex items-center gap-3">
+<button class="text-slate-500 hover:text-red-600 font-body-md text-body-md font-medium transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+                  Quitar
+                </button>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-md font-body-md text-body-md text-slate-700 font-medium transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+                  Modificar
+                </button>
+</div>
+</div>
+</div>
+<!-- Card 2: Secondary Address -->
+<div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300">
+<div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<span class="bg-slate-100 text-slate-600 border border-slate-200 font-label-sm text-label-sm px-2.5 py-0.5 rounded-full">
+                  Secundaria
+                </span>
+<span class="bg-slate-50 text-slate-600 border border-slate-200 font-label-sm text-label-sm px-2 py-0.5 rounded">
+                  Laboral
+                </span>
+</div>
+<span class="text-xs text-slate-400 font-mono">CP C1428DNA</span>
+</div>
+<div class="mt-3.5 space-y-1.5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-slate-400 text-[18px]">business</span>
+<h3 class="font-headline-sm text-headline-sm text-[#18181b]">Oficina Belgrano</h3>
+</div>
+<p class="text-slate-700 font-body-md text-body-md pl-6">
+                Juramento 1945, Piso 8 Of. 802, Ciudad Autónoma de Buenos Aires
+              </p>
+<p class="text-slate-500 font-body-sm text-body-sm pl-6 flex items-center gap-1.5 pt-0.5">
+<span class="material-symbols-outlined text-[15px] text-slate-400">schedule</span>
+                Recepción: Lunes a Viernes 09:00 a 18:00 hs
+              </p>
+</div>
+<div class="mt-4 pt-3.5 border-t border-slate-100 flex items-center justify-between">
+<button class="text-[#1d4ed8] hover:underline font-body-md text-body-md font-medium flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+                Marcar como predeterminada
+              </button>
+<div class="flex items-center gap-3">
+<button class="text-slate-500 hover:text-red-600 font-body-md text-body-md font-medium transition-colors flex items-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+                  Quitar
+                </button>
+<button class="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-200 hover:bg-slate-50 rounded-md font-body-md text-body-md text-slate-700 font-medium transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+                  Modificar
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Security / Postal Verification Note -->
+<div class="p-4 rounded-lg bg-blue-50/70 border border-blue-100 text-slate-600 flex items-start gap-3">
+<span class="material-symbols-outlined text-[#1d4ed8] text-[20px] shrink-0 mt-0.5">info</span>
+<p class="font-body-sm text-body-sm leading-relaxed text-slate-600">
+            Las direcciones registradas se validan contra el código postal oficial para calcular opciones de entrega y tiempos de despacho en mostrador o mensajería.
+          </p>
+</div>
+</div>
+<!-- Right Column: Add Address Form Card -->
+<div class="lg:col-span-5">
+<div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+<div class="border-b border-slate-100 pb-4 mb-5">
+<h2 class="font-headline-sm text-headline-sm text-[#18181b] flex items-center gap-2">
+<span class="material-symbols-outlined text-[#1d4ed8]">add_location_alt</span>
+              Agregar nueva dirección
+            </h2>
+<p class="text-slate-500 font-body-sm text-body-sm mt-1">
+              Completá los datos para recibir envíos o coordinar retiros.
+            </p>
+</div>
+<form action="#" class="space-y-4" method="POST" onsubmit="event.preventDefault();">
+<!-- Field 1: Calle -->
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="street">
+                Calle <span class="text-red-500">*</span>
+</label>
+<input class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] placeholder-slate-400 focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="street" name="street" placeholder="Ej. Av. Monroe" required="" type="text"/>
+</div>
+<!-- Field 2: Número y Piso/Depto (Inline) -->
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="number">
+                  Número <span class="text-red-500">*</span>
+</label>
+<input class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] placeholder-slate-400 focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="number" name="number" placeholder="Ej. 2410" required="" type="text"/>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="floor_dept">
+                  Piso / Depto <span class="text-slate-400 text-xs font-normal">(Opcional)</span>
+</label>
+<input class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] placeholder-slate-400 focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="floor_dept" name="floor_dept" placeholder="Ej. 3° A" type="text"/>
+</div>
+</div>
+<!-- Field 3: Ciudad -->
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="city">
+                Ciudad <span class="text-red-500">*</span>
+</label>
+<input class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] placeholder-slate-400 focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="city" name="city" placeholder="Ej. Ciudad Autónoma de Buenos Aires" required="" type="text"/>
+</div>
+<!-- Field 4 & 5: Provincia y Código Postal -->
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="province">
+                  Provincia <span class="text-red-500">*</span>
+</label>
+<select class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="province" name="province" required="">
+<option selected="" value="CABA">CABA</option>
+<option value="Buenos Aires">Buenos Aires</option>
+<option value="Córdoba">Córdoba</option>
+<option value="Santa Fe">Santa Fe</option>
+<option value="Mendoza">Mendoza</option>
+</select>
+</div>
+<div>
+<label class="block font-label-md text-label-md text-[#18181b] mb-1.5" for="postal_code">
+                  Código Postal (CP) <span class="text-red-500">*</span>
+</label>
+<input class="w-full rounded-lg border border-[#d4d4d8] bg-white px-3.5 py-2 text-body-md text-[#18181b] placeholder-slate-400 focus:border-[#1d4ed8] focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] transition-colors" id="postal_code" name="postal_code" placeholder="Ej. C1428" required="" type="text"/>
+</div>
+</div>
+<!-- Checkbox: Dirección Predeterminada -->
+<div class="pt-2">
+<label class="flex items-start gap-3 cursor-pointer select-none">
+<input class="mt-1 h-4 w-4 rounded border-[#d4d4d8] text-[#1d4ed8] focus:ring-[#1d4ed8]" name="is_default" type="checkbox"/>
+<div class="text-body-sm text-body-sm">
+<span class="font-medium text-[#18181b] block">Establecer como dirección predeterminada</span>
+<span class="text-slate-500 leading-normal block">Se usará por defecto en tus próximas órdenes en la sucursal.</span>
+</div>
+</label>
+</div>
+<!-- Submit Button -->
+<div class="pt-3">
+<button class="w-full flex items-center justify-center gap-2 rounded-lg bg-[#1d4ed8] hover:bg-blue-700 text-white font-medium py-2.5 px-4 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 transition-colors" type="submit">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Agregar dirección
+              </button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="mt-auto border-t border-slate-200 bg-white">
+<div class="max-w-7xl mx-auto px-6 py-6 flex flex-col md:flex-row items-center justify-between gap-4 font-body-sm text-body-sm text-slate-500">
+<div class="flex items-center gap-2">
+<span class="font-semibold text-slate-800">StoreCore</span>
+<span>—</span>
+<span>Sistema de Operación de Tienda Unificada</span>
+</div>
+<div class="flex items-center gap-6">
+<a class="hover:text-slate-900 transition-colors" href="/terminos">Términos del servicio</a>
+<a class="hover:text-slate-900 transition-colors" href="/privacidad">Privacidad y resguardo</a>
+<a class="hover:text-slate-900 transition-colors" href="/soporte">Soporte al comprador</a>
+</div>
+</div>
+</footer>
+</body></html>

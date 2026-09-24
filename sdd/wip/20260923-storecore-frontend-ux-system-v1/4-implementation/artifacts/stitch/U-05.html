@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-05 StoreCore User Orders</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "tertiary-fixed": "#e4e1e6",
+            "on-tertiary-fixed-variant": "#47464a",
+            "surface-container-low": "#f4f2fd",
+            "on-error-container": "#93000a",
+            "secondary-fixed": "#dae2fd",
+            "on-surface-variant": "#434655",
+            "on-background": "#1a1b22",
+            "on-secondary-container": "#5c647a",
+            "primary-container": "#1d4ed8",
+            "surface-container-high": "#e8e7f1",
+            "tertiary": "#444447",
+            "secondary-fixed-dim": "#bec6e0",
+            "on-primary-container": "#cad3ff",
+            "on-secondary-fixed": "#131b2e",
+            "on-primary-fixed": "#001551",
+            "surface-bright": "#fbf8ff",
+            "error": "#ba1a1a",
+            "background": "#fbf8ff",
+            "on-primary-fixed-variant": "#0039b5",
+            "surface": "#fbf8ff",
+            "secondary": "#565e74",
+            "outline": "#747686",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary": "#ffffff",
+            "on-error": "#ffffff",
+            "outline-variant": "#c4c5d7",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "surface-variant": "#e3e1ec",
+            "on-tertiary-container": "#d6d3d7",
+            "on-secondary": "#ffffff",
+            "primary": "#0037b0",
+            "on-primary": "#ffffff",
+            "surface-dim": "#dad9e3",
+            "surface-container-highest": "#e3e1ec",
+            "inverse-primary": "#b7c4ff",
+            "inverse-on-surface": "#f1effa",
+            "surface-tint": "#2151da",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary-fixed-variant": "#3f465c",
+            "secondary-container": "#dae2fd",
+            "surface-container": "#eeedf7",
+            "primary-fixed-dim": "#b7c4ff",
+            "on-tertiary-fixed": "#1b1b1e",
+            "on-surface": "#1a1b22",
+            "tertiary-container": "#5c5b5f",
+            "inverse-surface": "#2f3038",
+            "error-container": "#ffdad6"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "space-lg": "1.25rem",
+            "space-xl": "2rem",
+            "space-sm": "0.5rem",
+            "margin": "1.5rem",
+            "space-md": "0.75rem",
+            "gutter": "1rem"
+          },
+          "fontFamily": {
+            "body-lg": ["Inter"],
+            "headline-md": ["Inter"],
+            "label-md": ["Inter"],
+            "label-sm": ["Inter"],
+            "headline-lg": ["Inter"],
+            "body-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "body-sm": ["Inter"]
+          },
+          "fontSize": {
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }]
+          }
+        },
+      },
+    }
+  </script>
+</head>
+<body class="min-h-full flex flex-col font-body-md text-on-surface antialiased bg-[#f4f4f5]">
+<!-- TopNavBar (Shared Component JSON Blueprint) -->
+<header class="w-full px-margin flex items-center justify-between h-14 bg-inverse-surface border-b border-outline-variant select-none sticky top-0 z-30">
+<div class="flex items-center gap-space-lg">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-surface">StoreCore</span>
+<span class="font-label-sm text-label-sm px-space-xs py-0.5 rounded bg-tertiary-container text-surface flex items-center gap-1">
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+          Salón Belgrano · HTTP 200 OK
+        </span>
+</div>
+<!-- Navigation Links from JSON: Contenido, Catálogo, Promos, Órdenes, Inventario, Mercado Libre -->
+<nav class="hidden md:flex items-center gap-space-md ml-space-md">
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Contenido</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Catálogo</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Promos</a>
+<!-- ACTIVE item: Órdenes (Semantic Destination Match) -->
+<a class="border-b-2 border-primary-container text-surface font-label-md text-label-md pb-1" href="#">Órdenes</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Inventario</a>
+<a class="text-surface-variant font-label-md text-label-md hover:text-surface pb-1 transition-colors" href="#">Mercado Libre</a>
+</nav>
+</div>
+<!-- Trailing Actions & User Status -->
+<div class="flex items-center gap-space-md">
+<button class="hidden sm:inline-flex items-center gap-1 text-surface-variant hover:text-surface font-label-md text-label-md transition-colors px-space-sm py-1 rounded hover:bg-tertiary-container" type="button">
+<span class="material-symbols-outlined text-[16px]">upload_file</span>
+        Importar perfil
+      </button>
+<div class="h-4 w-px bg-outline-variant/40 hidden sm:block"></div>
+<div class="flex items-center gap-space-xs text-surface">
+<button class="p-1 hover:bg-tertiary-container text-surface-variant hover:text-surface rounded transition-colors" title="Ajustes" type="button">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+<button class="p-1 hover:bg-tertiary-container text-surface-variant hover:text-surface rounded transition-colors relative" title="Notificaciones" type="button">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-1 right-1 w-1.5 h-1.5 bg-primary-container rounded-full"></span>
+</button>
+<div class="flex items-center gap-2 pl-space-xs">
+<span class="material-symbols-outlined text-[22px] text-primary-fixed">account_circle</span>
+<div class="hidden lg:flex flex-col text-left">
+<span class="font-label-md text-label-md text-surface leading-tight">Martín Rossi</span>
+<span class="font-label-sm text-label-sm text-surface-variant leading-tight">Operador Activo</span>
+</div>
+</div>
+</div>
+</div>
+</header>
+<!-- Technical Route & Node Topology Bar -->
+<div class="bg-surface-container-lowest border-b border-[#e4e4e7] px-margin py-2 flex flex-wrap items-center justify-between gap-space-sm text-on-surface-variant">
+<div class="flex items-center gap-2 font-mono text-[11px] leading-tight">
+<span class="font-semibold text-primary">Ruta:</span>
+<span class="text-on-surface font-medium">/user/orders</span>
+<span class="text-[#c4c5d7]">·</span>
+<span>Instancia StoreCore Nodo #01</span>
+<span class="text-[#c4c5d7]">·</span>
+<span>Entorno Local Belgrano</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface font-mono text-[11px] border border-[#e4e4e7]">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+        Desacoplado
+      </span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container text-on-surface font-mono text-[11px] border border-[#e4e4e7]">
+        PostgreSQL 16.2
+      </span>
+</div>
+</div>
+<!-- Main Canvas: Operator Fulfillment Console -->
+<main class="flex-1 w-full max-w-[1400px] mx-auto p-margin flex flex-col gap-space-lg">
+<!-- Title Section & Operator Guidance -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-space-md border-b border-[#e4e4e7] pb-space-md">
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Fulfillment</h1>
+<p class="font-body-md text-body-md text-secondary mt-1">
+          Sólo la siguiente transición. RMA de a una. Sin carrier real.
+        </p>
+</div>
+<div class="flex items-center gap-space-sm self-start md:self-auto">
+<span class="inline-flex items-center gap-1 font-label-md text-label-md text-secondary bg-surface-container-high px-space-sm py-1 rounded border border-[#e4e4e7]">
+<span class="material-symbols-outlined text-[15px]">lock_reset</span>
+          Transición Atómica 1-Paso
+        </span>
+</div>
+</div>
+<!-- Status & Operational Metrics Bar -->
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-space-md">
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg p-space-md flex flex-col justify-between shadow-sm">
+<span class="font-label-sm text-label-sm text-secondary font-medium">Órdenes listas para despacho</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline-md text-headline-md text-on-surface tabular-nums">2</span>
+<span class="font-label-sm text-label-sm text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">Pendiente acción</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg p-space-md flex flex-col justify-between shadow-sm">
+<span class="font-label-sm text-label-sm text-secondary font-medium">En tránsito</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline-md text-headline-md text-on-surface tabular-nums">5</span>
+<span class="font-label-sm text-label-sm text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">Circulación activa</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg p-space-md flex flex-col justify-between shadow-sm">
+<span class="font-label-sm text-label-sm text-secondary font-medium">RMAs en gestión</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline-md text-headline-md text-on-surface tabular-nums">1</span>
+<span class="font-label-sm text-label-sm text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">Revisión operador</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg p-space-md flex flex-col justify-between shadow-sm">
+<span class="font-label-sm text-label-sm text-secondary font-medium">Validación de motor</span>
+<div class="flex items-baseline justify-between mt-2">
+<span class="font-headline-md text-headline-md text-emerald-800">Canónica</span>
+<span class="material-symbols-outlined text-emerald-600 text-[18px]">verified</span>
+</div>
+</div>
+</section>
+<!-- Invariant Operational Callout -->
+<div class="bg-blue-50/60 border border-blue-200 rounded-lg p-space-md flex items-start gap-space-sm text-blue-950">
+<span class="material-symbols-outlined text-blue-700 text-[20px] mt-0.5 shrink-0">info</span>
+<div class="font-body-sm text-body-sm leading-relaxed">
+<strong class="font-semibold text-blue-900">Máquina de estados estricta:</strong> Cada orden sólo expone el paso transaccional inmediato. No existen wizards multi-paso ni simulación de transportistas externos. Si necesitás corregir o reversar un estado, gestioná el reclamo vía el identificador unívoco de RMA.
+      </div>
+</div>
+<!-- Fulfillment Data Table -->
+<div class="bg-surface-container-lowest border border-[#e4e4e7] rounded-lg shadow-sm overflow-hidden">
+<div class="px-space-md py-space-sm border-b border-[#e4e4e7] bg-[#fafafa] flex items-center justify-between">
+<span class="font-label-md text-label-md text-secondary tracking-wide">COLA DE PROCESAMIENTO INMEDIATO</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">2 registros en vista</span>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-[#e4e4e7] bg-[#f9fafb] text-secondary font-label-md text-label-md">
+<th class="py-space-md px-space-lg font-semibold w-1/4" scope="col">Orden</th>
+<th class="py-space-md px-space-md font-semibold w-1/5" scope="col">Envío</th>
+<th class="py-space-md px-space-md font-semibold w-1/5" scope="col">Tracking</th>
+<th class="py-space-md px-space-md font-semibold w-1/6" scope="col">RMA</th>
+<th class="py-space-md px-space-lg font-semibold text-right w-1/6" scope="col">Acción</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#e4e4e7] font-body-sm text-body-sm">
+<!-- Row 1: ORD-1042 -->
+<tr class="hover:bg-slate-50/75 transition-colors">
+<td class="py-space-md px-space-lg align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-mono font-semibold text-on-surface text-[13px]">#ORD-1042</span>
+<span class="font-mono text-label-sm text-secondary">10:42 hs</span>
+</div>
+<span class="font-body-md text-body-md font-medium text-on-surface mt-1">Martín Palermo</span>
+<span class="font-mono font-medium text-on-surface text-[13px] tabular-nums mt-0.5">$12.500 ARS</span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col items-start gap-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                    LISTO PARA DESPACHO
+                  </span>
+<span class="text-secondary font-label-sm text-label-sm mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">storefront</span>
+                    Retiro en mostrador
+                  </span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-mono font-medium text-on-surface text-[12px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 w-fit">
+                    TRK-1042-LOC
+                  </span>
+<span class="text-secondary font-label-sm text-label-sm mt-1">Sin carrier externo</span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col items-start gap-1.5">
+<span class="font-label-sm text-label-sm text-secondary">Sin reclamo</span>
+<button class="inline-flex items-center gap-1 font-label-sm text-label-sm text-on-surface hover:text-primary px-2 py-1 rounded border border-[#d4d4d8] hover:border-primary-container bg-surface-container-lowest transition-colors" type="button">
+<span class="material-symbols-outlined text-[13px]">assignment_return</span>
+                    Abrir RMA
+                  </button>
+</div>
+</td>
+<td class="py-space-md px-space-lg align-top text-right">
+<button class="inline-flex items-center justify-center gap-1 bg-[#1d4ed8] hover:bg-blue-800 text-white font-label-md text-label-md px- space-md py-1.5 rounded transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-[15px]">local_shipping</span>
+                  Marcá enviado
+                </button>
+</td>
+</tr>
+<!-- Row 2: ORD-1039 -->
+<tr class="hover:bg-slate-50/75 transition-colors">
+<td class="py-space-md px-space-lg align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-2">
+<span class="font-mono font-semibold text-on-surface text-[13px]">#ORD-1039</span>
+<span class="font-mono text-label-sm text-secondary">09:15 hs</span>
+</div>
+<span class="font-body-md text-body-md font-medium text-on-surface mt-1">Valentina Rossi</span>
+<span class="font-mono font-medium text-on-surface text-[13px] tabular-nums mt-0.5">$31.200 ARS</span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col items-start gap-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-900 border border-blue-300">
+                    EN TRÁNSITO
+                  </span>
+<span class="text-secondary font-label-sm text-label-sm mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">two_wheeler</span>
+                    Mensajería directa Belgrano
+                  </span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-mono font-medium text-on-surface text-[12px] bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 w-fit">
+                    TRK-1039-BUE
+                  </span>
+<span class="text-secondary font-label-sm text-label-sm mt-1">Sin carrier externo</span>
+</div>
+</td>
+<td class="py-space-md px-space-md align-top">
+<div class="flex flex-col items-start gap-1.5">
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-rose-50 text-rose-800 border border-rose-200">
+                    RMA #04 en curso
+                  </span>
+<button class="inline-flex items-center gap-1 font-label-sm text-label-sm text-secondary hover:text-on-surface px-2 py-0.5 rounded border border-[#e4e4e7] bg-surface-container transition-colors" type="button">
+<span class="material-symbols-outlined text-[13px]">visibility</span>
+                    Gestionar RMA
+                  </button>
+</div>
+</td>
+<td class="py-space-md px-space-lg align-top text-right">
+<button class="inline-flex items-center justify-center gap-1 bg-[#1d4ed8] hover:bg-blue-800 text-white font-label-md text-label-md px-space-md py-1.5 rounded transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 active:scale-[0.98]" type="button">
+<span class="material-symbols-outlined text-[15px]">check_circle</span>
+                  Confirmá entrega
+                </button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Sub-footer / Operational Invariant Guard -->
+<div class="p-space-md bg-[#fafafa] border-t border-[#e4e4e7] flex flex-col sm:flex-row items-center justify-between gap-space-sm text-secondary font-body-sm text-body-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-emerald-700">shield_lock</span>
+<span>Transiciones canónicas validadas bajo protocolo v2.4</span>
+</div>
+<div class="flex items-center gap-space-md">
+<span class="font-mono text-label-sm text-secondary">Fulfillment Engine: ONLINE</span>
+</div>
+</div>
+</div>
+<!-- Technical Metadata & Audit Drawer Footer -->
+<footer class="mt-auto border border-[#e4e4e7] rounded bg-surface-container-lowest p-space-sm text-secondary font-mono text-[11px] leading-relaxed flex flex-wrap items-center justify-between gap-y-1">
+<div class="flex items-center gap-2">
+<span class="font-semibold text-on-surface">StoreCore OS v2.4 Retail</span>
+<span>·</span>
+<span>Salón Central Belgrano</span>
+<span>·</span>
+<span class="text-primary font-medium">API Fulfillment /api/v1/orders/fulfillment</span>
+</div>
+<div class="flex items-center gap-3">
+<span>Modo transaccional desacoplado</span>
+<span>·</span>
+<span class="text-emerald-700 font-semibold">Latencia: 12ms</span>
+</div>
+</footer>
+</main>
+</body></html>

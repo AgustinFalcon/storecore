@@ -13,6 +13,7 @@ import { UserInventoryViewComponent } from './user-inventory.view';
       [rows]="(store.inventory$ | async) ?? []"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
+      (retry)="store.loadInventory()"
     />
   `,
 })

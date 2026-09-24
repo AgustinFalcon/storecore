@@ -14,7 +14,9 @@ Los cambios de estado reenvían la config/schema actuales mediante el `Capabilit
 
 V5/PIC-002 es dueño exclusivo de saga, tombstone, líneas, cursor y delta ledger; no duplica registry, companion, credentials ni seed de V4.
 
-La única excepción migratoria a la inmutabilidad es V6/`TASK-PIC-010` (no reutilizar `TASK-PIC-007`, que es el envelope de error/rate-limit). Después de evidencia verde de API/stock/worker/tests y un GO Sol de implementación, `storecore_migrator` con lock de tabla y asserts de fila/config DISABLED v2 deshabilita temporalmente sólo el trigger de `capability_modules`, cambia exactamente `BLACKSTORE_INTEGRATION.future_optional` de true a false, lo re-habilita `ALWAYS` y hace commit. No activa el módulo ni toca config, actions u otro registry. El runtime carece de privilegio DML/DDL; un ADMIN posterior usa el flujo CAS/audit de `CapabilityAdministrationPort` que reenvía la config/schema v2 actuales (nunca `{}`). Este ADR no autoriza ejecutar V4/V5/V6.
+Numeración Flyway canónica: V4 = Mercado Pago Orders; V5/`TASK-PIC-001` = registry BlackStore; V6/`TASK-PIC-002` = saga/tombstone; V7/`TASK-PIC-010` = flip documental `future_optional`. No reutilizar `TASK-PIC-007` (envelope de error/rate-limit) ni editar V6.
+
+La única excepción migratoria a la inmutabilidad es V7/`TASK-PIC-010` bajo `20260923-sol-pos-next-go.md`. `storecore_migrator` con lock de tabla y asserts de fila/config DISABLED v2 deshabilita temporalmente sólo el trigger de `capability_modules`, cambia exactamente `BLACKSTORE_INTEGRATION.future_optional` de true a false, lo re-habilita `ALWAYS` y hace commit. No activa el módulo ni toca config, actions u otro registry. El runtime carece de privilegio DML/DDL; un ADMIN posterior usa el flujo CAS/audit de `CapabilityAdministrationPort` que reenvía la config/schema v2 actuales (nunca `{}`). Fuera del next-go, este ADR no autoriza ejecutar V5/V6/V7.
 
 ## Rejected
 

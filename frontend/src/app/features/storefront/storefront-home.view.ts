@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, OnChanges, OnDestroy } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, OnDestroy, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { HomeBlock, HomeContent } from '../../domain/catalog/home-content.entity';
@@ -20,6 +20,7 @@ export class StorefrontHomeViewComponent implements OnChanges, OnDestroy {
   @Input() categories: readonly CatalogFacet[] = [];
   @Input() loading = false;
   @Input() error = '';
+  @Output() readonly retry = new EventEmitter<void>();
 
   slide = 0;
   private timer: ReturnType<typeof setInterval> | undefined;

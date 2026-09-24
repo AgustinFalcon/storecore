@@ -1,0 +1,27 @@
+<section class="sc-page sc-auth" aria-labelledby="register-title">
+  <div class="sc-auth__card">
+    <h1 id="register-title">Crear cuenta customer</h1>
+    <p class="sc-page__lede">Alta de compra. Separada del login de operadores.</p>
+    <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+    @if (authenticated) {
+      <p>Sesión customer activa. <a routerLink="/customer/profile">Ir al perfil</a></p>
+    } @else {
+      <form class="sc-auth__form" (submit)="$event.preventDefault(); submitRegister.emit()">
+        <label>Nombre
+          <input name="firstName" required autocomplete="given-name" [ngModel]="state.firstName" (ngModelChange)="firstNameChange.emit($event)" />
+        </label>
+        <label>Apellido
+          <input name="lastName" required autocomplete="family-name" [ngModel]="state.lastName" (ngModelChange)="lastNameChange.emit($event)" />
+        </label>
+        <label>Email
+          <input name="email" type="email" required autocomplete="email" [ngModel]="state.email" (ngModelChange)="emailChange.emit($event)" />
+        </label>
+        <label>Contraseña
+          <input name="password" type="password" required autocomplete="new-password" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" />
+        </label>
+        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Registrarme</button>
+      </form>
+      <p><a routerLink="/customer/session">Ya tengo cuenta</a></p>
+    }
+  </div>
+</section>

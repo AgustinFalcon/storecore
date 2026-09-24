@@ -15,7 +15,7 @@
 | fulfillment manual/returns | TASK-010 | state machine e inspección antes de restock |
 | profile/fixture prototype/fleet docs | TASK-012 | no mezcla de prototype con producción |
 | quality/release | TASK-013..015 | dependencias completas + Sol GO/NO-GO |
-| frontend UX Stitch | `docs/agent/frontend/` | DS-00…U-10 en código; axe en `npm run test:a11y` |
+| frontend UX Stitch | `sdd/wip/20260923-storecore-frontend-ux-system-v1/` + `docs/agent/frontend/` | Views DS-00…U-10 en código; SDD visual + HTML archivado; Stitch `6473866243657965808`; axe `npm run test:a11y` |
 | `ml-competition-insights` | TODO-030 deferred | señales oficiales read-only; no scraping/top-5 |
 | `ml-price-automation-management` | TODO-031 deferred | opt-in, min/max/margin/cooldown/audit/kill switch; writer exclusivo |
 | `ml-promotion-orchestrator` | TODO-032 deferred | oferta oficial, eligibility/preflight, approval/preauth, rollback/reconcile |
@@ -25,5 +25,5 @@
 | favorites/loyalty/carriers | TODO-036..038 deferred | sin DDL/tarea core |
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
-| Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`; Sol r3 documental APPROVED; dual Grok PR #17/#18 (docs); `ready_for_sol_review`; implementación bloqueada |
-| POS BlackStore | repo `BlackStore` WIP `blackstore-pilot` | ticket/caja; conector real bloqueado hasta GO del contrato v1 |
+| Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`. PIC-001..010 y L3 locales done: HTTP 200/304/409/410/429 en Testcontainers, V7 deja `future_optional=false` y el módulo `DISABLED`, outbox local PIC-009. Companion live, fiscal y `/sdd.finish` NO-GO |
+| POS BlackStore | repo `BlackStore` | ADP-001..010 + L3 locales en `master` (PR #1). Release disabled. Companion live NO-GO |

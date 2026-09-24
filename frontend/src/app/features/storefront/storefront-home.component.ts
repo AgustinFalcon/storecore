@@ -17,6 +17,7 @@ import { StorefrontHomeViewComponent } from './storefront-home.view';
       [categories]="(store.categories$ | async) ?? []"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
+      (retry)="store.loadStorefront()"
     />
   `,
 })

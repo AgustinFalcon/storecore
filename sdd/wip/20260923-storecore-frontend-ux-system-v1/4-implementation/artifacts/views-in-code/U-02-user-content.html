@@ -1,0 +1,14 @@
+<section class="sc-page sc-console" aria-labelledby="content-title">
+  <h1 id="content-title">Contenido del home</h1>
+  <p class="sc-page__lede">Esto alimenta el home público. Sin fixtures ni hero inventado.</p>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" />
+  <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+    <label>Título
+      <input required name="homeTitle" [ngModel]="state.home.title" (ngModelChange)="patch({ title: $event })" />
+    </label>
+    <label>Cuerpo
+      <textarea name="homeBody" [ngModel]="state.home.body" (ngModelChange)="patch({ body: $event })"></textarea>
+    </label>
+    <button type="submit" class="sc-btn sc-btn--primary">Publicar</button>
+  </form>
+</section>

@@ -1,0 +1,620 @@
+package com.storecore.blackstore
+
+import com.storecore.blackstore.application.port.BlackStoreMlListingPort
+import com.storecore.blackstore.application.port.BlackStoreSagaPort
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.DuplicateKeyException
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.stereotype.Component
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import java.sql.Timestamp
+import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+
+@Component
+class JdbcBlackStoreSagaEngine(
+    private val jdbc: JdbcTemplate,
+    transactionManager: PlatformTransactionManager,
+    private val mlListing: BlackStoreMlListingPort,
+) : BlackStoreSagaPort {
+    private val tx = TransactionTemplate(transactionManager)
+
+    override fun reserve(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+        claimPending(quadruple, catalogVersion, lines)
+        return finishReserve(quadruple, catalogVersion, lines)
+    }
+
+    fun claimPending(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+        validateReserve(catalogVersion, lines)
+        val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
+        return unwrapSaga {
+        tx.execute {
+            lockQuadruple(quadruple)
+            rejectTombstone(quadruple)
+            val existing = loadRow(quadruple, forUpdate = true)
+            if (existing != null) {
+                when (existing.state) {
+                    "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
+                    "EXPIRED" -> throw BlackStoreSagaException.expired()
+                    else -> if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                }
+                return@execute toReceipt(existing)
+            }
+            try {
+                jdbc.update(
+                    """
+                    INSERT INTO blackstore_integration_operations(
+                      client_instance_id, device_id, sale_id, operation_id, request_hash, catalog_version, state
+                    ) VALUES (?,?,?,?,?,?, 'PENDING')
+                    """.trimIndent(),
+                    quadruple.clientInstanceId,
+                    quadruple.deviceId,
+                    quadruple.saleId,
+                    quadruple.operationId,
+                    requestHash,
+                    catalogVersion,
+                )
+            } catch (_: DuplicateKeyException) {
+                lockQuadruple(quadruple)
+                rejectTombstone(quadruple)
+                val raced = loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.conflict()
+                when (raced.state) {
+                    "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
+                    "EXPIRED" -> throw BlackStoreSagaException.expired()
+                    else -> if (raced.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                }
+                return@execute toReceipt(raced)
+            }
+            toReceipt(loadRow(quadruple, forUpdate = true)!!)
+        }!!
+        }
+    }
+
+    fun finishReserve(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+        validateReserve(catalogVersion, lines)
+        val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
+        val outcome = unwrapSaga {
+        tx.execute {
+            lockQuadruple(quadruple)
+            rejectTombstone(quadruple)
+            val existing = loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.conflict()
+            when (existing.state) {
+                "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
+                "EXPIRED" -> throw BlackStoreSagaException.expired()
+                "RESERVED" -> {
+                    if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                    return@execute TxOutcome(toReceipt(existing), null)
+                }
+                "PENDING" -> if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                else -> throw BlackStoreSagaException.stateConflict()
+            }
+            if (currentCatalogVersion() != catalogVersion) {
+                deleteClaim(existing.id)
+                return@execute TxOutcome(null, BlackStoreSagaException.stale())
+            }
+            val sorted = lines.sortedBy { it.variantId }
+            val failures = mutableListOf<BlackStoreLineFailure>()
+            val locked = lockBalances(sorted.map { it.variantId })
+            sorted.forEachIndexed { index, line ->
+                val stock = locked[line.variantId]
+                if (stock == null || stock.sku != line.sku) {
+                    failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, 0, "VARIANT_NOT_FOUND")
+                    return@forEachIndexed
+                }
+                if (line.priceVersion != "catalog-${stock.productId}") {
+                    failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, maxOf(0, stock.available - stock.safety), "PRICE_VERSION_MISMATCH")
+                    return@forEachIndexed
+                }
+                val sellable = maxOf(0, stock.available - stock.safety)
+                if (line.quantity > sellable) {
+                    failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, sellable, "INSUFFICIENT_STOCK")
+                }
+            }
+            if (failures.isNotEmpty()) {
+                deleteClaim(existing.id)
+                val error = if (failures.any { it.code == "INSUFFICIENT_STOCK" }) {
+                    BlackStoreSagaException.insufficient(failures)
+                } else {
+                    BlackStoreSagaException("LINE_VALIDATION_FAILED", 409, retryable = false, lineFailures = failures)
+                }
+                return@execute TxOutcome(null, error)
+            }
+            val reservationRef = BlackStoreSagaPolicy.reservationRefFor(quadruple)
+            val receipt = BlackStoreSagaPolicy.receiptFor(quadruple)
+            val expiresAt = Instant.now().plusSeconds(BlackStoreSagaPolicy.RESERVATION_SECONDS)
+            sorted.forEach { line ->
+                val reservationKey = BlackStoreSagaPolicy.inventoryReservationKey(reservationRef, line.variantId)
+                jdbc.update(
+                    "UPDATE inventory_balances SET available_quantity=available_quantity-?, reserved_quantity=reserved_quantity+?, updated_at=now() WHERE variant_id=?",
+                    line.quantity, line.quantity, line.variantId,
+                )
+                val reservationId = jdbc.queryForObject(
+                    """
+                    INSERT INTO inventory_reservations(variant_id, reservation_saga_key, reservation_line_key, quantity, status, expires_at)
+                    VALUES (?,?,?,?,'ACTIVE',?) RETURNING id
+                    """.trimIndent(),
+                    Long::class.java,
+                    line.variantId, reservationRef, reservationKey, line.quantity, Timestamp.from(expiresAt),
+                )!!
+                appendLedger(
+                    variantId = line.variantId,
+                    reservationId = reservationId,
+                    eventType = "RESERVATION",
+                    delta = -line.quantity,
+                    key = BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RESERVATION"),
+                    actor = actor(quadruple),
+                )
+                jdbc.update(
+                    """
+                    INSERT INTO blackstore_integration_reservation_lines(
+                      operation_pk, reservation_ref, variant_id, sku, quantity, accepted_price_version,
+                      inventory_reservation_operation_key, ledger_reserve_operation_key,
+                      ledger_commit_operation_key, ledger_release_operation_key
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                    """.trimIndent(),
+                    existing.id,
+                    reservationRef,
+                    line.variantId,
+                    line.sku,
+                    line.quantity,
+                    line.priceVersion,
+                    reservationKey,
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RESERVATION"),
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "STOCK_COMMIT_EXTERNAL"),
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RELEASE"),
+                )
+            }
+            jdbc.update(
+                """
+                UPDATE blackstore_integration_operations
+                SET state='RESERVED', reservation_ref=?, receipt=?, expires_at=?, updated_at=now()
+                WHERE id=?
+                """.trimIndent(),
+                reservationRef, receipt, Timestamp.from(expiresAt), existing.id,
+            )
+            TxOutcome(toReceipt(loadRow(quadruple, forUpdate = true)!!), null)
+        }!!
+        }
+        outcome.error?.let { throw it }
+        return outcome.receipt!!
+    }
+
+    override fun commit(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
+        mutateReserved(quadruple, already = "COMMITTED") { row, lines ->
+            lines.forEach { line ->
+                val reservation = lockReservation(row.reservationRef!!, line.variantId)
+                jdbc.update("UPDATE inventory_balances SET reserved_quantity=reserved_quantity-?, updated_at=now() WHERE variant_id=?", line.quantity, line.variantId)
+                appendLedger(
+                    variantId = line.variantId,
+                    reservationId = reservation,
+                    eventType = "STOCK_COMMIT_EXTERNAL",
+                    delta = -line.quantity,
+                    key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, "STOCK_COMMIT_EXTERNAL"),
+                    actor = actor(quadruple),
+                )
+                jdbc.update("UPDATE inventory_reservations SET status='CONSUMED' WHERE id=?", reservation)
+            }
+            jdbc.update(
+                "UPDATE blackstore_integration_operations SET state='COMMITTED', expires_at=NULL, updated_at=now() WHERE id=?",
+                row.id,
+            )
+        }.also { receipt ->
+            mlListing.enqueueDesiredQuantityAfterBlackStore(receipt.reservationRef?.toString())
+        }
+
+    override fun release(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
+        mutateReserved(quadruple, already = "RELEASED") { row, lines ->
+            releaseStock(quadruple, row, lines, reservationStatus = "RELEASED", sagaState = "RELEASED")
+        }.also { receipt ->
+            mlListing.enqueueDesiredQuantityAfterBlackStore(receipt.reservationRef?.toString())
+        }
+
+    override fun expireDue(limit: Int): Int {
+        val candidates = jdbc.query(
+            """
+            SELECT client_instance_id, device_id, sale_id, operation_id
+            FROM blackstore_integration_operations
+            WHERE state='RESERVED' AND expires_at <= now()
+            ORDER BY id
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ ->
+                BlackStoreQuadruple(
+                    clientInstanceId = rs.getObject("client_instance_id", UUID::class.java),
+                    deviceId = rs.getString("device_id"),
+                    saleId = rs.getString("sale_id"),
+                    operationId = rs.getObject("operation_id", UUID::class.java),
+                )
+            },
+            limit,
+        )
+        var expired = 0
+        candidates.forEach { quadruple ->
+            try {
+                mutateReserved(quadruple, already = "EXPIRED", skipLocked = true) { row, lines ->
+                    releaseStock(quadruple, row, lines, reservationStatus = "EXPIRED", sagaState = "EXPIRED")
+                }
+                expired += 1
+            } catch (_: BlackStoreSagaException) {
+                // Commit or release won the saga lock.
+            }
+        }
+        return expired
+    }
+
+    fun deleteStalePending(): Int = jdbc.update(
+        """
+        DELETE FROM blackstore_integration_operations
+        WHERE state='PENDING' AND receipt IS NULL AND created_at < now() - interval '60 seconds'
+        """.trimIndent(),
+    )
+
+    override fun get(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt = unwrapSaga {
+        tx.execute {
+            lockQuadruple(quadruple)
+            rejectTombstone(quadruple)
+            toReceipt(loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.notFound())
+        }!!
+    }
+
+    override fun reconcile(knownReceipts: List<String>): BlackStoreReconcileResult {
+        if (knownReceipts.isEmpty() || knownReceipts.size > 500) throw BlackStoreSagaException.validation("RECONCILE_RECEIPTS_INVALID")
+        val unique = knownReceipts.distinct()
+        val placeholders = unique.joinToString(",") { "?" }
+        val found = jdbc.query(
+            """
+            SELECT client_instance_id, device_id, sale_id, operation_id
+            FROM blackstore_integration_operations
+            WHERE receipt IN ($placeholders)
+            """.trimIndent(),
+            { rs, _ ->
+                BlackStoreQuadruple(
+                    clientInstanceId = rs.getObject("client_instance_id", UUID::class.java),
+                    deviceId = rs.getString("device_id"),
+                    saleId = rs.getString("sale_id"),
+                    operationId = rs.getObject("operation_id", UUID::class.java),
+                )
+            },
+            *unique.toTypedArray(),
+        ).map { get(it) }
+        val present = found.mapNotNull { it.receipt }.toSet()
+        return BlackStoreReconcileResult(present = found, unknownReceipts = unique.filterNot { it in present })
+    }
+
+    fun purge(quadruple: BlackStoreQuadruple) {
+        tx.execute {
+            lockQuadruple(quadruple)
+            if (tombstoneExists(quadruple)) throw BlackStoreSagaException.retired()
+            val row = loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.notFound()
+            if (row.state !in TERMINAL) throw BlackStoreSagaException.stateConflict()
+            if (row.updatedAt.isAfter(Instant.now().minus(Duration.ofDays(BlackStoreSagaPolicy.PURGE_AFTER_DAYS)))) {
+                throw BlackStoreSagaException("RETENTION_ACTIVE", 409, retryable = false)
+            }
+            jdbc.update(
+                """
+                INSERT INTO blackstore_integration_operation_tombstones(
+                  client_instance_id, device_id, sale_id, operation_id, request_hash, final_state,
+                  receipt, reservation_ref, retired_at, retention_until
+                ) VALUES (?,?,?,?,?,?,?,?, now(), now() + interval '7 years')
+                """.trimIndent(),
+                quadruple.clientInstanceId,
+                quadruple.deviceId,
+                quadruple.saleId,
+                quadruple.operationId,
+                row.requestHash,
+                row.state,
+                row.receipt,
+                row.reservationRef,
+            )
+            jdbc.update("DELETE FROM blackstore_integration_reservation_lines WHERE operation_pk=?", row.id)
+            jdbc.update("DELETE FROM blackstore_integration_operations WHERE id=?", row.id)
+        }
+    }
+
+    override fun purgeDue(limit: Int): Int {
+        val candidates = jdbc.query(
+            """
+            SELECT client_instance_id, device_id, sale_id, operation_id
+            FROM blackstore_integration_operations
+            WHERE state IN ('COMMITTED','RELEASED','EXPIRED')
+              AND updated_at < now() - interval '90 days'
+            ORDER BY id
+            LIMIT ?
+            """.trimIndent(),
+            { rs, _ ->
+                BlackStoreQuadruple(
+                    clientInstanceId = rs.getObject("client_instance_id", UUID::class.java),
+                    deviceId = rs.getString("device_id"),
+                    saleId = rs.getString("sale_id"),
+                    operationId = rs.getObject("operation_id", UUID::class.java),
+                )
+            },
+            limit,
+        )
+        var purged = 0
+        candidates.forEach { quadruple ->
+            try {
+                purge(quadruple)
+                purged += 1
+            } catch (_: BlackStoreSagaException) {
+            }
+        }
+        return purged
+    }
+
+    private fun mutateReserved(
+        quadruple: BlackStoreQuadruple,
+        already: String,
+        skipLocked: Boolean = false,
+        body: (OperationRow, List<LineRow>) -> Unit,
+    ): BlackStoreOperationReceipt = unwrapSaga {
+        tx.execute {
+        lockQuadruple(quadruple)
+        rejectTombstone(quadruple)
+        val row = loadRow(quadruple, forUpdate = true, skipLocked = skipLocked) ?: throw BlackStoreSagaException.notFound()
+        if (row.state == already) return@execute toReceipt(row)
+        if (row.state == "EXPIRED" && already != "EXPIRED") throw BlackStoreSagaException.expired()
+        if (row.state != "RESERVED") throw BlackStoreSagaException.stateConflict()
+        val lines = loadLines(row.id)
+        lockBalances(lines.map { it.variantId })
+        body(row, lines)
+        toReceipt(loadRow(quadruple, forUpdate = true)!!)
+        }!!
+    }
+
+    private fun releaseStock(
+        quadruple: BlackStoreQuadruple,
+        row: OperationRow,
+        lines: List<LineRow>,
+        reservationStatus: String,
+        sagaState: String,
+    ) {
+        lines.forEach { line ->
+            val reservation = lockReservation(row.reservationRef!!, line.variantId)
+            jdbc.update(
+                "UPDATE inventory_balances SET available_quantity=available_quantity+?, reserved_quantity=reserved_quantity-?, updated_at=now() WHERE variant_id=?",
+                line.quantity, line.quantity, line.variantId,
+            )
+            appendLedger(
+                variantId = line.variantId,
+                reservationId = reservation,
+                eventType = "RELEASE",
+                delta = line.quantity,
+                key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, "RELEASE"),
+                actor = actor(quadruple),
+            )
+            jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", reservationStatus, reservation)
+        }
+        jdbc.update(
+            "UPDATE blackstore_integration_operations SET state=?, updated_at=now() WHERE id=?",
+            sagaState, row.id,
+        )
+    }
+
+    private fun appendLedger(variantId: Long, reservationId: Long, eventType: String, delta: Int, key: UUID, actor: String) {
+        jdbc.update(
+            """
+            INSERT INTO inventory_ledger(variant_id, reservation_id, event_idempotency_key, event_type, channel, quantity_delta, actor)
+            VALUES (?,?,?,?, 'EXTERNAL_BLACKSTORE', ?, ?)
+            """.trimIndent(),
+            variantId, reservationId, key, eventType, delta, actor,
+        )
+    }
+
+    private fun lockReservation(reservationRef: UUID, variantId: Long): Long =
+        jdbc.query(
+            "SELECT id FROM inventory_reservations WHERE reservation_saga_key=? AND variant_id=? AND status='ACTIVE' FOR UPDATE",
+            { rs, _ -> rs.getLong("id") },
+            reservationRef,
+            variantId,
+        ).singleOrNull() ?: throw BlackStoreSagaException.conflict()
+
+    private fun lockBalances(variantIds: List<Long>): Map<Long, StockRow> {
+        if (variantIds.isEmpty()) return emptyMap()
+        val placeholders = variantIds.joinToString(",") { "?" }
+        jdbc.query(
+            "SELECT variant_id FROM inventory_balances WHERE variant_id IN ($placeholders) ORDER BY variant_id ASC FOR UPDATE",
+            { _, _ -> },
+            *variantIds.toTypedArray(),
+        )
+        return jdbc.query(
+            """
+            SELECT v.id AS variant_id, COALESCE(i.available_quantity, 0) AS available_quantity,
+                   COALESCE(i.safety_stock, 0) AS safety_stock, v.sku, p.id AS product_id
+            FROM product_variants v
+            JOIN products p ON p.id = v.product_id
+            LEFT JOIN inventory_balances i ON i.variant_id = v.id
+            WHERE v.id IN ($placeholders)
+            ORDER BY v.id ASC
+            FOR UPDATE OF v
+            """.trimIndent(),
+            { rs, _ ->
+                StockRow(
+                    variantId = rs.getLong("variant_id"),
+                    available = rs.getInt("available_quantity"),
+                    safety = rs.getInt("safety_stock"),
+                    sku = rs.getString("sku"),
+                    productId = rs.getLong("product_id"),
+                )
+            },
+            *variantIds.toTypedArray(),
+        ).associateBy { it.variantId }
+    }
+
+    private fun lockQuadruple(quadruple: BlackStoreQuadruple) {
+        jdbc.query(
+            "SELECT pg_advisory_xact_lock(hashtext(?), hashtext(?))",
+            { _, _ -> },
+            "${quadruple.clientInstanceId}|${quadruple.operationId}",
+            "${quadruple.deviceId}|${quadruple.saleId}",
+        )
+    }
+
+    private fun rejectTombstone(quadruple: BlackStoreQuadruple) {
+        if (tombstoneExists(quadruple)) throw BlackStoreSagaException.retired()
+    }
+
+    private fun tombstoneExists(quadruple: BlackStoreQuadruple): Boolean =
+        jdbc.queryForObject(
+            """
+            SELECT EXISTS(
+              SELECT 1 FROM blackstore_integration_operation_tombstones
+              WHERE client_instance_id=? AND device_id=? AND sale_id=? AND operation_id=?
+            )
+            """.trimIndent(),
+            Boolean::class.java,
+            quadruple.clientInstanceId,
+            quadruple.deviceId,
+            quadruple.saleId,
+            quadruple.operationId,
+        ) == true
+
+    private fun currentCatalogVersion(): String =
+        jdbc.queryForObject("SELECT COALESCE(MAX(updated_at)::text, 'empty') FROM products", String::class.java)!!
+
+    private fun deleteClaim(operationPk: Long) {
+        jdbc.update("DELETE FROM blackstore_integration_reservation_lines WHERE operation_pk=?", operationPk)
+        jdbc.update("DELETE FROM blackstore_integration_operations WHERE id=?", operationPk)
+    }
+
+    private fun loadRow(quadruple: BlackStoreQuadruple, forUpdate: Boolean, skipLocked: Boolean = false): OperationRow? {
+        val suffix = when {
+            forUpdate && skipLocked -> " FOR UPDATE SKIP LOCKED"
+            forUpdate -> " FOR UPDATE"
+            else -> ""
+        }
+        return jdbc.query(
+            """
+            SELECT id, request_hash, catalog_version, state, reservation_ref, receipt, expires_at, updated_at
+            FROM blackstore_integration_operations
+            WHERE client_instance_id=? AND device_id=? AND sale_id=? AND operation_id=?
+            $suffix
+            """.trimIndent(),
+            { rs, _ ->
+                OperationRow(
+                    id = rs.getLong("id"),
+                    requestHash = rs.getString("request_hash"),
+                    catalogVersion = rs.getString("catalog_version"),
+                    state = rs.getString("state"),
+                    reservationRef = rs.getObject("reservation_ref", UUID::class.java),
+                    receipt = rs.getString("receipt"),
+                    expiresAt = rs.getTimestamp("expires_at")?.toInstant(),
+                    updatedAt = rs.getTimestamp("updated_at").toInstant(),
+                )
+            },
+            quadruple.clientInstanceId,
+            quadruple.deviceId,
+            quadruple.saleId,
+            quadruple.operationId,
+        ).singleOrNull()
+    }
+
+    private fun loadLines(operationPk: Long): List<LineRow> =
+        jdbc.query(
+            """
+            SELECT variant_id, sku, quantity, accepted_price_version
+            FROM blackstore_integration_reservation_lines
+            WHERE operation_pk=?
+            ORDER BY variant_id
+            """.trimIndent(),
+            { rs, _ ->
+                LineRow(
+                    variantId = rs.getLong("variant_id"),
+                    sku = rs.getString("sku"),
+                    quantity = rs.getInt("quantity"),
+                    priceVersion = rs.getString("accepted_price_version"),
+                )
+            },
+            operationPk,
+        )
+
+    private fun toReceipt(row: OperationRow): BlackStoreOperationReceipt {
+        val lines = if (row.state == "PENDING") emptyList() else loadLines(row.id)
+        val availableAfter = if (row.state == "RESERVED" || row.state == "COMMITTED") {
+            lines.map { line ->
+                val sellable = jdbc.queryForObject(
+                    "SELECT GREATEST(0, available_quantity - safety_stock) FROM inventory_balances WHERE variant_id=?",
+                    Int::class.java,
+                    line.variantId,
+                ) ?: 0
+                BlackStoreAvailableAfter(line.variantId, sellable)
+            }
+        } else {
+            emptyList()
+        }
+        return BlackStoreOperationReceipt(
+            state = row.state,
+            catalogVersion = row.catalogVersion,
+            receipt = row.receipt,
+            reservationRef = row.reservationRef,
+            expiresAt = row.expiresAt,
+            acceptedPriceVersions = lines.map { BlackStoreAcceptedPrice(it.variantId, it.sku, it.priceVersion) },
+            availableAfter = availableAfter,
+        )
+    }
+
+    private fun validateReserve(catalogVersion: String, lines: List<BlackStoreReserveLine>) {
+        if (catalogVersion.isBlank() || catalogVersion.length > 64) throw BlackStoreSagaException.validation()
+        if (lines.isEmpty() || lines.size > 200) throw BlackStoreSagaException.validation()
+        if (lines.map { it.variantId }.distinct().size != lines.size) throw BlackStoreSagaException.validation("DUPLICATE_VARIANT")
+        lines.forEach { line ->
+            if (line.quantity < 1 || line.sku.isBlank() || line.priceVersion.isBlank()) throw BlackStoreSagaException.validation()
+        }
+    }
+
+    private fun actor(quadruple: BlackStoreQuadruple): String = "BLACKSTORE:${quadruple.clientInstanceId}"
+
+    private fun <T> unwrapSaga(block: () -> T): T = try {
+        block()
+    } catch (ex: RuntimeException) {
+        throw if (isRetryableLock(ex)) BlackStoreSagaException.conflict() else ex
+    }
+
+    private fun isRetryableLock(ex: Throwable): Boolean {
+        var current: Throwable? = ex
+        while (current != null) {
+            if (current is CannotAcquireLockException) return true
+            val message = current.message.orEmpty()
+            if (message.contains("40P01") || message.contains("deadlock", ignoreCase = true)) return true
+            current = current.cause
+        }
+        return false
+    }
+
+    private data class OperationRow(
+        val id: Long,
+        val requestHash: String,
+        val catalogVersion: String,
+        val state: String,
+        val reservationRef: UUID?,
+        val receipt: String?,
+        val expiresAt: Instant?,
+        val updatedAt: Instant,
+    )
+
+    private data class LineRow(
+        val variantId: Long,
+        val sku: String,
+        val quantity: Int,
+        val priceVersion: String,
+    )
+
+    private data class TxOutcome(
+        val receipt: BlackStoreOperationReceipt?,
+        val error: BlackStoreSagaException?,
+    )
+
+    private data class StockRow(
+        val variantId: Long,
+        val available: Int,
+        val safety: Int,
+        val sku: String,
+        val productId: Long,
+    )
+
+    companion object {
+        private val TERMINAL = setOf("COMMITTED", "RELEASED", "EXPIRED")
+    }
+}

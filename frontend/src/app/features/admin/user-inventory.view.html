@@ -1,32 +1,45 @@
 <section class="sc-page sc-console" aria-labelledby="inv-title">
-  <h1 id="inv-title">Inventario WEB</h1>
-  <p class="sc-page__lede">Disponibilidad derivada. Esta pantalla no escribe stock.</p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">Sólo lectura</p>
+    <h1 id="inv-title">Inventario WEB</h1>
+    <p class="sc-page__lede">Disponibilidad derivada. Esta pantalla no escribe stock.</p>
+  </header>
   <sc-feature-status
     [loading]="loading"
     [error]="error"
     [empty]="!loading && rows.length === 0"
     emptyText="No hay filas de inventario."
+    (retry)="retry.emit()"
   />
   @if (rows.length) {
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>SKU</th>
-          <th>Disponible</th>
-          <th>Reservado</th>
-          <th>Safety</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (row of rows; track row.sku) {
+    <ul class="sc-metrics">
+      <li class="sc-metric"><span>SKUs</span><strong>{{ rows.length }}</strong></li>
+      <li class="sc-metric"><span>Disponible</span><strong>{{ availableTotal }}</strong></li>
+      <li class="sc-metric"><span>Reservado</span><strong>{{ reservedTotal }}</strong></li>
+      <li class="sc-metric"><span>Safety</span><strong>{{ safetyTotal }}</strong></li>
+    </ul>
+    <p class="sc-callout sc-callout--info">Los totales salen de las filas ya cargadas. No hay ajuste desde esta vista.</p>
+    <div class="sc-table-wrap">
+      <table class="sc-table">
+        <thead>
           <tr>
-            <td class="sc-mono">{{ row.sku }}</td>
-            <td>{{ row.availableQuantity }}</td>
-            <td>{{ row.reservedQuantity }}</td>
-            <td>{{ row.safetyStock }}</td>
+            <th>SKU</th>
+            <th>Disponible</th>
+            <th>Reservado</th>
+            <th>Safety</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (row of rows; track row.sku) {
+            <tr>
+              <td class="sc-mono">{{ row.sku }}</td>
+              <td>{{ row.availableQuantity }}</td>
+              <td>{{ row.reservedQuantity }}</td>
+              <td>{{ row.safetyStock }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   }
 </section>

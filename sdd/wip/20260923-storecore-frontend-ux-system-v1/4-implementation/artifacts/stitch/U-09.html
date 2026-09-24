@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>U-09 StoreCore Capabilities</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-secondary-container": "#5c647a",
+            "on-tertiary-fixed": "#1b1b1e",
+            "primary-fixed-dim": "#b7c4ff",
+            "on-secondary-fixed-variant": "#3f465c",
+            "on-tertiary-container": "#d6d3d7",
+            "surface-tint": "#2151da",
+            "surface-container-low": "#f4f2fd",
+            "on-primary-fixed": "#001551",
+            "outline": "#747686",
+            "surface-dim": "#dad9e3",
+            "on-surface": "#1a1b22",
+            "surface-bright": "#fbf8ff",
+            "tertiary-fixed": "#e4e1e6",
+            "surface-container-highest": "#e3e1ec",
+            "surface-variant": "#e3e1ec",
+            "primary": "#0037b0",
+            "inverse-on-surface": "#f1effa",
+            "secondary-fixed": "#dae2fd",
+            "background": "#fbf8ff",
+            "secondary-fixed-dim": "#bec6e0",
+            "outline-variant": "#c4c5d7",
+            "on-secondary-fixed": "#131b2e",
+            "on-error-container": "#93000a",
+            "on-primary": "#ffffff",
+            "secondary-container": "#dae2fd",
+            "surface-container-lowest": "#ffffff",
+            "primary-fixed": "#dce1ff",
+            "secondary": "#565e74",
+            "on-secondary": "#ffffff",
+            "error": "#ba1a1a",
+            "tertiary": "#444447",
+            "on-tertiary": "#ffffff",
+            "on-surface-variant": "#434655",
+            "surface-container": "#eeedf7",
+            "on-tertiary-fixed-variant": "#47464a",
+            "surface-container-high": "#e8e7f1",
+            "on-error": "#ffffff",
+            "on-primary-container": "#cad3ff",
+            "on-background": "#1a1b22",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "primary-container": "#1d4ed8",
+            "inverse-surface": "#2f3038",
+            "tertiary-container": "#5c5b5f",
+            "on-primary-fixed-variant": "#0039b5",
+            "error-container": "#ffdad6",
+            "inverse-primary": "#b7c4ff",
+            "surface": "#fbf8ff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-xs": "0.25rem",
+            "gutter": "1rem",
+            "space-xl": "2rem",
+            "space-md": "0.75rem",
+            "margin": "1.5rem",
+            "space-sm": "0.5rem",
+            "space-lg": "1.25rem"
+          },
+          "fontFamily": {
+            "label-sm": ["Inter"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "headline-sm": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-lg": ["Inter"],
+            "headline-md": ["Inter"],
+            "headline-lg": ["Inter"]
+          },
+          "fontSize": {
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+      color: #18181b;
+      background-color: #f4f4f5;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+      font-size: 18px;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col justify-between antialiased selection:bg-primary-container selection:text-white">
+<!-- Top Navigation & Header Anchor -->
+<header class="w-full bg-[#0f172a] text-[#f8fafc] sticky top-0 z-50">
+<div class="w-full h-14 flex items-center justify-between px-space-lg mx-auto">
+<!-- Brand + Node Status -->
+<div class="flex items-center space-x-3">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-white select-none">StoreCore</span>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#1e293b] text-slate-300 border border-slate-700">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>
+          Salón Belgrano #01 · HTTP 200 OK
+        </span>
+</div>
+<!-- Links Cluster according to Shared Components JSON (Active: Capabilities) -->
+<nav aria-label="Navegación principal" class="hidden md:flex items-center space-x-6 text-[13px] font-medium">
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Contenido</a>
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Catálogo</a>
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Promos</a>
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Órdenes</a>
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Inventario</a>
+<a class="text-slate-400 hover:text-white transition-colors duration-150 pb-1" href="#">Mercado Libre</a>
+<!-- Active Target as per hierarchy -->
+<a class="border-b-2 border-primary-container text-white font-semibold pb-1 cursor-pointer" href="/user/capabilities">Capabilities</a>
+</nav>
+<!-- Right Operator Status -->
+<div class="flex items-center space-x-3">
+<button class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition duration-150" title="Sincronización activa" type="button">
+<span class="material-symbols-outlined" data-icon="sync">sync</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition duration-150 relative" title="Notificaciones operativas" type="button">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-[#1d4ed8] rounded-full ring-2 ring-[#0f172a]"></span>
+</button>
+<div class="h-4 w-px bg-slate-700 mx-1"></div>
+<div class="flex items-center space-x-2 pl-1">
+<div class="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-semibold text-white">
+            MR
+          </div>
+<div class="text-left hidden lg:block leading-tight">
+<p class="text-xs font-medium text-slate-100">Martín Rossi (Nodo Local)</p>
+<p class="text-[10px] text-slate-400">Operador Matriculado</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Subnav / Operator Breadcrumb exact route indicator -->
+<div class="bg-[#1e293b] px-space-lg py-1.5 text-[11px] font-mono text-slate-300 flex items-center justify-between border-t border-slate-800">
+<div class="flex items-center space-x-2">
+<span class="text-slate-400">Ruta:</span>
+<span class="text-white font-semibold">/user/capabilities</span>
+<span class="text-slate-500">·</span>
+<span class="text-slate-300">Instancia StoreCore Nodo #01</span>
+<span class="text-slate-500">·</span>
+<span class="text-slate-300">Salón Belgrano</span>
+</div>
+<div class="flex items-center space-x-3 text-slate-400">
+<span>Transacciones: Síncronas</span>
+<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+<!-- Header Section -->
+<div class="border-b border-zinc-200 pb-5">
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+<div>
+<div class="flex items-center gap-3">
+<h1 class="font-headline-lg text-headline-lg font-bold text-zinc-900 tracking-tight">Capabilities</h1>
+<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-700 border border-zinc-300">
+              Ambiente Producción
+            </span>
+</div>
+<p class="mt-2 text-sm text-zinc-600 font-medium">
+            Estados tipados <code class="font-mono text-xs px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">DISABLED</code>, <code class="font-mono text-xs px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">READ_ONLY</code>, <code class="font-mono text-xs px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">ACTIVE</code>, <code class="font-mono text-xs px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">PAUSED</code>, <code class="font-mono text-xs px-1.5 py-0.5 bg-zinc-200 text-zinc-800 rounded">ERROR</code>. No es un interruptor booleano.
+          </p>
+</div>
+<!-- Badges informativos de arquitectura -->
+<div class="flex flex-wrap items-center gap-2 self-start md:self-auto">
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-white text-zinc-700 border border-zinc-300 shadow-sm">
+<span class="material-symbols-outlined mr-1 text-zinc-500" data-icon="memory">memory</span>
+            Protocolo v2.4
+          </span>
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-white text-zinc-700 border border-zinc-300 shadow-sm">
+<span class="material-symbols-outlined mr-1 text-zinc-500" data-icon="lock">lock</span>
+            Control de concurrencia estricto
+          </span>
+<span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium bg-blue-50 text-[#1d4ed8] border border-blue-200 shadow-sm">
+<span class="material-symbols-outlined mr-1 text-[#1d4ed8]" data-icon="schema">schema</span>
+            Sin switches binarios
+          </span>
+</div>
+</div>
+</div>
+<!-- Alert / Banner Notificación de Arquitectura StoreCore -->
+<div class="bg-white border-l-4 border-[#1d4ed8] border-y border-r border-zinc-200 p-4 rounded shadow-sm">
+<div class="flex">
+<div class="flex-shrink-0">
+<span class="material-symbols-outlined text-[#1d4ed8]" data-icon="info">info</span>
+</div>
+<div class="ml-3">
+<h3 class="text-xs font-semibold text-zinc-900 uppercase tracking-wider">Regla de arquitectura StoreCore</h3>
+<div class="mt-1 text-sm text-zinc-700 leading-relaxed">
+<p>
+              Las capacidades del sistema poseen 5 estados categóricos. Nunca implementar como toggle booleano simple (on/off). Un switch binario destruye la visibilidad operativa de restricciones por licencia, pausas de mantenimiento o desconexiones con el fisco.
+            </p>
+</div>
+</div>
+</div>
+</div>
+<!-- Primary Operator Table Card -->
+<div class="bg-white border border-zinc-200 rounded shadow-sm overflow-hidden">
+<div class="px-5 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/50">
+<div>
+<h2 class="text-sm font-semibold text-zinc-900 uppercase tracking-wider">Matriz de Capacidades Habilitadas</h2>
+<p class="text-xs text-zinc-500">Módulos locales con persistencia síncrona en Salón Belgrano #01</p>
+</div>
+<div class="flex items-center gap-2 text-xs text-zinc-500">
+<span class="inline-block w-2 h-2 rounded-full bg-zinc-400"></span>
+<span>Actualización en tiempo real</span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-zinc-200 bg-zinc-100/75 text-[11px] font-semibold text-zinc-600 uppercase tracking-wider">
+<th class="py-3 px-6 w-1/3" scope="col">MÓDULO</th>
+<th class="py-3 px-6 w-1/6" scope="col">ESTADO</th>
+<th class="py-3 px-6 w-1/2" scope="col">CAMBIAR</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-zinc-200 text-sm">
+<!-- Row 1: Emisión Fiscal AFIP (ACTIVE) -->
+<tr class="hover:bg-zinc-50/60 transition-colors">
+<td class="py-4 px-6 align-middle">
+<div class="font-semibold text-zinc-900 text-[14px]">Emisión Fiscal AFIP</div>
+<div class="text-xs text-zinc-500 mt-0.5 leading-snug">Facturación directa en mostrador y sincronización de comprobantes con CAE.</div>
+<div class="mt-2 text-[11px] text-zinc-400 font-mono">ID: cap_fiscal_afip_fe · Último CAE: #849201994</div>
+</td>
+<td class="py-4 px-6 align-middle">
+<!-- Badge ACTIVE -->
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5"></span>
+                  ACTIVE
+                </span>
+<p class="text-[11px] text-zinc-400 mt-1">TTL Sincronizado</p>
+</td>
+<td class="py-4 px-6 align-middle">
+<!-- Group of 5 typed buttons -->
+<div aria-label="Cambiar estado de Emisión Fiscal AFIP" class="inline-flex flex-wrap items-center gap-1.5 bg-zinc-100 p-1.5 rounded border border-zinc-200" role="group">
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    DISABLED
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    READ_ONLY
+                  </button>
+<!-- Disabled because current is ACTIVE -->
+<button class="px-2.5 py-1 text-xs font-bold rounded bg-emerald-600 text-white border border-emerald-700 opacity-90 cursor-not-allowed shadow-inner flex items-center gap-1" disabled="" title="Estado actual" type="button">
+<span class="material-symbols-outlined text-[13px] leading-none" data-icon="check">check</span>
+                    ACTIVE
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    PAUSED
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    ERROR
+                  </button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Sincronización de Stock Central (PAUSED) -->
+<tr class="hover:bg-zinc-50/60 transition-colors">
+<td class="py-4 px-6 align-middle">
+<div class="font-semibold text-zinc-900 text-[14px]">Sincronización de Stock Central</div>
+<div class="text-xs text-zinc-500 mt-0.5 leading-snug">Sincronización de existencias de salón físico y buffers contra nodo central.</div>
+<div class="mt-2 text-[11px] text-zinc-400 font-mono">ID: cap_stock_core_sync · Buffer en cola: 4 items</div>
+</td>
+<td class="py-4 px-6 align-middle">
+<!-- Badge PAUSED -->
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-600 mr-1.5 animate-pulse"></span>
+                  PAUSED
+                </span>
+<p class="text-[11px] text-zinc-400 mt-1">Intervención manual</p>
+</td>
+<td class="py-4 px-6 align-middle">
+<!-- Group of 5 typed buttons -->
+<div aria-label="Cambiar estado de Sincronización de Stock Central" class="inline-flex flex-wrap items-center gap-1.5 bg-zinc-100 p-1.5 rounded border border-zinc-200" role="group">
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    DISABLED
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    READ_ONLY
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    ACTIVE
+                  </button>
+<!-- Disabled because current is PAUSED -->
+<button class="px-2.5 py-1 text-xs font-bold rounded bg-amber-600 text-white border border-amber-700 opacity-90 cursor-not-allowed shadow-inner flex items-center gap-1" disabled="" title="Estado actual" type="button">
+<span class="material-symbols-outlined text-[13px] leading-none" data-icon="pause">pause</span>
+                    PAUSED
+                  </button>
+<button class="px-2.5 py-1 text-xs font-semibold rounded bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-50 hover:border-zinc-400 hover:text-zinc-900 active:scale-95 transition" type="button">
+                    ERROR
+                  </button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Utility Note -->
+<div class="px-6 py-3 bg-zinc-50 border-t border-zinc-200 text-xs text-zinc-500 flex flex-wrap items-center justify-between gap-2">
+<span>Toda transición de estado es auditada en la bitácora local inmutable del nodo.</span>
+<span class="font-mono text-[11px] text-zinc-400">UUID Transaccional: 9e3f1c84-bf50-48e0-a92c-0e78</span>
+</div>
+</div>
+<!-- Technical Architecture Explanation Box (5 Estados StoreCore) -->
+<section class="bg-white border border-zinc-200 rounded p-6 shadow-sm">
+<div class="flex items-center space-x-2 border-b border-zinc-200 pb-3 mb-4">
+<span class="material-symbols-outlined text-zinc-700" data-icon="account_tree">account_tree</span>
+<h2 class="text-sm font-bold text-zinc-900 uppercase tracking-wide">
+          Especificación de Estados Tipados StoreCore
+        </h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+<!-- DISABLED -->
+<div class="p-3 bg-zinc-50 rounded border border-zinc-200 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-zinc-800 bg-zinc-200 px-1.5 py-0.5 rounded">DISABLED</span>
+<span class="w-2 h-2 rounded-full bg-zinc-400"></span>
+</div>
+<p class="text-xs text-zinc-600 leading-normal">
+              Módulo deshabilitado por licencia o no contratado. Bloqueo total de endpoints e interfaces de entrada.
+            </p>
+</div>
+<span class="text-[10px] font-mono text-zinc-400 mt-3 pt-2 border-t border-zinc-200">HTTP 403 Forbidden</span>
+</div>
+<!-- READ_ONLY -->
+<div class="p-3 bg-blue-50/40 rounded border border-blue-200 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-blue-900 bg-blue-100 px-1.5 py-0.5 rounded">READ_ONLY</span>
+<span class="w-2 h-2 rounded-full bg-blue-500"></span>
+</div>
+<p class="text-xs text-zinc-600 leading-normal">
+              Acceso exclusivo de consulta y auditoría, edición restringida. Bloquea escrituras en base de datos.
+            </p>
+</div>
+<span class="text-[10px] font-mono text-blue-500 mt-3 pt-2 border-t border-blue-100">GET Only</span>
+</div>
+<!-- ACTIVE -->
+<div class="p-3 bg-emerald-50/40 rounded border border-emerald-200 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded">ACTIVE</span>
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+</div>
+<p class="text-xs text-zinc-600 leading-normal">
+              Operativo y procesando transacciones comerciales con normalidad. Rendimiento nominal verificado.
+            </p>
+</div>
+<span class="text-[10px] font-mono text-emerald-600 mt-3 pt-2 border-t border-emerald-100">Full I/O Read/Write</span>
+</div>
+<!-- PAUSED -->
+<div class="p-3 bg-amber-50/40 rounded border border-amber-200 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">PAUSED</span>
+<span class="w-2 h-2 rounded-full bg-amber-500"></span>
+</div>
+<p class="text-xs text-zinc-600 leading-normal">
+              Suspensión temporal manual o por proceso de mantenimiento. Encola eventos sin descartar paquetes.
+            </p>
+</div>
+<span class="text-[10px] font-mono text-amber-600 mt-3 pt-2 border-t border-amber-100">Queue Buffer Enabled</span>
+</div>
+<!-- ERROR -->
+<div class="p-3 bg-rose-50/40 rounded border border-rose-200 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<span class="font-mono text-xs font-bold text-rose-900 bg-rose-100 px-1.5 py-0.5 rounded">ERROR</span>
+<span class="w-2 h-2 rounded-full bg-rose-500"></span>
+</div>
+<p class="text-xs text-zinc-600 leading-normal">
+              Falla crítica en servicio, caída de pasarela o sincronización pendiente. Requiere triage del operador.
+            </p>
+</div>
+<span class="text-[10px] font-mono text-rose-600 mt-3 pt-2 border-t border-rose-100">Alert Dispatch</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Operator Status Footer according to Shared Components JSON -->
+<footer class="w-full bg-[#e8e7f1] border-t border-[#c4c5d7]">
+<div class="w-full h-9 flex items-center justify-between px-space-lg mx-auto text-xs text-zinc-600 font-mono">
+<div class="flex items-center space-x-2">
+<span class="font-bold text-zinc-900">StoreCore OS v2.4 Retail</span>
+<span>·</span>
+<span>Salón Central Belgrano</span>
+<span>·</span>
+<span class="text-zinc-800 font-semibold">/user/capabilities</span>
+</div>
+<div class="flex items-center space-x-4">
+<a class="hover:text-primary transition-colors duration-150" href="#">Diagnóstico de Red</a>
+<a class="hover:text-primary transition-colors duration-150" href="#">Sincronización Local</a>
+<a class="hover:text-primary transition-colors duration-150" href="#">Bitácora de Eventos</a>
+<span class="text-zinc-400">|</span>
+<span class="text-emerald-700 font-sans font-medium flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+          Modo transaccional desacoplado
+        </span>
+<span class="text-zinc-500">Latencia: 11ms</span>
+<button class="text-rose-700 font-semibold hover:underline cursor-pointer" type="button">Cerrar Turno</button>
+</div>
+</div>
+</footer>
+</body></html>

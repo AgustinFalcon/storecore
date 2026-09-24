@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-[#f4f4f5]" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>StoreCore — Sesión Customer</title>
+<!-- Inter Font Family -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols Outlined -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          "colors": {
+            "on-surface-variant": "#434655",
+            "inverse-on-surface": "#f1effa",
+            "inverse-primary": "#b7c4ff",
+            "surface-variant": "#e3e1ec",
+            "on-secondary": "#ffffff",
+            "on-error-container": "#93000a",
+            "surface-container-highest": "#e3e1ec",
+            "outline-variant": "#c4c5d7",
+            "on-surface": "#1a1b22",
+            "surface-dim": "#dad9e3",
+            "tertiary-fixed-dim": "#c8c5ca",
+            "surface-bright": "#fbf8ff",
+            "primary-container": "#1d4ed8",
+            "on-secondary-container": "#5c647a",
+            "secondary": "#565e74",
+            "primary-fixed-dim": "#b7c4ff",
+            "surface-container-low": "#f4f2fd",
+            "surface-container-high": "#e8e7f1",
+            "on-secondary-fixed-variant": "#3f465c",
+            "error-container": "#ffdad6",
+            "on-tertiary-fixed-variant": "#47464a",
+            "on-tertiary-container": "#d6d3d7",
+            "on-primary-fixed": "#001551",
+            "secondary-fixed": "#dae2fd",
+            "outline": "#747686",
+            "on-tertiary-fixed": "#1b1b1e",
+            "surface": "#fbf8ff",
+            "tertiary-container": "#5c5b5f",
+            "on-primary-container": "#cad3ff",
+            "on-secondary-fixed": "#131b2e",
+            "on-tertiary": "#ffffff",
+            "inverse-surface": "#2f3038",
+            "error": "#ba1a1a",
+            "surface-container-lowest": "#ffffff",
+            "surface-tint": "#2151da",
+            "primary": "#0037b0",
+            "tertiary": "#444447",
+            "primary-fixed": "#dce1ff",
+            "on-background": "#1a1b22",
+            "secondary-container": "#dae2fd",
+            "on-primary-fixed-variant": "#0039b5",
+            "background": "#fbf8ff",
+            "secondary-fixed-dim": "#bec6e0",
+            "tertiary-fixed": "#e4e1e6",
+            "surface-container": "#eeedf7",
+            "on-primary": "#ffffff",
+            "on-error": "#ffffff"
+          },
+          "borderRadius": {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          "spacing": {
+            "space-sm": "0.5rem",
+            "space-lg": "1.25rem",
+            "space-xl": "2rem",
+            "space-md": "0.75rem",
+            "margin": "1.5rem",
+            "gutter": "1rem",
+            "space-xs": "0.25rem"
+          },
+          "fontFamily": {
+            "headline-md": ["Inter"],
+            "headline-lg": ["Inter"],
+            "headline-sm": ["Inter"],
+            "label-sm": ["Inter"],
+            "body-md": ["Inter"],
+            "label-md": ["Inter"],
+            "body-sm": ["Inter"],
+            "body-lg": ["Inter"]
+          },
+          "fontSize": {
+            "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+            "headline-lg": ["30px", { "lineHeight": "36px", "fontWeight": "700" }],
+            "headline-sm": ["18px", { "lineHeight": "26px", "fontWeight": "600" }],
+            "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+            "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+            "label-md": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+            "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+            "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 20px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body class="min-h-full flex flex-col bg-[#f4f4f5] text-zinc-900 antialiased selection:bg-blue-100 selection:text-blue-900">
+<!-- TopNavBar (Shared Component) -->
+<header class="sticky top-0 w-full z-50 bg-[#0f172a] shadow-sm">
+<div class="flex items-center justify-between h-16 px-6 max-w-7xl mx-auto w-full">
+<!-- Brand Logo / Product Name -->
+<div class="flex items-center space-x-8">
+<a class="font-headline text-lg font-bold tracking-tight text-white focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a] rounded" href="#">
+          StoreCore
+        </a>
+<!-- Navigation Links -->
+<nav class="hidden md:flex items-center space-x-6 text-sm font-medium">
+<a class="text-slate-300 hover:text-white transition-colors hover:text-white hover:bg-slate-800/50 px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            Storefront
+          </a>
+<a class="text-slate-300 hover:text-white transition-colors hover:text-white hover:bg-slate-800/50 px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            Catálogo
+          </a>
+<a class="text-slate-300 hover:text-white transition-colors hover:text-white hover:bg-slate-800/50 px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            Carrito
+          </a>
+<!-- Active link mapped to Customer session -->
+<a class="text-white font-semibold border-b-2 border-[#1d4ed8] pb-1 focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            Customer
+          </a>
+<a class="text-slate-300 hover:text-white transition-colors hover:text-white hover:bg-slate-800/50 px-2 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 focus:ring-offset-[#0f172a]" href="#">
+            User
+          </a>
+</nav>
+</div>
+<!-- Trailing Authentication Status Badges/Indicators -->
+<div class="flex items-center space-x-3">
+<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+<span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
+          Customer sin sesión
+        </span>
+<span class="hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-800/60 text-slate-400 border border-slate-700/60">
+          User sin sesión
+        </span>
+</div>
+</div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-1 flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-12">
+<!-- Top Breadcrumb Indicator -->
+<div class="w-full max-w-md mb-4 text-left">
+<nav class="flex items-center space-x-1.5 text-xs text-zinc-500 font-medium tracking-tight">
+<span>StoreCore</span>
+<span class="text-zinc-400">/</span>
+<span>Portal de Compradores</span>
+<span class="text-zinc-400">/</span>
+<span class="text-zinc-800 font-semibold">Iniciar sesión customer</span>
+</nav>
+</div>
+<!-- Auth Card Surface -->
+<div class="w-full max-w-md bg-white rounded-xl border border-zinc-200/80 shadow-sm p-8 sm:p-9 relative">
+<!-- Badge Pill Context -->
+<div class="inline-flex items-center bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-md mb-4 tracking-wide uppercase">
+        C-01 · Acceso Comprador
+      </div>
+<!-- Heading & Lede -->
+<h1 class="font-headline-md text-headline-md text-zinc-900 tracking-tight">
+        Sesión customer
+      </h1>
+<p class="font-body-md text-body-md text-zinc-500 mt-1 mb-6">
+        Identidad de compra. No es el acceso de operadores.
+      </p>
+<!-- Sign In Form -->
+<form class="space-y-4" onsubmit="event.preventDefault();">
+<!-- Field 1: Correo electrónico -->
+<div>
+<label class="block font-label-md text-label-md text-zinc-700 mb-1.5" for="email">
+            Correo electrónico
+          </label>
+<input autocomplete="email" class="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400 bg-white focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 transition-all" id="email" name="email" placeholder="comprador@ejemplo.com.ar" required="" type="email"/>
+</div>
+<!-- Field 2: Contraseña -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="block font-label-md text-label-md text-zinc-700" for="password">
+              Contraseña
+            </label>
+<a class="font-body-sm text-body-sm text-[#1d4ed8] hover:underline font-medium focus:outline-none focus:ring-1 focus:ring-[#1d4ed8] rounded" href="#">
+              ¿Olvidaste tu contraseña?
+            </a>
+</div>
+<input autocomplete="current-password" class="w-full px-3.5 py-2.5 rounded-lg border border-zinc-300 text-zinc-900 text-sm placeholder-zinc-400 bg-white focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 transition-all" id="password" name="password" placeholder="••••••••••••" required="" type="password"/>
+</div>
+<!-- Primary Submit Button -->
+<div class="pt-2">
+<button class="w-full py-3 px-4 bg-[#1d4ed8] hover:bg-[#1e40af] text-white font-medium rounded-lg text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#1d4ed8] focus:ring-offset-2 cursor-pointer flex items-center justify-center space-x-2" type="submit">
+<span>Entrar</span>
+</button>
+</div>
+<!-- Register Link -->
+<div class="text-center pt-2">
+<p class="font-body-sm text-body-sm text-zinc-600">
+            ¿No tenés cuenta aún? 
+            <a class="text-[#1d4ed8] hover:underline font-medium focus:outline-none focus:ring-1 focus:ring-[#1d4ed8] rounded" href="#">
+              Crear cuenta
+            </a>
+</p>
+</div>
+</form>
+<!-- Informational Verification Callout -->
+<div class="mt-6 pt-5 border-t border-zinc-100 flex items-start space-x-3 text-zinc-500 bg-zinc-50/80 -mx-8 -mb-8 p-5 rounded-b-xl border-b border-x border-zinc-200/50">
+<span class="material-symbols-outlined text-zinc-400 shrink-0 mt-0.5" data-icon="verified_user">verified_user</span>
+<p class="text-xs text-zinc-600 leading-relaxed font-normal">
+          Accedé para consultar el historial de tus compras y comprobantes emitidos en el local. Tus comprobantes están asociados a tu correo verificado.
+        </p>
+</div>
+</div>
+<!-- Secondary Helper Context for Operators -->
+<div class="w-full max-w-md mt-6 text-center">
+<p class="text-xs text-zinc-400">
+        ¿Operás la sucursal o gestionás stock? 
+        <a class="text-zinc-600 hover:text-zinc-800 font-medium underline underline-offset-2" href="#">
+          Ir a acceso del personal
+        </a>
+</p>
+</div>
+</main>
+<!-- Clean Utilitarian Footer -->
+<footer class="w-full bg-white border-t border-zinc-200 py-6 px-6 text-xs text-zinc-500 mt-auto">
+<div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center space-x-2">
+<span class="font-bold text-zinc-800 tracking-tight">StoreCore</span>
+<span class="text-zinc-300">|</span>
+<span>Sistema de Operación de Tienda Unificada</span>
+</div>
+<div class="flex items-center space-x-6">
+<a class="hover:text-zinc-800 transition-colors" href="#">Términos del servicio</a>
+<a class="hover:text-zinc-800 transition-colors" href="#">Privacidad y resguardo</a>
+<a class="hover:text-zinc-800 transition-colors" href="#">Soporte al comprador</a>
+</div>
+</div>
+</footer>
+</body></html>

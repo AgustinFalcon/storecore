@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 
 @Component({
   selector: 'sc-feature-status',
@@ -11,4 +11,5 @@ export class FeatureStatusComponent {
   @Input() empty = false;
   @Input() loadingText = 'Cargando…';
   @Input() emptyText = 'No hay datos en esta instalación.';
+  @Output() readonly retry = new EventEmitter<void>();
 }
