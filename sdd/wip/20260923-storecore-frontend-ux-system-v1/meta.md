@@ -10,7 +10,7 @@
 
 ## Objetivo
 
-Cerrar documentación y diseños Stitch del storefront/ops StoreCore: tokens, primitivas, dialogos, estados, tipografía, y las 22 pantallas (DS-00 + P-01…P-03 + C-01…C-09 + U-01…U-10). No implementa Angular. No toca BlackStore.
+Cerrar documentación y diseños Stitch del storefront/ops StoreCore, y aplicar UX-ANG en las 22 rutas existentes. No es pixel-complete. No agrega rutas ni SDK de pagos. No toca BlackStore.
 
 ## Stitch
 
@@ -20,4 +20,4 @@ Cerrar documentación y diseños Stitch del storefront/ops StoreCore: tokens, pr
 
 ## Gate
 
-Spec/plan listos para Sol. Implementación Angular bloqueada hasta GO. BlackStore back/front es otro tramo.
+UX-ANG aplicado en las rutas existentes. No pixel-complete. No archive. BlackStore es otro repo.

@@ -24,13 +24,13 @@
 
 ## Gate actual
 
-Plan frontend UX (`docs/agent/frontend/ux-handoff.md`) **cerrado en código de views**: DS-00…U-10 existen, sin favoritos ni SDK/credenciales de Mercado Pago en el browser. El **sistema visual SDD/Stitch** es el WIP de arriba; no sustituye Company Brain. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, POS/BlackStore adapter, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. POS y fiscal siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16–#18 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. Evidencia POS local está registrada abajo y el companion sigue disabled. Fiscal y live siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16–#18 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox ML local en Testcontainers; módulo vuelve a DISABLED. BlackStore ADP-001..010 + L3-001..003 locales done; dual Grok r4 y L3 APPROVED. Release disabled. Fiscal/live/`/sdd.finish` NO-GO.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox local en Testcontainers; módulo vuelve a DISABLED. BlackStore ADP-001..010 + L3 están en el `master` de ese repo (PR #1); el release de BlackStore sigue disabled y no es companion live. Fiscal, live y `/sdd.finish` NO-GO.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 

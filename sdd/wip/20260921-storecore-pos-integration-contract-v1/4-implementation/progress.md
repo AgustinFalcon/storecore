@@ -1,7 +1,7 @@
 # Implementation Progress
-**Status**: in_progress | **Strategy**: batched
+**Status**: local_done | **Strategy**: batched
 
-Fail-closed default plus Sol `20260923-sol-pos-next-go.md` Testcontainers CAS temporary ACTIVE. HTTP remains 403 `CAPABILITY_DISABLED` outside that test. Dual Grok r4 both `APPROVED` for the fail-closed facade. No live companion, PR merge, or archive until asked.
+Thirteen local tasks have evidence. HTTP 200/304/409/410/429 exists only inside the Testcontainers CAS temporary ACTIVE. Outside that test the module stays DISABLED and HTTP is 403. PIC-009 writes `channel_outbox` only on that temporary ACTIVE commit. No live companion and no `/sdd.finish`.
 
 | ID | Task | Status | Evidence |
 |----|------|--------|----------|

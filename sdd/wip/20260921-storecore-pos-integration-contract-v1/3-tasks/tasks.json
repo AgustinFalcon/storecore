@@ -156,7 +156,7 @@
       "files": ["sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/adr/ADR-008-v3-capability-compatibility-and-promotion.md"],
       "acceptance_criteria": [
         "ADR-008: only future_optional changes; module stays DISABLED; no runtime DML/DDL privilege",
-        "GATE: documentary only until a separate Sol implementation GO"
+        "GATE: V7 flips future_optional and leaves the module DISABLED; not a live activation"
       ],
       "references": ["AC-ID-1"],
       "design_decisions": ["ADR-008"]
@@ -278,7 +278,7 @@
     }
   },
   "notes": [
-    "Sol CONDITIONAL_GO 20260923-sol-pos-impl-go.md authorizes PIC-001..009 fail-closed only. PIC-010 remains forbidden. Module stays DISABLED and future_optional=true.",
+    "Local PIC-001..010 and L3-001..003 are done. V7 flips future_optional and leaves BLACKSTORE_INTEGRATION DISABLED. Live companion stays NO-GO.",
     "Does not alter the 14 executable tasks of storecore-core-v1.0.0.",
     "AC-STK-1 is a BlackStore-side precondition (persist intent+outbox before HTTP).",
     "AC-OFF-1 is a BlackStore-side obligation; StoreCore only supplies validUntil.",
@@ -286,6 +286,6 @@
     "AC-STK-7 error matrix: stock/stale/validation delete claim; reserve CONFLICT preserves PENDING; commit/release CONFLICT preserves prior durable state; mismatch/EXPIRED keep row; live terminal incompatible command is 409 OPERATION_STATE_CONFLICT; tombstone 410 is never re-POSTed.",
     "AC-STK-8 purge sequence is unique: INSERT tombstone (retention_until >= retired_at+7y) → DELETE lines → DELETE saga.",
     "Flyway: V4=MP Orders, V5=PIC-001 registry, V6=PIC-002 saga, V7=PIC-010 future_optional flip. PIC-007 is error envelope only.",
-    "2026-09-23 HTTP 200/304/409/410/429 proven in BlackStoreHttpContractTest via CAS temporary ACTIVE (Testcontainers only). PIC-003..007 and L3-001/002 done. PIC-009 and L3-003 stay in_progress (ML listing adapter still returns false). Module remains DISABLED outside that test. Not live companion."
+    "2026-09-23 HTTP 200/304/409/410/429 proven in BlackStoreHttpContractTest via CAS temporary ACTIVE (Testcontainers only). PIC-009 enqueues channel_outbox only while that temporary ACTIVE commit runs and returns false while DISABLED. Module remains DISABLED outside that test. Not live companion."
   ]
 }
