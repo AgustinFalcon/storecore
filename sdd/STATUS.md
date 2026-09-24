@@ -30,7 +30,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox local en Testcontainers; módulo vuelve a DISABLED. BlackStore ADP-001..010 + L3 están en el `master` de ese repo (PR #1); el release de BlackStore sigue disabled y no es companion live. Fiscal, live y `/sdd.finish` NO-GO.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox local en Testcontainers; módulo vuelve a DISABLED. Dual Grok r2 de PR #19 ambos `APPROVED` (`20260924-grok-pr19-scope-r2.md`, `20260924-grok-pr19-sdd-r2.md`). La r1 de alcance pedía base `master`; el PR ya estaba retargeteado. Verify de #19 no es CI verde. BlackStore ADP-001..010 + L3 están en el `master` de ese repo (PR #1); el release de BlackStore sigue disabled y no es companion live. Fiscal, live y `/sdd.finish` NO-GO.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
