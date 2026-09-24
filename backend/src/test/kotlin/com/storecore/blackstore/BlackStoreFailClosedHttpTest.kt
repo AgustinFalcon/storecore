@@ -51,6 +51,7 @@ class BlackStoreFailClosedHttpTest(
         assertEquals(0, worker.expireReserved())
         assertEquals(0, worker.purgeTerminal())
         assertFalse(mlListing.enqueueDesiredQuantityAfterBlackStore("any"))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
         assertEquals(false, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))
     }

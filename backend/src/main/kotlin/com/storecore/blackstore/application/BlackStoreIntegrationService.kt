@@ -43,7 +43,7 @@ class BlackStoreIntegrationService(
         companions.assertBound(client)
         limiter.check(client.toString(), BlackStoreRateLimiter.Scope.CATALOG)
         val page = catalog.readPage(client, cursor, pageSize ?: BlackStoreSagaPolicy.CATALOG_PAGE_MAX, includeCost)
-        if (!ifNoneMatch.isNullOrBlank() && ifNoneMatch == page.etag) {
+        if (etagMatches(ifNoneMatch, page.etag)) {
             throw BlackStoreNotModified(page.etag)
         }
         return page
@@ -181,6 +181,16 @@ class BlackStoreIntegrationService(
         if (BlackStoreSagaPolicy.reservationRefFor(quadruple) != parseUuid(reservationRef, "reservationRef")) {
             throw BlackStoreSagaException.validation()
         }
+    }
+
+    private fun etagMatches(ifNoneMatch: String?, etag: String): Boolean {
+        val incoming = normalizeEtag(ifNoneMatch) ?: return false
+        return incoming == normalizeEtag(etag)
+    }
+
+    private fun normalizeEtag(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        return raw.trim().removePrefix("W/").trim().trim('"')
     }
 
     private fun parseUuid(raw: String?, name: String): UUID {

@@ -89,6 +89,12 @@ class BlackStoreIntegrationServiceTest {
         assertEquals("NOT_MODIFIED", assertThrows(BlackStoreNotModified::class.java) {
             service.catalog(client, null, 10, false, "v1")
         }.message)
+        assertEquals("NOT_MODIFIED", assertThrows(BlackStoreNotModified::class.java) {
+            service.catalog(client, null, 10, false, "\"v1\"")
+        }.message)
+        assertEquals("NOT_MODIFIED", assertThrows(BlackStoreNotModified::class.java) {
+            service.catalog(client, null, 10, false, "W/\"v1\"")
+        }.message)
     }
 
     private fun reserveBody() = BlackStoreReservationRequest(

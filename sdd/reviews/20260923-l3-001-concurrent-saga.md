@@ -1,8 +1,8 @@
-VERDICT: APPROVED (isolated fail-closed)
+VERDICT: APPROVED (Testcontainers CAS temporary ACTIVE; not live)
 
 # L3-001 — Concurrent saga, expiry, commit/release, crash/retry
 
-**Scope:** PIC-001..009 fail-closed. Isolated `JdbcBlackStoreSagaEngine` + HTTP deny-first. Not live. Not PIC-010.
+**Scope:** Isolated engine + HTTP matrix under Sol `20260923-sol-pos-next-go.md`. Not companion live.
 
 ## Evidence
 
@@ -11,8 +11,8 @@ VERDICT: APPROVED (isolated fail-closed)
 - GET after Tx-A sees PENDING; tombstone GET/POST is 410 `OPERATION_RETIRED` `retryable=false`.
 - Stock/stale delete claim (GET 404). Reserve mismatch keeps PENDING. Live terminal incompatible command is 409 `OPERATION_STATE_CONFLICT`.
 - Purge is INSERT tombstone (`retention_until >= retired_at + 7 years`) then DELETE lines then DELETE saga.
-- HTTP operational routes stay 403 `CAPABILITY_DISABLED` via `BlackStoreIntegrationService.requireEnabled`. Facade unit test proves limiter/catalog/saga are not called while disabled.
+- `BlackStoreHttpContractTest` CAS temporary ACTIVE: catalog/stock 200, ETag 304 (quoted/weak), reserve 200, GET 200, commit 200, 409 `OPERATION_STATE_CONFLICT`, GET 404 missing, 410 after purge, concurrent HTTP reserve one 200, baseline 403 after restore DISABLED.
 
 ## Residual
 
-HTTP 200 saga paths are not Testcontainers-proven because Sol forbids activating `BLACKSTORE_INTEGRATION`. Facade enabled-double is a local port fake, not a module flip.
+Not live identity, network, or real companion. PIC-009 ML outbox still returns false.
