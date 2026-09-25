@@ -1,4 +1,4 @@
-import { mapCart, mapCustomerSession, mapProductDetail, mapReceipt } from './http-mappers';
+import { mapCart, mapCustomerSession, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
 
 describe('http-mappers', () => {
   it('maps a customer session without a token', () => {
@@ -22,6 +22,25 @@ describe('http-mappers', () => {
 
   it('maps a cart with no lines as empty', () => {
     expect(mapCart({})).toEqual({ lines: [], currency: '' });
+  });
+
+  it('keeps storefront cards on the effective price and uses only API media', () => {
+    expect(
+      mapProductSummary({
+        sku: 'SKU-1',
+        name: 'Lámpara',
+        price: { effective: 80, base: 100 },
+        images: ['https://cdn.example.test/lamp.jpg'],
+        offerRef: 'O-1',
+      }),
+    ).toEqual({
+      sku: 'SKU-1',
+      name: 'Lámpara',
+      price: 80,
+      originalPrice: 100,
+      imageUrl: 'https://cdn.example.test/lamp.jpg',
+      offerRef: 'O-1',
+    });
   });
 
   it('maps an optional allowlisted checkout url without treating it as payment proof', () => {

@@ -32,6 +32,7 @@
       <div class="sc-buybox">
         <p class="sc-buybox__meta">{{ product.brand }} · {{ product.category }}</p>
         <h1 id="product-title">{{ product.name }}</h1>
+        <p class="sc-mono">SKU {{ product.sku }}</p>
         <p>{{ product.description }}</p>
         <div class="sc-price-stack">
           @if (hasDiscount) {
@@ -63,7 +64,7 @@
           @if (signedIn) {
             <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
           } @else {
-            <p><a routerLink="/customer/session">Entrá para agregar al carrito</a></p>
+            <p><a routerLink="/customer/session">Entrar para agregar</a></p>
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>

@@ -2,108 +2,69 @@
   <sc-feature-status
     [loading]="loading"
     [error]="error"
-    [empty]="false"
-    emptyText=""
+    [empty]="homeEmpty"
+    emptyText="Home configurable vacío."
     (retry)="retry.emit()"
   />
 
+  <header class="sc-page-head">
+    <p class="sc-kicker">Tienda</p>
+    <h1 id="home-title">Inicio</h1>
+  </header>
+
   @if (carouselSlides.length) {
-    <div class="sc-carousel" (mouseenter)="pause()" (mouseleave)="play()">
+    <div class="sc-carousel" (mouseenter)="pause()" (mouseleave)="play()" (focusin)="pause()" (focusout)="play()">
       @for (block of carouselSlides; track block.id; let i = $index) {
         @if (i === slide) {
           <article class="sc-carousel__slide">
             <p class="sc-carousel__kicker">En esta tienda</p>
-            <h1 id="home-title">{{ block.title || home?.title || 'Storefront' }}</h1>
+            <h2>{{ block.title || home?.title || 'Inicio' }}</h2>
             <p>{{ block.body }}</p>
             <a class="sc-btn sc-btn--primary" routerLink="/catalog">Ir al catálogo</a>
           </article>
         }
       }
       @if (carouselSlides.length > 1) {
+        <div class="sc-carousel__controls" aria-label="Controles del banner">
+          <button type="button" class="sc-btn sc-btn--ghost" (click)="go(slide - 1)" aria-label="Banner anterior">Anterior</button>
+          <button type="button" class="sc-btn sc-btn--ghost" (click)="go(slide + 1)" aria-label="Banner siguiente">Siguiente</button>
+        </div>
         <div class="sc-carousel__dots">
           @for (block of carouselSlides; track block.id; let i = $index) {
-            <button type="button" [class.is-on]="i === slide" [attr.aria-label]="'Slide ' + (i + 1)" (click)="go(i)"></button>
+            <button type="button" [class.is-on]="i === slide" [attr.aria-current]="i === slide ? 'true' : null" [attr.aria-label]="'Ir al banner ' + (i + 1)" (click)="go(i)"></button>
           }
         </div>
       }
     </div>
-  } @else if (!loading) {
-    <div class="sc-carousel">
-      <article class="sc-carousel__slide">
-        <h1 id="home-title">{{ home?.title || 'Storefront' }}</h1>
-        <p>Cuando el operador publique contenido, este home se llena solo.</p>
-        <a class="sc-btn sc-btn--primary" routerLink="/catalog">Ir al catálogo</a>
-      </article>
-    </div>
   }
 
+  @if (categories.length) {
   <section class="sc-home__section" aria-labelledby="home-categories-title">
     <div class="sc-home__section-head">
       <h2 id="home-categories-title">Comprar por categoría</h2>
       <a routerLink="/catalog">Ver catálogo</a>
     </div>
-    @if (categories.length) {
-      <ul class="sc-home__tiles">
-        @for (category of categories; track category.id) {
-          <li>
-            <a routerLink="/catalog" [queryParams]="{ category: category.id }">{{ category.name }}</a>
-          </li>
-        }
-      </ul>
-    } @else if (!loading) {
-      <p>Todavía no hay categorías publicadas.</p>
-    }
+    <ul class="sc-home__tiles">
+      @for (category of categories; track category.id) {
+        <li>
+          <a routerLink="/catalog" [queryParams]="{ category: category.id }">{{ category.name }}</a>
+        </li>
+      }
+    </ul>
   </section>
+  }
 
+  @if (offers.length) {
   <section class="sc-home__section" aria-labelledby="home-offers-title">
     <div class="sc-home__section-head">
       <h2 id="home-offers-title">Ofertas</h2>
       <a routerLink="/catalog" [queryParams]="{ offers: '1' }">Sólo ofertas</a>
     </div>
-    @if (offers.length) {
-      <div class="sc-rail">
-        @for (product of offers; track product.sku) {
-          <sc-product-tile [product]="product" [offer]="true" />
-        }
-      </div>
-    } @else if (!loading) {
-      <p>Todavía no hay ofertas activas. El operador las carga en Promos.</p>
-    }
-  </section>
-
-  <section class="sc-home__section" aria-labelledby="home-products-title">
-    <div class="sc-home__section-head">
-      <h2 id="home-products-title">Productos</h2>
-      <a routerLink="/catalog">Ver todos</a>
+    <div class="sc-rail">
+      @for (product of offers; track product.sku) {
+        <sc-product-tile [product]="product" [offer]="true" />
+      }
     </div>
-    @if (featuredProducts.length) {
-      <ul class="sc-grid sc-grid--tiles">
-        @for (product of featuredProducts; track product.sku) {
-          <li>
-            <sc-product-tile [product]="product" />
-          </li>
-        }
-      </ul>
-    } @else if (!loading) {
-      <p>Todavía no hay productos publicados.</p>
-    }
   </section>
-
-  <section class="sc-home__section" aria-labelledby="home-brands-title">
-    <div class="sc-home__section-head">
-      <h2 id="home-brands-title">Marcas</h2>
-      <a routerLink="/catalog">Filtrar en catálogo</a>
-    </div>
-    @if (brands.length) {
-      <ul class="sc-home__tiles">
-        @for (brand of brands; track brand.id) {
-          <li>
-            <a routerLink="/catalog" [queryParams]="{ brand: brand.id }">{{ brand.name }}</a>
-          </li>
-        }
-      </ul>
-    } @else if (!loading) {
-      <p>Todavía no hay marcas publicadas.</p>
-    }
-  </section>
+  }
 </section>

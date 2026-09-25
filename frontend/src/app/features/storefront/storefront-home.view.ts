@@ -14,9 +14,7 @@ import { ProductTileComponent } from '../../shared/product-tile.component';
 })
 export class StorefrontHomeViewComponent implements OnChanges, OnDestroy {
   @Input() home: HomeContent | null = null;
-  @Input() products: readonly ProductSummary[] = [];
   @Input() offers: readonly ProductSummary[] = [];
-  @Input() brands: readonly CatalogFacet[] = [];
   @Input() categories: readonly CatalogFacet[] = [];
   @Input() loading = false;
   @Input() error = '';
@@ -25,16 +23,17 @@ export class StorefrontHomeViewComponent implements OnChanges, OnDestroy {
   slide = 0;
   private timer: ReturnType<typeof setInterval> | undefined;
 
-  get featuredProducts(): readonly ProductSummary[] {
-    return this.products.slice(0, 8);
-  }
-
   get carouselSlides(): readonly HomeBlock[] {
     const blocks = this.home?.blocks ?? [];
     return blocks.length ? blocks.slice(0, 5) : [];
   }
 
+  get homeEmpty(): boolean {
+    return !this.loading && !this.error && this.carouselSlides.length === 0 && this.offers.length === 0 && this.categories.length === 0;
+  }
+
   ngOnChanges(): void {
+    this.go(this.slide);
     this.play();
   }
 
@@ -44,10 +43,13 @@ export class StorefrontHomeViewComponent implements OnChanges, OnDestroy {
 
   play(): void {
     this.pause();
-    if (this.carouselSlides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (
+      this.carouselSlides.length < 2 ||
+      (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    ) {
       return;
     }
-    this.timer = setInterval(() => this.go(this.slide + 1), 5200);
+    this.timer = setInterval(() => this.go(this.slide + 1), 6000);
   }
 
   pause(): void {
