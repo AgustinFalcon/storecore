@@ -98,7 +98,18 @@ export function mapFacets(value: unknown): readonly CatalogFacet[] {
 
 export function mapProductSummary(value: unknown): ProductSummary {
   const row = asRecord(value);
-  return { sku: text(row['sku']), name: text(row['name']), price: num(row['price']) };
+  const price = asRecord(row['price']);
+  const effective = num(typeof row['price'] === 'object' ? price['effective'] : row['effective'] ?? row['price']);
+  const original = nullableNum(row['originalPrice'] ?? row['basePrice'] ?? price['base']);
+  const image = text(row['imageUrl'] ?? row['image'] ?? items(row['images'])[0]) || null;
+  return {
+    sku: text(row['sku']),
+    name: text(row['name']),
+    price: effective,
+    originalPrice: original !== null && original > effective ? original : null,
+    imageUrl: image,
+    offerRef: text(row['offerRef']) || null,
+  };
 }
 
 export function mapProductSummaries(value: unknown): readonly ProductSummary[] {

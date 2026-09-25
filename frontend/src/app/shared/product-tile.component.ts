@@ -8,17 +8,26 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
-      @if (offer) {
-        <span class="sc-off">OFF</span>
+      @if (offer || product.offerRef) {
+        <span class="sc-off">Oferta</span>
       }
       <a class="sc-tile__media" [routerLink]="['/catalog', product.sku]" [attr.aria-label]="product.name">
-        <span class="sc-tile__figure" aria-hidden="true"></span>
+        @if (product.imageUrl) {
+          <img class="sc-tile__image" [src]="product.imageUrl" [alt]="product.name" />
+        } @else {
+          <span class="sc-tile__figure" aria-hidden="true"></span>
+        }
       </a>
       <div class="sc-tile__body">
         <h3>
           <a [routerLink]="['/catalog', product.sku]">{{ product.name }}</a>
         </h3>
-        <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price }}</p>
+        <div class="sc-price-stack">
+          @if (product.originalPrice !== null) {
+            <p class="sc-price__was">{{ product.originalPrice }}</p>
+          }
+          <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price }}</p>
+        </div>
       </div>
     </article>
   `,

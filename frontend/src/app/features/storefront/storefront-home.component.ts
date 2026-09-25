@@ -11,9 +11,7 @@ import { StorefrontHomeViewComponent } from './storefront-home.view';
   template: `
     <sc-storefront-home-view
       [home]="store.home$ | async"
-      [products]="(store.products$ | async) ?? []"
       [offers]="(store.offers$ | async) ?? []"
-      [brands]="(store.brands$ | async) ?? []"
       [categories]="(store.categories$ | async) ?? []"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"

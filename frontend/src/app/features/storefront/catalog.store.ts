@@ -80,12 +80,6 @@ export class CatalogStore extends ComponentStore<CatalogState> {
               return of(null);
             }),
           ),
-          products: this.searchCatalog.execute(this.snapshot.query).pipe(
-            catchError((err: unknown) => {
-              remember(err);
-              return of([]);
-            }),
-          ),
           offers: this.searchCatalog.execute({ ...emptyCatalogQuery, offersOnly: true }).pipe(
             catchError((err: unknown) => {
               remember(err);
@@ -100,10 +94,9 @@ export class CatalogStore extends ComponentStore<CatalogState> {
           ),
         }).pipe(
           tapResponse({
-            next: ({ home, products, offers, facets }) =>
+            next: ({ home, offers, facets }) =>
               this.patchState({
                 home,
-                products,
                 offers,
                 brands: facets.brands,
                 categories: facets.categories,

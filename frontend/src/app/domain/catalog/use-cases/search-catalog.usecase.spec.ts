@@ -6,7 +6,7 @@ import { SearchCatalogUseCase } from './search-catalog.usecase';
 describe('SearchCatalogUseCase', () => {
   it('delegates search to the HTTP catalog port', async () => {
     const repo: ICatalogRepository = {
-      search: (query) => of([{ sku: query.query || 'x', name: query.query, price: 0 }]),
+      search: (query) => of([{ sku: query.query || 'x', name: query.query, price: 0, originalPrice: null, imageUrl: null, offerRef: null }]),
       readProduct: () => of() as never,
       listBrands: () => of([]),
       listCategories: () => of([]),

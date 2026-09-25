@@ -4,6 +4,7 @@ import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
 import { filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
+import { environment } from '../../../environments/environment';
 import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.usecase';
@@ -131,8 +132,9 @@ export class CartStore extends ComponentStore<CartState> {
             tapResponse({
               next: (receipt) => {
                 this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS' });
-                if (receipt.checkoutUrl?.startsWith('https://')) {
-                  window.location.assign(receipt.checkoutUrl);
+                const checkoutUrl = receipt.checkoutUrl ?? null;
+                if (this.isAllowlistedCheckoutUrl(checkoutUrl)) {
+                  window.location.assign(checkoutUrl);
                   return;
                 }
                 void this.router.navigate(['/checkout/result', receipt.orderId]);
@@ -143,4 +145,16 @@ export class CartStore extends ComponentStore<CartState> {
       ),
     ),
   );
+
+  private isAllowlistedCheckoutUrl(value: string | null): value is string {
+    if (!value) {
+      return false;
+    }
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && environment.checkoutAllowedOrigins.includes(url.origin);
+    } catch {
+      return false;
+    }
+  }
 }

@@ -18,7 +18,9 @@ describe('CatalogHttpRepository', () => {
     const req = ctrl.expectOne('/api/v1/catalog');
     expect(req.request.params.keys().length).toBe(0);
     req.flush([{ sku: 'SKU-1', name: 'Lámpara', price: 10 }]);
-    await expect(pending).resolves.toEqual([{ sku: 'SKU-1', name: 'Lámpara', price: 10 }]);
+    await expect(pending).resolves.toEqual([
+      { sku: 'SKU-1', name: 'Lámpara', price: 10, originalPrice: null, imageUrl: null, offerRef: null },
+    ]);
   });
 
   it('sends only filled filters and offers', async () => {
