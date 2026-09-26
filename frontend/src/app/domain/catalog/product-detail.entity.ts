@@ -24,4 +24,7 @@ export interface ProductDetail {
   readonly price: ProductPrice;
   readonly offerRef: string | null;
   readonly active: boolean;
+  /** Offer window from the detail payload. Absent means do not hide an API offer. */
+  readonly validFrom?: string | null;
+  readonly validUntil?: string | null;
 }

@@ -1,8 +1,11 @@
 /**
  * Storefront offer window. No Angular.
  * A missing window must not hide an offer the API already sent.
- * Both bounds show the badge and the home rail only while now is inside
- * [validFrom, validUntil), using installation local time.
+ * Both bounds show the badge only while now is inside [validFrom, validUntil),
+ * using installation local time.
+ * The home rail omits a product whose window is closed.
+ * The catalog grid and the product detail keep that product and its effective
+ * price, and clear only the offer badge.
  * This does not change the effective price.
  */
 
@@ -50,6 +53,24 @@ export function isApiOfferVisible(
   }
   const at = now.getTime();
   return at >= from && at < until;
+}
+
+type OfferBadgeProduct = {
+  readonly offerRef: string | null;
+  readonly validFrom?: string | null;
+  readonly validUntil?: string | null;
+};
+
+/**
+ * A missing window leaves offerRef and every price field as the API sent them.
+ * A closed window keeps the product and its effective price and clears only offerRef.
+ * Callers that list the catalog must map with this helper, not filter the product out.
+ */
+export function withoutClosedOfferBadge<T extends OfferBadgeProduct>(product: T, now: Date): T {
+  if (isApiOfferVisible(product.validFrom, product.validUntil, now) || product.offerRef == null) {
+    return product;
+  }
+  return { ...product, offerRef: null };
 }
 
 /** datetime-local (installation clock) → ISO-8601 instant the promo API can parse. */

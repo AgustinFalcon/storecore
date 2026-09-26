@@ -165,6 +165,7 @@ export function mapProductDetail(value: unknown): ProductDetail {
     price: mapPrice(row['price']),
     offerRef: text(row['offerRef']) || null,
     active: row['active'] !== false,
+    ...offerWindow(row),
   };
 }
 
