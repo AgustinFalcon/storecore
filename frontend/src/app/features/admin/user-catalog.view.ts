@@ -1,9 +1,19 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { ProductDetail, ProductVariant } from '../../domain/catalog/product-detail.entity';
+import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+
+export function operatorPriceCells(price: ProductPrice): readonly { kind: string; value: string }[] {
+  const blank = (value: number | null): string => (value == null ? '—' : String(value));
+  return [
+    { kind: 'Base', value: String(price.base) },
+    { kind: 'Desired', value: blank(price.desired) },
+    { kind: 'Observed', value: blank(price.observed) },
+    { kind: 'Efectivo', value: String(price.effective) },
+  ];
+}
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -20,6 +30,10 @@ export class UserCatalogViewComponent {
   @Output() readonly saveBrand = new EventEmitter<void>();
   @Output() readonly saveCategory = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
+
+  priceCells(price: ProductPrice): readonly { kind: string; value: string }[] {
+    return operatorPriceCells(price);
+  }
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');
