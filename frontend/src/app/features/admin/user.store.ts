@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { EMPTY, exhaustMap, filter, forkJoin, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, exhaustMap, filter, forkJoin, map, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
 import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
@@ -185,19 +185,39 @@ export class UserStore extends ComponentStore<UserState> {
         this.patchState({ loading: true, errorMessage: '' });
       }),
       filter(() => Boolean(this.snapshot.home.title.trim())),
-      switchMap(() =>
-        this.saveHome.execute({ title: this.snapshot.home.title, body: this.snapshot.home.body }).pipe(
+      switchMap(() => {
+        const draft = { title: this.snapshot.home.title, body: this.snapshot.home.body };
+        return this.saveHome.execute(draft).pipe(
+          switchMap((home) =>
+            this.publicHome.execute().pipe(
+              map((published) => ({ home, published })),
+              catchError((err: unknown) => {
+                this.patchState({
+                  home: { title: home.title, body: home.body },
+                  homeBlocks: null,
+                  loading: false,
+                  errorMessage: getApiErrorMessage(err),
+                });
+                return EMPTY;
+              }),
+            ),
+          ),
           tapResponse({
-            next: (home) =>
+            next: ({ home, published }) =>
               this.patchState({
                 home: { title: home.title, body: home.body },
-                ...(home.blocks === undefined ? {} : { homeBlocks: home.blocks }),
+                homeBlocks: published.blocks.map((block) => ({
+                  id: block.id,
+                  title: block.title,
+                  body: block.body,
+                })),
                 loading: false,
+                errorMessage: '',
               }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
 
