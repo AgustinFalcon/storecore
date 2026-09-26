@@ -109,7 +109,21 @@ export function mapProductSummary(value: unknown): ProductSummary {
     originalPrice: original !== null && original > effective ? original : null,
     imageUrl: image,
     offerRef: text(row['offerRef']) || null,
+    ...offerWindow(row),
   };
+}
+
+function offerWindow(row: Record<string, unknown>): { validFrom?: string; validUntil?: string } {
+  const validFrom = bound(row['validFrom']);
+  const validUntil = bound(row['validUntil']);
+  return {
+    ...(validFrom ? { validFrom } : {}),
+    ...(validUntil ? { validUntil } : {}),
+  };
+}
+
+function bound(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 export function mapProductSummaries(value: unknown): readonly ProductSummary[] {

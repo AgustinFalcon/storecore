@@ -6,7 +6,7 @@ import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.u
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
 import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.usecase';
-import { ProfilePreview } from '../../domain/user/user.entity';
+import { ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
 import { UserStore } from './user.store';
 
 describe('UserStore profile preview', () => {
@@ -81,13 +81,59 @@ describe('UserStore profile preview', () => {
   });
 });
 
-function createStore(importer: ImportProfileUseCase): UserStore {
+describe('UserStore promo window', () => {
+  it('does not post when hasta is not after desde', () => {
+    const save = vi.fn(() => of(promoDraft()));
+    const store = createStore({} as ImportProfileUseCase, { list: () => of([]), save } as unknown as ManagePromosUseCase);
+
+    store.setPromoDraft(promoDraft({ validFrom: '2026-09-26T20:00', validTo: '2026-09-26T18:00' }));
+    store.persistPromo();
+    store.setPromoDraft(promoDraft({ validFrom: '2026-09-26T18:00', validTo: '2026-09-26T18:00' }));
+    store.persistPromo();
+
+    expect(save).not.toHaveBeenCalled();
+    expect(store.snapshot.loading).toBe(false);
+    expect(store.snapshot.errorMessage).toBe('Hasta tiene que ser posterior a desde.');
+  });
+
+  it('posts a local day and hour as an instant without rewriting the price', () => {
+    const save = vi.fn((promo: ManualPromo) => of(promo));
+    const store = createStore({} as ImportProfileUseCase, { list: () => of([]), save } as unknown as ManagePromosUseCase);
+    store.setPromoDraft(promoDraft({ validFrom: '2026-09-26T18:00', validTo: '2026-09-26T20:00' }));
+    store.persistPromo();
+
+    expect(save).toHaveBeenCalledTimes(1);
+    const sent = save.mock.calls[0][0] as ManualPromo;
+    expect(sent.writer).toBe('MANUAL');
+    expect(sent.validFrom.endsWith('Z')).toBe(true);
+    expect(Date.parse(sent.validTo)).toBeGreaterThan(Date.parse(sent.validFrom));
+    expect(Date.parse(sent.validFrom)).toBe(Date.parse('2026-09-26T18:00'));
+  });
+});
+
+function promoDraft(overrides: Partial<ManualPromo> = {}): ManualPromo {
+  return {
+    id: '',
+    listingSku: 'SKU-1',
+    currency: 'ARS',
+    validFrom: '2026-09-26T18:00',
+    validTo: '2026-09-26T20:00',
+    priority: 1,
+    margin: 0,
+    approvedBy: '',
+    approvedAt: '',
+    writer: 'MANUAL',
+    ...overrides,
+  };
+}
+
+function createStore(importer: ImportProfileUseCase, promos: ManagePromosUseCase = {} as ManagePromosUseCase): UserStore {
   const session = { authenticated: () => false } as UserSession;
   return new UserStore(
     {} as SignInUserUseCase,
     {} as SignOutUserUseCase,
     {} as SaveHomeContentUseCase,
-    {} as ManagePromosUseCase,
+    promos,
     importer,
     session,
     { navigateByUrl: () => Promise.resolve(true) } as unknown as Router,

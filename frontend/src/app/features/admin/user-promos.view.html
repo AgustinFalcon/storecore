@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">MANUAL</p>
     <h1 id="promos-title">Promos MANUAL</h1>
-    <p class="sc-page__lede">Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización ML.</p>
+    <p class="sc-page__lede">Calendario de esta instalación: happy hour, fin de semana o campaña, con día y hora. Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización de Mercado Libre.</p>
   </header>
   <sc-feature-status
     [loading]="state.loading"
@@ -31,7 +31,7 @@
               @for (promo of state.promos; track promo.id) {
                 <tr>
                   <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
-                  <td>{{ promo.validFrom }} – {{ promo.validTo }}</td>
+                  <td>{{ clock(promo.validFrom) }} – {{ clock(promo.validTo) }}</td>
                   <td>{{ promo.priority }}</td>
                   <td>{{ promo.margin }}</td>
                   <td>{{ promo.currency }}</td>
@@ -48,14 +48,14 @@
       <label>SKU <input required name="sku" [ngModel]="state.promoDraft.listingSku" (ngModelChange)="patch({ listingSku: $event })" /></label>
       <label>Moneda <input required name="currency" [ngModel]="state.promoDraft.currency" (ngModelChange)="patch({ currency: $event })" /></label>
       <div class="sc-fields-2">
-        <label>Desde <input required type="date" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label>
-        <label>Hasta <input required type="date" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
+        <label>Desde <input required type="datetime-local" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label>
+        <label>Hasta <input required type="datetime-local" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
       </div>
       <label>Prioridad <input type="number" name="priority" [ngModel]="state.promoDraft.priority" (ngModelChange)="patch({ priority: +$event })" /></label>
       <label>Margen <input type="number" name="margin" [ngModel]="state.promoDraft.margin" (ngModelChange)="patch({ margin: +$event })" /></label>
       <label>Aprobador <input name="approvedBy" [ngModel]="state.promoDraft.approvedBy" (ngModelChange)="patch({ approvedBy: $event })" /></label>
       <label>Aprobado <input type="datetime-local" name="approvedAt" [ngModel]="state.promoDraft.approvedAt" (ngModelChange)="patch({ approvedAt: $event })" /></label>
-      <p class="sc-callout">El aprobador queda en el registro. Esta pantalla no dispara Mercado Libre.</p>
+      <p class="sc-callout">La hora es la de esta instalación. El aprobador queda en el registro. Esta pantalla no dispara Mercado Libre ni cambia precios sola.</p>
       <button type="submit" class="sc-btn sc-btn--primary">Crear promo</button>
     </form>
   </div>

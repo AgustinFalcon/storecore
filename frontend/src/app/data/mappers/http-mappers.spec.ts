@@ -43,6 +43,31 @@ describe('http-mappers', () => {
     });
   });
 
+  it('reads an offer window only when the catalog payload sends it', () => {
+    const withoutWindow = mapProductSummary({ sku: 'SKU-1', name: 'Lámpara', effective: 80, offerRef: 'O-1' });
+    expect(withoutWindow.price).toBe(80);
+    expect(withoutWindow.offerRef).toBe('O-1');
+    expect(withoutWindow.validFrom).toBeUndefined();
+    expect(withoutWindow.validUntil).toBeUndefined();
+
+    expect(
+      mapProductSummary({
+        sku: 'SKU-1',
+        name: 'Lámpara',
+        price: { effective: 80, base: 100 },
+        offerRef: 'O-1',
+        validFrom: ' 2026-09-26T18:00:00.000Z ',
+        validUntil: '2026-09-26T20:00:00.000Z',
+      }),
+    ).toMatchObject({
+      price: 80,
+      originalPrice: 100,
+      offerRef: 'O-1',
+      validFrom: '2026-09-26T18:00:00.000Z',
+      validUntil: '2026-09-26T20:00:00.000Z',
+    });
+  });
+
   it('maps an optional allowlisted checkout url without treating it as payment proof', () => {
     expect(
       mapReceipt({
