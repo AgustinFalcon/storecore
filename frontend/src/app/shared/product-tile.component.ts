@@ -8,7 +8,8 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   selector: 'sc-product-tile',
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template:     <article class="sc-tile">
+  template: `
+    <article class="sc-tile">
       @let marked = favorites.ids().includes(product.sku);
       @if (offerBadge) {
         <span class="sc-off">Oferta</span>
@@ -42,7 +43,7 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
         </div>
       </div>
     </article>
-  \,
+  `,
 })
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
