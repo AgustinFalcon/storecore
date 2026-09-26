@@ -11,5 +11,5 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
 })
 export class CustomerFavoritesViewComponent {
   @Input() entries: readonly BrowserFavorite[] = [];
-  @Output() readonly toggle = new EventEmitter<BrowserFavorite>();
+  @Output() readonly remove = new EventEmitter<BrowserFavorite>();
 }

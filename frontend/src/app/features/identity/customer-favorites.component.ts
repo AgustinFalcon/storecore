@@ -9,7 +9,7 @@ import { CustomerFavoritesViewComponent } from './customer-favorites.view';
   template: `
     <sc-customer-favorites-view
       [entries]="favorites.list()"
-      (toggle)="favorites.toggle($event)"
+      (remove)="favorites.toggle($event)"
     />
   `,
 })

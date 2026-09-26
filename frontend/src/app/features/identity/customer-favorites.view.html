@@ -1,8 +1,7 @@
 <section class="sc-page" aria-labelledby="favorites-title">
   <header class="sc-page-head">
-    <p class="sc-kicker">Cuenta customer</p>
     <h1 id="favorites-title">Favoritos</h1>
-    <p class="sc-page__lede">Esta lista está solo en este navegador y no se guarda en la instalación.</p>
+    <p class="sc-page__lede">Boceto de la interfaz. Esta lista vive solo en este navegador y no queda guardada en la instalación.</p>
   </header>
   <sc-feature-status
     [loading]="false"
@@ -18,8 +17,8 @@
             type="button"
             class="sc-heart is-on"
             aria-pressed="true"
-            aria-label="Quitar de favoritos"
-            (click)="toggle.emit(entry)"
+            aria-label="Quitar de este navegador"
+            (click)="remove.emit(entry)"
           >
             <span aria-hidden="true">♥</span>
           </button>

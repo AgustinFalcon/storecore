@@ -18,7 +18,7 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
         class="sc-heart"
         [class.is-on]="marked"
         [attr.aria-pressed]="marked"
-        [attr.aria-label]="marked ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+        [attr.aria-label]="marked ? 'Quitar de este navegador' : 'Marcar en este navegador'"
         (click)="favorites.toggle({ sku: product.sku, name: product.name })"
       >
         <span aria-hidden="true">{{ marked ? '♥' : '♡' }}</span>

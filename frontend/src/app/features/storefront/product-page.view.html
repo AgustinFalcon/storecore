@@ -38,7 +38,7 @@
             class="sc-heart"
             [class.is-on]="favorite"
             [attr.aria-pressed]="favorite"
-            [attr.aria-label]="favorite ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+            [attr.aria-label]="favorite ? 'Quitar de este navegador' : 'Marcar en este navegador'"
             (click)="toggleFavorite.emit({ sku: product.sku, name: product.name })"
           >
             <span aria-hidden="true">{{ favorite ? '♥' : '♡' }}</span>
