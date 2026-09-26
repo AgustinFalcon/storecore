@@ -25,8 +25,9 @@
             <tr>
               <th>Producto</th>
               <th>Cant.</th>
-              <th>Efectivo</th>
               <th>Original</th>
+              <th>Dto</th>
+              <th>Efectivo</th>
             </tr>
           </thead>
           <tbody>
@@ -34,8 +35,9 @@
               <tr>
                 <td>{{ line.name }}</td>
                 <td>{{ line.quantity }}</td>
+                <td>{{ line.originalUnitPrice }}</td>
+                <td>{{ line.discountAmount }}</td>
                 <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
-                <td class="sc-price__meta">{{ line.originalUnitPrice }} · dto {{ line.discountAmount }}</td>
               </tr>
             }
           </tbody>

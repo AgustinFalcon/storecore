@@ -63,7 +63,13 @@
     <label>Desired
       <input type="number" name="desired" [ngModel]="state.draft.price.desired" (ngModelChange)="patchPrice({ desired: $event === '' ? null : +$event })" />
     </label>
-    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Efectivo {{ state.draft.price.effective }}</p>
+    <label>Observed
+      <input name="observed" readonly [ngModel]="state.draft.price.observed ?? ''" />
+    </label>
+    <label>Efectivo
+      <input name="effective" readonly [ngModel]="state.draft.price.effective" />
+    </label>
+    <p class="sc-price__meta">Observed y efectivo son de sólo lectura. El storefront vende el efectivo.</p>
     <label>Price version <input name="priceVersion" [ngModel]="state.draft.price.priceVersion" (ngModelChange)="patchPrice({ priceVersion: $event })" /></label>
     <label>Oferta <input name="offerRef" [ngModel]="state.draft.offerRef" (ngModelChange)="patch({ offerRef: $event || null })" /></label>
     <label>

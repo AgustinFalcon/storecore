@@ -4,7 +4,13 @@
     <h1 id="ml-title">Mercado Libre</h1>
     <p class="sc-page__lede">Cuenta autorizada y mapa listing/variation → SKU. Sin secretos.</p>
   </header>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
+  <sc-feature-status
+    [loading]="state.loading"
+    [error]="state.errorMessage"
+    [empty]="!state.loading && !state.errorMessage && !state.mlAccount && state.listings.length === 0"
+    emptyText="No hay cuenta ni listings en esta instalación."
+    (retry)="retry.emit()"
+  />
   @if (state.mlAccount) {
     <article class="sc-panel" aria-labelledby="ml-account-title">
       <h2 id="ml-account-title">Cuenta vinculada</h2>
@@ -22,6 +28,9 @@
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Mapa listing → SKU</h2>
+      @if (!state.loading && !state.errorMessage && state.mlAccount && state.listings.length === 0) {
+        <p class="sc-callout">No hay listings mapeados.</p>
+      }
       @if (state.listings.length) {
         <div class="sc-table-wrap">
           <table class="sc-table">
