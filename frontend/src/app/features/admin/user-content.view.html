@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="content-title">Contenido del home</h1>
-    <p class="sc-page__lede">Esto alimenta el home público. Sin fixtures ni hero inventado.</p>
+    <p class="sc-page__lede">Esto alimenta el home público. No es la cuenta de quien compra.</p>
   </header>
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
   <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
@@ -14,4 +14,19 @@
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Publicar</button>
   </form>
+  <section class="sc-panel" aria-labelledby="banner-blocks-title">
+    <h2 id="banner-blocks-title">Bloques del banner</h2>
+    @if (state.homeBlocks === null && !state.loading) {
+      <p>Este home no tiene bloques para el banner.</p>
+    } @else if (state.homeBlocks) {
+      <ul>
+        @for (block of state.homeBlocks; track $index) {
+          <li>
+            <p>{{ block.title }}</p>
+            <p>{{ block.body }}</p>
+          </li>
+        }
+      </ul>
+    }
+  </section>
 </section>
