@@ -7,27 +7,26 @@ VERDICT: APPROVED
 **Title:** Mostrar los bloques del banner en la consola de contenido
 **GitHub base:** `master` (`baseRefName=master`)
 **Branch:** `feature/storecore-home-blocks`
-**Fetched head:** `a2970dc987555076350988e09fe28372d3c991de` (`Re-read the public home after publish so the console does not keep the previous banner list.`)
-**Earlier product commit:** `4a1760cb02461ae8e75f1d9df9a2891efc18eb22` left the pre-save list in place. `a2970dc` is the product tip.
-**State when reviewed:** `OPEN`
-**Reviewed diff:** `git diff origin/master...HEAD` (`6831a13...a2970dc`).
+**PR head judged:** `a2970dc987555076350988e09fe28372d3c991de` (`Re-read the public home after publish so the console does not keep the previous banner list.`)
+**Product list commit:** `4a1760cb02461ae8e75f1d9df9a2891efc18eb22` (`Show the public home banner blocks on the operator content screen.`)
+**Reviewed diff:** `git diff origin/master...HEAD` (merge-base `6831a13`). `git diff 4a1760c..a2970dc -- frontend/` is only `user.store.ts` and `user.store.spec.ts`.
 **No merge.** This file does not approve GitHub, does not call CI green, and does not authorize `/sdd.finish`.
 
-Notes that say `APPROVED` against `7572278` or `644bb2a` do not cover this head. `4a1760c` re-introduced the empty-banner sentence and kept a stale `[]` after publish. This pass judges `a2970dc`.
+`gh pr view 25 --json headRefOid` at the start of this review was `4a1760cb02461ae8e75f1d9df9a2891efc18eb22`, state `OPEN`. Notes that say `APPROVED` for `7572278` do not cover `4a1760c`. `4a1760c` alone left «Este home no tiene bloques para el banner.» on screen after Publicar created the first hero. The current head `a2970dc` re-reads the public home after that save. This verdict is for `a2970dc`.
 
 ## What was read
 
-1. `gh pr view 25` after fetch (title, body, base `master`, state `OPEN`, head `a2970dc`).
-2. Full `git diff origin/master...HEAD`, plus `git diff 4a1760c..HEAD` (`user.store.ts`, `user.store.spec.ts` only).
-3. SDD why: `sdd/STATUS.md` (UX-ANG on the 22 existing routes; MP-LIVE-05, fiscal, and `/sdd.finish` stay NO-GO; a Verify job that never starts is not CI green). U-02 (`/user/content`, “Título + cuerpo → home HTTP”). `product-decision-home-carousels.md` (banner slides come from `GET /api/v1/content/home`; zero slides do not paint a region).
-4. `sdd/PATTERNS.md`: container → view → ComponentStore → use case → HTTP repository.
-5. `user-content.view.html`, `UserStore.loadHome` / `persistHome`, `mapHomeDraft`, `homeDraftSavePayload`, `GetHomeUseCase`, and `CatalogService.home()` / `adminHomeDraft()` / `saveHome()` on `master` (not in this diff).
-
-`git grep` for `Este home no tiene bloques` under `*.html`, `*.ts`, and `*.kt` finds one line, in `user-content.view.html`.
+1. `gh pr view 25` at the start (title, body, base `master`, state `OPEN`, head `4a1760c`) and again after `a2970dc` (same URL, state `OPEN`, head `a2970dc987555076350988e09fe28372d3c991de`).
+2. Full `git diff origin/master...4a1760c`, `git show 4a1760c`, and `git show a2970dc`.
+3. SDD why: `sdd/STATUS.md` (UX-ANG on the 22 existing routes, not pixel-complete, not an archive; a `checkoutUrl` is not payment proof; MP-LIVE-05, fiscal, and `/sdd.finish` stay NO-GO; a Verify job that never starts is not CI green). `screen-inventory.md` U-02 (`/user/content`, “Título + cuerpo → home HTTP”). `product-decision-home-carousels.md` (public banner slides come from `GET /api/v1/content/home`; zero slides do not paint a region; no invented copy).
+4. `sdd/PATTERNS.md` frontend path: container → view → ComponentStore → use case → HTTP repository. USER and CUSTOMER stay separate.
+5. `UserStore.loadHome` / `persistHome` at `a2970dc`, `user-content.view.html`, `GetHomeUseCase`, `CatalogHttpRepository.readHome` (`GET /content/home`), and `CatalogService.home()` / `saveHome()` / `adminHomeDraft()` / `HomeRequest` outside the diff.
 
 ## SDD why
 
-`/user/content` lists the banner titles and bodies the public home is already serving, from the existing `GET /content/home`. Publish stays title + body on the existing `PUT /user/content/home`. No new endpoint and no Kotlin. The sentence «Este home no tiene bloques para el banner.» may appear only when `homeBlocks` is a present array of length 0, and only when the screen is not loading and has no error. An omitted `blocks` field must not print that sentence.
+`/user/content` lists the banner titles and bodies the public home is already serving. That list is the existing `GET /content/home` through `GetHomeUseCase`. Publish stays title + body on the existing `PUT /user/content/home`. The public carousel, catalog, promos, favorites, and cart stay as they are. STATUS still refuses a new content API, a payment SDK, fiscal/ARCA, secrets, tag, deploy, publish, and `/sdd.finish`. U-02 still describes title + body; the read-only list does not add a route or a save field.
+
+This is still the operator content screen. There is no new endpoint and no invented slide.
 
 ## Diff judged
 
@@ -44,41 +43,41 @@ sdd/reviews/20260926-grok-pr25-scope.md
 sdd/reviews/20260926-grok-pr25-sdd.md
 ```
 
-No Kotlin, SQL, OpenAPI, `app.routes.ts`, `package.json`, `.github`, or storefront/cart/promo path. `mapHome` is untouched. `GetHomeUseCase` is already provided in `app.config.ts` and still calls `GET /content/home`.
+`4a1760c` fills `homeBlocks` from `GetHomeUseCase` on load and prints the empty sentence only for a non-null empty array. `a2970dc` makes `persistHome` call that same use case again after a successful save. No Kotlin, SQL, OpenAPI, `app.routes.ts`, `package.json`, `.github`, or storefront/cart/promo path. `mapHome` is unchanged. `GetHomeUseCase` is already provided in `app.config.ts`.
 
 ## Scope checks
 
 | Check | Result |
 | --- | --- |
-| Sentence only for a present `homeBlocks` array of length 0, while not loading and with no error | PASS. The section is `@if (!state.loading && !state.errorMessage && state.homeBlocks)`. The sentence is the inner `@if (state.homeBlocks.length === 0)`. An empty array is truthy, so that case prints it. `null` does not. Initial state is `homeBlocks: null`. `loadHome` and `persistHome` set `loading: true` before the request, so the section is hidden while a read is in flight. |
-| An omitted `blocks` field does not print that sentence | PASS. `mapHomeDraft` leaves `blocks` off the draft when the field is not an array. `loadHome` does not copy the console draft’s `blocks`; it sets `homeBlocks` from the public read. A failed public read sets `homeBlocks` to `null` and `errorMessage`. After a successful save, `persistHome` ignores `blocks` on the PUT body and sets `homeBlocks` from a new `GetHomeUseCase` read. The store test starts from a public `[]`, saves `{ title, body }` with no `blocks`, and expects the second public read’s hero row. If that re-read fails, `homeBlocks` becomes `null` and `errorMessage` is set, so the sentence stays hidden. |
-| Save stays title + body | PASS. `persistHome` executes `{ title, body }`. `homeDraftSavePayload` returns only those fields. `PUT /user/content/home` sends that object. `setHome` and the view `patch` keep the editable draft to title and body. `HomeRequest` / `HomeDraft` stay title + body. The new spec asserts the save call is exactly those two fields. |
-| No new endpoint, no Kotlin | PASS. The extra read is the existing `GET /content/home`, including the post-save re-read. Console read and save stay `GET`/`PUT /user/content/home`. The diff has no `.kt` file. |
-| Public carousel, catalog, promos, favorites, and cart stay | PASS. No storefront, cart, promo, or router file is in the diff. |
-| Existing route only | PASS. The screen remains `/user/content`. The lede says this screen feeds the public home and is not the buyer account. |
+| Still the operator content screen | PASS. The route stays `/user/content`. The form is still title and body. The block section is read-only. The lede says this screen feeds the public home and is not the buyer account. |
+| Banner list comes from the existing public home read | PASS. `loadHome` `forkJoin`s `SaveHomeContentUseCase.load()` with `GetHomeUseCase.execute()`. `homeBlocks` is `published.blocks` mapped to id, title, and body. After a successful save, `persistHome` calls `publicHome.execute()` again and replaces `homeBlocks` from that result. The console PUT body is not the list. |
+| Empty sentence only when that public call returned `[]`, and not while loading, on error, or when `homeBlocks` is null | PASS. The template shows «Este home no tiene bloques para el banner.» only inside `@if (!state.loading && !state.errorMessage && state.homeBlocks)` when `length === 0`. `null` hides it. `loadHome` and `persistHome` set `loading: true` before the read, so the sentence is hidden in flight. A failed load sets `homeBlocks` to `null` and `errorMessage`. A failed re-read after a successful save sets `homeBlocks` to `null` and `errorMessage` and does not keep the pre-save array. A save error sets `errorMessage` and does not paint the section. Title validation sets “El título es obligatorio.” and does not touch `homeBlocks`. |
+| Save stays title + body | PASS. `persistHome` executes `{ title, body }`. `homeDraftSavePayload` returns only those fields. `PUT /user/content/home` sends that object. `setHome` and the view `patch` keep the editable draft to title and body. `HomeRequest` is still title + body. The store spec asserts the save call is that object. |
+| No new endpoint | PASS. Public read is the existing catalog home GET. Save is the existing operator PUT. The diff has no new controller mapping. |
+| No invented slides | PASS. Rows are id, title, and body from the public blocks. The console does not synthesize a hero from the form. `saveHome()` still writes the existing `hero` section. The storefront carousel file is not in the diff. |
 | No payment SDK, fiscal code, secrets, tag, deploy, or `/sdd.finish` | PASS. No `package.json`, Kotlin, SQL, workflow, or archive move. |
 
-`CatalogService.home()` always returns a `blocks` list from active `home_content_sections` rows. Zero rows is a present empty array, which is the case that shows the sentence. `saveHome` inserts an active `hero` when that row is missing. The post-save public read is what replaces the pre-save `[]`, so the sentence does not stay up after that insert.
+`CatalogService.home()` returns a `blocks` array from active `home_content_sections` rows. Zero rows is an empty public list, which is the case that shows the sentence. `saveHome()` upserts `hero` with `active=true` and returns `HomeDraft` without `blocks`. The follow-up public read is what drops the empty sentence after that insert.
 
 ## Validations
 
 | Check | Result |
 | --- | --- |
-| Diff name-only and commit list | PASS, 2026-09-26. Merge-base with `origin/master` is `6831a13`. Fetched head `a2970dc` changes `user.store.ts` and `user.store.spec.ts` on top of `4a1760c`. |
-| `npm test` in `frontend/` | PASS, 2026-09-26. `node_modules` is present. `ng test --watch=false` exited 0 on this head: 21 files, 53 tests, vitest duration 8.67s. Local pass only. The new store test covers a public `[]`, a save body of title + body, and the following public read. This local pass is not CI green. |
-| GitHub Verify run [36218364090](https://github.com/AgustinFalcon/storecore/actions/runs/36218364090) on `a2970dc` | **Not CI green.** `backend` `108338768396` and `frontend` `108338768577` both completed `failure` in about 2–3 s (`2026-09-26T04:37:06Z`–`04:37:09Z`), `steps: []`. No test suite ran on GitHub. |
-| GitHub Verify run [36216827777](https://github.com/AgustinFalcon/storecore/actions/runs/36216827777) on `4a1760c` | **Not CI green.** `backend` `108334331177` and `frontend` `108334331231` completed `failure` with `steps: []` and the billing annotation that the job was not started because recent account payments failed or the spending limit needs to be increased. |
+| Diff name-only and commit list | PASS, 2026-09-26. Merge-base with `origin/master` is `6831a13`. Judged head `a2970dc987555076350988e09fe28372d3c991de`. `4a1760c` is its ancestor. |
+| `npm test` in `frontend/` | PASS, 2026-09-26, on this worktree at `a2970dc`. `node_modules` is present. `npm test -- --watch=false` ran `ng test --watch=false` and exited 0: 21 files, 53 tests, duration 15.47s. Local pass only. The new store test loads a public `[]`, saves title + body, and expects a second public read that replaces `homeBlocks`. |
+| GitHub Verify run [36218364090](https://github.com/AgustinFalcon/storecore/actions/runs/36218364090) on `a2970dc` | **Not CI green.** `backend` `108338768396` and `frontend` `108338768577` both completed `failure` in about 2–3 s (`2026-09-26T04:37:06Z`–`04:37:09Z`), `steps: []`. Annotation on both: the job was not started because recent account payments failed or the spending limit needs to be increased. No test suite ran on GitHub. |
+| GitHub Verify run [36216827777](https://github.com/AgustinFalcon/storecore/actions/runs/36216827777) on `4a1760c` | **Not CI green.** `backend` `108334331177` and `frontend` `108334331231` both completed `failure` in about 2 s (`2026-09-26T04:06:16Z`–`04:06:18Z`), `steps: []`, same billing annotation. |
 
 ## Standards
 
-StoreCore presentation stays container → view → ComponentStore → use case → HTTP repository (`sdd/PATTERNS.md`). The content view stays presentational. `UserStore` owns `homeBlocks` and calls `GetHomeUseCase` plus `SaveHomeContentUseCase`. The public read is the catalog home use case, not a CUSTOMER session. This PR does not start a second state stack.
+StoreCore presentation stays container → view → ComponentStore → use case → HTTP repository (`sdd/PATTERNS.md`). The content view stays presentational. `UserStore` owns `homeBlocks` and calls `GetHomeUseCase` plus `SaveHomeContentUseCase`. The public read is the catalog home use case, not a CUSTOMER session. The generic Angular NgRx folder layout is not the StoreCore pattern, and this PR does not start a second state stack.
 
 No backend or architecture file is in the diff, so those standards have nothing new to apply. No new forbidden surface (route, SDK, fiscal, BlackStore browser client, secret, tag, deploy, `/sdd.finish`).
 
 ## Gaps
 
-Non-blocking. A failed save sets `errorMessage` and does not clear `homeBlocks`; the template still hides the section while that error is set. `forkJoin` on load still drops a successful console draft when the public read fails. The storefront rotates at most five blocks; the console lists the full public array. Unchanged `mapHome` turns a missing public `blocks` key into `[]`; live `home()` always emits the array. There is no store test for a failed post-save re-read; that path sets `homeBlocks` to `null`. U-02 still says “Título + cuerpo → home HTTP”; updating that inventory line is not a close-out.
+Non-blocking. `forkJoin` fails the whole load when the public read fails, so a successful console draft is not applied and the form stays on the initial blank title and body while the error is shown. The empty sentence stays hidden in that case. The storefront rotates at most five blocks (`carouselSlides` uses `slice(0, 5)`); the console lists the full public array. `mapHome` turns a missing public `blocks` field into `[]`; live `home()` always emits the array, and this PR does not change `mapHome`. A save-transport error sets `errorMessage` and leaves the previous `homeBlocks` in memory; the template still hides the section while that message is set. There is no store test for a public re-read that fails after a successful save. U-02 still says “Título + cuerpo → home HTTP”; updating that inventory line is not a close-out.
 
 ## Residual NO-GO
 
-MP-LIVE-05, live credentials, fiscal/ARCA, BlackStore companion live, tag, deploy, publish, and `/sdd.finish` stay outside this PR. The UX WIP stays under `sdd/wip/`. Verify runs `36218364090` and `36216827777` are not CI green. This verdict is scope only.
+MP-LIVE-05, live credentials, fiscal/ARCA, BlackStore companion live, tag, deploy, publish, and `/sdd.finish` stay outside this PR. The UX WIP stays under `sdd/wip/`. Verify runs `36216827777` and `36218364090` are not CI green. This verdict is scope only.
