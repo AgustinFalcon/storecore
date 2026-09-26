@@ -31,7 +31,19 @@
       </div>
       <div class="sc-buybox">
         <p class="sc-buybox__meta">{{ product.brand }} · {{ product.category }}</p>
-        <h1 id="product-title">{{ product.name }}</h1>
+        <div class="sc-buybox__head">
+          <h1 id="product-title">{{ product.name }}</h1>
+          <button
+            type="button"
+            class="sc-heart"
+            [class.is-on]="favorite"
+            [attr.aria-pressed]="favorite"
+            [attr.aria-label]="favorite ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+            (click)="toggleFavorite.emit({ sku: product.sku, name: product.name })"
+          >
+            <span aria-hidden="true">{{ favorite ? '♥' : '♡' }}</span>
+          </button>
+        </div>
         <p class="sc-mono">SKU {{ product.sku }}</p>
         <p>{{ product.description }}</p>
         <div class="sc-price-stack">

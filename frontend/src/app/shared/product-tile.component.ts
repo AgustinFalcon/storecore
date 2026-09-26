@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { FavoritesBrowserStore } from '../core/favorites/favorites-browser.store';
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
@@ -8,9 +9,20 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
+      @let marked = favorites.ids().includes(product.sku);
       @if (offer || product.offerRef) {
         <span class="sc-off">Oferta</span>
       }
+      <button
+        type="button"
+        class="sc-heart"
+        [class.is-on]="marked"
+        [attr.aria-pressed]="marked"
+        [attr.aria-label]="marked ? 'Quitar de favoritos' : 'Agregar a favoritos'"
+        (click)="favorites.toggle({ sku: product.sku, name: product.name })"
+      >
+        <span aria-hidden="true">{{ marked ? '♥' : '♡' }}</span>
+      </button>
       <a class="sc-tile__media" [routerLink]="['/catalog', product.sku]" [attr.aria-label]="product.name">
         @if (product.imageUrl) {
           <img class="sc-tile__image" [src]="product.imageUrl" [alt]="product.name" />
@@ -35,4 +47,6 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
   @Input() offer = false;
+
+  constructor(readonly favorites: FavoritesBrowserStore) {}
 }

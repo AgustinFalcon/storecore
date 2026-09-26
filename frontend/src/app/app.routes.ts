@@ -16,6 +16,7 @@ import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
 import { CheckoutResultComponent } from './features/cart/checkout-result.component';
 import { CustomerAddressesComponent } from './features/identity/customer-addresses.component';
+import { CustomerFavoritesComponent } from './features/identity/customer-favorites.component';
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
 import { CustomerProfileComponent } from './features/identity/customer-profile.component';
 import { CustomerRegisterComponent } from './features/identity/customer-register.component';
@@ -47,6 +48,7 @@ export const routes: Routes = [
           { path: 'register', component: CustomerRegisterComponent, title: 'Registro' },
           { path: 'profile', component: CustomerProfileComponent, title: 'Perfil', canActivate: [customerGuard] },
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
+          { path: 'favorites', component: CustomerFavoritesComponent, title: 'Favoritos', canActivate: [customerGuard] },
           { path: 'orders', component: CustomerOrdersComponent, title: 'Órdenes', canActivate: [customerGuard] },
           { path: 'orders/:id', component: CustomerOrderDetailComponent, title: 'Orden', canActivate: [customerGuard] },
         ],
