@@ -25,7 +25,7 @@
       </select>
     </label>
     <label class="sc-filters__check">
-      <input type="checkbox" [ngModel]="state.query.offersOnly" (ngModelChange)="offersChange.emit($event)" />
+      <input type="checkbox" name="offers" [ngModel]="state.query.offersOnly" (ngModelChange)="offersChange.emit($event)" />
       Sólo ofertas
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Buscar</button>
