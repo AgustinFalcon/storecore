@@ -1,16 +1,16 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FavoritesBrowserStore } from '../core/favorites/favorites-browser.store';
+import { showsOfferBadge } from '../domain/catalog/offer-window';
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
   selector: 'sc-product-tile',
   imports: [RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <article class="sc-tile">
+  template:     <article class="sc-tile">
       @let marked = favorites.ids().includes(product.sku);
-      @if (offer || product.offerRef) {
+      @if (offerBadge) {
         <span class="sc-off">Oferta</span>
       }
       <button
@@ -42,11 +42,16 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
         </div>
       </div>
     </article>
-  `,
+  \,
 })
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
+  /** When true, mark the row as an offer unless its own window is closed. */
   @Input() offer = false;
 
   constructor(readonly favorites: FavoritesBrowserStore) {}
+
+  get offerBadge(): boolean {
+    return showsOfferBadge(this.product.offerRef, this.product.validFrom, this.product.validUntil, new Date(), this.offer);
+  }
 }

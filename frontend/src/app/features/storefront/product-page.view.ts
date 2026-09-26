@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Cart } from '../../domain/cart/cart.entity';
+import { showsOfferBadge } from '../../domain/catalog/offer-window';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -27,6 +28,14 @@ export class ProductPageViewComponent {
 
   get hasDiscount(): boolean {
     return !!this.product && this.product.price.base > this.product.price.effective;
+  }
+
+  get showOffer(): boolean {
+    const product = this.product;
+    if (!product) {
+      return false;
+    }
+    return showsOfferBadge(product.offerRef, product.validFrom, product.validUntil, new Date());
   }
 
   changeQty(delta: number): void {
