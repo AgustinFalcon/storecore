@@ -68,21 +68,13 @@ describe('http-mappers', () => {
     });
   });
 
-<<<<<<< HEAD
   it('maps an offer window onto product detail only when the payload includes it', () => {
-=======
-  it('reads an offer window on product detail only when the payload sends it', () => {
->>>>>>> origin/feature/storecore-offer-window-pages
     const withoutWindow = mapProductDetail({
       sku: 'SKU-1',
       price: { effective: 80, base: 100 },
       offerRef: 'O-1',
     });
     expect(withoutWindow.price.effective).toBe(80);
-<<<<<<< HEAD
-=======
-    expect(withoutWindow.price.base).toBe(100);
->>>>>>> origin/feature/storecore-offer-window-pages
     expect(withoutWindow.offerRef).toBe('O-1');
     expect(withoutWindow.validFrom).toBeUndefined();
     expect(withoutWindow.validUntil).toBeUndefined();
@@ -96,17 +88,10 @@ describe('http-mappers', () => {
         validUntil: '2026-09-26T20:00:00.000Z',
       }),
     ).toMatchObject({
-<<<<<<< HEAD
       price: { effective: 80 },
       offerRef: 'O-1',
       validFrom: '2026-09-26T18:00:00.000Z',
       validUntil: '2026-09-26T20:00:00.000Z',
-=======
-      offerRef: 'O-1',
-      validFrom: '2026-09-26T18:00:00.000Z',
-      validUntil: '2026-09-26T20:00:00.000Z',
-      price: { effective: 80, base: 100 },
->>>>>>> origin/feature/storecore-offer-window-pages
     });
   });
 

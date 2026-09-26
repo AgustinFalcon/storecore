@@ -164,7 +164,6 @@ export function mapProductDetail(value: unknown): ProductDetail {
     variants: items(row['variants']).map(mapVariant),
     price: mapPrice(row['price']),
     offerRef: text(row['offerRef']) || null,
-    ...offerWindow(row),
     active: row['active'] !== false,
     ...offerWindow(row),
   };

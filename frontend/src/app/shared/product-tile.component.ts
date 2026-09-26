@@ -1,10 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-<<<<<<< HEAD
 import { FavoritesBrowserStore } from '../core/favorites/favorites-browser.store';
-=======
-import { isApiOfferVisible } from '../domain/catalog/offer-window';
->>>>>>> origin/feature/storecore-offer-window-pages
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
@@ -13,12 +9,8 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
-<<<<<<< HEAD
       @let marked = favorites.ids().includes(product.sku);
       @if (offer || product.offerRef) {
-=======
-      @if (showOffer) {
->>>>>>> origin/feature/storecore-offer-window-pages
         <span class="sc-off">Oferta</span>
       }
       <button
@@ -56,13 +48,5 @@ export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
   @Input() offer = false;
 
-<<<<<<< HEAD
   constructor(readonly favorites: FavoritesBrowserStore) {}
-=======
-  /** Badge only. A closed window hides it; the numeric price stays on the card. */
-  get showOffer(): boolean {
-    const marked = this.offer || !!this.product?.offerRef;
-    return marked && isApiOfferVisible(this.product?.validFrom, this.product?.validUntil, new Date());
-  }
->>>>>>> origin/feature/storecore-offer-window-pages
 }
