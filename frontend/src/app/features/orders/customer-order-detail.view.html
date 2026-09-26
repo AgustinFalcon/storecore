@@ -11,10 +11,11 @@
     <header class="sc-page-head">
       <p class="sc-kicker">Snapshot</p>
       <h1 id="order-detail-title">Orden {{ order.id }}</h1>
+      <p class="sc-page__lede">La orden y el pago son datos distintos. Acá se lee el snapshot, no se modifica.</p>
       <p>
-        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
+        <span class="sc-badge" data-fact="order">orden {{ order.orderStatus.label }}</span>
+        <span class="sc-badge sc-badge--info" data-fact="payment">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn" data-fact="shipment">envío {{ order.shipmentStatus.label }}</span>
       </p>
     </header>
     <div class="sc-workbench">
@@ -25,8 +26,9 @@
             <tr>
               <th>Producto</th>
               <th>Cant.</th>
-              <th>Efectivo</th>
               <th>Original</th>
+              <th>Descuento</th>
+              <th>Efectivo</th>
             </tr>
           </thead>
           <tbody>
@@ -34,8 +36,21 @@
               <tr>
                 <td>{{ line.name }}</td>
                 <td>{{ line.quantity }}</td>
-                <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
-                <td class="sc-price__meta">{{ line.originalUnitPrice }} · dto {{ line.discountAmount }}</td>
+                <td data-fact="original">
+                  @if (moneyWasSent(line.originalUnitPrice)) {
+                    <span class="sc-price__meta"><span class="sc-price__kind">Original</span>{{ line.originalUnitPrice }}</span>
+                  }
+                </td>
+                <td data-fact="discount">
+                  @if (moneyWasSent(line.discountAmount)) {
+                    <span class="sc-price__meta"><span class="sc-price__kind">Descuento</span>{{ line.discountAmount }}</span>
+                  }
+                </td>
+                <td data-fact="effective">
+                  @if (moneyWasSent(line.effectiveUnitPrice)) {
+                    <span class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</span>
+                  }
+                </td>
               </tr>
             }
           </tbody>
