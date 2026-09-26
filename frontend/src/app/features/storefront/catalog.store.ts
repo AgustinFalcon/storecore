@@ -149,7 +149,11 @@ export class CatalogStore extends ComponentStore<CatalogState> {
             next: (products) => {
               const now = new Date();
               this.patchState({
+<<<<<<< HEAD
                 products: products.map((product) => withoutClosedOfferBadge(product, now)),
+=======
+                products: products.map((product) => offerForDisplay(product, now)),
+>>>>>>> origin/feature/storecore-offer-window-pages
                 loading: false,
               });
             },
@@ -166,11 +170,25 @@ export class CatalogStore extends ComponentStore<CatalogState> {
       switchMap((sku) =>
         this.getProduct.execute(sku).pipe(
           tapResponse({
+<<<<<<< HEAD
             next: (product) => this.patchState({ product: withoutClosedOfferBadge(product, new Date()), loading: false }),
+=======
+            next: (product) => this.patchState({ product: offerForDisplay(product, new Date()), loading: false }),
+>>>>>>> origin/feature/storecore-offer-window-pages
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
       ),
     ),
   );
+}
+
+/** Drop the badge outside a complete window. The numeric price stays the API effective. */
+function offerForDisplay<
+  T extends { readonly offerRef: string | null; readonly validFrom?: string | null; readonly validUntil?: string | null },
+>(item: T, now: Date): T {
+  if (isApiOfferVisible(item.validFrom, item.validUntil, now)) {
+    return item;
+  }
+  return { ...item, offerRef: null };
 }
