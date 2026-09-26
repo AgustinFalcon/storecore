@@ -105,6 +105,28 @@ class JdbcOfferService(
         return load(id)
     }
 
+    fun changeStatus(actor: InternalUserPrincipal, id: Long, status: String): OfferView {
+        capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor))
+        if (status !in OFFER_STATUSES) throw CommerceValidation("OFFER_STATUS_INVALID")
+        val approvedAt = Timestamp.from(Instant.now())
+        val updated = jdbc.update(
+            """UPDATE offers
+               SET status=?,
+                   approved_by=CASE WHEN ?='ACTIVE' THEN ? ELSE approved_by END,
+                   approved_at=CASE WHEN ?='ACTIVE' THEN ? ELSE approved_at END
+               WHERE id=?""",
+            status,
+            status,
+            actor.userId,
+            status,
+            approvedAt,
+            id,
+        )
+        if (updated != 1) throw ResourceNotFound()
+        jdbc.audit("USER", actor.userId.toString(), "OFFER_STATUS_CHANGED", "offers", id.toString(), mapper)
+        return load(id)
+    }
+
     private fun load(id: Long): OfferView {
         val offer = jdbc.query(
             """SELECT id,name,status,priority,starts_at,ends_at,discount_type,discount_value,min_margin_percent,approved_by,approved_at
@@ -141,6 +163,10 @@ class JdbcOfferService(
         Instant.parse(value)
     } catch (_: DateTimeParseException) {
         throw CommerceValidation("OFFER_WINDOW_INVALID")
+    }
+
+    private companion object {
+        val OFFER_STATUSES = setOf("DRAFT", "ACTIVE", "PAUSED", "ENDED")
     }
 }
 
