@@ -8,9 +8,16 @@ export interface UserCredentials {
   readonly password: string;
 }
 
+export interface HomeBannerBlock {
+  readonly id: string;
+  readonly title: string;
+  readonly body: string;
+}
+
 export interface HomeContentDraft {
   readonly title: string;
   readonly body: string;
+  readonly blocks?: readonly HomeBannerBlock[];
 }
 
 export interface ManualPromo {

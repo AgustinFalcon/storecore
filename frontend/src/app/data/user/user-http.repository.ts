@@ -19,6 +19,7 @@ import {
 } from '../../domain/user/user.entity';
 import { IUserRepository } from '../../domain/user/user.repository';
 import {
+  homeDraftSavePayload,
   mapCapabilities,
   mapCapability,
   mapFacet,
@@ -67,7 +68,7 @@ export class UserHttpRepository implements IUserRepository {
 
   saveHome(draft: HomeContentDraft): Observable<HomeContentDraft> {
     return this.http
-      .put<unknown>(`${environment.apiBaseUrl}/user/content/home`, draft)
+      .put<unknown>(`${environment.apiBaseUrl}/user/content/home`, homeDraftSavePayload(draft))
       .pipe(map((body) => mapHomeDraft(readApiBody<unknown>(body))));
   }
 

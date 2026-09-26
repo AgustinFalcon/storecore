@@ -16,7 +16,10 @@ export class UserContentViewComponent {
   @Output() readonly save = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
 
-  patch(partial: Partial<HomeContentDraft>): void {
-    this.homeChange.emit({ ...this.state.home, ...partial });
+  patch(partial: Partial<Pick<HomeContentDraft, 'title' | 'body'>>): void {
+    this.homeChange.emit({
+      title: partial.title ?? this.state.home.title,
+      body: partial.body ?? this.state.home.body,
+    });
   }
 }

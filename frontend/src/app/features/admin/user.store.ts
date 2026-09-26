@@ -6,7 +6,7 @@ import { EMPTY, exhaustMap, filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
 import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
-import { HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
+import { HomeBannerBlock, HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
@@ -20,6 +20,7 @@ export interface UserState {
   readonly email: string;
   readonly password: string;
   readonly home: HomeContentDraft;
+  readonly homeBlocks: readonly HomeBannerBlock[] | null;
   readonly promos: readonly ManualPromo[];
   readonly promoDraft: ManualPromo;
   readonly manifest: string;
@@ -58,6 +59,7 @@ export class UserStore extends ComponentStore<UserState> {
       email: '',
       password: '',
       home: { title: '', body: '' },
+      homeBlocks: null,
       promos: [],
       promoDraft: emptyPromo,
       manifest: '',
@@ -79,7 +81,10 @@ export class UserStore extends ComponentStore<UserState> {
 
   readonly setEmail = this.updater((s, email: string) => ({ ...s, email }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
-  readonly setHome = this.updater((s, home: HomeContentDraft) => ({ ...s, home }));
+  readonly setHome = this.updater((s, home: HomeContentDraft) => ({
+    ...s,
+    home: { title: home.title, body: home.body },
+  }));
   readonly setPromoDraft = this.updater((s, promoDraft: ManualPromo) => ({ ...s, promoDraft }));
   private previewGeneration = 0;
 
@@ -149,7 +154,12 @@ export class UserStore extends ComponentStore<UserState> {
       switchMap(() =>
         this.saveHome.load().pipe(
           tapResponse({
-            next: (home) => this.patchState({ home, loading: false }),
+            next: (home) =>
+              this.patchState({
+                home: { title: home.title, body: home.body },
+                homeBlocks: home.blocks ?? null,
+                loading: false,
+              }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
@@ -168,9 +178,14 @@ export class UserStore extends ComponentStore<UserState> {
       }),
       filter(() => Boolean(this.snapshot.home.title.trim())),
       switchMap(() =>
-        this.saveHome.execute(this.snapshot.home).pipe(
+        this.saveHome.execute({ title: this.snapshot.home.title, body: this.snapshot.home.body }).pipe(
           tapResponse({
-            next: (home) => this.patchState({ home, loading: false }),
+            next: (home) =>
+              this.patchState({
+                home: { title: home.title, body: home.body },
+                ...(home.blocks === undefined ? {} : { homeBlocks: home.blocks }),
+                loading: false,
+              }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),

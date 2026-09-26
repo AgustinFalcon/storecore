@@ -8,6 +8,7 @@ import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
 import {
   CapabilityModule,
   CapabilityState,
+  HomeBannerBlock,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -183,9 +184,22 @@ export function mapHome(value: unknown): HomeContent {
   };
 }
 
+function mapHomeBannerBlock(value: unknown): HomeBannerBlock {
+  const item = asRecord(value);
+  return { id: text(item['id']), title: text(item['title']), body: text(item['body']) };
+}
+
 export function mapHomeDraft(value: unknown): HomeContentDraft {
   const row = asRecord(value);
-  return { title: text(row['title']), body: text(row['body']) };
+  const draft: HomeContentDraft = { title: text(row['title']), body: text(row['body']) };
+  if (!Array.isArray(row['blocks'])) {
+    return draft;
+  }
+  return { ...draft, blocks: row['blocks'].map(mapHomeBannerBlock) };
+}
+
+export function homeDraftSavePayload(draft: HomeContentDraft): Pick<HomeContentDraft, 'title' | 'body'> {
+  return { title: draft.title, body: draft.body };
 }
 
 function mapCartLine(value: unknown): CartLine {
