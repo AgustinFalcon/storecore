@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { HomeContent } from '../../domain/catalog/home-content.entity';
-import { isApiOfferVisible } from '../../domain/catalog/offer-window';
+import { isApiOfferVisible, withoutClosedOfferBadge } from '../../domain/catalog/offer-window';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
@@ -146,7 +146,13 @@ export class CatalogStore extends ComponentStore<CatalogState> {
       switchMap(() =>
         this.searchCatalog.execute(this.snapshot.query).pipe(
           tapResponse({
-            next: (products) => this.patchState({ products, loading: false }),
+            next: (products) => {
+              const now = new Date();
+              this.patchState({
+                products: products.map((product) => withoutClosedOfferBadge(product, now)),
+                loading: false,
+              });
+            },
             error: (err: unknown) => this.patchState({ loading: false, products: [], errorMessage: getApiErrorMessage(err) }),
           }),
         ),
@@ -160,7 +166,7 @@ export class CatalogStore extends ComponentStore<CatalogState> {
       switchMap((sku) =>
         this.getProduct.execute(sku).pipe(
           tapResponse({
-            next: (product) => this.patchState({ product, loading: false }),
+            next: (product) => this.patchState({ product: withoutClosedOfferBadge(product, new Date()), loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),

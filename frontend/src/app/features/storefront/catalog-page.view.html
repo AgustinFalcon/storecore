@@ -40,7 +40,7 @@
   <ul class="sc-grid sc-grid--tiles">
     @for (product of state.products; track product.sku) {
       <li>
-        <sc-product-tile [product]="product" [offer]="state.query.offersOnly" />
+        <sc-product-tile [product]="product" />
       </li>
     }
   </ul>
