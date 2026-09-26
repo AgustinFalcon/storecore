@@ -15,6 +15,7 @@ export class UserCapabilitiesViewComponent {
   @Input() loading = false;
   @Input() error = '';
   readonly states = STATES;
+  readonly flipTitle = 'Esta instalación no prende capabilities desde la consola.';
 
   @Output() readonly changeState = new EventEmitter<{ module: string; state: CapabilityState }>();
   @Output() readonly retry = new EventEmitter<void>();

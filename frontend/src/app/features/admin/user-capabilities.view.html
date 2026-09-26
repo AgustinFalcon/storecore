@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="cap-title">Capabilities</h1>
-    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Sin feature flags genéricos.</p>
+    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Esta instalación no prende capabilities desde la consola.</p>
   </header>
   <sc-feature-status
     [loading]="loading"
@@ -24,7 +24,7 @@
           <tr>
             <th>Módulo</th>
             <th>Estado</th>
-            <th>Cambiar</th>
+            <th>Estados</th>
           </tr>
         </thead>
         <tbody>
@@ -46,9 +46,8 @@
                     type="button"
                     class="sc-btn sc-btn--ghost"
                     [class.is-on]="state === item.state"
-                    [disabled]="state === item.state"
-                    [attr.title]="state === item.state ? 'Ya está en ' + state : 'Pasar a ' + state"
-                    (click)="changeState.emit({ module: item.module, state })"
+                    disabled
+                    [attr.title]="flipTitle"
                   >
                     {{ state }}
                   </button>
