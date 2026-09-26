@@ -35,8 +35,16 @@
               <tr>
                 <td>{{ line.name }}</td>
                 <td>{{ line.quantity }}</td>
-                <td>{{ line.originalUnitPrice }}</td>
-                <td>{{ line.discountAmount }}</td>
+                <td>
+                  @if (hasRealLineDiscount(line)) {
+                    <span class="sc-price__was">{{ line.originalUnitPrice }}</span>
+                  }
+                </td>
+                <td>
+                  @if (hasRealLineDiscount(line)) {
+                    {{ line.discountAmount }}
+                  }
+                </td>
                 <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
               </tr>
             }

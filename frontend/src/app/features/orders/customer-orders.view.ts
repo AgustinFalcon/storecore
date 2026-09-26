@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { hasRealLineDiscount } from '../../domain/order/line-discount';
 import { CustomerOrder } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -14,4 +15,5 @@ export class CustomerOrdersViewComponent {
   @Input() loading = false;
   @Input() error = '';
   @Output() readonly retry = new EventEmitter<void>();
+  readonly hasRealLineDiscount = hasRealLineDiscount;
 }
