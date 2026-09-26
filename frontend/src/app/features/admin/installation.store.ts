@@ -18,7 +18,7 @@ export interface InstallationState {
   readonly capabilities: readonly CapabilityModule[];
   readonly inventory: readonly InventoryRow[];
   readonly mlAccount: MercadoLibreAccount | null;
-  readonly listings: readonly MercadoLibreListing[];
+  readonly listings: readonly MercadoLibreListing[] | null;
   readonly listingDraft: MercadoLibreListing;
 }
 
@@ -33,7 +33,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       capabilities: [],
       inventory: [],
       mlAccount: null,
-      listings: [],
+      listings: null,
       listingDraft: emptyListing,
     });
   }
