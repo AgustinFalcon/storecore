@@ -14,11 +14,9 @@
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Publicar</button>
   </form>
-  <section class="sc-panel" aria-labelledby="banner-blocks-title">
-    <h2 id="banner-blocks-title">Bloques del banner</h2>
-    @if (state.homeBlocks === null && !state.loading) {
-      <p>Este home no tiene bloques para el banner.</p>
-    } @else if (state.homeBlocks) {
+  @if (state.homeBlocks) {
+    <section class="sc-panel" aria-labelledby="banner-blocks-title">
+      <h2 id="banner-blocks-title">Bloques del banner</h2>
       <ul>
         @for (block of state.homeBlocks; track $index) {
           <li>
@@ -27,6 +25,6 @@
           </li>
         }
       </ul>
-    }
-  </section>
+    </section>
+  }
 </section>
