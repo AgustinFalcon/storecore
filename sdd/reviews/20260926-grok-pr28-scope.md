@@ -7,53 +7,63 @@ VERDICT: APPROVED
 **Title:** Integrate the storefront mock branches
 **GitHub base:** `master` (`baseRefName=master`)
 **Branch:** `integration/storefront-mock`
-**Published head when the review started:** `d8163a69f05edcdaf1ce710c8c538269083f9c64`
-**Fetched head judged:** `d3f86fd3d6f9ab05d51aad9b360eba11008fbb10`
-**State when reviewed:** `OPEN`
-**Reviewed diff:** `git diff origin/master...HEAD` (`6831a13...d3f86fd`). 44 files, +2122 / −58.
-**No merge.** This file does not approve GitHub, does not call CI green, and does not authorize merging this demo stack into `master` or `/sdd.finish`.
+**SHA reviewed:** `00908d5f427a8a0bbb43ab9ca5e629a02c8e994b`
+**Tip when the fast-forward was rejected:** `e25513ba7b6afcafe1d90eac2f68e8c77dee8893`. `git diff 00908d5..e25513b -- frontend` is empty. Commits after `00908d5` are review markdown only (`bc915f1`, `d3f86fd` rewrites `20260926-grok-pr25-scope.md`, `ed1b96e`, `e25513b`). The product tree judged here is the product tree on that tip. `sdd/reviews/20260926-grok-pr28-sdd.md` stays.
+**Reviewed diff:** `git diff origin/master...00908d5` (merge-base `6831a135e9cb74627b995ca6f4472f757416b3f3`). 44 files, +2118 / −58. No backend path.
+**No merge.** This file does not approve GitHub, does not call CI green, and does not authorize `/sdd.finish`.
 
-`d3f86fd` is `d8163a69` plus later home-blocks review notes only (`00908d5`, then `bc915f1` / `d3f86fd` rewriting `sdd/reviews/20260926-grok-pr25-scope.md`). `git diff d8163a69..d3f86fd -- frontend` is empty. The frontend product tree is the same.
+`gh pr view 28` returned state `OPEN`, base `master`, and head `00908d5f427a8a0bbb43ab9ca5e629a02c8e994b`. After `git fetch origin integration/storefront-mock master`, `origin/integration/storefront-mock` was that same SHA. `770593c` is an ancestor. This note judges `00908d5`.
+
+## Ancestors
+
+Present on `00908d5`:
+
+- PR 22 catalog query string: `ce0c801` (`Sync catalog filters with the query string so home links stay shareable.`)
+- PR 26 promo datetime: `4d8f573`. Closed-window badge: `4f9fd8a` (`Clear the offer badge when a promo window is closed.`)
+- PR 25 home banner blocks: `332a75d`. Public re-read after publish: `a2970dc` (`Re-read the public home after publish so the console does not keep the previous banner list.`)
+- PR 24 favorites in `sessionStorage`: `7809546`
+
+`git merge-base --is-ancestor` exit 0 for `4f9fd8a`, `a2970dc`, `ce0c801`, `4d8f573`, `332a75d`, and `7809546`.
+
+Absent: `99f6daac98844356a7dba94d703a39c9c5d8850c` (`origin/feature/storecore-catalog-effective-price`) is not an ancestor (exit 1). `git diff origin/master...HEAD -- backend` is empty. `CatalogService.kt` at HEAD matches `origin/master`. The diff has no `EffectivePrice*` file and no Kotlin change. The only `EffectivePrice` string in the diff is a review note that left that tree unreviewed.
+
+Offer-window follow-ups already named in the PR body are also ancestors: `19f869c` / `2f69289` (PR 27) and `742cbd3` (PR 29). Their net effect is the badge on the home rail, the catalog grid, and the product detail. They do not add a fifth product and they do not bring the Kotlin effective-price branch.
 
 ## What was read
 
-1. `gh pr view 28` (title, body, base `master`, state `OPEN`). The body is a demo stack. It says not to merge to `master`. It lists #22, #24, #25, #26, #27, and #29, and leaves #23 out.
-2. Full `git diff --stat origin/master...HEAD`, then the merge-sensitive files: `catalog-query.entity.ts`, `catalog-page.component.ts`, `catalog-page.view.html`, `catalog.store.ts`, `offer-window.ts`, `product-tile.component.ts`, `storefront-home.view.html`, `product-page.view.html`, `product-page.view.ts`, `http-mappers.ts`, `user.store.ts`, `user-content.view.html`, `user-http.repository.ts`, `catalog-http.repository.ts`, `app.routes.ts`, `session-favorites.ts`, `favorites-browser.store.ts`.
-3. Ancestry of the four stacked tips against `d3f86fd`: `feature/storecore-catalog-query-url` (`886c2e4`), `feature/storecore-promo-hours` (`9ae9aa6`), `feature/storecore-home-blocks` (`bc915f1`), `feature/storecore-favorites-ui` (`fd8680d`). Each `git merge-base --is-ancestor` exits 0.
-4. `git diff origin/master...HEAD -- backend` and `*.kt` is empty. No `EffectivePrice` commit on this compare.
+1. `gh pr view 28 --json title,body,baseRefName,headRefOid,state`.
+2. `git diff --stat origin/master...HEAD` and the conflict-prone surfaces: `user.store.ts` `persistHome`, `offer-window.ts` plus catalog/home/detail usage, `catalog-query.entity.ts`, `session-favorites.ts`.
+3. SDD why: `sdd/STATUS.md`. UX-ANG stays on the existing routes. MP-LIVE-05, fiscal/ARCA, tag, deploy, publish, and `/sdd.finish` stay NO-GO. A Verify job that never starts is not CI green. The PR body: demo stack only, do not merge to master, no payment, no fiscal, favorites in this browser session, promo windows do not invent prices, PR 23 stays out.
 
 ## SDD why
 
-This PR is a storefront mock you can walk in one checkout. It is not a master merge and not a feature close-out. Catalog links stay on `q`, `brand`, `category`, and `offers=1`. A closed window keeps the catalog row and the product page, keeps the API effective price, and clears only the badge. A missing window still paints Oferta on Sólo ofertas and on the home rail. `/user/content` lists banner blocks from public `GET /content/home`, re-reads that GET after publish, and still PUTs only title and body. Favorites stay in `sessionStorage` and the list route stays behind `customerGuard`. Promo datetime checks and the read-only banner list both have to remain after the `user.store.ts` and `http-mappers.ts` merges. Kotlin effective price (PR 23) stays out.
+This branch is a storefront mock stack for a walkthrough. It is not a master merge. The four product surfaces are the catalog query string (`q`, brand, category, `offers=1`), MANUAL promo day and hour with an offer-window badge, public home banner blocks with a re-read after publish, and favorites in `sessionStorage`. USER and CUSTOMER stay separate. Publish on `/user/content` still sends title and body. A closed window may clear the badge and may omit the card from the home offers rail. The catalog grid and the product detail keep the product and the API price.
 
-## Stack
+## Diff judged
 
-| Order | Branch | PR | On `00908d5` |
-| --- | --- | --- | --- |
-| 1 | `feature/storecore-catalog-query-url` | #22 | ancestor |
-| 2 | `feature/storecore-promo-hours` | #26 | ancestor |
-| 3 | `feature/storecore-home-blocks` (`bc915f1`) | #25 | ancestor |
-| 4 | `feature/storecore-favorites-ui` | #24 | ancestor |
+Frontend product paths plus prior review markdown. No payment, fiscal, tenancy, or Kotlin effective-price code.
 
-PR 23 is absent: the compare adds no Kotlin and no backend file. Badge behavior from the later offer-window commits on this branch (`showsOfferBadge`, `catalogOffersBadge`) is present in `offer-window.ts` and is what the catalog grid, product page, and home rail call.
+Both required behaviors survive together in `user.store.ts` and `offer-window.ts`:
 
-`user.store.ts` versus `origin/feature/storecore-home-blocks` adds only `promoWindowError` / `promoForApi`. The public-home re-read in `loadHome` and `persistHome` is unchanged. `http-mappers.ts` versus that tip adds only `offerWindow` on summary and detail. Versus `origin/feature/storecore-promo-hours`, the same mapper adds `mapHomeDraft` (omit `blocks` when the payload has no array) and `homeDraftSavePayload` (title and body only). `catalog.store.ts` matches the promo-hours tip.
-
-## Merge behavior
-
-- **Query string.** `catalogQueryParams` writes `q`, `brand`, `category`, and `offers=1`. `catalogQueryFromParams` treats only `offers=1` as offers-only. `CatalogPageComponent` applies the route and writes it back on search. The catalog HTTP call still sends API `offers=true` when that flag is set. That split is the #22 contract.
-- **Closed window.** `CatalogStore.search` and `loadProduct` map with `withoutClosedOfferBadge`. That helper keeps the product object and its price and sets `offerRef` to null when the window is closed. The grid still renders the row. `catalogOffersBadge` is false, so Sólo ofertas does not force Oferta. The product page still prints `product.price.effective` and `showOffer` is false. The home rail uses `isApiOfferVisible` and omits a closed window. That omission is the rail contract; the grid and the detail page are where the product and the effective price stay.
-- **Missing window.** `isApiOfferVisible` stays true when either bound is absent. Sólo ofertas paints Oferta through `catalogOffersBadge`. The home rail keeps the card and `storefront-home.view.html` passes `[offer]="true"`, so `showsOfferBadge` paints Oferta. `mapProductSummary` still stores `price.effective` and does not invent a window.
-- **`/user/content`.** `loadHome` joins the operator draft with `GetHomeUseCase`, which is public `GET /content/home`. `persistHome` saves title and body, then calls that public GET again and replaces `homeBlocks`. A failed public read sets `homeBlocks` to null, so the pre-save list is not kept and the empty-banner sentence stays hidden. The sentence renders only when `homeBlocks` is a present array of length 0 and the screen is not loading and has no error.
-- **Favorites.** `FavoritesBrowserStore` reads and writes `sessionStorage` under `storecore.ui.favorites` (sku and name only). `/customer/favorites` has `canActivate: [customerGuard]`. The page copy says the list is this browser, not the installation.
-- **Both operator behaviors.** `persistPromo` still rejects a window whose end is not after its start and sends `toInstallationInstant`. `persistHome` still re-reads the public home. `http-mappers.ts` still maps offer bounds and still refuses to PUT banner blocks.
+- `persistHome` saves title and body, then calls `publicHome.execute()` and replaces `homeBlocks` from that GET. A failed re-read sets `homeBlocks` to null and does not paint an empty banner list. `user.store.spec.ts` expects the second public read after save.
+- `persistPromo` still sends a local day and hour as an instant and does not rewrite a price.
+- Catalog `search` maps with `withoutClosedOfferBadge`. That helper clears `offerRef` when the window is closed and leaves `price` untouched. `catalog-page.view.html` renders `state.products` with no window filter. The grid spec keeps four tiles, including the closed window, and hides only `.sc-off`.
+- The home offers rail filters with `isApiOfferVisible`. A closed window leaves that rail. A missing window stays. That is the home rail, not the catalog grid.
+- `showsOfferBadge` / `catalogOffersBadge` return false outside `[validFrom, validUntil)`. `offersOnly` can mark a row that has no window. It cannot mark a row outside its own window.
+- `mapProductSummary` copies API `effective` and sets `originalPrice` only when the payload base is already higher. The window does not write a new price. Detail `hasDiscount` compares API `base` and `effective`. A closed window does not synthesize a discount.
+- `catalogQueryParams` / `catalogQueryFromParams` round-trip `q`, `brand`, `category`, and `offers=1`.
+- Favorites use `sessionStorage` key `storecore.ui.favorites`. No HTTP and no account sync. `/customer/favorites` is the browser mock route.
 
 ## Validation
 
-`npm test` in `C:\Users\agustin\Desktop\StoreCore-storefront-mock\frontend` (`node_modules` present), while the product tree was `d8163a69` and identical to `00908d5`: 27 files passed, 85 tests passed.
+Junction only, not committed: `frontend/node_modules` → `C:\Users\agustin\Desktop\StoreCore-home-blocks-fix\frontend\node_modules`. Node `v24.19.0`. No `npm install`, so no `TAR_ENTRY_ERROR`.
 
-GitHub Verify on `d3f86fd` is run `36219131488`. Conclusion `failure`. Jobs `backend` and `frontend` completed in about two seconds with `steps: []`. That empty-step run is not CI green.
+```text
+npx ng test --watch=false --include=src/app/domain/catalog/offer-window.spec.ts --include=src/app/domain/catalog/catalog-query.entity.spec.ts --include=src/app/core/favorites/session-favorites.spec.ts --include=src/app/features/admin/user.store.spec.ts --include=src/app/features/storefront/catalog-page.component.spec.ts --include=src/app/features/storefront/catalog-page.view.spec.ts --include=src/app/features/storefront/product-page.view.spec.ts --include=src/app/data/mappers/http-mappers.spec.ts
+```
+
+Result: `Test Files  8 passed (8)` / `Tests  45 passed (45)`. Duration 3.18s. Vitest v4.1.11.
 
 ## Gaps
 
-None that block this demo stack. Do not merge PR 28 to `master` from this note. Fiscal, payment, and Kotlin effective price stay out.
+None that change this verdict. This stack is still a demo branch. Do not merge it to `master` from this note. GitHub Verify was not treated as green. MP-LIVE-05, fiscal, tag, deploy, publish, and `/sdd.finish` stay refused.
