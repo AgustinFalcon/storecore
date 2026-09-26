@@ -19,4 +19,11 @@ export class UserMercadoLibreViewComponent {
   patch(partial: Partial<MercadoLibreListing>): void {
     this.draftChange.emit({ ...this.state.listingDraft, ...partial });
   }
+
+  get installationEmpty(): boolean {
+    return !this.state.loading
+      && !this.state.errorMessage
+      && !this.state.mlAccount
+      && this.state.listings.length === 0;
+  }
 }
