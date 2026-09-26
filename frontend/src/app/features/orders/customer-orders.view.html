@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Cuenta customer</p>
     <h1 id="orders-title">Mis órdenes</h1>
-    <p class="sc-page__lede">Sólo las órdenes de esta cuenta customer.</p>
+    <p class="sc-page__lede">Sólo las órdenes de esta cuenta customer. La orden y el pago van por separado.</p>
   </header>
   <sc-feature-status
     [loading]="loading"
@@ -17,13 +17,18 @@
         <li class="sc-card sc-order-card">
           <p>
             <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
-            <span class="sc-badge">orden {{ order.orderStatus }}</span>
-            <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
+            <span class="sc-badge" data-fact="order">orden {{ order.orderStatus }}</span>
+            <span class="sc-badge sc-badge--info" data-fact="payment">pago {{ order.paymentStatus }}</span>
           </p>
           <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
           <ul class="sc-order-card__lines">
             @for (line of order.lines; track line.sku) {
-              <li>{{ line.name }} × {{ line.quantity }} · {{ line.effectiveUnitPrice }}</li>
+              <li>
+                {{ line.name }} × {{ line.quantity }}
+                @if (moneyWasSent(line.effectiveUnitPrice)) {
+                  · <span class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</span>
+                }
+              </li>
             }
           </ul>
         </li>
