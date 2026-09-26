@@ -4,6 +4,7 @@ import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.domain.InventoryRow
+import com.storecore.identity.application.ResourceNotFound
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -20,6 +21,10 @@ class JdbcInventoryService(private val jdbc: JdbcTemplate, private val transacti
         """SELECT v.sku,b.available_quantity,b.reserved_quantity,b.safety_stock
            FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id ORDER BY v.sku""",
     ) { rs, _ -> InventoryRow(rs.getString("sku"), rs.getInt("available_quantity"), rs.getInt("reserved_quantity"), rs.getInt("safety_stock")) }
+
+    fun variantIdBySku(sku: String): Long =
+        jdbc.query("SELECT id FROM product_variants WHERE sku=?", { rs, _ -> rs.getLong("id") }, sku).firstOrNull()
+            ?: throw ResourceNotFound()
 
     override fun reserve(saga: UUID, lineKey: UUID, variantId: Long, quantity: Int, actor: String): Long = transactions.execute {
         val existing = jdbc.query("SELECT id FROM inventory_reservations WHERE reservation_line_key=? OR (reservation_saga_key=? AND variant_id=?)", { rs, _ -> rs.getLong("id") }, lineKey, saga, variantId).firstOrNull()
