@@ -40,7 +40,7 @@
           }
           <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</p>
         </div>
-        @if (product.offerRef) {
+        @if (showOffer) {
           <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>
         } @else {
           <span class="sc-badge">sin oferta</span>

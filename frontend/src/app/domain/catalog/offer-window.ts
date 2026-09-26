@@ -6,6 +6,7 @@
  * The home rail omits a product whose window is closed.
  * The catalog grid and the product detail keep that product and its effective
  * price, and clear only the offer badge.
+ * offersOnly may mark a row, but not a row outside its own window.
  * This does not change the effective price.
  */
 
@@ -71,6 +72,25 @@ export function withoutClosedOfferBadge<T extends OfferBadgeProduct>(product: T,
     return product;
   }
   return { ...product, offerRef: null };
+}
+
+/**
+ * Oferta badge for one product. A closed window hides the badge.
+ * The product itself stays in the grid, and the API price is left alone.
+ * offersOnly may mark a row that has no offerRef, but not a row outside its own window.
+ * A missing window keeps the API offerRef.
+ */
+export function showsOfferBadge(
+  offerRef: string | null | undefined,
+  validFrom: string | null | undefined,
+  validUntil: string | null | undefined,
+  now: Date,
+  offersOnly = false,
+): boolean {
+  if (!isApiOfferVisible(validFrom, validUntil, now)) {
+    return false;
+  }
+  return offersOnly || Boolean(offerRef);
 }
 
 /** datetime-local (installation clock) → ISO-8601 instant the promo API can parse. */

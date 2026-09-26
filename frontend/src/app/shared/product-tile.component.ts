@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { showsOfferBadge } from '../domain/catalog/offer-window';
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
@@ -8,7 +9,7 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
-      @if (offer || product.offerRef) {
+      @if (offerBadge) {
         <span class="sc-off">Oferta</span>
       }
       <a class="sc-tile__media" [routerLink]="['/catalog', product.sku]" [attr.aria-label]="product.name">
@@ -34,5 +35,10 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
 })
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
+  /** When true, mark the row as an offer unless its own window is closed. */
   @Input() offer = false;
+
+  get offerBadge(): boolean {
+    return showsOfferBadge(this.product.offerRef, this.product.validFrom, this.product.validUntil, new Date(), this.offer);
+  }
 }

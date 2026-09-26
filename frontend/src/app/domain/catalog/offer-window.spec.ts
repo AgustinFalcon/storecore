@@ -1,4 +1,4 @@
-import { isApiOfferVisible, isValidOfferWindow, toInstallationInstant, withoutClosedOfferBadge } from './offer-window';
+import { isApiOfferVisible, isValidOfferWindow, showsOfferBadge, toInstallationInstant, withoutClosedOfferBadge } from './offer-window';
 
 const from = '2026-09-26T18:00:00.000Z';
 const until = '2026-09-26T20:00:00.000Z';
@@ -72,6 +72,19 @@ describe('offer window', () => {
   it('leaves the badge when the window is open', () => {
     const product = { sku: 'SKU-1', price: 80, offerRef: 'O-1', validFrom: from, validUntil: until };
     expect(withoutClosedOfferBadge(product, new Date('2026-09-26T18:30:00.000Z'))).toBe(product);
+  });
+
+  it('hides the Oferta badge outside the window and keeps an offer that has no window', () => {
+    const now = new Date('2026-09-26T12:00:00.000Z');
+    const inside = new Date('2026-09-26T18:30:00.000Z');
+    expect(showsOfferBadge('O-1', from, until, inside)).toBe(true);
+    expect(showsOfferBadge('O-1', from, until, now)).toBe(false);
+    expect(showsOfferBadge('O-1', from, until, new Date('2026-09-26T20:00:00.000Z'))).toBe(false);
+    expect(showsOfferBadge('O-1', undefined, undefined, now)).toBe(true);
+    expect(showsOfferBadge(null, from, until, inside, true)).toBe(true);
+    expect(showsOfferBadge(null, from, until, now, true)).toBe(false);
+    expect(showsOfferBadge(null, undefined, undefined, now, true)).toBe(true);
+    expect(showsOfferBadge(null, undefined, undefined, now, false)).toBe(false);
   });
 
   it('turns a local datetime-local value into the same instant', () => {
