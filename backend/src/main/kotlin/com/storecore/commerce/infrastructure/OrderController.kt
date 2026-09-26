@@ -23,8 +23,8 @@ import javax.sql.DataSource
 @RequestMapping("/api/v1")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class OrderController(private val orders: JdbcOrderService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator, private val capabilities: CapabilityDecisionPort) {
-    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest) = BaseResponse.ok(orders.customerOrders(auth.customer(http)).map { it.copy(rmaStatus = null) })
-    @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long) = BaseResponse.ok(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = null))
+    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest) = BaseResponse.ok(orders.customerOrders(auth.customer(http)).map { it.copy(rmaStatus = null, nextShipAction = null, nextRmaAction = null) })
+    @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long) = BaseResponse.ok(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = null, nextShipAction = null, nextRmaAction = null))
     @GetMapping("/user/orders") fun admin(http: HttpServletRequest): BaseResponse<Any?> {
         val actor = auth.operatorOrAdmin(http)
         capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
