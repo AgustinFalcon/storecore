@@ -1,4 +1,4 @@
-import { isApiOfferVisible, isValidOfferWindow, toInstallationInstant, withoutClosedOfferBadge } from './offer-window';
+import { catalogOffersBadge, isApiOfferVisible, isValidOfferWindow, toInstallationInstant, withoutClosedOfferBadge } from './offer-window';
 
 const from = '2026-09-26T18:00:00.000Z';
 const until = '2026-09-26T20:00:00.000Z';
@@ -72,6 +72,18 @@ describe('offer window', () => {
   it('leaves the badge when the window is open', () => {
     const product = { sku: 'SKU-1', price: 80, offerRef: 'O-1', validFrom: from, validUntil: until };
     expect(withoutClosedOfferBadge(product, new Date('2026-09-26T18:30:00.000Z'))).toBe(product);
+  });
+
+  it('keeps the catalog Oferta badge for Sólo ofertas when the payload has no window', () => {
+    const now = new Date('2026-09-26T12:00:00.000Z');
+    expect(catalogOffersBadge(true, null, null, now)).toBe(true);
+    expect(catalogOffersBadge(false, null, null, now)).toBe(false);
+  });
+
+  it('drops the catalog Oferta badge when Sólo ofertas is on and the window is closed', () => {
+    const now = new Date('2026-09-26T21:00:00.000Z');
+    expect(catalogOffersBadge(true, from, until, now)).toBe(false);
+    expect(catalogOffersBadge(true, from, until, new Date('2026-09-26T19:00:00.000Z'))).toBe(true);
   });
 
   it('turns a local datetime-local value into the same instant', () => {

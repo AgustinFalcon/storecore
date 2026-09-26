@@ -34,6 +34,19 @@ export function isValidOfferWindow(validFrom: string, validUntil: string): boole
 }
 
 /**
+ * Catalog “Sólo ofertas” paints Oferta when the filter is on and the API offer
+ * is still visible. A missing window stays visible. A closed window does not.
+ */
+export function catalogOffersBadge(
+  offersOnly: boolean,
+  validFrom: string | null | undefined,
+  validUntil: string | null | undefined,
+  now: Date,
+): boolean {
+  return offersOnly && isApiOfferVisible(validFrom, validUntil, now);
+}
+
+/**
  * Keep an API offer when the payload has no usable window.
  * When both bounds exist, keep it only inside [from, until).
  * An inverted window (until <= from) is not an open interval, so the offer stays hidden.
