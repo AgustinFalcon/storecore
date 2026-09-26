@@ -9,6 +9,7 @@ import { UserContentComponent } from './features/admin/user-content.component';
 import { UserInventoryComponent } from './features/admin/user-inventory.component';
 import { UserLayoutComponent } from './features/admin/user-layout.component';
 import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
+import { UserOffersComponent } from './features/admin/user-offers.component';
 import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
 import { UserPromosComponent } from './features/admin/user-promos.component';
 import { UserSessionComponent } from './features/admin/user-session.component';
@@ -61,6 +62,7 @@ export const routes: Routes = [
           { path: 'session', component: UserSessionComponent, title: 'User' },
           { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard] },
           { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
+          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard] },
           { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
           { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
           { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard] },

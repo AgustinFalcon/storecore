@@ -1,12 +1,13 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { ManualPromo } from '../../domain/user/user.entity';
 import { UserState } from './user.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
 @Component({
   selector: 'sc-user-promos-view',
-  imports: [FormsModule, FeatureStatusComponent],
+  imports: [FormsModule, RouterLink, FeatureStatusComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-promos.view.html',
 })
