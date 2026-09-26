@@ -134,6 +134,30 @@ describe('UserStore home blocks', () => {
     expect(store.snapshot.homeBlocks).toEqual([{ id: 'hero', title: 'Banner', body: 'Cuerpo del banner' }]);
   });
 
+  it('re-reads the public home after save when the save body omits blocks', () => {
+    const publicHome = vi
+      .fn()
+      .mockReturnValueOnce(of({ title: 'Viejo', blocks: [] }))
+      .mockReturnValueOnce(of({ title: 'Nuevo', blocks: [{ id: 'hero', title: 'Banner nuevo', body: 'Cuerpo nuevo' }] }));
+    const save = vi.fn(() => of({ title: 'Banner nuevo', body: 'Cuerpo nuevo' }));
+    const store = createStore(
+      {} as ImportProfileUseCase,
+      { load: () => of({ title: 'Viejo', body: '' }), execute: save } as unknown as SaveHomeContentUseCase,
+      { execute: publicHome } as unknown as GetHomeUseCase,
+    );
+
+    store.loadHome();
+    expect(store.snapshot.homeBlocks).toEqual([]);
+    store.setHome({ title: 'Banner nuevo', body: 'Cuerpo nuevo' });
+    store.persistHome();
+
+    expect(save).toHaveBeenCalledWith({ title: 'Banner nuevo', body: 'Cuerpo nuevo' });
+    expect(publicHome).toHaveBeenCalledTimes(2);
+    expect(store.snapshot.homeBlocks).toEqual([{ id: 'hero', title: 'Banner nuevo', body: 'Cuerpo nuevo' }]);
+    expect(store.snapshot.loading).toBe(false);
+    expect(store.snapshot.errorMessage).toBe('');
+  });
+
   it('does not claim an empty banner when the public home fails', () => {
     const store = createStore(
       {} as ImportProfileUseCase,
