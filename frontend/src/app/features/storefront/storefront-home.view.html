@@ -62,7 +62,7 @@
     </div>
     <div class="sc-rail">
       @for (product of offers; track product.sku) {
-        <sc-product-tile [product]="product" />
+        <sc-product-tile [product]="product" [offer]="true" />
       }
     </div>
   </section>
