@@ -1,8 +1,11 @@
 package com.storecore.commerce
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.infrastructure.InboxApplicationWorker
 import com.storecore.commerce.infrastructure.JdbcInventoryService
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -225,6 +228,42 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `admin order reads expose the next ship and rma action`() {
+        val orderId = checkoutOne("SKU-NEXT-${UUID.randomUUID()}")
+        assertAdminNext(orderId, "PACKED", "RECEIVED")
+        val customerView = exchange("/api/v1/customer/orders/$orderId", HttpMethod.GET, null, customer.cookie)
+        assertEquals(200, customerView.statusCode.value(), customerView.body)
+        assertEquals(null, jsonText(ObjectMapper().readTree(customerView.body).path("data"), "nextShipAction"))
+        assertEquals(null, jsonText(ObjectMapper().readTree(customerView.body).path("data"), "nextRmaAction"))
+
+        admin = postOrder(orderId, "/shipments", """{"status":"PACKED","tracking":null}""")
+        assertAdminNext(orderId, "SHIPPED", "RECEIVED")
+        admin = postOrder(orderId, "/shipments", """{"status":"SHIPPED","tracking":"TRK-1"}""")
+        assertAdminNext(orderId, "DELIVERED", "RECEIVED")
+        admin = postOrder(orderId, "/shipments", """{"status":"DELIVERED","tracking":"TRK-1"}""")
+        assertAdminNext(orderId, null, "RECEIVED")
+        admin = postOrder(orderId, "/rma", """{"status":"RECEIVED"}""")
+        assertAdminNext(orderId, null, "INSPECTED")
+        admin = postOrder(orderId, "/rma", """{"status":"INSPECTED"}""")
+        assertAdminNext(orderId, null, "ADJUSTED")
+        admin = postOrder(orderId, "/rma", """{"status":"ADJUSTED"}""")
+        assertAdminNext(orderId, null, null)
+    }
+
+    @Test
+    fun `paid stock review exposes no next fulfillment action`() {
+        val orderId = checkoutOne("SKU-REVIEW-NEXT-${UUID.randomUUID()}")
+        jdbc.update("UPDATE orders SET status='PAID_STOCK_REVIEW' WHERE id=?", orderId.toLong())
+        assertAdminNext(orderId, null, null)
+        val ship = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"PACKED","tracking":null}""", admin.cookie, admin.csrf)
+        assertEquals(400, ship.statusCode.value(), ship.body)
+        admin = admin.copy(csrf = ship.headers.getFirst("X-CSRF-Token") ?: admin.csrf)
+        val rma = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"RECEIVED"}""", admin.cookie, admin.csrf)
+        assertEquals(400, rma.statusCode.value(), rma.body)
+        assertAdminNext(orderId, null, null)
+    }
+
+    @Test
     fun `ml inbox persists before ack and profiles reject secrets`() {
         val missing = exchange("/api/v1/integrations/mercadolibre/notifications?topic=orders_v2&resource=/orders/555", HttpMethod.POST, """{"topic":"orders_v2","resource":"/orders/555"}""")
         assertEquals(409, missing.statusCode.value())
@@ -242,6 +281,41 @@ class CommerceHttpIntegrationTest(
         val preview = exchange("/api/v1/user/profiles/preview", HttpMethod.POST, """{"manifest":"{\"profile_name\":\"universal-tools-profile\",\"profile_version\":\"1.0.0\",\"coreCompatibility\":\"1.x\",\"fixtures\":true}"}""", admin.cookie, admin.csrf)
         assertEquals(200, preview.statusCode.value())
         assertTrue(preview.body!!.contains("\"compatible\":true"))
+    }
+
+    private fun checkoutOne(sku: String): String {
+        putProduct(sku, "Next Action Item", available = 5, safety = 0)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        assertEquals(200, added.statusCode.value(), added.body)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        customer = customer.copy(csrf = checkout.headers.getFirst("X-CSRF-Token")!!)
+        return Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
+    }
+
+    private fun postOrder(orderId: String, suffix: String, body: String): Session {
+        val response = exchange("/api/v1/user/orders/$orderId$suffix", HttpMethod.POST, body, admin.cookie, admin.csrf)
+        assertEquals(200, response.statusCode.value(), response.body)
+        return admin.copy(csrf = response.headers.getFirst("X-CSRF-Token")!!)
+    }
+
+    private fun assertAdminNext(orderId: String, ship: String?, rma: String?) {
+        listOf("/api/v1/user/orders", "/api/v1/user/orders/$orderId").forEach { path ->
+            val response = exchange(path, HttpMethod.GET, null, admin.cookie)
+            assertEquals(200, response.statusCode.value(), response.body)
+            val data = ObjectMapper().readTree(response.body).path("data")
+            val order = if (data.isArray) data.first { it.path("id").asText() == orderId } else data
+            assertEquals(ship, jsonText(order, "nextShipAction"), path)
+            assertEquals(rma, jsonText(order, "nextRmaAction"), path)
+        }
+    }
+
+    private fun jsonText(node: JsonNode, field: String): String? {
+        val value = node.path(field)
+        assertFalse(value.isMissingNode, field)
+        return if (value.isNull) null else value.asText()
     }
 
     private fun putProduct(sku: String, name: String, available: Int = 10, safety: Int = 0) {

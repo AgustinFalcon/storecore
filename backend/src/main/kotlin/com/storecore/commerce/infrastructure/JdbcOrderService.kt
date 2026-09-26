@@ -2,6 +2,7 @@ package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.FulfillmentRejected
 import com.storecore.commerce.domain.CartLineView
+import com.storecore.commerce.domain.FulfillmentNextAction
 import com.storecore.commerce.domain.OrderView
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
@@ -96,7 +97,10 @@ class JdbcOrderService(
         val row = if (customerId != null) jdbc.query(sql, mapper, id, customerId).firstOrNull() else jdbc.query(sql, mapper, id).firstOrNull()
         val header = row ?: throw ResourceNotFound()
         val lines = jdbc.query("SELECT v.sku,COALESCE(oi.product_snapshot->>'name',v.label) name,oi.quantity,oi.original_unit_price,oi.discount_amount,oi.offer_id,oi.campaign_reference,oi.effective_unit_price FROM order_items oi JOIN product_variants v ON v.id=oi.variant_id WHERE oi.order_id=? ORDER BY oi.id", { rs, _ -> CartLineView(rs.getString("sku"), rs.getString("name"), rs.getInt("quantity"), rs.getBigDecimal("original_unit_price"), rs.getBigDecimal("discount_amount"), rs.getObject("offer_id")?.toString(), rs.getString("campaign_reference"), rs.getBigDecimal("effective_unit_price")) }, id)
-        return OrderView(header["id"].toString(), header["orderStatus"] as String, header["paymentStatus"] as String, header["shipmentStatus"] as String, header["tracking"] as String?, header["total"] as java.math.BigDecimal, lines, header["rmaStatus"] as String?)
+        val orderStatus = header["orderStatus"] as String
+        val shipmentStatus = header["shipmentStatus"] as String
+        val rmaStatus = header["rmaStatus"] as String?
+        return OrderView(header["id"].toString(), orderStatus, header["paymentStatus"] as String, shipmentStatus, header["tracking"] as String?, header["total"] as java.math.BigDecimal, lines, rmaStatus, FulfillmentNextAction.ship(orderStatus, shipmentStatus), FulfillmentNextAction.rma(orderStatus, rmaStatus))
     }
 
     private val mapper = { rs: java.sql.ResultSet, _: Int -> mapOf("id" to rs.getLong("id"), "orderStatus" to rs.getString("status"), "paymentStatus" to rs.getString("payment"), "shipmentStatus" to rs.getString("shipment"), "tracking" to rs.getString("tracking_code"), "total" to rs.getBigDecimal("total"), "rmaStatus" to rs.getString("rma")) }
