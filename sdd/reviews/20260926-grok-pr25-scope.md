@@ -6,24 +6,27 @@ VERDICT: APPROVED
 **PR:** https://github.com/AgustinFalcon/storecore/pull/25
 **Title:** Mostrar los bloques del banner en la consola de contenido
 **GitHub base:** `master` (`baseRefName=master`)
-**Product commit judged:** `7572278decf007df99405f0ab1f72a485f2caa2b` (`Stop claiming the home has no banner blocks when the console payload omits them.`)
-**Reviewed diff:** `git diff origin/master...7572278` (`6831a13...7572278`). Seven frontend files plus the two PR 25 review files. +229 / −11 across those nine paths.
+**Branch:** `feature/storecore-home-blocks`
+**PR head when re-checked:** `644bb2a` (`Record the SDD approval of the home blocks console.`)
+**Product commit:** `7572278` (`Stop claiming the home has no banner blocks when the console payload omits them.`)
+**Reviewed diff:** `git diff origin/master...644bb2a` (`6831a13...644bb2a`). Product behavior is `7572278`. `git diff 7572278..644bb2a -- frontend/` is empty.
 **No merge.** This file does not approve GitHub, does not call CI green, and does not authorize `/sdd.finish`.
 
-The scope file previously on this branch approved `332a75d`. That approval is stale. This review replaces it and judges `7572278`.
-
-At the start of this review, `gh pr view 25` reported `headRefOid` `7572278decf007df99405f0ab1f72a485f2caa2b`, state `OPEN`. Later commits on the branch rewrite review files only. `git diff 7572278` for the Angular paths is empty. The product files judged here are the ones in `7572278`.
+The scope note that approved `332a75d` is stale. That commit still printed «Este home no tiene bloques para el banner.» This review judges the product at `7572278`, which is an ancestor of `644bb2a`. Commits after `7572278` through `644bb2a` only rewrite `sdd/reviews/`.
 
 ## What was read
 
-1. `gh pr view 25` (title, body, base, head `7572278` at confirmation time, commits, Verify rollup).
-2. Full `git diff origin/master...7572278`, and commit `7572278` itself (only `user-content.view.html`).
-3. SDD why: `sdd/STATUS.md` (UX-ANG on existing routes; a checkout URL is not payment proof; MP-LIVE-05, fiscal, tag, deploy, publish, and `/sdd.finish` stay NO-GO; a Verify job that never starts is not CI green).
-4. The prior scope text, which still described the empty-banner sentence as the console behavior.
+1. `gh pr view 25` (title, body, base `master`, state `OPEN`, Verify rollup). The re-check head on this branch is `644bb2a`.
+2. Full `git diff origin/master...644bb2a`, plus `git show 7572278` (template only).
+3. SDD why: `sdd/STATUS.md` (UX-ANG on the 22 existing routes, not pixel-complete, not an archive; a `checkoutUrl` is not payment proof; MP-LIVE-05, fiscal, and `/sdd.finish` stay NO-GO; a Verify job that never starts is not CI green). `screen-inventory.md` U-02 (`/user/content`, “Título + cuerpo → home HTTP”). `product-decision-home-carousels.md` (public banner slides come from `GET /api/v1/content/home`; zero slides do not paint a region; no invented copy).
+4. `sdd/PATTERNS.md` frontend path: container → view → ComponentStore → use case → HTTP repository. USER and CUSTOMER stay separate.
+5. `UserStore.loadHome` / `persistHome`, `mapHomeDraft`, `homeDraftSavePayload`, and `user-content.view.html` at `7572278`.
+
+`git grep` for `Este home no tiene bloques` on `644bb2a` under `*.html`, `*.ts`, and `*.kt` finds no match.
 
 ## SDD why
 
-The operator screen `/user/content` may list banner blocks only when the existing home GET body includes a `blocks` array. Publish stays title + body on the existing PUT. The public carousel, catalog, promos, favorites, and cart stay as they are. STATUS still refuses a new content API, Kotlin in this PR, invented slides, fiscal/ARCA, a payment SDK, secrets, tag, deploy, publish, and `/sdd.finish`.
+`/user/content` may list banner block titles and bodies only when the existing home-content GET includes a `blocks` array. Publish stays title + body on the existing PUT. The public carousel, catalog, promos, favorites, and cart stay as they are. STATUS still refuses a new content API, a payment SDK, fiscal/ARCA, secrets, tag, deploy, publish, and `/sdd.finish`. U-02 still describes title + body; the read-only list does not add a route or a save field.
 
 ## Diff judged
 
@@ -35,42 +38,48 @@ frontend/src/app/domain/user/user.entity.ts
 frontend/src/app/features/admin/user-content.view.html
 frontend/src/app/features/admin/user-content.view.ts
 frontend/src/app/features/admin/user.store.ts
+sdd/reviews/20260926-grok-pr25-scope.md
+sdd/reviews/20260926-grok-pr25-sdd.md
 ```
 
-`7572278` changes the content template only. No Kotlin, SQL, OpenAPI, `app.routes.ts`, `package.json`, `.github`, or storefront home.
+`7572278` changes only `user-content.view.html`: it deletes the empty-banner sentence and wraps the list in `@if (state.homeBlocks)`. No Kotlin, SQL, OpenAPI, `app.routes.ts`, `package.json`, `.github`, or storefront/cart/promo path.
 
 ## Scope checks
 
 | Check | Result |
 | --- | --- |
-| Empty sentence gone | PASS on `7572278`. `git grep` for `Este home no tiene bloques para el banner.` in `*.html` and `*.ts` has no hit. Commit `7572278` deletes that paragraph from `user-content.view.html`. |
-| Block list only when `homeBlocks` is an array | PASS. `mapHomeDraft` copies `blocks` only when `Array.isArray`. Otherwise the draft has no `blocks` and `loadHome` sets `homeBlocks` to `null`. The template is `@if (state.homeBlocks)` around the banner section and its `<ul>`. `null` skips the section. An array, including an empty one, renders the list. Initial state is `null`, so the list is absent before a payload that includes an array. |
-| Save stays title + body | PASS. `homeDraftSavePayload` returns `{ title, body }`. `saveHome()` puts that object. `persistHome` executes `{ title: this.snapshot.home.title, body: this.snapshot.home.body }`. `setHome` and the view `patch` keep the editable draft to those two fields. |
-| No invented slides | PASS. The list renders `state.homeBlocks` from the mapped payload. There is no hardcoded slide, fixture hero, or fallback campaign. A missing `blocks` field does not synthesize rows and does not print a claim that the home has no banner blocks. |
-| No Kotlin | PASS. The product paths are Angular. `HomeDraft`, `HomeRequest`, `adminHomeDraft`, and `saveHome` are untouched. |
-| No new route | PASS. No router file. The screen remains the existing content view. `readHome()` is still `GET /user/content/home`. |
-| USER and CUSTOMER stay separate | PASS. The lede says this screen feeds the public home and is not the buyer account. No customer cookie, session, or route is in the diff. |
-| No secrets, tag, deploy, or `/sdd.finish` | PASS. No workflow, environment secret, tag, or SDD archive edit in the product commit. |
+| List only when the user-content payload includes a `blocks` array | PASS. `mapHomeDraft` copies `blocks` only when that field is an array. `loadHome` sets `homeBlocks` to `home.blocks ?? null`. The template renders the section only inside `@if (state.homeBlocks)`, and each row shows `title` and `body` with no inputs. |
+| Omitted `blocks` render no empty-banner sentence | PASS. A missing or non-array `blocks` leaves the draft without that field, so `homeBlocks` becomes `null`. `@if` is false. The sentence is not in the template. |
+| Errors render no such sentence | PASS. Load and save errors set `loading` and `errorMessage` and do not assign `homeBlocks`. They do not print that sentence. |
+| Title validation renders no such sentence | PASS. An empty title sets “El título es obligatorio.” and does not touch `homeBlocks`. |
+| Pre-load renders no such sentence | PASS. Initial state is `loading: false` and `homeBlocks: null`. The first paint has no banner section and no empty-banner sentence. |
+| Save stays title + body | PASS. `persistHome` executes `{ title, body }`. `homeDraftSavePayload` returns only those fields. `PUT /user/content/home` sends that object. `setHome` and the view `patch` keep the editable draft to title and body. A PUT response that omits `blocks` leaves `homeBlocks` as it was. |
+| No new API; public carousel, catalog, promos, favorites, and cart stay | PASS. `readHome` stays `GET /user/content/home`. `mapHome` is untouched. No storefront, cart, promo, or router file is in the diff. |
+| Existing route only | PASS. The screen remains `/user/content`. The lede says this screen feeds the public home and is not the buyer account. |
+| No payment SDK, fiscal code, secrets, tag, deploy, or `/sdd.finish` | PASS. No `package.json`, Kotlin, SQL, workflow, or archive move. |
+
+An explicit `blocks: []` is still an array, so the heading and an empty `<ul>` can show. That list does not say the home has no banner blocks.
 
 ## Validations
 
 | Check | Result |
 | --- | --- |
-| Diff and commit | PASS, 2026-09-26. Merge-base with `origin/master` is `6831a13`. Product behavior is commit `7572278`. |
-| `npm test` in `frontend/` | PASS, 2026-09-26. `ng test --watch=false` exit 0. `Test Files  21 passed (21)`. `Tests  50 passed (50)`. Duration 8.91s. The mapper case still maps two blocks when present, omits them from `homeDraftSavePayload`, and leaves `blocks` undefined when the payload has no array. |
-| GitHub Verify on `7572278`, run [36215609934](https://github.com/AgustinFalcon/storecore/actions/runs/36215609934) | **Not CI green.** `backend` (`108330864067`) and `frontend` (`108330864308`) completed `failure` in about 2 s (`2026-09-26T03:42:06Z`–`03:42:09Z`), `steps: []`. Annotation on both: the job was not started because recent account payments failed or the spending limit needs to be increased. No test suite ran on GitHub. |
-| Later Verify on docs commit `afd214b`, run [36216050790](https://github.com/AgustinFalcon/storecore/actions/runs/36216050790) | **Not CI green either.** `backend` and `frontend` completed `failure` in about 3 s (`2026-09-26T03:50:44Z`–`03:50:47Z`), `steps: []`. Same billing failure. Empty steps are not a green check. |
+| Diff name-only and commit list | PASS, 2026-09-26. Merge-base with `origin/master` is `6831a13`. Re-check head `644bb2a87ff85d9258e873d1ecedf92bf573ac45` is later than `7572278`. Frontend files match `7572278`. |
+| `npm test` in `frontend/` | PASS, 2026-09-26. `node_modules` is present. `ng test --watch=false` exited 0: 21 files, 50 tests, duration 9.18s. Local pass only. |
+| GitHub Verify run [36216363923](https://github.com/AgustinFalcon/storecore/actions/runs/36216363923) on `deaec75` | **Not CI green.** `backend` `108332998065` and `frontend` `108332998014` both completed `failure` in about 2 s (`2026-09-26T03:57:06Z`–`03:57:08Z`), `steps: []`. Annotation on both: the job was not started because recent account payments failed or the spending limit needs to be increased. No test suite ran on GitHub. |
+| GitHub Verify run [36216050790](https://github.com/AgustinFalcon/storecore/actions/runs/36216050790) on `afd214b` | **Not CI green.** Same billing failure, `steps: []`, about 3 s (`03:50:44Z`–`03:50:47Z`). |
+| GitHub Verify run [36215609934](https://github.com/AgustinFalcon/storecore/actions/runs/36215609934) on product commit `7572278` | **Not CI green.** Same billing failure, `steps: []`, about 2–3 s (`03:42:06Z`–`03:42:09Z`). |
 
 ## Standards
 
-StoreCore presentation stays container → view → ComponentStore → use case → HTTP repository (`sdd/PATTERNS.md`). This diff keeps that split: the content view stays presentational, `UserStore` owns `homeBlocks`, and the HTTP repository is the only place that writes the PUT body. The generic Angular NgRx folder layout is not the StoreCore pattern, and this PR does not start a second state stack.
+StoreCore presentation stays container → view → ComponentStore → use case → HTTP repository (`sdd/PATTERNS.md`). This diff keeps that split: the content view stays presentational, `UserStore` owns `homeBlocks`, and the HTTP repository sends the save payload. The generic Angular NgRx folder layout is not the StoreCore pattern, and this PR does not start a second state stack.
 
-No backend or architecture file is in the product diff, so those standards have nothing new to apply. No new forbidden surface (endpoint, Kotlin, invented slide, route, SDK, fiscal, secret, tag, deploy, `/sdd.finish`).
+No backend or architecture file is in the diff, so those standards have nothing new to apply. No new forbidden surface (route, SDK, fiscal, BlackStore browser client, secret, tag, deploy, `/sdd.finish`).
 
 ## Gaps
 
-Non-blocking. Today's `HomeDraft` JSON is title and body, so a live admin GET omits `blocks`, `homeBlocks` stays `null`, and the banner section stays off the page. That is the allowed ceiling; this PR does not change the API to start returning blocks. An empty `blocks` array is truthy in the template, so it renders the heading and an empty list, with no invented row and without the removed sentence. A non-object array entry becomes an empty id/title/body through `asRecord` and `text`, the same shape the public `mapHome` mapper already uses. `UserStore` has no new unit test for the null versus array split; the mapper test covers presence, absence, and the save payload.
+Non-blocking. `UserStore` has no unit test for the `null` versus array split. The mapper spec covers a present array, an omitted field, and a save body of title + body. Today’s operator GET still returns title and body only, so the console shows no banner list and no claim that the banner is empty. U-02 still says “Título + cuerpo → home HTTP”; updating that inventory line is not a close-out.
 
 ## Residual NO-GO
 
-MP-LIVE-05, live credentials, fiscal/ARCA, BlackStore companion live, tag, deploy, publish, and `/sdd.finish` stay outside this PR. This verdict is scope only. No merge and no GitHub approve.
+MP-LIVE-05, live credentials, fiscal/ARCA, BlackStore companion live, tag, deploy, publish, and `/sdd.finish` stay outside this PR. The UX WIP stays under `sdd/wip/`. Verify runs `36215609934`, `36216050790`, and `36216363923` are not CI green. This verdict is scope only.
