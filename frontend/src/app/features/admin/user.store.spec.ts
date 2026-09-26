@@ -1,6 +1,7 @@
 import { Router } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { UserSession } from '../../core/auth/user-session';
+import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
@@ -84,7 +85,10 @@ describe('UserStore profile preview', () => {
 describe('UserStore promo window', () => {
   it('does not post when hasta is not after desde', () => {
     const save = vi.fn(() => of(promoDraft()));
-    const store = createStore({} as ImportProfileUseCase, { list: () => of([]), save } as unknown as ManagePromosUseCase);
+    const store = createStore({} as ImportProfileUseCase, {} as SaveHomeContentUseCase, {} as GetHomeUseCase, {
+      list: () => of([]),
+      save,
+    } as unknown as ManagePromosUseCase);
 
     store.setPromoDraft(promoDraft({ validFrom: '2026-09-26T20:00', validTo: '2026-09-26T18:00' }));
     store.persistPromo();
@@ -98,7 +102,10 @@ describe('UserStore promo window', () => {
 
   it('posts a local day and hour as an instant without rewriting the price', () => {
     const save = vi.fn((promo: ManualPromo) => of(promo));
-    const store = createStore({} as ImportProfileUseCase, { list: () => of([]), save } as unknown as ManagePromosUseCase);
+    const store = createStore({} as ImportProfileUseCase, {} as SaveHomeContentUseCase, {} as GetHomeUseCase, {
+      list: () => of([]),
+      save,
+    } as unknown as ManagePromosUseCase);
     store.setPromoDraft(promoDraft({ validFrom: '2026-09-26T18:00', validTo: '2026-09-26T20:00' }));
     store.persistPromo();
 
@@ -108,6 +115,36 @@ describe('UserStore promo window', () => {
     expect(sent.validFrom.endsWith('Z')).toBe(true);
     expect(Date.parse(sent.validTo)).toBeGreaterThan(Date.parse(sent.validFrom));
     expect(Date.parse(sent.validFrom)).toBe(Date.parse('2026-09-26T18:00'));
+  });
+});
+
+describe('UserStore home blocks', () => {
+  it('shows the public home blocks when the console payload omits them', () => {
+    const store = createStore(
+      {} as ImportProfileUseCase,
+      { load: () => of({ title: 'Vidriera', body: 'Texto' }) } as unknown as SaveHomeContentUseCase,
+      {
+        execute: () => of({ title: 'Vidriera', blocks: [{ id: 'hero', title: 'Banner', body: 'Cuerpo del banner' }] }),
+      } as unknown as GetHomeUseCase,
+    );
+
+    store.loadHome();
+
+    expect(store.snapshot.home).toEqual({ title: 'Vidriera', body: 'Texto' });
+    expect(store.snapshot.homeBlocks).toEqual([{ id: 'hero', title: 'Banner', body: 'Cuerpo del banner' }]);
+  });
+
+  it('does not claim an empty banner when the public home fails', () => {
+    const store = createStore(
+      {} as ImportProfileUseCase,
+      { load: () => of({ title: 'Vidriera', body: 'Texto' }) } as unknown as SaveHomeContentUseCase,
+      { execute: () => throwError(() => new Error('caido')) } as unknown as GetHomeUseCase,
+    );
+
+    store.loadHome();
+
+    expect(store.snapshot.homeBlocks).toBeNull();
+    expect(store.snapshot.errorMessage).not.toBe('');
   });
 });
 
@@ -127,12 +164,18 @@ function promoDraft(overrides: Partial<ManualPromo> = {}): ManualPromo {
   };
 }
 
-function createStore(importer: ImportProfileUseCase, promos: ManagePromosUseCase = {} as ManagePromosUseCase): UserStore {
+function createStore(
+  importer: ImportProfileUseCase,
+  saveHome: SaveHomeContentUseCase = {} as SaveHomeContentUseCase,
+  publicHome: GetHomeUseCase = {} as GetHomeUseCase,
+  promos: ManagePromosUseCase = {} as ManagePromosUseCase,
+): UserStore {
   const session = { authenticated: () => false } as UserSession;
   return new UserStore(
     {} as SignInUserUseCase,
     {} as SignOutUserUseCase,
-    {} as SaveHomeContentUseCase,
+    saveHome,
+    publicHome,
     promos,
     importer,
     session,

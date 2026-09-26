@@ -14,17 +14,22 @@
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Publicar</button>
   </form>
-  @if (state.homeBlocks) {
+  @if (!state.loading && !state.errorMessage && state.homeBlocks) {
     <section class="sc-panel" aria-labelledby="banner-blocks-title">
       <h2 id="banner-blocks-title">Bloques del banner</h2>
-      <ul>
-        @for (block of state.homeBlocks; track $index) {
-          <li>
-            <p>{{ block.title }}</p>
-            <p>{{ block.body }}</p>
-          </li>
-        }
-      </ul>
+      <p class="sc-page__lede">Lo que el home público está rotando. Publicar sigue enviando sólo título y cuerpo.</p>
+      @if (state.homeBlocks.length === 0) {
+        <p>Este home no tiene bloques para el banner.</p>
+      } @else {
+        <ul>
+          @for (block of state.homeBlocks; track block.id) {
+            <li>
+              <p>{{ block.title }}</p>
+              <p>{{ block.body }}</p>
+            </li>
+          }
+        </ul>
+      }
     </section>
   }
 </section>
