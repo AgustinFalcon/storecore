@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="admin-catalog-title">Catálogo operador</h1>
-    <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra efectivo. Base, desired y observed no se mezclan.</p>
+    <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. La tabla separa base, deseado, observado y efectivo. El storefront vende solo el efectivo.</p>
   </header>
   <sc-feature-status
     [loading]="state.loading"
@@ -16,34 +16,43 @@
     <div class="sc-workbench__main">
       <h2>Productos</h2>
   @if (state.products.length) {
-    <table class="sc-table">
-      <thead>
-        <tr>
-          <th>SKU</th>
-          <th>Nombre</th>
-          <th>Estado</th>
-          <th>Efectivo</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (product of state.products; track product.sku) {
+    <div class="sc-table-wrap">
+      <table class="sc-table">
+        <caption>El storefront vende solo el efectivo. Base, deseado y observado no son el precio de venta.</caption>
+        <thead>
           <tr>
-            <td>
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(product)">{{ product.sku }}</button>
-            </td>
-            <td>{{ product.name }}</td>
-            <td>
-              @if (product.active) {
-                <span class="sc-badge sc-badge--ok">activo</span>
-              } @else {
-                <span class="sc-badge sc-badge--warn">inactivo</span>
-              }
-            </td>
-            <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
+            <th>SKU</th>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Base</th>
+            <th>Deseado</th>
+            <th>Observado</th>
+            <th>Efectivo</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (product of state.products; track product.sku) {
+            <tr>
+              <td>
+                <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(product)">{{ product.sku }}</button>
+              </td>
+              <td>{{ product.name }}</td>
+              <td>
+                @if (product.active) {
+                  <span class="sc-badge sc-badge--ok">activo</span>
+                } @else {
+                  <span class="sc-badge sc-badge--warn">inactivo</span>
+                }
+              </td>
+              <td class="sc-price__meta" data-price-kind="base"><span class="sc-price__kind">Base</span>{{ product.price.base }}</td>
+              <td class="sc-price__meta" data-price-kind="desired"><span class="sc-price__kind">Deseado</span>{{ product.price.desired ?? '—' }}</td>
+              <td class="sc-price__meta" data-price-kind="observed"><span class="sc-price__kind">Observado</span>{{ product.price.observed ?? '—' }}</td>
+              <td class="sc-price" data-price-kind="effective"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   }
   <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
     <label>SKU <input required name="sku" [ngModel]="state.draft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
@@ -60,10 +69,10 @@
     <label>Precio base
       <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
     </label>
-    <label>Desired
+    <label>Deseado
       <input type="number" name="desired" [ngModel]="state.draft.price.desired" (ngModelChange)="patchPrice({ desired: $event === '' ? null : +$event })" />
     </label>
-    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Efectivo {{ state.draft.price.effective }}</p>
+    <p class="sc-price__meta">Observado {{ state.draft.price.observed ?? '—' }} · Efectivo {{ state.draft.price.effective }}. Solo lectura: el storefront vende el efectivo.</p>
     <label>Price version <input name="priceVersion" [ngModel]="state.draft.price.priceVersion" (ngModelChange)="patchPrice({ priceVersion: $event })" /></label>
     <label>Oferta <input name="offerRef" [ngModel]="state.draft.offerRef" (ngModelChange)="patch({ offerRef: $event || null })" /></label>
     <label>
