@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotNull
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -58,7 +59,24 @@ class OfferController(
         }
         return csrfOk(mutation)
     }
+
+    @PostMapping("/{id}/status")
+    fun changeStatus(
+        http: HttpServletRequest,
+        @RequestHeader("X-CSRF-Token") csrf: String,
+        @PathVariable id: Long,
+        @Valid @RequestBody request: OfferStatusRequest,
+    ): ResponseEntity<BaseResponse<Any?>> {
+        auth.requireSameOrigin(http)
+        val actor = auth.operatorOrAdmin(http)
+        val mutation = mutations.execute(actor, csrf) { offers.changeStatus(actor, id, request.status) }
+        return csrfOk(mutation)
+    }
 }
+
+data class OfferStatusRequest(
+    @field:NotBlank val status: String,
+)
 
 data class OfferRequest(
     @field:NotBlank val name: String,

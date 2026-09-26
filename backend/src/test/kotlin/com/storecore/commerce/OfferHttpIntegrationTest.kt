@@ -1,6 +1,7 @@
 package com.storecore.commerce
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -72,6 +73,25 @@ class OfferHttpIntegrationTest(
         assertEquals(200, added.statusCode.value(), added.body)
         assertTrue(added.body!!.contains("\"effectiveUnitPrice\":80"), added.body)
         assertTrue(added.body!!.contains("\"offerRef\":\"$offerId\""), added.body)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+
+        val paused = exchange(
+            "/api/v1/user/offers/$offerId/status",
+            HttpMethod.POST,
+            """{"status":"PAUSED"}""",
+            admin.cookie,
+            admin.csrf,
+        )
+        assertEquals(200, paused.statusCode.value(), paused.body)
+        assertTrue(paused.body!!.contains("\"status\":\"PAUSED\""), paused.body)
+        assertEquals(policies, policyCount())
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE event_type='OFFER_STATUS_CHANGED' AND aggregate_type='offers'", Int::class.java))
+        admin = admin.copy(csrf = paused.headers.getFirst("X-CSRF-Token")!!)
+
+        val repriced = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        assertEquals(200, repriced.statusCode.value(), repriced.body)
+        assertTrue(repriced.body!!.contains("\"effectiveUnitPrice\":100"), repriced.body)
+        assertFalse(repriced.body!!.contains("\"offerRef\":\"$offerId\""), repriced.body)
 
         val unknown = exchange(
             "/api/v1/user/offers",
