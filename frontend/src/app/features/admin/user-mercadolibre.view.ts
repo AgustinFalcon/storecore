@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MercadoLibreListing } from '../../domain/user/user.entity';
+import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import { InstallationState } from './installation.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -26,5 +27,12 @@ export class UserMercadoLibreViewComponent {
     }
     const parsed = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  get installationEmpty(): boolean {
+    const account = this.state.mlAccount;
+    const noRealAccount = !account
+      || (account.status === MercadoLibreAccountStatus.Disabled && account.accountRef.trim() === '');
+    return !this.state.loading && !this.state.errorMessage && noRealAccount && this.state.listings.length === 0;
   }
 }
