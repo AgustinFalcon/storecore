@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { HomeContent } from '../../domain/catalog/home-content.entity';
+import { isApiOfferVisible } from '../../domain/catalog/offer-window';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
@@ -94,15 +95,17 @@ export class CatalogStore extends ComponentStore<CatalogState> {
           ),
         }).pipe(
           tapResponse({
-            next: ({ home, offers, facets }) =>
+            next: ({ home, offers, facets }) => {
+              const now = new Date();
               this.patchState({
                 home,
-                offers,
+                offers: offers.filter((product) => isApiOfferVisible(product.validFrom, product.validUntil, now)),
                 brands: facets.brands,
                 categories: facets.categories,
                 loading: false,
                 errorMessage: firstError,
-              }),
+              });
+            },
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         );

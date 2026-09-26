@@ -19,4 +19,15 @@ export class UserPromosViewComponent {
   patch(partial: Partial<ManualPromo>): void {
     this.draftChange.emit({ ...this.state.promoDraft, ...partial });
   }
+
+  clock(value: string): string {
+    const trimmed = value.trim();
+    const parsed = Date.parse(trimmed);
+    if (!Number.isFinite(parsed)) {
+      return trimmed;
+    }
+    const date = new Date(parsed);
+    const pad = (part: number) => String(part).padStart(2, '0');
+    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
 }

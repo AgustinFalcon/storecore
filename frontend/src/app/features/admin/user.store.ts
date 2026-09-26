@@ -5,6 +5,7 @@ import { tapResponse } from '@ngrx/operators';
 import { EMPTY, exhaustMap, filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
+import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
 import { HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
@@ -194,19 +195,16 @@ export class UserStore extends ComponentStore<UserState> {
   readonly persistPromo = this.effect<void>((trigger$) =>
     trigger$.pipe(
       tap(() => {
-        const draft = this.snapshot.promoDraft;
-        if (!draft.listingSku.trim() || !draft.currency.trim() || !draft.validFrom || !draft.validTo) {
-          this.patchState({ loading: false, errorMessage: 'SKU, moneda y vigencia son obligatorios.' });
+        const errorMessage = promoWindowError(this.snapshot.promoDraft);
+        if (errorMessage) {
+          this.patchState({ loading: false, errorMessage });
           return;
         }
         this.patchState({ loading: true, errorMessage: '' });
       }),
-      filter(() => {
-        const draft = this.snapshot.promoDraft;
-        return Boolean(draft.listingSku.trim() && draft.currency.trim() && draft.validFrom && draft.validTo);
-      }),
+      filter(() => promoWindowError(this.snapshot.promoDraft) === ''),
       switchMap(() =>
-        this.promos.save(this.snapshot.promoDraft).pipe(
+        this.promos.save(promoForApi(this.snapshot.promoDraft)).pipe(
           tapResponse({
             next: () => {
               this.patchState({ promoDraft: emptyPromo });
@@ -281,4 +279,23 @@ export class UserStore extends ComponentStore<UserState> {
       }),
     ),
   );
+}
+
+function promoWindowError(draft: ManualPromo): string {
+  if (!draft.listingSku.trim() || !draft.currency.trim() || !draft.validFrom.trim() || !draft.validTo.trim()) {
+    return 'SKU, moneda y vigencia son obligatorios.';
+  }
+  if (!isValidOfferWindow(draft.validFrom, draft.validTo)) {
+    return 'Hasta tiene que ser posterior a desde.';
+  }
+  return '';
+}
+
+function promoForApi(draft: ManualPromo): ManualPromo {
+  return {
+    ...draft,
+    validFrom: toInstallationInstant(draft.validFrom),
+    validTo: toInstallationInstant(draft.validTo),
+    approvedAt: draft.approvedAt.trim() ? toInstallationInstant(draft.approvedAt) : draft.approvedAt,
+  };
 }
