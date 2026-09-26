@@ -1,0 +1,83 @@
+<section class="sc-page sc-console" aria-labelledby="offers-title">
+  <header class="sc-page-head">
+    <p class="sc-kicker">HAPPY HOUR</p>
+    <h1 id="offers-title">Ofertas de vitrina</h1>
+    <p class="sc-page__lede">
+      Acá escribís la tabla offers: la vitrina y el happy hour de esta instalación.
+      El descuento viaja tal cual lo cargás; el precio efectivo lo calcula el servidor en el carrito.
+      <a routerLink="/user/promos">/user/promos</a> es el writer MANUAL del canal y no toca esta tabla.
+    </p>
+  </header>
+  <sc-feature-status
+    [loading]="state.loading"
+    [error]="state.errorMessage"
+    [empty]="!state.loading && state.offers.length === 0"
+    emptyText="No hay ofertas de vitrina."
+    (retry)="retry.emit()"
+  />
+  <div class="sc-workbench">
+    <div class="sc-workbench__main">
+      <h2>Ofertas registradas</h2>
+      @if (state.offers.length) {
+        <div class="sc-table-wrap">
+          <table class="sc-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>SKUs</th>
+                <th>Vigencia</th>
+                <th>Estado</th>
+                <th>Descuento</th>
+                <th>Margen mín.</th>
+                <th>Prio</th>
+                <th>Aprobador</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (offer of state.offers; track offer.id) {
+                <tr>
+                  <td>{{ offer.name }}</td>
+                  <td class="sc-mono">{{ offer.skus.join(', ') }}</td>
+                  <td>{{ clock(offer.startsAt) }} – {{ clock(offer.endsAt) }}</td>
+                  <td><span class="sc-badge sc-badge--info">{{ offer.status }}</span></td>
+                  <td>{{ discountLabel(offer) }}</td>
+                  <td>{{ offer.minMarginPercent }}</td>
+                  <td>{{ offer.priority }}</td>
+                  <td>{{ offer.approvedBy || 'Sin aprobar' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
+    <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+      <h2>Cargar oferta de vitrina</h2>
+      <label>Nombre <input required name="name" [ngModel]="state.draft.name" (ngModelChange)="patch({ name: $event })" /></label>
+      <label>
+        Estado
+        <select name="status" [ngModel]="state.draft.status" (ngModelChange)="setStatus($event)">
+          <option value="DRAFT">Borrador</option>
+          <option value="ACTIVE">Activa</option>
+        </select>
+      </label>
+      <div class="sc-fields-2">
+        <label>Desde <input required type="datetime-local" name="from" [ngModel]="state.draft.startsAt" (ngModelChange)="patch({ startsAt: $event })" /></label>
+        <label>Hasta <input required type="datetime-local" name="to" [ngModel]="state.draft.endsAt" (ngModelChange)="patch({ endsAt: $event })" /></label>
+      </div>
+      <label>Prioridad <input type="number" name="priority" [ngModel]="state.draft.priority" (ngModelChange)="patch({ priority: priorityOf($event) })" /></label>
+      <label>
+        Tipo de descuento
+        <select name="discountType" [ngModel]="state.draft.discountType" (ngModelChange)="setDiscountType($event)">
+          <option value="PERCENT">Porcentaje</option>
+          <option value="FIXED">Monto fijo</option>
+        </select>
+      </label>
+      <label>Descuento <input required name="discountValue" inputmode="decimal" [ngModel]="state.draft.discountValue" (ngModelChange)="patch({ discountValue: $event })" /></label>
+      <label>Margen mínimo <input required name="minMarginPercent" inputmode="decimal" [ngModel]="state.draft.minMarginPercent" (ngModelChange)="patch({ minMarginPercent: $event })" /></label>
+      <label>SKUs <input required name="skus" [ngModel]="state.draft.skusText" (ngModelChange)="patch({ skusText: $event })" /></label>
+      <p class="sc-callout">La hora es la de esta instalación. Borrador no aprueba; activa queda aprobada por la sesión USER. Esta consola no arma un precio ni escribe una promo MANUAL.</p>
+      <button type="submit" class="sc-btn sc-btn--primary">Guardar oferta</button>
+    </form>
+  </div>
+</section>

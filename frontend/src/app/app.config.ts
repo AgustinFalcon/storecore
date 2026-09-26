@@ -8,11 +8,13 @@ import { CATALOG_REPOSITORY } from './core/tokens/catalog.tokens';
 import { CUSTOMER_REPOSITORY } from './core/tokens/customer.tokens';
 import { HEALTH_REPOSITORY } from './core/tokens/health.tokens';
 import { ORDER_REPOSITORY } from './core/tokens/order.tokens';
+import { OFFER_REPOSITORY } from './core/tokens/offer.tokens';
 import { USER_REPOSITORY } from './core/tokens/user.tokens';
 import { CartHttpRepository } from './data/cart/cart-http.repository';
 import { CatalogHttpRepository } from './data/catalog/catalog-http.repository';
 import { CustomerHttpRepository } from './data/customer/customer-http.repository';
 import { HealthHttpRepository } from './data/health/health-http.repository';
+import { OfferHttpRepository } from './data/offer/offer-http.repository';
 import { OrderHttpRepository } from './data/order/order-http.repository';
 import { UserHttpRepository } from './data/user/user-http.repository';
 import { AddCartLineUseCase } from './domain/cart/use-cases/add-cart-line.usecase';
@@ -37,6 +39,7 @@ import { GetAdminOrderUseCase } from './domain/order/use-cases/get-admin-order.u
 import { GetMyOrderUseCase } from './domain/order/use-cases/get-my-order.usecase';
 import { ListAdminOrdersUseCase } from './domain/order/use-cases/list-admin-orders.usecase';
 import { ListMyOrdersUseCase } from './domain/order/use-cases/list-my-orders.usecase';
+import { ManageStorefrontOffersUseCase } from './domain/offer/use-cases/manage-storefront-offers.usecase';
 import { ImportProfileUseCase } from './domain/user/use-cases/import-profile.usecase';
 import { ManageInstallationUseCase } from './domain/user/use-cases/manage-installation.usecase';
 import { ManageAdminCatalogUseCase } from './domain/user/use-cases/manage-admin-catalog.usecase';
@@ -56,6 +59,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
+    { provide: OFFER_REPOSITORY, useClass: OfferHttpRepository },
     GetHealthUseCase,
     SearchCatalogUseCase,
     GetHomeUseCase,
@@ -83,6 +87,7 @@ export const appConfig: ApplicationConfig = {
     ProbeUserSessionUseCase,
     SaveHomeContentUseCase,
     ManagePromosUseCase,
+    ManageStorefrontOffersUseCase,
     ManageAdminCatalogUseCase,
     ImportProfileUseCase,
     ManageInstallationUseCase,
