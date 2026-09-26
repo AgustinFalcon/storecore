@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { isApiOfferVisible } from '../domain/catalog/offer-window';
 import { ProductSummary } from '../domain/catalog/product-summary.entity';
 
 @Component({
@@ -8,7 +9,7 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <article class="sc-tile">
-      @if (offer || product.offerRef) {
+      @if (showOffer) {
         <span class="sc-off">Oferta</span>
       }
       <a class="sc-tile__media" [routerLink]="['/catalog', product.sku]" [attr.aria-label]="product.name">
@@ -35,4 +36,10 @@ import { ProductSummary } from '../domain/catalog/product-summary.entity';
 export class ProductTileComponent {
   @Input({ required: true }) product!: ProductSummary;
   @Input() offer = false;
+
+  /** Badge only. A closed window hides it; the numeric price stays on the card. */
+  get showOffer(): boolean {
+    const marked = this.offer || !!this.product?.offerRef;
+    return marked && isApiOfferVisible(this.product?.validFrom, this.product?.validUntil, new Date());
+  }
 }

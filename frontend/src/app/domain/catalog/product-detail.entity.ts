@@ -23,5 +23,8 @@ export interface ProductDetail {
   readonly variants: readonly ProductVariant[];
   readonly price: ProductPrice;
   readonly offerRef: string | null;
+  /** Offer window from the catalog payload. Absent means do not hide an API offer. */
+  readonly validFrom?: string | null;
+  readonly validUntil?: string | null;
   readonly active: boolean;
 }
