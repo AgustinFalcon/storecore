@@ -1,0 +1,29 @@
+<section class="sc-page" aria-labelledby="favorites-title">
+  <header class="sc-page-head">
+    <h1 id="favorites-title">Favoritos</h1>
+    <p class="sc-page__lede">Boceto de la interfaz. Esta lista vive solo en este navegador y no queda guardada en la instalación.</p>
+  </header>
+  <sc-feature-status
+    [loading]="false"
+    [empty]="entries.length === 0"
+    emptyText="Todavía no marcaste ningún producto en este navegador."
+  />
+  @if (entries.length) {
+    <ul class="sc-fav-list">
+      @for (entry of entries; track entry.sku) {
+        <li>
+          <a [routerLink]="['/catalog', entry.sku]">{{ entry.name }}</a>
+          <button
+            type="button"
+            class="sc-heart is-on"
+            aria-pressed="true"
+            aria-label="Quitar de este navegador"
+            (click)="remove.emit(entry)"
+          >
+            <span aria-hidden="true">♥</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>

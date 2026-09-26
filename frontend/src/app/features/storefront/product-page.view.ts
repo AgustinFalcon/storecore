@@ -17,11 +17,13 @@ export class ProductPageViewComponent {
   @Input() loading = false;
   @Input() error = '';
   @Input() signedIn = false;
+  @Input() favorite = false;
   quantity = 1;
   activeImage = '';
 
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
+  @Output() readonly toggleFavorite = new EventEmitter<{ sku: string; name: string }>();
 
   get hasDiscount(): boolean {
     return !!this.product && this.product.price.base > this.product.price.effective;
