@@ -13,7 +13,6 @@ import { UserCapabilitiesViewComponent } from './user-capabilities.view';
       [items]="(store.capabilities$ | async) ?? []"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
-      (changeState)="store.changeCapability($event)"
       (retry)="store.loadCapabilities()"
     />
   `,

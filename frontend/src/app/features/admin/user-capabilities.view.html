@@ -4,6 +4,7 @@
     <h1 id="cap-title">Capabilities</h1>
     <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Sin feature flags genéricos.</p>
   </header>
+  <p class="sc-callout sc-callout--info">Esta instalación no prende capabilities desde la consola.</p>
   <sc-feature-status
     [loading]="loading"
     [error]="error"
@@ -46,9 +47,8 @@
                     type="button"
                     class="sc-btn sc-btn--ghost"
                     [class.is-on]="state === item.state"
-                    [disabled]="state === item.state"
-                    [attr.title]="state === item.state ? 'Ya está en ' + state : 'Pasar a ' + state"
-                    (click)="changeState.emit({ module: item.module, state })"
+                    disabled
+                    title="Esta instalación no prende capabilities desde la consola."
                   >
                     {{ state }}
                   </button>

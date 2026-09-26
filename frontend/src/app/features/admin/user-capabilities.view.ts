@@ -16,6 +16,5 @@ export class UserCapabilitiesViewComponent {
   @Input() error = '';
   readonly states = STATES;
 
-  @Output() readonly changeState = new EventEmitter<{ module: string; state: CapabilityState }>();
   @Output() readonly retry = new EventEmitter<void>();
 }
