@@ -11,9 +11,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
+import java.time.Instant
 import javax.sql.DataSource
 
-data class CatalogProduct(val sku: String, val name: String, val description: String, val brand: String, val category: String, val images: List<String>, val variants: List<Map<String, Any?>>, val price: Map<String, Any?>, val offerRef: String?, val active: Boolean)
+data class CatalogProduct(val sku: String, val name: String, val description: String, val brand: String, val category: String, val images: List<String>, val variants: List<Map<String, Any?>>, val price: Map<String, Any?>, val offerRef: String?, val active: Boolean, val validFrom: Instant? = null, val validUntil: Instant? = null)
 data class CatalogFacet(val id: Long, val name: String)
 data class HomeContent(val title: String, val blocks: List<Map<String, Any?>>)
 data class HomeBlockInput(val id: String, val title: String, val body: String)
@@ -57,6 +58,8 @@ class JdbcCatalogService(
                 "imageUrl" to image,
                 "images" to listOfNotNull(image),
                 "offerRef" to snapshot?.offerRef,
+                "validFrom" to snapshot?.validFrom,
+                "validUntil" to snapshot?.validUntil,
             )
         }
     }
@@ -79,6 +82,8 @@ class JdbcCatalogService(
             mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.offerRef?.let { "offer-$it" } ?: "catalog-${row["id"]}")),
             snapshot?.offerRef,
             row["status"] == "ACTIVE",
+            snapshot?.validFrom,
+            snapshot?.validUntil,
         )
     }
     fun adminList(): List<CatalogProduct> = jdbc.query("SELECT v.sku FROM product_variants v JOIN products p ON p.id=v.product_id ORDER BY p.name,v.id", { rs, _ -> rs.getString("sku") }).mapNotNull { product(it, admin = true) }

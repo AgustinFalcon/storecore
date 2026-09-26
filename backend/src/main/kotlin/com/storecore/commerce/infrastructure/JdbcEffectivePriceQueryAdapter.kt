@@ -18,11 +18,12 @@ open class JdbcEffectivePriceQueryAdapter(private val jdbc: JdbcTemplate) : Effe
         val prices = jdbc.query(
             """SELECT v.id AS variant_id,v.sku,p.base_price,v.active,p.status,
                       selected_offer.id AS offer_id,selected_offer.name AS campaign_ref,
-                      selected_offer.discount_type,selected_offer.discount_value
+                      selected_offer.discount_type,selected_offer.discount_value,
+                      selected_offer.starts_at,selected_offer.ends_at
                FROM product_variants v
                JOIN products p ON p.id=v.product_id
                LEFT JOIN LATERAL (
-                   SELECT o.id,o.name,o.discount_type,o.discount_value
+                   SELECT o.id,o.name,o.discount_type,o.discount_value,o.starts_at,o.ends_at
                    FROM offers o
                    JOIN offer_products op ON op.offer_id=o.id
                    WHERE op.product_id=p.id AND o.status='ACTIVE'
@@ -42,6 +43,8 @@ open class JdbcEffectivePriceQueryAdapter(private val jdbc: JdbcTemplate) : Effe
                     else -> BigDecimal.ZERO
                 }
                 val offerId = rs.getLong("offer_id").let { if (rs.wasNull()) null else it }
+                val windowStart = rs.getTimestamp("starts_at")?.toInstant()
+                val windowEnd = rs.getTimestamp("ends_at")?.toInstant()
                 EffectivePrice(
                     variantId = rs.getLong("variant_id"),
                     sku = rs.getString("sku"),
@@ -51,6 +54,8 @@ open class JdbcEffectivePriceQueryAdapter(private val jdbc: JdbcTemplate) : Effe
                     offerRef = offerId?.toString(),
                     campaignRef = rs.getString("campaign_ref"),
                     active = rs.getString("status") == "ACTIVE" && rs.getBoolean("active"),
+                    validFrom = if (offerId == null) null else windowStart,
+                    validUntil = if (offerId == null) null else windowEnd,
                 )
             },
             *distinctSkus.toTypedArray(),

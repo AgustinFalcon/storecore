@@ -51,24 +51,38 @@ class CatalogEffectiveOfferTest @Autowired constructor(
             )!!
         jdbc.update("INSERT INTO offer_products(offer_id,product_id) VALUES (?,?)", liveId, productId)
 
+        val window = jdbc.queryForMap("SELECT starts_at, ends_at FROM offers WHERE id=?", liveId)
+        val validFrom = (window["starts_at"] as java.sql.Timestamp).toInstant()
+        val validUntil = (window["ends_at"] as java.sql.Timestamp).toInstant()
+
         val card = catalog.search(sku, null, null, true).single()
         val price = card["price"] as Map<*, *>
         assertMoney("100.00", price["base"])
         assertMoney("80.00", price["effective"])
         assertMoney("100.00", card["originalPrice"])
         assertEquals(liveId.toString(), card["offerRef"])
+        assertEquals(validFrom, card["validFrom"])
+        assertEquals(validUntil, card["validUntil"])
         assertEquals("https://cdn.example.test/$sku.jpg", card["imageUrl"])
 
         val detail = catalog.product(sku)!!
         assertMoney("80.00", detail.price["effective"])
         assertMoney("100.00", detail.price["base"])
         assertEquals(liveId.toString(), detail.offerRef)
+        assertEquals(validFrom, detail.validFrom)
+        assertEquals(validUntil, detail.validUntil)
 
         jdbc.update("UPDATE offers SET status='ENDED',ends_at=now()-interval '1 minute' WHERE id=?", liveId)
         assertEquals(true, catalog.search(sku, null, null, true).isEmpty())
+        val closedCard = catalog.search(sku, null, null, false).single()
+        assertNull(closedCard["offerRef"])
+        assertNull(closedCard["validFrom"])
+        assertNull(closedCard["validUntil"])
         val after = catalog.product(sku)!!
         assertMoney("100.00", after.price["effective"])
         assertNull(after.offerRef)
+        assertNull(after.validFrom)
+        assertNull(after.validUntil)
     }
 
     private fun assertMoney(expected: String, actual: Any?) {
