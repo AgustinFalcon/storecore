@@ -23,7 +23,13 @@
           <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
           <ul class="sc-order-card__lines">
             @for (line of order.lines; track line.sku) {
-              <li>{{ line.name }} × {{ line.quantity }} · {{ line.effectiveUnitPrice }}</li>
+              <li>
+                {{ line.name }} × {{ line.quantity }} ·
+                @if (hasRealLineDiscount(line)) {
+                  <span class="sc-price__was">{{ line.originalUnitPrice }}</span>
+                }
+                <span class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</span>
+              </li>
             }
           </ul>
         </li>
