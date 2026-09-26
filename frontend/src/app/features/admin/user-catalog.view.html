@@ -22,6 +22,9 @@
           <th>SKU</th>
           <th>Nombre</th>
           <th>Estado</th>
+          <th>Base</th>
+          <th>Desired</th>
+          <th>Observed</th>
           <th>Efectivo</th>
         </tr>
       </thead>
@@ -39,7 +42,9 @@
                 <span class="sc-badge sc-badge--warn">inactivo</span>
               }
             </td>
-            <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
+            @for (cell of priceCells(product.price); track cell.kind) {
+              <td class="sc-price"><span class="sc-price__kind">{{ cell.kind }}</span>{{ cell.value }}</td>
+            }
           </tr>
         }
       </tbody>
