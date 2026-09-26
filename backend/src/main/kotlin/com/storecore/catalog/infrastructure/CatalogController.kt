@@ -8,6 +8,7 @@ import com.storecore.identity.infrastructure.web.RequestAuth
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -54,12 +55,13 @@ class CatalogController(
     @GetMapping("/user/content/home") fun adminHome(http: HttpServletRequest): BaseResponse<Any?> { val actor = auth.operatorOrAdmin(http); capabilities.decide("CATALOG", "READ", CapabilityActor.Internal(actor)); return BaseResponse.ok(catalog.adminHomeDraft()) }
     @PutMapping("/user/content/home") fun saveHome(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @Valid @RequestBody request: HomeRequest): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http); val actor = auth.operatorOrAdmin(http)
-        val mutation = mutations.execute(actor, csrf) { capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor)); catalog.saveHome(request.title, request.body, actor.userId) }
+        val mutation = mutations.execute(actor, csrf) { capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor)); catalog.saveHome(request.title, request.body, request.blocks?.map { HomeBlockInput(it.id, it.title, it.body) }, actor.userId) }
         return csrfOk(mutation)
     }
     private fun csrfOk(mutation: com.storecore.identity.infrastructure.web.CsrfMutation<*>) = ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mutation.value))
 }
 
-data class HomeRequest(@field:NotBlank val title: String, val body: String = "")
+data class HomeBlockRequest(@field:NotBlank @field:Size(max = 80) val id: String, val title: String = "", val body: String = "")
+data class HomeRequest(@field:NotBlank val title: String, val body: String = "", @field:Valid val blocks: List<HomeBlockRequest>? = null)
 data class FacetWriteRequest(@field:NotBlank val name: String, val id: Long? = null)
 data class ProductDetailRequest(val sku: String = "", val name: String = "", val description: String = "", val brand: String = "", val category: String = "", val images: List<String> = emptyList(), val variants: List<Map<String, Any?>> = emptyList(), val price: Map<String, Any?> = emptyMap(), val offerRef: String? = null, val active: Boolean = true)

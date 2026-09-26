@@ -63,6 +63,40 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `admin persists extra home blocks`() {
+        val saved = exchange(
+            "/api/v1/user/content/home",
+            HttpMethod.PUT,
+            """{"title":"Vitrina","body":"Hero body","blocks":[{"id":"shipping","title":"Envios","body":"A domicilio"}]}""",
+            admin.cookie,
+            admin.csrf,
+        )
+        assertEquals(200, saved.statusCode.value(), saved.body)
+        assertEquals(0, jdbc.queryForObject("SELECT sort_order FROM home_content_sections WHERE section_key=?", Int::class.java, "shipping"))
+        assertEquals(true, jdbc.queryForObject("SELECT active FROM home_content_sections WHERE section_key=?", Boolean::class.java, "shipping"))
+        admin = admin.copy(csrf = saved.headers.getFirst("X-CSRF-Token")!!)
+        val published = exchange("/api/v1/content/home", HttpMethod.GET, null)
+        assertEquals(200, published.statusCode.value(), published.body)
+        assertTrue(published.body!!.contains("\"id\":\"hero\""))
+        assertTrue(published.body!!.contains("\"title\":\"Vitrina\""))
+        assertTrue(published.body!!.contains("\"id\":\"shipping\""))
+        assertTrue(published.body!!.contains("\"title\":\"Envios\""))
+        assertTrue(published.body!!.contains("\"body\":\"A domicilio\""))
+        val draft = exchange("/api/v1/user/content/home", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, draft.statusCode.value(), draft.body)
+        assertTrue(draft.body!!.contains("\"title\":\"Vitrina\""))
+        assertTrue(draft.body!!.contains("\"body\":\"Hero body\""))
+        assertTrue(draft.body!!.contains("\"blocks\""))
+        assertTrue(draft.body!!.contains("\"id\":\"shipping\""))
+        val heroOnly = exchange("/api/v1/user/content/home", HttpMethod.PUT, """{"title":"Portada","body":"Solo hero"}""", admin.cookie, admin.csrf)
+        assertEquals(200, heroOnly.statusCode.value(), heroOnly.body)
+        val still = exchange("/api/v1/content/home", HttpMethod.GET, null)
+        assertTrue(still.body!!.contains("\"title\":\"Portada\""))
+        assertTrue(still.body!!.contains("\"id\":\"shipping\""))
+        assertTrue(still.body!!.contains("\"body\":\"A domicilio\""))
+    }
+
+    @Test
     fun `cart snapshots prices and checkout replays the same claim`() {
         val sku = "SKU-CART-${UUID.randomUUID()}"
         putProduct(sku, "Cart Item", available = 8, safety = 1)
