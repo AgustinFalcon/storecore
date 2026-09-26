@@ -3,6 +3,7 @@ package com.storecore.commerce.infrastructure
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.CheckoutConflict
 import com.storecore.commerce.application.CommerceValidation
+import com.storecore.commerce.application.port.output.EffectivePriceQueryPort
 import com.storecore.commerce.domain.CartLineView
 import com.storecore.commerce.domain.CartView
 import com.storecore.commerce.domain.CheckoutReceipt
@@ -27,6 +28,7 @@ class JdbcCartService(
     private val inventory: JdbcInventoryService,
     private val capabilities: CapabilityDecisionPort,
     private val mpAttempts: ObjectProvider<MpCheckoutAttemptService>,
+    private val effectivePrices: EffectivePriceQueryPort,
 ) {
     fun read(customer: CustomerPrincipal): CartView = snapshot(ensureCart(customer.customerId))
 
@@ -102,14 +104,15 @@ class JdbcCartService(
     private data class Priced(val variantId: Long, val original: BigDecimal, val discount: BigDecimal, val effective: BigDecimal, val offerId: Long?, val campaign: String?)
 
     private fun price(sku: String): Priced {
-        val row = jdbc.query("SELECT v.id,p.id product_id,p.base_price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=? AND p.status='ACTIVE' AND v.active", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("product_id"), rs.getBigDecimal("base_price")) }, sku).firstOrNull() ?: throw ResourceNotFound()
-        val offer = jdbc.query("SELECT o.id,o.name,o.discount_type,o.discount_value FROM offers o JOIN offer_products op ON op.offer_id=o.id WHERE op.product_id=? AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at ORDER BY o.priority DESC,o.id LIMIT 1", { rs, _ -> mapOf("id" to rs.getLong("id"), "name" to rs.getString("name"), "type" to rs.getString("discount_type"), "value" to rs.getBigDecimal("discount_value")) }, row.second).firstOrNull()
-        val original = row.third
-        val discount = when (offer?.get("type")) {
-            "PERCENT" -> original.multiply(offer["value"] as BigDecimal).divide(BigDecimal(100), 2, java.math.RoundingMode.HALF_UP).min(original)
-            "FIXED" -> (offer["value"] as BigDecimal).min(original)
-            else -> BigDecimal.ZERO
-        }
-        return Priced(row.first, original, discount, original.subtract(discount), offer?.get("id") as Long?, offer?.get("name") as String?)
+        val snapshot = effectivePrices.findBySkus(listOf(sku))[sku] ?: throw ResourceNotFound()
+        if (!snapshot.active) throw ResourceNotFound()
+        return Priced(
+            snapshot.variantId,
+            snapshot.basePrice,
+            snapshot.discountAmount,
+            snapshot.effectivePrice,
+            snapshot.offerRef?.toLongOrNull(),
+            snapshot.campaignRef,
+        )
     }
 }

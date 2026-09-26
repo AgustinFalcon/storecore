@@ -3,6 +3,7 @@ package com.storecore.catalog.infrastructure
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
+import com.storecore.commerce.application.port.output.EffectivePriceQueryPort
 import com.storecore.commerce.infrastructure.JdbcInventoryService
 import com.storecore.commerce.application.CommerceValidation
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -18,7 +19,12 @@ data class HomeDraft(val title: String, val body: String)
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val inventory: JdbcInventoryService) : CatalogQueryPort {
+class JdbcCatalogService(
+    private val jdbc: JdbcTemplate,
+    private val mapper: ObjectMapper,
+    private val inventory: JdbcInventoryService,
+    private val effectivePrices: EffectivePriceQueryPort,
+) : CatalogQueryPort {
     override fun searchActive(query: String): List<CatalogSearchResult> = jdbc.query("""SELECT v.sku,p.name FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE p.status='ACTIVE' AND v.active AND (lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?) OR lower(coalesce(b.name,'')) LIKE lower(?) OR lower(coalesce(c.name,'')) LIKE lower(?)) ORDER BY p.name LIMIT 100""", { rs, _ -> CatalogSearchResult(com.storecore.catalog.domain.ProductSku(rs.getString("sku")), rs.getString("name")) }, "%$query%", "%$query%", "%$query%", "%$query%")
     fun facets(kind: String): List<CatalogFacet> = jdbc.query("SELECT id,name FROM ${if (kind == "brands") "brands" else "categories"} WHERE active ORDER BY name", { rs, _ -> CatalogFacet(rs.getLong("id"), rs.getString("name")) })
     fun search(query: String, brand: Long?, category: Long?, offers: Boolean): List<Map<String, Any?>> {
@@ -26,14 +32,52 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         if (query.isNotBlank()) { clauses += "(lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?))"; args += "%$query%"; args += "%$query%" }
         if (brand != null) { clauses += "p.brand_id=?"; args += brand }; if (category != null) { clauses += "p.category_id=?"; args += category }
         if (offers) clauses += "EXISTS (SELECT 1 FROM offer_products op JOIN offers o ON o.id=op.offer_id WHERE op.product_id=p.id AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at)"
-        return jdbc.query("SELECT v.sku,p.name,COALESCE(p.base_price,0) price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE ${clauses.joinToString(" AND ")} ORDER BY p.name LIMIT 100", { rs, _ -> mapOf("sku" to rs.getString("sku"), "name" to rs.getString("name"), "price" to rs.getBigDecimal("price")) }, *args.toTypedArray())
+        val rows =
+            jdbc.query(
+                """SELECT v.sku,p.name,(SELECT url FROM product_images WHERE product_id=p.id ORDER BY sort_order,id LIMIT 1) image
+                   FROM product_variants v JOIN products p ON p.id=v.product_id
+                   WHERE ${clauses.joinToString(" AND ")} ORDER BY p.name LIMIT 100""",
+                { rs, _ -> mapOf("sku" to rs.getString("sku"), "name" to rs.getString("name"), "image" to rs.getString("image")) },
+                *args.toTypedArray(),
+            )
+        val priced = effectivePrices.findBySkus(rows.map { it["sku"] as String })
+        return rows.map { row ->
+            val sku = row["sku"] as String
+            val snapshot = priced[sku]
+            val base = snapshot?.basePrice ?: BigDecimal.ZERO
+            val effective = snapshot?.effectivePrice ?: base
+            val image = row["image"]
+            mapOf(
+                "sku" to sku,
+                "name" to row["name"],
+                "price" to mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.offerRef?.let { "offer-$it" } ?: "catalog")),
+                "originalPrice" to if (snapshot != null && snapshot.discountAmount.signum() > 0) base else null,
+                "imageUrl" to image,
+                "images" to listOfNotNull(image),
+                "offerRef" to snapshot?.offerRef,
+            )
+        }
     }
     fun product(sku: String, admin: Boolean = false): CatalogProduct? {
         val visibility = if (admin) "v.sku=?" else "v.sku=? AND p.status='ACTIVE' AND v.active"
         val row = jdbc.query("SELECT p.id,p.name,p.description,b.name brand,c.name category,p.base_price,p.status FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE $visibility", { rs, _ -> mapOf("id" to rs.getLong("id"), "name" to rs.getString("name"), "description" to (rs.getString("description") ?: ""), "brand" to (rs.getString("brand") ?: ""), "category" to (rs.getString("category") ?: ""), "base" to rs.getBigDecimal("base_price"), "status" to rs.getString("status")) }, sku).firstOrNull() ?: return null
         val variants = jdbc.query("SELECT v.id,v.sku,v.label,v.active,CASE WHEN ? THEN COALESCE(i.available_quantity,0) ELSE GREATEST(0,COALESCE(i.available_quantity,0)-COALESCE(i.safety_stock,0)) END available FROM product_variants v LEFT JOIN inventory_balances i ON i.variant_id=v.id JOIN products p ON p.id=v.product_id WHERE p.id=? ${if (admin) "" else "AND v.active"} ORDER BY v.id", { rs, _ -> mapOf("id" to rs.getLong("id").toString(), "sku" to rs.getString("sku"), "name" to rs.getString("label"), "availableQuantity" to rs.getInt("available")) }, admin, row["id"] as Long)
-        val images = jdbc.query("SELECT url FROM product_images WHERE product_id=? ORDER BY sort_order,id", { rs, _ -> rs.getString("url") }, row["id"] as Long); val base = row["base"] as BigDecimal
-        return CatalogProduct(sku, row["name"] as String, row["description"] as String, row["brand"] as String, row["category"] as String, images, variants, mapOf("base" to base, "desired" to null, "observed" to null, "effective" to base, "priceVersion" to "catalog-${row["id"]}"), null, row["status"] == "ACTIVE")
+        val images = jdbc.query("SELECT url FROM product_images WHERE product_id=? ORDER BY sort_order,id", { rs, _ -> rs.getString("url") }, row["id"] as Long)
+        val base = row["base"] as BigDecimal
+        val snapshot = effectivePrices.findBySkus(listOf(sku))[sku]
+        val effective = snapshot?.effectivePrice ?: base
+        return CatalogProduct(
+            sku,
+            row["name"] as String,
+            row["description"] as String,
+            row["brand"] as String,
+            row["category"] as String,
+            images,
+            variants,
+            mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.offerRef?.let { "offer-$it" } ?: "catalog-${row["id"]}")),
+            snapshot?.offerRef,
+            row["status"] == "ACTIVE",
+        )
     }
     fun adminList(): List<CatalogProduct> = jdbc.query("SELECT v.sku FROM product_variants v JOIN products p ON p.id=v.product_id ORDER BY p.name,v.id", { rs, _ -> rs.getString("sku") }).mapNotNull { product(it, admin = true) }
     fun home(): HomeContent { val rows = jdbc.query("SELECT section_key,content FROM home_content_sections WHERE active ORDER BY sort_order,id", { rs, _ -> rs.getString("section_key") to mapper.readTree(rs.getString("content")) }); val title = rows.firstOrNull { it.first == "hero" }?.second?.path("title")?.asText() ?: "StoreCore"; return HomeContent(title, rows.map { mapOf("id" to it.first, "title" to it.second.path("title").asText(it.first), "body" to it.second.path("body").asText("")) }) }
