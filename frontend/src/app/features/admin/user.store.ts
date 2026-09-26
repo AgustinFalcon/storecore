@@ -2,9 +2,10 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { EMPTY, exhaustMap, filter, switchMap, tap } from 'rxjs';
+import { EMPTY, exhaustMap, filter, forkJoin, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
+import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
 import { HomeBannerBlock, HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
@@ -46,6 +47,7 @@ export class UserStore extends ComponentStore<UserState> {
     private readonly signIn: SignInUserUseCase,
     private readonly signOutUser: SignOutUserUseCase,
     private readonly saveHome: SaveHomeContentUseCase,
+    private readonly publicHome: GetHomeUseCase,
     private readonly promos: ManagePromosUseCase,
     private readonly importer: ImportProfileUseCase,
     private readonly session: UserSession,
@@ -151,15 +153,22 @@ export class UserStore extends ComponentStore<UserState> {
     trigger$.pipe(
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
-        this.saveHome.load().pipe(
+        forkJoin({
+          draft: this.saveHome.load(),
+          published: this.publicHome.execute(),
+        }).pipe(
           tapResponse({
-            next: (home) =>
+            next: ({ draft, published }) =>
               this.patchState({
-                home: { title: home.title, body: home.body },
-                homeBlocks: home.blocks ?? null,
+                home: { title: draft.title, body: draft.body },
+                homeBlocks: published.blocks.map((block) => ({
+                  id: block.id,
+                  title: block.title,
+                  body: block.body,
+                })),
                 loading: false,
               }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, homeBlocks: null, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
       ),

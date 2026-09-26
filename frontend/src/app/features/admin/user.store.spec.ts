@@ -1,6 +1,7 @@
 import { Router } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { UserSession } from '../../core/auth/user-session';
+import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
@@ -81,12 +82,47 @@ describe('UserStore profile preview', () => {
   });
 });
 
-function createStore(importer: ImportProfileUseCase): UserStore {
+describe('UserStore home blocks', () => {
+  it('shows the public home blocks when the console payload omits them', () => {
+    const store = createStore(
+      {} as ImportProfileUseCase,
+      { load: () => of({ title: 'Vidriera', body: 'Texto' }) } as unknown as SaveHomeContentUseCase,
+      {
+        execute: () => of({ title: 'Vidriera', blocks: [{ id: 'hero', title: 'Banner', body: 'Cuerpo del banner' }] }),
+      } as unknown as GetHomeUseCase,
+    );
+
+    store.loadHome();
+
+    expect(store.snapshot.home).toEqual({ title: 'Vidriera', body: 'Texto' });
+    expect(store.snapshot.homeBlocks).toEqual([{ id: 'hero', title: 'Banner', body: 'Cuerpo del banner' }]);
+  });
+
+  it('does not claim an empty banner when the public home fails', () => {
+    const store = createStore(
+      {} as ImportProfileUseCase,
+      { load: () => of({ title: 'Vidriera', body: 'Texto' }) } as unknown as SaveHomeContentUseCase,
+      { execute: () => throwError(() => new Error('caido')) } as unknown as GetHomeUseCase,
+    );
+
+    store.loadHome();
+
+    expect(store.snapshot.homeBlocks).toBeNull();
+    expect(store.snapshot.errorMessage).not.toBe('');
+  });
+});
+
+function createStore(
+  importer: ImportProfileUseCase,
+  saveHome: SaveHomeContentUseCase = {} as SaveHomeContentUseCase,
+  publicHome: GetHomeUseCase = {} as GetHomeUseCase,
+): UserStore {
   const session = { authenticated: () => false } as UserSession;
   return new UserStore(
     {} as SignInUserUseCase,
     {} as SignOutUserUseCase,
-    {} as SaveHomeContentUseCase,
+    saveHome,
+    publicHome,
     {} as ManagePromosUseCase,
     importer,
     session,
