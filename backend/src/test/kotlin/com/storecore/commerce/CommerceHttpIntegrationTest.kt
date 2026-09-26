@@ -166,6 +166,84 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `operator adjusts web available stock with a reason`() {
+        val sku = "SKU-ADJ-${UUID.randomUUID()}"
+        putProduct(sku, "Adjustable", available = 10, safety = 1)
+        jdbc.update("UPDATE inventory_balances SET reserved_quantity=2 WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", sku)
+        val variantId = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, sku)!!
+        val adjustmentsBefore = adjustments(sku)
+
+        val missingCsrf = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), admin.cookie)
+        assertEquals(403, missingCsrf.statusCode.value(), missingCsrf.body)
+        assertTrue(missingCsrf.body!!.contains("CSRF_INVALID"))
+
+        val foreignOrigin = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), admin.cookie, admin.csrf, "https://evil.example")
+        assertEquals(403, foreignOrigin.statusCode.value(), foreignOrigin.body)
+        assertTrue(foreignOrigin.body!!.contains("CSRF_INVALID") || foreignOrigin.body!!.contains("Invalid CORS request"), foreignOrigin.body)
+
+        val missingOrigin = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), admin.cookie, admin.csrf, null)
+        assertEquals(403, missingOrigin.statusCode.value(), missingOrigin.body)
+        assertTrue(missingOrigin.body!!.contains("CSRF_INVALID"))
+
+        val blankReason = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "   "), admin.cookie, admin.csrf)
+        assertEquals(400, blankReason.statusCode.value(), blankReason.body)
+        assertTrue(blankReason.body!!.contains("REQUEST_VALIDATION_FAILED"))
+
+        val negative = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, -1, "cycle count"), admin.cookie, admin.csrf)
+        assertEquals(400, negative.statusCode.value(), negative.body)
+        assertTrue(negative.body!!.contains("REQUEST_VALIDATION_FAILED"))
+        assertEquals(10, available(sku))
+        assertEquals(adjustmentsBefore, adjustments(sku))
+
+        val unknown = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody("SKU-MISSING-${UUID.randomUUID()}", 1, "cycle count"), admin.cookie, admin.csrf)
+        assertEquals(404, unknown.statusCode.value(), unknown.body)
+        assertTrue(unknown.body!!.contains("RESOURCE_NOT_FOUND"))
+
+        val customerDenied = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), customer.cookie, customer.csrf)
+        assertEquals(401, customerDenied.statusCode.value(), customerDenied.body)
+
+        val adjusted = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), admin.cookie, admin.csrf)
+        assertEquals(200, adjusted.statusCode.value(), adjusted.body)
+        val nextCsrf = adjusted.headers.getFirst("X-CSRF-Token")
+        assertNotNull(nextCsrf)
+        val replay = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 4, "cycle count"), admin.cookie, admin.csrf)
+        assertEquals(403, replay.statusCode.value(), replay.body)
+        assertTrue(replay.body!!.contains("CSRF_INVALID"))
+        admin = admin.copy(csrf = nextCsrf!!)
+
+        assertEquals(7, available(sku))
+        assertEquals(2, jdbc.queryForObject("SELECT reserved_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId))
+        assertEquals(1, jdbc.queryForObject("SELECT safety_stock FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId))
+        assertEquals(adjustmentsBefore + 1, adjustments(sku))
+        assertEquals(-3, jdbc.queryForObject("SELECT quantity_delta FROM inventory_ledger WHERE variant_id=? AND event_type='ADJUSTMENT' AND channel='INTERNAL' ORDER BY id DESC LIMIT 1", Int::class.java, variantId))
+        assertEquals("cycle count", jdbc.queryForObject("SELECT payload_redacted->>'reason' FROM audit_events WHERE event_type='INVENTORY_ADJUSTED' AND aggregate_id=? ORDER BY id DESC LIMIT 1", String::class.java, variantId))
+        val listed = exchange("/api/v1/user/inventory", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, listed.statusCode.value(), listed.body)
+        assertTrue(listed.body!!.contains("\"sku\":\"$sku\""))
+        assertTrue(listed.body!!.contains("\"availableQuantity\":7"))
+
+        val unchanged = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 7, "cycle count"), admin.cookie, admin.csrf)
+        assertEquals(200, unchanged.statusCode.value(), unchanged.body)
+        admin = admin.copy(csrf = unchanged.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(adjustmentsBefore + 1, adjustments(sku))
+
+        val operator = provisionInternal("operator-${UUID.randomUUID()}@example.com", "OPERATOR")
+        val operatorAdjusted = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 6, "operator count"), operator.cookie, operator.csrf)
+        assertEquals(200, operatorAdjusted.statusCode.value(), operatorAdjusted.body)
+        assertEquals(6, available(sku))
+        assertEquals("operator count", jdbc.queryForObject("SELECT payload_redacted->>'reason' FROM audit_events WHERE event_type='INVENTORY_ADJUSTED' AND aggregate_id=? ORDER BY id DESC LIMIT 1", String::class.java, variantId))
+
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, "MANUAL_FULFILLMENT")
+        jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), "MANUAL_FULFILLMENT", version, "READ_ONLY", "{}", UUID.randomUUID(), "test")
+        val stillListed = exchange("/api/v1/user/inventory", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, stillListed.statusCode.value(), stillListed.body)
+        val denied = exchange("/api/v1/user/inventory/adjust", HttpMethod.POST, adjustBody(sku, 1, "blocked"), admin.cookie, admin.csrf)
+        assertEquals(409, denied.statusCode.value(), denied.body)
+        assertTrue(denied.body!!.contains("CAPABILITY_READ_ONLY"))
+        assertEquals(6, available(sku))
+    }
+
+    @Test
     fun `admin order reads require fulfillment capability`() {
         val allowed = exchange("/api/v1/user/orders", HttpMethod.GET, null, admin.cookie)
         assertEquals(200, allowed.statusCode.value(), allowed.body)
@@ -333,15 +411,26 @@ class CommerceHttpIntegrationTest(
         jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
     }
 
-    private fun provisionAdmin(email: String): Session {
+    private fun provisionAdmin(email: String) = provisionInternal(email, "ADMIN")
+
+    private fun provisionInternal(email: String, role: String): Session {
         val hash = passwords.hash("a-very-long-password".toCharArray())
         val userId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, email, hash)
-        jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code='ADMIN'", userId)
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code=?", userId, role)
         val login = exchange("/api/v1/internal/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
         val cookie = login.headers.getFirst(HttpHeaders.SET_COOKIE) ?: error("admin login ${login.statusCode} ${login.body}")
         val csrf = login.headers.getFirst("X-CSRF-Token") ?: error("admin login missing csrf ${login.statusCode} ${login.body}")
         return Session(cookie.substringBefore(';'), csrf)
     }
+
+    private fun adjustBody(sku: String, availableQuantity: Int, reason: String) =
+        """{"sku":"$sku","availableQuantity":$availableQuantity,"reason":"$reason"}"""
+
+    private fun available(sku: String) =
+        jdbc.queryForObject("SELECT available_quantity FROM inventory_balances WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku)
+
+    private fun adjustments(sku: String) =
+        jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku)
 
     private fun registerCustomer(email: String): Session {
         val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Person","lastName":"One"}""")
@@ -355,11 +444,11 @@ class CommerceHttpIntegrationTest(
 
     private fun adminUserId() = jdbc.queryForObject("SELECT id FROM users WHERE email LIKE 'admin-%' ORDER BY id DESC LIMIT 1", Long::class.java)!!
 
-    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null) = http.exchange(
+    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null, origin: String? = "http://localhost:4200") = http.exchange(
         URI("http://localhost:$port$path"), method,
         HttpEntity(body, HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
-            set(HttpHeaders.ORIGIN, "http://localhost:4200")
+            origin?.let { set(HttpHeaders.ORIGIN, it) }
             cookie?.let { set(HttpHeaders.COOKIE, it) }
             csrf?.let { set("X-CSRF-Token", it) }
         }), String::class.java,
