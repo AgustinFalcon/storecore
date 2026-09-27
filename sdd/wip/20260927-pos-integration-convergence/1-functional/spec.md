@@ -2,6 +2,8 @@
 
 **Gate vigente:** POSC-000/000A/001 están done; POSC-001 cerró sólo un harness test-only con doble GO Astra de código (`sdd/reviews/20260927-posc001-dual-code-go.md`). POSC-002 espera review de spec. No hay GO de porteo productivo, Flyway, adapter live ni cierre del WIP.
 
+La propuesta `2-technical/posc002-identity-acl-proposal.md` explicita la identidad del companion antes de portear funciones de negocio: bearer opaco verificado por secret-provider compatible con el `resolveToken` de BlackStore, principal inmutable y scopes por ruta. El header de instancia no autentica; `DISABLED` y credenciales V5 legacy sin metadata deniegan aunque la fila siga ACTIVE. POSC-002 incluye pasar el principal y revalidar el guard `READ COMMITTED` con lecturas frescas posteriores al lock en Tx-A/Tx-B/commit/release existentes y filtrar GET/reconcile por companion dueño, sin cambiar reglas comerciales. La administración USER ADMIN usa provisioning Tx-P/Tx-C y entry points SQL estrechos con permisos comprobados en PG16. `cost:read` nunca corresponde a cashier y el companion no recibe coste en este corte sin delegación humana verificable; `X-Actor-Role` es sólo audit-only. La propuesta sigue pendiente de review, no activa el companion ni concede GO de migración.
+
 ## Problema y resultado esperado
 
 La línea de integración ya expone el contrato `/blackstore-integration/v1` mediante un adapter monolítico y migraciones V5–V7. La rama de preparación POS desarrolló módulos hexagonales, controles de identidad, catálogo, reserva y lectura de recuperación sobre otra secuencia Flyway V4–V7. Copiarla completa haría que un número de migración publicado significara dos cosas y registraría dos handlers para las mismas rutas.

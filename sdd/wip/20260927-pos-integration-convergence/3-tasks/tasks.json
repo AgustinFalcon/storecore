@@ -36,7 +36,7 @@
       "status": "pending_spec_review",
       "layer": 2,
       "depends_on": ["TASK-POSC-001"],
-      "acceptance_criteria": ["Migraciones nuevas y aditivas sin modificar V1–V7", "0..1 companion y revocación/rotación de credencial seguras", "Pruebas PG16 positivas y negativas para scopes y roles"]
+      "acceptance_criteria": ["Doble review de spec de 2-technical/posc002-identity-acl-proposal.md antes de código o DDL; owner único V8+ compartido ML-DSP-000B y autorización específica SECURITY DEFINER pendientes", "Bearer opaco 256-bit compatible con BlackStore resolveToken, principal inmutable, provider y error matrix YAML 401/403/500; header/actor claim no autorizan, DISABLED y V5 ACTIVE legacy auth_ready=false deniegan, cashier nunca cost:read", "Admin USER ADMIN+CSRF y pool/rol DB segregado; nueve entry points exactos prepare/attach/status/abort/pair/activate/suspend/rotate/revoke con owner SELECT users/roles/user_roles, locks capability y sólo EXECUTE para login admin; pairing 0..1, CAS, audit y Tx-P idempotente antes del secreto", "Guard POS SECURITY DEFINER VOLATILE con lock owner mínimo y runtime EXECUTE; Tx-A/Tx-B/commit/release reales READ COMMITTED rechazan RR/Serializable, action anchor primero y config/switch en sentencias posteriores con snapshot fresco; admin ML/POS mismo ancla FOR UPDATE; GET/reconcile RO filtran client_instance_id, RR guard primer SQL sin lock; saga DELETE no revocada hasta POSC-004A", "PG16 clean+upgrade y loopback BlackStore sintético: grants PUBLIC/roles, cursor UPSERT, provider outage, admin login positivo/negativo y Tx-P/Tx-C, A→B ownership, carrera admin-wins determinista contra cada efecto y RR read guard, sin efecto post-revocación; sin conexión live"]
     },
     {
       "id": "TASK-POSC-003",

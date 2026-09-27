@@ -2,6 +2,8 @@
 
 **Estado:** `ready_for_posc002_spec_review`. ADR-001 adjudicó el contrato, POSC-000A validó el baseline y POSC-001 cerró el harness PG16 test-only tras 32 suites/142 tests locales y doble GO Astra de código. Los cortes de porteo siguen gated; ver `sdd/reviews/20260927-posc001-dual-code-go.md`.
 
+**Corte POSC-002 en review:** `posc002-identity-acl-proposal.md` define bearer opaco real, matriz ruta/scope/capability, barrera revoke/rotate/Tx-A→Tx-B, Tx-P/Tx-C administrativo con nueve entry points, ACL y pruebas PG16. El guard mutante compartido ML/POS exige READ COMMITTED y sentencias `VOLATILE` posteriores al lock de ancla para observar configuración/switch recién confirmados; el read guard RR conserva otro contrato. No concede GO de implementación ni de migración; su versión V8+ debe coordinarse con ML-DSP-000B y el head real. V3 concede `EXECUTE` a `PUBLIC` sobre cuatro funciones administrativas `SECURITY DEFINER`: el cierre es gate explícito y no se presume hecho.
+
 ## Evidencia de ramas (2026-09-27)
 
 Base común `5d28a76`. Desde esa base, `origin/integration/storecore-int` contiene 145 commits y `fix/storecore-pos-contract-readiness` 23; esta última tiene además 32 tracked modificados y 97 untracked. Los números describen inventario, no calidad ni completitud. La rama de preparación es fuente de piezas a inspeccionar, no fuente de migraciones para cherry-pick masivo.
