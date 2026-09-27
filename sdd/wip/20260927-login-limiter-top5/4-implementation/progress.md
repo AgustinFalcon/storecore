@@ -1,6 +1,6 @@
 # Progreso — cota top 5 del limitador
 
-Estado: in_progress. Fecha: 2026-09-27. TASK-LT5-001–004 done local; TASK-LT5-005 pending.
+Estado: in_progress. Fecha: 2026-09-27. TASK-LT5-001–004 done; TASK-LT5-005 pending sólo por los gates de cierre posteriores a la integración.
 
 El GO documental inicial está en sdd/reviews/20260927-login-limiter-top5-astra-documentary-go.md. La implementación se basó en integration/storecore-int 73367fa, posterior a los PR #53–#56. LoginRateLimiter conserva hasta cinco marcas por bucket USER/CUSTOMER y usa un watermark de tiempo efectivo no decreciente bajo el monitor existente. Las pruebas comparan el comportamiento con una referencia independiente de historial completo y cubren secuencias de 6, 32 y 256 fallos, bordes de expiración, Retry-After, capacidad, rewind, clear y llamada directa.
 
@@ -11,8 +11,8 @@ El GO documental inicial está en sdd/reviews/20260927-login-limiter-top5-astra-
 - Maven/Surefire local: 29 suites, 129 pruebas, cero fallos, cero errores y cero skips; prueba enfocada verde. git diff --check limpio.
 - Astra A y B revisaron el mismo snapshot final. Después de corregir la observación P3 de conteos exactos, ambos emitieron GO sin P0–P3 abiertos. Ver sdd/reviews/20260927-login-top5-local-dual-code-go.md.
 
-Esto completa TASK-LT5-002/003/004 a nivel local. El PR, su integración y las verificaciones de cierre son TASK-LT5-005. El CI alojado no está acreditado como verde; tampoco hay merge, promoción a master, release o sdd.finish para este WIP.
+Esto completa TASK-LT5-002/003/004 a nivel local. El PR #57 se fusionó en integration/storecore-int como b6f37df el 2026-09-27, después de dos GO Astra sobre el HEAD b8d1d4d. La evidencia posterior al merge está en sdd/reviews/20260927-login-top5-pr57-integration.md. La preparación e integración de TASK-LT5-005 están satisfechas; el cierre condicionado sigue pendiente. Verify 36350747675 concluyó failure en backend y frontend con steps=[]; no acredita CI verde. Tampoco hay promoción a master, release o sdd.finish para este WIP.
 
 ## Próximo gate
 
-Preparar el PR acotado hacia integration/storecore-int, someter el diff final a las dos reviews pactadas y registrar el resultado real del CI antes de cualquier cierre SDD.
+Resolver el Verify alojado y acreditar los gates aplicables antes de promover a master, liberar o ejecutar sdd.finish. Mantener TASK-LT5-005 pending mientras el criterio de cierre siga incluido en esa tarea.

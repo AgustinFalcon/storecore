@@ -1,7 +1,7 @@
 # Meta — cota de cinco fallos por bucket de login
 
 - Feature id: 20260927-login-limiter-top5
-- Estado: building (código y pruebas locales con GO de Astra A/B; PR pendiente)
+- Estado: building (PR #57 integrado; gate de cierre SDD pendiente)
 - Tipo: delta acotado del backend Kotlin/Spring Boot
 - Base de redacción: origin/integration/storecore-int 56baa2db2d6fabbd683ce41459414c556cb5246d (2026-09-27)
 - Contrato precedente: sdd/wip/20260927-login-realm-budget/, TASK-LRB-005
@@ -22,4 +22,4 @@ No requiere migración, base de datos, proveedor externo, Mercado Libre, BlackSt
 | Tasks | ready_for_implementation |
 | Implementation | in_progress |
 
-Dos revisiones Astra independientes dieron GO documental; el expediente está en sdd/reviews/20260927-login-limiter-top5-astra-documentary-go.md. La observación editorial P3 de Astra A sobre cardinalidad quedó corregida en el spec técnico y TASK-LT5-003. La implementación local partió de integration/storecore-int 73367fa, pasó 29 suites/129 pruebas sin fallos, errores ni skips, y obtuvo dos GO de Astra sobre el snapshot final tras corregir el P3 de conteos exactos. La evidencia está en sdd/reviews/20260927-login-top5-local-dual-code-go.md. TASK-LT5-001–004 están done a nivel local; TASK-LT5-005 sigue pending hasta crear y fusionar el PR hacia integración. No hay CI alojado verde, promoción a master, release ni sdd.finish declarados.
+Dos revisiones Astra independientes dieron GO documental; el expediente está en sdd/reviews/20260927-login-limiter-top5-astra-documentary-go.md. La observación editorial P3 de Astra A sobre cardinalidad quedó corregida en el spec técnico y TASK-LT5-003. La implementación local partió de integration/storecore-int 73367fa, pasó 29 suites/129 pruebas sin fallos, errores ni skips, y obtuvo dos GO de Astra sobre el snapshot final tras corregir el P3 de conteos exactos. La evidencia local está en sdd/reviews/20260927-login-top5-local-dual-code-go.md. El PR #57, HEAD b8d1d4d, se fusionó en integration/storecore-int como b6f37df el 2026-09-27; ver sdd/reviews/20260927-login-top5-pr57-integration.md. TASK-LT5-001–004 están done; la parte PR/integración de TASK-LT5-005 está satisfecha, pero la tarea permanece pending porque su criterio incluye cierre SDD condicionado. El Verify alojado de ese HEAD falló con jobs sin pasos; no hay CI alojado verde, promoción a master, release ni sdd.finish declarados.
