@@ -1,7 +1,7 @@
 {
   "feature": "20260927-login-realm-budget",
   "status": "ready_for_implementation",
-  "stats": { "total": 5, "pending": 2, "done": 3 },
+  "stats": { "total": 5, "pending": 1, "done": 4 },
   "tasks": [
     {
       "id": "TASK-LRB-001",
@@ -30,7 +30,7 @@
     {
       "id": "TASK-LRB-004",
       "title": "Revisar código por dos agentes independientes y registrar cierre local",
-      "status": "pending",
+      "status": "done",
       "depends_on": ["TASK-LRB-003"],
       "files": ["sdd/reviews/", "sdd/wip/20260927-login-realm-budget/4-implementation/progress.md"],
       "acceptance_criteria": ["Dos revisiones independientes del diff y tests aprueban o dejan hallazgos trazables", "Suite relevante y diff check documentados", "CI remoto se declara no verificado si no ejecutó"]
