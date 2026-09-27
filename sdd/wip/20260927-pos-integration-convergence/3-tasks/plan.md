@@ -1,0 +1,46 @@
+# Plan de convergencia POS — gates secuenciales
+
+Este plan está en `ready_for_contract_adjudication`: dos reviewers Astra dieron **GO documental sólo para preparar POSC-000 y POSC-000A**, todavía pendientes (`sdd/reviews/20260927-pos-convergence-dual-documentary-go.md`). POSC-001 y posteriores siguen gated hasta decisión contractual, evidencia y GO propio. Cada corte futuro puede prepararse en PR independiente hacia `integration/storecore-int`, con revisión documental/código correspondiente y sin merge prematuro. El head, Flyway, YAML y árbol de controladores se vuelven a inventariar antes de cada PR. PIC-006A conserva su alcance de lectura; PIC-008A histórico (SKU 128/129) queda pendiente si se conserva baseline 64/65 y ningún subcorte se sustituye con el harness PG16 general.
+
+## Corte 0 — propuesta de adjudicación contractual y ownership (POSC-000)
+
+Revisar la matriz técnica con Astra, inventariar migraciones y objetos reales del head, comparar los siete paths y elegir **un** adapter candidato por ruta. `ADR-001` documenta dos YAML `1.0.0-draft` distintos: integrado/servido/pinneado por BlackStore `7B907...DE30` y dirty readiness `2AEAC...B7FD`, con +108/-43 líneas. Adjudicar SKU, selector bearer, ETag/304, override, 409, `expiresAt` y reconcile; identificar qué ports/domain use cases se portan y cuáles se reemplazan. **Salida:** propuesta ADR con aceptar/rechazar/diferir por grupo y matriz de fixtures para POSC-000A, sin código/migraciones ni cambio de pin.
+
+## Gate contractual del baseline inspirado en PIC-008A (POSC-000A)
+
+Validar el YAML integrado con **parser OpenAPI 3.1 y fixtures sólo de lo que ese digest declara**, sin PostgreSQL, endpoint publicado ni cliente BlackStore. Según la matriz técnica: SKU 64/65; códigos 409 por endpoint, tombstone 410, GET PENDING 200, ausencia 404, forma de `lineFailures` cuando aparece, ETag/304 y OneOf de receipt. No atribuirle `if/then`, ETag débil exacto ni precedencia 410→409→404 que sólo figuran en la propuesta dirty. Fijar SHA-256 de bytes exactos y cotejarlo con copia servida y pin BlackStore. **Salida:** ADR-001 aprobado para baseline con versión/digest/pin invariantes y GO documental cruzado. PIC-008A histórico y SKU 128/129 permanecen pendientes/diferidos a una evolución contractual coordinada; este plan puede seguir sin ella.
+
+## Corte 1 — harness PG16 de integración separado (POSC-001)
+
+Montar pruebas de mapa de rutas, Flyway PG16 limpio + upgrade V1–V7 con datos, roles runtime/worker, concurrencia e idempotencia. Evitar mocks que oculten persistencia/ACL. Validar que el harness falla de manera controlada antes de usarlo como gate de cada delta. **Salida:** evidencia reproducible del baseline y escenarios nuevos; no se atribuye a PIC-008A ni PIC-006A.
+
+## Corte 2 — identidad, capability y ACL
+
+Portar sólo deltas de registry/companion/credential y controles por scope, revocación, `DISABLED` y permisos mínimos. Usar versiones Flyway nuevas aditivas y preflight contra la base publicada; probar grants efectivos (incluido PUBLIC/membership) y roles runtime, migrator y worker sin DDL ni DML excesivo. **Salida:** 0..1 companion, pruebas de denegación, races de credencial/estado y migración limpia+upgrade. No se habilitan rutas write por el solo hecho de migrar.
+
+## Corte 3 — catálogo y reserve
+
+Seleccionar y portar read model/cursor/ETag/stock y reserva Tx-A/Tx-B, retirando en el mismo PR los handlers que colisionen. Preservar contratos 304/409/410/422/429, saleId+operationId, hash y precio versionado; probar stock con safety y reserva ya neta. **Salida:** un handler por ruta y PG16 idempotency/concurrency GO local.
+
+## Corte 4 — commit, release y recovery
+
+Portar commit/release y lectura GET/reconcile sobre el esquema migrado con un único owner por ruta. Verificar exactamente un `STOCK_COMMIT_EXTERNAL`, sin `SALE`, y que los reintentos no duplican decrementos. Conservar el bridge del PR #52: `NOT_ELIGIBLE`, cero escritura nueva directa a `desired_quantity` y `LISTING_STOCK`, histórico intacto. **Salida:** pruebas de saldo/ledger, 409/410 y timeout. GET/reconcile todavía requieren el subcorte PIC-006A para certificar read-only.
+
+## Subcorte worker y purge (POSC-004A)
+
+Portar sólo con decisión de esquema/roles revisada: worker EXTERNAL_BLACKSTORE distinto del WEB; advisory de cuádruple → saga → balances en orden de variante → reservas externas; commit comprueba TTL bajo lock y la carrera con expire no descuenta dos veces. Retry/poison usa CAS, cuarentena, audit+alerta atómicos y principal worker estrecho. Purge de terminales a 90 días conserva tombstone ≥7 años: INSERT tombstone → DELETE retry → líneas → saga en una Tx bajo lock; ledger/audit permanecen. Revocar DELETE directo runtime sólo cuando una función worker-only lo sustituya sin romper limpieza de PENDING. **Salida:** PG16 limpia+upgrade, negativos ACL, rollback y races WEB/PIC/commit/expire/purge. Si esto se difiere, documentar residual explícito y mantener NO-GO de cierre operativo.
+
+## Subcorte PIC-006A — GET/reconcile read-only (POSC-006)
+
+Sólo tras elegir e incorporar el adapter definitivo de lectura **y completar POSC-004A**, ejecutar tests PG16 **por proxy Spring real** que verifiquen `@Transactional(readOnly = true, isolation = REPEATABLE_READ)` efectivo. Comparar snapshots completos y ordenados antes/después, con payloads, estados y timestamps de saga/líneas/tombstones, retry, alert outbox/delivery/inbox, audit, ledger, reservas y balances. Cubrir GET 404/PENDING/durable/410; reconcile 0/501 inválidos, 500 válidos y duplicados aceptados/deduplicados por el adapter del baseline; registrar orden de respuesta, ajenos/revocados/retirados y writer concurrente con una fotografía consistente. El YAML integrado exige 1..500 receipts y no declara `uniqueItems`; el 400 por duplicados pertenece sólo al contrato dirty diferido. Una identidad revocada falla antes de leer receipts. Este subcorte no cambia código productivo, Flyway, ACL, `pom.xml` ni configuración compartida; tampoco certifica commit/release, recovery mutante o purge.
+
+## Corte 5 — wire, topología y cierre offline
+
+Después de PIC-006A y worker/purge, unificar error envelope `BaseResponse`, OpenAPI publicado, rate limits, headers, trazas y mapas de Spring. Revisar documentación operativa de instalación y rollback con módulo DISABLED; reejecutar suite de backend y aceptación cruzada BlackStore offline usando el digest adjudicado. **Salida:** dos reviews de código independientes sobre diff final, sin P0–P2 abiertos, y GO explícito de integración offline. El conector live, credenciales, fiscal y `sdd.finish` conservan gates independientes.
+
+## Bloqueos honestos
+
+- No existe GO actual para traer el worktree POS dirty ni para activar BlackStore. Los tests 288/48 del 24-Sep no prueban la base de integración 2026-09-27.
+- GitHub CI puede no iniciar jobs por billing. Los tests locales se registran con comando, SHA y alcance; no se presentan como CI remoto verde.
+- Toda migración que afecte funciones `SECURITY DEFINER` o privilegios necesita revisión de superficie/roles y pruebas PG16 explícitas antes de aplicarse. La compatibilidad de la base instalada decide el delta, no el nombre de archivo de la rama fuente.
+- El YAML dirty no es equivalente al pin de BlackStore por compartir `1.0.0-draft`. Hasta ADR-001 + POSC-000A aprobados se conserva el pin integrado y no se transporta un contrato mixto. PIC-008A histórico permanece pendiente/diferido; no se marca done por el gate baseline.
