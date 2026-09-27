@@ -1,9 +1,9 @@
 # Estado canónico del SDD — StoreCore
 
-**Validado:** 2026-09-23  
+**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `dedeb1a`
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
-**Git:** feature branch + finish en el PR. No tag, deploy o publish.
+**Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
 
 ## Residuales honestos
 
@@ -26,11 +26,17 @@
 
 UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. Evidencia POS local está registrada abajo y el companion sigue disabled. Fiscal y live siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16–#18 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones.
+
+## Backend posterior al baseline core
+
+- **Login USER/CUSTOMER:** `sdd/wip/20260927-login-realm-budget/` tiene TASK-LRB-001–005 completos a nivel local e integrados por PR #50 (`7644feb`). La evidencia de contención y su límite está en `sdd/reviews/20260927-login-limiter-contention-measurement.md`; no representa un SLO de producción. El WIP permanece abierto por sus gates de cierre.
+- **Cota de memoria del login:** `sdd/wip/20260927-login-limiter-top5/` obtuvo dos GO documentales Astra y entró a integración por PR #54 (`dedeb1a`). TASK-LT5-001 está done; TASK-LT5-002–005 requieren implementación, pruebas y dos reviews de código. El GO documental no aprueba el código en desarrollo.
+- **Stock deseado Mercado Libre:** `sdd/wip/20260924-ml-desired-stock-projection/` obtuvo GO documental en TASK-DSP-R00 por PR #51 (`474a007`). TASK-DSP-000A selló el writer PIC-009 y se integró por PR #52 (`56baa2d`); PR #53 (`767e71a`) registró su evidencia. El DAG tiene 3/14 tareas done: 000B y las diez posteriores siguen pendientes. El bridge queda fail-closed, sin red ni activación ML/BlackStore; ver `sdd/reviews/20260927-ml-dsp-000a-pr52-integration.md`.
 
 ## WIP POS (paralelo, no es el baseline)
 
-- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 done a nivel local. HTTP 200/304/409/410/429 + outbox local en Testcontainers; módulo vuelve a DISABLED. PR #19 mergeado en `master` (`18d18f7`) tras dual Grok r2 ambos `APPROVED` (`20260924-grok-pr19-scope-r2.md`, `20260924-grok-pr19-sdd-r2.md`). Verify de #19 no es CI verde. El WIP sigue abierto: companion live, fiscal, MP-LIVE-05 y `/sdd.finish` NO-GO. BlackStore ADP-001..010 + L3 están en el `master` de ese repo. PR #2 (`395ca30`) es el perfil opt-in `loopback`. PR #5 (`c5f6239`) ata el reserve a la variante del catálogo vigente. El release de BlackStore sigue disabled y no es companion live. Fiscal, live y `/sdd.finish` NO-GO.
+- `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 tienen evidencia **local histórica**; HTTP 200/304/409/410/429 y outbox se probaron en Testcontainers con activación temporal, y el módulo vuelve a DISABLED. PR #19 quedó en `master` (`18d18f7`) con dos reviews Grok; su Verify no fue CI verde. El worktree posterior de readiness divergió de integración y requiere convergencia documental y port por partes: POS/conector live sigue NO-GO. El WIP permanece abierto; tampoco hay GO fiscal, MP-LIVE-05 ni `sdd.finish`. BlackStore ADP-001..010 + L3 tienen evidencia en su propio repo; su release permanece disabled, sin companion live.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
