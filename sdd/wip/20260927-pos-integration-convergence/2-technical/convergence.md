@@ -1,12 +1,12 @@
 # Diseño técnico — inventario y cortes de convergencia
 
-**Estado:** `ready_for_contract_adjudication`. El GO documental dual Astra habilita preparar POSC-000/000A, no convierte esta matriz en decisión contractual definitiva ni autoriza los cortes de implementación. Ver `sdd/reviews/20260927-pos-convergence-dual-documentary-go.md`.
+**Estado:** `ready_for_baseline_contract_harness`. ADR-001 adjudicó el contrato de trabajo con doble GO Astra para POSC-000; POSC-000A y los cortes de implementación siguen pendientes. Ver `sdd/reviews/20260927-posc000-dual-adr-go.md`.
 
 ## Evidencia de ramas (2026-09-27)
 
 Base común `5d28a76`. Desde esa base, `origin/integration/storecore-int` contiene 145 commits y `fix/storecore-pos-contract-readiness` 23; esta última tiene además 32 tracked modificados y 97 untracked. Los números describen inventario, no calidad ni completitud. La rama de preparación es fuente de piezas a inspeccionar, no fuente de migraciones para cherry-pick masivo.
 
-**Gate contractual P1:** el YAML integrado y servido por StoreCore tiene SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, que coincide con el pin BlackStore. El YAML dirty de readiness tiene `2AEACCD5E1AA3990CF514DAC5C241DBF6E9420999426C89768FCEF05FDFCB7FD` (+108/-43 líneas) y también dice `1.0.0-draft`. `adr/ADR-001-contract-adjudication.md` propone conservar el baseline integrado y diferir los cambios de SKU 64/128, selector bearer, ETag/304, override, 409, `expiresAt` y reconcile. POSC-000/000A deben revisar esa disposición y validar digest/compatibilidad antes de DTOs o porteo; no se sobreescribe la copia servida por aproximación.
+**Gate contractual P1:** el YAML integrado y servido por StoreCore tiene SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, que coincide con el pin BlackStore. El YAML dirty de readiness tiene `2AEACCD5E1AA3990CF514DAC5C241DBF6E9420999426C89768FCEF05FDFCB7FD` (+108/-43 líneas) y también dice `1.0.0-draft`. `adr/ADR-001-contract-adjudication.md` adjudicó conservar el baseline integrado y diferir los cambios de SKU 64/128, selector bearer, ETag/304, override, 409, `expiresAt` y reconcile. POSC-000A aún debe validar parser/fixtures/digest antes de DTOs o porteo; no se sobreescribe la copia servida por aproximación.
 
 ### Matriz de esquema y ownership
 
@@ -27,7 +27,7 @@ Los nombres de versiones futuras **no se fijan aquí**: se determinan tras leer 
 
 El adapter publicado `BlackStoreIntegrationController` posee las siete rutas de negocio y `/openapi.yaml`. La preparación las reparte entre controladores. Una sustitución es atómica por ruta y no puede registrar ambas clases bajo el mismo contexto Spring.
 
-| Ruta contractual bajo `/blackstore-integration/v1` | Owner publicado | Candidato en preparación | Decisión pendiente / gate |
+| Ruta contractual bajo `/blackstore-integration/v1` | Owner publicado | Destino propuesto por ADR-001 | Gate de porteo pendiente |
 |---|---|---|---|
 | `GET /catalog` | `BlackStoreIntegrationController` | `BlackStoreCatalogController` | Elegir read adapter/cursor; ETag/304, coste por scope y filtro de items; una ruta. |
 | `GET /stock/variants/{variantId}` | mismo | `BlackStoreCatalogController` | `stock:read`, safety stock neto y aislamiento de companion; una ruta. |

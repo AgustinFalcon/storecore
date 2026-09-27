@@ -3,13 +3,13 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_contract_adjudication",
-  "stats": { "total": 9, "done": 0, "by_layer": { "1": 1, "2": 8 } },
+  "status": "ready_for_baseline_contract_harness",
+  "stats": { "total": 9, "done": 1, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
       "id": "TASK-POSC-000",
       "title": "Proponer ADR de adjudicación YAML y adapter owner",
-      "status": "pending",
+      "status": "done",
       "layer": 1,
       "depends_on": [],
       "acceptance_criteria": ["Registrar hashes 7B907...DE30 integrado/servido/pin BlackStore y 2AEAC...B7FD dirty", "Matriz aceptar/rechazar/diferir por SKU, token, ETag, override, 409, expiresAt y reconcile", "Astra revisa V4–V7, ocho rutas incluido OpenAPI y adapter owner candidato"]
