@@ -4,7 +4,7 @@
 - **Feature UUID:** `ef497bb4-6121-4c83-928b-61067485dca0`
 - **Status:** `ready_for_baseline_contract_harness` (POSC-000 documental done con doble GO Astra; POSC-000A pendiente; sin aprobación de porteo)
 - **Mode / stack:** standard / backend Kotlin-Spring Boot, PostgreSQL 16, Flyway
-- **Snapshot de redacción inicial:** `origin/integration/storecore-int` en `56baa2db2d6fabbd683ce41459414c556cb5246d`. **Head de adjudicación:** `73367fa8711ac1d2e95397ec25c98eb9e20d7ad9`; worktree documental rebasado sobre `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5` (2026-09-27). El delta hasta `b6f37df` no cambió YAML POS, Flyway ni este WIP; revalidar head antes de POSC-000A o migraciones.
+- **Snapshot de redacción inicial:** `origin/integration/storecore-int` en `56baa2db2d6fabbd683ce41459414c556cb5246d`. **Head de adjudicación:** `73367fa8711ac1d2e95397ec25c98eb9e20d7ad9`; snapshot revisado sobre `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5` (2026-09-27). **Base actual de la rama documental:** `d6a30832112064ca08300126ea568ccaaf7f784c` tras #58, que sólo registró documentación LT5. El delta de `b6f37df` a `d6a3083` no cambió YAML POS, Flyway ni este WIP; revalidar head antes de POSC-000A o migraciones.
 - **Fuente de comparación, sólo lectura:** `fix/storecore-pos-contract-readiness` en `0f2b21a`, con 32 archivos tracked modificados y 97 untracked al inventariar. No es una rama integrable en bloque.
 - **Contrato funcional de referencia:** `sdd/wip/20260921-storecore-pos-integration-contract-v1/` y su único OpenAPI versionado `1.0.0-draft`; el companion vivo se especifica en BlackStore `blackstore-pilot`. La copia de integración y la copia dirty readiness son divergentes y no se pueden llamar equivalentes.
 

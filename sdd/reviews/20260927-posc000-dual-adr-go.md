@@ -1,6 +1,6 @@
 # POSC-000 — doble review Astra del ADR contractual
 
-**Fecha:** 2026-09-27. **Objeto:** `sdd/wip/20260927-pos-integration-convergence/2-technical/adr/ADR-001-contract-adjudication.md`, frente al contrato integrado `1.0.0-draft`, la copia servida, el pin BlackStore y el worktree readiness sólo lectura. Base de adjudicación `73367fa8711ac1d2e95397ec25c98eb9e20d7ad9`; rama documental rebasada sobre `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5`. El rango entre ambos no cambió archivos POS contractuales ni Flyway.
+**Fecha:** 2026-09-27. **Objeto:** `sdd/wip/20260927-pos-integration-convergence/2-technical/adr/ADR-001-contract-adjudication.md`, frente al contrato integrado `1.0.0-draft`, la copia servida, el pin BlackStore y el worktree readiness sólo lectura. Base de adjudicación `73367fa8711ac1d2e95397ec25c98eb9e20d7ad9`; snapshot revisado sobre `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5`. La rama documental actual parte de `d6a30832112064ca08300126ea568ccaaf7f784c` tras #58 (documentación LT5); el rango desde `b6f37df` no cambió archivos POS contractuales ni Flyway.
 
 ## Veredictos
 
