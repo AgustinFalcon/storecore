@@ -1,6 +1,6 @@
 # Plan de convergencia POS — gates secuenciales
 
-Este plan está en `ready_for_posc001_spec_review`: POSC-000 cerró la adjudicación documental y POSC-000A cerró el parser/fixtures/digest del baseline con dos GO Astra (2/9 tareas done; `sdd/reviews/20260927-posc000a-dual-contract-go.md`). POSC-001 requiere review y GO propios antes de implementar; los cortes posteriores conservan sus dependencias. Cada corte futuro puede prepararse en PR independiente hacia `integration/storecore-int`, con revisión documental/código correspondiente y sin merge prematuro. El head, Flyway, YAML y árbol de controladores se vuelven a inventariar antes de cada PR. PIC-006A conserva su alcance de lectura; PIC-008A histórico (SKU 128/129) queda pendiente al conservar baseline 64/65 y ningún subcorte se sustituye con el harness PG16 general.
+Este plan está en `ready_for_posc001_test_only_implementation`: POSC-000 cerró la adjudicación documental y POSC-000A cerró el parser/fixtures/digest del baseline (2/9 tareas done). POSC-001 obtuvo dos GO Astra sobre la propuesta corregida para implementar sólo el harness test-only (`sdd/reviews/20260927-posc001-dual-spec-go.md`); los cortes posteriores conservan sus dependencias y gates. Cada corte futuro puede prepararse en PR independiente hacia `integration/storecore-int`, con revisión documental/código correspondiente y sin merge prematuro. El head, Flyway, YAML y árbol de controladores se vuelven a inventariar antes de cada PR. PIC-006A conserva su alcance de lectura; PIC-008A histórico (SKU 128/129) queda pendiente al conservar baseline 64/65 y ningún subcorte se sustituye con el harness PG16 general.
 
 ## Corte 0 — adjudicación contractual y ownership (POSC-000, done documental)
 
@@ -12,7 +12,7 @@ El harness validó el YAML integrado con **parser OpenAPI 3.1 y fixtures sólo d
 
 ## Corte 1 — harness PG16 de integración separado (POSC-001)
 
-Revisar primero `2-technical/posc001-harness-proposal.md` y obtener GO propio. Montar pruebas de mapa de rutas, Flyway PG16 limpio + upgrade V1–V7 con datos, roles efectivos del baseline, concurrencia e idempotencia. Evitar mocks que oculten persistencia/ACL. Validar que el harness falla de manera controlada antes de usarlo como gate de cada delta. El worker aún no tiene rol DB propio en V1–V7: registrar esa brecha sin adelantar POSC-004A. **Salida:** evidencia reproducible del baseline y escenarios nuevos; no se atribuye a PIC-008A ni PIC-006A.
+La propuesta `2-technical/posc001-harness-proposal.md` recibió doble GO Astra para un PR test-only. Montar pruebas de mapa de rutas, Flyway PG16 limpio + upgrade V1–V7 con datos, roles efectivos del baseline, concurrencia e idempotencia. Evitar mocks que oculten persistencia/ACL. Validar que el harness falla de manera controlada antes de usarlo como gate de cada delta. El worker aún no tiene rol DB propio en V1–V7: registrar esa brecha sin adelantar POSC-004A. **Salida:** evidencia reproducible del baseline y escenarios nuevos; no se atribuye a PIC-008A ni PIC-006A. La aprobación documental no sustituye la review del código ni los tests ejecutados.
 
 ## Corte 2 — identidad, capability y ACL
 

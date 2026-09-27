@@ -1,6 +1,6 @@
 # Especificación funcional — convergencia POS offline
 
-**Gate vigente:** POSC-000 cerró ADR-001 documentalmente y POSC-000A obtuvo doble GO Astra para parser, fixtures y digest del baseline (`sdd/reviews/20260927-posc000a-dual-contract-go.md`). POSC-001 está pendiente de revisión de spec; no hay GO de porteo productivo, Flyway, adapter live ni cierre del WIP.
+**Gate vigente:** POSC-000 cerró ADR-001 documentalmente, POSC-000A obtuvo doble GO Astra para el baseline y POSC-001 obtuvo doble GO Astra sólo para implementar el harness test-only (`sdd/reviews/20260927-posc001-dual-spec-go.md`). No hay GO de porteo productivo, Flyway, adapter live ni cierre del WIP.
 
 ## Problema y resultado esperado
 

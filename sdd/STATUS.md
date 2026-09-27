@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `6ebab95`
+**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `3df741c`
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
@@ -37,7 +37,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 ## WIP POS (paralelo, no es el baseline)
 
 - `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 tienen evidencia **local histórica**; HTTP 200/304/409/410/429 y outbox se probaron en Testcontainers con activación temporal, y el módulo vuelve a DISABLED. PR #19 quedó en `master` (`18d18f7`) con dos reviews Grok; su Verify no fue CI verde. El worktree posterior de readiness divergió de integración y requiere convergencia documental y port por partes: POS/conector live sigue NO-GO. El WIP permanece abierto; tampoco hay GO fiscal, MP-LIVE-05 ni `sdd.finish`. BlackStore ADP-001..010 + L3 tienen evidencia en su propio repo; su release permanece disabled, sin companion live.
-- `sdd/wip/20260927-pos-integration-convergence/` — plan de convergencia integrado por PR #56 (`73367fa`). La decisión contractual POSC-000 recibió dos GO Astra y se integró por PR #59 (`6ebab95`): 1/9 tareas done. POSC-000A (parser, fixtures y digest del baseline OpenAPI) sigue pending antes del porteo; el PIC-008A histórico no queda acreditado por esa validación. `BLACKSTORE_INTEGRATION` permanece `DISABLED`, sin conector live ni cierre SDD.
+- `sdd/wip/20260927-pos-integration-convergence/` — plan de convergencia integrado por PR #56 (`73367fa`). POSC-000 recibió dos GO Astra y se integró por PR #59 (`6ebab95`). POSC-000A (parser OpenAPI 3.1, fixtures y digest reproducible del baseline) pasó 30 suites/135 tests locales y dos reviews Astra; PR #61 (`3df741c`) lo integró: 2/9 tareas done. POSC-001 recibió doble GO Astra documental para implementar sólo el harness PG16; todavía no hay código ni evidencia de ese corte. PIC-008A histórico no queda acreditado; `BLACKSTORE_INTEGRATION` permanece `DISABLED`, sin conector live ni cierre SDD. Verify alojado de #61 falló con `steps=[]`, no es CI verde.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
