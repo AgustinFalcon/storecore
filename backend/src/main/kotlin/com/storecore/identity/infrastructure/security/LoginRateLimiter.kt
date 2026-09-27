@@ -23,6 +23,7 @@ class LoginRateLimiter(
         IdentityRealm.entries.forEach { put(it, LinkedHashMap()) }
     }
     private val window = Duration.ofMinutes(15).toMillis()
+    private var lastObservedMillis: Long? = null
 
     init {
         require(maxBucketsPerRealm > 0) { "maxBucketsPerRealm must be positive" }
@@ -30,9 +31,9 @@ class LoginRateLimiter(
 
     @Synchronized
     fun checkAllowed(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
+        val now = effectiveNow()
         val realmBuckets = bucketsByRealm.getValue(realm)
         val key = key(realm, sourceIp, canonicalEmail)
-        val now = clock.millis()
         val bucket = realmBuckets[key]
         if (bucket != null) {
             prune(bucket, now)
@@ -53,12 +54,13 @@ class LoginRateLimiter(
 
     @Synchronized
     fun recordFailure(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
+        val now = effectiveNow()
         val realmBuckets = bucketsByRealm.getValue(realm)
         val key = key(realm, sourceIp, canonicalEmail)
-        val now = clock.millis()
         val bucket = realmBuckets[key]
         if (bucket != null) {
             prune(bucket, now)
+            while (bucket.failures.size >= MAX_FAILURES) bucket.failures.removeFirst()
             bucket.failures.addLast(now)
             return
         }
@@ -87,6 +89,13 @@ class LoginRateLimiter(
 
     private fun prune(bucket: Bucket, now: Long) {
         while (bucket.failures.isNotEmpty() && now - bucket.failures.first >= window) bucket.failures.removeFirst()
+    }
+
+    private fun effectiveNow(): Long {
+        val wallNow = clock.millis()
+        val effectiveNow = lastObservedMillis?.let { maxOf(wallNow, it) } ?: wallNow
+        lastObservedMillis = effectiveNow
+        return effectiveNow
     }
 
     private fun retryAfter(expiryMillis: Long, now: Long): Long {
