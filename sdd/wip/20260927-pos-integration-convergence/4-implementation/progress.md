@@ -1,7 +1,8 @@
 # Progreso — convergencia POS sobre integración
 
-- **Estado:** `ready_for_baseline_contract_harness`.
-- **Base documental:** `origin/integration/storecore-int` `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5` (2026-09-27); YAML canónico y servido `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, igual al pin BlackStore.
-- **Tareas:** 1/9 done. `TASK-POSC-000` cerró sólo la decisión documental ADR-001 con doble GO Astra; ver `sdd/reviews/20260927-posc000-dual-adr-go.md`. `TASK-POSC-000A` sigue pending.
-- **Siguiente gate:** parser OpenAPI 3.1 y fixtures del baseline integrado, incluidos SKU 64/65 y schema reconcile 1..500 sin `uniqueItems`; cotejo de bytes, copia servida y pin. La deduplicación ejecutada por el adapter se prueba luego en PIC-006A. PIC-008A dirty 128/129 no se acredita.
-- **Código:** ningún controller, port, Flyway, permiso, worker, conector ni cliente cambió por POSC-000. Destinos de ruta del ADR son propuesta de porteo; POSC-001..006 siguen gated. `BLACKSTORE_INTEGRATION` permanece `DISABLED`.
+- **Estado:** `ready_for_posc001_spec_review`.
+- **Base de POSC-000A:** `882e42ffb549e28ff8e1d05a44c3cdc55ec23524` (2026-09-27); YAML canónico y recurso servido con SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, igual al pin BlackStore. `.gitattributes` fija CRLF para ambos YAML, preservando el digest de bytes.
+- **Tareas:** 2/9 done. `TASK-POSC-000` cerró ADR-001 documental. `TASK-POSC-000A` agregó un harness offline: parser OpenAPI 3.1.0, siete operaciones, fixtures de SKU 64/65, 409 por endpoint, 410, GET PENDING/404, oneOf, ETag/304 y reconcile 1..500 con duplicados permitidos a nivel schema. Dos Astra dieron GO acotado; ver `sdd/reviews/20260927-posc000a-dual-contract-go.md`.
+- **Verificación local:** `cd backend; mvn -q test` sobre esa base con 30 suites, 135 tests, cero failures/errors/skips. El harness POSC-000A tiene seis tests; la suite total incluye pruebas PG16 preexistentes, pero POSC-000A no las reclama como evidencia propia.
+- **Siguiente gate:** revisar la propuesta POSC-001 de mapa Spring, Flyway PG16 clean+upgrade con datos, roles efectivos y falla controlada del harness (`2-technical/posc001-harness-proposal.md`). No hay todavía GO de implementación para POSC-001. La deduplicación efectiva de reconcile se prueba en PIC-006A; PIC-008A dirty 128/129 no se acredita.
+- **Código:** POSC-000A modificó sólo dependencias de test, tests/fixture de pin y reglas de line endings. Ningún controller, port, Flyway, permiso, worker, conector ni cliente cambió. Los destinos de ruta del ADR siguen como propuesta. `BLACKSTORE_INTEGRATION` permanece `DISABLED`.

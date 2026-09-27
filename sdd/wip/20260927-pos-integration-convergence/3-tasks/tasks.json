@@ -3,8 +3,8 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_baseline_contract_harness",
-  "stats": { "total": 9, "done": 1, "by_layer": { "1": 1, "2": 8 } },
+  "status": "ready_for_posc001_spec_review",
+  "stats": { "total": 9, "done": 2, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
       "id": "TASK-POSC-000",
@@ -17,7 +17,7 @@
     {
       "id": "TASK-POSC-000A",
       "title": "Harness contractual baseline inspirado en PIC-008A (sin cerrar el histórico)",
-      "status": "pending",
+      "status": "done",
       "layer": 2,
       "depends_on": ["TASK-POSC-000"],
       "acceptance_criteria": ["Validar YAML integrado por parser OpenAPI 3.1 y fixtures que el baseline declara: SKU 64/65, statuses/code, 409 por endpoint, 410, GET PENDING/ausencia, ETag, lineFailures y OneOf", "Registrar SHA-256 exacto y coincidencia con copia servida y pin BlackStore; no mezclar precedencia/if-then/ETag exacto dirty", "Resolver ADR/version/digest baseline sin re-pin; PIC-008A dirty SKU 128/129 sigue pendiente/diferido; sin PG16, endpoint ni cliente"]
@@ -25,7 +25,7 @@
     {
       "id": "TASK-POSC-001",
       "title": "Harness PG16 general de integración, separado de PIC-008A/006A",
-      "status": "blocked_by_contract_gate",
+      "status": "pending_spec_review",
       "layer": 2,
       "depends_on": ["TASK-POSC-000A"],
       "acceptance_criteria": ["Migración limpia y upgrade V1–V7 con datos", "Mapa Spring de rutas sin duplicados", "Pruebas fail-closed, idempotencia, concurrencia, roles y tombstone reproducibles sin credenciales live"]
@@ -33,7 +33,7 @@
     {
       "id": "TASK-POSC-002",
       "title": "Portar deltas de identidad companion, capability y ACL",
-      "status": "blocked_by_contract_gate",
+      "status": "blocked_by_predecessor_gate",
       "layer": 2,
       "depends_on": ["TASK-POSC-001"],
       "acceptance_criteria": ["Migraciones nuevas y aditivas sin modificar V1–V7", "0..1 companion y revocación/rotación de credencial seguras", "Pruebas PG16 positivas y negativas para scopes y roles"]
@@ -41,7 +41,7 @@
     {
       "id": "TASK-POSC-003",
       "title": "Portar catálogo, stock read y reserva Tx-A/Tx-B",
-      "status": "blocked_by_contract_gate",
+      "status": "blocked_by_predecessor_gate",
       "layer": 2,
       "depends_on": ["TASK-POSC-002"],
       "acceptance_criteria": ["Un handler por cada ruta portada", "Cursor/ETag/304 y stock sellable correctos", "Una cuádruple, una reserva y respuesta coherente en retries/concurrencia"]
@@ -49,7 +49,7 @@
     {
       "id": "TASK-POSC-004",
       "title": "Portar commit, release y GET/reconcile sobre adapter elegido",
-      "status": "blocked_by_contract_gate",
+      "status": "blocked_by_predecessor_gate",
       "layer": 2,
       "depends_on": ["TASK-POSC-003"],
       "acceptance_criteria": ["Un solo STOCK_COMMIT_EXTERNAL y cero SALE en StoreCore", "Un handler por GET/reconcile y 410 tombstone; falta PIC-006A para certificar RO", "Bridge #52 conserva NOT_ELIGIBLE y cero LISTING_STOCK/desired_quantity directos nuevos"]
@@ -57,7 +57,7 @@
     {
       "id": "TASK-POSC-004A",
       "title": "Worker EXTERNAL_BLACKSTORE, retry/poison y purge con privilegio mínimo",
-      "status": "blocked_by_contract_gate",
+      "status": "blocked_by_predecessor_gate",
       "layer": 2,
       "depends_on": ["TASK-POSC-004"],
       "acceptance_criteria": ["WEB/PIC owner separados y carrera commit/expire/WEB sin doble descuento", "Purge tombstone >=7y antes de retry/lines/saga con rollback/race; ledger/audit intactos", "Worker-only función/rol y revocación DELETE runtime sin romper PENDING; ACL positiva/negativa PG16"]
@@ -65,7 +65,7 @@
     {
       "id": "TASK-POSC-005",
       "title": "Cerrar wire/topología y review offline",
-      "status": "blocked_by_contract_gate",
+      "status": "blocked_by_predecessor_gate",
       "layer": 2,
       "depends_on": ["TASK-POSC-004A", "TASK-POSC-006"],
       "acceptance_criteria": ["BaseResponse/OpenAPI/headers/rate limits coherentes", "Siete rutas únicas y openapi.yaml servido", "Dos reviews de código independientes sin P0–P2 abiertos y suite PG16 sobre SHA final"]

@@ -1,12 +1,12 @@
 # Diseño técnico — inventario y cortes de convergencia
 
-**Estado:** `ready_for_baseline_contract_harness`. ADR-001 adjudicó el contrato de trabajo con doble GO Astra para POSC-000; POSC-000A y los cortes de implementación siguen pendientes. Ver `sdd/reviews/20260927-posc000-dual-adr-go.md`.
+**Estado:** `ready_for_posc001_spec_review`. ADR-001 adjudicó el contrato de trabajo y POSC-000A validó el baseline con doble GO Astra. POSC-001 está pendiente de review de spec; los cortes de porteo siguen gated. Ver `sdd/reviews/20260927-posc000a-dual-contract-go.md`.
 
 ## Evidencia de ramas (2026-09-27)
 
 Base común `5d28a76`. Desde esa base, `origin/integration/storecore-int` contiene 145 commits y `fix/storecore-pos-contract-readiness` 23; esta última tiene además 32 tracked modificados y 97 untracked. Los números describen inventario, no calidad ni completitud. La rama de preparación es fuente de piezas a inspeccionar, no fuente de migraciones para cherry-pick masivo.
 
-**Gate contractual P1:** el YAML integrado y servido por StoreCore tiene SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, que coincide con el pin BlackStore. El YAML dirty de readiness tiene `2AEACCD5E1AA3990CF514DAC5C241DBF6E9420999426C89768FCEF05FDFCB7FD` (+108/-43 líneas) y también dice `1.0.0-draft`. `adr/ADR-001-contract-adjudication.md` adjudicó conservar el baseline integrado y diferir los cambios de SKU 64/128, selector bearer, ETag/304, override, 409, `expiresAt` y reconcile. POSC-000A aún debe validar parser/fixtures/digest antes de DTOs o porteo; no se sobreescribe la copia servida por aproximación.
+**Gate contractual P1:** el YAML integrado y servido por StoreCore tiene SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, que coincide con el pin BlackStore. El YAML dirty de readiness tiene `2AEACCD5E1AA3990CF514DAC5C241DBF6E9420999426C89768FCEF05FDFCB7FD` (+108/-43 líneas) y también dice `1.0.0-draft`. `adr/ADR-001-contract-adjudication.md` adjudicó conservar el baseline integrado y diferir los cambios de SKU 64/128, selector bearer, ETag/304, override, 409, `expiresAt` y reconcile. POSC-000A validó parser/fixtures/digest sobre `882e42ffb549e28ff8e1d05a44c3cdc55ec23524`; los DTOs y el porteo aún dependen de sus propios gates.
 
 ### Matriz de esquema y ownership
 
