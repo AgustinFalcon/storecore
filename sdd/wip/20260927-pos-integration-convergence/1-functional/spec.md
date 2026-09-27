@@ -1,12 +1,12 @@
 # Especificación funcional — convergencia POS offline
 
-**Gate vigente:** dos reviews Astra dieron GO documental sólo para preparar POSC-000 y POSC-000A (`sdd/reviews/20260927-pos-convergence-dual-documentary-go.md`). Ambos siguen pendientes; este dictamen no aprueba porteo productivo, Flyway, adapter live ni cierre del WIP.
+**Gate vigente:** el GO documental inicial permitió preparar POSC-000/000A (`sdd/reviews/20260927-pos-convergence-dual-documentary-go.md`). Dos re-reviews Astra aprobaron ADR-001 y cerraron POSC-000 a nivel documental (`sdd/reviews/20260927-posc000-dual-adr-go.md`). POSC-000A sigue pendiente; no hay GO de porteo productivo, Flyway, adapter live ni cierre del WIP.
 
 ## Problema y resultado esperado
 
 La línea de integración ya expone el contrato `/blackstore-integration/v1` mediante un adapter monolítico y migraciones V5–V7. La rama de preparación POS desarrolló módulos hexagonales, controles de identidad, catálogo, reserva y lectura de recuperación sobre otra secuencia Flyway V4–V7. Copiarla completa haría que un número de migración publicado significara dos cosas y registraría dos handlers para las mismas rutas.
 
-El resultado de esta convergencia es **una** implementación offline de un contrato adjudicado en integración, con la historia existente preservada y evidencia reproducible en una instalación limpia y una existente. Hoy hay dos contenidos YAML bajo `1.0.0-draft`: la copia integrada que BlackStore tiene pinneada y una copia dirty más reciente con cambios de wire. Hasta decidir su compatibilidad y digest, no se portean DTOs, endpoints ni transporte. La cuádruple, el ledger `EXTERNAL_BLACKSTORE`, la lectura read-only de reconcile y la semántica 410 de tombstone permanecen requisitos de negocio; cualquier cambio de wire requiere decisión explícita.
+El resultado de esta convergencia es **una** implementación offline de un contrato adjudicado en integración, con la historia existente preservada y evidencia reproducible en una instalación limpia y una existente. Hay dos contenidos YAML bajo `1.0.0-draft`: la copia integrada que BlackStore tiene pinneada y una copia dirty más reciente con cambios de wire. ADR-001 conservó la copia integrada y difirió el wire dirty; POSC-000A aún debe validar parser/fixtures/digest antes de portar DTOs, endpoints o transporte. La cuádruple, el ledger `EXTERNAL_BLACKSTORE`, la lectura read-only de reconcile y la semántica 410 de tombstone permanecen requisitos de negocio; cualquier cambio de wire requiere decisión explícita.
 
 ## Reglas de producto
 
