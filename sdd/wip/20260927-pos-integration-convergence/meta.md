@@ -2,7 +2,7 @@
 
 - **Feature id:** `20260927-pos-integration-convergence`
 - **Feature UUID:** `ef497bb4-6121-4c83-928b-61067485dca0`
-- **Status:** `ready_for_posc001_test_only_implementation` (POSC-000 y POSC-000A done; POSC-001 con doble GO Astra para harness test-only; sin aprobación de porteo)
+- **Status:** `ready_for_posc002_spec_review` (POSC-000/000A/001 done; POSC-002 pendiente de review documental, sin GO de código ni DDL)
 - **Mode / stack:** standard / backend Kotlin-Spring Boot, PostgreSQL 16, Flyway
 - **Snapshot de redacción inicial:** `origin/integration/storecore-int` en `56baa2db2d6fabbd683ce41459414c556cb5246d`. **Head de adjudicación:** `73367fa8711ac1d2e95397ec25c98eb9e20d7ad9`; snapshot revisado sobre `b6f37df5b9f1ef41e2af194f08a457a25fdcc2c5` (2026-09-27). **Base de implementación POSC-000A:** `882e42ffb549e28ff8e1d05a44c3cdc55ec23524`. Revalidar head antes de migraciones.
 - **Fuente de comparación, sólo lectura:** `fix/storecore-pos-contract-readiness` en `0f2b21a`, con 32 archivos tracked modificados y 97 untracked al inventariar. No es una rama integrable en bloque.
@@ -16,11 +16,11 @@ Planificar la incorporación segura de la evidencia POS local a la historia Flyw
 
 | Fase | Estado |
 |---|---|
-| 1 — Functional Spec | `posc001_spec_reviewed` |
-| 2 — Technical Spec | `posc001_spec_reviewed` |
-| 3 — Tasks | `posc001_ready_for_test_only_implementation` |
-| 4 — Implementation | `posc000a_done_posc001_not_started` |
+| 1 — Functional Spec | `posc002_pending_spec_review` |
+| 2 — Technical Spec | `posc002_pending_spec_review` |
+| 3 — Tasks | `posc002_pending_spec_review` |
+| 4 — Implementation | `posc001_test_only_done_posc002_not_started` |
 
 ## Gates
 
-Dos revisores Astra dieron GO documental a POSC-000 y GO acotado al harness offline de POSC-000A: 2/9 tareas done. Tras corregir cuatro gaps de la propuesta PG16, ambos dieron GO documental a POSC-001 exclusivamente para implementar un harness test-only (`sdd/reviews/20260927-posc001-dual-spec-go.md`). Su código y sus pruebas aún no existen en este corte; faltan evidencia PG16 y GO propio para cada corte de porteo. Los controllers especializados son destinos propuestos, no owners activos; autenticación compatible, backfill de owner, receipts históricos y filtro OpenAPI conservan gates explícitos. POSC-000A no cierra PIC-008A histórico; POSC-006 valida GET/reconcile read-only PG16 por proxy Spring después de POSC-004A. `BLACKSTORE_INTEGRATION` permanece `DISABLED`; no hay conector live, fiscal ni `sdd.finish` por este WIP.
+Dos revisores Astra dieron GO documental a POSC-000/000A y a la propuesta test-only de POSC-001. El harness PG16 se implementó sobre la base `01a5bea779b0be498ea678af21db343edc821e94`, pasó 32 suites/142 tests locales y obtuvo dos GO Astra de código después de corregir dos P2 (`sdd/reviews/20260927-posc001-dual-code-go.md`): 3/9 tareas done. POSC-002 pasa sólo a review de spec; faltan GO propios para código/DDL y para cada corte posterior. Los controllers especializados son destinos propuestos, no owners activos; autenticación compatible, backfill de owner, receipts históricos y filtro OpenAPI conservan gates explícitos. POSC-001 no cierra PIC-008A ni PIC-006A; POSC-006 valida GET/reconcile read-only PG16 por proxy Spring después de POSC-004A. `BLACKSTORE_INTEGRATION` permanece `DISABLED`; no hay conector live, fiscal ni `sdd.finish` por este WIP.

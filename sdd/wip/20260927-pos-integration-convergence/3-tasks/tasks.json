@@ -3,8 +3,8 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_posc001_test_only_implementation",
-  "stats": { "total": 9, "done": 2, "by_layer": { "1": 1, "2": 8 } },
+  "status": "ready_for_posc002_spec_review",
+  "stats": { "total": 9, "done": 3, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
       "id": "TASK-POSC-000",
@@ -25,7 +25,7 @@
     {
       "id": "TASK-POSC-001",
       "title": "Harness PG16 general de integración, separado de PIC-008A/006A",
-      "status": "ready_for_implementation",
+      "status": "done",
       "layer": 2,
       "depends_on": ["TASK-POSC-000A"],
       "acceptance_criteria": ["Migración limpia y upgrade V1–V7 con datos", "Mapa Spring de rutas sin duplicados", "Pruebas fail-closed, idempotencia, concurrencia, roles y tombstone reproducibles sin credenciales live"]
@@ -33,7 +33,7 @@
     {
       "id": "TASK-POSC-002",
       "title": "Portar deltas de identidad companion, capability y ACL",
-      "status": "blocked_by_predecessor_gate",
+      "status": "pending_spec_review",
       "layer": 2,
       "depends_on": ["TASK-POSC-001"],
       "acceptance_criteria": ["Migraciones nuevas y aditivas sin modificar V1–V7", "0..1 companion y revocación/rotación de credencial seguras", "Pruebas PG16 positivas y negativas para scopes y roles"]

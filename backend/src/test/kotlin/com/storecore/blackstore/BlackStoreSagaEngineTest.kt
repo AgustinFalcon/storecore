@@ -17,9 +17,11 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.TimeoutException
 
 class BlackStoreSagaEngineTest {
     companion object {
@@ -82,6 +84,40 @@ class BlackStoreSagaEngineTest {
             assertEquals(false, it.retryable)
         }
         assertEquals("COMMITTED", engine.get(q).state)
+    }
+
+    @Test
+    fun `commit replay preserves full receipt ledger balances saga and reservation rows`() {
+        val seeded = seedVariant("SKU-REPLAY-${UUID.randomUUID()}", available = 9, safety = 1)
+        val q = quadruple()
+        val reserved = engine.reserve(q, seeded.catalogVersion, seeded.line(2))
+        val committed = engine.commit(q)
+
+        assertEquals("COMMITTED", committed.state)
+        assertTrue(committed.receipt != null)
+        assertEquals(BlackStoreSagaPolicy.reservationRefFor(q), committed.reservationRef)
+        assertEquals("CONSUMED", reservationStatus(q, seeded.variantId))
+        val ledgerBeforeReplay = completeLedgerSnapshot(q)
+        val balancesBeforeReplay = balanceSnapshot(seeded.variantId)
+        val sagaBeforeReplay = operationSnapshot(q)
+        val reservationsBeforeReplay = reservationSnapshot(q)
+        assertEquals(2, ledgerBeforeReplay.size)
+        assertEquals(1, reservationsBeforeReplay.size)
+
+        val replayed = engine.commit(q)
+
+        assertEquals(committed, replayed)
+        assertEquals(committed.receipt, replayed.receipt)
+        assertEquals(committed.reservationRef, replayed.reservationRef)
+        assertEquals(ledgerBeforeReplay, completeLedgerSnapshot(q))
+        assertEquals(balancesBeforeReplay, balanceSnapshot(seeded.variantId))
+        assertEquals(sagaBeforeReplay, operationSnapshot(q))
+        assertEquals(reservationsBeforeReplay, reservationSnapshot(q))
+        assertEquals("COMMITTED", engine.get(q).state)
+        assertEquals(1, reservationCount(q, seeded.variantId, "CONSUMED"))
+        assertEquals(7, availableQty(seeded.variantId))
+        assertEquals(0, reservedQty(seeded.variantId))
+        assertEquals(6, sellable(seeded.variantId))
     }
 
     @Test
@@ -213,23 +249,33 @@ class BlackStoreSagaEngineTest {
         val q = quadruple()
         val pool = Executors.newFixedThreadPool(2)
         val start = CountDownLatch(1)
-        val receipts = ConcurrentLinkedQueue<String>()
-        val errors = ConcurrentLinkedQueue<String>()
-        repeat(2) {
-            pool.submit {
-                start.await()
-                try {
-                    receipts += engine.reserve(q, seeded.catalogVersion, seeded.line(2)).receipt!!
-                } catch (ex: Exception) {
-                    errors += (ex.message ?: ex.javaClass.simpleName)
+        val futures = mutableListOf<Future<SagaAttempt<BlackStoreOperationReceipt>>>()
+        val attempts = try {
+            repeat(2) {
+                futures += pool.submit<SagaAttempt<BlackStoreOperationReceipt>> {
+                    start.await()
+                    captureSagaAttempt { engine.reserve(q, seeded.catalogVersion, seeded.line(2)) }
                 }
             }
+            start.countDown()
+            awaitEveryFuture(futures).map { it as SagaAttempt<BlackStoreOperationReceipt> }
+        } finally {
+            start.countDown()
+            pool.shutdownNow()
+            assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS), "reserve executor did not terminate")
         }
-        start.countDown()
-        pool.shutdown()
-        assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS))
-        assertTrue(errors.isEmpty() || errors.all { it == "CONFLICT" })
+
+        val receipts = attempts.filterIsInstance<SagaAttempt.Success<BlackStoreOperationReceipt>>()
+            .map { it.value.receipt!! }
+        val businessErrors = attempts.filterIsInstance<SagaAttempt.BusinessError>().map { it.code }
+        assertTrue(receipts.isNotEmpty(), "at least one identical reserve request must succeed")
+        assertTrue(businessErrors.all { it in setOf("CONFLICT") }, "unexpected reserve errors: $businessErrors")
         assertEquals(1, receipts.distinct().size)
+        assertEquals("RESERVED", operationState(q))
+        assertEquals(1, reservationLineCount(q, seeded.variantId))
+        assertEquals(1, reservationCount(q, seeded.variantId, "ACTIVE"))
+        assertEquals(listOf("RESERVATION" to -2), ledgerEvents(q))
+        assertEquals(4, availableQty(seeded.variantId))
         assertEquals(2, reservedQty(seeded.variantId))
         assertEquals(4, sellable(seeded.variantId))
     }
@@ -242,30 +288,75 @@ class BlackStoreSagaEngineTest {
         jdbc.update("UPDATE blackstore_integration_operations SET expires_at = now() - interval '1 second' WHERE operation_id=?", q.operationId)
         val pool = Executors.newFixedThreadPool(2)
         val start = CountDownLatch(1)
-        val states = ConcurrentLinkedQueue<String>()
-        pool.submit {
-            start.await()
-            try {
-                states += engine.commit(q).state
-            } catch (ex: BlackStoreSagaException) {
-                states += ex.message!!
+        val futures = mutableListOf<Future<*>>()
+        val outcomes = try {
+            futures += pool.submit<SagaAttempt<BlackStoreOperationReceipt>> {
+                start.await()
+                captureSagaAttempt { engine.commit(q) }
             }
+            futures += pool.submit<Int> {
+                start.await()
+                engine.expireDue(100)
+            }
+            start.countDown()
+            awaitEveryFuture(futures)
+        } finally {
+            start.countDown()
+            pool.shutdownNow()
+            assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS), "commit/expire executor did not terminate")
         }
-        pool.submit {
-            start.await()
-            engine.expireDue(100)
-            states += engine.get(q).state
-        }
-        start.countDown()
-        pool.shutdown()
-        assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS))
+
+        @Suppress("UNCHECKED_CAST")
+        val commitAttempt = outcomes[0] as SagaAttempt<BlackStoreOperationReceipt>
+        val expiredCount = outcomes[1] as Int
+        val commitBusinessErrors = listOfNotNull((commitAttempt as? SagaAttempt.BusinessError)?.code)
+        assertTrue(commitBusinessErrors.all { it in setOf("EXPIRED") }, "unexpected commit errors: $commitBusinessErrors")
+        val committedReceipt = (commitAttempt as? SagaAttempt.Success<BlackStoreOperationReceipt>)?.value
+        if (committedReceipt != null) assertEquals("COMMITTED", committedReceipt.state)
+        assertTrue(expiredCount in 0..1, "expiry worker may expire at most this one operation")
+
         val terminal = engine.get(q).state
         assertTrue(terminal == "COMMITTED" || terminal == "EXPIRED", terminal)
+        assertEquals(terminal == "EXPIRED", expiredCount == 1)
+        assertEquals(terminal, operationState(q))
+        assertEquals(1, reservationLineCount(q, seeded.variantId))
         assertEquals(0, reservedQty(seeded.variantId))
         if (terminal == "COMMITTED") {
+            assertEquals(3, availableQty(seeded.variantId))
             assertEquals(3, sellable(seeded.variantId))
+            assertEquals(1, reservationCount(q, seeded.variantId, "CONSUMED"))
+            assertEquals(listOf("RESERVATION" to -2, "STOCK_COMMIT_EXTERNAL" to -2), ledgerEvents(q))
+
+            val ledgerBeforeReplay = ledgerEvents(q)
+            val availableBeforeReplay = availableQty(seeded.variantId)
+            val reservedBeforeReplay = reservedQty(seeded.variantId)
+            val reservationStatusBeforeReplay = reservationStatus(q, seeded.variantId)
+            assertEquals("COMMITTED", engine.commit(q).state)
+            assertEquals(ledgerBeforeReplay, ledgerEvents(q))
+            assertEquals(availableBeforeReplay, availableQty(seeded.variantId))
+            assertEquals(reservedBeforeReplay, reservedQty(seeded.variantId))
+            assertEquals(reservationStatusBeforeReplay, reservationStatus(q, seeded.variantId))
         } else {
+            assertEquals(5, availableQty(seeded.variantId))
             assertEquals(5, sellable(seeded.variantId))
+            assertEquals(1, reservationCount(q, seeded.variantId, "EXPIRED"))
+            assertEquals(listOf("RESERVATION" to -2, "RELEASE" to 2), ledgerEvents(q))
+            val error = assertThrows(BlackStoreSagaException::class.java) { engine.commit(q) }
+            assertEquals("EXPIRED", error.message)
+            assertEquals(listOf("RESERVATION" to -2, "RELEASE" to 2), ledgerEvents(q))
+        }
+    }
+
+    @Test
+    fun `future verifier surfaces an unexpected asynchronous failure`() {
+        val pool = Executors.newSingleThreadExecutor()
+        try {
+            val future = pool.submit<String> { throw IllegalStateException("synthetic unexpected failure") }
+            val failure = assertThrows(AssertionError::class.java) { awaitEveryFuture(listOf(future)) }
+            assertEquals("synthetic unexpected failure", failure.cause?.cause?.message)
+        } finally {
+            pool.shutdownNow()
+            assertTrue(pool.awaitTermination(20, TimeUnit.SECONDS), "synthetic Future executor did not terminate")
         }
     }
 
@@ -369,6 +460,126 @@ class BlackStoreSagaEngineTest {
 
     private fun reservedQty(variantId: Long): Int =
         jdbc.queryForObject("SELECT reserved_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId)!!
+
+    private fun availableQty(variantId: Long): Int =
+        jdbc.queryForObject("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId)!!
+
+    private fun operationState(q: BlackStoreQuadruple): String =
+        jdbc.queryForObject(
+            "SELECT state FROM blackstore_integration_operations WHERE client_instance_id=? AND device_id=? AND sale_id=? AND operation_id=?",
+            String::class.java,
+            q.clientInstanceId,
+            q.deviceId,
+            q.saleId,
+            q.operationId,
+        )!!
+
+    private fun reservationLineCount(q: BlackStoreQuadruple, variantId: Long): Int =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM blackstore_integration_reservation_lines WHERE reservation_ref=? AND variant_id=?",
+            Int::class.java,
+            BlackStoreSagaPolicy.reservationRefFor(q),
+            variantId,
+        )!!
+
+    private fun reservationCount(q: BlackStoreQuadruple, variantId: Long, status: String): Int =
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM inventory_reservations WHERE reservation_saga_key=? AND variant_id=? AND status=?",
+            Int::class.java,
+            BlackStoreSagaPolicy.reservationRefFor(q),
+            variantId,
+            status,
+        )!!
+
+    private fun reservationStatus(q: BlackStoreQuadruple, variantId: Long): String =
+        jdbc.queryForObject(
+            "SELECT status FROM inventory_reservations WHERE reservation_saga_key=? AND variant_id=?",
+            String::class.java,
+            BlackStoreSagaPolicy.reservationRefFor(q),
+            variantId,
+        )!!
+
+    private fun ledgerEvents(q: BlackStoreQuadruple): List<Pair<String, Int>> =
+        jdbc.query(
+            """
+            SELECT l.event_type, l.quantity_delta
+            FROM inventory_ledger l
+            JOIN inventory_reservations r ON r.id = l.reservation_id
+            WHERE r.reservation_saga_key=? AND l.channel='EXTERNAL_BLACKSTORE'
+            ORDER BY l.id
+            """.trimIndent(),
+            { rs, _ -> rs.getString("event_type") to rs.getInt("quantity_delta") },
+            BlackStoreSagaPolicy.reservationRefFor(q),
+        )
+
+    private fun completeLedgerSnapshot(q: BlackStoreQuadruple): List<Map<String, Any>> =
+        jdbc.queryForList(
+            """
+            SELECT l.*
+            FROM inventory_ledger l
+            JOIN inventory_reservations r ON r.id = l.reservation_id
+            WHERE r.reservation_saga_key=?
+            ORDER BY l.id
+            """.trimIndent(),
+            BlackStoreSagaPolicy.reservationRefFor(q),
+        )
+
+    private fun balanceSnapshot(variantId: Long): Map<String, Any> =
+        jdbc.queryForMap("SELECT * FROM inventory_balances WHERE variant_id=?", variantId)
+
+    private fun operationSnapshot(q: BlackStoreQuadruple): Map<String, Any> =
+        jdbc.queryForMap(
+            "SELECT * FROM blackstore_integration_operations WHERE client_instance_id=? AND device_id=? AND sale_id=? AND operation_id=?",
+            q.clientInstanceId,
+            q.deviceId,
+            q.saleId,
+            q.operationId,
+        )
+
+    private fun reservationSnapshot(q: BlackStoreQuadruple): List<Map<String, Any>> =
+        jdbc.queryForList(
+            "SELECT * FROM inventory_reservations WHERE reservation_saga_key=? ORDER BY variant_id",
+            BlackStoreSagaPolicy.reservationRefFor(q),
+        )
+
+    private fun awaitEveryFuture(futures: List<Future<*>>): List<Any?> {
+        val outcomes = mutableListOf<Any?>()
+        val failures = mutableListOf<AssertionError>()
+        var interrupted = false
+        futures.forEachIndexed { index, future ->
+            try {
+                outcomes += future.get(20, TimeUnit.SECONDS)
+            } catch (failure: ExecutionException) {
+                outcomes += null
+                failures += AssertionError("asynchronous task $index failed unexpectedly", failure.cause ?: failure)
+            } catch (failure: TimeoutException) {
+                outcomes += null
+                failures += AssertionError("asynchronous task $index timed out", failure)
+            } catch (failure: InterruptedException) {
+                outcomes += null
+                interrupted = true
+                failures += AssertionError("interrupted while awaiting asynchronous task $index", failure)
+            }
+        }
+        if (interrupted) Thread.currentThread().interrupt()
+        if (failures.isNotEmpty()) {
+            val failure = AssertionError("${failures.size} asynchronous task(s) failed verification", failures.first())
+            failures.drop(1).forEach(failure::addSuppressed)
+            throw failure
+        }
+        return outcomes
+    }
+
+    private inline fun <T> captureSagaAttempt(block: () -> T): SagaAttempt<T> = try {
+        SagaAttempt.Success(block())
+    } catch (failure: BlackStoreSagaException) {
+        SagaAttempt.BusinessError(failure.message ?: failure.javaClass.simpleName)
+    }
+
+    private sealed interface SagaAttempt<out T> {
+        data class Success<T>(val value: T) : SagaAttempt<T>
+        data class BusinessError(val code: String) : SagaAttempt<Nothing>
+    }
 
     private data class Seeded(val productId: Long, val variantId: Long, val sku: String, val catalogVersion: String) {
         fun line(quantity: Int) = listOf(BlackStoreReserveLine(variantId, sku, quantity, "catalog-$productId"))
