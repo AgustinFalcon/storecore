@@ -1,6 +1,6 @@
 # Propuesta POSC-001 — harness PG16 del baseline integrado
 
-**Estado:** `approved_for_test_only_implementation`. Dos revisores Astra dieron GO documental a esta propuesta corregida (`sdd/reviews/20260927-posc001-dual-spec-go.md`). Delimita un PR test-only posterior a POSC-000A para que Luna implemente el harness. No cambia V1–V7, permisos, controllers, workers, OpenAPI ni estado de capability; el GO de spec no acredita tests ejecutados.
+**Estado:** `implemented_test_only`. Dos revisores Astra dieron GO documental a esta propuesta corregida (`sdd/reviews/20260927-posc001-dual-spec-go.md`); el harness posterior pasó tests locales y doble review de código (`sdd/reviews/20260927-posc001-dual-code-go.md`). Delimita sólo el PR test-only POSC-001. No cambia V1–V7, permisos, controllers, workers, OpenAPI ni estado de capability.
 
 ## Alcance verificable
 
