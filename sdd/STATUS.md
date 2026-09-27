@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `dedeb1a`
+**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `6ebab95`
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
@@ -31,12 +31,13 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 ## Backend posterior al baseline core
 
 - **Login USER/CUSTOMER:** `sdd/wip/20260927-login-realm-budget/` tiene TASK-LRB-001–005 completos a nivel local e integrados por PR #50 (`7644feb`). La evidencia de contención y su límite está en `sdd/reviews/20260927-login-limiter-contention-measurement.md`; no representa un SLO de producción. El WIP permanece abierto por sus gates de cierre.
-- **Cota de memoria del login:** `sdd/wip/20260927-login-limiter-top5/` obtuvo dos GO documentales Astra y entró a integración por PR #54 (`dedeb1a`). TASK-LT5-001 está done; TASK-LT5-002–005 requieren implementación, pruebas y dos reviews de código. El GO documental no aprueba el código en desarrollo.
+- **Cota de memoria del login:** `sdd/wip/20260927-login-limiter-top5/` obtuvo dos GO documentales Astra por PR #54 (`dedeb1a`). El código pasó 29 suites/129 pruebas locales y dos reviews Astra; PR #57 se integró como `b6f37df` y PR #58 registró el estado como `d6a3083`. TASK-LT5-001–004 están done (4/5); TASK-LT5-005 sigue pending por los gates de cierre del WIP. Verify alojado del PR #57 falló con `steps=[]`, por lo que no hay CI remoto verde ni `sdd.finish`.
 - **Stock deseado Mercado Libre:** `sdd/wip/20260924-ml-desired-stock-projection/` obtuvo GO documental en TASK-DSP-R00 por PR #51 (`474a007`). TASK-DSP-000A selló el writer PIC-009 y se integró por PR #52 (`56baa2d`); PR #53 (`767e71a`) registró su evidencia. El DAG tiene 3/14 tareas done: 000B y las diez posteriores siguen pendientes. El bridge queda fail-closed, sin red ni activación ML/BlackStore; ver `sdd/reviews/20260927-ml-dsp-000a-pr52-integration.md`.
 
 ## WIP POS (paralelo, no es el baseline)
 
 - `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 tienen evidencia **local histórica**; HTTP 200/304/409/410/429 y outbox se probaron en Testcontainers con activación temporal, y el módulo vuelve a DISABLED. PR #19 quedó en `master` (`18d18f7`) con dos reviews Grok; su Verify no fue CI verde. El worktree posterior de readiness divergió de integración y requiere convergencia documental y port por partes: POS/conector live sigue NO-GO. El WIP permanece abierto; tampoco hay GO fiscal, MP-LIVE-05 ni `sdd.finish`. BlackStore ADP-001..010 + L3 tienen evidencia en su propio repo; su release permanece disabled, sin companion live.
+- `sdd/wip/20260927-pos-integration-convergence/` — plan de convergencia integrado por PR #56 (`73367fa`). La decisión contractual POSC-000 recibió dos GO Astra y se integró por PR #59 (`6ebab95`): 1/9 tareas done. POSC-000A (parser, fixtures y digest del baseline OpenAPI) sigue pending antes del porteo; el PIC-008A histórico no queda acreditado por esa validación. `BLACKSTORE_INTEGRATION` permanece `DISABLED`, sin conector live ni cierre SDD.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
