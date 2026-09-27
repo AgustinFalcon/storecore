@@ -12,6 +12,6 @@ Dos agentes Astra independientes dieron GO al diff de código de esta rama contr
 | TASK-LRB-002 | done | Código y tests locales revisados; preparar PR |
 | TASK-LRB-003 | done | Suite completa: 29 suites / 126 tests locales verdes |
 | TASK-LRB-004 | done | PR #50: dos Astra independientes `APPROVED` sobre `da3b372`; 126 tests locales; CI remoto no verde (`steps=[]`) |
-| TASK-LRB-005 | pending | Medir barrido O(n) en cada clave nueva, monitor compartido y crecimiento de deque |
+| TASK-LRB-005 | done | Nueve corridas crudas y JFR; Astra GO de medición/propuesta. Riesgo de contención registrado, sin optimización ni SLO. |
 
-El cuerpo del PR deja TASK-LRB-005 como seguimiento separado y pendiente. El PR #50 no está mergeado. Integración, promoción a `master`, release y `/sdd.finish` necesitan sus propios gates; ningún estado de este archivo los presupone.
+El PR #50 aún no contiene la evidencia nueva de TASK-LRB-005 y no está mergeado. Antes de integrar, publicar el diff final y obtener dos reviews independientes sobre ese HEAD. La optimización sugerida requiere otro SDD/GO. Promoción a `master`, release y `/sdd.finish` necesitan sus propios gates; ningún estado de este archivo los presupone.

@@ -1,7 +1,7 @@
 {
   "feature": "20260927-login-realm-budget",
   "status": "ready_for_implementation",
-  "stats": { "total": 5, "pending": 1, "done": 4 },
+  "stats": { "total": 5, "pending": 0, "done": 5 },
   "tasks": [
     {
       "id": "TASK-LRB-001",
@@ -38,10 +38,10 @@
     {
       "id": "TASK-LRB-005",
       "title": "Seguimiento separado de contención y memoria por bucket",
-      "status": "pending",
+      "status": "done",
       "depends_on": ["TASK-LRB-004"],
       "files": ["sdd/wip/20260927-login-realm-budget/2-technical/spec.md"],
-      "acceptance_criteria": ["Medir monitor compartido con carga representativa", "Proponer cota por bucket que conserve la semántica temporal", "No marcar el hardening principal como distribuido o libre de contención"]
+      "acceptance_criteria": ["Benchmark opt-in sólo del limiter: 1/8/32 workers, tres JVM por configuración, warmup 5 s y medición 10 s para claves existentes, misses 1000/9999/10000, churn e interferencia cruzada de realms; publicar entorno, commit, comando y métricas crudas por corrida incluidas fallas/timeouts", "Pasada JFR separada con jdk.JavaMonitorEnter en 0 ms y stacks que atribuyan contención al monitor del limiter", "Proponer cota de cinco fallos recientes por bucket con argumento de equivalencia temporal y límites del reloj; no implementarla sin nuevo GO", "No marcar el hardening principal como distribuido, libre de contención ni sujeto a un SLO productivo no definido"]
     }
   ]
 }

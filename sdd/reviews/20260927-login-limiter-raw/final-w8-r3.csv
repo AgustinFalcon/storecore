@@ -1,0 +1,41 @@
+# synthetic_workload=true
+# commit=744f7f524037a2c9ea4a89d5fcc1cc9fb333679b
+# java=21.0.8
+# java_vm=OpenJDK 64-Bit Server VM
+# jvm_args=
+# os=Windows 10 10.0 amd64
+# available_processors=20
+# max_heap_bytes=10695475200
+# workers=8,repeat=3,warmup_seconds=5,measure_seconds=10
+scenario,lane,completed,accepted,rejected,errors,worker_timeouts,worker_failures,elapsed_ms,throughput_per_s,p50_us,p95_us,p99_us,max_us,samples
+# phase=warmup,scenario=existing_four,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=existing_four,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+existing_four,user,1028111,1028111,0,0,0,0,10000.4672,102806.29688980931,9.1,13.4,17.6,161371.1,16384
+# phase=warmup,scenario=existing_five,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=existing_five,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+existing_five,user,927131,0,927131,0,0,0,10000.4837,92708.61568425935,10.2,12.9,19.1,142404.8,16384
+# phase=warmup,scenario=miss_1000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_1000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_1000,customer,705256,705256,0,0,0,0,10000.4837,70522.18884172573,13.1,19.5,26.4,324786.5,16384
+# phase=warmup,scenario=miss_9999,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_9999,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_9999,customer,140192,140192,0,0,0,0,10001.4311,14017.193999366751,69.0,84.1,110.0,753911.6,16384
+# phase=warmup,scenario=miss_10000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_10000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_10000,customer,66645,0,66645,0,0,0,10001.6966,6663.369492731863,142.4,195.2,295.0,657430.7,16384
+# phase=warmup,scenario=churn_near_capacity,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=churn_near_capacity,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+churn_near_capacity,clear,112236,112236,0,0,0,0,10000.8206,11222.679066955765,10.0,18.2,22.3,600324.9,16384
+churn_near_capacity,record,112233,112233,0,0,0,0,10000.8206,11222.379091571745,74.4,97.3,131.6,519146.4,16384
+# phase=warmup,scenario=cross_user_customer_existing,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_user_customer_existing,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_user_customer_existing,user,98833,98833,0,0,0,0,10000.4914,9882.814358502423,9.1,14.6,19.7,173670.6,2048
+cross_user_customer_existing,customer,902412,902412,0,0,0,0,10000.4914,90236.76576533029,9.1,14.4,19.8,192896.7,14336
+# phase=warmup,scenario=cross_user_customer_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_user_customer_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_user_customer_misses,primary,30934,30934,0,0,0,0,10001.3341,3092.9873645556945,9.1,15.3,19.7,379760.8,2048
+cross_user_customer_misses,background,68996,0,68996,0,0,0,10001.3341,6898.679647148274,134.5,175.0,273.5,411239.4,14336
+# phase=warmup,scenario=cross_customer_user_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_customer_user_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_customer_user_misses,primary,15784,15784,0,0,0,0,10001.2569,1578.2016358363917,8.6,15.8,19.3,647417.5,2048
+cross_customer_user_misses,background,74805,0,74805,0,0,0,10001.2569,7479.559894116908,125.5,159.5,236.9,615542.3,14336
