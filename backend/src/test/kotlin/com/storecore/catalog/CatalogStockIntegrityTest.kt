@@ -11,7 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
 import org.springframework.transaction.annotation.Transactional
+import org.testcontainers.containers.PostgreSQLContainer
 import java.math.BigDecimal
 import java.util.UUID
 
@@ -104,4 +107,17 @@ class CatalogStockIntegrityTest @Autowired constructor(
 
     private fun variantId(sku: String): Long = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, sku)!!
     private fun scalar(sql: String, arg: Any): Int = jdbc.queryForObject(sql, Int::class.java, arg)!!
+
+    companion object {
+        private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
+
+        @JvmStatic
+        @DynamicPropertySource
+        fun database(registry: DynamicPropertyRegistry) {
+            postgres.start()
+            registry.add("spring.datasource.url") { postgres.jdbcUrl }
+            registry.add("spring.datasource.username") { postgres.username }
+            registry.add("spring.datasource.password") { postgres.password }
+        }
+    }
 }

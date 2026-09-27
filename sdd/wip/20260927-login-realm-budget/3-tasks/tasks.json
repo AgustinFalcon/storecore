@@ -1,0 +1,47 @@
+{
+  "feature": "20260927-login-realm-budget",
+  "status": "ready_for_implementation",
+  "stats": { "total": 5, "pending": 2, "done": 3 },
+  "tasks": [
+    {
+      "id": "TASK-LRB-001",
+      "title": "Revisar delta SDD y decidir gate de implementación",
+      "status": "done",
+      "depends_on": [],
+      "files": ["sdd/wip/20260927-login-realm-budget/", "sdd/reviews/20260927-login-realm-budget-astra-r2-go.md"],
+      "acceptance_criteria": ["Revisión independiente valida semántica de capacidad, umbral n >= 5 con índice n - 5, Retry-After y límites process-local", "Registrar GO/NO-GO explícito y residual SHOULD antes de código nuevo"]
+    },
+    {
+      "id": "TASK-LRB-002",
+      "title": "Corregir Retry-After de saturación",
+      "status": "done",
+      "depends_on": ["TASK-LRB-001"],
+      "files": ["backend/src/main/kotlin/com/storecore/identity/infrastructure/security/LoginRateLimiter.kt"],
+      "acceptance_criteria": ["Saturación usa el menor vencimiento de último fallo de cada bucket activo del realm", "Con n >= 5 fallos vigentes, el bloqueo usa el fallo de índice n - 5; para n = 5 coincide con el primero y para n > 5 no anuncia liberación prematura", "La intercalación checkAllowed seguida de recordFailure puede registrar más de cinco fallos, y la respuesta posterior usa la cantidad real", "No se expulsan buckets activos ni se mezclan realms"]
+    },
+    {
+      "id": "TASK-LRB-003",
+      "title": "Validar reloj, recuperación y contrato HTTP",
+      "status": "done",
+      "depends_on": ["TASK-LRB-002"],
+      "files": ["backend/src/test/kotlin/com/storecore/identity/LoginRateLimiterTest.kt", "backend/src/test/kotlin/com/storecore/identity/IdentityHttpIntegrationTest.kt"],
+      "acceptance_criteria": ["Intercalación determinista de cuatro fallos previos y dos intentos en vuelo deja seis fallos; vencer el primero conserva 429 y el header usa el fallo de índice n - 5", "Dos buckets con fallos escalonados prueban que capacidad toma el menor vencimiento de último fallo, no el menor primer fallo", "En expiry - 1 ms continúa el bloqueo; en expiry se libera; Retry-After redondea hacia arriba a segundos y tiene mínimo positivo de 1", "Clear por realm libera plaza sin alterar el otro realm", "Nueva clave con credenciales válidas también se rechaza antes de verificar contraseña si el cupo está lleno", "Cliente HTTP con timeout explícito observa el primer 429 sin retry ni espera de 900 segundos"]
+    },
+    {
+      "id": "TASK-LRB-004",
+      "title": "Revisar código por dos agentes independientes y registrar cierre local",
+      "status": "pending",
+      "depends_on": ["TASK-LRB-003"],
+      "files": ["sdd/reviews/", "sdd/wip/20260927-login-realm-budget/4-implementation/progress.md"],
+      "acceptance_criteria": ["Dos revisiones independientes del diff y tests aprueban o dejan hallazgos trazables", "Suite relevante y diff check documentados", "CI remoto se declara no verificado si no ejecutó"]
+    },
+    {
+      "id": "TASK-LRB-005",
+      "title": "Seguimiento separado de contención y memoria por bucket",
+      "status": "pending",
+      "depends_on": ["TASK-LRB-004"],
+      "files": ["sdd/wip/20260927-login-realm-budget/2-technical/spec.md"],
+      "acceptance_criteria": ["Medir monitor compartido con carga representativa", "Proponer cota por bucket que conserve la semántica temporal", "No marcar el hardening principal como distribuido o libre de contención"]
+    }
+  ]
+}

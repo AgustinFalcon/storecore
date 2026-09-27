@@ -2,6 +2,7 @@
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -15,13 +16,20 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
+import com.storecore.identity.domain.IdentityRealm
+import com.storecore.identity.infrastructure.security.LoginRateLimiter
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = ["storecore.installation-guard.enabled=false"])
 class IdentityHttpIntegrationTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: org.springframework.jdbc.core.JdbcTemplate,
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
+    @Autowired private val loginRateLimiter: LoginRateLimiter,
     @LocalServerPort private val port: Int,
 ) {
     @Test
@@ -126,10 +134,31 @@ class IdentityHttpIntegrationTest(
             val failed = exchange("/api/v1/customer/auth/login", HttpMethod.POST, """{"email":"limited@example.com","password":"wrong-password-xx"}""")
             assertEquals(401, failed.statusCode.value())
         }
-        val limited = exchange("/api/v1/customer/auth/login", HttpMethod.POST, """{"email":"limited@example.com","password":"wrong-password-xx"}""")
-        assertEquals(429, limited.statusCode.value())
-        assertEquals(true, limited.body!!.contains("AUTH_RATE_LIMITED"))
-        assertNotNull(limited.headers.getFirst("Retry-After"))
+        val limited = postLoginWithoutRetry("limited@example.com", "wrong-password-xx")
+        assertEquals(429, limited.statusCode())
+        assertEquals(true, limited.body().contains("AUTH_RATE_LIMITED"))
+        assertRateLimitedHeaders(limited)
+    }
+
+    @Test
+    fun `realm capacity returns rate limited response for valid credentials`() {
+        val email = "capacity-valid-${System.nanoTime()}@example.com"
+        val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Capacity","lastName":"Valid"}""")
+        assertEquals(201, registered.statusCode.value())
+
+        val budgetEmails = (0 until LoginRateLimiter.DEFAULT_MAX_BUCKETS_PER_REALM).map { "capacity-$it-${System.nanoTime()}@example.com" }
+        try {
+            budgetEmails.forEach { loginRateLimiter.recordFailure(IdentityRealm.CUSTOMER, "127.0.0.1", it) }
+
+            val response = postLoginWithoutRetry(email, "a-very-long-password")
+
+            assertEquals(429, response.statusCode())
+            assertEquals(true, response.body().contains("AUTH_RATE_LIMITED"))
+            assertRateLimitedHeaders(response)
+            assertEquals(null, response.headers().firstValue(HttpHeaders.SET_COOKIE).orElse(null))
+        } finally {
+            budgetEmails.forEach { loginRateLimiter.clear(IdentityRealm.CUSTOMER, "127.0.0.1", it) }
+        }
     }
 
     @Test
@@ -281,6 +310,26 @@ class IdentityHttpIntegrationTest(
             csrf?.let { set("X-CSRF-Token", it) }
         }), String::class.java,
     )
+
+    private fun postLoginWithoutRetry(email: String, password: String): HttpResponse<String> {
+        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
+        val request = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/v1/customer/auth/login"))
+            .timeout(Duration.ofSeconds(3))
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .header(HttpHeaders.ORIGIN, "http://localhost:4200")
+            .POST(HttpRequest.BodyPublishers.ofString("""{"email":"$email","password":"$password"}"""))
+            .build()
+        return client.send(request, HttpResponse.BodyHandlers.ofString())
+    }
+
+    private fun assertRateLimitedHeaders(response: HttpResponse<String>) {
+        val retryAfter = response.headers().firstValue("Retry-After").orElseThrow()
+        assertTrue(retryAfter.matches(Regex("\\d+")))
+        assertTrue(retryAfter.toLong() > 0)
+
+        val cacheControl = response.headers().firstValue("Cache-Control").orElse("")
+        assertTrue(cacheControl.split(',').any { it.trim().equals("no-store", ignoreCase = true) })
+    }
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
