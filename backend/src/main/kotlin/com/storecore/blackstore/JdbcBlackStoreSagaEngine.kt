@@ -1,6 +1,6 @@
 package com.storecore.blackstore
 
-import com.storecore.blackstore.application.port.BlackStoreMlListingPort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
@@ -17,7 +17,7 @@ import java.util.UUID
 class JdbcBlackStoreSagaEngine(
     private val jdbc: JdbcTemplate,
     transactionManager: PlatformTransactionManager,
-    private val mlListing: BlackStoreMlListingPort,
+    private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
 ) : BlackStoreSagaPort {
     private val tx = TransactionTemplate(transactionManager)
 
@@ -201,14 +201,17 @@ class JdbcBlackStoreSagaEngine(
                 row.id,
             )
         }.also { receipt ->
-            mlListing.enqueueDesiredQuantityAfterBlackStore(receipt.reservationRef?.toString())
+            // mutateReserved has committed before this callback. The fail-closed bridge is inert;
+            // a future canonical delegation must move inside the shared transaction boundary.
+            projectionBridge.requestProjection(receipt.reservationRef?.toString())
         }
 
     override fun release(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
         mutateReserved(quadruple, already = "RELEASED") { row, lines ->
             releaseStock(quadruple, row, lines, reservationStatus = "RELEASED", sagaState = "RELEASED")
         }.also { receipt ->
-            mlListing.enqueueDesiredQuantityAfterBlackStore(receipt.reservationRef?.toString())
+            // As with commit, this callback is post-transaction and cannot own projection writes.
+            projectionBridge.requestProjection(receipt.reservationRef?.toString())
         }
 
     override fun expireDue(limit: Int): Int {

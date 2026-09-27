@@ -1,6 +1,7 @@
 package com.storecore.blackstore
 
-import com.storecore.blackstore.application.port.BlackStoreMlListingPort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -35,7 +36,7 @@ class BlackStoreSagaEngineTest {
             Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
             val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
             jdbc = JdbcTemplate(dataSource)
-            engine = JdbcBlackStoreSagaEngine(jdbc, DataSourceTransactionManager(dataSource), BlackStoreMlListingPort { false })
+            engine = JdbcBlackStoreSagaEngine(jdbc, DataSourceTransactionManager(dataSource), LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE })
             catalog = JdbcBlackStoreCatalogQuery(jdbc)
             jdbc.update(
                 "INSERT INTO installation_settings(installation_id, business_name, allowed_host, currency) VALUES (1, 'Test', 'localhost', 'ARS') ON CONFLICT DO NOTHING",

@@ -1,6 +1,7 @@
 package com.storecore.blackstore
 
-import com.storecore.blackstore.application.port.BlackStoreMlListingPort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -23,7 +24,7 @@ class BlackStoreFailClosedHttpTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val worker: BlackStoreExpiryWorker,
-    @Autowired private val mlListing: BlackStoreMlListingPort,
+    @Autowired private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
 ) {
     @Test
     fun `mutating and read routes stay 403 while capability is disabled`() {
@@ -50,7 +51,10 @@ class BlackStoreFailClosedHttpTest(
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE channel='EXTERNAL_BLACKSTORE'", Int::class.java))
         assertEquals(0, worker.expireReserved())
         assertEquals(0, worker.purgeTerminal())
-        assertFalse(mlListing.enqueueDesiredQuantityAfterBlackStore("any"))
+        assertEquals(
+            LegacyBlackStoreProjectionResult.NOT_ELIGIBLE,
+            projectionBridge.requestProjection("00000000-0000-0000-0000-000000000001"),
+        )
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
         assertEquals(false, jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='BLACKSTORE_INTEGRATION'", Boolean::class.java))

@@ -2,6 +2,8 @@ package com.storecore.blackstore
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
@@ -35,6 +37,7 @@ class BlackStoreHttpContractTest(
     @Autowired private val capabilities: JdbcCapabilityService,
     @Autowired private val worker: BlackStoreExpiryWorker,
     @Autowired private val mapper: ObjectMapper,
+    @Autowired private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
 ) {
     @LocalServerPort
     private var port: Int = 0
@@ -124,6 +127,32 @@ class BlackStoreHttpContractTest(
             val receipt = reservedData["receipt"].asText()
             val reservationRef = reservedData["reservationRef"].asText()
 
+            assertEquals(
+                LegacyBlackStoreProjectionResult.NOT_ELIGIBLE,
+                projectionBridge.requestProjection(reservationRef),
+            )
+            assertEquals(
+                0,
+                jdbc.queryForObject("SELECT desired_quantity FROM channel_listings WHERE external_listing_id='ML-HTTP-1'", Int::class.java),
+            )
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
+
+            val historyId = jdbc.queryForObject(
+                """
+                INSERT INTO channel_outbox(idempotency_key, account_id, listing_id, kind, payload_redacted)
+                SELECT ?, account_id, id, 'LISTING_STOCK', '{"legacy":true}'::jsonb
+                FROM channel_listings WHERE external_listing_id='ML-HTTP-1'
+                RETURNING id
+                """.trimIndent(),
+                Long::class.java,
+                UUID.randomUUID(),
+            )!!
+            val historicalSnapshotBefore = jdbc.queryForObject(
+                "SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?",
+                String::class.java,
+                historyId,
+            )!!
+
             val got = operation(operationId)
             assertEquals(200, got.statusCode.value(), got.body)
             assertEquals("RESERVED", mapper.readTree(got.body)["data"]["state"].asText())
@@ -135,12 +164,65 @@ class BlackStoreHttpContractTest(
             assertEquals(200, committed.statusCode.value(), committed.body)
             assertEquals("COMMITTED", mapper.readTree(committed.body)["data"]["state"].asText())
             assertEquals(
-                5,
+                0,
                 jdbc.queryForObject("SELECT desired_quantity FROM channel_listings WHERE external_listing_id='ML-HTTP-1'", Int::class.java),
             )
             assertEquals(
                 1,
                 jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java),
+            )
+            assertEquals(
+                "{\"legacy\": true}",
+                jdbc.queryForObject("SELECT payload_redacted::text FROM channel_outbox WHERE id=?", String::class.java, historyId),
+            )
+            assertEquals(
+                historicalSnapshotBefore,
+                jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId),
+            )
+            val replayedCommit = mutate("commit", operationId, reservationRef)
+            assertEquals(200, replayedCommit.statusCode.value(), replayedCommit.body)
+            assertEquals("COMMITTED", mapper.readTree(replayedCommit.body)["data"]["state"].asText())
+            assertEquals(
+                0,
+                jdbc.queryForObject("SELECT desired_quantity FROM channel_listings WHERE external_listing_id='ML-HTTP-1'", Int::class.java),
+            )
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
+            assertEquals(
+                historicalSnapshotBefore,
+                jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId),
+            )
+
+            val currentCatalog = mapper.readTree(catalog().body)["data"]
+            val releaseOperationId = UUID.randomUUID()
+            val releaseReservation = reserve(
+                releaseOperationId,
+                catalogVersion = currentCatalog["catalogVersion"].asText(),
+                variantId = currentCatalog["items"][0]["variantId"].asLong(),
+                priceVersion = currentCatalog["items"][0]["priceVersion"].asText(),
+            )
+            assertEquals(200, releaseReservation.statusCode.value(), releaseReservation.body)
+            val releaseReservationRef = mapper.readTree(releaseReservation.body)["data"]["reservationRef"].asText()
+            val desiredBeforeRelease = jdbc.queryForObject(
+                "SELECT desired_quantity FROM channel_listings WHERE external_listing_id='ML-HTTP-1'",
+                Int::class.java,
+            )
+            assertEquals(0, desiredBeforeRelease)
+            val historyBeforeRelease = jdbc.queryForObject(
+                "SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?",
+                String::class.java,
+                historyId,
+            )
+            val released = mutate("release", releaseOperationId, releaseReservationRef)
+            assertEquals(200, released.statusCode.value(), released.body)
+            assertEquals("RELEASED", mapper.readTree(released.body)["data"]["state"].asText())
+            assertEquals(
+                desiredBeforeRelease,
+                jdbc.queryForObject("SELECT desired_quantity FROM channel_listings WHERE external_listing_id='ML-HTTP-1'", Int::class.java),
+            )
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
+            assertEquals(
+                historyBeforeRelease,
+                jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId),
             )
             assertEquals(
                 0,
