@@ -8,50 +8,92 @@ import java.security.MessageDigest
 import java.time.Clock
 import java.time.Duration
 import java.util.ArrayDeque
-import java.util.concurrent.ConcurrentHashMap
+import java.util.EnumMap
+import java.util.LinkedHashMap
 
 /** Process-local login failure limiter. The key never contains the raw email. */
 @Component
-class LoginRateLimiter(private val clock: Clock = Clock.systemUTC()) {
+class LoginRateLimiter(
+    private val clock: Clock = Clock.systemUTC(),
+    private val maxBucketsPerRealm: Int = DEFAULT_MAX_BUCKETS_PER_REALM,
+) {
     private data class Bucket(val failures: ArrayDeque<Long> = ArrayDeque())
 
-    private val buckets = ConcurrentHashMap<String, Bucket>()
+    private val bucketsByRealm = EnumMap<IdentityRealm, LinkedHashMap<String, Bucket>>(IdentityRealm::class.java).apply {
+        IdentityRealm.entries.forEach { put(it, LinkedHashMap()) }
+    }
     private val window = Duration.ofMinutes(15).toMillis()
 
+    init {
+        require(maxBucketsPerRealm > 0) { "maxBucketsPerRealm must be positive" }
+    }
+
+    @Synchronized
     fun checkAllowed(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
+        val realmBuckets = bucketsByRealm.getValue(realm)
         val key = key(realm, sourceIp, canonicalEmail)
         val now = clock.millis()
-        val bucket = buckets[key] ?: return
-        synchronized(bucket) {
+        val bucket = realmBuckets[key]
+        if (bucket != null) {
             prune(bucket, now)
             if (bucket.failures.size >= MAX_FAILURES) {
-                throw LoginRateLimited(retryAfter(bucket, now))
+                val unblockAt = bucket.failures.elementAt(bucket.failures.size - MAX_FAILURES) + window
+                throw LoginRateLimited(retryAfter(unblockAt, now))
             }
-            if (bucket.failures.isEmpty()) buckets.remove(key, bucket)
+            if (bucket.failures.isEmpty()) realmBuckets.remove(key)
+            return
+        }
+
+        pruneExpiredBuckets(realmBuckets, now)
+        if (realmBuckets.size >= maxBucketsPerRealm) {
+            val earliestCapacityRelease = realmBuckets.values.minOf { bucket -> bucket.failures.last + window }
+            throw LoginRateLimited(retryAfter(earliestCapacityRelease, now))
         }
     }
 
+    @Synchronized
     fun recordFailure(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
+        val realmBuckets = bucketsByRealm.getValue(realm)
         val key = key(realm, sourceIp, canonicalEmail)
-        val bucket = buckets.computeIfAbsent(key) { Bucket() }
         val now = clock.millis()
-        synchronized(bucket) {
+        val bucket = realmBuckets[key]
+        if (bucket != null) {
             prune(bucket, now)
             bucket.failures.addLast(now)
+            return
+        }
+
+        pruneExpiredBuckets(realmBuckets, now)
+        // A concurrent request can fill the final slot after checkAllowed. Keep the
+        // memory bound; the next attempt for this new key will fail closed at admission.
+        if (realmBuckets.size < maxBucketsPerRealm) {
+            realmBuckets[key] = Bucket(ArrayDeque<Long>().apply { addLast(now) })
         }
     }
 
+    @Synchronized
     fun clear(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
-        val key = key(realm, sourceIp, canonicalEmail)
-        buckets.remove(key)
+        bucketsByRealm.getValue(realm).remove(key(realm, sourceIp, canonicalEmail))
+    }
+
+    private fun pruneExpiredBuckets(realmBuckets: LinkedHashMap<String, Bucket>, now: Long) {
+        val iterator = realmBuckets.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            prune(entry.value, now)
+            if (entry.value.failures.isEmpty()) iterator.remove()
+        }
     }
 
     private fun prune(bucket: Bucket, now: Long) {
         while (bucket.failures.isNotEmpty() && now - bucket.failures.first >= window) bucket.failures.removeFirst()
     }
 
-    private fun retryAfter(bucket: Bucket, now: Long): Long =
-        ((bucket.failures.first + window - now + 999) / 1000).coerceAtLeast(1)
+    private fun retryAfter(expiryMillis: Long, now: Long): Long {
+        val remainingMillis = (expiryMillis - now).coerceAtLeast(0)
+        val seconds = remainingMillis / MILLIS_PER_SECOND + if (remainingMillis % MILLIS_PER_SECOND == 0L) 0 else 1
+        return seconds.coerceAtLeast(1)
+    }
 
     private fun key(realm: IdentityRealm, sourceIp: String, canonicalEmail: String): String =
         realm.name + "|" + sourceIp.trim() + "|" + sha256(canonicalEmail)
@@ -61,5 +103,9 @@ class LoginRateLimiter(private val clock: Clock = Clock.systemUTC()) {
         return digest.joinToString("") { "%02x".format(it) }
     }
 
-    companion object { private const val MAX_FAILURES = 5 }
+    companion object {
+        private const val MAX_FAILURES = 5
+        private const val MILLIS_PER_SECOND = 1_000L
+        const val DEFAULT_MAX_BUCKETS_PER_REALM = 10_000
+    }
 }

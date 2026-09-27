@@ -1,0 +1,38 @@
+# synthetic_workload=true
+# commit=744f7f524037a2c9ea4a89d5fcc1cc9fb333679b
+# java=21.0.8
+# java_vm=OpenJDK 64-Bit Server VM
+# jvm_args=
+# os=Windows 10 10.0 amd64
+# available_processors=20
+# max_heap_bytes=10695475200
+# workers=1,repeat=3,warmup_seconds=5,measure_seconds=10
+scenario,lane,completed,accepted,rejected,errors,worker_timeouts,worker_failures,elapsed_ms,throughput_per_s,p50_us,p95_us,p99_us,max_us,samples
+# phase=warmup,scenario=existing_four,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=existing_four,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+existing_four,user,1387225,1387225,0,0,0,0,10000.1676,138720.17504986617,6.8,8.3,12.0,1535.0,2048
+# phase=warmup,scenario=existing_five,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=existing_five,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+existing_five,user,1180570,0,1180570,0,0,0,10000.168,118055.01667571985,7.8,10.6,15.4,7496.0,2048
+# phase=warmup,scenario=miss_1000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_1000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_1000,customer,929139,929139,0,0,0,0,10000.2004,92912.03804275762,10.1,12.3,18.4,1921.8,2048
+# phase=warmup,scenario=miss_9999,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_9999,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_9999,customer,153081,153081,0,0,0,0,10000.2144,15307.771801372579,62.1,80.5,112.5,1845.9,2048
+# phase=warmup,scenario=miss_10000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=miss_10000,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+miss_10000,customer,79393,0,79393,0,0,0,10000.1654,7939.168686149931,118.9,149.6,237.0,1818.8,2048
+# phase=warmup,scenario=churn_near_capacity,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=churn_near_capacity,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+churn_near_capacity,clear,137837,137837,0,0,0,0,10000.132,13783.51805756164,7.0,8.7,14.1,1237.0,2048
+churn_near_capacity,record,137837,137837,0,0,0,0,10000.132,13783.51805756164,62.6,74.7,105.0,1528.2,2048
+# phase=warmup,scenario=cross_user_customer_existing,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_user_customer_existing,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_user_customer_existing,user,1424043,1424043,0,0,0,0,10000.1213,142402.57265679367,6.6,8.2,12.1,979.7,2048
+# phase=warmup,scenario=cross_user_customer_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_user_customer_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_user_customer_misses,primary,1359370,1359370,0,0,0,0,10000.2957,135932.98046176776,6.8,8.6,13.2,9067.8,2048
+# phase=warmup,scenario=cross_customer_user_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+# phase=measure,scenario=cross_customer_user_misses,error_calls=0,worker_timeouts=0,worker_failures=0,terminated=true,exception=none
+cross_customer_user_misses,primary,1440511,1440511,0,0,0,0,10000.1317,144049.2028719982,6.6,8.0,11.8,863.2,2048
