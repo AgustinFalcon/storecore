@@ -3,8 +3,8 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "incremental-gated",
-  "status": "ready_for_implementation",
-  "stats": { "total": 5, "pending": 4, "done": 1 },
+  "status": "building",
+  "stats": { "total": 5, "pending": 1, "done": 4 },
   "tasks": [
     {
       "id": "TASK-LT5-001",
@@ -17,7 +17,7 @@
     {
       "id": "TASK-LT5-002",
       "title": "Acotar historial y fijar watermark local",
-      "status": "pending",
+      "status": "done",
       "depends_on": ["TASK-LT5-001"],
       "files": ["backend/src/main/kotlin/com/storecore/identity/infrastructure/security/LoginRateLimiter.kt"],
       "acceptance_criteria": ["Cada deque conserva como máximo cinco timestamps lógicos sin perder el último ni el índice n - 5 observable", "checkAllowed y recordFailure usan effectiveNow=max(wallNow,lastObservedMillis) bajo monitor; clear no reinicia watermark", "Capacidad, dos realms, clave hash y respuesta 429 mantienen el contrato existente", "Sin lock partitioning, cambio del barrido O(n), DDL ni dependencia externa"]
@@ -25,7 +25,7 @@
     {
       "id": "TASK-LT5-003",
       "title": "Demostrar equivalencia temporal y cota",
-      "status": "pending",
+      "status": "done",
       "depends_on": ["TASK-LT5-002"],
       "files": ["backend/src/test/kotlin/com/storecore/identity/LoginRateLimiterTest.kt", "backend/src/test/kotlin/com/storecore/identity/IdentityHttpIntegrationTest.kt"],
       "acceptance_criteria": ["Referencia de historial completo independiente con el mismo watermark coincide en decisiones y Retry-After tras cada operación para 6, 32 y 256 fallos", "Tras igual poda, las claves/buckets activos coinciden por realm y cada deque acotado es el sufijo de hasta cinco timestamps de la referencia, con tamaño min(5, tamaño de referencia)", "Bordes expiry-1ms/expiry/expiry+1ms, n-5, redondeo y mínimo positivo probados en umbral y capacidad", "Rewind antes/después de poda, clear intercalado, llamada directa y dos checks en vuelo cubiertos", "Cada deque mantiene size<=5 y suite login/HTTP local pasa"]
@@ -33,7 +33,7 @@
     {
       "id": "TASK-LT5-004",
       "title": "Obtener dos reviews independientes del diff final",
-      "status": "pending",
+      "status": "done",
       "depends_on": ["TASK-LT5-003"],
       "files": ["sdd/reviews/", "sdd/wip/20260927-login-limiter-top5/4-implementation/progress.md"],
       "acceptance_criteria": ["Dos agentes Astra revisan código, tests y SDD sobre el mismo snapshot y dejan veredicto trazable", "Hallazgos P0/P1/P2 se corrigen y re-revisan", "Pruebas locales y estado real de CI se documentan sin equiparar steps=[] con verde"]

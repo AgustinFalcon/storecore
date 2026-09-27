@@ -20,5 +20,6 @@ Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-04
 ### Fixed
 
 - Isolated USER/CUSTOMER login-rate budgets and corrected `Retry-After` for concurrent failures and capacity saturation ([#49](https://github.com/AgustinFalcon/storecore/issues/49)).
+- Bounded per-bucket login failure history to five timestamps while preserving USER/CUSTOMER decisions and `Retry-After` through clock rewinds.
 
 No autoriza release, tag, deploy, credenciales de vendor en CI, adapter POS/BlackStore ni fiscal/ARCA.

@@ -1,7 +1,7 @@
 # Meta — cota de cinco fallos por bucket de login
 
 - Feature id: 20260927-login-limiter-top5
-- Estado: ready_for_implementation (GO documental Astra A/B; código pendiente)
+- Estado: building (código y pruebas locales con GO de Astra A/B; PR pendiente)
 - Tipo: delta acotado del backend Kotlin/Spring Boot
 - Base de redacción: origin/integration/storecore-int 56baa2db2d6fabbd683ce41459414c556cb5246d (2026-09-27)
 - Contrato precedente: sdd/wip/20260927-login-realm-budget/, TASK-LRB-005
@@ -20,6 +20,6 @@ No requiere migración, base de datos, proveedor externo, Mercado Libre, BlackSt
 | Functional Spec | ready_for_implementation |
 | Technical Spec | ready_for_implementation |
 | Tasks | ready_for_implementation |
-| Implementation | not_started |
+| Implementation | in_progress |
 
-Dos revisiones Astra independientes dieron GO documental; el expediente está en sdd/reviews/20260927-login-limiter-top5-astra-documentary-go.md. La observación editorial P3 de Astra A sobre cardinalidad quedó corregida en el spec técnico y TASK-LT5-003. La simulación de referencia informada por Astra B valida el diseño, no una implementación de StoreCore. TASK-LT5-001 está done y habilita TASK-LT5-002/003. Antes de código se debe volver a comprobar el HEAD de integración: avanzó por PR #53 desde la base 56baa2d de esta redacción. Después se exigen pruebas locales y dos reviews independientes del diff final. El CI alojado del WIP precedente no se declara verde: sus jobs fallaron con steps=[]. No hay aprobación de código, PR, merge, release ni sdd.finish en este corte.
+Dos revisiones Astra independientes dieron GO documental; el expediente está en sdd/reviews/20260927-login-limiter-top5-astra-documentary-go.md. La observación editorial P3 de Astra A sobre cardinalidad quedó corregida en el spec técnico y TASK-LT5-003. La implementación local partió de integration/storecore-int 73367fa, pasó 29 suites/129 pruebas sin fallos, errores ni skips, y obtuvo dos GO de Astra sobre el snapshot final tras corregir el P3 de conteos exactos. La evidencia está en sdd/reviews/20260927-login-top5-local-dual-code-go.md. TASK-LT5-001–004 están done a nivel local; TASK-LT5-005 sigue pending hasta crear y fusionar el PR hacia integración. No hay CI alojado verde, promoción a master, release ni sdd.finish declarados.
