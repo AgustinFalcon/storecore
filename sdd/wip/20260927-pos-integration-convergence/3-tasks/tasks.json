@@ -3,7 +3,7 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_posc001_spec_review",
+  "status": "ready_for_posc001_test_only_implementation",
   "stats": { "total": 9, "done": 2, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
@@ -25,7 +25,7 @@
     {
       "id": "TASK-POSC-001",
       "title": "Harness PG16 general de integración, separado de PIC-008A/006A",
-      "status": "pending_spec_review",
+      "status": "ready_for_implementation",
       "layer": 2,
       "depends_on": ["TASK-POSC-000A"],
       "acceptance_criteria": ["Migración limpia y upgrade V1–V7 con datos", "Mapa Spring de rutas sin duplicados", "Pruebas fail-closed, idempotencia, concurrencia, roles y tombstone reproducibles sin credenciales live"]

@@ -1,6 +1,6 @@
 # Diseño técnico — inventario y cortes de convergencia
 
-**Estado:** `ready_for_posc001_spec_review`. ADR-001 adjudicó el contrato de trabajo y POSC-000A validó el baseline con doble GO Astra. POSC-001 está pendiente de review de spec; los cortes de porteo siguen gated. Ver `sdd/reviews/20260927-posc000a-dual-contract-go.md`.
+**Estado:** `ready_for_posc001_test_only_implementation`. ADR-001 adjudicó el contrato y POSC-000A validó el baseline. POSC-001 obtuvo doble GO Astra sólo para un harness test-only; los cortes de porteo siguen gated. Ver `sdd/reviews/20260927-posc001-dual-spec-go.md`.
 
 ## Evidencia de ramas (2026-09-27)
 
