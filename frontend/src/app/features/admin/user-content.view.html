@@ -5,6 +5,9 @@
     <p class="sc-page__lede">Esto alimenta el home público. No es la cuenta de quien compra.</p>
   </header>
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
+  @if (state.notice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ state.notice }}</p>
+  }
   <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
     <label>Título
       <input required name="homeTitle" [ngModel]="state.home.title" (ngModelChange)="patch({ title: $event })" />

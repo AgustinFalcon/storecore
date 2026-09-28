@@ -12,6 +12,8 @@ import { CustomerOrderDetailStore } from './customer-order-detail.store';
   template: `
     <sc-customer-order-detail-view
       [order]="store.order$ | async"
+      [shipping]="store.shipping$ | async"
+      [shippingError]="(store.shippingError$ | async) ?? ''"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
       (retry)="reload()"

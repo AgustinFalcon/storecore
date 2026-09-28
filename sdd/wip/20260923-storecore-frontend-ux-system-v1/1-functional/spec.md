@@ -36,5 +36,5 @@ POS/BlackStore UI, fiscal, favoritos, loyalty, carriers reales, calendario, auto
 - AC-UX-2: CUSTOMER vs USER se distinguen por densidad, no por otra paleta.
 - AC-UX-3: P-01 lleno tiene banner auto-rotate (pause hover/focus/reduced-motion) y carrusel ofertas; ambos por HTTP.
 - AC-UX-4: storefront muestra sólo effective; original tachado sólo con dto.
-- AC-UX-5: checkout sin UI Mercado Pago; ML sin secretos ni skin amarilla; capabilities = 5 botones.
+- AC-UX-5: el checkout elige Mercado Pago o efectivo en el local, sin cargar tarjeta ni cobrar; ML sin secretos ni skin amarilla; capabilities = 5 botones.
 - AC-UX-6: cada pantalla documenta default / loading / vacío / error / disabled / éxito.

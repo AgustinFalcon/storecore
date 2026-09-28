@@ -1,9 +1,12 @@
+import type { PaymentMethodId } from '../cart/cart.entity';
+
 export interface CustomerOrder {
   readonly id: string;
   readonly orderStatus: string;
   readonly paymentStatus: string;
   readonly shipmentStatus: string;
   readonly tracking: string | null;
+  readonly paymentMethod: PaymentMethodId | null;
   readonly total: number;
   readonly lines: readonly {
     readonly sku: string;

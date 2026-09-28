@@ -13,6 +13,7 @@ function order(id: string, shipmentStatus: string, rmaStatus: string | null): Ad
     paymentStatus: 'APPROVED',
     shipmentStatus,
     tracking: shipmentStatus === 'SHIPPED' ? 'TRK-1' : null,
+    paymentMethod: null,
     total: 100,
     rmaStatus,
     lines: [
@@ -28,6 +29,11 @@ function order(id: string, shipmentStatus: string, rmaStatus: string | null): Ad
       },
     ],
   };
+}
+
+function confirmDialog(root: ParentNode): void {
+  const button = [...root.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Confirmar') as HTMLButtonElement | undefined;
+  button?.click();
 }
 
 function buttonLabels(root: ParentNode, names: readonly string[]): string[] {
@@ -91,7 +97,11 @@ describe('FulfillmentViewComponent', () => {
     fixture.componentInstance.rma.subscribe((event) => returned.push(event));
 
     (actions.querySelector('button.sc-btn--primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    confirmDialog(fixture.nativeElement);
     (actions.querySelector('button.sc-btn--ghost') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    confirmDialog(fixture.nativeElement);
 
     expect(shipped).toEqual([{ orderId: 'ord-9', status: 'SHIPPED', tracking: 'ANDES-9' }]);
     expect(returned).toEqual([{ orderId: 'ord-9', status: 'INSPECTED' }]);

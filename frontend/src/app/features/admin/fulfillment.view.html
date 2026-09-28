@@ -13,7 +13,7 @@
   />
   @if (orders.length) {
     <div class="sc-table-wrap">
-      <table class="sc-table">
+      <table class="sc-table sc-stack">
         <thead>
           <tr>
             <th>Orden</th>
@@ -26,24 +26,24 @@
         <tbody>
           @for (order of orders; track order.id) {
             <tr>
-              <td><a [routerLink]="['/user/orders', order.id]">{{ order.id }}</a></td>
-              <td><span class="sc-badge sc-badge--warn">{{ order.shipmentStatus }}</span></td>
-              <td>
+              <td data-label="Orden"><a [routerLink]="['/user/orders', order.id]">{{ order.id }}</a></td>
+              <td data-label="Envío"><span class="sc-badge sc-badge--warn">{{ shipmentStatusLabel(order.shipmentStatus) }}</span></td>
+              <td data-label="Tracking">
                 @if (nextShip(order) === 'SHIPPED') {
-                  <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
+                  <input [attr.aria-label]="'Tracking ' + order.id" [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
                 } @else {
                   {{ order.tracking || '—' }}
                 }
               </td>
-              <td><span class="sc-badge">{{ order.rmaStatus || '—' }}</span></td>
-              <td class="sc-table__actions">
+              <td data-label="RMA"><span class="sc-badge">{{ order.rmaStatus || '—' }}</span></td>
+              <td class="sc-table__actions" data-label="Acción">
                 @if (nextShip(order); as next) {
-                  <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking[order.id] || null })">
+                  <button type="button" class="sc-btn sc-btn--primary" (click)="pendingShip = { orderId: order.id, status: next, tracking: tracking[order.id] || null }">
                     {{ shipLabel(next) }}
                   </button>
                 }
                 @if (nextReturn(order); as next) {
-                  <button type="button" class="sc-btn sc-btn--ghost" (click)="rma.emit({ orderId: order.id, status: next })">{{ returnLabel(next) }}</button>
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="pendingRma = { orderId: order.id, status: next }">{{ returnLabel(next) }}</button>
                 }
               </td>
             </tr>
@@ -53,4 +53,20 @@
     </div>
     <p class="sc-callout">Cada fila ofrece una sola transición de envío y, si corresponde, una de RMA.</p>
   }
+  <sc-dialog
+    [open]="pendingShip !== null"
+    title="Confirmar transición"
+    message="Avanza una sola vez. El tracking es informativo y no habla con un correo."
+    confirmLabel="Confirmar"
+    (confirm)="ship.emit(pendingShip!); pendingShip = null"
+    (dismissed)="pendingShip = null"
+  />
+  <sc-dialog
+    [open]="pendingRma !== null"
+    title="Confirmar RMA"
+    message="Registra el siguiente paso de la devolución. No repone stock hasta el ajuste."
+    confirmLabel="Confirmar"
+    (confirm)="rma.emit(pendingRma!); pendingRma = null"
+    (dismissed)="pendingRma = null"
+  />
 </section>

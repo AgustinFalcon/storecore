@@ -1,4 +1,4 @@
-import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { Cart, CartLine, CheckoutReceipt, PaymentMethodId } from '../../domain/cart/cart.entity';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { HomeContent, HomeBlock } from '../../domain/catalog/home-content.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
@@ -20,6 +20,10 @@ import {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function paymentMethodId(value: unknown): PaymentMethodId | null {
+  return value === 'MERCADO_PAGO' || value === 'CASH' ? value : null;
 }
 
 function text(value: unknown): string {
@@ -240,6 +244,7 @@ function mapOrder(value: unknown): CustomerOrder {
     paymentStatus: text(row['paymentStatus']),
     shipmentStatus: text(row['shipmentStatus']),
     tracking: text(row['tracking']) || null,
+    paymentMethod: paymentMethodId(row['paymentMethod']),
     total: num(row['total']),
     lines: items(row['lines']).map(mapCartLine),
   };

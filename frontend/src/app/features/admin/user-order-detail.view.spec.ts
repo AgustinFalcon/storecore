@@ -14,6 +14,7 @@ function order(shipmentStatus: string, rmaStatus: string | null): AdminOrder {
     paymentStatus: 'APPROVED',
     shipmentStatus,
     tracking: shipmentStatus === 'SHIPPED' ? 'TRK-1' : null,
+    paymentMethod: null,
     total: 100,
     rmaStatus,
     lines: [
@@ -35,6 +36,11 @@ function buttonLabels(root: ParentNode, names: readonly string[]): string[] {
   return [...root.querySelectorAll('button')]
     .map((button) => button.textContent?.trim() ?? '')
     .filter((text) => names.includes(text));
+}
+
+function confirmDialog(root: ParentNode): void {
+  const button = [...root.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Confirmar') as HTMLButtonElement | undefined;
+  button?.click();
 }
 
 describe('UserOrderDetailViewComponent', () => {
@@ -82,7 +88,11 @@ describe('UserOrderDetailViewComponent', () => {
     fixture.componentInstance.rma.subscribe((event) => returned.push(event));
 
     (summary.querySelector('button.sc-btn--primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    confirmDialog(fixture.nativeElement);
     (summary.querySelector('button.sc-btn--ghost') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    confirmDialog(fixture.nativeElement);
 
     expect(shipped).toEqual([{ orderId: 'ord-1', status: 'SHIPPED', tracking: 'ANDES-1' }]);
     expect(returned).toEqual([{ orderId: 'ord-1', status: 'INSPECTED' }]);

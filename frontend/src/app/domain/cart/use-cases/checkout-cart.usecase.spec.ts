@@ -12,7 +12,7 @@ describe('CheckoutCartUseCase', () => {
     };
     const useCase = new CheckoutCartUseCase(repo);
     const receipt = await firstValueFrom(
-      useCase.execute({ idempotencyKey: 'same-key', addressId: 'addr-1', currency: 'ARS' }),
+      useCase.execute({ idempotencyKey: 'same-key', addressId: 'addr-1', currency: 'ARS', paymentMethod: 'MERCADO_PAGO' }),
     );
     expect(receipt.orderId).toBe('o-1');
   });
@@ -30,7 +30,7 @@ describe('CheckoutCartUseCase', () => {
         }),
     };
     const receipt = await firstValueFrom(
-      new CheckoutCartUseCase(repo).execute({ idempotencyKey: 'k', addressId: 'addr-1', currency: 'ARS' }),
+      new CheckoutCartUseCase(repo).execute({ idempotencyKey: 'k', addressId: 'addr-1', currency: 'ARS', paymentMethod: 'CASH' }),
     );
     expect(receipt.checkoutUrl).toBe('https://www.mercadopago.com.ar/checkout/ORD-2');
     expect(receipt.paymentStatus).toBe('PENDING');

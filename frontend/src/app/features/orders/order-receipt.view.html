@@ -1,0 +1,44 @@
+<section class="sc-page" aria-labelledby="receipt-title">
+  <p class="sc-pdp__crumb"><a [routerLink]="order ? ['/customer/orders', order.id] : '/customer/orders'">Volver a la orden</a></p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">Cuenta customer</p>
+    <h1 id="receipt-title">Comprobante</h1>
+    <p class="sc-page__lede">Acá se guardan los datos para facturar. Esta pantalla no emite factura, CAE ni PDF.</p>
+  </header>
+  <sc-feature-status [loading]="loading" [error]="error" (retry)="retry.emit()" />
+  @if (notice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ notice }}</p>
+  }
+  @if (order && profile) {
+    <div class="sc-workbench sc-workbench--even">
+      <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+        <h2>Datos de facturación</h2>
+        <label>Nombre o razón social
+          <input name="legalName" [ngModel]="profile.legalName" (ngModelChange)="legalNameChange.emit($event)" />
+        </label>
+        <label>CUIT o CUIL
+          <input name="taxId" [ngModel]="profile.taxId" (ngModelChange)="taxIdChange.emit($event)" />
+        </label>
+        <label>Condición
+          <select name="taxCondition" [ngModel]="profile.taxCondition" (ngModelChange)="conditionChange.emit($event)">
+            <option value="CONSUMIDOR_FINAL">Consumidor final</option>
+            <option value="MONOTRIBUTO">Monotributo</option>
+            <option value="RESPONSABLE_INSCRIPTO">Responsable inscripto</option>
+            <option value="EXENTO">Exento</option>
+          </select>
+        </label>
+        <button type="submit" class="sc-btn sc-btn--primary" [disabled]="loading">Guardar datos</button>
+      </form>
+      <aside class="sc-summary">
+        <h2>Orden {{ order.id }}</h2>
+        <p>Medio {{ paymentMethodLabel(order.paymentMethod) }}</p>
+        <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+        @if (profile.documentStatus === 'ISSUED') {
+          <p class="sc-banner sc-banner--ok" role="status">El servicio fiscal marcó el comprobante como emitido.</p>
+        } @else {
+          <p class="status status--empty" role="status">Sin comprobante. La emisión queda en el servicio fiscal.</p>
+        }
+      </aside>
+    </div>
+  }
+</section>

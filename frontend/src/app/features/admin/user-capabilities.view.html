@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="cap-title">Capabilities</h1>
-    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Esta instalación no prende capabilities desde la consola.</p>
+    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Son el registro de la instalación. La vidriera y el checkout de esta simulación no se apagan desde acá.</p>
   </header>
   <sc-feature-status
     [loading]="loading"
@@ -18,7 +18,7 @@
   </ul>
   @if (items.length) {
     <div class="sc-table-wrap">
-      <table class="sc-table">
+      <table class="sc-table sc-stack">
         <caption>Matriz de capabilities</caption>
         <thead>
           <tr>
@@ -30,8 +30,8 @@
         <tbody>
           @for (item of items; track item.module) {
             <tr>
-              <td>{{ item.module }}</td>
-              <td>
+              <td data-label="Módulo">{{ item.module }}</td>
+              <td data-label="Estado">
                 <span
                   class="sc-badge"
                   [class.sc-badge--info]="item.state === 'READ_ONLY'"
@@ -40,7 +40,7 @@
                   [class.sc-badge--err]="item.state === 'ERROR'"
                 >{{ item.state }}</span>
               </td>
-              <td class="sc-table__actions">
+              <td class="sc-table__actions" data-label="Estados">
                 @for (state of states; track state) {
                   <button
                     type="button"

@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Compra</p>
     <h1 id="result-title">Pedido iniciado</h1>
-    <p class="sc-page__lede">Orden y pago son estados independientes. Esta pantalla no confirma Mercado Pago.</p>
+    <p class="sc-page__lede">Orden y pago son estados independientes. Esta pantalla no confirma el cobro.</p>
   </header>
   <sc-feature-status
     [loading]="loading"
@@ -15,11 +15,24 @@
     <div class="sc-panel sc-result__card">
       <p class="sc-result__id">Orden {{ order.id }}</p>
       <p>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
+        <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
       </p>
-      <p class="sc-callout">El identificador de la orden no es un comprobante de pago.</p>
+      <p>Medio {{ paymentMethodLabel(order.paymentMethod) }}</p>
+      <p class="sc-callout" role="status">{{ outcome }}</p>
+      <p class="sc-summary__label">Efectivo del pedido</p>
+      <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+      @if (shippingError) {
+        <p class="status status--error" role="alert">{{ shippingError }}</p>
+      } @else if (shipping?.optionId) {
+        <p class="sc-summary__label">Envío simulado {{ shippingName }}</p>
+        <p class="sc-price"><span class="sc-price__kind">Simulado</span>{{ shippingAmount }}</p>
+        <p class="sc-summary__label">Total simulado</p>
+        <p class="sc-price sc-price--hero"><span class="sc-price__kind">Simulado</span>{{ simulatedTotal }}</p>
+      }
+      <p class="sc-callout">El identificador de la orden no es un comprobante de pago. El total simulado incluye el envío y no cambia el efectivo guardado.</p>
       <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>
+      <a class="sc-btn sc-btn--ghost" [routerLink]="['/customer/orders', order.id, 'comprobante']">Datos para facturar</a>
       <a class="sc-btn sc-btn--ghost" routerLink="/catalog">Seguir comprando</a>
     </div>
   }

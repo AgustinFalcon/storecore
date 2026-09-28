@@ -11,10 +11,13 @@
     emptyText="El carrito está vacío."
     (retry)="retry.emit()"
   />
+  @if (state.notice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ state.notice }}</p>
+  }
   @if (state.cart.lines.length > 0) {
     <div class="sc-bag__layout">
       <div class="sc-table-wrap">
-        <table class="sc-table">
+        <table class="sc-table sc-stack">
           <caption class="sc-price__meta">Artículos en la orden ({{ state.cart.lines.length }})</caption>
           <thead>
             <tr>
@@ -31,23 +34,23 @@
           <tbody>
             @for (line of state.cart.lines; track line.sku) {
               <tr>
-                <td>
+                <td data-label="Artículo">
                   <strong>{{ line.name }}</strong>
                   <p class="sc-price__meta">{{ line.sku }}</p>
                 </td>
-                <td>
+                <td data-label="Cant.">
                   <div class="sc-stepper">
-                    <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity - 1 })" [attr.aria-label]="'Quitar una unidad de ' + line.name">−</button>
+                    <button type="button" class="sc-btn sc-btn--ghost" (click)="askQuantity(line, line.quantity - 1)" [attr.aria-label]="'Quitar una unidad de ' + line.name">−</button>
                     <span>{{ line.quantity }}</span>
-                    <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })" [attr.aria-label]="'Agregar una unidad de ' + line.name">+</button>
+                    <button type="button" class="sc-btn sc-btn--ghost" (click)="askQuantity(line, line.quantity + 1)" [attr.aria-label]="'Agregar una unidad de ' + line.name">+</button>
                   </div>
                 </td>
-                <td>{{ line.originalUnitPrice }}</td>
-                <td>{{ line.discountAmount }}</td>
-                <td>{{ line.offerRef || '—' }}</td>
-                <td>{{ line.campaignRef || '—' }}</td>
-                <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
-                <td class="sc-price">{{ lineSubtotal(line) }}</td>
+                <td data-label="Original">{{ line.originalUnitPrice }}</td>
+                <td data-label="Dto">{{ line.discountAmount }}</td>
+                <td data-label="Oferta">{{ line.offerRef || '—' }}</td>
+                <td data-label="Campaña">{{ line.campaignRef || '—' }}</td>
+                <td class="sc-price" data-label="Efectivo"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
+                <td class="sc-price" data-label="Subtotal">{{ lineSubtotal(line) }}</td>
               </tr>
             }
           </tbody>
@@ -67,4 +70,13 @@
   } @else if (!state.loading) {
     <p><a class="sc-btn sc-btn--primary" routerLink="/catalog">Ir al catálogo</a></p>
   }
+  <sc-dialog
+    [open]="pendingRemove !== null"
+    title="Quitar del carrito"
+    [message]="pendingRemove ? 'Se saca ' + pendingRemove.name + ' del carrito.' : ''"
+    confirmLabel="Quitar"
+    [danger]="true"
+    (confirm)="confirmRemove()"
+    (dismissed)="pendingRemove = null"
+  />
 </section>

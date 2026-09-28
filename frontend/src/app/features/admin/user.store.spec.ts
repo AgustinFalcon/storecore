@@ -167,6 +167,7 @@ describe('UserStore home blocks', () => {
 
     store.loadHome();
 
+    expect(store.snapshot.home).toEqual({ title: 'Vidriera', body: 'Texto' });
     expect(store.snapshot.homeBlocks).toBeNull();
     expect(store.snapshot.errorMessage).not.toBe('');
   });

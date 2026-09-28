@@ -1,0 +1,42 @@
+<section class="sc-page" aria-labelledby="shipping-track-title">
+  <p class="sc-pdp__crumb"><a [routerLink]="['/customer/orders', state.orderId]">Volver a la orden</a></p>
+  <header class="sc-page-head">
+    <p class="sc-kicker">Simulación</p>
+    <h1 id="shipping-track-title">Envío</h1>
+    <p class="sc-page__lede">Simulación del recorrido. Correo Argentino no está conectado.</p>
+  </header>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
+  @if (!state.loading && !state.errorMessage) {
+    @if (state.steps.length) {
+      <p>
+        <span class="sc-badge">orden {{ state.orderId }}</span>
+        <span class="sc-badge sc-badge--info">{{ state.optionName }}</span>
+      </p>
+      @if (state.latitude !== null && state.longitude !== null) {
+        <p class="sc-mono">{{ state.latitude }}, {{ state.longitude }}</p>
+        <p class="sc-price__meta">Ubicación registrada para validar esta simulación.</p>
+        <sc-location-map
+          [interactive]="false"
+          [latitude]="state.latitude"
+          [longitude]="state.longitude"
+          [originLatitude]="state.originLatitude"
+          [originLongitude]="state.originLongitude"
+        />
+      }
+      <ol class="sc-ship-steps">
+        @for (step of state.steps; track step.id) {
+          <li [attr.data-state]="step.state">
+            <strong>{{ step.label }}</strong>
+            <span>{{ step.detail }}</span>
+          </li>
+        }
+      </ol>
+      <button type="button" class="sc-btn sc-btn--primary" [disabled]="!state.canAdvance" (click)="advance.emit()">
+        Simular siguiente estado
+      </button>
+    } @else {
+      <p class="sc-callout">Todavía no hay una simulación de envío guardada en esta cuenta.</p>
+    }
+    <p><a routerLink="/checkout/shipping">Cambiar la simulación de precio</a></p>
+  }
+</section>

@@ -12,6 +12,8 @@ import { CheckoutResultViewComponent } from './checkout-result.view';
   template: `
     <sc-checkout-result-view
       [order]="store.order$ | async"
+      [shipping]="store.shipping$ | async"
+      [shippingError]="(store.shippingError$ | async) ?? ''"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
       (retry)="reload()"

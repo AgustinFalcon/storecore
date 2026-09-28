@@ -25,6 +25,7 @@ export interface CustomerState {
   readonly password: string;
   readonly profile: CustomerProfile;
   readonly saved: boolean;
+  readonly addressNotice: string;
   readonly addresses: readonly CustomerAddress[];
   readonly addressDraft: CustomerAddress;
 }
@@ -50,6 +51,7 @@ const INITIAL: CustomerState = {
   password: '',
   profile: emptyProfile,
   saved: false,
+  addressNotice: '',
   addresses: [],
   addressDraft: emptyAddress,
 };
@@ -188,7 +190,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
         this.listAddresses.execute().pipe(
           tapResponse({
             next: (addresses) => this.patchState({ addresses, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), addressNotice: '' }),
           }),
         ),
       ),
@@ -200,10 +202,10 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => {
         const draft = this.snapshot.addressDraft;
         if (!draft.street.trim() || !draft.number.trim() || !draft.city.trim() || !draft.province.trim() || !draft.postalCode.trim()) {
-          this.patchState({ loading: false, errorMessage: 'Calle, número, ciudad, provincia y CP son obligatorios.' });
+          this.patchState({ loading: false, errorMessage: 'Calle, número, ciudad, provincia y CP son obligatorios.', addressNotice: '' });
           return;
         }
-        this.patchState({ loading: true, errorMessage: '' });
+        this.patchState({ loading: true, errorMessage: '', addressNotice: '' });
       }),
       filter(() => {
         const draft = this.snapshot.addressDraft;
@@ -213,10 +215,10 @@ export class CustomerStore extends ComponentStore<CustomerState> {
         this.saveAddress.execute(this.snapshot.addressDraft).pipe(
           tapResponse({
             next: () => {
-              this.patchState({ addressDraft: emptyAddress });
+              this.patchState({ addressDraft: emptyAddress, addressNotice: 'Dirección guardada.' });
               this.loadAddresses();
             },
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), addressNotice: '' }),
           }),
         ),
       ),
@@ -226,15 +228,15 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   readonly removeAddress = this.effect<string>((id$) =>
     id$.pipe(
       filter((id) => Boolean(id.trim())),
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      tap(() => this.patchState({ loading: true, errorMessage: '', addressNotice: '' })),
       switchMap((id) =>
         this.deleteAddress.execute(id).pipe(
           tapResponse({
             next: () => {
-              this.patchState({ addressDraft: emptyAddress });
+              this.patchState({ addressDraft: emptyAddress, addressNotice: 'Dirección quitada.' });
               this.loadAddresses();
             },
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), addressNotice: '' }),
           }),
         ),
       ),

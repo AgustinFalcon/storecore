@@ -16,7 +16,8 @@
     <div class="sc-workbench__main">
       <h2>Productos</h2>
   @if (state.products.length) {
-    <table class="sc-table">
+    <div class="sc-table-wrap">
+    <table class="sc-table sc-stack">
       <thead>
         <tr>
           <th>SKU</th>
@@ -31,11 +32,11 @@
       <tbody>
         @for (product of state.products; track product.sku) {
           <tr>
-            <td>
+            <td data-label="SKU">
               <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(product)">{{ product.sku }}</button>
             </td>
-            <td>{{ product.name }}</td>
-            <td>
+            <td data-label="Nombre">{{ product.name }}</td>
+            <td data-label="Estado">
               @if (product.active) {
                 <span class="sc-badge sc-badge--ok">activo</span>
               } @else {
@@ -43,12 +44,13 @@
               }
             </td>
             @for (cell of priceCells(product.price); track cell.kind) {
-              <td class="sc-price"><span class="sc-price__kind">{{ cell.kind }}</span>{{ cell.value }}</td>
+              <td class="sc-price" [attr.data-label]="cell.kind"><span class="sc-price__kind">{{ cell.kind }}</span>{{ cell.value }}</td>
             }
           </tr>
         }
       </tbody>
     </table>
+    </div>
   }
   <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
     <label>SKU <input required name="sku" [ngModel]="state.draft.sku" (ngModelChange)="patch({ sku: $event })" /></label>

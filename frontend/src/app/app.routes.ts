@@ -15,6 +15,7 @@ import { UserSessionComponent } from './features/admin/user-session.component';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
 import { CheckoutResultComponent } from './features/cart/checkout-result.component';
+import { CheckoutShippingComponent } from './features/cart/checkout-shipping.component';
 import { CustomerAddressesComponent } from './features/identity/customer-addresses.component';
 import { CustomerFavoritesComponent } from './features/identity/customer-favorites.component';
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
@@ -23,6 +24,8 @@ import { CustomerRegisterComponent } from './features/identity/customer-register
 import { CustomerSessionComponent } from './features/identity/customer-session.component';
 import { CustomerOrderDetailComponent } from './features/orders/customer-order-detail.component';
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
+import { OrderReceiptComponent } from './features/orders/order-receipt.component';
+import { ShippingTrackComponent } from './features/orders/shipping-track.component';
 import { ShellComponent } from './features/shell/shell.component';
 import { CatalogPageComponent } from './features/storefront/catalog-page.component';
 import { ProductPageComponent } from './features/storefront/product-page.component';
@@ -37,6 +40,7 @@ export const routes: Routes = [
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },
+      { path: 'checkout/shipping', component: CheckoutShippingComponent, title: 'Envío', canActivate: [customerGuard] },
       { path: 'checkout', component: CheckoutPageComponent, title: 'Checkout', canActivate: [customerGuard] },
       { path: 'checkout/result/:orderId', component: CheckoutResultComponent, title: 'Pedido', canActivate: [customerGuard] },
       {
@@ -50,6 +54,8 @@ export const routes: Routes = [
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
           { path: 'favorites', component: CustomerFavoritesComponent, title: 'Favoritos', canActivate: [customerGuard] },
           { path: 'orders', component: CustomerOrdersComponent, title: 'Órdenes', canActivate: [customerGuard] },
+          { path: 'orders/:id/envio', component: ShippingTrackComponent, title: 'Envío', canActivate: [customerGuard] },
+          { path: 'orders/:id/comprobante', component: OrderReceiptComponent, title: 'Comprobante', canActivate: [customerGuard] },
           { path: 'orders/:id', component: CustomerOrderDetailComponent, title: 'Orden', canActivate: [customerGuard] },
         ],
       },

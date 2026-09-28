@@ -30,10 +30,13 @@ Estados globales de **todas**: default / loading / vacío / error+Reintentar / d
 | C-03 | `/customer/profile` | sí | `C-03-customer-profile.html` | Nombre, email, teléfono. Banner éxito |
 | C-04 | `/customer/addresses` | sí | `C-04-customer-addresses.html` | Lista + form etiqueta/línea/ciudad/CP |
 | C-05 | `/cart` | sí | `C-05-cart.html` | Líneas con original/dto/oferta/campaña/**effective**. Qty stepper |
-| C-06 | `/checkout` | sí | `C-06-checkout.html` | Entrega + moneda. Sin UI MP. Reintentar = misma clave |
-| C-07 | `/checkout/result/:orderId` | sí | `C-07-checkout-result.html` | Orden ≠ pago. Sin confetti |
+| C-06 | `/checkout` | sí | `C-06-checkout.html` | Dirección, moneda y medio (Mercado Pago o efectivo en el local). Sin tarjeta ni SDK. Reintentar = misma clave |
+| C-06b | `/checkout/shipping` | sí | Stitch C-06b | Cotización simulada. Exige líneas en el carrito. No es un correo |
+| C-07 | `/checkout/result/:orderId` | sí | `C-07-checkout-result.html` | Orden ≠ pago. El pendiente de efectivo no habla de Mercado Pago |
+| C-07b | `/customer/orders/:id/envio` | sí | — | Recorrido simulado. El HTTP es de la cuenta, no de la orden |
 | C-08 | `/customer/orders` | sí | `C-08-customer-orders.html` | Sólo órdenes de ese customer |
 | C-09 | `/customer/orders/:id` | sí | `C-09-customer-order-detail.html` | Snapshot líneas. Read-only |
+| C-09b | `/customer/orders/:id/comprobante` | sí | — | Datos para facturar. No emite CAE, factura ni PDF |
 
 ## User
 

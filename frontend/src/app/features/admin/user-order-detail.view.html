@@ -12,9 +12,9 @@
       <p class="sc-kicker">Consola</p>
       <h1 id="admin-order-title">Fulfillment {{ order.id }}</h1>
       <p>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+        <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ shipmentStatusLabel(order.shipmentStatus) }}</span>
         <span class="sc-badge">rma {{ order.rmaStatus || '—' }}</span>
       </p>
       <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
@@ -35,7 +35,10 @@
               <tr>
                 <td>{{ line.name }}</td>
                 <td>{{ line.quantity }}</td>
-                <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
+                <td class="sc-price">
+                  <span class="sc-price__meta">{{ line.effectiveUnitPrice }} por unidad</span>
+                  <span class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice * line.quantity }}</span>
+                </td>
               </tr>
             }
           </tbody>
@@ -50,18 +53,34 @@
                 <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
               </label>
             }
-            <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
+            <button type="button" class="sc-btn sc-btn--primary" (click)="pendingShip = true">
               {{ shipmentLabel(next) }}
             </button>
           </form>
         }
         @if (nextReturn(order); as next) {
-          <button type="button" class="sc-btn sc-btn--ghost" (click)="rma.emit({ orderId: order.id, status: next })">
+          <button type="button" class="sc-btn sc-btn--ghost" (click)="pendingRma = true">
             {{ rmaLabel(next) }}
           </button>
         }
         <p class="sc-callout">Una transición por vez. El tracking es informativo.</p>
       </aside>
     </div>
+    <sc-dialog
+      [open]="pendingShip"
+      title="Confirmar transición"
+      message="Avanza una sola vez. El tracking es informativo y no habla con un correo."
+      confirmLabel="Confirmar"
+      (confirm)="pendingShip = false; ship.emit({ orderId: order.id, status: nextShip(order)!, tracking: tracking || null })"
+      (dismissed)="pendingShip = false"
+    />
+    <sc-dialog
+      [open]="pendingRma"
+      title="Confirmar RMA"
+      message="Registra el siguiente paso de la devolución. No repone stock hasta el ajuste."
+      confirmLabel="Confirmar"
+      (confirm)="pendingRma = false; rma.emit({ orderId: order.id, status: nextReturn(order)! })"
+      (dismissed)="pendingRma = false"
+    />
   }
 </section>

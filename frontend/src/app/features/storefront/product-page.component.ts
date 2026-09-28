@@ -18,6 +18,7 @@ import { ProductPageViewComponent } from './product-page.view';
       [cart]="cart.cart$ | async"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || ''"
+      [notice]="(cart.notice$ | async) ?? ''"
       [signedIn]="session.authenticated()"
       [favorite]="favorites.ids().includes((store.product$ | async)?.sku ?? '')"
       (add)="cart.add($event)"

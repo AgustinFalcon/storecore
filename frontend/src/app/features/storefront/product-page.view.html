@@ -6,6 +6,9 @@
     emptyText="Producto no disponible."
     (retry)="retry.emit()"
   />
+  @if (notice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ notice }}</p>
+  }
   @if (product) {
     <p class="sc-pdp__crumb">
       <a routerLink="/">Inicio</a> / <a routerLink="/catalog">Catálogo</a> / {{ product.name }}
@@ -53,7 +56,7 @@
           <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</p>
         </div>
         @if (showOffer) {
-          <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>
+          <span class="sc-badge sc-badge--info">oferta {{ product.offerRef }}</span>
         } @else {
           <span class="sc-badge">sin oferta</span>
         }
@@ -76,7 +79,7 @@
           @if (signedIn) {
             <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
           } @else {
-            <p><a routerLink="/customer/session">Entrá para agregar al carrito</a></p>
+            <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/customer/session">Entrá para agregar al carrito</a>
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>

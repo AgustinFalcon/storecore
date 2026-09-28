@@ -3,10 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { CustomerAddress } from '../../domain/customer/customer.entity';
 import { CustomerState } from './customer.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+import { DialogComponent } from '../../shared/dialog.component';
 
 @Component({
   selector: 'sc-customer-addresses-view',
-  imports: [FormsModule, FeatureStatusComponent],
+  imports: [FormsModule, FeatureStatusComponent, DialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './customer-addresses.view.html',
 })
@@ -17,6 +18,7 @@ export class CustomerAddressesViewComponent {
   @Output() readonly remove = new EventEmitter<string>();
   @Output() readonly clearDraft = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
+  pendingRemoveId = '';
 
   patch(partial: Partial<CustomerAddress>): void {
     this.draftChange.emit({ ...this.state.addressDraft, ...partial });

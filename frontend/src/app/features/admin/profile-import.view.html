@@ -18,7 +18,7 @@
           class="sc-btn sc-btn--ghost"
           [disabled]="!canMerge"
           [attr.title]="canMerge ? null : 'El merge queda cerrado si el manifiesto es incompatible'"
-          (click)="merge.emit()"
+          (click)="confirming = true"
         >Aplicar merge</button>
       </div>
     </form>
@@ -36,4 +36,22 @@
       }
     </aside>
   </div>
+  <sc-dialog
+    [open]="incompatibleOpen"
+    title="Manifiesto incompatible"
+    [message]="'Merge cerrado para ' + (state.preview?.version || 'esta versión') + '. Corregí el manifiesto antes de mezclar.'"
+    confirmLabel="Entendido"
+    cancelLabel="Cerrar"
+    [danger]="true"
+    (confirm)="incompatibleOpen = false"
+    (dismissed)="incompatibleOpen = false"
+  />
+  <sc-dialog
+    [open]="confirming"
+    title="Aplicar merge"
+    message="Mezcla el manifiesto compatible en esta instalación. No reescribe histórico ni trae secretos."
+    confirmLabel="Aplicar merge"
+    (confirm)="confirming = false; merge.emit()"
+    (dismissed)="confirming = false"
+  />
 </section>

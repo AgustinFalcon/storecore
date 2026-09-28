@@ -1,0 +1,92 @@
+<section class="sc-page sc-checkout" aria-labelledby="shipping-title">
+  <header class="sc-page-head">
+    <p class="sc-kicker">Checkout</p>
+    <h1 id="shipping-title">Envío</h1>
+    <p class="sc-page__lede">Simulación para esta instalación. No es una cotización de un correo.</p>
+  </header>
+  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
+  @if (!state.loading) {
+    <div class="sc-checkout__layout">
+      <div class="sc-panel">
+        <h2>Ubicación</h2>
+        <p class="sc-price__meta">Marcá el punto en el mapa. Lo guardamos en esta instalación y con esas coordenadas validamos la cobertura. No es Google Maps ni Correo Argentino.</p>
+        <sc-location-map
+          [latitude]="state.latitude"
+          [longitude]="state.longitude"
+          [originLatitude]="state.originLatitude"
+          [originLongitude]="state.originLongitude"
+          (pin)="pin.emit($event)"
+        />
+        @if (state.latitude !== null && state.longitude !== null) {
+          <p class="sc-mono">{{ state.latitude }}, {{ state.longitude }}</p>
+          <p class="sc-price__meta">Ubicación registrada.</p>
+        }
+        <h2>Dirección</h2>
+        @if (state.addressLabel) {
+          <p>{{ state.addressLabel }}</p>
+        } @else {
+          <p class="sc-callout">Elegí una dirección en el checkout. Esta simulación no inventa una.</p>
+        }
+        <h2>Opciones</h2>
+        @if (state.lineCount < 1 && !state.errorMessage) {
+          <p class="sc-callout">El carrito no tiene líneas. Esta simulación no arma un envío vacío.</p>
+        }
+        <fieldset class="sc-ship-options">
+          <legend class="sc-summary__label">Precio simulado sobre el efectivo del carrito</legend>
+          @for (option of state.options; track option.id) {
+            <label class="sc-ship-option" [class.sc-ship-option--on]="state.selectedId === option.id">
+              <input
+                type="radio"
+                name="shippingOption"
+                [value]="option.id"
+                [checked]="state.selectedId === option.id"
+                (change)="choose.emit(option.id)"
+              />
+              <span>
+                <strong>{{ option.name }}</strong>
+                <span class="sc-price__meta">{{ option.windowLabel }} · {{ coverage(option.id).reason }}</span>
+              </span>
+              <strong class="sc-price"><span class="sc-price__kind">Simulado</span>{{ option.price }}</strong>
+            </label>
+          }
+        </fieldset>
+        <h2>Recorrido</h2>
+        <p class="sc-price__meta">
+          @if (state.selectedId === 'PICKUP') {
+            Recorrido de retiro. Termina en listo para retirar. No sale con un correo.
+          } @else if (state.selectedId) {
+            Recorrido de despacho. Los pasos que faltan están en futuro. Correo Argentino no está conectado.
+          } @else {
+            Elegí una opción para ver si el recorrido es retiro o despacho.
+          }
+        </p>
+        @if (state.steps.length) {
+          <ol class="sc-ship-steps">
+            @for (step of state.steps; track step.id) {
+              <li [attr.data-state]="step.state">
+                <strong>{{ step.label }}</strong>
+                <span>{{ step.detail }}</span>
+              </li>
+            }
+          </ol>
+        }
+      </div>
+      <aside class="sc-summary">
+        <h2>Total</h2>
+        <p class="sc-summary__label">Carrito</p>
+        <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ state.cartTotal }}</p>
+        <p class="sc-summary__label">Envío simulado</p>
+        <p class="sc-price"><span class="sc-price__kind">Simulado</span>{{ selectedPrice }}</p>
+        <p class="sc-summary__label">Total simulado</p>
+        <p class="sc-price sc-price--hero"><span class="sc-price__kind">Simulado</span>{{ payable }}</p>
+        <p class="sc-price__meta">El checkout repite este total. El pedido del servidor guarda sólo el efectivo de los artículos.</p>
+        @if (canContinue) {
+          <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/checkout">Continuar al pago</a>
+        } @else {
+          <button type="button" class="sc-btn sc-btn--primary sc-btn--block" disabled [attr.title]="continueHint">Continuar al pago</button>
+        }
+        <a routerLink="/checkout">Volver al checkout</a>
+      </aside>
+    </div>
+  }
+</section>

@@ -24,6 +24,7 @@ function order(item: CustomerOrder['lines'][number]): CustomerOrder {
     paymentStatus: 'APPROVED',
     shipmentStatus: 'PREPARING',
     tracking: null,
+    paymentMethod: null,
     total: 900,
     lines: [item],
   };

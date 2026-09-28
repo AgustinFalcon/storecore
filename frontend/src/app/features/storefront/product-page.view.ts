@@ -17,6 +17,7 @@ export class ProductPageViewComponent {
   @Input() cart: Cart | null = null;
   @Input() loading = false;
   @Input() error = '';
+  @Input() notice = '';
   @Input() signedIn = false;
   @Input() favorite = false;
   quantity = 1;

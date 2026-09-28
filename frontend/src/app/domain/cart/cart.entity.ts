@@ -14,10 +14,17 @@ export interface Cart {
   readonly currency: string;
 }
 
+export type PaymentMethodId = 'MERCADO_PAGO' | 'CASH';
+
+export function leavesForPaymentProvider(method: PaymentMethodId, allowlistedUrl: boolean): boolean {
+  return method === 'MERCADO_PAGO' && allowlistedUrl;
+}
+
 export interface CheckoutCommand {
   readonly idempotencyKey: string;
   readonly addressId: string;
   readonly currency: string;
+  readonly paymentMethod: PaymentMethodId;
 }
 
 export interface CheckoutReceipt {

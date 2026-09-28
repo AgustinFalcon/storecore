@@ -13,14 +13,14 @@
       <h1 id="order-detail-title">Orden {{ order.id }}</h1>
       <p class="sc-page__lede">La orden y el pago son datos distintos. Acá se lee el snapshot, no se modifica.</p>
       <p>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+        <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ shipmentStatusLabel(order.shipmentStatus) }}</span>
       </p>
     </header>
     <div class="sc-workbench">
       <div class="sc-table-wrap">
-        <table class="sc-table">
+        <table class="sc-table sc-stack">
           <caption>Artículos de la orden</caption>
           <thead>
             <tr>
@@ -34,19 +34,19 @@
           <tbody>
             @for (line of order.lines; track line.sku) {
               <tr>
-                <td>{{ line.name }}</td>
-                <td>{{ line.quantity }}</td>
-                <td>
+                <td data-label="Producto">{{ line.name }}</td>
+                <td data-label="Cant.">{{ line.quantity }}</td>
+                <td data-label="Original">
                   @if (hasRealLineDiscount(line)) {
                     <span class="sc-price__was">{{ line.originalUnitPrice }}</span>
                   }
                 </td>
-                <td>
+                <td data-label="Dto">
                   @if (hasRealLineDiscount(line)) {
                     {{ line.discountAmount }}
                   }
                 </td>
-                <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }}</td>
+                <td class="sc-price" data-label="Efectivo"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }} <span class="sc-price__meta">por unidad</span></td>
               </tr>
             }
           </tbody>
@@ -55,7 +55,19 @@
       <aside class="sc-summary">
         <h2>Entrega</h2>
         <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
-        <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+        <p><a [routerLink]="['/customer/orders', order.id, 'envio']">Ver simulación de envío</a></p>
+        <p><a [routerLink]="['/customer/orders', order.id, 'comprobante']">Datos para facturar</a></p>
+        <p class="sc-summary__label">Efectivo del pedido</p>
+        <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+        @if (shippingError) {
+          <p class="status status--error" role="alert">{{ shippingError }}</p>
+        } @else if (shipping?.optionId) {
+          <p class="sc-summary__label">Envío simulado {{ shippingName }}</p>
+          <p class="sc-price"><span class="sc-price__kind">Simulado</span>{{ shippingAmount }}</p>
+          <p class="sc-summary__label">Total simulado</p>
+          <p class="sc-price sc-price--hero"><span class="sc-price__kind">Simulado</span>{{ simulatedTotal }}</p>
+          <p class="sc-price__meta">Mismo total que la cotización. El snapshot de la orden guarda sólo el efectivo de los artículos.</p>
+        }
         <p class="sc-callout">Lectura solamente. Esta orden no se edita desde acá.</p>
       </aside>
     </div>

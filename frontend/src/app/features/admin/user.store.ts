@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { catchError, EMPTY, exhaustMap, filter, forkJoin, map, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, exhaustMap, filter, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
 import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
@@ -17,6 +17,7 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 export interface UserState {
   readonly loading: boolean;
   readonly errorMessage: string;
+  readonly notice: string;
   readonly authenticated: boolean;
   readonly email: string;
   readonly password: string;
@@ -57,6 +58,7 @@ export class UserStore extends ComponentStore<UserState> {
     super({
       loading: false,
       errorMessage: '',
+      notice: '',
       authenticated: session.authenticated(),
       email: '',
       password: '',
@@ -156,20 +158,28 @@ export class UserStore extends ComponentStore<UserState> {
       switchMap(() =>
         forkJoin({
           draft: this.saveHome.load(),
-          published: this.publicHome.execute(),
+          published: this.publicHome.execute().pipe(
+            map((home) => ({ blocks: home.blocks, failed: '' })),
+            catchError((err: unknown) => of({ blocks: null, failed: getApiErrorMessage(err) })),
+          ),
         }).pipe(
           tapResponse({
             next: ({ draft, published }) =>
               this.patchState({
                 home: { title: draft.title, body: draft.body },
-                homeBlocks: published.blocks.map((block) => ({
-                  id: block.id,
-                  title: block.title,
-                  body: block.body,
-                })),
+                homeBlocks: published.blocks
+                  ? published.blocks.map((block) => ({
+                      id: block.id,
+                      title: block.title,
+                      body: block.body,
+                    }))
+                  : null,
                 loading: false,
+                errorMessage: published.failed,
+                notice: published.failed ? '' : this.snapshot.notice,
               }),
-            error: (err: unknown) => this.patchState({ loading: false, homeBlocks: null, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) =>
+              this.patchState({ loading: false, homeBlocks: null, errorMessage: getApiErrorMessage(err), notice: '' }),
           }),
         ),
       ),
@@ -180,10 +190,10 @@ export class UserStore extends ComponentStore<UserState> {
     trigger$.pipe(
       tap(() => {
         if (!this.snapshot.home.title.trim()) {
-          this.patchState({ loading: false, errorMessage: 'El título es obligatorio.' });
+          this.patchState({ loading: false, errorMessage: 'El título es obligatorio.', notice: '' });
           return;
         }
-        this.patchState({ loading: true, errorMessage: '' });
+        this.patchState({ loading: true, errorMessage: '', notice: '' });
       }),
       filter(() => Boolean(this.snapshot.home.title.trim())),
       switchMap(() => {
@@ -198,6 +208,7 @@ export class UserStore extends ComponentStore<UserState> {
                   homeBlocks: null,
                   loading: false,
                   errorMessage: getApiErrorMessage(err),
+                  notice: '',
                 });
                 return EMPTY;
               }),
@@ -214,8 +225,9 @@ export class UserStore extends ComponentStore<UserState> {
                 })),
                 loading: false,
                 errorMessage: '',
+                notice: 'Contenido publicado.',
               }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), notice: '' }),
           }),
         );
       }),
@@ -229,7 +241,7 @@ export class UserStore extends ComponentStore<UserState> {
         this.promos.list().pipe(
           tapResponse({
             next: (items) => this.patchState({ promos: items, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), notice: '' }),
           }),
         ),
       ),
@@ -241,20 +253,20 @@ export class UserStore extends ComponentStore<UserState> {
       tap(() => {
         const errorMessage = promoWindowError(this.snapshot.promoDraft);
         if (errorMessage) {
-          this.patchState({ loading: false, errorMessage });
+          this.patchState({ loading: false, errorMessage, notice: '' });
           return;
         }
-        this.patchState({ loading: true, errorMessage: '' });
+        this.patchState({ loading: true, errorMessage: '', notice: '' });
       }),
       filter(() => promoWindowError(this.snapshot.promoDraft) === ''),
       switchMap(() =>
         this.promos.save(promoForApi(this.snapshot.promoDraft)).pipe(
           tapResponse({
             next: () => {
-              this.patchState({ promoDraft: emptyPromo });
+              this.patchState({ promoDraft: emptyPromo, notice: 'Promo guardada.' });
               this.loadPromos();
             },
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), notice: '' }),
           }),
         ),
       ),

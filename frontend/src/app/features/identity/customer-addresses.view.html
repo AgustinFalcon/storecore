@@ -11,6 +11,9 @@
     emptyText="No hay direcciones para este customer."
     (retry)="retry.emit()"
   />
+  @if (state.addressNotice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ state.addressNotice }}</p>
+  }
   <div class="sc-workbench sc-workbench--even">
     <div class="sc-workbench__main">
       <h2>Guardadas</h2>
@@ -29,7 +32,7 @@
                 <p class="sc-price__meta">Predeterminada</p>
               }
             </button>
-            <button type="button" class="sc-btn sc-btn--danger" (click)="remove.emit(address.id)">Quitar</button>
+            <button type="button" class="sc-btn sc-btn--danger" (click)="pendingRemoveId = address.id">Quitar</button>
           </li>
         }
       </ul>
@@ -63,4 +66,13 @@
       }
     </form>
   </div>
+  <sc-dialog
+    [open]="pendingRemoveId.length > 0"
+    title="Quitar dirección"
+    message="La dirección sale de esta cuenta. El checkout deja de ofrecerla."
+    confirmLabel="Quitar"
+    [danger]="true"
+    (confirm)="remove.emit(pendingRemoveId); pendingRemoveId = ''"
+    (dismissed)="pendingRemoveId = ''"
+  />
 </section>

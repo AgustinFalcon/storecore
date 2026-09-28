@@ -3,21 +3,28 @@ import { authInterceptor } from './core/auth/auth.interceptor';
 import { ApplicationConfig } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
-import { CART_REPOSITORY } from './core/tokens/cart.tokens';
+import { BILLING_REPOSITORY } from './core/tokens/billing.tokens';
 import { CATALOG_REPOSITORY } from './core/tokens/catalog.tokens';
 import { CUSTOMER_REPOSITORY } from './core/tokens/customer.tokens';
 import { HEALTH_REPOSITORY } from './core/tokens/health.tokens';
+import { CART_REPOSITORY } from './core/tokens/cart.tokens';
 import { ORDER_REPOSITORY } from './core/tokens/order.tokens';
+import { SHIPPING_REPOSITORY } from './core/tokens/shipping.tokens';
 import { USER_REPOSITORY } from './core/tokens/user.tokens';
+import { BillingHttpRepository } from './data/billing/billing-http.repository';
 import { CartHttpRepository } from './data/cart/cart-http.repository';
 import { CatalogHttpRepository } from './data/catalog/catalog-http.repository';
 import { CustomerHttpRepository } from './data/customer/customer-http.repository';
 import { HealthHttpRepository } from './data/health/health-http.repository';
 import { OrderHttpRepository } from './data/order/order-http.repository';
+import { ShippingHttpRepository } from './data/shipping/shipping-http.repository';
 import { UserHttpRepository } from './data/user/user-http.repository';
+import { GetBillingProfileUseCase } from './domain/billing/use-cases/get-billing-profile.usecase';
+import { SaveBillingProfileUseCase } from './domain/billing/use-cases/save-billing-profile.usecase';
 import { AddCartLineUseCase } from './domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from './domain/cart/use-cases/checkout-cart.usecase';
 import { GetCartUseCase } from './domain/cart/use-cases/get-cart.usecase';
+import { GetHealthUseCase } from './domain/health/use-cases/get-health.usecase';
 import { GetHomeUseCase } from './domain/catalog/use-cases/get-home.usecase';
 import { GetProductUseCase } from './domain/catalog/use-cases/get-product.usecase';
 import { ListCatalogFacetsUseCase } from './domain/catalog/use-cases/list-catalog-facets.usecase';
@@ -31,7 +38,10 @@ import { SaveCustomerProfileUseCase } from './domain/customer/use-cases/save-cus
 import { RegisterCustomerUseCase } from './domain/customer/use-cases/register-customer.usecase';
 import { SignInCustomerUseCase } from './domain/customer/use-cases/sign-in-customer.usecase';
 import { SignOutCustomerUseCase } from './domain/customer/use-cases/sign-out-customer.usecase';
-import { GetHealthUseCase } from './domain/health/use-cases/get-health.usecase';
+import { AdvanceShippingSimulationUseCase } from './domain/shipping/use-cases/advance-shipping-simulation.usecase';
+import { GetShippingSelectionUseCase } from './domain/shipping/use-cases/get-shipping-selection.usecase';
+import { SaveShippingLocationUseCase } from './domain/shipping/use-cases/save-shipping-location.usecase';
+import { SaveShippingOptionUseCase } from './domain/shipping/use-cases/save-shipping-option.usecase';
 import { AdvanceFulfillmentUseCase } from './domain/order/use-cases/advance-fulfillment.usecase';
 import { GetAdminOrderUseCase } from './domain/order/use-cases/get-admin-order.usecase';
 import { GetMyOrderUseCase } from './domain/order/use-cases/get-my-order.usecase';
@@ -51,12 +61,16 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     provideRouter(routes),
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpRepository },
+    { provide: BILLING_REPOSITORY, useClass: BillingHttpRepository },
     { provide: CATALOG_REPOSITORY, useClass: CatalogHttpRepository },
     { provide: CUSTOMER_REPOSITORY, useClass: CustomerHttpRepository },
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },
+    { provide: SHIPPING_REPOSITORY, useClass: ShippingHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
     GetHealthUseCase,
+    GetBillingProfileUseCase,
+    SaveBillingProfileUseCase,
     SearchCatalogUseCase,
     GetHomeUseCase,
     GetProductUseCase,
@@ -78,6 +92,10 @@ export const appConfig: ApplicationConfig = {
     ListAdminOrdersUseCase,
     GetAdminOrderUseCase,
     AdvanceFulfillmentUseCase,
+    GetShippingSelectionUseCase,
+    SaveShippingOptionUseCase,
+    SaveShippingLocationUseCase,
+    AdvanceShippingSimulationUseCase,
     SignInUserUseCase,
     SignOutUserUseCase,
     ProbeUserSessionUseCase,

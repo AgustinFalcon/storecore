@@ -24,7 +24,13 @@
 
 ## Gate actual
 
-UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+UX-ANG está aplicado en las rutas del storefront. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+
+## WIP envío simulado y contratos de UI
+
+- `sdd/wip/20260926-storecore-shipping-quote-sim/` — cotización y recorrido simulados en `/checkout/shipping` y `/customer/orders/:id/envio`. `GET/POST /customer/shipping` es de la cuenta. El total simulado no se escribe en `orders.total` ni en `shipping_cost`. Sin carrier.
+- `/customer/orders/:id/comprobante` guarda datos para facturar y no emite CAE, factura ni PDF.
+- El checkout manda `paymentMethod` (`MERCADO_PAGO` o `CASH`) y no cobra. MP-LIVE-05, emisión fiscal y Correo Argentino en vivo siguen NO-GO.
 
 Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. Evidencia POS local está registrada abajo y el companion sigue disabled. Fiscal y live siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16–#18 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
 

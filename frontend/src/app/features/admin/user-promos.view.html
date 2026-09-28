@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">MANUAL</p>
     <h1 id="promos-title">Promos MANUAL</h1>
-    <p class="sc-page__lede">Calendario de esta instalación: happy hour, fin de semana o campaña, con día y hora. Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización de Mercado Libre.</p>
+    <p class="sc-page__lede">Calendario de esta instalación: happy hour, fin de semana o campaña, con día y hora. Writer MANUAL. La oferta que ve el customer sale del catálogo, no de esta grilla. El API rechaza solapes ACTIVE. Sin automatización de Mercado Libre.</p>
   </header>
   <sc-feature-status
     [loading]="state.loading"
@@ -11,12 +11,15 @@
     emptyText="No hay promos MANUAL."
     (retry)="retry.emit()"
   />
+  @if (state.notice) {
+    <p class="sc-banner sc-banner--ok" role="status">{{ state.notice }}</p>
+  }
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Reglas registradas</h2>
       @if (state.promos.length) {
         <div class="sc-table-wrap">
-          <table class="sc-table">
+          <table class="sc-table sc-stack">
             <thead>
               <tr>
                 <th>SKU</th>
@@ -30,12 +33,12 @@
             <tbody>
               @for (promo of state.promos; track promo.id) {
                 <tr>
-                  <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
-                  <td>{{ clock(promo.validFrom) }} – {{ clock(promo.validTo) }}</td>
-                  <td>{{ promo.priority }}</td>
-                  <td>{{ promo.margin }}</td>
-                  <td>{{ promo.currency }}</td>
-                  <td>{{ promo.approvedBy }}</td>
+                  <td data-label="SKU">{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
+                  <td data-label="Vigencia">{{ clock(promo.validFrom) }} – {{ clock(promo.validTo) }}</td>
+                  <td data-label="Prio">{{ promo.priority }}</td>
+                  <td data-label="Margen">{{ promo.margin }}</td>
+                  <td data-label="Moneda">{{ promo.currency }}</td>
+                  <td data-label="Aprobador">{{ promo.approvedBy }}</td>
                 </tr>
               }
             </tbody>

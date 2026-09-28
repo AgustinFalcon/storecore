@@ -13,6 +13,7 @@ import { CartStore } from './cart.store';
         [state]="state"
         (addressChange)="store.setAddressId($event)"
         (currencyChange)="store.setCurrency($event)"
+        (paymentMethodChange)="store.setPaymentMethod($event)"
         (pay)="store.submitCheckout()"
         (retry)="reload()"
       />
@@ -29,5 +30,6 @@ export class CheckoutPageComponent implements OnInit {
   reload(): void {
     this.store.load();
     this.store.loadAddresses();
+    this.store.loadShipping();
   }
 }
