@@ -52,9 +52,9 @@
         </fieldset>
         <h2>Recorrido</h2>
         <p class="sc-price__meta">
-          @if (state.selectedId === 'PICKUP') {
+          @if (pickup) {
             Recorrido de retiro. Termina en listo para retirar. No sale con un correo.
-          } @else if (state.selectedId) {
+          } @else if (dispatch) {
             Recorrido de despacho. Los pasos que faltan están en futuro. Correo Argentino no está conectado.
           } @else {
             Elegí una opción para ver si el recorrido es retiro o despacho.
@@ -63,7 +63,7 @@
         @if (state.steps.length) {
           <ol class="sc-ship-steps">
             @for (step of state.steps; track step.id) {
-              <li [attr.data-state]="step.state">
+              <li [attr.data-state]="step.state.code">
                 <strong>{{ step.label }}</strong>
                 <span>{{ step.detail }}</span>
               </li>

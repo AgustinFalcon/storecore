@@ -12,7 +12,7 @@ import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.u
 import { GetCartUseCase } from '../../domain/cart/use-cases/get-cart.usecase';
 import { CustomerAddress } from '../../domain/customer/customer.entity';
 import { ListCustomerAddressesUseCase } from '../../domain/customer/use-cases/list-customer-addresses.usecase';
-import { ShippingOptionId } from '../../domain/shipping/shipping.entity';
+import { ShippingChoice } from '../../domain/order/closed-status';
 import { GetShippingSelectionUseCase } from '../../domain/shipping/use-cases/get-shipping-selection.usecase';
 
 export interface CartState {
@@ -24,7 +24,7 @@ export interface CartState {
   readonly currency: string;
   readonly idempotencyKey: string;
   readonly receipt: CheckoutReceipt | null;
-  readonly shippingOptionId: ShippingOptionId | null;
+  readonly shippingOptionId: ShippingChoice | null;
   readonly paymentMethod: PaymentMethod;
   readonly notice: string;
 }

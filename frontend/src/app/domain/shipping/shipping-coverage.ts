@@ -1,4 +1,4 @@
-import { ShippingOptionId } from './shipping.entity';
+import { ShippingChoice } from '../order/closed-status';
 
 export interface GeoPoint {
   readonly latitude: number;
@@ -38,21 +38,24 @@ export function distanceKm(from: GeoPoint, to: GeoPoint): number {
 }
 
 export function coverageFor(
-  option: ShippingOptionId,
+  option: ShippingChoice,
   pin: { latitude: number | null; longitude: number | null },
   origin: { latitude: number | null; longitude: number | null },
 ): Coverage {
+  if (option === ShippingChoice.Unknown) {
+    return { ok: false, distanceKm: null, reason: 'La opción de envío no se reconoce.' };
+  }
   if (!isGeoPoint(pin)) {
     return { ok: false, distanceKm: null, reason: 'Marcá el punto en el mapa para registrar la ubicación.' };
   }
-  if (option === 'PICKUP') {
+  if (option === ShippingChoice.Pickup) {
     return { ok: true, distanceKm: null, reason: 'Retiro: la ubicación queda registrada y no depende de la distancia.' };
   }
   if (!isGeoPoint(origin)) {
     return { ok: false, distanceKm: null, reason: 'Esta instalación no publicó un origen. No se valida la cobertura.' };
   }
   const kilometers = Math.round(distanceKm(pin, origin) * 10) / 10;
-  const limit = option === 'EXPRESS' ? SIMULATED_COVERAGE_KM.EXPRESS : SIMULATED_COVERAGE_KM.STANDARD;
+  const limit = option === ShippingChoice.Express ? SIMULATED_COVERAGE_KM.EXPRESS : SIMULATED_COVERAGE_KM.STANDARD;
   if (kilometers <= limit) {
     return { ok: true, distanceKm: kilometers, reason: `A ${kilometers} km del origen. Dentro de la simulación (${limit} km).` };
   }

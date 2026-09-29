@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { RouterLink } from '@angular/router';
 import { coverageFor, Coverage } from '../../domain/shipping/shipping-coverage';
 import { shippingPrice } from '../../domain/shipping/shipping-quote';
-import { ShippingOptionId } from '../../domain/shipping/shipping.entity';
+import { ShippingChoice } from '../../domain/order/closed-status';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { LocationMapComponent } from './location-map.component';
 import { CheckoutShippingState } from './checkout-shipping.store';
@@ -15,7 +15,7 @@ import { CheckoutShippingState } from './checkout-shipping.store';
 })
 export class CheckoutShippingViewComponent {
   @Input({ required: true }) state!: CheckoutShippingState;
-  @Output() readonly choose = new EventEmitter<ShippingOptionId>();
+  @Output() readonly choose = new EventEmitter<ShippingChoice>();
   @Output() readonly pin = new EventEmitter<{ latitude: number; longitude: number }>();
   @Output() readonly retry = new EventEmitter<void>();
 
@@ -41,7 +41,15 @@ export class CheckoutShippingViewComponent {
     return 'Falta la ubicación o está fuera de la cobertura simulada.';
   }
 
-  coverage(optionId: ShippingOptionId): Coverage {
+  get pickup(): boolean {
+    return this.state.selectedId === ShippingChoice.Pickup;
+  }
+
+  get dispatch(): boolean {
+    return this.state.selectedId === ShippingChoice.Standard || this.state.selectedId === ShippingChoice.Express;
+  }
+
+  coverage(optionId: ShippingChoice): Coverage {
     return coverageFor(
       optionId,
       { latitude: this.state.latitude, longitude: this.state.longitude },

@@ -1,13 +1,32 @@
-import { ShippingOptionId, ShippingSimStatus, ShippingStep } from './shipping.entity';
+import { MilestonePaint } from '../order/order-milestone';
+import { ShippingChoice } from '../order/closed-status';
+import { ShippingSimStatus, ShippingStep } from './shipping.entity';
 
-const PICKUP_PATH: readonly ShippingSimStatus[] = ['CONFIRMED', 'PREPARING', 'PACKED', 'READY_FOR_PICKUP'];
-const SHIP_PATH: readonly ShippingSimStatus[] = ['CONFIRMED', 'PREPARING', 'PACKED', 'DISPATCHED', 'ARRIVING'];
+const PICKUP_PATH: readonly ShippingSimStatus[] = [
+  ShippingSimStatus.Confirmed,
+  ShippingSimStatus.Preparing,
+  ShippingSimStatus.Packed,
+  ShippingSimStatus.ReadyForPickup,
+];
+const SHIP_PATH: readonly ShippingSimStatus[] = [
+  ShippingSimStatus.Confirmed,
+  ShippingSimStatus.Preparing,
+  ShippingSimStatus.Packed,
+  ShippingSimStatus.Dispatched,
+  ShippingSimStatus.Arriving,
+];
 
-export function pathFor(option: ShippingOptionId): readonly ShippingSimStatus[] {
-  return option === 'PICKUP' ? PICKUP_PATH : SHIP_PATH;
+export function pathFor(option: ShippingChoice): readonly ShippingSimStatus[] {
+  if (option === ShippingChoice.Pickup) {
+    return PICKUP_PATH;
+  }
+  if (option === ShippingChoice.Standard || option === ShippingChoice.Express) {
+    return SHIP_PATH;
+  }
+  return [];
 }
 
-export function nextSimStatus(option: ShippingOptionId, current: ShippingSimStatus): ShippingSimStatus | null {
+export function nextSimStatus(option: ShippingChoice, current: ShippingSimStatus): ShippingSimStatus | null {
   const path = pathFor(option);
   const index = path.indexOf(current);
   if (index < 0 || index >= path.length - 1) {
@@ -16,12 +35,12 @@ export function nextSimStatus(option: ShippingOptionId, current: ShippingSimStat
   return path[index + 1];
 }
 
-export function arrivalDate(option: ShippingOptionId, now: Date): Date | null {
-  if (option === 'PICKUP') {
+export function arrivalDate(option: ShippingChoice, now: Date): Date | null {
+  if (option !== ShippingChoice.Standard && option !== ShippingChoice.Express) {
     return null;
   }
   const next = new Date(now.getTime());
-  next.setUTCDate(next.getUTCDate() + (option === 'EXPRESS' ? 2 : 5));
+  next.setUTCDate(next.getUTCDate() + (option === ShippingChoice.Express ? 2 : 5));
   return next;
 }
 
@@ -35,95 +54,120 @@ export function formatArrival(date: Date): string {
   return `Tu envío llega el ${formatted}`;
 }
 
-export function shippingSteps(option: ShippingOptionId, current: ShippingSimStatus, now: Date): readonly ShippingStep[] {
+export function shippingSteps(option: ShippingChoice, current: ShippingSimStatus, now: Date): readonly ShippingStep[] {
   const path = pathFor(option);
-  const at = Math.max(0, path.indexOf(current));
+  const at = path.indexOf(current);
+  if (at < 0) {
+    if (current === ShippingSimStatus.Unknown && path.length > 0) {
+      return [
+        {
+          id: ShippingSimStatus.Unknown,
+          label: 'Estado no reconocido',
+          detail: 'Esta simulación no avanza un estado que no conoce.',
+          state: MilestonePaint.Current,
+        },
+      ];
+    }
+    return [];
+  }
   return path.map((id, index) => ({
     id,
-    label: labelFor(id, option, now, index < at ? 'done' : index === at ? 'current' : 'upcoming'),
-    detail: detailFor(id, index < at ? 'done' : index === at ? 'current' : 'upcoming'),
-    state: index < at ? 'done' : index === at ? 'current' : 'upcoming',
+    label: labelFor(id, option, now, index < at ? MilestonePaint.Done : index === at ? MilestonePaint.Current : MilestonePaint.Upcoming),
+    detail: detailFor(id, index < at ? MilestonePaint.Done : index === at ? MilestonePaint.Current : MilestonePaint.Upcoming),
+    state: index < at ? MilestonePaint.Done : index === at ? MilestonePaint.Current : MilestonePaint.Upcoming,
   }));
 }
 
-function labelFor(
-  id: ShippingSimStatus,
-  option: ShippingOptionId,
-  now: Date,
-  state: ShippingStep['state'],
-): string {
-  switch (id) {
-    case 'CONFIRMED':
-      return 'Pedido confirmado';
-    case 'PREPARING':
-      return 'Pedido en preparación';
-    case 'PACKED':
-      return 'Empaquetado';
-    case 'READY_FOR_PICKUP':
-      return 'Listo para retirar';
-    case 'DISPATCHED':
-      return state === 'upcoming' ? 'Despacho' : 'El envío ya fue despachado';
-    case 'ARRIVING': {
-      const date = arrivalDate(option, now);
-      if (!date) {
-        return 'Llegada';
-      }
-      const formatted = new Intl.DateTimeFormat('es-AR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        timeZone: 'UTC',
-      }).format(date);
-      return state === 'upcoming' ? `Llegada prevista el ${formatted}` : `Tu envío llega el ${formatted}`;
-    }
+function labelFor(id: ShippingSimStatus, option: ShippingChoice, now: Date, state: MilestonePaint): string {
+  if (id === ShippingSimStatus.Confirmed) {
+    return 'Pedido confirmado';
   }
+  if (id === ShippingSimStatus.Preparing) {
+    return 'Pedido en preparación';
+  }
+  if (id === ShippingSimStatus.Packed) {
+    return 'Empaquetado';
+  }
+  if (id === ShippingSimStatus.ReadyForPickup) {
+    return 'Listo para retirar';
+  }
+  if (id === ShippingSimStatus.Dispatched) {
+    return state === MilestonePaint.Upcoming ? 'Despacho' : 'El envío ya fue despachado';
+  }
+  if (id === ShippingSimStatus.Arriving) {
+    const date = arrivalDate(option, now);
+    if (!date) {
+      return 'Llegada';
+    }
+    const formatted = new Intl.DateTimeFormat('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }).format(date);
+    return state === MilestonePaint.Upcoming ? `Llegada prevista el ${formatted}` : `Tu envío llega el ${formatted}`;
+  }
+  return id.label;
 }
 
-function detailFor(id: ShippingSimStatus, state: ShippingStep['state']): string {
-  if (state === 'done') {
-    switch (id) {
-      case 'CONFIRMED':
-        return 'Quedó confirmado en esta simulación.';
-      case 'PREPARING':
-        return 'El local ya armó el pedido.';
-      case 'PACKED':
-        return 'El paquete ya se cerró.';
-      case 'READY_FOR_PICKUP':
-        return 'Quedó listo para retirar. No salió con un correo.';
-      case 'DISPATCHED':
-        return 'Figura como despachado. Correo Argentino no está conectado.';
-      case 'ARRIVING':
-        return 'La fecha simulada ya quedó en el recorrido.';
+function detailFor(id: ShippingSimStatus, state: MilestonePaint): string {
+  if (state === MilestonePaint.Done) {
+    if (id === ShippingSimStatus.Confirmed) {
+      return 'Quedó confirmado en esta simulación.';
+    }
+    if (id === ShippingSimStatus.Preparing) {
+      return 'El local ya armó el pedido.';
+    }
+    if (id === ShippingSimStatus.Packed) {
+      return 'El paquete ya se cerró.';
+    }
+    if (id === ShippingSimStatus.ReadyForPickup) {
+      return 'Quedó listo para retirar. No salió con un correo.';
+    }
+    if (id === ShippingSimStatus.Dispatched) {
+      return 'Figura como despachado. Correo Argentino no está conectado.';
+    }
+    if (id === ShippingSimStatus.Arriving) {
+      return 'La fecha simulada ya quedó en el recorrido.';
     }
   }
-  if (state === 'upcoming') {
-    switch (id) {
-      case 'CONFIRMED':
-        return 'Todavía no está confirmado en esta simulación.';
-      case 'PREPARING':
-        return 'Después el local arma el pedido.';
-      case 'PACKED':
-        return 'Después se cierra el paquete.';
-      case 'READY_FOR_PICKUP':
-        return 'Después queda listo para retirar. No sale con un correo.';
-      case 'DISPATCHED':
-        return 'Después figura el despacho. Correo Argentino no está conectado.';
-      case 'ARRIVING':
-        return 'La fecha es simulada. Todavía no es la llegada.';
+  if (state === MilestonePaint.Upcoming) {
+    if (id === ShippingSimStatus.Confirmed) {
+      return 'Todavía no está confirmado en esta simulación.';
+    }
+    if (id === ShippingSimStatus.Preparing) {
+      return 'Después el local arma el pedido.';
+    }
+    if (id === ShippingSimStatus.Packed) {
+      return 'Después se cierra el paquete.';
+    }
+    if (id === ShippingSimStatus.ReadyForPickup) {
+      return 'Después queda listo para retirar. No sale con un correo.';
+    }
+    if (id === ShippingSimStatus.Dispatched) {
+      return 'Después figura el despacho. Correo Argentino no está conectado.';
+    }
+    if (id === ShippingSimStatus.Arriving) {
+      return 'La fecha es simulada. Todavía no es la llegada.';
     }
   }
-  switch (id) {
-    case 'CONFIRMED':
-      return 'La compra quedó registrada en esta simulación.';
-    case 'PREPARING':
-      return 'El local está armando el pedido.';
-    case 'PACKED':
-      return 'El paquete está cerrado.';
-    case 'READY_FOR_PICKUP':
-      return 'Se puede pasar a buscarlo. No sale con un correo.';
-    case 'DISPATCHED':
-      return 'Aviso simulado. Correo Argentino todavía no está conectado.';
-    case 'ARRIVING':
-      return 'Fecha simulada. No es un plazo de Correo Argentino.';
+  if (id === ShippingSimStatus.Confirmed) {
+    return 'La compra quedó registrada en esta simulación.';
   }
+  if (id === ShippingSimStatus.Preparing) {
+    return 'El local está armando el pedido.';
+  }
+  if (id === ShippingSimStatus.Packed) {
+    return 'El paquete está cerrado.';
+  }
+  if (id === ShippingSimStatus.ReadyForPickup) {
+    return 'Se puede pasar a buscarlo. No sale con un correo.';
+  }
+  if (id === ShippingSimStatus.Dispatched) {
+    return 'Aviso simulado. Correo Argentino todavía no está conectado.';
+  }
+  if (id === ShippingSimStatus.Arriving) {
+    return 'Fecha simulada. No es un plazo de Correo Argentino.';
+  }
+  return 'Esta simulación no avanza un estado que no conoce.';
 }
