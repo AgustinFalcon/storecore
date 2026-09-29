@@ -8,7 +8,8 @@ import { CartStore } from './cart.store';
 import { CustomerAddress } from '../../domain/customer/customer.entity';
 import { ListCustomerAddressesUseCase } from '../../domain/customer/use-cases/list-customer-addresses.usecase';
 import { quoteShipping } from '../../domain/shipping/shipping-quote';
-import { ShippingOption, ShippingOptionId, ShippingSelection, ShippingStep } from '../../domain/shipping/shipping.entity';
+import { ShippingChoice } from '../../domain/order/closed-status';
+import { ShippingOption, ShippingSelection, ShippingSimStatus, ShippingStep } from '../../domain/shipping/shipping.entity';
 import { shippingSteps } from '../../domain/shipping/shipping-timeline';
 import { GetShippingSelectionUseCase } from '../../domain/shipping/use-cases/get-shipping-selection.usecase';
 import { SaveShippingLocationUseCase } from '../../domain/shipping/use-cases/save-shipping-location.usecase';
@@ -21,7 +22,7 @@ export interface CheckoutShippingState {
   readonly lineCount: number;
   readonly addressLabel: string;
   readonly options: readonly ShippingOption[];
-  readonly selectedId: ShippingOptionId | null;
+  readonly selectedId: ShippingChoice | null;
   readonly steps: readonly ShippingStep[];
   readonly latitude: number | null;
   readonly longitude: number | null;
@@ -85,7 +86,7 @@ export class CheckoutShippingStore extends ComponentStore<CheckoutShippingState>
     ),
   );
 
-  readonly choose = this.effect<ShippingOptionId>((id$) =>
+  readonly choose = this.effect<ShippingChoice>((id$) =>
     id$.pipe(
       tap(() => this.patchState({ errorMessage: '' })),
       switchMap((optionId) =>
@@ -120,7 +121,7 @@ function placed(selection: ShippingSelection): Pick<
 > {
   return {
     selectedId: selection.optionId,
-    steps: selection.optionId ? shippingSteps(selection.optionId, 'CONFIRMED', new Date()) : [],
+    steps: selection.optionId ? shippingSteps(selection.optionId, ShippingSimStatus.Confirmed, new Date()) : [],
     latitude: selection.latitude,
     longitude: selection.longitude,
     originLatitude: selection.originLatitude,

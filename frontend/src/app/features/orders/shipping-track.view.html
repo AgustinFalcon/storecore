@@ -25,7 +25,7 @@
       }
       <ol class="sc-ship-steps">
         @for (step of state.steps; track step.id) {
-          <li [attr.data-state]="step.state">
+          <li [attr.data-state]="step.state.code">
             <strong>{{ step.label }}</strong>
             <span>{{ step.detail }}</span>
           </li>

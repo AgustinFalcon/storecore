@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { hasRealLineDiscount } from '../../domain/order/line-discount';
-import { DocumentStatus, PaymentMethod, ShippingChoice } from '../../domain/order/closed-status';
+import { DocumentStatus, PaymentMethod } from '../../domain/order/closed-status';
 import { MilestonePaint, OrderMilestone } from '../../domain/order/order-milestone';
 import { orderMilestones } from '../../domain/order/order-milestones';
 import { CustomerOrder } from '../../domain/order/order.entity';
@@ -34,7 +34,7 @@ export class CustomerOrderDetailViewComponent {
       method: this.order.paymentMethod,
       shipment: this.order.shipmentStatus,
       tracking: this.order.tracking,
-      shipping: ShippingChoice.fromWire(this.shipping?.optionId ?? null),
+      shipping: this.shipping?.optionId ?? null,
       document: DocumentStatus.Unknown,
     });
   }

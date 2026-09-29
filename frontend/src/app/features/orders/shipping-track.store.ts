@@ -5,7 +5,8 @@ import { EMPTY, forkJoin, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { GetMyOrderUseCase } from '../../domain/order/use-cases/get-my-order.usecase';
 import { quoteShipping } from '../../domain/shipping/shipping-quote';
-import { ShippingOptionId, ShippingSelection, ShippingSimStatus, ShippingStep } from '../../domain/shipping/shipping.entity';
+import { ShippingChoice } from '../../domain/order/closed-status';
+import { ShippingSelection, ShippingSimStatus, ShippingStep } from '../../domain/shipping/shipping.entity';
 import { nextSimStatus, shippingSteps } from '../../domain/shipping/shipping-timeline';
 import { AdvanceShippingSimulationUseCase } from '../../domain/shipping/use-cases/advance-shipping-simulation.usecase';
 import { GetShippingSelectionUseCase } from '../../domain/shipping/use-cases/get-shipping-selection.usecase';
@@ -14,7 +15,7 @@ export interface ShippingTrackState {
   readonly loading: boolean;
   readonly errorMessage: string;
   readonly orderId: string;
-  readonly optionId: ShippingOptionId | null;
+  readonly optionId: ShippingChoice | null;
   readonly optionName: string;
   readonly status: ShippingSimStatus;
   readonly steps: readonly ShippingStep[];
@@ -31,7 +32,7 @@ const INITIAL: ShippingTrackState = {
   orderId: '',
   optionId: null,
   optionName: '',
-  status: 'CONFIRMED',
+  status: ShippingSimStatus.Unknown,
   steps: [],
   canAdvance: false,
   latitude: null,
