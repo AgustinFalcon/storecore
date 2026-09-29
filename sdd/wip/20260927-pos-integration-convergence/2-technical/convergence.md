@@ -1,6 +1,8 @@
 # Diseño técnico — inventario y cortes de convergencia
 
-**Estado:** `ready_for_posc002_spec_review`. ADR-001 adjudicó el contrato, POSC-000A validó el baseline y POSC-001 cerró el harness PG16 test-only tras 32 suites/142 tests locales y doble GO Astra de código. Los cortes de porteo siguen gated; ver `sdd/reviews/20260927-posc001-dual-code-go.md`.
+**Estado:** `ready_for_posc002_implementation_plan_review`. ADR-001 adjudicó el contrato, POSC-000A validó el baseline y POSC-001 cerró el harness PG16 test-only tras 32 suites/142 tests locales y doble GO Astra de código. POSC-002 recibió GO documental Astra acotado al camino POS; sus subcortes 002A–G están en review de plan. Ver `sdd/reviews/20260928-posc002-shared-pos-spec-go.md`.
+
+**Corte POSC-002 planificado:** `posc002-identity-acl-proposal.md` define bearer opaco, matriz ruta/scope/capability, barrera revoke/rotate/Tx-A→Tx-B, Tx-P/Tx-C administrativo con nueve entry points, ACL y pruebas PG16. POS usa READ COMMITTED y sentencias `VOLATILE` posteriores al lock de ancla; read guard GET/reconcile RR conserva snapshot propio. La versión V8+ es candidata sólo si sigue libre. El cierre V3 PUBLIC/runtime y roles shared tiene owner/Flyway únicos coordinados con ML-DSP-000B; su caller ML RR conserva gate separado de snapshot y carrera. El usuario autorizó la migración, pero el cierre no está aplicado ni verificado.
 
 ## Evidencia de ramas (2026-09-27)
 

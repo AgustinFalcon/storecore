@@ -1,6 +1,8 @@
 # Especificación funcional — convergencia POS offline
 
-**Gate vigente:** POSC-000/000A/001 están done; POSC-001 cerró sólo un harness test-only con doble GO Astra de código (`sdd/reviews/20260927-posc001-dual-code-go.md`). POSC-002 espera review de spec. No hay GO de porteo productivo, Flyway, adapter live ni cierre del WIP.
+**Gate vigente:** POSC-000/000A/001 están done; POSC-001 cerró un harness test-only con doble GO Astra de código (`sdd/reviews/20260927-posc001-dual-code-go.md`). POSC-002 recibió GO documental Astra acotado al camino POS sobre el spec en `d8dc971` y el usuario autorizó la migración de permisos/SECURITY DEFINER (`sdd/reviews/20260928-posc002-shared-pos-spec-go.md`). El plan 002A–G está en review; aún faltan implementación, pruebas y dos reviews de código por PR. No se aplicó migración ni se activó adapter live o cerró este WIP.
+
+La propuesta `2-technical/posc002-identity-acl-proposal.md` explicita la identidad del companion antes de portear funciones de negocio: bearer opaco verificado por secret-provider compatible con el `resolveToken` de BlackStore, principal inmutable y scopes por ruta. El header de instancia no autentica; `DISABLED` y credenciales V5 legacy sin metadata deniegan aunque la fila siga ACTIVE. POSC-002 incluye pasar el principal y revalidar el guard `READ COMMITTED` con lecturas frescas posteriores al lock en Tx-A/Tx-B/commit/release existentes y filtrar GET/reconcile por companion dueño, sin cambiar reglas comerciales. La administración USER ADMIN usa provisioning Tx-P/Tx-C y entry points SQL estrechos con permisos comprobados en PG16. `cost:read` nunca corresponde a cashier y el companion no recibe coste en este corte sin delegación humana verificable; `X-Actor-Role` es sólo audit-only. Astra dio GO documental acotado al camino POS sobre `d8dc971`; los subcortes 002A–G requieren review de plan y código. El companion no está activo ni existe migración aplicada.
 
 ## Problema y resultado esperado
 

@@ -4,6 +4,7 @@ import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -12,6 +13,9 @@ import org.postgresql.util.PSQLException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.testcontainers.containers.PostgreSQLContainer
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.charset.StandardCharsets
 import java.sql.Connection
 import java.sql.DriverManager
 import java.util.UUID
@@ -21,6 +25,135 @@ import java.util.UUID
  * The measured ACL is reported as current behavior, never as least-privilege approval.
  */
 class BlackStorePg16UpgradeAclHarnessTest {
+    @Test
+    fun `posc002a preflight inventories immutable flyway and current function role surface`() {
+        val database = createDatabase()
+        migrateTo(database, "7")
+        val jdbc = jdbc(database)
+
+        assertEquals(160000, jdbc.queryForObject("SELECT current_setting('server_version_num')::integer / 10000 * 10000", Int::class.java))
+        val history = jdbc.queryForList(
+            "SELECT version,script,checksum,success FROM flyway_schema_history WHERE version BETWEEN '3' AND '7' ORDER BY installed_rank",
+        )
+        assertEquals(
+            listOf(
+                "3" to "V3__capability_administration.sql",
+                "4" to "V4__mp_orders_checkout.sql",
+                "5" to "V5__blackstore_integration_registry.sql",
+                "6" to "V6__blackstore_integration_saga.sql",
+                "7" to "V7__blackstore_future_optional_promotion.sql",
+            ),
+            history.map { it.getValue("version").toString() to it.getValue("script").toString() },
+        )
+        assertTrue(history.all { it.getValue("success") == true && it["checksum"] != null })
+
+        val expectedLfNormalizedSha256 = mapOf(
+            "V3__capability_administration.sql" to "0D2CEBE1FBA3D43C1C33E2EA216B5D931EA57D510B967D7C471BBB8B87A65DC8",
+            "V4__mp_orders_checkout.sql" to "EB677AE41202961AA1527B4AD0539A344A2620E75079241AEE9BA356209A4C5F",
+            "V5__blackstore_integration_registry.sql" to "B27C38CCDB6BAAAAB689197A948C96567BB20CC8BFE7E363DD51FF3ADE34220A",
+            "V6__blackstore_integration_saga.sql" to "BC06A1F0C1CDB51A6737E972C2FDC0777C9206F624EF73D70C2F0B8CADD9EB6D",
+            "V7__blackstore_future_optional_promotion.sql" to "6444ADB440C4B7DC8536F4BA9856AC9C041742CA67EFB91C03EC6409B5398A0C",
+        )
+        expectedLfNormalizedSha256.forEach { (script, expected) ->
+            val bytes = Files.readAllBytes(Path.of("src/main/resources/db/migration", script))
+            val actual = lfNormalizedSha256(bytes)
+            assertEquals(expected, actual, "portable LF-normalized source checksum for $script")
+        }
+        assertEquals("7", jdbc.queryForObject("SELECT MAX(version) FROM flyway_schema_history WHERE success", String::class.java))
+        assertTrue(
+            Files.exists(Path.of("src/main/resources/db/migration", "V8__posc002_shared_capability_cutover.sql")),
+            "V8 is the shared capability cutover and is not applied when this preflight stops at V7",
+        )
+
+        val functions = jdbc.queryForList(
+            """
+            SELECT p.proname,
+                   pg_get_function_identity_arguments(p.oid) AS identity_arguments,
+                   pg_get_userbyid(p.proowner) AS owner,
+                   p.oid::regprocedure::text AS signature,
+                   p.prosecdef AS security_definer,
+                   COALESCE(array_to_string(p.proconfig, ','), '<unset>') AS function_config,
+                   COALESCE(p.proacl::text, '<default>') AS acl,
+                   has_function_privilege('storecore_runtime', p.oid, 'EXECUTE') AS runtime_execute,
+                   EXISTS (
+                     SELECT 1
+                       FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) privilege
+                      WHERE privilege.grantee=0 AND privilege.privilege_type='EXECUTE'
+                   ) AS public_execute
+              FROM pg_proc p
+              JOIN pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public'
+               AND p.proname IN (
+                 'capability_admin_change_configuration',
+                 'capability_admin_create_kill_switch',
+                 'capability_admin_remove_kill_switch',
+                 'capability_admin_replace_kill_switch'
+               )
+             ORDER BY p.proname
+            """.trimIndent(),
+        )
+        assertEquals(
+            mapOf(
+                "capability_admin_change_configuration" to "capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)",
+                "capability_admin_create_kill_switch" to "capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)",
+                "capability_admin_remove_kill_switch" to "capability_admin_remove_kill_switch(bigint,bigint,character varying,uuid)",
+                "capability_admin_replace_kill_switch" to "capability_admin_replace_kill_switch(bigint,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
+            ),
+            functions.associate { it.getValue("proname").toString() to it.getValue("signature").toString() },
+        )
+        assertTrue(functions.all { it.getValue("security_definer") == true })
+        assertTrue(functions.all { it.getValue("owner") == "storecore_migrator" })
+        assertTrue(functions.all { it.getValue("function_config") == "search_path=pg_catalog, public" })
+        assertTrue(functions.all { it.getValue("runtime_execute") == true })
+        assertTrue(functions.all { it.getValue("public_execute") == true })
+
+        val roles = jdbc.queryForList(
+            "SELECT rolname,rolcanlogin,rolsuper FROM pg_roles WHERE rolname LIKE 'storecore_%' ORDER BY rolname",
+        )
+        assertEquals(listOf("storecore_migrator", "storecore_runtime"), roles.map { it.getValue("rolname").toString() })
+        assertTrue(roles.all { it.getValue("rolcanlogin") == false })
+        val memberships = jdbc.queryForList(
+            """
+            SELECT parent.rolname || ' -> ' || member.rolname AS membership
+              FROM pg_auth_members m
+              JOIN pg_roles parent ON parent.oid=m.roleid
+              JOIN pg_roles member ON member.oid=m.member
+             WHERE parent.rolname LIKE 'storecore_%' OR member.rolname LIKE 'storecore_%'
+             ORDER BY membership
+            """.trimIndent(),
+        )
+        val defaultPrivileges = jdbc.queryForList(
+            """
+            SELECT pg_get_userbyid(d.defaclrole) AS owner, n.nspname AS schema_name, d.defaclobjtype AS object_type, d.defaclacl::text AS acl
+              FROM pg_default_acl d
+              LEFT JOIN pg_namespace n ON n.oid=d.defaclnamespace
+             WHERE d.defaclrole IN (SELECT oid FROM pg_roles WHERE rolname LIKE 'storecore_%')
+                OR n.nspname='public'
+             ORDER BY owner, schema_name, object_type
+            """.trimIndent(),
+        )
+        val runtimeBalanceInsert = jdbc.queryForObject(
+            "SELECT has_column_privilege('storecore_runtime','public.inventory_balances','variant_id','INSERT')",
+            Boolean::class.java,
+        )!!
+        val hasVersionEight = jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM flyway_schema_history WHERE version='8')", Boolean::class.java)!!
+        assertFalse(hasVersionEight)
+
+        println("POSC-002A Flyway V3-V7: " + history.joinToString { "${it["version"]}/${it["script"]}/checksum=${it["checksum"]}/success=${it["success"]}" })
+        println("POSC-002A V3 function inventory: " + functions.joinToString { "${it["proname"]}(${it["identity_arguments"]}) owner=${it["owner"]} SECURITY DEFINER=${it["security_definer"]} config=${it["function_config"]} proacl=${it["acl"]} runtime_EXECUTE=${it["runtime_execute"]} PUBLIC_EXECUTE=${it["public_execute"]}" })
+        println("POSC-002A roles: " + roles.joinToString { "${it["rolname"]}(LOGIN=${it["rolcanlogin"]},SUPER=${it["rolsuper"]})" })
+        println("POSC-002A memberships=$memberships defaultPrivileges=$defaultPrivileges inventory_balances INSERT(variant_id) for runtime=$runtimeBalanceInsert; required by JdbcInventoryService.lockBalance on every adjust/setAvailableQuantity call")
+        println("POSC-002A stops at V7; V8__posc002_shared_capability_cutover.sql is present and is not in this history. Flyway SQL rollback strategy is documented as backup/restore before commit, forward correction after commit.")
+    }
+
+    @Test
+    fun `migration source fingerprint treats CRLF and LF files identically`() {
+        val lf = "SELECT 1;\nSELECT 2;\n".toByteArray(StandardCharsets.UTF_8)
+        val crlf = "SELECT 1;\r\nSELECT 2;\r\n".toByteArray(StandardCharsets.UTF_8)
+
+        assertEquals(lfNormalizedSha256(lf), lfNormalizedSha256(crlf))
+    }
+
     @Test
     fun cleanAndPopulatedStagedUpgradeHaveEquivalentHistoryAndCatalog() {
         val clean = createDatabase()
@@ -655,6 +788,15 @@ class BlackStorePg16UpgradeAclHarnessTest {
     private fun assertSqlState42501(connection: Connection, action: (Connection) -> Unit) {
         val error = assertThrows(PSQLException::class.java) { action(connection) }
         assertEquals("42501", error.sqlState)
+    }
+
+    private fun lfNormalizedSha256(bytes: ByteArray): String {
+        val normalizedText = String(bytes, StandardCharsets.UTF_8)
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+        return java.security.MessageDigest.getInstance("SHA-256")
+            .digest(normalizedText.toByteArray(StandardCharsets.UTF_8))
+            .joinToString("") { "%02X".format(it) }
     }
 
     private fun migrateTo(database: String, target: String) {

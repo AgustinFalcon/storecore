@@ -3,7 +3,7 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_posc002_spec_review",
+  "status": "ready_for_posc002_implementation_plan_review",
   "stats": { "total": 9, "done": 3, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
@@ -33,10 +33,19 @@
     {
       "id": "TASK-POSC-002",
       "title": "Portar deltas de identidad companion, capability y ACL",
-      "status": "pending_spec_review",
+      "status": "pending_implementation_plan_review",
       "layer": 2,
       "depends_on": ["TASK-POSC-001"],
-      "acceptance_criteria": ["Migraciones nuevas y aditivas sin modificar V1–V7", "0..1 companion y revocación/rotación de credencial seguras", "Pruebas PG16 positivas y negativas para scopes y roles"]
+      "acceptance_criteria": ["GO documental Astra POS sobre d8dc971 registrado en sdd/reviews/20260928-posc002-shared-pos-spec-go.md; plan 002A–G en review, sin evidencia de código", "002B: owner/migración shared cierra V3 PUBLIC/runtime y conserva las cuatro rutas capability con Tx-S durable antes de Tx-C, correlation obligatoria, intent/comando, status y recuperación; instala sólo ancla/roles compartidos, no guard POS completo", "002C: esquema companion auth_ready/scopes, nueve entry points y Tx-P idempotente consumen Tx-S/Tx-C de 002B; bearer opaco 256-bit/provider y principal quedan en 002D", "002E: tras 002C crea guard POS VOLATILE completo para companion/credential en Tx-A/Tx-B/commit/release READ COMMITTED y read guard RR sin locks; admin-wins/effect-wins PG16", "Revalidar integración 9ce355b y versión Flyway; ML RR mantiene gate separado; balance INSERT(variant_id), cursor UPSERT y HTTP loopback en matriz 002F", "002A–G con pruebas locales y dos reviews Astra de código por PR; sin activación live ni cierre SDD"],
+      "implementation_slices": [
+        {"id":"TASK-POSC-002A","status":"pending_dual_review","depends_on":[],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"4-implementation/posc002a-preflight.md"},
+        {"id":"TASK-POSC-002B","status":"blocked_by_002A","depends_on":["TASK-POSC-002A"],"scope":"shared anchor plus complete durable Tx-S/Tx-C capability administration; no full POS guard","plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002C","status":"blocked_by_002B","depends_on":["TASK-POSC-002B"],"scope":"companion schema auth_ready/scopes and Tx-P consume 002B protocol","plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002D","status":"blocked_by_002C_integration","depends_on":["TASK-POSC-002C"],"plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002E","status":"blocked_by_002B_002C_002D","depends_on":["TASK-POSC-002B","TASK-POSC-002C","TASK-POSC-002D"],"scope":"full POS effect/read guards after companion schema plus engine wiring","plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002F","status":"blocked_by_002E","depends_on":["TASK-POSC-002E"],"plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002G","status":"blocked_by_002F","depends_on":["TASK-POSC-002F"],"plan_ref":"3-tasks/posc002-implementation-slices.md"}
+      ]
     },
     {
       "id": "TASK-POSC-003",
