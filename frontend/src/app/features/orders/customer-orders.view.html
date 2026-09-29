@@ -17,8 +17,8 @@
         <li class="sc-card sc-order-card">
           <p>
             <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
-            <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
-            <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
+            <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
+            <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
           </p>
           <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
           <ul class="sc-order-card__lines">

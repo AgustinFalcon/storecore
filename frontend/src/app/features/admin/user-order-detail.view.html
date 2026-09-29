@@ -12,10 +12,10 @@
       <p class="sc-kicker">Consola</p>
       <h1 id="admin-order-title">Fulfillment {{ order.id }}</h1>
       <p>
-        <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ shipmentStatusLabel(order.shipmentStatus) }}</span>
-        <span class="sc-badge">rma {{ order.rmaStatus || '—' }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
+        <span class="sc-badge">rma {{ order.rmaStatus?.label || '—' }}</span>
       </p>
       <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
     </header>
@@ -48,19 +48,19 @@
         <h2>Siguiente transición</h2>
         @if (nextShip(order); as next) {
           <form class="sc-panel" (submit)="$event.preventDefault()">
-            @if (next === 'SHIPPED') {
+            @if (next.asksTracking) {
               <label>Tracking
                 <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
               </label>
             }
             <button type="button" class="sc-btn sc-btn--primary" (click)="pendingShip = true">
-              {{ shipmentLabel(next) }}
+              {{ next.actionLabel }}
             </button>
           </form>
         }
         @if (nextReturn(order); as next) {
           <button type="button" class="sc-btn sc-btn--ghost" (click)="pendingRma = true">
-            {{ rmaLabel(next) }}
+            {{ next.actionLabel }}
           </button>
         }
         <p class="sc-callout">Una transición por vez. El tracking es informativo.</p>
@@ -71,7 +71,7 @@
       title="Confirmar transición"
       message="Avanza una sola vez. El tracking es informativo y no habla con un correo."
       confirmLabel="Confirmar"
-      (confirm)="pendingShip = false; ship.emit({ orderId: order.id, status: nextShip(order)!, tracking: tracking || null })"
+      (confirm)="pendingShip = false; ship.emit({ orderId: order.id, status: shipCommand(nextShip(order)!), tracking: tracking || null })"
       (dismissed)="pendingShip = false"
     />
     <sc-dialog
@@ -79,7 +79,7 @@
       title="Confirmar RMA"
       message="Registra el siguiente paso de la devolución. No repone stock hasta el ajuste."
       confirmLabel="Confirmar"
-      (confirm)="pendingRma = false; rma.emit({ orderId: order.id, status: nextReturn(order)! })"
+      (confirm)="pendingRma = false; rma.emit({ orderId: order.id, status: returnCommand(nextReturn(order)!) })"
       (dismissed)="pendingRma = false"
     />
   }

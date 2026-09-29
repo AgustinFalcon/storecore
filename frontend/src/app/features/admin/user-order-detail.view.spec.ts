@@ -1,22 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
+import { OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus } from '../../domain/order/closed-status';
 import { AdminOrder } from '../../domain/order/order.entity';
 import { UserOrderDetailViewComponent } from './user-order-detail.view';
 
 const SHIP_LABELS = ['Empacar', 'Enviar', 'Entregar'] as const;
 const RMA_LABELS = ['RMA recibido', 'Inspeccionar', 'Ajustar stock'] as const;
 
-function order(shipmentStatus: string, rmaStatus: string | null): AdminOrder {
+function order(shipmentWire: string, rmaWire: string | null): AdminOrder {
+  const shipmentStatus = ShipmentStatus.fromWire(shipmentWire);
   return {
     id: 'ord-1',
-    orderStatus: 'PAID',
-    paymentStatus: 'APPROVED',
+    orderStatus: OrderStatus.Paid,
+    paymentStatus: PaymentStatus.Approved,
     shipmentStatus,
-    tracking: shipmentStatus === 'SHIPPED' ? 'TRK-1' : null,
+    tracking: shipmentStatus === ShipmentStatus.Shipped ? 'TRK-1' : null,
     paymentMethod: null,
     total: 100,
-    rmaStatus,
+    rmaStatus: rmaWire ? RmaStatus.fromWire(rmaWire) : null,
     lines: [
       {
         sku: 'SKU-1',

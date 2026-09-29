@@ -22,7 +22,13 @@ export class CustomerOrderDetailStore extends ComponentStore<CustomerOrderDetail
     private readonly getMine: GetMyOrderUseCase,
     private readonly getShipping: GetShippingSelectionUseCase,
   ) {
-    super({ loading: false, errorMessage: '', order: null, shipping: null, shippingError: '' });
+    super({
+      loading: false,
+      errorMessage: '',
+      order: null,
+      shipping: null,
+      shippingError: '',
+    });
   }
 
   readonly loading$ = this.select((s) => s.loading);
@@ -33,7 +39,15 @@ export class CustomerOrderDetailStore extends ComponentStore<CustomerOrderDetail
 
   readonly load = this.effect<string>((id$) =>
     id$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '', order: null, shipping: null, shippingError: '' })),
+      tap(() =>
+        this.patchState({
+          loading: true,
+          errorMessage: '',
+          order: null,
+          shipping: null,
+          shippingError: '',
+        }),
+      ),
       switchMap((orderId) =>
         forkJoin({
           order: this.getMine.execute(orderId),

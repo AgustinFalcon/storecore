@@ -1,3 +1,6 @@
+import { PaymentMethod } from '../order/closed-status';
+import type { OrderStatus, PaymentStatus } from '../order/closed-status';
+
 export interface CartLine {
   readonly sku: string;
   readonly name: string;
@@ -16,8 +19,8 @@ export interface Cart {
 
 export type PaymentMethodId = 'MERCADO_PAGO' | 'CASH';
 
-export function leavesForPaymentProvider(method: PaymentMethodId, allowlistedUrl: boolean): boolean {
-  return method === 'MERCADO_PAGO' && allowlistedUrl;
+export function leavesForPaymentProvider(method: PaymentMethod, allowlistedUrl: boolean): boolean {
+  return method === PaymentMethod.MercadoPago && allowlistedUrl;
 }
 
 export interface CheckoutCommand {
@@ -29,7 +32,7 @@ export interface CheckoutCommand {
 
 export interface CheckoutReceipt {
   readonly orderId: string;
-  readonly paymentStatus: string;
-  readonly orderStatus: string;
+  readonly paymentStatus: PaymentStatus;
+  readonly orderStatus: OrderStatus;
   readonly checkoutUrl?: string | null;
 }

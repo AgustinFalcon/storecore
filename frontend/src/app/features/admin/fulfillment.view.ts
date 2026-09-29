@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { nextRma, nextShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
-import { shipmentStatusLabel } from '../../domain/order/status-label';
+import { RmaStatus, ShipmentStatus } from '../../domain/order/closed-status';
+import { nextRma, nextShipment, rmaCommand, shipmentCommand } from '../../domain/order/fulfillment-transition';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { DialogComponent } from '../../shared/dialog.component';
@@ -25,8 +25,6 @@ export class FulfillmentViewComponent {
   pendingShip: { orderId: string; status: ShipmentTransition; tracking: string | null } | null = null;
   pendingRma: { orderId: string; status: RmaTransition } | null = null;
 
-  readonly shipmentStatusLabel = shipmentStatusLabel;
-
   trackingOf(orderId: string): string {
     return this.tracking[orderId] || '';
   }
@@ -39,11 +37,11 @@ export class FulfillmentViewComponent {
     return nextRma(order.rmaStatus);
   }
 
-  shipLabel(status: ShipmentTransition) {
-    return shipmentLabel(status);
+  shipCommand(status: ShipmentStatus) {
+    return shipmentCommand(status);
   }
 
-  returnLabel(status: RmaTransition) {
-    return rmaLabel(status);
+  returnCommand(status: RmaStatus) {
+    return rmaCommand(status);
   }
 }

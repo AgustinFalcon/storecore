@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { OrderStatus, PaymentStatus, ShipmentStatus } from '../../domain/order/closed-status';
 import { CustomerOrder } from '../../domain/order/order.entity';
 import { CustomerOrderDetailViewComponent } from './customer-order-detail.view';
 
@@ -20,9 +21,9 @@ function line(partial: Partial<CustomerOrder['lines'][number]> = {}): CustomerOr
 function order(item: CustomerOrder['lines'][number]): CustomerOrder {
   return {
     id: 'ORD-1',
-    orderStatus: 'PAID',
-    paymentStatus: 'APPROVED',
-    shipmentStatus: 'PREPARING',
+    orderStatus: OrderStatus.Paid,
+    paymentStatus: PaymentStatus.Approved,
+    shipmentStatus: ShipmentStatus.Preparing,
     tracking: null,
     paymentMethod: null,
     total: 900,

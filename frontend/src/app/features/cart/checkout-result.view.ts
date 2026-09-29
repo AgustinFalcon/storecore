@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CustomerOrder } from '../../domain/order/order.entity';
-import { orderStatusLabel, paymentMethodLabel, paymentStatusLabel } from '../../domain/order/status-label';
+import { PaymentMethod, PaymentStatus } from '../../domain/order/closed-status';
 import { quoteShipping, shippingPrice } from '../../domain/shipping/shipping-quote';
 import { ShippingSelection } from '../../domain/shipping/shipping.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
@@ -19,27 +19,24 @@ export class CheckoutResultViewComponent {
   @Input() loading = false;
   @Input() error = '';
   @Output() readonly retry = new EventEmitter<void>();
-  readonly orderStatusLabel = orderStatusLabel;
-  readonly paymentStatusLabel = paymentStatusLabel;
-
-  readonly paymentMethodLabel = paymentMethodLabel;
+  readonly methodLabel = PaymentMethod.labelOf;
 
   get shippingName(): string {
     return quoteShipping(this.order?.total ?? 0).find((option) => option.id === this.shipping?.optionId)?.name ?? '';
   }
 
   get outcome(): string {
-    if (this.order?.paymentStatus === 'APPROVED') {
+    if (this.order?.paymentStatus === PaymentStatus.Approved) {
       return 'El servidor marcó el pago acreditado. Esta pantalla no lo decide.';
     }
-    if (this.order?.paymentStatus === 'REJECTED') {
+    if (this.order?.paymentStatus === PaymentStatus.Rejected) {
       return 'El servidor marcó el pago rechazado. La orden sigue y se puede reintentar.';
     }
     const method = this.order?.paymentMethod;
-    if (method === 'CASH') {
+    if (method === PaymentMethod.Cash) {
       return 'El pago sigue pendiente. El efectivo se cobra en el local. Esta pantalla no lo marca como cobrado.';
     }
-    if (method === 'MERCADO_PAGO') {
+    if (method === PaymentMethod.MercadoPago) {
       return 'El pago sigue pendiente. Mercado Pago acredita en su sitio. Esta pantalla no lo decide.';
     }
     return 'El pago sigue pendiente. Esta pantalla no elige el medio ni lo marca como cobrado.';

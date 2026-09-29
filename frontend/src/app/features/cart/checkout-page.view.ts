@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CartLine } from '../../domain/cart/cart.entity';
-import { orderStatusLabel, paymentStatusLabel } from '../../domain/order/status-label';
+import { PaymentMethod } from '../../domain/order/closed-status';
 import { quoteShipping, shippingPrice } from '../../domain/shipping/shipping-quote';
 import { CartState } from './cart.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
@@ -22,9 +22,8 @@ export class CheckoutPageViewComponent {
   @Output() readonly pay = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
   confirming = false;
-
-  readonly orderStatusLabel = orderStatusLabel;
-  readonly paymentStatusLabel = paymentStatusLabel;
+  readonly cash = PaymentMethod.Cash;
+  readonly mercadoPago = PaymentMethod.MercadoPago;
 
   get canPay(): boolean {
     return !this.state.loading && this.state.cart.lines.length > 0 && this.state.addressId.length > 0 && this.state.currency.length > 0;
@@ -51,7 +50,7 @@ export class CheckoutPageViewComponent {
   }
 
   get payLabel(): string {
-    return this.state.paymentMethod === 'CASH' ? 'Registrar pago en efectivo' : 'Pagar con Mercado Pago';
+    return this.state.paymentMethod === this.cash ? 'Registrar pago en efectivo' : 'Pagar con Mercado Pago';
   }
 
   askPay(): void {

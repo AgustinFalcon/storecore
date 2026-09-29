@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { RouterLink } from '@angular/router';
 import { hasRealLineDiscount } from '../../domain/order/line-discount';
 import { CustomerOrder } from '../../domain/order/order.entity';
-import { orderStatusLabel, paymentStatusLabel } from '../../domain/order/status-label';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
 @Component({
@@ -17,6 +16,4 @@ export class CustomerOrdersViewComponent {
   @Input() error = '';
   @Output() readonly retry = new EventEmitter<void>();
   readonly hasRealLineDiscount = hasRealLineDiscount;
-  readonly orderStatusLabel = orderStatusLabel;
-  readonly paymentStatusLabel = paymentStatusLabel;
 }

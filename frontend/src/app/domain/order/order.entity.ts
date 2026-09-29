@@ -1,12 +1,12 @@
-import type { PaymentMethodId } from '../cart/cart.entity';
+import type { PaymentMethod, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus } from './closed-status';
 
 export interface CustomerOrder {
   readonly id: string;
-  readonly orderStatus: string;
-  readonly paymentStatus: string;
-  readonly shipmentStatus: string;
+  readonly orderStatus: OrderStatus;
+  readonly paymentStatus: PaymentStatus;
+  readonly shipmentStatus: ShipmentStatus;
   readonly tracking: string | null;
-  readonly paymentMethod: PaymentMethodId | null;
+  readonly paymentMethod: PaymentMethod | null;
   readonly total: number;
   readonly lines: readonly {
     readonly sku: string;
@@ -21,7 +21,7 @@ export interface CustomerOrder {
 }
 
 export interface AdminOrder extends CustomerOrder {
-  readonly rmaStatus: string | null;
+  readonly rmaStatus: RmaStatus | null;
 }
 
 export type ShipmentTransition = 'PACKED' | 'SHIPPED' | 'DELIVERED';

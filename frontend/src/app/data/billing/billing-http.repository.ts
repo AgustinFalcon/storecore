@@ -4,6 +4,7 @@ import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { BillingProfile, TaxCondition } from '../../domain/billing/billing.entity';
+import { DocumentStatus } from '../../domain/order/closed-status';
 import { IBillingRepository } from '../../domain/billing/billing.repository';
 
 const CONDITIONS = new Set<TaxCondition>(['CONSUMIDOR_FINAL', 'MONOTRIBUTO', 'RESPONSABLE_INSCRIPTO', 'EXENTO']);
@@ -30,6 +31,6 @@ function mapProfile(value: unknown): BillingProfile {
     legalName: String(row['legalName'] ?? ''),
     taxId: String(row['taxId'] ?? ''),
     taxCondition: CONDITIONS.has(condition as TaxCondition) ? (condition as TaxCondition) : 'CONSUMIDOR_FINAL',
-    documentStatus: row['documentStatus'] === 'ISSUED' ? 'ISSUED' : 'NOT_ISSUED',
+    documentStatus: DocumentStatus.fromWire(row['documentStatus']),
   };
 }

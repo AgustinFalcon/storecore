@@ -66,7 +66,7 @@ export class OrderReceiptStore extends ComponentStore<OrderReceiptState> {
           taxCondition: profile.taxCondition,
         }).pipe(
           tapResponse({
-            next: (saved) => this.patchState({ profile: saved, loading: false, notice: 'Datos guardados. El comprobante sigue sin emitirse.' }),
+            next: (saved) => this.patchState({ profile: saved, loading: false, notice: 'Datos guardados. El comprobante queda emitido cuando el servicio fiscal lo marca.' }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         );

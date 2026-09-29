@@ -1,4 +1,5 @@
-import { Cart, CartLine, CheckoutReceipt, PaymentMethodId } from '../../domain/cart/cart.entity';
+import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { OrderStatus, PaymentMethod, PaymentStatus, RmaStatus, ShipmentStatus } from '../../domain/order/closed-status';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { HomeContent, HomeBlock } from '../../domain/catalog/home-content.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
@@ -22,8 +23,8 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
-function paymentMethodId(value: unknown): PaymentMethodId | null {
-  return value === 'MERCADO_PAGO' || value === 'CASH' ? value : null;
+function paymentMethod(value: unknown): PaymentMethod | null {
+  return PaymentMethod.fromWire(value);
 }
 
 function text(value: unknown): string {
@@ -230,8 +231,8 @@ export function mapReceipt(value: unknown): CheckoutReceipt {
   const row = asRecord(value);
   return {
     orderId: text(row['orderId']),
-    paymentStatus: text(row['paymentStatus']),
-    orderStatus: text(row['orderStatus']),
+    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
+    orderStatus: OrderStatus.fromWire(row['orderStatus']),
     checkoutUrl: text(row['checkoutUrl']) || null,
   };
 }
@@ -240,11 +241,11 @@ function mapOrder(value: unknown): CustomerOrder {
   const row = asRecord(value);
   return {
     id: text(row['id']),
-    orderStatus: text(row['orderStatus']),
-    paymentStatus: text(row['paymentStatus']),
-    shipmentStatus: text(row['shipmentStatus']),
+    orderStatus: OrderStatus.fromWire(row['orderStatus']),
+    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
+    shipmentStatus: ShipmentStatus.fromWire(row['shipmentStatus']),
     tracking: text(row['tracking']) || null,
-    paymentMethod: paymentMethodId(row['paymentMethod']),
+    paymentMethod: paymentMethod(row['paymentMethod']),
     total: num(row['total']),
     lines: items(row['lines']).map(mapCartLine),
   };
@@ -260,7 +261,8 @@ export function mapCustomerOrders(value: unknown): readonly CustomerOrder[] {
 
 export function mapAdminOrder(value: unknown): AdminOrder {
   const row = asRecord(value);
-  return { ...mapOrder(value), rmaStatus: text(row['rmaStatus']) || null };
+  const rma = text(row['rmaStatus']);
+  return { ...mapOrder(value), rmaStatus: rma ? RmaStatus.fromWire(rma) : null };
 }
 
 export function mapAdminOrders(value: unknown): readonly AdminOrder[] {

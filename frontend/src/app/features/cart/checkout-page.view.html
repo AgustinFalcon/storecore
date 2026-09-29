@@ -20,15 +20,15 @@
       <h2>Medio de pago</h2>
       <fieldset class="sc-ship-options">
         <legend class="sc-summary__label">El servidor registra la elección. El cobro llega cuando exista el servicio.</legend>
-        <label class="sc-ship-option" [class.sc-ship-option--on]="state.paymentMethod === 'MERCADO_PAGO'">
-          <input type="radio" name="paymentMethod" value="MERCADO_PAGO" [checked]="state.paymentMethod === 'MERCADO_PAGO'" (change)="paymentMethodChange.emit('MERCADO_PAGO')" />
+        <label class="sc-ship-option" [class.sc-ship-option--on]="state.paymentMethod === mercadoPago">
+          <input type="radio" name="paymentMethod" [value]="mercadoPago.code" [checked]="state.paymentMethod === mercadoPago" (change)="paymentMethodChange.emit(mercadoPago.code)" />
           <span>
             <strong>Mercado Pago</strong>
             <span class="sc-price__meta">Si el servidor devuelve una URL permitida, salís a Mercado Pago en esta misma ventana. La tarjeta se elige allá.</span>
           </span>
         </label>
-        <label class="sc-ship-option" [class.sc-ship-option--on]="state.paymentMethod === 'CASH'">
-          <input type="radio" name="paymentMethod" value="CASH" [checked]="state.paymentMethod === 'CASH'" (change)="paymentMethodChange.emit('CASH')" />
+        <label class="sc-ship-option" [class.sc-ship-option--on]="state.paymentMethod === cash">
+          <input type="radio" name="paymentMethod" [value]="cash.code" [checked]="state.paymentMethod === cash" (change)="paymentMethodChange.emit(cash.code)" />
           <span>
             <strong>Efectivo en el local</strong>
             <span class="sc-price__meta">Lo pagás al retirar. Esta pantalla no marca el pago como cobrado.</span>
@@ -70,8 +70,8 @@
       @if (state.receipt) {
         <p>
           Orden {{ state.receipt.orderId }}
-          · <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(state.receipt.paymentStatus) }}</span>
-          · <span class="sc-badge">orden {{ orderStatusLabel(state.receipt.orderStatus) }}</span>
+          · <span class="sc-badge sc-badge--info">pago {{ state.receipt.paymentStatus.label }}</span>
+          · <span class="sc-badge">orden {{ state.receipt.orderStatus.label }}</span>
         </p>
       }
     </aside>
@@ -79,7 +79,7 @@
   <sc-dialog
     [open]="confirming"
     title="Registrar el pedido"
-    [message]="state.paymentMethod === 'CASH' ? 'El pago en efectivo queda pendiente. El local lo cobra al retirar. Esta pantalla no lo marca cobrado.' : 'Si el servidor tiene una URL permitida, vas a salir a Mercado Pago. Si no, el pedido queda pendiente acá.'"
+    [message]="state.paymentMethod === cash ? 'El pago en efectivo queda pendiente. El local lo cobra al retirar. Esta pantalla no lo marca cobrado.' : 'Si el servidor tiene una URL permitida, vas a salir a Mercado Pago. Si no, el pedido queda pendiente acá.'"
     [confirmLabel]="payLabel"
     (confirm)="confirmPay()"
     (dismissed)="confirming = false"

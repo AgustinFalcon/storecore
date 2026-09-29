@@ -1,49 +1,54 @@
+import { RmaStatus, ShipmentStatus } from './closed-status';
 import { RmaTransition, ShipmentTransition } from './order.entity';
 
-export function nextShipment(status: string): ShipmentTransition | null {
-  switch (status) {
-    case 'PREPARING':
-      return 'SHIPPED';
-    case 'SHIPPED':
-      return 'DELIVERED';
-    case 'DELIVERED':
-      return null;
-    default:
-      return 'PACKED';
+export function nextShipment(status: ShipmentStatus): ShipmentStatus | null {
+  if (status === ShipmentStatus.Preparing) {
+    return ShipmentStatus.Shipped;
   }
+  if (status === ShipmentStatus.Shipped) {
+    return ShipmentStatus.Delivered;
+  }
+  if (status === ShipmentStatus.Delivered || status === ShipmentStatus.Unknown) {
+    return null;
+  }
+  return ShipmentStatus.Packed;
 }
 
-export function nextRma(status: string | null): RmaTransition | null {
-  switch (status) {
-    case 'RETURN_RECEIVED':
-      return 'INSPECTED';
-    case 'INSPECTED':
-      return 'ADJUSTED';
-    case 'CLOSED':
-      return null;
-    default:
-      return 'RECEIVED';
+export function shipmentCommand(status: ShipmentStatus): ShipmentTransition {
+  if (status === ShipmentStatus.Packed) {
+    return 'PACKED';
   }
+  if (status === ShipmentStatus.Shipped) {
+    return 'SHIPPED';
+  }
+  if (status === ShipmentStatus.Delivered) {
+    return 'DELIVERED';
+  }
+  throw new Error('Estado de envío sin transición');
 }
 
-export function shipmentLabel(status: ShipmentTransition): string {
-  switch (status) {
-    case 'PACKED':
-      return 'Empacar';
-    case 'SHIPPED':
-      return 'Enviar';
-    case 'DELIVERED':
-      return 'Entregar';
+export function nextRma(status: RmaStatus | null): RmaStatus | null {
+  if (status === RmaStatus.ReturnReceived) {
+    return RmaStatus.Inspected;
   }
+  if (status === RmaStatus.Inspected) {
+    return RmaStatus.Adjusted;
+  }
+  if (status === RmaStatus.Closed) {
+    return null;
+  }
+  return RmaStatus.Received;
 }
 
-export function rmaLabel(status: RmaTransition): string {
-  switch (status) {
-    case 'RECEIVED':
-      return 'RMA recibido';
-    case 'INSPECTED':
-      return 'Inspeccionar';
-    case 'ADJUSTED':
-      return 'Ajustar stock';
+export function rmaCommand(status: RmaStatus): RmaTransition {
+  if (status === RmaStatus.Received) {
+    return 'RECEIVED';
   }
+  if (status === RmaStatus.Inspected) {
+    return 'INSPECTED';
+  }
+  if (status === RmaStatus.Adjusted) {
+    return 'ADJUSTED';
+  }
+  throw new Error('Estado de RMA sin transición');
 }
