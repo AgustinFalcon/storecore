@@ -13,11 +13,35 @@
       <h1 id="order-detail-title">Orden {{ order.id }}</h1>
       <p class="sc-page__lede">La orden y el pago son datos distintos. Acá se lee el snapshot, no se modifica.</p>
       <p>
-        <span class="sc-badge">orden {{ orderStatusLabel(order.orderStatus) }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ paymentStatusLabel(order.paymentStatus) }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ shipmentStatusLabel(order.shipmentStatus) }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
       </p>
     </header>
+    <section aria-labelledby="order-status-title">
+      <h2 id="order-status-title">Estado del pedido</h2>
+      @if (currentMilestone) {
+        <p class="sc-kicker">Estado actual</p>
+        <p><strong>{{ currentMilestone.label }}</strong></p>
+        <p>{{ currentMilestone.detail }}</p>
+      }
+      @if (previousMilestone) {
+        <p class="sc-kicker">Estado anterior</p>
+        <p>{{ previousMilestone.label }}</p>
+      }
+      @if (nextMilestone) {
+        <p class="sc-kicker">Siguiente</p>
+        <p>{{ nextMilestone.label }}. {{ nextMilestone.detail }}</p>
+      }
+      <ol class="sc-ship-steps">
+        @for (step of milestones; track step.id) {
+          <li [attr.data-state]="step.state">
+            <strong>{{ step.label }}</strong>
+            <span>{{ step.detail }}</span>
+          </li>
+        }
+      </ol>
+    </section>
     <div class="sc-workbench">
       <div class="sc-table-wrap">
         <table class="sc-table sc-stack">
@@ -29,6 +53,7 @@
               <th>Original</th>
               <th>Dto</th>
               <th>Efectivo</th>
+              <th>Subtotal</th>
             </tr>
           </thead>
           <tbody>
@@ -47,6 +72,7 @@
                   }
                 </td>
                 <td class="sc-price" data-label="Efectivo"><span class="sc-price__kind">Efectivo</span>{{ line.effectiveUnitPrice }} <span class="sc-price__meta">por unidad</span></td>
+                <td class="sc-price" data-label="Subtotal">{{ lineSubtotal(line.quantity, line.effectiveUnitPrice) }}</td>
               </tr>
             }
           </tbody>
@@ -54,9 +80,14 @@
       </div>
       <aside class="sc-summary">
         <h2>Entrega</h2>
-        <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
+        <p>Medio {{ methodLabel(order.paymentMethod) }}</p>
+        @if (order.tracking) {
+          <p>Número de Correo Argentino: {{ order.tracking }}. El seguimiento sigue en el correo.</p>
+        } @else {
+          <p class="sc-price__meta">Todavía no hay número de Correo Argentino.</p>
+        }
         <p><a [routerLink]="['/customer/orders', order.id, 'envio']">Ver simulación de envío</a></p>
-        <p><a [routerLink]="['/customer/orders', order.id, 'comprobante']">Datos para facturar</a></p>
+        <p><a [routerLink]="['/customer/orders', order.id, 'comprobante']">Comprobante de la venta</a></p>
         <p class="sc-summary__label">Efectivo del pedido</p>
         <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
         @if (shippingError) {

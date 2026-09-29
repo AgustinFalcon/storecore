@@ -20,3 +20,7 @@ Leer `sdd/STATUS.md`, `sdd/PROJECT.md`, `sdd/PATTERNS.md` y el WIP activo antes 
 3. Sol declara GO/NO-GO.
 4. Luna implementa únicamente tareas con GO.
 5. Todo PR se mergea sólo tras dos reviews Grok 4.7 en paralelo (ver `.cursor/rules/pr-dual-grok-review.mdc`): leen descripción, diff y motivo, validan, revisan código; si piden mejoras se implementan; ambos `APPROVED` y close-out SDD honesto antes del merge. El approve no es un click humano en GitHub.
+
+## Estados cerrados
+
+Un estado, rol, medio de pago o paso de un flujo es un tipo cerrado (`enum` o clase sellada). En TypeScript, clase con constructor privado, instancias estáticas y `fromWire` en el borde. La vista no compara strings de estado. Un valor de red desconocido es el caso `Unknown` de ese tipo. Cada paso de un flujo es un objeto. El dominio no importa framework.

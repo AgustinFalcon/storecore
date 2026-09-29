@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BillingProfile } from '../../domain/billing/billing.entity';
-import { paymentMethodLabel } from '../../domain/order/status-label';
+import { PaymentMethod } from '../../domain/order/closed-status';
 import { CustomerOrder } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -23,5 +23,5 @@ export class OrderReceiptViewComponent {
   @Output() readonly conditionChange = new EventEmitter<string>();
   @Output() readonly save = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
-  readonly paymentMethodLabel = paymentMethodLabel;
+  readonly methodLabel = PaymentMethod.labelOf;
 }

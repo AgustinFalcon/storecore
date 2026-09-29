@@ -3,7 +3,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Simulación</p>
     <h1 id="shipping-track-title">Envío</h1>
-    <p class="sc-page__lede">Simulación del recorrido. Correo Argentino no está conectado.</p>
+    <p class="sc-page__lede">Simulación del recorrido. El estado del pedido está en la orden. Correo Argentino no está conectado.</p>
   </header>
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
   @if (!state.loading && !state.errorMessage) {

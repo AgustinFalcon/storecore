@@ -5,7 +5,8 @@ import { tapResponse } from '@ngrx/operators';
 import { filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { environment } from '../../../environments/environment';
-import { Cart, CheckoutReceipt, leavesForPaymentProvider, PaymentMethodId } from '../../domain/cart/cart.entity';
+import { Cart, CheckoutReceipt, leavesForPaymentProvider } from '../../domain/cart/cart.entity';
+import { PaymentMethod } from '../../domain/order/closed-status';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.usecase';
 import { GetCartUseCase } from '../../domain/cart/use-cases/get-cart.usecase';
@@ -24,7 +25,7 @@ export interface CartState {
   readonly idempotencyKey: string;
   readonly receipt: CheckoutReceipt | null;
   readonly shippingOptionId: ShippingOptionId | null;
-  readonly paymentMethod: PaymentMethodId;
+  readonly paymentMethod: PaymentMethod;
   readonly notice: string;
 }
 
@@ -38,7 +39,7 @@ const INITIAL: CartState = {
   idempotencyKey: crypto.randomUUID(),
   receipt: null,
   shippingOptionId: null,
-  paymentMethod: 'MERCADO_PAGO',
+  paymentMethod: PaymentMethod.MercadoPago,
   notice: '',
 };
 
@@ -72,7 +73,7 @@ export class CartStore extends ComponentStore<CartState> {
   readonly setCurrency = this.updater((s, currency: string) => ({ ...s, currency: currency === 'ARS' ? currency : 'ARS' }));
   readonly setPaymentMethod = this.updater((s, paymentMethod: string) => ({
     ...s,
-    paymentMethod: paymentMethod === 'CASH' ? 'CASH' : 'MERCADO_PAGO',
+    paymentMethod: PaymentMethod.fromWire(paymentMethod) ?? PaymentMethod.MercadoPago,
   }));
 
   readonly load = this.effect<void>((trigger$) =>
@@ -159,7 +160,7 @@ export class CartStore extends ComponentStore<CartState> {
             idempotencyKey: this.snapshot.idempotencyKey,
             addressId: this.snapshot.addressId,
             currency: this.snapshot.currency,
-            paymentMethod: this.snapshot.paymentMethod,
+            paymentMethod: this.snapshot.paymentMethod === PaymentMethod.Cash ? 'CASH' : 'MERCADO_PAGO',
           })
           .pipe(
             tapResponse({

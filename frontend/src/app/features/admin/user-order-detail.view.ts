@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { nextRma, nextShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
-import { orderStatusLabel, paymentStatusLabel, shipmentStatusLabel } from '../../domain/order/status-label';
+import { RmaStatus, ShipmentStatus } from '../../domain/order/closed-status';
+import { nextRma, nextShipment, rmaCommand, shipmentCommand } from '../../domain/order/fulfillment-transition';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { DialogComponent } from '../../shared/dialog.component';
@@ -25,17 +25,19 @@ export class UserOrderDetailViewComponent {
   @Output() readonly rma = new EventEmitter<{ orderId: string; status: RmaTransition }>();
   @Output() readonly retry = new EventEmitter<void>();
 
-  readonly shipmentLabel = shipmentLabel;
-  readonly rmaLabel = rmaLabel;
-  readonly orderStatusLabel = orderStatusLabel;
-  readonly paymentStatusLabel = paymentStatusLabel;
-  readonly shipmentStatusLabel = shipmentStatusLabel;
-
   nextShip(order: AdminOrder) {
     return nextShipment(order.shipmentStatus);
   }
 
   nextReturn(order: AdminOrder) {
     return nextRma(order.rmaStatus);
+  }
+
+  shipCommand(status: ShipmentStatus): ShipmentTransition {
+    return shipmentCommand(status);
+  }
+
+  returnCommand(status: RmaStatus): RmaTransition {
+    return rmaCommand(status);
   }
 }

@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { hasRealLineDiscount } from '../../domain/order/line-discount';
+import { DocumentStatus, PaymentMethod, ShippingChoice } from '../../domain/order/closed-status';
+import { OrderMilestone } from '../../domain/order/order-milestone';
+import { orderMilestones } from '../../domain/order/order-milestones';
 import { CustomerOrder } from '../../domain/order/order.entity';
-import { orderStatusLabel, paymentStatusLabel, shipmentStatusLabel } from '../../domain/order/status-label';
 import { quoteShipping, shippingPrice } from '../../domain/shipping/shipping-quote';
 import { ShippingSelection } from '../../domain/shipping/shipping.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
@@ -17,13 +19,49 @@ export class CustomerOrderDetailViewComponent {
   @Input() order: CustomerOrder | null = null;
   @Input() shipping: ShippingSelection | null = null;
   @Input() shippingError = '';
+  @Input() documentStatus: DocumentStatus | null = null;
   @Input() loading = false;
   @Input() error = '';
   @Output() readonly retry = new EventEmitter<void>();
   readonly hasRealLineDiscount = hasRealLineDiscount;
-  readonly orderStatusLabel = orderStatusLabel;
-  readonly paymentStatusLabel = paymentStatusLabel;
-  readonly shipmentStatusLabel = shipmentStatusLabel;
+  readonly methodLabel = PaymentMethod.labelOf;
+
+  get milestones(): readonly OrderMilestone[] {
+    if (!this.order) {
+      return [];
+    }
+    return orderMilestones({
+      payment: this.order.paymentStatus,
+      method: this.order.paymentMethod,
+      shipment: this.order.shipmentStatus,
+      tracking: this.order.tracking,
+      shipping: ShippingChoice.fromWire(this.shipping?.optionId ?? null),
+      document: this.documentStatus ?? DocumentStatus.Unknown,
+    });
+  }
+
+  get currentMilestone(): OrderMilestone | null {
+    return this.milestones.find((step) => step.state === 'current') ?? null;
+  }
+
+  get previousMilestone(): OrderMilestone | null {
+    const current = this.milestones.findIndex((step) => step.state === 'current');
+    for (let index = current - 1; index >= 0; index -= 1) {
+      if (this.milestones[index].state === 'done') {
+        return this.milestones[index];
+      }
+    }
+    return null;
+  }
+
+  get nextMilestone(): OrderMilestone | null {
+    const current = this.milestones.findIndex((step) => step.state === 'current');
+    return this.milestones.slice(current + 1).find((step) => step.state === 'upcoming') ?? null;
+  }
+
+  lineSubtotal(quantity: number, unit: number): number {
+    return quantity * unit;
+  }
 
   get shippingName(): string {
     return quoteShipping(this.order?.total ?? 0).find((option) => option.id === this.shipping?.optionId)?.name ?? '';
