@@ -1,5 +1,5 @@
 import { DocumentStatus, PaymentMethod, PaymentStatus, ShippingChoice, ShipmentStatus } from './closed-status';
-import { OrderMilestone } from './order-milestone';
+import { MilestonePaint, OrderMilestone } from './order-milestone';
 
 export interface OrderFacts {
   readonly payment: PaymentStatus;
@@ -64,7 +64,7 @@ class ShippingStep implements MilestoneRule {
     return facts.shipping?.detail ?? 'Falta elegir retiro, estándar o exprés.';
   }
   reached(facts: OrderFacts): boolean {
-    return facts.shipping !== null;
+    return facts.shipping !== null && facts.shipping !== ShippingChoice.Unknown;
   }
 }
 
@@ -73,17 +73,11 @@ class InvoiceStep implements MilestoneRule {
   label(_facts: OrderFacts): string {
     return 'Comprobante';
   }
-  detail(facts: OrderFacts): string {
-    if (facts.document.issued) {
-      return 'StoreCore emitió el comprobante de esta venta.';
-    }
-    if (facts.document === DocumentStatus.NotIssued) {
-      return 'StoreCore factura esta venta. El comprobante todavía no está emitido.';
-    }
-    return 'No pudimos leer el estado del comprobante.';
+  detail(_facts: OrderFacts): string {
+    return 'Los datos del comprobante están en su pantalla. Esta página no emite.';
   }
-  reached(facts: OrderFacts): boolean {
-    return facts.document.issued;
+  reached(_facts: OrderFacts): boolean {
+    return false;
   }
 }
 
@@ -120,12 +114,12 @@ class DispatchStep implements MilestoneRule {
   }
   detail(facts: OrderFacts): string {
     if (facts.tracking) {
-      return `Número de Correo Argentino: ${facts.tracking}. El seguimiento sigue en el correo.`;
+      return `Número de seguimiento: ${facts.tracking}. Lo cargó el operador. Esta pantalla no consulta a Correo Argentino.`;
     }
     if (facts.shipment.rank >= ShipmentStatus.Shipped.rank) {
-      return 'Despachado. Todavía no hay número de Correo Argentino.';
+      return 'Despachado. Todavía no hay número de seguimiento.';
     }
-    return 'El número aparece cuando Correo Argentino lo asigna.';
+    return 'El número aparece cuando el operador lo carga.';
   }
   reached(facts: OrderFacts): boolean {
     return facts.shipment.rank >= ShipmentStatus.Shipped.rank;
@@ -138,7 +132,7 @@ class ReadyStep implements MilestoneRule {
     return 'Listo para retirar';
   }
   detail(_facts: OrderFacts): string {
-    return 'El pedido espera en el local. No hay número de Correo Argentino.';
+    return 'El pedido espera en el local. No hay número de seguimiento.';
   }
   reached(facts: OrderFacts): boolean {
     return facts.shipment.rank >= ShipmentStatus.Packed.rank;
@@ -187,6 +181,6 @@ export function orderMilestones(facts: OrderFacts): readonly OrderMilestone[] {
     id: rule.id,
     label: rule.label(facts),
     detail: rule.detail(facts),
-    state: index === lastReached ? 'current' : rule.reached(facts) ? 'done' : 'upcoming',
+    state: index === lastReached ? MilestonePaint.Current : rule.reached(facts) ? MilestonePaint.Done : MilestonePaint.Upcoming,
   }));
 }

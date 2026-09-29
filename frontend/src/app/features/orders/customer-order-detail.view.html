@@ -35,7 +35,7 @@
       }
       <ol class="sc-ship-steps">
         @for (step of milestones; track step.id) {
-          <li [attr.data-state]="step.state">
+          <li [attr.data-state]="step.state.code">
             <strong>{{ step.label }}</strong>
             <span>{{ step.detail }}</span>
           </li>
@@ -82,9 +82,9 @@
         <h2>Entrega</h2>
         <p>Medio {{ methodLabel(order.paymentMethod) }}</p>
         @if (order.tracking) {
-          <p>Número de Correo Argentino: {{ order.tracking }}. El seguimiento sigue en el correo.</p>
+          <p>Número de seguimiento: {{ order.tracking }}. Lo cargó el operador. Esta pantalla no consulta a Correo Argentino.</p>
         } @else {
-          <p class="sc-price__meta">Todavía no hay número de Correo Argentino.</p>
+          <p class="sc-price__meta">Todavía no hay número de seguimiento.</p>
         }
         <p><a [routerLink]="['/customer/orders', order.id, 'envio']">Ver simulación de envío</a></p>
         <p><a [routerLink]="['/customer/orders', order.id, 'comprobante']">Comprobante de la venta</a></p>

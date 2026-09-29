@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { RouterLink } from '@angular/router';
 import { hasRealLineDiscount } from '../../domain/order/line-discount';
 import { DocumentStatus, PaymentMethod, ShippingChoice } from '../../domain/order/closed-status';
-import { OrderMilestone } from '../../domain/order/order-milestone';
+import { MilestonePaint, OrderMilestone } from '../../domain/order/order-milestone';
 import { orderMilestones } from '../../domain/order/order-milestones';
 import { CustomerOrder } from '../../domain/order/order.entity';
 import { quoteShipping, shippingPrice } from '../../domain/shipping/shipping-quote';
@@ -19,7 +19,6 @@ export class CustomerOrderDetailViewComponent {
   @Input() order: CustomerOrder | null = null;
   @Input() shipping: ShippingSelection | null = null;
   @Input() shippingError = '';
-  @Input() documentStatus: DocumentStatus | null = null;
   @Input() loading = false;
   @Input() error = '';
   @Output() readonly retry = new EventEmitter<void>();
@@ -36,18 +35,18 @@ export class CustomerOrderDetailViewComponent {
       shipment: this.order.shipmentStatus,
       tracking: this.order.tracking,
       shipping: ShippingChoice.fromWire(this.shipping?.optionId ?? null),
-      document: this.documentStatus ?? DocumentStatus.Unknown,
+      document: DocumentStatus.Unknown,
     });
   }
 
   get currentMilestone(): OrderMilestone | null {
-    return this.milestones.find((step) => step.state === 'current') ?? null;
+    return this.milestones.find((step) => step.state === MilestonePaint.Current) ?? null;
   }
 
   get previousMilestone(): OrderMilestone | null {
-    const current = this.milestones.findIndex((step) => step.state === 'current');
+    const current = this.milestones.findIndex((step) => step.state === MilestonePaint.Current);
     for (let index = current - 1; index >= 0; index -= 1) {
-      if (this.milestones[index].state === 'done') {
+      if (this.milestones[index].state === MilestonePaint.Done) {
         return this.milestones[index];
       }
     }
@@ -55,8 +54,8 @@ export class CustomerOrderDetailViewComponent {
   }
 
   get nextMilestone(): OrderMilestone | null {
-    const current = this.milestones.findIndex((step) => step.state === 'current');
-    return this.milestones.slice(current + 1).find((step) => step.state === 'upcoming') ?? null;
+    const current = this.milestones.findIndex((step) => step.state === MilestonePaint.Current);
+    return this.milestones.slice(current + 1).find((step) => step.state === MilestonePaint.Upcoming) ?? null;
   }
 
   lineSubtotal(quantity: number, unit: number): number {

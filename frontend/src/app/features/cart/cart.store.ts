@@ -71,10 +71,10 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly setAddressId = this.updater((s, addressId: string) => ({ ...s, addressId }));
   readonly setCurrency = this.updater((s, currency: string) => ({ ...s, currency: currency === 'ARS' ? currency : 'ARS' }));
-  readonly setPaymentMethod = this.updater((s, paymentMethod: string) => ({
-    ...s,
-    paymentMethod: PaymentMethod.fromWire(paymentMethod) ?? PaymentMethod.MercadoPago,
-  }));
+  readonly setPaymentMethod = this.updater((s, paymentMethod: string) => {
+    const next = PaymentMethod.fromWire(paymentMethod);
+    return { ...s, paymentMethod: next === PaymentMethod.Unknown ? s.paymentMethod : next };
+  });
 
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(

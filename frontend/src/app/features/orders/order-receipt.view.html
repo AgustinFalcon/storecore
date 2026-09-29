@@ -3,7 +3,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Cuenta customer</p>
     <h1 id="receipt-title">Comprobante</h1>
-    <p class="sc-page__lede">StoreCore factura esta venta. Acá se guardan los datos. El comprobante figura emitido cuando el servicio fiscal lo marca.</p>
+    <p class="sc-page__lede">Acá se guardan los datos para facturar. Esta pantalla no emite.</p>
   </header>
   <sc-feature-status [loading]="loading" [error]="error" (retry)="retry.emit()" />
   @if (notice) {
@@ -36,7 +36,7 @@
         @if (profile.documentStatus.issued) {
           <p class="sc-banner sc-banner--ok" role="status">El servicio fiscal marcó el comprobante como emitido.</p>
         } @else {
-          <p class="status status--empty" role="status">El comprobante todavía no está emitido. StoreCore lo marca cuando el servicio fiscal lo autoriza.</p>
+          <p class="status status--empty" role="status">El comprobante todavía no está emitido. El servicio fiscal es el que lo marca.</p>
         }
       </aside>
     </div>

@@ -1,5 +1,3 @@
-import type { ShippingOptionId } from '../shipping/shipping.entity';
-
 abstract class ClosedStatus {
   protected constructor(
     readonly code: string,
@@ -134,21 +132,22 @@ export class DocumentStatus extends ClosedStatus {
 }
 
 export class PaymentMethod extends ClosedStatus {
-  private constructor(code: 'MERCADO_PAGO' | 'CASH', label: string) {
+  private constructor(code: string, label: string) {
     super(code, label);
   }
 
   static readonly MercadoPago = new PaymentMethod('MERCADO_PAGO', 'Mercado Pago');
   static readonly Cash = new PaymentMethod('CASH', 'efectivo en el local');
+  static readonly Unknown = new PaymentMethod('UNKNOWN', 'desconocido');
 
-  static fromWire(raw: unknown): PaymentMethod | null {
+  static fromWire(raw: unknown): PaymentMethod {
     if (raw === PaymentMethod.MercadoPago.code) {
       return PaymentMethod.MercadoPago;
     }
     if (raw === PaymentMethod.Cash.code) {
       return PaymentMethod.Cash;
     }
-    return null;
+    return PaymentMethod.Unknown;
   }
 
   static labelOf(method: PaymentMethod | null | undefined): string {
@@ -157,17 +156,18 @@ export class PaymentMethod extends ClosedStatus {
 }
 
 export class ShippingChoice extends ClosedStatus {
-  private constructor(code: ShippingOptionId, label: string, readonly detail: string) {
+  private constructor(code: string, label: string, readonly detail: string) {
     super(code, label);
   }
 
   static readonly Pickup = new ShippingChoice('PICKUP', 'Retiro', 'Retiro en el local.');
   static readonly Standard = new ShippingChoice('STANDARD', 'Estándar', 'Envío estándar simulado. La fecha es una estimación.');
   static readonly Express = new ShippingChoice('EXPRESS', 'Exprés', 'Envío exprés simulado. La fecha es una estimación.');
+  static readonly Unknown = new ShippingChoice('UNKNOWN', 'desconocido', 'No hay una opción de envío reconocida.');
   static readonly known = [ShippingChoice.Pickup, ShippingChoice.Standard, ShippingChoice.Express] as const;
 
-  static fromWire(raw: string | null): ShippingChoice | null {
-    return ShippingChoice.known.find((choice) => choice.code === raw) ?? null;
+  static fromWire(raw: unknown): ShippingChoice {
+    return ShippingChoice.known.find((choice) => choice.code === raw) ?? ShippingChoice.Unknown;
   }
 
   get pickup(): boolean {
