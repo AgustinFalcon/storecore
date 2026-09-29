@@ -1,6 +1,6 @@
 # POSC-002 — subcortes revisables de identidad y ACL
 
-**Estado:** plan pendiente de review documental. La propuesta técnica obtuvo GO documental Astra acotado al camino POS en el snapshot d8dc971; ver sdd/reviews/20260928-posc002-shared-pos-spec-go.md. Ningún subcorte está implementado ni aprobado por código. Este plan descompone TASK-POSC-002 sin alterar el total 3/9 del DAG principal.
+**Estado:** plan/subcortes aún no tienen aprobación final. POSC-002A tiene implementación y evidencia PG16 local en `4-implementation/posc002a-preflight.md`, pendiente de review independiente; los demás subcortes no están implementados ni aprobados por código. La propuesta técnica obtuvo GO documental Astra acotado al camino POS en el snapshot d8dc971; ver sdd/reviews/20260928-posc002-shared-pos-spec-go.md. Este plan descompone TASK-POSC-002 sin alterar el total 3/9 del DAG principal.
 
 ## Base, ownership y secuencia
 
@@ -10,6 +10,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002A — preflight y manifiesto de corte compartido
 
+- **Estado local:** implementación test-only/evidencia agregada; `pending_dual_review`. No cierra la tarea hasta review independiente del manifiesto y confirmación del snapshot de integración real.
 - **Dependencia:** POSC-001; sin migración ni código productivo.
 - **Owner/artefactos:** inventario de V3–V7, cuatro rutas de CapabilityController, JdbcCapabilityService.decide, roles/grants efectivos y llamadas ML/POS; manifiesto por objeto/operación/rol; versión Flyway libre y rollback operativo.
 - **Aceptación:** PostgreSQL 16 limpia y upgrade con datos muestran checksums y objetos antes de escribir SQL; enumera PUBLIC, runtime, admin, owners NOLOGIN y membership; confirma que inventory_balances necesita INSERT(variant_id) por lockBalance incluso con fila existente. La decisión shared adjudica una sola migración y una sola firma por función, con referencia cruzada en ML-DSP-000B. Si head/objeto difiere, se actualiza el plan antes del DDL.

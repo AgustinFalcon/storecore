@@ -2,6 +2,7 @@ package com.storecore.blackstore
 
 import io.swagger.v3.parser.OpenAPIV3Parser
 import io.swagger.v3.parser.core.models.ParseOptions
+import com.storecore.configuration.infrastructure.web.CapabilityController
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -52,6 +53,78 @@ class BlackStoreRouteTopologyHarnessTest(
         assertFalse(missingDiagnostics.any { it.contains("unexpected") }, missingDiagnostics.toString())
     }
 
+    @Test
+    fun `spring inventory includes only the exact capability routes and their expected owners`() {
+        val expected = expectedCapabilityRoutes()
+        val actual = handlerMapping.handlerMethods.flatMap { (mapping, handler) ->
+            val paths = mapping.pathPatternsCondition?.patterns?.map { it.patternString }
+                ?: mapping.patternsCondition?.patterns.orEmpty()
+            val methods = mapping.methodsCondition.methods
+            paths.filter(::isCapabilityRoute).flatMap { path ->
+                if (methods.isEmpty()) listOf(OwnedRoute("*", path, owner(handler), mapping.toString()))
+                else methods.map { method -> OwnedRoute(method.name, path, owner(handler), mapping.toString()) }
+            }
+        }
+        val diagnostics = verifyCapabilityRouteInventory(expected, actual)
+        assertTrue(diagnostics.isEmpty(), diagnostics.joinToString("\n"))
+        assertEquals(5, expected.size, "four mutation routes plus the read-only capability list")
+        assertEquals(
+            setOf("changeState", "createKill", "removeKill", "replaceKill"),
+            expected.values.map { it.substringAfter('#') }.filter { it != "list" }.toSet(),
+            "exactly four mutating capability controller handlers are in scope",
+        )
+        assertEquals(
+            setOf("changeState", "createKill", "removeKill", "replaceKill"),
+            CapabilityController::class.java.declaredMethods.map { it.name }
+                .filter { it in expected.values.map { owner -> owner.substringAfter('#') } && it != "list" }.toSet(),
+            "the four mapped mutator methods exist on the controller",
+        )
+        val root = repositoryRoot()
+        val controllerSource = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/configuration/infrastructure/web/CapabilityController.kt"))
+        val serviceSource = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/configuration/infrastructure/JdbcCapabilityService.kt"))
+        val controllerCalls = mapOf(
+            "changeState" to "capabilities.changeState(",
+            "createKill" to "capabilities.createKill(",
+            "removeKill" to "capabilities.removeKill(",
+            "replaceKill" to "capabilities.replaceKill(",
+        )
+        val sqlCallers = mapOf(
+            "capability_admin_change_configuration" to "SELECT capability_admin_change_configuration(",
+            "capability_admin_create_kill_switch" to "SELECT capability_admin_create_kill_switch(",
+            "capability_admin_remove_kill_switch" to "SELECT capability_admin_remove_kill_switch(",
+            "capability_admin_replace_kill_switch" to "SELECT capability_admin_replace_kill_switch(",
+        )
+        controllerCalls.forEach { (method, call) ->
+            val methodStart = controllerSource.indexOf("fun $method(")
+            assertTrue(methodStart >= 0, "CapabilityController.$method must exist")
+            val nextMapping = controllerSource.indexOf("\n    @", methodStart + 1)
+            val methodEnd = if (nextMapping >= 0) nextMapping else controllerSource.indexOf("\n}", methodStart).takeIf { it >= 0 } ?: controllerSource.length
+            assertTrue(controllerSource.substring(methodStart, methodEnd).contains(call), "CapabilityController.$method must delegate to $call")
+        }
+        sqlCallers.forEach { (routine, call) ->
+            assertTrue(serviceSource.contains(call), "JdbcCapabilityService must call $routine through $call")
+        }
+    }
+
+    @Test
+    fun `capability topology verifier detects a header-conditioned duplicate and an unexpected route`() {
+        val expected = expectedCapabilityRoutes()
+        val complete = expected.map { (route, expectedOwner) -> OwnedRoute(route.method, route.path, expectedOwner) }
+        val stateRoute = RouteKey("POST", "$CAPABILITY_PATH/{module}/state")
+        val duplicateWithRequestCondition = OwnedRoute(
+            stateRoute.method,
+            stateRoute.path,
+            "ConditionalController#changeStateForHeader",
+            "headers=[X-Source=admin]",
+        )
+        val unexpected = OwnedRoute("PATCH", "$CAPABILITY_PATH/unplanned", "UnexpectedController#unplanned", "params=[mode=internal]")
+
+        val diagnostics = verifyCapabilityRouteInventory(expected, complete + duplicateWithRequestCondition + unexpected)
+        assertTrue(diagnostics.any { it.contains("duplicate POST $CAPABILITY_PATH/{module}/state") }, diagnostics.toString())
+        assertTrue(diagnostics.any { it.contains("unexpected PATCH $CAPABILITY_PATH/unplanned") }, diagnostics.toString())
+        assertTrue(diagnostics.any { it.contains("ConditionalController#changeStateForHeader") }, diagnostics.toString())
+    }
+
     private fun expectedContractRoutes(): Set<RouteKey> {
         val contractPath = repositoryRoot().resolve(CANONICAL_CONTRACT)
         val parsed = OpenAPIV3Parser().readLocation(contractPath.toUri().toString(), null, ParseOptions())
@@ -77,8 +150,36 @@ class BlackStoreRouteTopologyHarnessTest(
         return diagnostics
     }
 
+    private fun verifyCapabilityRouteInventory(expected: Map<RouteKey, String>, actual: List<OwnedRoute>): List<String> {
+        val diagnostics = mutableListOf<String>()
+        val actualKeys = actual.map { RouteKey(it.method, it.path) }.toSet()
+        (expected.keys - actualKeys).sortedWith(routeOrder).forEach { diagnostics += "missing ${it.method} ${it.path}" }
+        (actualKeys - expected.keys).sortedWith(routeOrder).forEach { diagnostics += "unexpected ${it.method} ${it.path}" }
+        actual.groupBy { RouteKey(it.method, it.path) }
+            .filterValues { mappings -> mappings.size != 1 }
+            .toSortedMap(routeOrder)
+            .forEach { (key, mappings) -> diagnostics += "duplicate ${key.method} ${key.path}: ${mappings.map { it.description() }.sorted()}" }
+        actual.forEach { route ->
+            val key = RouteKey(route.method, route.path)
+            val expectedOwner = expected[key]
+            if (expectedOwner != null && route.owner != expectedOwner) {
+                diagnostics += "wrong owner ${key.method} ${key.path}: expected $expectedOwner, got ${route.description()}"
+            }
+        }
+        return diagnostics
+    }
+
     private fun isInScope(path: String): Boolean = path == BASE_PATH || path.startsWith("$BASE_PATH/")
+    private fun isCapabilityRoute(path: String): Boolean = path == CAPABILITY_PATH || path.startsWith("$CAPABILITY_PATH/")
     private fun owner(handler: org.springframework.web.method.HandlerMethod): String = "${handler.beanType.simpleName}#${handler.method.name}"
+
+    private fun expectedCapabilityRoutes(): Map<RouteKey, String> = linkedMapOf(
+        RouteKey("GET", CAPABILITY_PATH) to "CapabilityController#list",
+        RouteKey("POST", "$CAPABILITY_PATH/{module}/state") to "CapabilityController#changeState",
+        RouteKey("POST", "$CAPABILITY_PATH/{module}/kills") to "CapabilityController#createKill",
+        RouteKey("POST", "$CAPABILITY_PATH/{module}/kills/{id}/remove") to "CapabilityController#removeKill",
+        RouteKey("POST", "$CAPABILITY_PATH/{module}/kills/{id}/replace") to "CapabilityController#replaceKill",
+    )
 
     private fun repositoryRoot(): Path {
         var candidate: Path? = Path.of("").toAbsolutePath().normalize()
@@ -90,11 +191,14 @@ class BlackStoreRouteTopologyHarnessTest(
     }
 
     private data class RouteKey(val method: String, val path: String)
-    private data class OwnedRoute(val method: String, val path: String, val owner: String)
+    private data class OwnedRoute(val method: String, val path: String, val owner: String, val conditions: String = "") {
+        fun description() = if (conditions.isBlank()) owner else "$owner [$conditions]"
+    }
 
     companion object {
         private const val BASE_PATH = "/blackstore-integration/v1"
         private const val OPENAPI_PATH = "$BASE_PATH/openapi.yaml"
+        private const val CAPABILITY_PATH = "/api/v1/user/capabilities"
         private const val CANONICAL_CONTRACT = "sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/api/blackstore-integration.openapi.yaml"
         private val routeOrder = compareBy<RouteKey>({ it.path }, { it.method })
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
