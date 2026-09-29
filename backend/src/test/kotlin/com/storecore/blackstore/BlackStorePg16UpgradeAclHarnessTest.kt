@@ -60,11 +60,9 @@ class BlackStorePg16UpgradeAclHarnessTest {
             assertEquals(expected, actual, "portable LF-normalized source checksum for $script")
         }
         assertEquals("7", jdbc.queryForObject("SELECT MAX(version) FROM flyway_schema_history WHERE success", String::class.java))
-        assertFalse(
-            Files.list(Path.of("src/main/resources/db/migration")).use { paths ->
-                paths.anyMatch { it.fileName.toString().matches(Regex("V8(?:__.*)?\\.sql")) }
-            },
-            "V8 is only the next candidate; no V8 script exists in this checkout",
+        assertTrue(
+            Files.exists(Path.of("src/main/resources/db/migration", "V8__posc002_shared_capability_cutover.sql")),
+            "V8 is the shared capability cutover and is not applied when this preflight stops at V7",
         )
 
         val functions = jdbc.queryForList(
@@ -145,7 +143,7 @@ class BlackStorePg16UpgradeAclHarnessTest {
         println("POSC-002A V3 function inventory: " + functions.joinToString { "${it["proname"]}(${it["identity_arguments"]}) owner=${it["owner"]} SECURITY DEFINER=${it["security_definer"]} config=${it["function_config"]} proacl=${it["acl"]} runtime_EXECUTE=${it["runtime_execute"]} PUBLIC_EXECUTE=${it["public_execute"]}" })
         println("POSC-002A roles: " + roles.joinToString { "${it["rolname"]}(LOGIN=${it["rolcanlogin"]},SUPER=${it["rolsuper"]})" })
         println("POSC-002A memberships=$memberships defaultPrivileges=$defaultPrivileges inventory_balances INSERT(variant_id) for runtime=$runtimeBalanceInsert; required by JdbcInventoryService.lockBalance on every adjust/setAvailableQuantity call")
-        println("POSC-002A V8 candidate is free after V7; Flyway SQL rollback strategy is documented as backup/restore before commit, forward correction after commit.")
+        println("POSC-002A stops at V7; V8__posc002_shared_capability_cutover.sql is present and is not in this history. Flyway SQL rollback strategy is documented as backup/restore before commit, forward correction after commit.")
     }
 
     @Test
