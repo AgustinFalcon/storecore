@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Estado actualizado:** 2026-09-27, `origin/integration/storecore-int` en `9ce355b`
+**Estado actualizado:** 2026-09-29; `origin/integration/storecore-int` verificado en `9ce355b` para POSC-002 (revalidar antes de migrar)
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
@@ -37,7 +37,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 ## WIP POS (paralelo, no es el baseline)
 
 - `sdd/wip/20260921-storecore-pos-integration-contract-v1/` — PIC-001..010 y L3-001..003 tienen evidencia **local histórica**; HTTP 200/304/409/410/429 y outbox se probaron en Testcontainers con activación temporal, y el módulo vuelve a DISABLED. PR #19 quedó en `master` (`18d18f7`) con dos reviews Grok; su Verify no fue CI verde. El worktree posterior de readiness divergió de integración y requiere convergencia documental y port por partes: POS/conector live sigue NO-GO. El WIP permanece abierto; tampoco hay GO fiscal, MP-LIVE-05 ni `sdd.finish`. BlackStore ADP-001..010 + L3 tienen evidencia en su propio repo; su release permanece disabled, sin companion live.
-- `sdd/wip/20260927-pos-integration-convergence/` — POSC-000 (ADR) y POSC-000A (contrato OpenAPI) se integraron por PR #59 (`6ebab95`) y #61 (`3df741c`). POSC-001 verificó rutas Spring, upgrade V1–V7, ACL efectiva y concurrencia en PostgreSQL 16; pasó 32 suites/142 tests locales y dos reviews Astra. PR #63 (`9ce355b`) lo integró: 3/9 tareas done. Los grants amplios, `PUBLIC EXECUTE` y ausencia de rol worker son gaps observados, no permisos mínimos aprobados. POSC-002 espera spec/review propios antes de código o DDL; PIC-008A histórico no queda acreditado. `BLACKSTORE_INTEGRATION` permanece `DISABLED`, sin conector live ni cierre SDD. Verify alojado de #63 falló con `steps=[]`, no es CI verde.
+- `sdd/wip/20260927-pos-integration-convergence/` — POSC-000 (ADR) y POSC-000A (contrato OpenAPI) se integraron por PR #59 (`6ebab95`) y #61 (`3df741c`). POSC-001 verificó rutas Spring, upgrade V1–V7, ACL efectiva y concurrencia en PostgreSQL 16; pasó 32 suites/142 tests locales y dos reviews Astra. PR #63 (`9ce355b`) lo integró: 3/9 tareas done. POSC-002 recibió GO documental Astra acotado al camino POS sobre `d8dc971` (`sdd/reviews/20260928-posc002-shared-pos-spec-go.md`) y la migración SECURITY DEFINER fue autorizada por el usuario; ahora 002A–G están en review de plan, sin código ni DDL aplicado. El cierre V3 PUBLIC/runtime y el delta de roles compartidos ML/POS tienen un owner/migración únicos; ML REPEATABLE READ y TASK-DSP-000B mantienen NO-GO propio. `inventory_balances` debe conservar INSERT(`variant_id`) para lockBalance. PIC-008A histórico no queda acreditado. `BLACKSTORE_INTEGRATION` permanece `DISABLED`, sin conector live ni cierre SDD. Verify alojado de #63 falló con `steps=[]`, no es CI verde.
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
