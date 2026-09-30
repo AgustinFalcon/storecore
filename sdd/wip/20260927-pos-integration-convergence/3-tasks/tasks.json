@@ -3,7 +3,7 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "ready_for_posc002_implementation_plan_review",
+  "status": "posc002_slices_complete_residuals_posc003_spec_approved",
   "stats": { "total": 9, "done": 3, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
@@ -33,15 +33,15 @@
     {
       "id": "TASK-POSC-002",
       "title": "Portar deltas de identidad companion, capability y ACL",
-      "status": "pending_implementation_plan_review",
+      "status": "slices_complete_residuals",
       "layer": 2,
       "depends_on": ["TASK-POSC-001"],
-      "acceptance_criteria": ["GO documental Astra POS sobre d8dc971 registrado en sdd/reviews/20260928-posc002-shared-pos-spec-go.md; plan 002A–G en review, sin evidencia de código", "002B: owner/migración shared cierra V3 PUBLIC/runtime y conserva las cuatro rutas capability con Tx-S durable antes de Tx-C, correlation obligatoria, intent/comando, status y recuperación; instala sólo ancla/roles compartidos, no guard POS completo", "002C: esquema companion auth_ready/scopes, nueve entry points y Tx-P idempotente consumen Tx-S/Tx-C de 002B; bearer opaco 256-bit/provider y principal quedan en 002D", "002E: tras 002C crea guard POS VOLATILE completo para companion/credential en Tx-A/Tx-B/commit/release READ COMMITTED y read guard RR sin locks; admin-wins/effect-wins PG16", "Revalidar integración 9ce355b y versión Flyway; ML RR mantiene gate separado; balance INSERT(variant_id), cursor UPSERT y HTTP loopback en matriz 002F", "002A–G con pruebas locales y dos reviews Astra de código por PR; sin activación live ni cierre SDD"],
+      "acceptance_criteria": ["002A–G mergeados en 8e2a47f (V8–V10, HTTP capability/companion, guards, matriz 002F, runbook 002G); TASK-POSC-002 = slices_complete_residuals (INSERT(variant_id)=false, ML RR NO-GO); no sdd.finish", "002B: owner/migración shared cierra V3 PUBLIC/runtime y conserva las cuatro rutas capability con Tx-S durable antes de Tx-C, correlation obligatoria, intent/comando, status y recuperación; instala sólo ancla/roles compartidos, no guard POS completo", "002C: esquema companion auth_ready/scopes, nueve entry points y Tx-P idempotente consumen Tx-S/Tx-C de 002B; bearer opaco 256-bit/provider y principal quedan en 002D", "002E: tras 002C crea guard POS VOLATILE completo para companion/credential en Tx-A/Tx-B/commit/release READ COMMITTED y read guard RR sin locks; admin-wins/effect-wins PG16", "Revalidar integración 9ce355b y versión Flyway; ML RR mantiene gate separado; balance INSERT(variant_id), cursor UPSERT y HTTP loopback en matriz 002F", "002A–G con pruebas locales y dos reviews Astra de código por PR; sin activación live ni cierre SDD"],
       "implementation_slices": [
-        {"id":"TASK-POSC-002A","status":"pending_dual_review","depends_on":[],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"4-implementation/posc002a-preflight.md"},
-        {"id":"TASK-POSC-002B","status":"http_txs_merged","depends_on":["TASK-POSC-002A"],"scope":"shared anchor plus complete durable Tx-S/Tx-C capability administration; no full POS guard","plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv14-sdd.md"},
-        {"id":"TASK-POSC-002C","status":"http_provider_dual_approved_pending_merge"},"depends_on":["TASK-POSC-002B"],"scope":"companion schema plus USER ADMIN HTTP/CSRF, companion-admin pool and install secret provider","plan_ref":"3-tasks/posc002-implementation-slices.md"},
-        {"id":"TASK-POSC-002D","status":"http_slice_dual_approved","depends_on":["TASK-POSC-002C"],"plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002A","status":"done","depends_on":[],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"4-implementation/posc002a-preflight.md"},
+        {"id":"TASK-POSC-002B","status":"merged","depends_on":["TASK-POSC-002A"],"scope":"shared anchor plus complete durable Tx-S/Tx-C capability administration; no full POS guard","plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv14-sdd.md"},
+        {"id":"TASK-POSC-002C","status":"merged","depends_on":["TASK-POSC-002B"],"scope":"companion schema plus USER ADMIN HTTP/CSRF, companion-admin pool and install secret provider","plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv15-sdd.md"},
+        {"id":"TASK-POSC-002D","status":"merged","depends_on":["TASK-POSC-002C"],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260929-grok-prv10-sdd.md"},
         {"id":"TASK-POSC-002E","status":"sql_engine_merged","depends_on":["TASK-POSC-002B","TASK-POSC-002C","TASK-POSC-002D"],"scope":"full POS effect/read guards after companion schema plus engine wiring","plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260929-grok-prv11-sdd.md"},
         {"id":"TASK-POSC-002F","status":"merged","depends_on":["TASK-POSC-002E"],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv12-sdd.md"},
         {"id":"TASK-POSC-002G","status":"merged","depends_on":["TASK-POSC-002F"],"plan_ref":"3-tasks/posc002-implementation-slices.md","evidence_ref":"4-implementation/posc002g-rollout-runbook.md"}
@@ -50,7 +50,7 @@
     {
       "id": "TASK-POSC-003",
       "title": "Portar catálogo, stock read y reserva Tx-A/Tx-B",
-      "status": "blocked_by_predecessor_gate",
+      "status": "spec_approved",
       "layer": 2,
       "depends_on": ["TASK-POSC-002"],
       "acceptance_criteria": ["Un handler por cada ruta portada", "Cursor/ETag/304 y stock sellable correctos", "Una cuádruple, una reserva y respuesta coherente en retries/concurrencia"]

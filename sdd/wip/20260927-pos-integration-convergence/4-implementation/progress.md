@@ -1,14 +1,7 @@
 # Progreso — convergencia POS sobre integración
 
-- **Estado:** `posc002g_runbook_pending_dual_review`; V8–V10 + bearer + guards + matriz 002F integrados (`bfdfb88`). HTTP/Tx-S capability y companion admin HTTP/provider siguen abiertos.
-- **Base de POSC-000A:** `882e42ffb549e28ff8e1d05a44c3cdc55ec23524` (2026-09-27); YAML canónico y recurso servido con SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`, igual al pin BlackStore. `.gitattributes` fija CRLF para ambos YAML, preservando el digest de bytes.
-- **Tareas:** 3/9 done. `TASK-POSC-000` cerró ADR-001 documental; `TASK-POSC-000A` validó el contrato offline. `TASK-POSC-001` agregó únicamente tres archivos de test: mapa de ocho rutas Spring, upgrade PG16 V1–V7 con datos y ACL baseline, más carreras/replay/tombstone fail-closed. Dos Astra dieron GO final al código tras corregir dos P2; ver `sdd/reviews/20260927-posc001-dual-code-go.md`.
-- **Verificación local:** `cd backend; mvn -q test` sobre esa base con 30 suites, 135 tests, cero failures/errors/skips. El harness POSC-000A tiene seis tests; la suite total incluye pruebas PG16 preexistentes, pero POSC-000A no las reclama como evidencia propia.
-- **POSC-001 local:** sobre la base Git `01a5bea779b0be498ea678af21db343edc821e94` y su diff de tres tests, `cd backend; mvn -q test` pasó 32 suites/142 tests, cero failures/errors/skips. La evidencia PG16 de este corte cubre instalaciones limpia y escalonada, preservación de filas por etapa, bcrypt V1→V2 negativo, roles reales y carreras. Es una ejecución local, no CI remoto verde.
-- **Siguiente gate:** 002G es runbook only y no desbloquea POSC-003. Residual 002B HTTP/Tx-S y 002C companion admin HTTP/provider siguen abiertos. ML RR sigue NO-GO. No hay `sdd.finish`.
-- **Código:** POSC-001 no cambió controller, port, Flyway, permiso, worker, conector ni cliente; los destinos de ruta del ADR siguen como propuesta. V8–V10 añaden DDL administrativo fail-closed. 002G no cambia código comercial. `BLACKSTORE_INTEGRATION` permanece `DISABLED`.
-- **POSC-002B V8:** PR #66 integrado en `20152b9`. SQL+PG16 local 15 tests; dual Grok APPROVED. Tx-S/HTTP/adapter siguen abiertos; no marcar TASK-POSC-002B done.
-- **POSC-002C V9:** `V9__posc002c_companion_admin.sql` + `Posc002cV9AclTest` — 6 tests, 0 failures, PG16.14, BUILD SUCCESS 2026-09-29T22:12:04-03:00. Dual Grok 4.7 APPROVED (`sdd/reviews/20260929-grok-prv9-sdd.md`, `sdd/reviews/20260929-grok-prv9-scope.md`). Sin HTTP, provider, guards POS ni activación.
-- **POSC-002D:** bearer opaco + filtro HTTP + tipos cerrados. `Posc002dCompanionAuthHttpTest` + regresión FailClosed/HttpContract. Dual Grok 4.7 APPROVED (`sdd/reviews/20260929-grok-prv10-sdd.md`, `sdd/reviews/20260929-grok-prv10-scope.md`). Principal aún no entra al saga (002E). YAML pinneado intacto.
-- **POSC-002F:** PR #70 integrado en `bfdfb88`. Dual Grok 4.7 APPROVED. Test-only; residuals HTTP admin/Tx-S abiertos.
-- **POSC-002G:** runbook `posc002g-rollout-runbook.md` sobre `bfdfb88`. Sin código comercial, sin activación, sin `sdd.finish`. POSC-003 sigue `blocked_by_predecessor_gate`.
+- **Estado:** `posc002_slices_complete_residuals_posc003_spec_approved`. Head `origin/integration/storecore-int` = `8e2a47f` (POSC-002C HTTP merge PR #73).
+- **Base de POSC-000A:** YAML canónico y recurso servido SHA-256 `7B907A2E11C52A66B7253407FB3F9450CAE7B792BECCF34C1636BE9D3945DE30`.
+- **Tareas DAG:** 3/9 done (000/000A/001). TASK-POSC-002 = `slices_complete_residuals` (no archive). TASK-POSC-003 = `spec_approved` (prv16 dual APPROVED).
+- **Residuales 002:** runtime `INSERT(variant_id)` sobre `inventory_balances` es false; ML RR / TASK-DSP-000B NO-GO.
+- **Siguiente gate:** POSC-003A (SQL revisión/audit) en PR propio con dual Grok de código. Sin Flyway en este close-out, sin activación, sin `sdd.finish`. Verify alojado no es CI verde.
