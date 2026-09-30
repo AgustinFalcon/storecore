@@ -59,7 +59,7 @@
         {"id":"TASK-POSC-003B","status":"merged","depends_on":["TASK-POSC-003A"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv18-sdd.md"},
         {"id":"TASK-POSC-003C","status":"merged","depends_on":["TASK-POSC-003B"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv19-sdd.md"},
         {"id":"TASK-POSC-003D","status":"merged","depends_on":["TASK-POSC-003C"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv20-sdd.md"},
-        {"id":"TASK-POSC-003E","status":"local_complete_pending_review","depends_on":["TASK-POSC-003D"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv21-sdd.md"}
+        {"id":"TASK-POSC-003E","status":"dual_approved_pending_pr","depends_on":["TASK-POSC-003D"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv21-sdd-r2.md"}
       ]
     },
     {
