@@ -1,6 +1,6 @@
 # POSC-005 — wire, topología y cierre offline
 
-**Estado:** 006 merge `#82` (`dc23b45`). Corte de certificación offline; **no** activa live, fiscal ni `sdd.finish`.
+**Estado:** dual prv25 APPROVED (`sdd/reviews/20260930-grok-prv25-sdd.md`, `sdd/reviews/20260930-grok-prv25-scope.md`) @ `56976db`. PR pendiente.
 
 ## Alcance
 
