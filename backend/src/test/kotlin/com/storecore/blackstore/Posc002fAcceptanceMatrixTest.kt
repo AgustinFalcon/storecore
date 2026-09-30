@@ -10,9 +10,6 @@ import com.storecore.blackstore.domain.CompanionServiceRole
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.blackstore.infrastructure.JdbcPosCompanionGuard
 import com.storecore.configuration.domain.CapabilityState
-import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.junit.jupiter.api.AfterAll
@@ -216,7 +213,7 @@ class Posc002fAcceptanceMatrixTest {
     }
 
     @Test
-    fun eightContractRoutesStayPinnedAndAdminHttpResidualsStayOpen() {
+    fun eightContractRoutesStayPinnedAndCompanionAdminControllerExists() {
         val yaml = Files.readString(Path.of("../sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/api/blackstore-integration.openapi.yaml"))
         assertTrue(yaml.contains("/catalog"))
         assertTrue(yaml.contains("/stock/variants/{variantId}"))
@@ -229,7 +226,7 @@ class Posc002fAcceptanceMatrixTest {
         val controllers = Files.walk(Path.of("../backend/src/main/kotlin")).use { paths ->
             paths.filter { it.toString().endsWith("Controller.kt") }.map { it.fileName.toString() }.toList()
         }
-        assertFalse(controllers.any { it.contains("CompanionAdmin", ignoreCase = true) }, controllers.toString())
+        assertTrue(controllers.any { it.contains("CompanionAdmin", ignoreCase = true) }, controllers.toString())
         val capability = Files.readString(Path.of("../backend/src/main/kotlin/com/storecore/configuration/infrastructure/JdbcCapabilityService.kt"))
         assertFalse(capability.contains("capability_admin_change_configuration("))
         assertTrue(capability.contains("capability_tx_c_execute("), "002B adapter must call Tx-C")
@@ -263,14 +260,12 @@ class Posc002fAcceptanceMatrixTest {
 
     private fun activate(state: CapabilityState, reason: String) {
         val adminId = jdbc.queryForObject("SELECT id FROM users WHERE email='f-admin@example.com'", Long::class.java)!!
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        JdbcCapabilityService(jdbc).changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            state,
-            version,
-            reason,
-            UUID.randomUUID(),
+        jdbc.update(
+            """UPDATE module_configurations
+               SET state=?, config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+               WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            state.name,
+            adminId,
         )
     }
 
@@ -303,15 +298,7 @@ class Posc002fAcceptanceMatrixTest {
             setOf(CompanionScope.CATALOG_READ, CompanionScope.STOCK_READ, CompanionScope.STOCK_RESERVE, CompanionScope.STOCK_COMMIT, CompanionScope.STOCK_RELEASE),
             CompanionLifecycleStatus.ACTIVE,
         )
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        JdbcCapabilityService(jdbc).changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            CapabilityState.ACTIVE,
-            version,
-            "posc002f temporary active",
-            UUID.randomUUID(),
-        )
+        activate(CapabilityState.ACTIVE, "posc002f temporary active")
     }
 
     private fun seedVariant(sku: String): Seeded {

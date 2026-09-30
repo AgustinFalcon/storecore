@@ -23,8 +23,8 @@ POSC-000 `#59` (`6ebab95`), POSC-000A `#61` (`3df741c`), POSC-001 `#63` (`9ce355
 - `BLACKSTORE_INTEGRATION` permanece `DISABLED` en migrate limpio y en upgrade con filas. Activación temporal sólo en tests; restaurar `DISABLED` antes de terminar.
 - Roles NOLOGIN: `storecore_capability_admin_owner`, `storecore_capability_admin`, `storecore_companion_admin_owner`, `storecore_companion_admin`, `storecore_pos_guard_owner`.
 - Tx-C SQL: `capability_tx_c_execute` / `status` / `abort`. EXECUTE sólo `storecore_capability_admin`. PUBLIC y `storecore_runtime` sin EXECUTE.
-- Cuatro firmas V3 (`capability_admin_change_*` / kill) revocadas de PUBLIC y `storecore_runtime` en V8. Siguen existiendo; el adapter HTTP actual **aún las llama** (`JdbcCapabilityService`). Eso es residual 002B, no un procedimiento de instalación.
-- Tx-P SQL: `companion_admin_prepare_command`, `attach_secret`, `command_status`, `abort_command`, `pair`, `rotate`, `activate`, `suspend`, `revoke`. EXECUTE sólo `storecore_companion_admin`. No hay `CompanionAdminController`.
+- Cuatro firmas V3 (`capability_admin_change_*` / kill) revocadas de PUBLIC y `storecore_runtime` en V8. Siguen existiendo; el adapter HTTP llama `capability_tx_c_execute` (PR #72, `8bc95cf`), no las firmas V3.
+- Tx-P SQL: `companion_admin_prepare_command`, `attach_secret`, `command_status`, `abort_command`, `pair`, `rotate`, `activate`, `suspend`, `revoke`. EXECUTE sólo `storecore_companion_admin`. El adapter HTTP USER ADMIN+CSRF y el provider de instalación viven en el corte 002C (no en este runbook documental).
 - Guards POS: `pos_companion_effect_guard` (VOLATILE, primera sentencia de Tx mutante READ COMMITTED) y `pos_companion_read_guard` (STABLE, primer SELECT RR). EXECUTE `storecore_runtime`. Owner `storecore_pos_guard_owner` NOLOGIN.
 - Bearer opaco ≥256 bit; fingerprint selecciona; comparación constante autentica. `X-Client-Instance-Id` no crea identidad. `includeCost=true` → `COST_SCOPE_REQUIRED`.
 - Índice 0..1 companion no-REVOKED: no hay dos `ACTIVE` simultáneos. GET/reconcile filtran `client_instance_id`.

@@ -1,6 +1,8 @@
 package com.storecore.blackstore.infrastructure
 
+import com.storecore.blackstore.application.CompanionTokenGenerator
 import com.storecore.blackstore.application.port.CompanionSecretProvider
+import com.storecore.blackstore.application.port.PreparedCompanionSecret
 import com.storecore.blackstore.application.port.SecretResolveResult
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
@@ -28,13 +30,17 @@ class InMemoryCompanionSecretProvider : CompanionSecretProvider {
         return SecretResolveResult.SecretBytes(stored.copyOf())
     }
 
-    override fun prepare(requestId: String, rawBearer: ByteArray): String {
+    override fun prepare(requestId: String, rawBearer: ByteArray): PreparedCompanionSecret {
         val existing = prepared[requestId]
-        if (existing != null) return existing
+        if (existing != null) {
+            val stored = secrets[existing] ?: rawBearer
+            return PreparedCompanionSecret(existing, CompanionTokenGenerator.fingerprint(stored))
+        }
         val ref = "synthetic:$requestId"
         secrets.putIfAbsent(ref, rawBearer.copyOf())
         prepared[requestId] = ref
-        return ref
+        val stored = secrets[ref] ?: rawBearer
+        return PreparedCompanionSecret(ref, CompanionTokenGenerator.fingerprint(stored))
     }
 
     override fun discard(credentialSecretRef: String, requestId: String) {
