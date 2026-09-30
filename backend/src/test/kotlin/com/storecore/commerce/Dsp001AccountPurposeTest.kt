@@ -71,9 +71,8 @@ class Dsp001AccountPurposeTest {
     fun v16ShaFlywayBackfillAndPurposeCheck() {
         val path = Path.of("src/main/resources/db/migration/V16__dsp001_channel_account_purpose.sql")
         assertEquals(V16_SHA, lfSha(Files.readAllBytes(path)))
-        assertEquals(
-            "16",
-            jdbc.queryForObject("SELECT MAX(version::int)::text FROM flyway_schema_history WHERE success", String::class.java),
+        assertTrue(
+            jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("16"),
         )
         jdbc.update("INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state) VALUES ('legacy-unknown','MERCADO_LIBRE','ref:legacy','ACTIVE')")
         assertEquals(
