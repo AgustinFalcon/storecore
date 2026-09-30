@@ -158,23 +158,27 @@ class JdbcBlackStoreCatalogQuery(
         }
     }
 
-    override fun readStock(variantId: Long): BlackStoreVariantStock {
-        val row = jdbc.query(
-            """
-            SELECT v.id, v.sku, GREATEST(0, COALESCE(i.available_quantity, 0) - COALESCE(i.safety_stock, 0)) AS sellable
-            FROM product_variants v
-            LEFT JOIN inventory_balances i ON i.variant_id = v.id
-            WHERE v.id=?
-            """.trimIndent(),
-            { rs, _ -> Triple(rs.getLong("id"), rs.getString("sku"), rs.getInt("sellable")) },
-            variantId,
-        ).singleOrNull() ?: throw BlackStoreSagaException.notFound()
-        return BlackStoreVariantStock(
-            variantId = row.first,
-            sku = row.second,
-            availableQuantity = row.third,
-            catalogVersion = currentCatalogVersion(),
-        )
+    override fun readStock(clientInstanceId: UUID, variantId: Long): BlackStoreVariantStock {
+        return try {
+            val row = jdbc.query(
+                """
+                SELECT v.id, v.sku, GREATEST(0, COALESCE(i.available_quantity, 0) - COALESCE(i.safety_stock, 0)) AS sellable
+                FROM product_variants v
+                LEFT JOIN inventory_balances i ON i.variant_id = v.id
+                WHERE v.id=? AND char_length(v.sku) BETWEEN 1 AND 64
+                """.trimIndent(),
+                { rs, _ -> Triple(rs.getLong("id"), rs.getString("sku"), rs.getInt("sellable")) },
+                variantId,
+            ).singleOrNull() ?: throw BlackStoreSagaException.notFound()
+            BlackStoreVariantStock(
+                variantId = row.first,
+                sku = row.second,
+                availableQuantity = row.third,
+                catalogVersion = currentCatalogVersion(),
+            )
+        } finally {
+            lazyDeleteExpired(clientInstanceId)
+        }
     }
 
     fun currentCatalogVersion(): String {

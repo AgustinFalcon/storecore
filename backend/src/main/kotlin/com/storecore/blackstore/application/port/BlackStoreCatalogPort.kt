@@ -13,5 +13,5 @@ interface BlackStoreCatalogPort {
         includeCost: Boolean = false,
     ): BlackStoreCatalogPage
 
-    fun readStock(variantId: Long): BlackStoreVariantStock
+    fun readStock(clientInstanceId: UUID, variantId: Long): BlackStoreVariantStock
 }
