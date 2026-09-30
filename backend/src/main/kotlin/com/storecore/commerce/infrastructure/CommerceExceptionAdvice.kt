@@ -8,6 +8,7 @@ import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.InvalidWebhookSignature
 import com.storecore.commerce.application.LegacyMpNotificationRetired
 import com.storecore.commerce.application.MercadoLibreAccountMissing
+import com.storecore.commerce.application.MercadoLibreAccountNotEligible
 import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.application.PromoWindowOverlap
 import com.storecore.commerce.application.WebhookPayloadTooLarge
@@ -39,7 +40,7 @@ class CommerceExceptionAdvice {
     @ExceptionHandler(CheckoutConflict::class, PromoWindowOverlap::class, MercadoLibreAccountMissing::class)
     fun conflict(exception: CommerceException) = error(HttpStatus.CONFLICT, exception.message ?: "CONFLICT", exception.retryable)
 
-    @ExceptionHandler(CommerceValidation::class, ProfileRejected::class, InsufficientInventory::class, FulfillmentRejected::class, WebhookPayloadTooLarge::class)
+    @ExceptionHandler(CommerceValidation::class, ProfileRejected::class, InsufficientInventory::class, FulfillmentRejected::class, WebhookPayloadTooLarge::class, MercadoLibreAccountNotEligible::class)
     fun rejected(exception: CommerceException) = error(HttpStatus.BAD_REQUEST, exception.message ?: "REQUEST_VALIDATION_FAILED", false)
 
     @ExceptionHandler(CommerceException::class)
