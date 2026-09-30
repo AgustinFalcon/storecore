@@ -2,4 +2,4 @@
 
 ## Estado
 
-`implementable_dag_merged`. DAG 000A–009 merge `#97` (`8da8392`, issue [#96](https://github.com/AgustinFalcon/storecore/issues/96), dual prv39 APPROVED). SHA stamp issue [#98](https://github.com/AgustinFalcon/storecore/issues/98). Techo Flyway **V19**; siguiente libre **V20**. Registro: `knowledge.md`. WIP abierto; sin dispatcher, red, secretos ni `sdd.finish`.
+`implementable_dag_merged`. DAG 000A–009 merge `#97` (`8da8392`, issue [#96](https://github.com/AgustinFalcon/storecore/issues/96), dual prv39 APPROVED). SHA stamp `#99` (`41966d4`, issue [#98](https://github.com/AgustinFalcon/storecore/issues/98)). Residual release/expiry tests issue [#100](https://github.com/AgustinFalcon/storecore/issues/100). Techo Flyway **V19**; siguiente libre **V20**. Registro: `knowledge.md`. WIP abierto; sin dispatcher, red, secretos ni `sdd.finish`.

@@ -25,7 +25,6 @@ import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -34,6 +33,10 @@ import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.testcontainers.containers.PostgreSQLContainer
 import java.util.UUID
 
+/**
+ * TASK-DSP-009: BlackStore saga delegates to the local desired-stock projector in the same transaction.
+ * GitHub issues 96 (commit path) and 100 (release/expiry residual recorded by prv39).
+ */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class Dsp009BlackStoreBridgeTest {
     private lateinit var jdbc: JdbcTemplate
@@ -180,12 +183,86 @@ class Dsp009BlackStoreBridgeTest {
             engine.commit(principal, q)
             assertEquals(1, desiredChangedCount(listingId))
         } finally {
-            jdbc.update(
-                """UPDATE module_configurations SET state='DISABLED', config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
-                   WHERE module_code='MARKETPLACE_ML' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
-                adminId,
-            )
+            disableMarketplaceMl()
         }
+    }
+
+    @Test
+    fun releaseWithMlDelegatesPendingDesiredChangedWithoutListingStock() {
+        val seeded = seedVariant("SKU-DSP009-REL")
+        val listingId = insertListing(seeded.variantId, "MLA-009-REL", ChannelAccountPurpose.ExternalMlSync.wire)
+        val historyId = insertHistoricListingStock(listingId)
+        val historic = jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId)!!
+        CapabilityAdminTestSupport.activateMarketplaceMl(jdbc, adminId)
+        try {
+            val q = quadruple()
+            engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
+            val released = engine.release(principal, q)
+            assertEquals("RELEASED", released.state)
+            assertEquals(1, desiredChangedCount(listingId))
+            assertPendingDesiredChanged(listingId, ProjectionSourceCause.ExternalBlackStoreRelease)
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE id=? AND kind=?", Int::class.java, historyId, ChannelOutboxKind.ListingStock.wire))
+            assertEquals(historic, jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId))
+            engine.release(principal, q)
+            assertEquals(1, desiredChangedCount(listingId))
+        } finally {
+            disableMarketplaceMl()
+        }
+    }
+
+    @Test
+    fun expireWithMlDelegatesPendingDesiredChangedWithoutListingStock() {
+        val seeded = seedVariant("SKU-DSP009-EXP")
+        val listingId = insertListing(seeded.variantId, "MLA-009-EXP", ChannelAccountPurpose.ExternalMlSync.wire)
+        val historyId = insertHistoricListingStock(listingId)
+        val historic = jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId)!!
+        CapabilityAdminTestSupport.activateMarketplaceMl(jdbc, adminId)
+        try {
+            val q = quadruple()
+            engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
+            jdbc.update(
+                "UPDATE blackstore_integration_operations SET expires_at = now() - interval '1 second' WHERE operation_id=?",
+                q.operationId,
+            )
+            assertEquals(1, engine.expireDue(100))
+            assertEquals("EXPIRED", engine.get(principal, q).state)
+            assertEquals(1, desiredChangedCount(listingId))
+            assertPendingDesiredChanged(listingId, ProjectionSourceCause.ExternalBlackStoreExpiry)
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE id=? AND kind=?", Int::class.java, historyId, ChannelOutboxKind.ListingStock.wire))
+            assertEquals(historic, jdbc.queryForObject("SELECT to_jsonb(o)::text FROM channel_outbox AS o WHERE id=?", String::class.java, historyId))
+            assertEquals(0, engine.expireDue(100))
+            assertEquals(1, desiredChangedCount(listingId))
+        } finally {
+            disableMarketplaceMl()
+        }
+    }
+
+    private fun disableMarketplaceMl() {
+        jdbc.update(
+            """UPDATE module_configurations SET state='DISABLED', config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+               WHERE module_code='MARKETPLACE_ML' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            adminId,
+        )
+    }
+
+    private fun assertPendingDesiredChanged(listingId: Long, cause: ProjectionSourceCause) {
+        assertEquals(
+            OutboxDeliveryStatus.Pending.wire,
+            jdbc.queryForObject(
+                "SELECT d.status FROM channel_outbox_delivery d JOIN channel_outbox o ON o.id=d.outbox_id WHERE o.listing_id=? AND o.kind=?",
+                String::class.java,
+                listingId,
+                ChannelOutboxKind.StockDesiredChanged.wire,
+            ),
+        )
+        assertEquals(
+            cause.wire,
+            jdbc.queryForObject(
+                "SELECT source_cause FROM channel_listing_stock_projection WHERE listing_id=?",
+                String::class.java,
+                listingId,
+            ),
+        )
     }
 
     private fun quadruple() = BlackStoreQuadruple(client, "POS-009", "sale-${UUID.randomUUID()}", UUID.randomUUID())
