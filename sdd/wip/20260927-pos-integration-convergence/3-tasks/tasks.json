@@ -73,7 +73,7 @@
     {
       "id": "TASK-POSC-004A",
       "title": "Worker EXTERNAL_BLACKSTORE, retry/poison y purge con privilegio mínimo",
-      "status": "dual_approved_pending_pr",
+      "status": "merged",
       "layer": 2,
       "depends_on": ["TASK-POSC-004"],
       "acceptance_criteria": ["WEB/PIC owner separados y carrera commit/expire/WEB sin doble descuento", "Purge tombstone >=7y antes de retry/lines/saga con rollback/race; ledger/audit intactos", "Worker-only función/rol y revocación DELETE runtime sin romper PENDING; ACL positiva/negativa PG16"]
@@ -89,7 +89,7 @@
     {
       "id": "TASK-POSC-006",
       "title": "PIC-006A GET/reconcile RO baseline por proxy Spring (400 dirty diferido)",
-      "status": "blocked_by_adapter_choice",
+      "status": "in_progress",
       "layer": 2,
       "depends_on": ["TASK-POSC-000", "TASK-POSC-004A"],
       "acceptance_criteria": ["PG16 proxy real aplica readOnly y REPEATABLE_READ para GET/reconcile tras POSC-004A", "Snapshots completos, incluidas retry/alert, antes/después y writer concurrente prueban cero writes y fotografía consistente", "GET 404/PENDING/durable/410; reconcile 0/501 inválidos, 500 válidos y duplicados aceptados/deduplicados conforme baseline; 400 duplicado queda dirty/deferred; sin cambios productivos/Flyway/ACL/pom"]
