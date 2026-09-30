@@ -2,6 +2,7 @@ package com.storecore.blackstore
 
 import io.swagger.v3.parser.OpenAPIV3Parser
 import io.swagger.v3.parser.core.models.ParseOptions
+import com.storecore.blackstore.infrastructure.web.CompanionAdminController
 import com.storecore.configuration.infrastructure.web.CapabilityController
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -108,6 +109,40 @@ class BlackStoreRouteTopologyHarnessTest(
     }
 
     @Test
+    fun `spring inventory includes companion admin routes and httpcode envelope`() {
+        val expected = expectedCompanionAdminRoutes()
+        val actual = handlerMapping.handlerMethods.flatMap { (mapping, handler) ->
+            val paths = mapping.pathPatternsCondition?.patterns?.map { it.patternString }
+                ?: mapping.patternsCondition?.patterns.orEmpty()
+            val methods = mapping.methodsCondition.methods
+            paths.filter(::isCompanionAdminRoute).flatMap { path ->
+                if (methods.isEmpty()) listOf(OwnedRoute("*", path, owner(handler)))
+                else methods.map { method -> OwnedRoute(method.name, path, owner(handler)) }
+            }
+        }
+        val diagnostics = verifyCapabilityRouteInventory(expected, actual)
+        assertTrue(diagnostics.isEmpty(), diagnostics.joinToString("\n"))
+        assertEquals(6, expected.size, "pair rotate activate suspend revoke and status")
+        assertEquals(
+            setOf("pair", "rotate", "activate", "suspend", "revoke", "commandStatus"),
+            CompanionAdminController::class.java.declaredMethods.map { it.name }
+                .filter { it in expected.values.map { owner -> owner.substringAfter('#') } }.toSet(),
+        )
+        val root = repositoryRoot()
+        val controller = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/blackstore/infrastructure/web/CompanionAdminController.kt"))
+        val adapter = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/blackstore/infrastructure/JdbcCompanionAdminCommands.kt"))
+        val envelope = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/identity/infrastructure/web/IdentityController.kt"))
+        assertTrue(controller.contains("BaseResponse.ok(data, code)"))
+        assertTrue(controller.contains("HttpCode.Ok"))
+        assertTrue(adapter.contains("companion_admin_prepare_command("))
+        assertTrue(adapter.contains("companion_admin_attach_secret("))
+        assertTrue(adapter.contains("companion_admin_pair("))
+        assertTrue(envelope.contains("fun <T> ok(data: T, code: com.storecore.shared.http.HttpCode)"))
+        assertTrue(envelope.contains("fun <T> error("))
+        assertFalse(adapter.contains("IdentityMutationCoordinator"))
+    }
+
+    @Test
     fun `capability topology verifier detects a header-conditioned duplicate and an unexpected route`() {
         val expected = expectedCapabilityRoutes()
         val complete = expected.map { (route, expectedOwner) -> OwnedRoute(route.method, route.path, expectedOwner) }
@@ -172,6 +207,7 @@ class BlackStoreRouteTopologyHarnessTest(
 
     private fun isInScope(path: String): Boolean = path == BASE_PATH || path.startsWith("$BASE_PATH/")
     private fun isCapabilityRoute(path: String): Boolean = path == CAPABILITY_PATH || path.startsWith("$CAPABILITY_PATH/")
+    private fun isCompanionAdminRoute(path: String): Boolean = path == COMPANION_ADMIN_PATH || path.startsWith("$COMPANION_ADMIN_PATH/")
     private fun owner(handler: org.springframework.web.method.HandlerMethod): String = "${handler.beanType.simpleName}#${handler.method.name}"
 
     private fun expectedCapabilityRoutes(): Map<RouteKey, String> = linkedMapOf(
@@ -182,6 +218,15 @@ class BlackStoreRouteTopologyHarnessTest(
         RouteKey("POST", "$CAPABILITY_PATH/{module}/kills/{id}/replace") to "CapabilityController#replaceKill",
         RouteKey("GET", "$CAPABILITY_PATH/commands/{correlationId}") to "CapabilityController#commandStatus",
         RouteKey("POST", "$CAPABILITY_PATH/commands/{correlationId}/abort") to "CapabilityController#abortCommand",
+    )
+
+    private fun expectedCompanionAdminRoutes(): Map<RouteKey, String> = linkedMapOf(
+        RouteKey("POST", "$COMPANION_ADMIN_PATH/pair") to "CompanionAdminController#pair",
+        RouteKey("POST", "$COMPANION_ADMIN_PATH/rotate") to "CompanionAdminController#rotate",
+        RouteKey("POST", "$COMPANION_ADMIN_PATH/activate") to "CompanionAdminController#activate",
+        RouteKey("POST", "$COMPANION_ADMIN_PATH/suspend") to "CompanionAdminController#suspend",
+        RouteKey("POST", "$COMPANION_ADMIN_PATH/revoke") to "CompanionAdminController#revoke",
+        RouteKey("GET", "$COMPANION_ADMIN_PATH/commands/{correlationId}") to "CompanionAdminController#commandStatus",
     )
 
     private fun repositoryRoot(): Path {
@@ -202,6 +247,7 @@ class BlackStoreRouteTopologyHarnessTest(
         private const val BASE_PATH = "/blackstore-integration/v1"
         private const val OPENAPI_PATH = "$BASE_PATH/openapi.yaml"
         private const val CAPABILITY_PATH = "/api/v1/user/capabilities"
+        private const val COMPANION_ADMIN_PATH = "/api/v1/internal/admin/blackstore-companion"
         private const val CANONICAL_CONTRACT = "sdd/wip/20260921-storecore-pos-integration-contract-v1/2-technical/api/blackstore-integration.openapi.yaml"
         private val routeOrder = compareBy<RouteKey>({ it.path }, { it.method })
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")

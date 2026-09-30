@@ -150,7 +150,18 @@ class IdentityController(
 }
 
 data class BaseResponse<T>(val code: Int, val data: T?, val message: String?, val errorCode: String?, val retryable: Boolean?, val traceId: String?) {
-    companion object { fun <T> ok(data: T, code: Int = 200) = BaseResponse(code, data, null, null, null, null) }
+    companion object {
+        fun <T> ok(data: T, code: Int = 200) = BaseResponse(code, data, null, null, null, null)
+        fun <T> ok(data: T, code: com.storecore.shared.http.HttpCode) = ok(data, code.status)
+        fun <T> created(data: T) = ok(data, com.storecore.shared.http.HttpCode.Created)
+        fun <T> error(
+            code: com.storecore.shared.http.HttpCode,
+            errorCode: String,
+            message: String = "Request rejected",
+            retryable: Boolean = false,
+            traceId: String = java.util.UUID.randomUUID().toString(),
+        ) = BaseResponse<T>(code.status, null, message, errorCode, retryable, traceId)
+    }
 }
 data class RegisterRequest(@field:NotBlank val email: String, @field:NotBlank val password: String, @field:NotBlank val firstName: String, @field:NotBlank val lastName: String)
 data class LoginRequest(@field:NotBlank val email: String, @field:NotBlank val password: String)

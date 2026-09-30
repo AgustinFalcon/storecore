@@ -8,6 +8,6 @@ sealed class SecretResolveResult {
 
 interface CompanionSecretProvider {
     fun resolve(credentialSecretRef: String): SecretResolveResult
-    fun prepare(requestId: String, rawBearer: ByteArray): String
+    fun prepare(requestId: String, rawBearer: ByteArray): PreparedCompanionSecret
     fun discard(credentialSecretRef: String, requestId: String)
 }
