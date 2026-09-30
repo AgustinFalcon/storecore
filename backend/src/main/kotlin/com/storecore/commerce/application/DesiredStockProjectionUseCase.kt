@@ -2,6 +2,7 @@ package com.storecore.commerce.application
 
 import com.storecore.commerce.application.port.ChannelStockOutboxPort
 import com.storecore.commerce.application.port.DesiredStockChangedIntent
+import com.storecore.commerce.application.port.DesiredStockProjectionObserver
 import com.storecore.commerce.application.port.LockedListingProjection
 import com.storecore.commerce.application.port.MarketplaceListingProjectionPort
 import com.storecore.commerce.application.port.ProjectionWrite
@@ -24,6 +25,7 @@ open class DesiredStockProjectionUseCase(
     private val capabilities: CapabilityDecisionPort,
     private val listings: MarketplaceListingProjectionPort,
     private val outbox: ChannelStockOutboxPort,
+    private val observer: DesiredStockProjectionObserver = DesiredStockProjectionObserver.NoOp,
 ) {
     @Transactional
     open fun project(
@@ -45,6 +47,7 @@ open class DesiredStockProjectionUseCase(
         locked.sortedBy { it.listingId }.forEach { row ->
             results += upsert(row, cause, forceBaseline)
         }
+        observer.record(results)
         return results
     }
 
