@@ -4,7 +4,7 @@
 
 ## POSC-006 / PIC-006A
 
-- **Estado:** implementación local en `feature/posc006a-get-reconcile-ro`.
+- **Estado:** dual prv24 APPROVED (`sdd/reviews/20260930-grok-prv24-sdd.md`, `sdd/reviews/20260930-grok-prv24-scope.md`) @ `53d48cb`. PR pendiente.
 - **Dependencia:** 004A mergeado (`1dbad5d`).
 - **Ownership:** tests PG16 por contexto Spring real (`@SpringBootTest` + `TestRestTemplate`) sobre los handlers ya existentes `GET /operations/{operationId}` y `POST /operations/reconcile`. El engine Spring-wired aplica `TransactionTemplate` REPEATABLE READ + `readOnly` (no hay `@Transactional` en el service/controller; **no se agrega** aquí). El test refleja ese campo del bean y prueba cero writes por HTTP.
 - **Aceptación observada:** GET 404 / PENDING 200 / durable 200 / tombstone 410; reconcile 0 y 501 → 400 `VALIDATION`; 500 unknown 200; duplicados del baseline aceptados/deduplicados; header de client ajeno → 403 `FORBIDDEN` (requireOwned); companion `REVOKED` → 401 `UNAUTHORIZED` en el filtro de bearer **antes** de leer receipts; snapshots de saga/líneas/tombstone/ledger/reservas/audit/outbox/inbox iguales antes y después de GET/reconcile; writer concurrente en `inventory_balances` no altera esa fotografía. 400 por duplicados del YAML dirty queda diferido.
