@@ -338,9 +338,14 @@ class IdentityHttpIntegrationTest(
         @DynamicPropertySource
         fun database(registry: DynamicPropertyRegistry) {
             postgres.start()
+            org.flywaydb.core.Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
+            com.storecore.configuration.CapabilityAdminTestSupport.provisionLogin(postgres)
             registry.add("spring.datasource.url") { postgres.jdbcUrl }
             registry.add("spring.datasource.username") { postgres.username }
             registry.add("spring.datasource.password") { postgres.password }
+            registry.add("storecore.capability-admin.datasource.url") { postgres.jdbcUrl }
+            registry.add("storecore.capability-admin.datasource.username") { com.storecore.configuration.CapabilityAdminTestSupport.LOGIN }
+            registry.add("storecore.capability-admin.datasource.password") { com.storecore.configuration.CapabilityAdminTestSupport.PASSWORD }
         }
     }
 }

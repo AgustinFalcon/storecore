@@ -231,8 +231,8 @@ class Posc002fAcceptanceMatrixTest {
         }
         assertFalse(controllers.any { it.contains("CompanionAdmin", ignoreCase = true) }, controllers.toString())
         val capability = Files.readString(Path.of("../backend/src/main/kotlin/com/storecore/configuration/infrastructure/JdbcCapabilityService.kt"))
-        assertTrue(capability.contains("capability_admin_change_configuration("))
-        assertFalse(capability.contains("capability_tx_c_execute("), "002B Tx-S/HTTP residual remains open")
+        assertFalse(capability.contains("capability_admin_change_configuration("))
+        assertTrue(capability.contains("capability_tx_c_execute("), "002B adapter must call Tx-C")
     }
 
     private fun createKill(action: String, reason: String): Long {

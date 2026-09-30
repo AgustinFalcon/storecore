@@ -15,14 +15,12 @@ import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
-import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.time.Instant
 import java.util.UUID
@@ -92,24 +90,26 @@ class CapabilityTask003Test {
         capabilities.changeState(admin(), module, state, version, "test-$state", UUID.randomUUID())
     }
 
-    private fun admin() = InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN))
+    private fun admin() = InternalUserPrincipal(adminSession, adminId, setOf(InternalRole.ADMIN))
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
         private lateinit var jdbc: JdbcTemplate
         private lateinit var capabilities: JdbcCapabilityService
         private var adminId: Long = 0
+        private lateinit var adminSession: UUID
 
         @JvmStatic
         @BeforeAll
         fun startDatabase() {
             postgres.start()
-            Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
-            jdbc = JdbcTemplate(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
-            capabilities = JdbcCapabilityService(jdbc)
+            val provisioned = CapabilityAdminTestSupport.migrateAndProvision(postgres)
+            jdbc = provisioned.first
+            capabilities = JdbcCapabilityService(jdbc, provisioned.second)
             val hash = Argon2PasswordHasher().hash("a-very-long-password".toCharArray())
             adminId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, "capability-admin@example.com", hash)!!
             jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code='ADMIN'", adminId)
+            adminSession = CapabilityAdminTestSupport.liveAdminSession(jdbc, adminId)
         }
 
         @JvmStatic

@@ -67,32 +67,29 @@ class BlackStoreRouteTopologyHarnessTest(
         }
         val diagnostics = verifyCapabilityRouteInventory(expected, actual)
         assertTrue(diagnostics.isEmpty(), diagnostics.joinToString("\n"))
-        assertEquals(5, expected.size, "four mutation routes plus the read-only capability list")
+        assertEquals(7, expected.size, "four mutation routes, list, status and abort")
         assertEquals(
-            setOf("changeState", "createKill", "removeKill", "replaceKill"),
+            setOf("changeState", "createKill", "removeKill", "replaceKill", "commandStatus", "abortCommand"),
             expected.values.map { it.substringAfter('#') }.filter { it != "list" }.toSet(),
-            "exactly four mutating capability controller handlers are in scope",
+            "capability command routes stay in the inventory",
         )
         assertEquals(
-            setOf("changeState", "createKill", "removeKill", "replaceKill"),
+            setOf("changeState", "createKill", "removeKill", "replaceKill", "commandStatus", "abortCommand"),
             CapabilityController::class.java.declaredMethods.map { it.name }
                 .filter { it in expected.values.map { owner -> owner.substringAfter('#') } && it != "list" }.toSet(),
-            "the four mapped mutator methods exist on the controller",
+            "mapped capability methods exist on the controller",
         )
         val root = repositoryRoot()
         val controllerSource = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/configuration/infrastructure/web/CapabilityController.kt"))
         val serviceSource = Files.readString(root.resolve("backend/src/main/kotlin/com/storecore/configuration/infrastructure/JdbcCapabilityService.kt"))
         val controllerCalls = mapOf(
-            "changeState" to "capabilities.changeState(",
-            "createKill" to "capabilities.createKill(",
-            "removeKill" to "capabilities.removeKill(",
-            "replaceKill" to "capabilities.replaceKill(",
+            "changeState" to "adminCommands.changeState(",
+            "createKill" to "adminCommands.createKill(",
+            "removeKill" to "adminCommands.removeKill(",
+            "replaceKill" to "adminCommands.replaceKill(",
         )
         val sqlCallers = mapOf(
-            "capability_admin_change_configuration" to "SELECT capability_admin_change_configuration(",
-            "capability_admin_create_kill_switch" to "SELECT capability_admin_create_kill_switch(",
-            "capability_admin_remove_kill_switch" to "SELECT capability_admin_remove_kill_switch(",
-            "capability_admin_replace_kill_switch" to "SELECT capability_admin_replace_kill_switch(",
+            "capability_tx_c_execute" to "SELECT capability_tx_c_execute(",
         )
         controllerCalls.forEach { (method, call) ->
             val methodStart = controllerSource.indexOf("fun $method(")
@@ -104,6 +101,10 @@ class BlackStoreRouteTopologyHarnessTest(
         sqlCallers.forEach { (routine, call) ->
             assertTrue(serviceSource.contains(call), "JdbcCapabilityService must call $routine through $call")
         }
+        assertFalse(serviceSource.contains("SELECT capability_admin_change_configuration("))
+        assertFalse(serviceSource.contains("SELECT capability_admin_create_kill_switch("))
+        assertFalse(serviceSource.contains("SELECT capability_admin_remove_kill_switch("))
+        assertFalse(serviceSource.contains("SELECT capability_admin_replace_kill_switch("))
     }
 
     @Test
@@ -179,6 +180,8 @@ class BlackStoreRouteTopologyHarnessTest(
         RouteKey("POST", "$CAPABILITY_PATH/{module}/kills") to "CapabilityController#createKill",
         RouteKey("POST", "$CAPABILITY_PATH/{module}/kills/{id}/remove") to "CapabilityController#removeKill",
         RouteKey("POST", "$CAPABILITY_PATH/{module}/kills/{id}/replace") to "CapabilityController#replaceKill",
+        RouteKey("GET", "$CAPABILITY_PATH/commands/{correlationId}") to "CapabilityController#commandStatus",
+        RouteKey("POST", "$CAPABILITY_PATH/commands/{correlationId}/abort") to "CapabilityController#abortCommand",
     )
 
     private fun repositoryRoot(): Path {
