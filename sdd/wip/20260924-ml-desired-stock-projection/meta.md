@@ -2,7 +2,7 @@
 
 - **Feature id:** `20260924-ml-desired-stock-projection`
 - **Feature UUID:** `4cb2fdb0-14d4-4fe5-87ae-34858300b63a`
-- **Status:** `ready_for_implementation` — TASK-DSP-R00 tiene GO documental Astra; 000A está mergeada sólo en integración y 000B/resto del DAG siguen sujetos a sus gates
+- **Status:** `implementable_dag_merged` — DAG 000A–009 mergeado sólo en integración (`8da8392`, PR #97 / issue #96). El WIP permanece abierto: sin dispatcher, live ML/BlackStore ni `sdd.finish`
 - **Mode:** `standard`
 - **Project type / stack:** producción / backend Kotlin-Spring Boot + PostgreSQL 16
 - **Related baseline:** `sdd/features/20260921-single-tenant-installation-baseline/`
