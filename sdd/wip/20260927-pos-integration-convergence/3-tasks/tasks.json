@@ -42,7 +42,7 @@
         {"id":"TASK-POSC-002B","status":"sql_merged_http_open","depends_on":["TASK-POSC-002A"],"scope":"shared anchor plus complete durable Tx-S/Tx-C capability administration; no full POS guard","plan_ref":"3-tasks/posc002-implementation-slices.md"},
         {"id":"TASK-POSC-002C","status":"sql_slice_dual_approved","depends_on":["TASK-POSC-002B"],"scope":"companion schema auth_ready/scopes and Tx-P consume 002B protocol","plan_ref":"3-tasks/posc002-implementation-slices.md"},
         {"id":"TASK-POSC-002D","status":"http_slice_dual_approved","depends_on":["TASK-POSC-002C"],"plan_ref":"3-tasks/posc002-implementation-slices.md"},
-        {"id":"TASK-POSC-002E","status":"blocked_by_002B_002C_002D","depends_on":["TASK-POSC-002B","TASK-POSC-002C","TASK-POSC-002D"],"scope":"full POS effect/read guards after companion schema plus engine wiring","plan_ref":"3-tasks/posc002-implementation-slices.md"},
+        {"id":"TASK-POSC-002E","status":"dual_approved_pending_merge","depends_on":["TASK-POSC-002B","TASK-POSC-002C","TASK-POSC-002D"],"scope":"full POS effect/read guards after companion schema plus engine wiring","plan_ref":"3-tasks/posc002-implementation-slices.md"},
         {"id":"TASK-POSC-002F","status":"blocked_by_002E","depends_on":["TASK-POSC-002E"],"plan_ref":"3-tasks/posc002-implementation-slices.md"},
         {"id":"TASK-POSC-002G","status":"blocked_by_002F","depends_on":["TASK-POSC-002F"],"plan_ref":"3-tasks/posc002-implementation-slices.md"}
       ]

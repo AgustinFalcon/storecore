@@ -10,6 +10,10 @@ import com.storecore.blackstore.application.port.BlackStoreCatalogPort
 import com.storecore.blackstore.application.port.BlackStoreCompanionGuard
 import com.storecore.blackstore.application.port.BlackStoreRateLimitPort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
+import com.storecore.blackstore.domain.CompanionLifecycleStatus
+import com.storecore.blackstore.domain.CompanionScope
+import com.storecore.blackstore.domain.CompanionServiceRole
+import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
@@ -22,6 +26,21 @@ import java.util.UUID
 class BlackStoreIntegrationServiceTest {
     private val client = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
     private val operation = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    private val principal = VerifiedCompanionPrincipal.of(
+        UUID.fromString(client),
+        1L,
+        1L,
+        1,
+        CompanionServiceRole.SERVICE,
+        setOf(
+            CompanionScope.CATALOG_READ,
+            CompanionScope.STOCK_READ,
+            CompanionScope.STOCK_RESERVE,
+            CompanionScope.STOCK_COMMIT,
+            CompanionScope.STOCK_RELEASE,
+        ),
+        CompanionLifecycleStatus.ACTIVE,
+    )
 
     @Test
     fun `disabled capability never calls limiter catalog or saga`() {
@@ -36,19 +55,19 @@ class BlackStoreIntegrationServiceTest {
             service.stock(client, 1)
         }
         assertThrows(BlackStoreCapabilityDisabled::class.java) {
-            service.reserve(client, "pos-1", "sale-1", operation, reserveBody())
+            service.reserve(principal, client, "pos-1", "sale-1", operation, reserveBody())
         }
         assertThrows(BlackStoreCapabilityDisabled::class.java) {
-            service.commit(client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
+            service.commit(principal, client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
         }
         assertThrows(BlackStoreCapabilityDisabled::class.java) {
-            service.release(client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
+            service.release(principal, client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
         }
         assertThrows(BlackStoreCapabilityDisabled::class.java) {
-            service.operation(client, "pos-1", "sale-1", operation, operation)
+            service.operation(principal, client, "pos-1", "sale-1", operation, operation)
         }
         assertThrows(BlackStoreCapabilityDisabled::class.java) {
-            service.reconcile(client, BlackStoreReconcileRequest(listOf("r1")))
+            service.reconcile(principal, client, BlackStoreReconcileRequest(listOf("r1")))
         }
         assertEquals(0, service.expireDue())
         assertEquals(0, service.purgeDue())
@@ -67,7 +86,7 @@ class BlackStoreIntegrationServiceTest {
         assertEquals("v1", page.catalogVersion)
         assertEquals(1, limiter.checks)
         assertEquals(1, catalog.calls)
-        val reserved = service.reserve(client, "pos-1", "sale-1", operation, reserveBody())
+        val reserved = service.reserve(principal, client, "pos-1", "sale-1", operation, reserveBody())
         assertEquals("RESERVED", reserved.state)
         assertEquals(2, limiter.checks)
         assertEquals(1, saga.calls)
@@ -77,14 +96,14 @@ class BlackStoreIntegrationServiceTest {
         val ref = BlackStoreSagaPolicy.reservationRefFor(
             BlackStoreQuadruple(UUID.fromString(client), "pos-1", "sale-1", UUID.fromString(operation)),
         ).toString()
-        assertEquals("COMMITTED", service.commit(client, "pos-1", "sale-1", operation, ref).state)
-        assertEquals("RELEASED", service.release(client, "pos-1", "sale-1", operation, ref).state)
-        assertEquals("RESERVED", service.operation(client, "pos-1", "sale-1", operation, operation).state)
-        assertEquals(listOf("missing"), service.reconcile(client, BlackStoreReconcileRequest(listOf("missing"))).unknownReceipts)
+        assertEquals("COMMITTED", service.commit(principal, client, "pos-1", "sale-1", operation, ref).state)
+        assertEquals("RELEASED", service.release(principal, client, "pos-1", "sale-1", operation, ref).state)
+        assertEquals("RESERVED", service.operation(principal, client, "pos-1", "sale-1", operation, operation).state)
+        assertEquals(listOf("missing"), service.reconcile(principal, client, BlackStoreReconcileRequest(listOf("missing"))).unknownReceipts)
         assertEquals(1, service.purgeDue())
         assertEquals(7, limiter.checks)
         assertThrows(BlackStoreSagaException::class.java) {
-            service.commit(client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
+            service.commit(principal, client, "pos-1", "sale-1", operation, UUID.randomUUID().toString())
         }
         assertEquals("NOT_MODIFIED", assertThrows(BlackStoreNotModified::class.java) {
             service.catalog(client, null, 10, false, "v1")
@@ -153,6 +172,7 @@ class BlackStoreIntegrationServiceTest {
     private class RecordingSaga : BlackStoreSagaPort {
         var calls = 0
         override fun reserve(
+            principal: VerifiedCompanionPrincipal,
             quadruple: BlackStoreQuadruple,
             catalogVersion: String,
             lines: List<BlackStoreReserveLine>,
@@ -161,22 +181,22 @@ class BlackStoreIntegrationServiceTest {
             return BlackStoreOperationReceipt("RESERVED", catalogVersion = catalogVersion)
         }
 
-        override fun commit(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
+        override fun commit(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
             calls += 1
             return BlackStoreOperationReceipt("COMMITTED", catalogVersion = "v1")
         }
 
-        override fun release(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
+        override fun release(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
             calls += 1
             return BlackStoreOperationReceipt("RELEASED", catalogVersion = "v1")
         }
 
-        override fun get(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
+        override fun get(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt {
             calls += 1
             return BlackStoreOperationReceipt("RESERVED", catalogVersion = "v1")
         }
 
-        override fun reconcile(knownReceipts: List<String>): BlackStoreReconcileResult {
+        override fun reconcile(principal: VerifiedCompanionPrincipal, knownReceipts: List<String>): BlackStoreReconcileResult {
             calls += 1
             return BlackStoreReconcileResult(emptyList(), knownReceipts)
         }

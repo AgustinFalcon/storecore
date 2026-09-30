@@ -2,11 +2,14 @@ package com.storecore.blackstore
 
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
+import com.storecore.blackstore.application.port.PosCompanionGuardPort
+import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import java.sql.Timestamp
 import java.time.Duration
@@ -18,19 +21,27 @@ class JdbcBlackStoreSagaEngine(
     private val jdbc: JdbcTemplate,
     transactionManager: PlatformTransactionManager,
     private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
+    private val companionGuard: PosCompanionGuardPort,
 ) : BlackStoreSagaPort {
-    private val tx = TransactionTemplate(transactionManager)
-
-    override fun reserve(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
-        claimPending(quadruple, catalogVersion, lines)
-        return finishReserve(quadruple, catalogVersion, lines)
+    private val tx = TransactionTemplate(transactionManager).apply {
+        isolationLevel = TransactionDefinition.ISOLATION_READ_COMMITTED
+    }
+    private val readTx = TransactionTemplate(transactionManager).apply {
+        isolationLevel = TransactionDefinition.ISOLATION_REPEATABLE_READ
+        isReadOnly = true
     }
 
-    fun claimPending(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+    override fun reserve(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+        claimPending(principal, quadruple, catalogVersion, lines)
+        return finishReserve(principal, quadruple, catalogVersion, lines)
+    }
+
+    fun claimPending(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
         validateReserve(catalogVersion, lines)
         val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
         return unwrapSaga {
         tx.execute {
+            companionGuard.authorizeForEffect(principal, "STOCK_RESERVE")
             lockQuadruple(quadruple)
             rejectTombstone(quadruple)
             val existing = loadRow(quadruple, forUpdate = true)
@@ -72,11 +83,12 @@ class JdbcBlackStoreSagaEngine(
         }
     }
 
-    fun finishReserve(quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+    fun finishReserve(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
         validateReserve(catalogVersion, lines)
         val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
         val outcome = unwrapSaga {
         tx.execute {
+            companionGuard.authorizeForEffect(principal, "STOCK_RESERVE")
             lockQuadruple(quadruple)
             rejectTombstone(quadruple)
             val existing = loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.conflict()
@@ -181,8 +193,8 @@ class JdbcBlackStoreSagaEngine(
         return outcome.receipt!!
     }
 
-    override fun commit(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
-        mutateReserved(quadruple, already = "COMMITTED") { row, lines ->
+    override fun commit(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
+        mutateReserved(quadruple, already = "COMMITTED", principal = principal, action = "STOCK_COMMIT") { row, lines ->
             lines.forEach { line ->
                 val reservation = lockReservation(row.reservationRef!!, line.variantId)
                 jdbc.update("UPDATE inventory_balances SET reserved_quantity=reserved_quantity-?, updated_at=now() WHERE variant_id=?", line.quantity, line.variantId)
@@ -206,8 +218,8 @@ class JdbcBlackStoreSagaEngine(
             projectionBridge.requestProjection(receipt.reservationRef?.toString())
         }
 
-    override fun release(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
-        mutateReserved(quadruple, already = "RELEASED") { row, lines ->
+    override fun release(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
+        mutateReserved(quadruple, already = "RELEASED", principal = principal, action = "STOCK_RELEASE") { row, lines ->
             releaseStock(quadruple, row, lines, reservationStatus = "RELEASED", sagaState = "RELEASED")
         }.also { receipt ->
             // As with commit, this callback is post-transaction and cannot own projection writes.
@@ -254,36 +266,44 @@ class JdbcBlackStoreSagaEngine(
         """.trimIndent(),
     )
 
-    override fun get(quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt = unwrapSaga {
-        tx.execute {
-            lockQuadruple(quadruple)
+    override fun get(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt = unwrapSaga {
+        readTx.execute {
+            companionGuard.authorizeForRead(principal, "STOCK_READ")
+            if (quadruple.clientInstanceId != principal.clientInstanceId) throw BlackStoreSagaException.notFound()
             rejectTombstone(quadruple)
-            toReceipt(loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.notFound())
+            toReceipt(loadRow(quadruple, forUpdate = false) ?: throw BlackStoreSagaException.notFound())
         }!!
     }
 
-    override fun reconcile(knownReceipts: List<String>): BlackStoreReconcileResult {
+    override fun reconcile(principal: VerifiedCompanionPrincipal, knownReceipts: List<String>): BlackStoreReconcileResult {
         if (knownReceipts.isEmpty() || knownReceipts.size > 500) throw BlackStoreSagaException.validation("RECONCILE_RECEIPTS_INVALID")
         val unique = knownReceipts.distinct()
         val placeholders = unique.joinToString(",") { "?" }
-        val found = jdbc.query(
-            """
-            SELECT client_instance_id, device_id, sale_id, operation_id
-            FROM blackstore_integration_operations
-            WHERE receipt IN ($placeholders)
-            """.trimIndent(),
-            { rs, _ ->
-                BlackStoreQuadruple(
-                    clientInstanceId = rs.getObject("client_instance_id", UUID::class.java),
-                    deviceId = rs.getString("device_id"),
-                    saleId = rs.getString("sale_id"),
-                    operationId = rs.getObject("operation_id", UUID::class.java),
-                )
-            },
-            *unique.toTypedArray(),
-        ).map { get(it) }
-        val present = found.mapNotNull { it.receipt }.toSet()
-        return BlackStoreReconcileResult(present = found, unknownReceipts = unique.filterNot { it in present })
+        return unwrapSaga {
+        readTx.execute {
+            companionGuard.authorizeForRead(principal, "STOCK_READ")
+            val found = jdbc.query(
+                """
+                SELECT client_instance_id, device_id, sale_id, operation_id
+                FROM blackstore_integration_operations
+                WHERE receipt IN ($placeholders)
+                  AND client_instance_id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    BlackStoreQuadruple(
+                        clientInstanceId = rs.getObject("client_instance_id", UUID::class.java),
+                        deviceId = rs.getString("device_id"),
+                        saleId = rs.getString("sale_id"),
+                        operationId = rs.getObject("operation_id", UUID::class.java),
+                    )
+                },
+                *unique.toTypedArray(),
+                principal.clientInstanceId,
+            ).map { get(principal, it) }
+            val present = found.mapNotNull { it.receipt }.toSet()
+            BlackStoreReconcileResult(present = found, unknownReceipts = unique.filterNot { it in present })
+        }!!
+        }
     }
 
     fun purge(quadruple: BlackStoreQuadruple) {
@@ -351,9 +371,14 @@ class JdbcBlackStoreSagaEngine(
         quadruple: BlackStoreQuadruple,
         already: String,
         skipLocked: Boolean = false,
+        principal: VerifiedCompanionPrincipal? = null,
+        action: String? = null,
         body: (OperationRow, List<LineRow>) -> Unit,
     ): BlackStoreOperationReceipt = unwrapSaga {
         tx.execute {
+        if (principal != null && action != null) {
+            companionGuard.authorizeForEffect(principal, action)
+        }
         lockQuadruple(quadruple)
         rejectTombstone(quadruple)
         val row = loadRow(quadruple, forUpdate = true, skipLocked = skipLocked) ?: throw BlackStoreSagaException.notFound()
