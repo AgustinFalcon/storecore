@@ -11,7 +11,8 @@ Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-04
 - TASK-DSP-002: proyección `channel_listing_stock_projection` (V17) con versión monotónica y fórmula `max(0, available-safety)` sin restar `reserved_quantity`. Merge [#86](https://github.com/AgustinFalcon/storecore/pull/86).
 - TASK-DSP-003: outbox inmutable `STOCK_DESIRED_CHANGED` + delivery `PENDING` (V18) en la misma transacción que el snapshot. Sin dispatcher. Merge [#87](https://github.com/AgustinFalcon/storecore/pull/87).
 - TASK-DSP-004: callers WEB/MP, `releaseSaga` idempotente y orden global de locks; checkout multi-SKU en una transacción. Sin dispatcher ni `InboxApplicationWorker`. Merge [#88](https://github.com/AgustinFalcon/storecore/pull/88).
-- TASK-DSP-005: lifecycle de listing (crear PAUSED, activar/pausar, remap con intervención, confirmación baseline) y `saveProduct` en la misma transacción que la proyección.
+- TASK-DSP-005: lifecycle de listing (crear PAUSED, activar/pausar, remap con intervención, confirmación baseline) y `saveProduct` en la misma transacción que la proyección. Merge [#89](https://github.com/AgustinFalcon/storecore/pull/89).
+- TASK-DSP-006: matriz PG16 de concurrencia, rollback multi-SKU con order/attempt y runtime NOLOGIN; sin dispatcher.
 - BlackStore/PIC-009: retirado el writer directo de `desired_quantity` y `LISTING_STOCK`; bridge de aplicación fail-closed `NOT_ELIGIBLE`, sin activar el conector ni alterar outbox histórico.
 - POSC-000A: harness offline OpenAPI 3.1 con fixtures del baseline y pin SHA-256 reproducible para StoreCore/BlackStore; sin conector ni porteo.
 - POSC-001: harness PG16 test-only de rutas, upgrade V1–V7 con datos, ACL baseline y carreras idempotentes; sin migraciones ni conector.

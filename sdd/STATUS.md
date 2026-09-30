@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Estado actualizado:** 2026-09-30; `origin/integration/storecore-int` verificado en `f82eed1` (TASK-DSP-004 merge #88). Revalidar head antes de migrar.
+**Estado actualizado:** 2026-09-30; `origin/integration/storecore-int` verificado en `bdd1c92` (TASK-DSP-005 merge #89). Revalidar head antes de migrar.
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
@@ -32,7 +32,7 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 
 - **Login USER/CUSTOMER:** `sdd/wip/20260927-login-realm-budget/` tiene TASK-LRB-001–005 completos a nivel local e integrados por PR #50 (`7644feb`). La evidencia de contención y su límite está en `sdd/reviews/20260927-login-limiter-contention-measurement.md`; no representa un SLO de producción. El WIP permanece abierto por sus gates de cierre.
 - **Cota de memoria del login:** `sdd/wip/20260927-login-limiter-top5/` obtuvo dos GO documentales Astra por PR #54 (`dedeb1a`). El código pasó 29 suites/129 pruebas locales y dos reviews Astra; PR #57 se integró como `b6f37df` y PR #58 registró el estado como `d6a3083`. TASK-LT5-001–004 están done (4/5); TASK-LT5-005 sigue pending por los gates de cierre del WIP. Verify alojado del PR #57 falló con `steps=[]`, por lo que no hay CI remoto verde ni `sdd.finish`.
-- **Stock deseado Mercado Libre:** `sdd/wip/20260924-ml-desired-stock-projection/` obtuvo GO documental en TASK-DSP-R00 por PR #51 (`474a007`). TASK-DSP-000A `#52` (`56baa2d`). TASK-DSP-000B `#84` (`878461f`). TASK-DSP-001 `#85` (`715f37d`). TASK-DSP-002 snapshot V17 `#86` (`edf5dcb`). TASK-DSP-003 outbox V18 `#87` (`211e7c6`; dual prv29 APPROVED). TASK-DSP-004 callers WEB/MP `#88` (`f82eed1`; dual prv30 APPROVED). TASK-DSP-005 lifecycle dual prv31 r2 APPROVED en `feature/dsp005-listing-lifecycle` (AC-DSP-11 `saveProduct` rollback PG16). El DAG queda 9/14 local hasta merge 005. El bridge queda fail-closed, sin red ni activación ML/BlackStore.
+- **Stock deseado Mercado Libre:** `sdd/wip/20260924-ml-desired-stock-projection/` obtuvo GO documental en TASK-DSP-R00 por PR #51 (`474a007`). TASK-DSP-000A `#52` (`56baa2d`). TASK-DSP-000B `#84` (`878461f`). TASK-DSP-001 `#85` (`715f37d`). TASK-DSP-002 snapshot V17 `#86` (`edf5dcb`). TASK-DSP-003 outbox V18 `#87` (`211e7c6`; dual prv29 APPROVED). TASK-DSP-004 callers WEB/MP `#88` (`f82eed1`; dual prv30 APPROVED). TASK-DSP-005 lifecycle `#89` (`bdd1c92`; dual prv31 r2 APPROVED). TASK-DSP-006 concurrency en `feature/dsp006-concurrency`. El DAG queda 9/14 done hasta merge 006. El bridge queda fail-closed, sin red ni activación ML/BlackStore.
 
 ## WIP POS (paralelo, no es el baseline)
 
