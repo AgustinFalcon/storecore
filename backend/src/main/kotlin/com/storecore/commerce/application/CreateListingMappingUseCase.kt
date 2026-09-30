@@ -4,6 +4,7 @@ import com.storecore.commerce.application.port.ChannelListingMappingPort
 import com.storecore.commerce.application.port.MarketplaceAccountSelectorPort
 import com.storecore.commerce.domain.MercadoLibreListingView
 import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.infrastructure.ChannelProjectionLockOrder
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.domain.InternalUserPrincipal
@@ -29,6 +30,17 @@ class CreateListingMappingUseCase(
             capabilities.decide("MARKETPLACE_ML", "SYNC", CapabilityActor.Internal(actor))
             val account = accounts.requireExternalMlSync(accountId)
             val variantId = mappings.requireVariantId(command.sku)
+            val existingVariant = jdbc.query(
+                """
+                SELECT variant_id FROM channel_listings
+                 WHERE account_id=? AND external_listing_id=? AND variation_id IS NOT DISTINCT FROM ?
+                """.trimIndent(),
+                { rs, _ -> rs.getLong(1) },
+                account.id,
+                command.externalListingId,
+                command.variationId.ifBlank { null },
+            ).firstOrNull()
+            ChannelProjectionLockOrder(jdbc).lock(account.id, listOfNotNull(variantId, existingVariant))
             val written = mappings.upsert(account.id, command.externalListingId, command.variationId, variantId)
             if (written.remapped) {
                 jdbc.update(
