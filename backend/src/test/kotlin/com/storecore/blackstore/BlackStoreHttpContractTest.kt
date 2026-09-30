@@ -2,6 +2,7 @@ package com.storecore.blackstore
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
+import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.configuration.domain.CapabilityState
@@ -38,16 +39,18 @@ class BlackStoreHttpContractTest(
     @Autowired private val worker: BlackStoreExpiryWorker,
     @Autowired private val mapper: ObjectMapper,
     @Autowired private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
+    @Autowired private val secrets: InMemoryCompanionSecretProvider,
 ) {
     @LocalServerPort
     private var port: Int = 0
 
     private val client = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    private lateinit var bearer: String
 
     @Test
     fun `cas temporary active proves catalog 200 then disabled returns 403`() {
-        assertEquals(403, catalog().statusCode.value())
         seedCatalog()
+        assertEquals(403, catalog().statusCode.value())
         activate(CapabilityState.ACTIVE, "testcontainers temporary active")
         val enabled = catalog()
         assertEquals(200, enabled.statusCode.value(), enabled.body)
@@ -296,6 +299,7 @@ class BlackStoreHttpContractTest(
         connection.requestMethod = "POST"
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", "application/json")
+        connection.setRequestProperty("Authorization", "Bearer $bearer")
         connection.setRequestProperty("X-Client-Instance-Id", client.toString())
         connection.outputStream.use { it.write(body.toByteArray()) }
         val status = connection.responseCode
@@ -343,6 +347,7 @@ class BlackStoreHttpContractTest(
 
     private fun clientHeaders() = HttpHeaders().apply {
         contentType = MediaType.APPLICATION_JSON
+        set(HttpHeaders.AUTHORIZATION, "Bearer $bearer")
         set("X-Client-Instance-Id", client.toString())
     }
 
@@ -392,7 +397,7 @@ class BlackStoreHttpContractTest(
 
     private fun seedCatalog() {
         jdbc.update("INSERT INTO installation_settings(installation_id, business_name, allowed_host, currency) VALUES (1, 'Test', 'localhost', 'ARS') ON CONFLICT DO NOTHING")
-        jdbc.update("INSERT INTO blackstore_companions(client_instance_id, status) VALUES (?, 'DISABLED') ON CONFLICT (client_instance_id) DO NOTHING", client)
+        bearer = CompanionAuthTestSupport.seedReadyCompanion(jdbc, secrets, client)
         if (jdbc.queryForObject("SELECT COUNT(*) FROM brands WHERE slug='http-brand'", Int::class.java) == 0) {
             jdbc.update("INSERT INTO brands(name, slug) VALUES ('Http', 'http-brand')")
             jdbc.update("INSERT INTO categories(name, slug) VALUES ('HttpCat', 'http-cat')")

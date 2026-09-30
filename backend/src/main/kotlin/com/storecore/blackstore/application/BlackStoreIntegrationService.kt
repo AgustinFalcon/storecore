@@ -38,7 +38,7 @@ class BlackStoreIntegrationService(
         ifNoneMatch: String? = null,
     ): BlackStoreCatalogPage {
         requireEnabled("CATALOG_READ")
-        if (includeCost) requireEnabled("COST_READ")
+        if (includeCost) throw BlackStoreSagaException.costForbidden()
         val client = parseUuid(clientInstanceId, "X-Client-Instance-Id")
         companions.assertBound(client)
         limiter.check(client.toString(), BlackStoreRateLimiter.Scope.CATALOG)
