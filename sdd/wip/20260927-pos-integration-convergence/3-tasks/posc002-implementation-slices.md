@@ -40,7 +40,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002E — guard transaccional en engine y lecturas
 
-- **Estado local:** V10 + wiring del principal en saga/engine/servicio/controller en `feature/posc002e-pos-guards`; dual Grok 4.7 APPROVED (`sdd/reviews/20260929-grok-prv11-sdd.md`, `sdd/reviews/20260929-grok-prv11-scope.md`). No cierra la tarea hasta merge a integración. No activa `BLACKSTORE_INTEGRATION`.
+- **Estado:** merge PR #69 (`7579d1d`) con dual Grok 4.7 APPROVED. Wiring de guards+principal cerrado; 002F cubre la matriz HTTP/PG16 y residuales P1. No activa `BLACKSTORE_INTEGRATION`.
 - **Dependencias:** 002B, 002C y 002D.
 - **Ownership:** después de 002C, migración POS de pos_companion_effect_guard y pos_companion_read_guard completos, con owner/grants mínimos sobre action/config/switch/companion/credential y lectura de auth_ready/scopes. BlackStoreSagaPort/callers y JdbcBlackStoreSagaEngine reciben VerifiedCompanionPrincipal; efecto llama guard como primera consulta de Tx-A, re-POST Tx-B, commit y release. Lecturas GET/reconcile reciben principal y usan read guard como primer SELECT RR read-only con filtro client_instance_id.
 - **Aceptación:** transacción mutante explícita READ COMMITTED; guard rechaza RR/Serializable antes del efecto, compara credential id/version y scopes bajo lock, y no llama al decide switch→config→action heredado. Admin-wins tras esperar ancla observa config/switch confirmado; effect-wins bloquea admin hasta commit/rollback. Revoke entre Tx-A/Tx-B deja PENDING recuperable sin reservar. No cambia fórmula de stock, ledger, regla de cuádruple ni estado de capability. GET ajeno 404 y reconcile ajeno unknownReceipts, sin lectura cruzada de tombstone.
@@ -48,6 +48,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002F — matriz de aceptación y regresión
 
+- **Estado local:** matriz test-only en `feature/posc002f-acceptance-matrix`. Cubre checksums V1–V10 + upgrade con filas, revoke Tx-A/Tx-B, kill reserve/commit/release, GET tras DISABLE, cursor UPSERT, ownership HTTP 404/unknown, grants residual INSERT(variant_id)=false, ocho rutas pinneadas y ML RR NO-GO. CSRF/nueve comandos companion HTTP y Tx-S capability quedan residuales de 002B/002C (sin controller). Sin código comercial nuevo.
 - **Dependencias:** 002B–002E integrados sobre un mismo head.
 - **Ownership:** tests PG16 Testcontainers y HTTP loopback, sin código comercial nuevo.
 - **Aceptación:** clean+upgrade V1–V7 con filas; diff de datos/grants/checksums; roles runtime/admin/migrator/ajeno reales; cursor UPSERT, inventory_balances INSERT(variant_id), catálogo/ajuste stock y WEB/ML sin regresión. Cubre bearer, provider outage, scopes, nueve comandos admin, CSRF, replay, revocación y kill contra Tx-A/Tx-B/commit/release, read RR y ownership A→B. No hay claim/ledger/stock al denegar; no doble descuento; digest YAML y mapa de ocho rutas sin duplicados. ML RR admin-wins se registra como gate separado NO-GO, sin convertir este test POS en su aprobación.
