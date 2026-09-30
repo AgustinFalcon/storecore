@@ -1,5 +1,7 @@
 package com.storecore.commerce.application
 
+import com.storecore.commerce.application.port.ChannelStockOutboxPort
+import com.storecore.commerce.application.port.DesiredStockChangedIntent
 import com.storecore.commerce.application.port.LockedListingProjection
 import com.storecore.commerce.application.port.MarketplaceListingProjectionPort
 import com.storecore.commerce.application.port.ProjectionWrite
@@ -21,6 +23,7 @@ import java.security.MessageDigest
 class DesiredStockProjectionUseCase(
     private val capabilities: CapabilityDecisionPort,
     private val listings: MarketplaceListingProjectionPort,
+    private val outbox: ChannelStockOutboxPort,
 ) {
     @Transactional
     fun project(variantIds: Collection<Long>, cause: ProjectionSourceCause, actor: CapabilityActor): List<DesiredStockProjectionResult> {
@@ -89,8 +92,24 @@ class DesiredStockProjectionUseCase(
             ),
         )
         if (written != 1) throw CommerceValidation("PROJECTION_VERSION_CONFLICT")
-        val outcome = if (state.isWithheld()) DesiredStockOutcome.Withheld else DesiredStockOutcome.SnapshotAdvanced
-        return DesiredStockProjectionResult(row.variantId, row.listingId, outcome, nextVersion, sellable)
+        if (state.isWithheld()) {
+            return DesiredStockProjectionResult(row.variantId, row.listingId, DesiredStockOutcome.Withheld, nextVersion, sellable)
+        }
+        outbox.appendDesiredStockChanged(
+            DesiredStockChangedIntent(
+                listingId = row.listingId,
+                accountId = row.accountId,
+                variantId = row.variantId,
+                externalListingId = row.externalListingId,
+                variationId = row.variationId,
+                desiredQuantity = sellable,
+                projectionVersion = nextVersion,
+                mappingFingerprint = mappingFp,
+                eligibilityFingerprint = eligibilityFp,
+                sourceCause = cause.wire,
+            ),
+        )
+        return DesiredStockProjectionResult(row.variantId, row.listingId, DesiredStockOutcome.Projected, nextVersion, sellable)
     }
 
     companion object {

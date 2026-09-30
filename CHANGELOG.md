@@ -8,7 +8,8 @@ Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-04
 - POSC-005: topología HTTP OpenAPI pinneada y envelope 401 (`Posc005WireTopologyTest`); merge [#83](https://github.com/AgustinFalcon/storecore/pull/83).
 - TASK-DSP-000B: snapshot SECURITY DEFINER `MARKETPLACE_ML/SYNC` (V15); `decide` consume la foto; V3 genérico rechaza ML. Merge [#84](https://github.com/AgustinFalcon/storecore/pull/84).
 - TASK-DSP-001: `channel_accounts.purpose` tipado (V16, backfill `UNCLASSIFIED`); CreateListingMapping exige `account_id` explícito `EXTERNAL_ML_SYNC`; `notify` no se toca. Merge [#85](https://github.com/AgustinFalcon/storecore/pull/85).
-- TASK-DSP-002: proyección `channel_listing_stock_projection` (V17) con versión monotónica y fórmula `max(0, available-safety)` sin restar `reserved_quantity`. Sin outbox ni dispatcher.
+- TASK-DSP-002: proyección `channel_listing_stock_projection` (V17) con versión monotónica y fórmula `max(0, available-safety)` sin restar `reserved_quantity`. Merge [#86](https://github.com/AgustinFalcon/storecore/pull/86).
+- TASK-DSP-003: outbox inmutable `STOCK_DESIRED_CHANGED` + delivery `PENDING` (V18) en la misma transacción que el snapshot. Sin dispatcher.
 - BlackStore/PIC-009: retirado el writer directo de `desired_quantity` y `LISTING_STOCK`; bridge de aplicación fail-closed `NOT_ELIGIBLE`, sin activar el conector ni alterar outbox histórico.
 - POSC-000A: harness offline OpenAPI 3.1 con fixtures del baseline y pin SHA-256 reproducible para StoreCore/BlackStore; sin conector ni porteo.
 - POSC-001: harness PG16 test-only de rutas, upgrade V1–V7 con datos, ACL baseline y carreras idempotentes; sin migraciones ni conector.

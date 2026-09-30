@@ -2,4 +2,4 @@
 
 ## Estado
 
-`in_progress`. TASK-DSP-000A merge `#52` (`56baa2d`). TASK-DSP-000B merge `#84` (`878461f`). TASK-DSP-001 merge `#85` (`715f37d`, V16). TASK-DSP-002 en `feature/dsp002-monotonic-snapshot` (V17 snapshot). Sin dispatcher, outbox `STOCK_DESIRED_CHANGED`, red, secretos ni `sdd.finish`.
+`in_progress`. 000A `#52`, 000B `#84`, 001 `#85`, 002 `#86` (`edf5dcb`, V17). TASK-DSP-003 en `feature/dsp003-stock-desired-changed` (V18 outbox). Sin dispatcher, red, secretos ni `sdd.finish`.
