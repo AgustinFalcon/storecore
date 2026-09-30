@@ -23,8 +23,13 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.dao.DataIntegrityViolationException
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.commerce.application.DesiredStockProjectionUseCase
+import com.storecore.commerce.infrastructure.JdbcChannelStockOutboxAdapter
+import com.storecore.commerce.infrastructure.JdbcMarketplaceListingProjectionAdapter
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.jdbc.datasource.DataSourceTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.PostgreSQLContainer
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -46,10 +51,18 @@ class Dsp001AccountPurposeTest {
         val provisioned = CapabilityAdminTestSupport.migrateAndProvision(postgres)
         jdbc = provisioned.first
         capabilities = JdbcCapabilityService(jdbc, provisioned.second)
+        val transactions = TransactionTemplate(DataSourceTransactionManager(jdbc.dataSource!!))
         mapping = CreateListingMappingUseCase(
             capabilities,
             JdbcMarketplaceAccountSelector(jdbc),
             JdbcChannelListingMappingAdapter(jdbc),
+            DesiredStockProjectionUseCase(
+                capabilities,
+                JdbcMarketplaceListingProjectionAdapter(jdbc),
+                JdbcChannelStockOutboxAdapter(jdbc, ObjectMapper()),
+            ),
+            jdbc,
+            transactions,
         )
         val hash = Argon2PasswordHasher().hash("a-very-long-password".toCharArray())
         adminId = jdbc.queryForObject(

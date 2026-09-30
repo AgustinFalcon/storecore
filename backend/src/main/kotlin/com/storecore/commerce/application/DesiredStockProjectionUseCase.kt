@@ -26,7 +26,12 @@ open class DesiredStockProjectionUseCase(
     private val outbox: ChannelStockOutboxPort,
 ) {
     @Transactional
-    open fun project(variantIds: Collection<Long>, cause: ProjectionSourceCause, actor: CapabilityActor): List<DesiredStockProjectionResult> {
+    open fun project(
+        variantIds: Collection<Long>,
+        cause: ProjectionSourceCause,
+        actor: CapabilityActor,
+        forceBaseline: Boolean = false,
+    ): List<DesiredStockProjectionResult> {
         if (cause === ProjectionSourceCause.Unknown) throw CommerceValidation("PROJECTION_CAUSE_UNKNOWN")
         val unique = variantIds.distinct().sorted()
         if (unique.isEmpty()) return emptyList()
@@ -38,12 +43,12 @@ open class DesiredStockProjectionUseCase(
             results += DesiredStockProjectionResult(variantId, null, DesiredStockOutcome.NoListing, null, null)
         }
         locked.sortedBy { it.listingId }.forEach { row ->
-            results += upsert(row, cause)
+            results += upsert(row, cause, forceBaseline)
         }
         return results
     }
 
-    private fun upsert(row: LockedListingProjection, cause: ProjectionSourceCause): DesiredStockProjectionResult {
+    private fun upsert(row: LockedListingProjection, cause: ProjectionSourceCause, forceBaseline: Boolean): DesiredStockProjectionResult {
         val sellable = sellable(row.availableQuantity, row.safetyStock)
         val withheldReason = withholdingReason(row)
         val state = if (withheldReason == null) ProjectionState.Emitted else ProjectionState.Withheld
@@ -70,7 +75,7 @@ open class DesiredStockProjectionUseCase(
                 (row.currentReason ?: "") == (withheldReason ?: "") &&
                 row.currentMappingFingerprint == mappingFp &&
                 row.currentEligibilityFingerprint == eligibilityFp
-        if (same) {
+        if (same && !forceBaseline) {
             return DesiredStockProjectionResult(row.variantId, row.listingId, DesiredStockOutcome.Unchanged, row.currentVersion, sellable)
         }
         val nextVersion = (row.currentVersion ?: 0L) + 1L

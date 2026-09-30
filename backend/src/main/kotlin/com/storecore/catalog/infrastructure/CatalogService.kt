@@ -5,11 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
 import com.storecore.commerce.application.port.output.EffectivePriceQueryPort
+import com.storecore.commerce.domain.ProjectionSourceCause
 import com.storecore.commerce.infrastructure.JdbcInventoryService
 import com.storecore.commerce.application.CommerceValidation
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
+import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.Instant
 import javax.sql.DataSource
@@ -26,6 +28,7 @@ class JdbcCatalogService(
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
     private val inventory: JdbcInventoryService,
+    private val transactions: TransactionTemplate,
     private val effectivePrices: EffectivePriceQueryPort,
 ) : CatalogQueryPort {
     override fun searchActive(query: String): List<CatalogSearchResult> = jdbc.query("""SELECT v.sku,p.name FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE p.status='ACTIVE' AND v.active AND (lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?) OR lower(coalesce(b.name,'')) LIKE lower(?) OR lower(coalesce(c.name,'')) LIKE lower(?)) ORDER BY p.name LIMIT 100""", { rs, _ -> CatalogSearchResult(com.storecore.catalog.domain.ProductSku(rs.getString("sku")), rs.getString("name")) }, "%$query%", "%$query%", "%$query%", "%$query%")
@@ -122,11 +125,12 @@ class JdbcCatalogService(
     private fun homeBlocks(rows: List<Pair<String, JsonNode>>) = rows.map { (key, content) ->
         mapOf("id" to key, "title" to content.path("title").asText(key), "body" to content.path("body").asText(""))
     }
-    fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean, actor: Long): CatalogProduct {
+    fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean, actor: Long): CatalogProduct = transactions.execute {
         val brandId = named("brands", brand); val categoryId = named("categories", category)
         val base = number(price["base"]) ?: number(price["effective"]) ?: BigDecimal.ZERO
-        val existing = jdbc.query("SELECT p.id,v.id variant_id FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=?", { rs, _ -> rs.getLong("id") to rs.getLong("variant_id") }, sku).firstOrNull()
+        val existing = jdbc.query("SELECT p.id,v.id variant_id,p.status FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=?", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("variant_id"), rs.getString("status")) }, sku).firstOrNull()
         val productId: Long; val variantId: Long
+        val wasActive = existing?.third == "ACTIVE"
         if (existing == null) {
             productId = jdbc.queryForObject("INSERT INTO products(brand_id,category_id,name,slug,description,base_price,status) VALUES (?,?,?,?,?,?,?) RETURNING id", Long::class.java, brandId, categoryId, name, slug(sku), description, base, if (active) "ACTIVE" else "DRAFT")!!
             variantId = jdbc.queryForObject("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,?) RETURNING id", Long::class.java, productId, sku, name, active)!!
@@ -137,6 +141,7 @@ class JdbcCatalogService(
         }
         jdbc.update("DELETE FROM product_images WHERE product_id=?", productId)
         images.filter { it.startsWith("https://") }.forEachIndexed { index, url -> jdbc.update("INSERT INTO product_images(product_id,url,sort_order,is_primary) VALUES (?,?,?,?)", productId, url, index, index == 0) }
+        val affected = linkedSetOf(variantId)
         variants.forEachIndexed { index, variant ->
             val variantSku = variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if (index == 0) sku else return@forEachIndexed
             val (targetVariantId, createdVariant) = if (variantSku == sku) variantId to (existing == null) else {
@@ -149,6 +154,7 @@ class JdbcCatalogService(
                     existingVariant.first to false
                 }
             }
+            affected += targetVariantId
             val rawQuantity = variant["availableQuantity"]
             if (rawQuantity != null) {
                 val quantity = number(rawQuantity)?.intValueExact() ?: throw CommerceValidation("CATALOG_AVAILABLE_QUANTITY_INVALID")
@@ -156,9 +162,15 @@ class JdbcCatalogService(
                 inventory.setAvailableQuantity(targetVariantId, quantity, "USER:$actor", reason)
             }
         }
+        val cause = when {
+            !active && wasActive -> ProjectionSourceCause.ProductDeactivated
+            active && !wasActive && existing != null -> ProjectionSourceCause.ProductReactivated
+            else -> ProjectionSourceCause.InternalAdjustment
+        }
+        inventory.reproject(affected, cause, forceBaseline = cause === ProjectionSourceCause.ProductDeactivated || cause === ProjectionSourceCause.ProductReactivated)
         audit(actor, "CATALOG_PRODUCT_SAVED", "products", sku)
-        return product(sku, admin = true)!!
-    }
+        product(sku, admin = true)!!
+    }!!
     fun saveBrand(id: Long, name: String, actor: Long): CatalogFacet = saveFacet("brands", id, name, actor)
     fun saveCategory(id: Long, name: String, actor: Long): CatalogFacet = saveFacet("categories", id, name, actor)
     private fun saveFacet(table: String, id: Long, name: String, actor: Long): CatalogFacet {
