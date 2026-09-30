@@ -316,7 +316,7 @@ class JdbcBlackStoreSagaEngine(
     }
 
     override fun reconcile(principal: VerifiedCompanionPrincipal, knownReceipts: List<String>): BlackStoreReconcileResult {
-        if (knownReceipts.isEmpty() || knownReceipts.size > 500) throw BlackStoreSagaException.validation("RECONCILE_RECEIPTS_INVALID")
+        if (knownReceipts.isEmpty() || knownReceipts.size > 500) throw BlackStoreSagaException.validation()
         val unique = knownReceipts.distinct()
         val placeholders = unique.joinToString(",") { "?" }
         return unwrapSaga {
