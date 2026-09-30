@@ -15,5 +15,23 @@ class VerifiedCompanionPrincipal internal constructor(
 
     companion object {
         const val REQUEST_ATTR = "storecore.verifiedCompanionPrincipal"
+
+        fun of(
+            clientInstanceId: UUID,
+            companionId: Long,
+            credentialId: Long,
+            credentialVersion: Int,
+            serviceRole: CompanionServiceRole,
+            scopes: Set<CompanionScope>,
+            companionStatus: CompanionLifecycleStatus,
+        ) = VerifiedCompanionPrincipal(
+            clientInstanceId,
+            companionId,
+            credentialId,
+            credentialVersion,
+            serviceRole,
+            scopes,
+            companionStatus,
+        )
     }
 }

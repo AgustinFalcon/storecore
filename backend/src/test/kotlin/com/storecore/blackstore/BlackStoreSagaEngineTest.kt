@@ -2,6 +2,15 @@ package com.storecore.blackstore
 
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
+import com.storecore.blackstore.domain.CompanionLifecycleStatus
+import com.storecore.blackstore.domain.CompanionScope
+import com.storecore.blackstore.domain.CompanionServiceRole
+import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
+import com.storecore.blackstore.infrastructure.JdbcPosCompanionGuard
+import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.infrastructure.JdbcCapabilityService
+import com.storecore.identity.domain.InternalRole
+import com.storecore.identity.domain.InternalUserPrincipal
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -30,6 +39,7 @@ class BlackStoreSagaEngineTest {
         private lateinit var jdbc: JdbcTemplate
         private lateinit var engine: JdbcBlackStoreSagaEngine
         private lateinit var catalog: JdbcBlackStoreCatalogQuery
+        private lateinit var principal: VerifiedCompanionPrincipal
 
         @JvmStatic
         @BeforeAll
@@ -38,12 +48,63 @@ class BlackStoreSagaEngineTest {
             Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
             val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
             jdbc = JdbcTemplate(dataSource)
-            engine = JdbcBlackStoreSagaEngine(jdbc, DataSourceTransactionManager(dataSource), LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE })
+            engine = JdbcBlackStoreSagaEngine(
+                jdbc,
+                DataSourceTransactionManager(dataSource),
+                LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
+                JdbcPosCompanionGuard(jdbc),
+            )
             catalog = JdbcBlackStoreCatalogQuery(jdbc)
             jdbc.update(
                 "INSERT INTO installation_settings(installation_id, business_name, allowed_host, currency) VALUES (1, 'Test', 'localhost', 'ARS') ON CONFLICT DO NOTHING",
             )
-            jdbc.update("INSERT INTO blackstore_companions(client_instance_id, status) VALUES (?, 'DISABLED')", client)
+            jdbc.update("INSERT INTO blackstore_companions(client_instance_id, status) VALUES (?, 'ACTIVE')", client)
+            val companionId = jdbc.queryForObject("SELECT id FROM blackstore_companions WHERE client_instance_id=?", Long::class.java, client)!!
+            jdbc.update(
+                """
+                INSERT INTO blackstore_companion_credentials(
+                  companion_id, credential_secret_ref, credential_version, status,
+                  token_fingerprint, scopes, service_role, auth_ready
+                ) VALUES (?, 'test-only:saga', 1, 'ACTIVE', ?, ?::text[], 'SERVICE', TRUE)
+                """.trimIndent(),
+                companionId,
+                "a".repeat(64),
+                "{catalog:read,stock:read,stock:reserve,stock:commit,stock:release}",
+            )
+            val credentialId = jdbc.queryForObject(
+                "SELECT id FROM blackstore_companion_credentials WHERE companion_id=? AND credential_version=1",
+                Long::class.java,
+                companionId,
+            )!!
+            principal = VerifiedCompanionPrincipal.of(
+                client,
+                companionId,
+                credentialId,
+                1,
+                CompanionServiceRole.SERVICE,
+                setOf(
+                    CompanionScope.CATALOG_READ,
+                    CompanionScope.STOCK_READ,
+                    CompanionScope.STOCK_RESERVE,
+                    CompanionScope.STOCK_COMMIT,
+                    CompanionScope.STOCK_RELEASE,
+                ),
+                CompanionLifecycleStatus.ACTIVE,
+            )
+            val adminId = jdbc.queryForObject(
+                "INSERT INTO users(email, password_hash, first_name, last_name) VALUES ('bs-saga@example.com', '\$argon2id\$fixture', 'Bs', 'Saga') ON CONFLICT (email) DO UPDATE SET email=EXCLUDED.email RETURNING id",
+                Long::class.java,
+            )!!
+            jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
+            val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
+            JdbcCapabilityService(jdbc).changeState(
+                InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
+                "BLACKSTORE_INTEGRATION",
+                CapabilityState.ACTIVE,
+                version,
+                "saga engine temporary active",
+                UUID.randomUUID(),
+            )
             jdbc.update("INSERT INTO brands(name, slug) VALUES ('Saga', 'saga-brand')")
             jdbc.update("INSERT INTO categories(name, slug) VALUES ('SagaCat', 'saga-cat')")
         }
@@ -57,16 +118,16 @@ class BlackStoreSagaEngineTest {
     fun `tx-a is visible and tx-b reserves then commit consumes reserved`() {
         val seeded = seedVariant("SKU-RSV-${UUID.randomUUID()}", available = 10, safety = 2)
         val q = quadruple()
-        val pending = engine.claimPending(q, seeded.catalogVersion, seeded.line(3))
+        val pending = engine.claimPending(principal, q, seeded.catalogVersion, seeded.line(3))
         assertEquals("PENDING", pending.state)
         assertNull(pending.receipt)
-        assertEquals("PENDING", engine.get(q).state)
-        val reserved = engine.finishReserve(q, seeded.catalogVersion, seeded.line(3))
+        assertEquals("PENDING", engine.get(principal, q).state)
+        val reserved = engine.finishReserve(principal, q, seeded.catalogVersion, seeded.line(3))
         assertEquals("RESERVED", reserved.state)
-        assertEquals(reserved.receipt, engine.reserve(q, seeded.catalogVersion, seeded.line(3)).receipt)
+        assertEquals(reserved.receipt, engine.reserve(principal, q, seeded.catalogVersion, seeded.line(3)).receipt)
         assertEquals(5, sellable(seeded.variantId))
         assertEquals(3, reservedQty(seeded.variantId))
-        val committed = engine.commit(q)
+        val committed = engine.commit(principal, q)
         assertEquals("COMMITTED", committed.state)
         assertEquals(5, sellable(seeded.variantId))
         assertEquals(0, reservedQty(seeded.variantId))
@@ -78,20 +139,20 @@ class BlackStoreSagaEngineTest {
             ),
         )
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='SALE' AND channel='EXTERNAL_BLACKSTORE'", Int::class.java))
-        assertThrows(BlackStoreSagaException::class.java) { engine.reserve(q, seeded.catalogVersion, seeded.line(1)) }.also {
+        assertThrows(BlackStoreSagaException::class.java) { engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1)) }.also {
             assertEquals("OPERATION_STATE_CONFLICT", it.message)
             assertEquals(409, it.httpStatus)
             assertEquals(false, it.retryable)
         }
-        assertEquals("COMMITTED", engine.get(q).state)
+        assertEquals("COMMITTED", engine.get(principal, q).state)
     }
 
     @Test
     fun `commit replay preserves full receipt ledger balances saga and reservation rows`() {
         val seeded = seedVariant("SKU-REPLAY-${UUID.randomUUID()}", available = 9, safety = 1)
         val q = quadruple()
-        val reserved = engine.reserve(q, seeded.catalogVersion, seeded.line(2))
-        val committed = engine.commit(q)
+        val reserved = engine.reserve(principal, q, seeded.catalogVersion, seeded.line(2))
+        val committed = engine.commit(principal, q)
 
         assertEquals("COMMITTED", committed.state)
         assertTrue(committed.receipt != null)
@@ -104,7 +165,7 @@ class BlackStoreSagaEngineTest {
         assertEquals(2, ledgerBeforeReplay.size)
         assertEquals(1, reservationsBeforeReplay.size)
 
-        val replayed = engine.commit(q)
+        val replayed = engine.commit(principal, q)
 
         assertEquals(committed, replayed)
         assertEquals(committed.receipt, replayed.receipt)
@@ -113,7 +174,7 @@ class BlackStoreSagaEngineTest {
         assertEquals(balancesBeforeReplay, balanceSnapshot(seeded.variantId))
         assertEquals(sagaBeforeReplay, operationSnapshot(q))
         assertEquals(reservationsBeforeReplay, reservationSnapshot(q))
-        assertEquals("COMMITTED", engine.get(q).state)
+        assertEquals("COMMITTED", engine.get(principal, q).state)
         assertEquals(1, reservationCount(q, seeded.variantId, "CONSUMED"))
         assertEquals(7, availableQty(seeded.variantId))
         assertEquals(0, reservedQty(seeded.variantId))
@@ -124,14 +185,14 @@ class BlackStoreSagaEngineTest {
     fun `insufficient stock deletes pending claim`() {
         val seeded = seedVariant("SKU-INS-${UUID.randomUUID()}", available = 5, safety = 2)
         val q = quadruple()
-        engine.claimPending(q, seeded.catalogVersion, seeded.line(4))
-        val error = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(q, seeded.catalogVersion, seeded.line(4)) }
+            engine.claimPending(principal, q, seeded.catalogVersion, seeded.line(4))
+        val error = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(principal, q, seeded.catalogVersion, seeded.line(4)) }
         assertEquals("INSUFFICIENT_STOCK", error.message)
         val failure = error.lineFailures.single()
         assertEquals("INSUFFICIENT_STOCK", failure.code)
         assertEquals(4, failure.requested)
         assertEquals(3, failure.availableQuantity)
-        assertThrows(BlackStoreSagaException::class.java) { engine.get(q) }.also { assertEquals("NOT_FOUND", it.message) }
+        assertThrows(BlackStoreSagaException::class.java) { engine.get(principal, q) }.also { assertEquals("NOT_FOUND", it.message) }
         assertEquals(3, sellable(seeded.variantId))
         assertEquals(0, reservedQty(seeded.variantId))
     }
@@ -140,37 +201,37 @@ class BlackStoreSagaEngineTest {
     fun `stale catalog deletes claim and payload mismatch keeps pending`() {
         val seeded = seedVariant("SKU-STL-${UUID.randomUUID()}", available = 8, safety = 0)
         val q = quadruple()
-        engine.claimPending(q, "stale-version", seeded.line(1))
-        val stale = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(q, "stale-version", seeded.line(1)) }
+            engine.claimPending(principal, q, "stale-version", seeded.line(1))
+        val stale = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(principal, q, "stale-version", seeded.line(1)) }
         assertEquals("CATALOG_VERSION_STALE", stale.message)
         assertEquals(422, stale.httpStatus)
         val q2 = quadruple()
-        engine.claimPending(q2, seeded.catalogVersion, seeded.line(1))
-        val mismatch = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(q2, seeded.catalogVersion, seeded.line(2)) }
+            engine.claimPending(principal, q2, seeded.catalogVersion, seeded.line(1))
+        val mismatch = assertThrows(BlackStoreSagaException::class.java) { engine.finishReserve(principal, q2, seeded.catalogVersion, seeded.line(2)) }
         assertEquals("IDEMPOTENCY_PAYLOAD_MISMATCH", mismatch.message)
-        assertEquals("PENDING", engine.get(q2).state)
+        assertEquals("PENDING", engine.get(principal, q2).state)
     }
 
     @Test
     fun `release and expiry restore sellable stock`() {
         val seeded = seedVariant("SKU-REL-${UUID.randomUUID()}", available = 6, safety = 1)
         val q = quadruple()
-        engine.reserve(q, seeded.catalogVersion, seeded.line(2))
+        engine.reserve(principal, q, seeded.catalogVersion, seeded.line(2))
         assertEquals(3, sellable(seeded.variantId))
-        assertEquals("RELEASED", engine.release(q).state)
+        assertEquals("RELEASED", engine.release(principal, q).state)
         assertEquals(5, sellable(seeded.variantId))
         assertEquals(0, reservedQty(seeded.variantId))
 
         val q2 = quadruple()
-        engine.reserve(q2, seeded.catalogVersion, seeded.line(2))
+        engine.reserve(principal, q2, seeded.catalogVersion, seeded.line(2))
         jdbc.update(
             "UPDATE blackstore_integration_operations SET expires_at = now() - interval '1 second' WHERE operation_id=?",
             q2.operationId,
         )
         assertEquals(1, engine.expireDue(100))
-        assertEquals("EXPIRED", engine.get(q2).state)
+        assertEquals("EXPIRED", engine.get(principal, q2).state)
         assertEquals(5, sellable(seeded.variantId))
-        val expiredCmd = assertThrows(BlackStoreSagaException::class.java) { engine.commit(q2) }
+        val expiredCmd = assertThrows(BlackStoreSagaException::class.java) { engine.commit(principal, q2) }
         assertEquals("EXPIRED", expiredCmd.message)
     }
 
@@ -178,8 +239,8 @@ class BlackStoreSagaEngineTest {
     fun `tombstone blocks reserve and purge follows retention then 410`() {
         val seeded = seedVariant("SKU-PRG-${UUID.randomUUID()}", available = 4, safety = 0)
         val q = quadruple()
-        val reserved = engine.reserve(q, seeded.catalogVersion, seeded.line(1))
-        engine.commit(q)
+        val reserved = engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
+        engine.commit(principal, q)
         val early = assertThrows(BlackStoreSagaException::class.java) { engine.purge(q) }
         assertEquals("RETENTION_ACTIVE", early.message)
         jdbc.update("UPDATE blackstore_integration_operations SET updated_at = now() - interval '91 days' WHERE operation_id=?", q.operationId)
@@ -193,15 +254,15 @@ class BlackStoreSagaEngineTest {
                 q.operationId,
             ) == true,
         )
-        val retired = assertThrows(BlackStoreSagaException::class.java) { engine.get(q) }
+        val retired = assertThrows(BlackStoreSagaException::class.java) { engine.get(principal, q) }
         assertEquals("OPERATION_RETIRED", retired.message)
         assertEquals(410, retired.httpStatus)
         assertEquals(false, retired.retryable)
-        val retiredPost = assertThrows(BlackStoreSagaException::class.java) { engine.reserve(q, seeded.catalogVersion, seeded.line(1)) }
+        val retiredPost = assertThrows(BlackStoreSagaException::class.java) { engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1)) }
         assertEquals("OPERATION_RETIRED", retiredPost.message)
         assertEquals(410, retiredPost.httpStatus)
         assertEquals(false, retiredPost.retryable)
-        val reconcile = engine.reconcile(listOf(reserved.receipt!!, "unknown-receipt"))
+        val reconcile = engine.reconcile(principal, listOf(reserved.receipt!!, "unknown-receipt"))
         assertTrue(reconcile.present.isEmpty())
         assertEquals(listOf(reserved.receipt, "unknown-receipt"), reconcile.unknownReceipts)
         assertTrue(
@@ -237,7 +298,7 @@ class BlackStoreSagaEngineTest {
             assertFalse(it.retryable)
         }.message)
         val overrideDenied = assertThrows(BlackStoreSagaException::class.java) {
-            engine.reserve(quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(first.variantId, first.sku, 1, "price-override")))
+            engine.reserve(principal, quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(first.variantId, first.sku, 1, "price-override")))
         }
         assertTrue(overrideDenied.lineFailures.any { it.code == "PRICE_VERSION_MISMATCH" })
         assertEquals(409, overrideDenied.httpStatus)
@@ -254,7 +315,7 @@ class BlackStoreSagaEngineTest {
             repeat(2) {
                 futures += pool.submit<SagaAttempt<BlackStoreOperationReceipt>> {
                     start.await()
-                    captureSagaAttempt { engine.reserve(q, seeded.catalogVersion, seeded.line(2)) }
+                    captureSagaAttempt { engine.reserve(principal, q, seeded.catalogVersion, seeded.line(2)) }
                 }
             }
             start.countDown()
@@ -284,7 +345,7 @@ class BlackStoreSagaEngineTest {
     fun `commit versus expire is exclusive`() {
         val seeded = seedVariant("SKU-RACE-${UUID.randomUUID()}", available = 5, safety = 0)
         val q = quadruple()
-        engine.reserve(q, seeded.catalogVersion, seeded.line(2))
+        engine.reserve(principal, q, seeded.catalogVersion, seeded.line(2))
         jdbc.update("UPDATE blackstore_integration_operations SET expires_at = now() - interval '1 second' WHERE operation_id=?", q.operationId)
         val pool = Executors.newFixedThreadPool(2)
         val start = CountDownLatch(1)
@@ -292,7 +353,7 @@ class BlackStoreSagaEngineTest {
         val outcomes = try {
             futures += pool.submit<SagaAttempt<BlackStoreOperationReceipt>> {
                 start.await()
-                captureSagaAttempt { engine.commit(q) }
+                captureSagaAttempt { engine.commit(principal, q) }
             }
             futures += pool.submit<Int> {
                 start.await()
@@ -315,7 +376,7 @@ class BlackStoreSagaEngineTest {
         if (committedReceipt != null) assertEquals("COMMITTED", committedReceipt.state)
         assertTrue(expiredCount in 0..1, "expiry worker may expire at most this one operation")
 
-        val terminal = engine.get(q).state
+        val terminal = engine.get(principal, q).state
         assertTrue(terminal == "COMMITTED" || terminal == "EXPIRED", terminal)
         assertEquals(terminal == "EXPIRED", expiredCount == 1)
         assertEquals(terminal, operationState(q))
@@ -331,7 +392,7 @@ class BlackStoreSagaEngineTest {
             val availableBeforeReplay = availableQty(seeded.variantId)
             val reservedBeforeReplay = reservedQty(seeded.variantId)
             val reservationStatusBeforeReplay = reservationStatus(q, seeded.variantId)
-            assertEquals("COMMITTED", engine.commit(q).state)
+            assertEquals("COMMITTED", engine.commit(principal, q).state)
             assertEquals(ledgerBeforeReplay, ledgerEvents(q))
             assertEquals(availableBeforeReplay, availableQty(seeded.variantId))
             assertEquals(reservedBeforeReplay, reservedQty(seeded.variantId))
@@ -341,7 +402,7 @@ class BlackStoreSagaEngineTest {
             assertEquals(5, sellable(seeded.variantId))
             assertEquals(1, reservationCount(q, seeded.variantId, "EXPIRED"))
             assertEquals(listOf("RESERVATION" to -2, "RELEASE" to 2), ledgerEvents(q))
-            val error = assertThrows(BlackStoreSagaException::class.java) { engine.commit(q) }
+            val error = assertThrows(BlackStoreSagaException::class.java) { engine.commit(principal, q) }
             assertEquals("EXPIRED", error.message)
             assertEquals(listOf("RESERVATION" to -2, "RELEASE" to 2), ledgerEvents(q))
         }
@@ -364,12 +425,12 @@ class BlackStoreSagaEngineTest {
     fun `reconcile is read-only and stale pending is deleted without ledger`() {
         val seeded = seedVariant("SKU-RO-${UUID.randomUUID()}", available = 7, safety = 1)
         val q = quadruple()
-        val reserved = engine.reserve(q, seeded.catalogVersion, seeded.line(1))
+        val reserved = engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
         val ledgerBefore = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger", Int::class.java)!!
         val availableBefore = jdbc.queryForObject("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, seeded.variantId)!!
         val reservedBefore = reservedQty(seeded.variantId)
         val opsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM blackstore_integration_operations", Int::class.java)!!
-        val result = engine.reconcile(listOf(reserved.receipt!!))
+        val result = engine.reconcile(principal, listOf(reserved.receipt!!))
         assertEquals(1, result.present.size)
         assertTrue(result.unknownReceipts.isEmpty())
         assertEquals(ledgerBefore, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger", Int::class.java))
@@ -378,12 +439,33 @@ class BlackStoreSagaEngineTest {
         assertEquals(opsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM blackstore_integration_operations", Int::class.java))
 
         val pending = quadruple()
-        engine.claimPending(pending, seeded.catalogVersion, seeded.line(1))
+            engine.claimPending(principal, pending, seeded.catalogVersion, seeded.line(1))
         jdbc.update("UPDATE blackstore_integration_operations SET created_at = now() - interval '61 seconds' WHERE operation_id=?", pending.operationId)
         val ledgerMid = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger", Int::class.java)!!
         assertEquals(1, engine.deleteStalePending())
-        assertEquals("NOT_FOUND", assertThrows(BlackStoreSagaException::class.java) { engine.get(pending) }.message)
+        assertEquals("NOT_FOUND", assertThrows(BlackStoreSagaException::class.java) { engine.get(principal, pending) }.message)
         assertEquals(ledgerMid, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger", Int::class.java))
+    }
+
+    @Test
+    fun `foreign get is 404 and foreign reconcile is unknown`() {
+        val seeded = seedVariant("SKU-OWN-${UUID.randomUUID()}", available = 5, safety = 0)
+        val q = quadruple()
+        val reserved = engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
+        val foreign = VerifiedCompanionPrincipal.of(
+            UUID.randomUUID(),
+            principal.companionId,
+            principal.credentialId,
+            principal.credentialVersion,
+            CompanionServiceRole.SERVICE,
+            principal.scopes,
+            CompanionLifecycleStatus.ACTIVE,
+        )
+        assertEquals("NOT_FOUND", assertThrows(BlackStoreSagaException::class.java) { engine.get(foreign, q) }.message)
+        val foreignReconcile = engine.reconcile(foreign, listOf(reserved.receipt!!))
+        assertTrue(foreignReconcile.present.isEmpty())
+        assertEquals(listOf(reserved.receipt), foreignReconcile.unknownReceipts)
+        assertEquals("RESERVED", engine.get(principal, q).state)
     }
 
     @Test
@@ -393,7 +475,7 @@ class BlackStoreSagaEngineTest {
         assertEquals(postgres.jdbcUrl, dataSource.url)
         assertFalse(dataSource.url.contains("blackstore", ignoreCase = true))
         val duplicate = assertThrows(BlackStoreSagaException::class.java) {
-            engine.reserve(quadruple(), seeded.catalogVersion, seeded.line(1) + seeded.line(1))
+            engine.reserve(principal, quadruple(), seeded.catalogVersion, seeded.line(1) + seeded.line(1))
         }
         assertEquals("DUPLICATE_VARIANT", duplicate.message)
         val orphanSku = "SKU-ORB-${UUID.randomUUID()}"
@@ -410,7 +492,7 @@ class BlackStoreSagaEngineTest {
             orphanSku,
         )!!
         val missing = assertThrows(BlackStoreSagaException::class.java) {
-            engine.reserve(quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(orphanVariant, orphanSku, 1, "catalog-$orphanProduct")))
+            engine.reserve(principal, quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(orphanVariant, orphanSku, 1, "catalog-$orphanProduct")))
         }
         assertEquals("INSUFFICIENT_STOCK", missing.message)
         assertEquals(0, missing.lineFailures.single().availableQuantity)
@@ -424,11 +506,11 @@ class BlackStoreSagaEngineTest {
     fun `purgeDue tombstones aged terminals in batch`() {
         val seeded = seedVariant("SKU-PDU-${UUID.randomUUID()}", available = 3, safety = 0)
         val q = quadruple()
-        engine.reserve(q, seeded.catalogVersion, seeded.line(1))
-        engine.commit(q)
+        engine.reserve(principal, q, seeded.catalogVersion, seeded.line(1))
+        engine.commit(principal, q)
         jdbc.update("UPDATE blackstore_integration_operations SET updated_at = now() - interval '91 days' WHERE operation_id=?", q.operationId)
         assertEquals(1, engine.purgeDue(100))
-        assertEquals("OPERATION_RETIRED", assertThrows(BlackStoreSagaException::class.java) { engine.get(q) }.message)
+        assertEquals("OPERATION_RETIRED", assertThrows(BlackStoreSagaException::class.java) { engine.get(principal, q) }.message)
     }
 
     private fun quadruple() = BlackStoreQuadruple(client, "POS-1", "sale-${UUID.randomUUID()}", UUID.randomUUID())

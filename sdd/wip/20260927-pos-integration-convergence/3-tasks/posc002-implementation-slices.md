@@ -40,6 +40,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002E — guard transaccional en engine y lecturas
 
+- **Estado local:** V10 + wiring del principal en saga/engine/servicio/controller en `feature/posc002e-pos-guards`; dual Grok 4.7 APPROVED (`sdd/reviews/20260929-grok-prv11-sdd.md`, `sdd/reviews/20260929-grok-prv11-scope.md`). No cierra la tarea hasta merge a integración. No activa `BLACKSTORE_INTEGRATION`.
 - **Dependencias:** 002B, 002C y 002D.
 - **Ownership:** después de 002C, migración POS de pos_companion_effect_guard y pos_companion_read_guard completos, con owner/grants mínimos sobre action/config/switch/companion/credential y lectura de auth_ready/scopes. BlackStoreSagaPort/callers y JdbcBlackStoreSagaEngine reciben VerifiedCompanionPrincipal; efecto llama guard como primera consulta de Tx-A, re-POST Tx-B, commit y release. Lecturas GET/reconcile reciben principal y usan read guard como primer SELECT RR read-only con filtro client_instance_id.
 - **Aceptación:** transacción mutante explícita READ COMMITTED; guard rechaza RR/Serializable antes del efecto, compara credential id/version y scopes bajo lock, y no llama al decide switch→config→action heredado. Admin-wins tras esperar ancla observa config/switch confirmado; effect-wins bloquea admin hasta commit/rollback. Revoke entre Tx-A/Tx-B deja PENDING recuperable sin reservar. No cambia fórmula de stock, ledger, regla de cuádruple ni estado de capability. GET ajeno 404 y reconcile ajeno unknownReceipts, sin lectura cruzada de tombstone.

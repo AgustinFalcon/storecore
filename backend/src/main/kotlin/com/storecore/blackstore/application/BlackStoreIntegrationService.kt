@@ -15,6 +15,7 @@ import com.storecore.blackstore.application.port.BlackStoreCatalogPort
 import com.storecore.blackstore.application.port.BlackStoreCompanionGuard
 import com.storecore.blackstore.application.port.BlackStoreRateLimitPort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
+import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
@@ -58,6 +59,7 @@ class BlackStoreIntegrationService(
     }
 
     fun reserve(
+        principal: VerifiedCompanionPrincipal,
         clientInstanceId: String?,
         deviceId: String?,
         saleId: String?,
@@ -66,6 +68,7 @@ class BlackStoreIntegrationService(
     ): BlackStoreOperationReceipt {
         requireEnabled("STOCK_RESERVE")
         val quadruple = quadruple(clientInstanceId, deviceId, saleId, operationId)
+        requireOwned(principal, quadruple.clientInstanceId)
         companions.assertBound(quadruple.clientInstanceId)
         limiter.check(quadruple.clientInstanceId.toString(), BlackStoreRateLimiter.Scope.RESERVE)
         val request = body ?: throw BlackStoreSagaException.validation()
@@ -82,10 +85,11 @@ class BlackStoreIntegrationService(
             BlackStoreReserveLine(line.variantId, sku, quantity, priceVersion)
         }
         if (lines.isEmpty()) throw BlackStoreSagaException.validation()
-        return saga.reserve(quadruple, catalogVersion, lines)
+        return saga.reserve(principal, quadruple, catalogVersion, lines)
     }
 
     fun commit(
+        principal: VerifiedCompanionPrincipal,
         clientInstanceId: String?,
         deviceId: String?,
         saleId: String?,
@@ -94,13 +98,15 @@ class BlackStoreIntegrationService(
     ): BlackStoreOperationReceipt {
         requireEnabled("STOCK_COMMIT")
         val quadruple = quadruple(clientInstanceId, deviceId, saleId, operationId)
+        requireOwned(principal, quadruple.clientInstanceId)
         companions.assertBound(quadruple.clientInstanceId)
         limiter.check(quadruple.clientInstanceId.toString(), BlackStoreRateLimiter.Scope.RESERVE)
         requireReservationRef(quadruple, reservationRef)
-        return saga.commit(quadruple)
+        return saga.commit(principal, quadruple)
     }
 
     fun release(
+        principal: VerifiedCompanionPrincipal,
         clientInstanceId: String?,
         deviceId: String?,
         saleId: String?,
@@ -109,13 +115,15 @@ class BlackStoreIntegrationService(
     ): BlackStoreOperationReceipt {
         requireEnabled("STOCK_RELEASE")
         val quadruple = quadruple(clientInstanceId, deviceId, saleId, operationId)
+        requireOwned(principal, quadruple.clientInstanceId)
         companions.assertBound(quadruple.clientInstanceId)
         limiter.check(quadruple.clientInstanceId.toString(), BlackStoreRateLimiter.Scope.RESERVE)
         requireReservationRef(quadruple, reservationRef)
-        return saga.release(quadruple)
+        return saga.release(principal, quadruple)
     }
 
     fun operation(
+        principal: VerifiedCompanionPrincipal,
         clientInstanceId: String?,
         deviceId: String?,
         saleId: String?,
@@ -124,20 +132,26 @@ class BlackStoreIntegrationService(
     ): BlackStoreOperationReceipt {
         requireEnabled("STOCK_READ")
         val quadruple = quadruple(clientInstanceId, deviceId, saleId, operationIdHeader ?: operationIdPath)
+        requireOwned(principal, quadruple.clientInstanceId)
         companions.assertBound(quadruple.clientInstanceId)
         if (quadruple.operationId != parseUuid(operationIdPath, "operationId")) {
             throw BlackStoreSagaException.validation()
         }
         limiter.check(quadruple.clientInstanceId.toString(), BlackStoreRateLimiter.Scope.STOCK_READ)
-        return saga.get(quadruple)
+        return saga.get(principal, quadruple)
     }
 
-    fun reconcile(clientInstanceId: String?, body: BlackStoreReconcileRequest?): BlackStoreReconcileResult {
+    fun reconcile(
+        principal: VerifiedCompanionPrincipal,
+        clientInstanceId: String?,
+        body: BlackStoreReconcileRequest?,
+    ): BlackStoreReconcileResult {
         requireEnabled("STOCK_READ")
         val client = parseUuid(clientInstanceId, "X-Client-Instance-Id")
+        requireOwned(principal, client)
         companions.assertBound(client)
         limiter.check(client.toString(), BlackStoreRateLimiter.Scope.RECONCILE)
-        return saga.reconcile(body?.knownReceipts.orEmpty())
+        return saga.reconcile(principal, body?.knownReceipts.orEmpty())
     }
 
     fun expireDue(): Int = runWhenEnabled("STOCK_RELEASE") { saga.expireDue() }
@@ -151,6 +165,10 @@ class BlackStoreIntegrationService(
         } catch (_: CapabilityDisabled) {
             0
         }
+
+    private fun requireOwned(principal: VerifiedCompanionPrincipal, clientInstanceId: UUID) {
+        if (principal.clientInstanceId != clientInstanceId) throw BlackStoreForbidden()
+    }
 
     private fun requireEnabled(action: String) {
         try {
