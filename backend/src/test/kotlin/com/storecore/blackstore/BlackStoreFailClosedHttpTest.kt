@@ -3,6 +3,8 @@ package com.storecore.blackstore
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
+import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
+import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -25,9 +27,12 @@ class BlackStoreFailClosedHttpTest(
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val worker: BlackStoreExpiryWorker,
     @Autowired private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
+    @Autowired private val secrets: InMemoryCompanionSecretProvider,
 ) {
     @Test
     fun `mutating and read routes stay 403 while capability is disabled`() {
+        val client = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+        val bearer = CompanionAuthTestSupport.seedReadyCompanion(jdbc, secrets, client)
         listOf(
             "/blackstore-integration/v1/catalog" to HttpMethod.GET,
             "/blackstore-integration/v1/stock/variants/1" to HttpMethod.GET,
@@ -37,7 +42,14 @@ class BlackStoreFailClosedHttpTest(
             "/blackstore-integration/v1/operations/00000000-0000-0000-0000-000000000002" to HttpMethod.GET,
             "/blackstore-integration/v1/operations/reconcile" to HttpMethod.POST,
         ).forEach { (path, method) ->
-            val headers = HttpHeaders().apply { contentType = MediaType.APPLICATION_JSON }
+            val headers = HttpHeaders().apply {
+                contentType = MediaType.APPLICATION_JSON
+                set(HttpHeaders.AUTHORIZATION, "Bearer $bearer")
+                set("X-Client-Instance-Id", client.toString())
+                set("X-Device-Id", "pos-fail")
+                set("X-Sale-Id", "sale-fail")
+                set("X-Operation-Id", "00000000-0000-0000-0000-000000000002")
+            }
             val response = http.exchange(path, method, HttpEntity("{}", headers), String::class.java)
             assertEquals(403, response.statusCode.value(), path)
             assertTrue(response.body!!.contains("CAPABILITY_DISABLED"), path)
