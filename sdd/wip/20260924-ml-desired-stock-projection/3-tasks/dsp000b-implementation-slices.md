@@ -1,6 +1,6 @@
 # TASK-DSP-000B — snapshot ML SYNC
 
-**Base:** `origin/integration/storecore-int` `d4137fb` (POSC-005 merge #83). Siguiente Flyway libre: **V15**.
+**Estado:** dual prv26 APPROVED (`sdd/reviews/20260930-grok-prv26-sdd.md`, `sdd/reviews/20260930-grok-prv26-scope.md`) @ `a2950d1`. PR pendiente.
 
 ## Qué hace este corte
 
