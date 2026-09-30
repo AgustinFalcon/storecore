@@ -1,6 +1,6 @@
 # POSC-002 — subcortes revisables de identidad y ACL
 
-**Estado:** plan/subcortes aún no tienen aprobación final. POSC-002A tiene implementación y evidencia PG16 local en `4-implementation/posc002a-preflight.md`, pendiente de review independiente; los demás subcortes no están implementados ni aprobados por código. La propuesta técnica obtuvo GO documental Astra acotado al camino POS en el snapshot d8dc971; ver sdd/reviews/20260928-posc002-shared-pos-spec-go.md. Este plan descompone TASK-POSC-002 sin alterar el total 3/9 del DAG principal.
+**Estado:** 002A–G con evidencia mergeada en `8e2a47f`. TASK-POSC-002 = `slices_complete_residuals` (`INSERT(variant_id)`, ML RR). No es `sdd.finish`. POSC-003 spec prv16 APPROVED; implementación 003A–E en PRs propios.
 
 ## Base, ownership y secuencia
 
@@ -27,7 +27,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002C — esquema y comando administrativo del companion
 
-- **Estado local:** SQL V9 integrado (`37b1621`). Residual HTTP + provider en `feature/posc002c-companion-admin-http`: `HttpCode` cerrado + factories `BaseResponse` (status HTTP = `code`); `CompanionAdminController` USER ADMIN+CSRF en `/api/v1/internal/admin/blackstore-companion/{pair,activate,suspend,rotate,revoke}` y GET status; pool `storecore.companion-admin.datasource.*`; prepare/attach internos; bearer una vez; sin token/ref en replay/status. Abort HTTP no es ruta pública. Sin Flyway nuevo.
+- **Estado:** merge PR #73 (`8e2a47f`) con dual Grok 4.7 APPROVED. SQL V9 + HTTP USER ADMIN+CSRF, `HttpCode`/`BaseResponse`, pool companion-admin y provider idempotente. Bearer una vez; replay/status sin token/ref. Prepare/attach internos. Sin Flyway en el corte HTTP.
 - **Dependencia:** 002B para Tx-S durable, protocolo de correlation/status/recuperación, rol/pool y orden de locks shared. Migración POS propia en siguiente versión libre.
 - **Ownership:** backfill fail-closed de registry/credential V5, auth_ready falso para filas legacy, fingerprint/scopes/service_role, índice 0..1 y comandos del companion; nueve entry points exactos prepare/attach/status/abort/pair/activate/suspend/rotate/revoke y audit. Añade Tx-P para preparar/adjuntar secreto y consume Tx-S/Tx-C de 002B; no vuelve a implementar ni omite la semántica durable de intent/correlation. Secret provider idempotente y rutas internas USER ADMIN.
 - **Aceptación:** provider prepara y resuelve antes de pair/rotate; replay de correlation devuelve metadata sin token/ref; primera entrega de bearer una sola vez y pérdida de respuesta obliga status+rotate; abort/discard seguro. CAS, razón, expectedVersion, actor USER real y CSRF durable. Upgrade preserva credential ACTIVE vieja en cuarentena hasta rotación explícita; limpia y upgrade mantienen DISABLED. Login admin sólo EXECUTE, runtime y PUBLIC sin DML/EXECUTE admin.
@@ -58,7 +58,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002G — rollout y transferencia al siguiente corte
 
-- **Estado:** merge PR #71 (`a6f520b`) con dual Grok 4.7 APPROVED. Runbook documental. Companion permanece DISABLED. **No** declara POSC-002 done ni desbloquea POSC-003 hasta evidencia HTTP 002C mergeada. Residual runtime `INSERT(variant_id)` y ML RR siguen abiertos.
+- **Estado:** merge PR #71 (`a6f520b`) con dual Grok 4.7 APPROVED. Runbook documental. Companion permanece DISABLED. Residuales 002B/002C HTTP ya mergeados (`8bc95cf`, `8e2a47f`). TASK-POSC-002 no se archiva: runtime `INSERT(variant_id)` y ML RR siguen abiertos. POSC-003 spec documental prv16 APPROVED; Flyway/código 003A–E en PRs propios.
 - **Dependencia:** 002F sin P0–P2 abiertos (PR #70).
 - **Ownership:** runbook de instalación por VM, configuración del provider/pool admin por referencia, backup/preflight, ventana de cambio para V3, rollback operativo y observabilidad sin secretos.
 - **Aceptación:** companion sigue DISABLED tras migrar; capacidad de apagar, revocar y recuperar PENDING demostrada. Se registra qué PR/SHA instaló el delta shared y cuál el POS, con dos reviews de código por PR. POSC-003 sólo recibe dependencia cumplida tras evidencia completa de 002A–G; POSC-004/004A, PIC-006A, conector live, fiscal y sdd.finish mantienen gates propios.

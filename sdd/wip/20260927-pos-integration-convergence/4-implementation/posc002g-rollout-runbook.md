@@ -1,6 +1,6 @@
 # POSC-002G — rollout y transferencia (una VM, un comercio)
 
-**Estado:** runbook documental. No es control plane, no autoriza activar `BLACKSTORE_INTEGRATION`, no cierra TASK-POSC-002 ni desbloquea POSC-003.
+**Estado:** runbook documental. No es control plane, no autoriza activar `BLACKSTORE_INTEGRATION`, no cierra TASK-POSC-002. POSC-003 spec prv16 APPROVED; no autoriza Flyway 003.
 
 Una instalación es un comercio, una PostgreSQL 16, un dominio y una VM. Este texto describe el delta POSC-002 ya integrado (`V8`–`V10` + bearer HTTP + guards + matriz 002F) y lo que sigue abierto. Backup/restore genéricos viven en `sdd/features/20260921-single-tenant-installation-baseline/2-technical/fleet-operations.md`. No copiar secretos, tokens, connection strings ni payloads comerciales a este archivo.
 
@@ -123,12 +123,11 @@ GET `/blackstore-integration/v1/openapi.yaml` es público; el digest pinneado pe
 
 ## Transferencia al siguiente corte
 
-POSC-002G transfiere el inventario anterior. **No** declara dependencia cumplida hacia POSC-003.
+POSC-002G transfiere el inventario. Los residuales HTTP 002B (`8bc95cf`) y 002C (`8e2a47f`) ya están en integración.
 
 Siguiente trabajo autorizado sobre el mismo WIP, sin `sdd.finish`:
 
-1. Residual **002B HTTP/Tx-S**: intent durable, CSRF consume/rota, correlation obligatoria del cliente (retirar `UUID.randomUUID()` de `CapabilityController.changeState`), pool capability-admin, `capability_tx_c_execute` en lugar de las cuatro firmas V3.
-2. Residual **002C HTTP/provider**: nueve entry points companion + CSRF + secret provider de instalación.
-3. Recién entonces reabrir el gate de POSC-003 (catálogo/reserve). POSC-004/004A, PIC-006A, conector live, fiscal y `sdd.finish` conservan gates propios.
+1. Spec POSC-003 documental prv16 dual APPROVED. Siguiente corte: 003A (revisión SQL + audit SECURITY DEFINER) en PR propio.
+2. 003B–E, POSC-004/004A, PIC-006A, conector live, fiscal y `sdd.finish` conservan gates propios.
 
 ML RR y `INSERT(variant_id)` siguen residuales explícitos.
