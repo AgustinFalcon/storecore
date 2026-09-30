@@ -46,7 +46,7 @@ class Posc004aWorkerPurgeTest {
         engine = JdbcBlackStoreSagaEngine(
             jdbc,
             DataSourceTransactionManager(dataSource),
-            LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
+            LegacyBlackStoreProjectionBridgePort { _, _ -> LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
             JdbcPosCompanionGuard(jdbc),
             quotes,
         )

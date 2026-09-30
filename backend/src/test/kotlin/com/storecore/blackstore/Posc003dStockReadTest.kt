@@ -1,5 +1,7 @@
 package com.storecore.blackstore
 
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
+import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.blackstore.domain.CompanionLifecycleStatus
 import com.storecore.blackstore.domain.CompanionScope
 import com.storecore.blackstore.domain.CompanionServiceRole
@@ -40,9 +42,7 @@ class Posc003dStockReadTest {
         engine = JdbcBlackStoreSagaEngine(
             jdbc,
             DataSourceTransactionManager(dataSource),
-            com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort {
-                com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult.NOT_ELIGIBLE
-            },
+            LegacyBlackStoreProjectionBridgePort { _, _ -> LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
             JdbcPosCompanionGuard(jdbc),
             quotes,
         )

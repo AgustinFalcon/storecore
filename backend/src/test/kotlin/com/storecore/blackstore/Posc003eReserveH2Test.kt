@@ -55,7 +55,7 @@ class Posc003eReserveH2Test {
         engine = JdbcBlackStoreSagaEngine(
             jdbc,
             DataSourceTransactionManager(dataSource),
-            LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
+            LegacyBlackStoreProjectionBridgePort { _, _ -> LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
             JdbcPosCompanionGuard(jdbc),
             quotes,
         )

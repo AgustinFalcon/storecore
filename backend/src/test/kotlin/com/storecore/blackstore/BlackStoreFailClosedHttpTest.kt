@@ -4,6 +4,7 @@ import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridg
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
 import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
+import com.storecore.commerce.domain.ProjectionSourceCause
 import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -65,7 +66,7 @@ class BlackStoreFailClosedHttpTest(
         assertEquals(0, worker.purgeTerminal())
         assertEquals(
             LegacyBlackStoreProjectionResult.NOT_ELIGIBLE,
-            projectionBridge.requestProjection("00000000-0000-0000-0000-000000000001"),
+            projectionBridge.requestProjection(emptyList(), ProjectionSourceCause.Unknown),
         )
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
