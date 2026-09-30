@@ -4,6 +4,8 @@ import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridg
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
 import com.storecore.blackstore.application.port.PosCompanionGuardPort
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
+import com.storecore.catalog.application.port.output.PriceQuotePort
+import com.storecore.catalog.domain.PriceVersion
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -22,6 +24,7 @@ class JdbcBlackStoreSagaEngine(
     transactionManager: PlatformTransactionManager,
     private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
     private val companionGuard: PosCompanionGuardPort,
+    private val quotes: PriceQuotePort,
 ) : BlackStoreSagaPort {
     private val tx = TransactionTemplate(transactionManager).apply {
         isolationLevel = TransactionDefinition.ISOLATION_READ_COMMITTED
@@ -102,11 +105,14 @@ class JdbcBlackStoreSagaEngine(
                 "PENDING" -> if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
                 else -> throw BlackStoreSagaException.stateConflict()
             }
-            if (currentCatalogVersion() != catalogVersion) {
+            quotes.shareRevision()
+            val asOf = quotes.clock()
+            if (quotes.catalogVersion(asOf).wire != catalogVersion) {
                 deleteClaim(existing.id)
                 return@execute TxOutcome(null, BlackStoreSagaException.stale())
             }
             val sorted = lines.sortedBy { it.variantId }
+            val quoted = quotes.quoteByVariantIds(asOf, sorted.map { it.variantId })
             val failures = mutableListOf<BlackStoreLineFailure>()
             val locked = lockBalances(sorted.map { it.variantId })
             sorted.forEachIndexed { index, line ->
@@ -115,9 +121,10 @@ class JdbcBlackStoreSagaEngine(
                     failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, 0, "VARIANT_NOT_FOUND")
                     return@forEachIndexed
                 }
-                if (line.priceVersion != "catalog-${stock.productId}") {
-                    failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, maxOf(0, stock.available - stock.safety), "PRICE_VERSION_MISMATCH")
-                    return@forEachIndexed
+                val livePrice = quoted[line.variantId]
+                if (livePrice == null || PriceVersion.fromWire(line.priceVersion) !is PriceVersion.Quoted || line.priceVersion != livePrice.priceVersion.wire) {
+                    deleteClaim(existing.id)
+                    return@execute TxOutcome(null, BlackStoreSagaException.stale())
                 }
                 val sellable = maxOf(0, stock.available - stock.safety)
                 if (line.quantity > sellable) {
@@ -498,9 +505,6 @@ class JdbcBlackStoreSagaEngine(
             quadruple.saleId,
             quadruple.operationId,
         ) == true
-
-    private fun currentCatalogVersion(): String =
-        jdbc.queryForObject("SELECT COALESCE(MAX(updated_at)::text, 'empty') FROM products", String::class.java)!!
 
     private fun deleteClaim(operationPk: Long) {
         jdbc.update("DELETE FROM blackstore_integration_reservation_lines WHERE operation_pk=?", operationPk)

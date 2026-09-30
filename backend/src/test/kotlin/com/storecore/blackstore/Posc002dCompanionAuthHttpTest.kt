@@ -71,7 +71,7 @@ class Posc002dCompanionAuthHttpTest(
         assertEnvelope(capability, 403, "CAPABILITY_DISABLED", retryable = false)
 
         val cost = exchange("/blackstore-integration/v1/catalog?includeCost=true", headers(live, client))
-        assertEnvelope(cost, 403, "COST_SCOPE_REQUIRED", retryable = false)
+        assertEnvelope(cost, 403, "FORBIDDEN", retryable = false)
 
         secrets.unavailable = true
         val outage = exchange("/blackstore-integration/v1/catalog", headers(live, client))

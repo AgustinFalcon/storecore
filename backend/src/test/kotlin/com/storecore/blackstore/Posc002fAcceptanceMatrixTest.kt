@@ -9,6 +9,7 @@ import com.storecore.blackstore.domain.CompanionScope
 import com.storecore.blackstore.domain.CompanionServiceRole
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.blackstore.infrastructure.JdbcPosCompanionGuard
+import com.storecore.catalog.infrastructure.JdbcPriceQuoteAdapter
 import com.storecore.configuration.domain.CapabilityState
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
@@ -45,13 +46,15 @@ class Posc002fAcceptanceMatrixTest {
         Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
         val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
         jdbc = JdbcTemplate(dataSource)
+        val quotes = JdbcPriceQuoteAdapter(jdbc)
         engine = JdbcBlackStoreSagaEngine(
             jdbc,
             DataSourceTransactionManager(dataSource),
             LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
             JdbcPosCompanionGuard(jdbc),
+            quotes,
         )
-        catalog = JdbcBlackStoreCatalogQuery(jdbc)
+        catalog = JdbcBlackStoreCatalogQuery(jdbc, quotes)
         jdbc.update("INSERT INTO installation_settings(installation_id, business_name, allowed_host, currency) VALUES (1, 'Test', 'localhost', 'ARS') ON CONFLICT DO NOTHING")
         jdbc.update("INSERT INTO brands(name, slug) VALUES ('F', 'f-brand')")
         jdbc.update("INSERT INTO categories(name, slug) VALUES ('FCat', 'f-cat')")
@@ -315,7 +318,8 @@ class Posc002fAcceptanceMatrixTest {
             sku,
         )!!
         jdbc.update("INSERT INTO inventory_balances(variant_id, available_quantity, safety_stock) VALUES (?,?,0)", variantId, 4)
-        return Seeded(productId, variantId, sku, catalog.currentCatalogVersion())
+        val priceVersion = JdbcPriceQuoteAdapter(jdbc).quoteByVariantIds(JdbcPriceQuoteAdapter(jdbc).clock(), listOf(variantId)).getValue(variantId).priceVersion.wire
+        return Seeded(productId, variantId, sku, catalog.currentCatalogVersion(), priceVersion)
     }
 
     private fun sellable(variantId: Long): Int =
@@ -326,8 +330,8 @@ class Posc002fAcceptanceMatrixTest {
         return MessageDigest.getInstance("SHA-256").digest(normalized.toByteArray(StandardCharsets.UTF_8)).joinToString("") { "%02X".format(it) }
     }
 
-    private data class Seeded(val productId: Long, val variantId: Long, val sku: String, val catalogVersion: String) {
-        fun line(quantity: Int) = listOf(BlackStoreReserveLine(variantId, sku, quantity, "catalog-$productId"))
+    private data class Seeded(val productId: Long, val variantId: Long, val sku: String, val catalogVersion: String, val priceVersion: String) {
+        fun line(quantity: Int) = listOf(BlackStoreReserveLine(variantId, sku, quantity, priceVersion))
     }
 
     companion object {

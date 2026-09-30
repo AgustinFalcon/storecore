@@ -34,7 +34,7 @@ class JdbcCatalogService(
         val clauses = mutableListOf("p.status='ACTIVE'", "v.active"); val args = mutableListOf<Any>()
         if (query.isNotBlank()) { clauses += "(lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?))"; args += "%$query%"; args += "%$query%" }
         if (brand != null) { clauses += "p.brand_id=?"; args += brand }; if (category != null) { clauses += "p.category_id=?"; args += category }
-        if (offers) clauses += "EXISTS (SELECT 1 FROM offer_products op JOIN offers o ON o.id=op.offer_id WHERE op.product_id=p.id AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at)"
+        if (offers) clauses += "EXISTS (SELECT 1 FROM offer_products op JOIN offers o ON o.id=op.offer_id WHERE op.product_id=p.id AND o.status='ACTIVE' AND o.starts_at <= now() AND now() < o.ends_at)"
         val rows =
             jdbc.query(
                 """SELECT v.sku,p.name,(SELECT url FROM product_images WHERE product_id=p.id ORDER BY sort_order,id LIMIT 1) image
@@ -53,7 +53,7 @@ class JdbcCatalogService(
             mapOf(
                 "sku" to sku,
                 "name" to row["name"],
-                "price" to mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.offerRef?.let { "offer-$it" } ?: "catalog")),
+                "price" to mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.priceVersion ?: "catalog")),
                 "originalPrice" to if (snapshot != null && snapshot.discountAmount.signum() > 0) base else null,
                 "imageUrl" to image,
                 "images" to listOfNotNull(image),
@@ -79,7 +79,7 @@ class JdbcCatalogService(
             row["category"] as String,
             images,
             variants,
-            mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.offerRef?.let { "offer-$it" } ?: "catalog-${row["id"]}")),
+            mapOf("base" to base, "desired" to null, "observed" to null, "effective" to effective, "priceVersion" to (snapshot?.priceVersion ?: "catalog")),
             snapshot?.offerRef,
             row["status"] == "ACTIVE",
             snapshot?.validFrom,
