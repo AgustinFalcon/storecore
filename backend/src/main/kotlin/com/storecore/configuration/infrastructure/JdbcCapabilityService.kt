@@ -1,5 +1,6 @@
 package com.storecore.configuration.infrastructure
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.configuration.application.CapabilityActionNotAllowed
 import com.storecore.configuration.application.CapabilityActorNotAuthorized
 import com.storecore.configuration.application.CapabilityAdminIntentMissing
@@ -47,6 +48,10 @@ open class JdbcCapabilityService(
 ) : CapabilityDecisionPort, CapabilityAdministrationPort, CapabilityAdminCommandPort {
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     override fun decide(module: String, action: String, actor: CapabilityActor) {
+        if (module == MARKETPLACE_ML_MODULE && action == MARKETPLACE_ML_SYNC) {
+            decideMarketplaceMlSync(actor)
+            return
+        }
         val kills = jdbc.queryForList(
             """SELECT id, expires_at, owner, reason FROM capability_kill_switches
                WHERE module_code=? AND action_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT' AND active
@@ -98,6 +103,58 @@ open class JdbcCapabilityService(
                 ) throw CapabilityActorNotAuthorized()
             }
         }
+    }
+
+    private fun decideMarketplaceMlSync(actor: CapabilityActor) {
+        val raw = try {
+            jdbc.queryForObject("SELECT public.marketplace_ml_sync_snapshot()::text", String::class.java)
+        } catch (exception: Exception) {
+            throw mapSnapshotError(exception)
+        } ?: throw CapabilityActionNotAllowed()
+        val photo = ObjectMapper().readTree(raw)
+        val kills = photo.path("switches").map { switch ->
+            mapOf(
+                "id" to switch.path("id").asLong(),
+                "expires_at" to switch.path("expiresAt").asText(),
+                "owner" to switch.path("owner").asText(),
+                "reason" to switch.path("reason").asText(),
+                "active" to switch.path("active").asBoolean(),
+            )
+        }
+        val live = kills.filter { kill ->
+            val expires = runCatching { Instant.parse(kill["expires_at"].toString()) }.getOrNull()
+                ?: runCatching { java.sql.Timestamp.valueOf(kill["expires_at"].toString().replace('T', ' ').take(19)) }.getOrNull()?.toInstant()
+            expires != null && expires.isAfter(Instant.now()) &&
+                kill["owner"]?.toString()?.isNotBlank() == true &&
+                kill["reason"]?.toString()?.isNotBlank() == true &&
+                kill["active"] == true
+        }
+        if (live.size > 1) throw CapabilityKillSwitchInvalid()
+        if (live.isNotEmpty()) throw CapabilityKillSwitchActive()
+        val state = CapabilityState.valueOf(photo.path("state").asText())
+        val kind = CapabilityActionKind.valueOf(photo.path("actionKind").asText())
+        when (state) {
+            CapabilityState.DISABLED -> throw CapabilityDisabled()
+            CapabilityState.READ_ONLY -> if (kind !in setOf(CapabilityActionKind.READ, CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityReadOnly()
+            CapabilityState.PAUSED -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityPaused()
+            CapabilityState.ERROR -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityErrorState()
+            CapabilityState.ACTIVE -> Unit
+        }
+        when (actor) {
+            CapabilityActor.Public -> if (kind != CapabilityActionKind.READ) throw CapabilityActorNotAuthorized()
+            CapabilityActor.System -> if (kind == CapabilityActionKind.PUBLISH) throw CapabilityActorNotAuthorized()
+            is CapabilityActor.Internal -> {
+                if (actor.principal.roles.isEmpty()) throw CapabilityActorNotAuthorized()
+                if (kind in setOf(CapabilityActionKind.WRITE, CapabilityActionKind.PUBLISH) &&
+                    actor.principal.roles.none { it == InternalRole.ADMIN || it == InternalRole.OPERATOR }
+                ) throw CapabilityActorNotAuthorized()
+            }
+        }
+    }
+
+    private fun mapSnapshotError(exception: Exception): RuntimeException {
+        val text = generateSequence(exception as Throwable) { it.cause }.mapNotNull { it.message }.joinToString(" ")
+        return if (text.contains("ML_SYNC_GUARD_DENIED")) CapabilityActionNotAllowed() else CapabilityActionNotAllowed()
     }
 
     override fun list(): List<CapabilityModuleView> = jdbc.query(
@@ -294,6 +351,8 @@ open class JdbcCapabilityService(
 
     companion object {
         const val BLACKSTORE_MODULE = "BLACKSTORE_INTEGRATION"
+        const val MARKETPLACE_ML_MODULE = "MARKETPLACE_ML"
+        const val MARKETPLACE_ML_SYNC = "SYNC"
         private val SCHEMA_V2_KEYS = listOf(
             "catalog_page_size",
             "catalog_rate_limit_rps",

@@ -81,7 +81,7 @@
     {
       "id": "TASK-POSC-005",
       "title": "Cerrar wire/topología y review offline",
-      "status": "dual_approved_pending_pr",
+      "status": "merged",
       "layer": 2,
       "depends_on": ["TASK-POSC-004A", "TASK-POSC-006"],
       "acceptance_criteria": ["BaseResponse/OpenAPI/headers/rate limits coherentes", "Siete rutas únicas y openapi.yaml servido", "Dos reviews de código independientes sin P0–P2 abiertos y suite PG16 sobre SHA final"]
