@@ -7,6 +7,8 @@ import com.storecore.blackstore.domain.RequestHashAlgorithm
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.catalog.application.port.output.PriceQuotePort
 import com.storecore.catalog.domain.PriceVersion
+import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.infrastructure.ChannelProjectionLockOrder
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -126,6 +128,7 @@ class JdbcBlackStoreSagaEngine(
             val asOf = quotes.clock()
             val liveCatalog = quotes.catalogVersion(asOf).wire
             val sorted = lines.sortedBy { it.variantId }
+            ChannelProjectionLockOrder(jdbc).lockVariants(sorted.map { it.variantId })
             val quoted = quotes.quoteByVariantIds(asOf, sorted.map { it.variantId })
             val catalogStale = liveCatalog != catalogVersion
             val priceStale = sorted.any { line ->
@@ -252,18 +255,11 @@ class JdbcBlackStoreSagaEngine(
                 "UPDATE blackstore_integration_operations SET state='COMMITTED', expires_at=NULL, updated_at=now() WHERE id=?",
                 row.id,
             )
-        }.also { receipt ->
-            // mutateReserved has committed before this callback. The fail-closed bridge is inert;
-            // a future canonical delegation must move inside the shared transaction boundary.
-            projectionBridge.requestProjection(receipt.reservationRef?.toString())
         }
 
     override fun release(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
         mutateReserved(quadruple, already = "RELEASED", principal = principal, action = "STOCK_RELEASE") { row, lines ->
             releaseStock(quadruple, row, lines, reservationStatus = "RELEASED", sagaState = "RELEASED")
-        }.also { receipt ->
-            // As with commit, this callback is post-transaction and cannot own projection writes.
-            projectionBridge.requestProjection(receipt.reservationRef?.toString())
         }
 
     override fun expireDue(limit: Int): Int {
@@ -411,8 +407,13 @@ class JdbcBlackStoreSagaEngine(
         if (row.state == "EXPIRED" && already != "EXPIRED") throw BlackStoreSagaException.expired()
         if (row.state != "RESERVED") throw BlackStoreSagaException.stateConflict()
         val lines = loadLines(row.id)
-        lockBalances(lines.map { it.variantId })
+        val variantIds = lines.map { it.variantId }
+        val emit = ChannelProjectionLockOrder(jdbc).lockVariants(variantIds)
+        lockBalances(variantIds)
         body(row, lines)
+        if (emit) {
+            projectionBridge.requestProjection(variantIds, projectionCause(already))
+        }
         toReceipt(loadRow(quadruple, forUpdate = true)!!)
         }!!
     }
@@ -763,6 +764,13 @@ class JdbcBlackStoreSagaEngine(
             current = current.cause
         }
         return if (ex is RuntimeException) ex else RuntimeException(ex)
+    }
+
+    private fun projectionCause(already: String): ProjectionSourceCause = when (already) {
+        "COMMITTED" -> ProjectionSourceCause.ExternalBlackStoreCommit
+        "RELEASED" -> ProjectionSourceCause.ExternalBlackStoreRelease
+        "EXPIRED" -> ProjectionSourceCause.ExternalBlackStoreExpiry
+        else -> ProjectionSourceCause.Unknown
     }
 
     private fun actor(quadruple: BlackStoreQuadruple): String = "BLACKSTORE:${quadruple.clientInstanceId}"

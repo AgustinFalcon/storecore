@@ -23,12 +23,16 @@ class ProjectionSourceCause private constructor(val wire: String) {
         val AccountReactivated = ProjectionSourceCause("ACCOUNT_REACTIVATED")
         val CapabilityReactivated = ProjectionSourceCause("CAPABILITY_REACTIVATED")
         val UpgradeQuarantine = ProjectionSourceCause("UPGRADE_QUARANTINE")
+        val ExternalBlackStoreCommit = ProjectionSourceCause("EXTERNAL_BLACKSTORE_COMMIT")
+        val ExternalBlackStoreRelease = ProjectionSourceCause("EXTERNAL_BLACKSTORE_RELEASE")
+        val ExternalBlackStoreExpiry = ProjectionSourceCause("EXTERNAL_BLACKSTORE_EXPIRY")
         val Unknown = ProjectionSourceCause("unknown")
         private val known = listOf(
             WebReserve, WebConsume, WebRelease, WebExpiry, InternalAdjustment, ListingActivated,
             ListingMappingConfirmed, ListingRemapped, ListingPaused, ListingReactivated,
             ProductDeactivated, VariantDeactivated, ProductReactivated, VariantReactivated,
             AccountReactivated, CapabilityReactivated, UpgradeQuarantine,
+            ExternalBlackStoreCommit, ExternalBlackStoreRelease, ExternalBlackStoreExpiry,
         )
         fun fromWire(raw: String?): ProjectionSourceCause {
             val normalized = raw?.trim().orEmpty()

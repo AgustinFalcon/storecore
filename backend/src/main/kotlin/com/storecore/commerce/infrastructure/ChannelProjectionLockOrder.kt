@@ -1,5 +1,6 @@
 package com.storecore.commerce.infrastructure
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.jdbc.core.JdbcTemplate
 
 /**
@@ -14,8 +15,31 @@ class ChannelProjectionLockOrder(private val jdbc: JdbcTemplate) {
      * @param variantIds candidates (remap passes previous and next); distinct+sorted
      */
     fun lock(accountId: Long, variantIds: Collection<Long>) {
-        jdbc.queryForObject("SELECT public.marketplace_ml_sync_snapshot()::text", String::class.java)
+        snapshotAllowsEmit()
         jdbc.query("SELECT id FROM channel_accounts WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, accountId)
+        lockInventory(variantIds)
+    }
+
+    /**
+     * Snapshot first, then every account that owns listings for [variantIds], then inventory.
+     * @return true when MARKETPLACE_ML is ACTIVE with no live kill, same rule as inventory `acquireScope`.
+     */
+    fun lockVariants(variantIds: Collection<Long>): Boolean {
+        val emit = snapshotAllowsEmit()
+        val variants = variantIds.distinct().sorted()
+        if (variants.isEmpty()) return emit
+        val placeholders = variants.joinToString(",") { "?" }
+        val accounts = jdbc.query(
+            "SELECT DISTINCT account_id FROM channel_listings WHERE variant_id IN ($placeholders) ORDER BY 1",
+            { rs, _ -> rs.getLong(1) },
+            *variants.toTypedArray(),
+        )
+        lockIds("channel_accounts", accounts)
+        lockInventory(variants)
+        return emit
+    }
+
+    private fun lockInventory(variantIds: Collection<Long>) {
         val variants = variantIds.distinct().sorted()
         if (variants.isEmpty()) return
         val placeholders = variants.joinToString(",") { "?" }
@@ -39,6 +63,20 @@ class ChannelProjectionLockOrder(private val jdbc: JdbcTemplate) {
             { rs, _ -> rs.getLong(1) },
             *variants.toTypedArray(),
         )
+    }
+
+    private fun snapshotAllowsEmit(): Boolean {
+        val raw = jdbc.queryForObject("SELECT public.marketplace_ml_sync_snapshot()::text", String::class.java) ?: return false
+        val photo = ObjectMapper().readTree(raw)
+        val liveKills = photo.path("switches").count { switch ->
+            val expires = runCatching { java.time.Instant.parse(switch.path("expiresAt").asText()) }.getOrNull()
+            switch.path("active").asBoolean() &&
+                expires != null &&
+                expires.isAfter(java.time.Instant.now()) &&
+                switch.path("owner").asText().isNotBlank() &&
+                switch.path("reason").asText().isNotBlank()
+        }
+        return liveKills == 0 && photo.path("state").asText() == "ACTIVE"
     }
 
     /** Table names are compile-time literals (`products`, `product_variants`), never caller input. */

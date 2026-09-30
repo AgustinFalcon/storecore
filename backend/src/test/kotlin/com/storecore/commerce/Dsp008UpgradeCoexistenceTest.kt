@@ -82,14 +82,14 @@ class Dsp008UpgradeCoexistenceTest {
     fun stop() = postgres.stop()
 
     @Test
-    fun flywayCeilingIsV18AndNextFreeIsV19() {
+    fun flywayCeilingIsV19AndNextFreeIsV20() {
         val dir = Path.of("src/main/resources/db/migration")
         val versions = Files.list(dir).use { stream ->
             stream.asSequence().map { it.fileName.toString() }.filter { it.startsWith("V") && it.contains("__") }.sorted().toList()
         }
-        assertTrue(versions.any { it.startsWith("V18__") }, versions.toString())
-        assertTrue(versions.none { it.startsWith("V19__") }, versions.toString())
-        assertTrue(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("18"))
+        assertTrue(versions.any { it.startsWith("V19__") }, versions.toString())
+        assertTrue(versions.none { it.startsWith("V20__") }, versions.toString())
+        assertTrue(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("19"))
         assertEquals(
             "DISABLED",
             jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java),

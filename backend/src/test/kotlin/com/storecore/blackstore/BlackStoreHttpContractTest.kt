@@ -5,6 +5,7 @@ import com.storecore.blackstore.infrastructure.BlackStoreExpiryWorker
 import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
+import com.storecore.commerce.domain.ProjectionSourceCause
 import com.storecore.configuration.domain.CapabilityState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -128,7 +129,7 @@ class BlackStoreHttpContractTest(
 
             assertEquals(
                 LegacyBlackStoreProjectionResult.NOT_ELIGIBLE,
-                projectionBridge.requestProjection(reservationRef),
+                projectionBridge.requestProjection(emptyList(), ProjectionSourceCause.Unknown),
             )
             assertEquals(
                 0,
