@@ -176,6 +176,7 @@ class BlackStoreIntegrationServiceTest {
             quadruple: BlackStoreQuadruple,
             catalogVersion: String,
             lines: List<BlackStoreReserveLine>,
+            override: PriceOverrideAttempt?,
         ): BlackStoreOperationReceipt {
             calls += 1
             return BlackStoreOperationReceipt("RESERVED", catalogVersion = catalogVersion)

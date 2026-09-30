@@ -29,14 +29,15 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003D — stock read
 
-- **Estado:** dual Grok 4.7 APPROVED (`sdd/reviews/20260930-grok-prv20-sdd.md`, `prv20-scope.md`). Pending PR merge. Sin Flyway.
+- **Estado:** merge `#78` (`eb59fb7`). Dual Grok 4.7 APPROVED (`sdd/reviews/20260930-grok-prv20-sdd.md`, `prv20-scope.md`).
 - **Dependencia:** 003C mergeado (`21780e4`).
 - **Ownership:** un handler `GET /stock/variants/{variantId}`.
 - **Aceptación:** ausente 404; SKU 65..128 → 404; inactivo visible en catálogo con `active=false` pero stock read reporta sellable físico; reserve no confía en cantidad de catálogo.
 
 ## POSC-003E — reserva Tx-A/Tx-B y hash H2
 
-- **Dependencia:** 003A–D (audit function, quotes, revisión).
+- **Estado:** dual Grok 4.7 r2 APPROVED (`sdd/reviews/20260930-grok-prv21-sdd-r2.md`, `prv21-scope-r2.md`) @ `d0e33ff`. prv21-sdd @ `840f5cb` fue `CHANGES_REQUIRED`; P0-01..P0-05 cerrados. V13 `request_hash_algorithm` DEFAULT H1, nuevas reservas H2, PENDING vivo <60s aborta migrate. Maven local `Posc003eReserveH2Test,BlackStoreSagaEngineTest,BlackStoreIntegrationServiceTest` exit 0. PR pendiente a `integration/storecore-int`. No es merge ni CI verde. No desbloquea 004 hasta el merge.
+- **Dependencia:** 003D mergeado (`eb59fb7`).
 - **Ownership:** un handler `POST /reservations`. ALTER aditivo `blackstore_integration_operations.request_hash_algorithm DEFAULT 'H1'` (mismo Flyway 003E o delta si 003A ya cerró el número). Hash H2, drain H1 sobre `blackstore_integration_operations` según runbook de la propuesta, taxonomía YAML exacta, override vía función 003A.
 - **Aceptación:** envelope `priceVersion` vacío → 400 pre-Tx-A; una cuádruple, una reserva/ledger por variante; crash A→B recupera PENDING; códigos `LINE_VALIDATION_FAILED`/`DUPLICATE_VARIANT`/`COST_SCOPE_REQUIRED` no se emiten (`includeCost` → `FORBIDDEN` o `CAPABILITY_DISABLED`); override ALLOWED/DENIED auditado; catálogo stale con precios de línea vigentes **sigue** exigiendo override; PENDING H1 vivo aborta migrate.
 

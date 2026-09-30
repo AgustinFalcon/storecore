@@ -475,7 +475,7 @@ class BlackStoreSagaEngineTest {
         val duplicate = assertThrows(BlackStoreSagaException::class.java) {
             engine.reserve(principal, quadruple(), seeded.catalogVersion, seeded.line(1) + seeded.line(1))
         }
-        assertEquals("DUPLICATE_VARIANT", duplicate.message)
+        assertEquals("VALIDATION", duplicate.message)
         val orphanSku = "SKU-ORB-${UUID.randomUUID()}"
         val orphanProduct = jdbc.queryForObject(
             "INSERT INTO products(brand_id, category_id, name, slug, base_price, status) VALUES (1, 1, ?, ?, 10, 'ACTIVE') RETURNING id",
