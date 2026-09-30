@@ -43,7 +43,10 @@ class BlackStoreIntegrationService(
         val client = parseUuid(clientInstanceId, "X-Client-Instance-Id")
         companions.assertBound(client)
         limiter.check(client.toString(), BlackStoreRateLimiter.Scope.CATALOG)
-        val page = catalog.readPage(client, cursor, pageSize ?: BlackStoreSagaPolicy.CATALOG_PAGE_MAX, includeCost)
+        val size = pageSize ?: BlackStoreSagaPolicy.CATALOG_PAGE_MAX
+        if (size < 1 || size > BlackStoreSagaPolicy.CATALOG_PAGE_MAX) throw BlackStoreSagaException.validation()
+        validateIfNoneMatch(ifNoneMatch)
+        val page = catalog.readPage(client, cursor, size, includeCost)
         if (etagMatches(ifNoneMatch, page.etag)) {
             throw BlackStoreNotModified(page.etag)
         }
@@ -201,9 +204,14 @@ class BlackStoreIntegrationService(
         }
     }
 
+    private fun validateIfNoneMatch(ifNoneMatch: String?) {
+        if (ifNoneMatch.isNullOrBlank()) return
+        if (ifNoneMatch.length > 64) throw BlackStoreSagaException.validation()
+    }
+
     private fun etagMatches(ifNoneMatch: String?, etag: String): Boolean {
         val incoming = normalizeEtag(ifNoneMatch) ?: return false
-        return incoming == normalizeEtag(etag)
+        return incoming == "*" || incoming == normalizeEtag(etag)
     }
 
     private fun normalizeEtag(raw: String?): String? {
