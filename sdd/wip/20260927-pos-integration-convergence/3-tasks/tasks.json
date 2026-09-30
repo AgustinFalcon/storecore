@@ -73,7 +73,7 @@
     {
       "id": "TASK-POSC-004A",
       "title": "Worker EXTERNAL_BLACKSTORE, retry/poison y purge con privilegio mínimo",
-      "status": "in_progress",
+      "status": "dual_approved_pending_pr",
       "layer": 2,
       "depends_on": ["TASK-POSC-004"],
       "acceptance_criteria": ["WEB/PIC owner separados y carrera commit/expire/WEB sin doble descuento", "Purge tombstone >=7y antes de retry/lines/saga con rollback/race; ledger/audit intactos", "Worker-only función/rol y revocación DELETE runtime sin romper PENDING; ACL positiva/negativa PG16"]

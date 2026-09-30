@@ -12,6 +12,6 @@
 
 ## POSC-004A — worker, retry/poison y purge
 
-- **Estado:** implementación local en `feature/posc004a-worker-purge`. V14 worker_owner + funciones SECURITY DEFINER; runtime sin DELETE en saga/líneas ni INSERT tombstone. Maven `Posc004aWorkerPurgeTest,BlackStoreSagaEngineTest,BlackStoreIntegrationServiceTest` exit 0. Dual Grok prv23 pendiente. Retry/poison inbox no se inventa (residual).
+- **Estado:** dual Grok 4.7 prv23 APPROVED (`sdd/reviews/20260930-grok-prv23-sdd.md`, `prv23-scope.md`) @ `def7d6a`. PR pendiente. Residual: retry/poison inbox no inventado. No es merge ni CI verde. No desbloquea PIC-006A hasta el merge.
 - **Ownership:** rol/función worker-only, expiry de RESERVED, drain PENDING >60s, purge 90d + tombstone ≥7y, revocación `DELETE` runtime sólo con reemplazo.
 - **Aceptación:** documentada en `3-tasks/plan.md` §POSC-004A. No se implementa en el PR 004.
