@@ -57,7 +57,8 @@
       "implementation_slices": [
         {"id":"TASK-POSC-003A","status":"merged","depends_on":[],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv17-sdd.md"},
         {"id":"TASK-POSC-003B","status":"merged","depends_on":["TASK-POSC-003A"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv18-sdd.md"},
-        {"id":"TASK-POSC-003C","status":"pending_merge","depends_on":["TASK-POSC-003B"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv19-sdd.md"}
+        {"id":"TASK-POSC-003C","status":"merged","depends_on":["TASK-POSC-003B"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv19-sdd.md"},
+        {"id":"TASK-POSC-003D","status":"local_complete_pending_review","depends_on":["TASK-POSC-003C"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv20-sdd.md"}
       ]
     },
     {

@@ -58,7 +58,7 @@ class BlackStoreIntegrationService(
         val client = parseUuid(clientInstanceId, "X-Client-Instance-Id")
         companions.assertBound(client)
         limiter.check(client.toString(), BlackStoreRateLimiter.Scope.STOCK_READ)
-        return catalog.readStock(variantId)
+        return catalog.readStock(client, variantId)
     }
 
     fun reserve(

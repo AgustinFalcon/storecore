@@ -280,7 +280,7 @@ class BlackStoreSagaEngineTest {
         assertTrue(item.priceVersion.startsWith("p1_"))
         assertEquals(46, item.priceVersion.length)
         assertEquals("ARS", item.currency)
-        val stock = catalog.readStock(first.variantId)
+        val stock = catalog.readStock(client, first.variantId)
         assertEquals(5, stock.availableQuantity)
         val firstPage = catalog.readPage(client, cursor = null, pageSize = 1, includeCost = false)
         assertEquals(1, firstPage.items.size)

@@ -163,7 +163,7 @@ class BlackStoreIntegrationServiceTest {
             return BlackStoreCatalogPage("v1", now, now, "v1", null, emptyList())
         }
 
-        override fun readStock(variantId: Long): BlackStoreVariantStock {
+        override fun readStock(clientInstanceId: UUID, variantId: Long): BlackStoreVariantStock {
             calls += 1
             return BlackStoreVariantStock(variantId, "SKU-1", 1, "v1")
         }

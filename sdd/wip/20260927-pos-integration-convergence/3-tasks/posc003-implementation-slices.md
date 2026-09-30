@@ -22,14 +22,15 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003C — cursor opaco, fotografía y ETag
 
-- **Estado:** dual Grok 4.7 código APPROVED (`sdd/reviews/20260930-grok-prv19-sdd.md`, `prv19-scope.md`). V12 SHA-256 LF `1352667604EFF8279C0759AA02C9A6119C7B7D446A18CE0DC6FC86AF1A60B0A5`. Cursor C1 opaco 43 chars, LEGACY/manipulado → 410, pageSize 0/201 → 400, ETag quoted `e1_` (48 chars), snapshot reuse 304, stock cambia ETag sin `catalogVersion`. Maven local: `Posc003cCursorEtagTest` 3/3. Pending PR merge. No activa BLACKSTORE.
+- **Estado:** merge `#77` (`21780e4`). Dual Grok 4.7 APPROVED (`sdd/reviews/20260930-grok-prv19-sdd.md`, `prv19-scope.md`).
 - **Dependencia:** 003B mergeado (`06a85e2`).
 - **Ownership:** columnas aditivas V6 (`last_variant_id`, `page_size`, `visibility_digest`, `format_version`, `issued_at`); `blackstore_catalog_page_snapshots`; `blackstore_price_quotes`; ETag `e1_`. Un handler `GET /catalog`. Lazy delete de snapshot/quote vencidos **después** de 200/304/410. Máx. 3 generaciones vivas por clave. Advisory lock: el perdedor reutiliza la fila ganadora.
 - **Aceptación:** cursor LEGACY/manipulado/cruzado → 410; pageSize 0/201 → 400; stock cambia ETag sin invalidar `catalogVersion`; 304 sólo fotografía viva; `visibility_digest` y `format_version` persistidos y verificados.
 
 ## POSC-003D — stock read
 
-- **Dependencia:** 003C (misma fuente de `catalogVersion` y sellable).
+- **Estado:** implementación local en `feature/posc003d-stock-read`. `GET /stock/variants/{variantId}`: ausente y SKU 65..128 → 404; SKU 64 y sellable físico; inactivo visible en catálogo (`active=false`) y stock reporta cantidad física; reserve usa saldo vivo, no la página. Sin Flyway. Dual Grok prv20 pendiente.
+- **Dependencia:** 003C mergeado (`21780e4`).
 - **Ownership:** un handler `GET /stock/variants/{variantId}`.
 - **Aceptación:** ausente 404; SKU 65..128 → 404; inactivo visible en catálogo con `active=false` pero stock read reporta sellable físico; reserve no confía en cantidad de catálogo.
 
