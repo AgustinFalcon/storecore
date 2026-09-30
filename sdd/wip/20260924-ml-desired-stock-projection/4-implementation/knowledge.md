@@ -16,6 +16,6 @@ Issue canónico = id SDD (`TASK-DSP-*`). No hay issues GitHub para este DAG (a d
 | TASK-DSP-007 | [#91](https://github.com/AgustinFalcon/storecore/pull/91) | `0f8b653` | prv33 | métricas locales |
 | TASK-DSP-008 | [#92](https://github.com/AgustinFalcon/storecore/pull/92) | `246662a` | prv34 | coexistencia `LISTING_STOCK` |
 | TASK-DSP-R01 / R02 | [#93](https://github.com/AgustinFalcon/storecore/pull/93) | `9ee37d7` | prv35 + prv36 | `ChannelProjectionLockOrder` |
-| suite local V3/Tx-C | [#94](https://github.com/AgustinFalcon/storecore/pull/94) | (squash al merge) | prv37 SDD+SCOPE APPROVED | fixtures SQL; V3 ML deny intacto |
+| suite local V3/Tx-C | [#94](https://github.com/AgustinFalcon/storecore/pull/94) | `b735a9a` | prv37 SDD+SCOPE APPROVED | fixtures SQL; V3 ML deny intacto |
 
 Espejo agent: `docs/agent/ml-desired-stock-local-intent.md`.

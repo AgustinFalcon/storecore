@@ -23,4 +23,4 @@ Issue canónico = id SDD (`TASK-POSC-*` / PIC). Merge sólo a `integration/store
 | TASK-POSC-006 | [#82](https://github.com/AgustinFalcon/storecore/pull/82) | `dc23b45` | prv24 |
 | TASK-POSC-005 | [#83](https://github.com/AgustinFalcon/storecore/pull/83) | `d4137fb` | prv25 |
 
-CHANGELOG unreleased lista los mismos PRs. Fixture SQL de `BLACKSTORE_INTEGRATION` en 002E/002F merge [#94](https://github.com/AgustinFalcon/storecore/pull/94) (dual prv37 APPROVED) no acredita companion live ni reabre Tx-C.
+CHANGELOG unreleased lista los mismos PRs. Fixture SQL de `BLACKSTORE_INTEGRATION` en 002E/002F merge [#94](https://github.com/AgustinFalcon/storecore/pull/94) (`b735a9a`, dual prv37 APPROVED) no acredita companion live ni reabre Tx-C.
