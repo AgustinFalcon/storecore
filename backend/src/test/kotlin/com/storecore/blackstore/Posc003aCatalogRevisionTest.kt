@@ -49,7 +49,7 @@ class Posc003aCatalogRevisionTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
         val after = JdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         assertEquals("DISABLED", after.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
-        assertEquals("11", after.queryForObject("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1", String::class.java))
+        assertTrue(after.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("11"))
         assertEquals(1, after.queryForObject("SELECT COUNT(*) FROM blackstore_catalog_revision WHERE id=1 AND revision=1", Int::class.java))
         assertEquals(1, after.queryForObject("SELECT COUNT(*) FROM brands WHERE slug='upgrade-003a'", Int::class.java))
     }

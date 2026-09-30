@@ -15,14 +15,15 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003B — `catalogVersion` / `priceVersion` y `PriceQuotePort`
 
-- **Estado:** implementación local en `feature/posc003b-price-quote`. Tipos `c1_`/`p1_`, `PriceQuotePort`, intervalo `[starts_at, ends_at)`, `includeCost` → `FORBIDDEN`. Maven: `Posc003bCatalogVersionTest`, `Posc003bPriceQuoteTest`, `BlackStoreSagaEngineTest`, `CatalogEffectiveOfferTest` exit 0.
+- **Estado:** merge `#76` (`06a85e2`). Dual Grok 4.7 código APPROVED (`sdd/reviews/20260930-grok-prv18-sdd.md`, `prv18-scope.md`).
 - **Dependencia:** 003A mergeado (`6cc7ffa`).
 - **Ownership:** tipos cerrados `c1_`/`p1_`; un `PriceQuotePort`. Refactor de `JdbcEffectivePriceQueryAdapter` y filtro de ofertas en `CatalogService` al intervalo canónico `[starts_at, ends_at)` (`starts_at <= asOf < ends_at`). Storefront y POS/Tx-B usan el mismo selector.
 - **Aceptación:** oferta vigente = storefront; `asOf == ends_at` no aplica la oferta; empate `priority DESC,id ASC`; includeCost fail-closed; `COST_SCOPE_REQUIRED` no se emite.
 
 ## POSC-003C — cursor opaco, fotografía y ETag
 
-- **Dependencia:** 003B.
+- **Estado:** implementación local en `feature/posc003c-cursor-etag`. V12 SHA-256 LF `1352667604EFF8279C0759AA02C9A6119C7B7D446A18CE0DC6FC86AF1A60B0A5`. Cursor C1 opaco 43 chars, LEGACY/manipulado → 410, pageSize 0/201 → 400, ETag quoted `e1_` (48 chars), snapshot reuse 304, stock cambia ETag sin `catalogVersion`. Maven local: `Posc003cCursorEtagTest` 3/3; suite 003A/003B/002F/saga/service/effective-offer exit 0. Dual Grok prv19 pendiente. No activa BLACKSTORE.
+- **Dependencia:** 003B mergeado (`06a85e2`).
 - **Ownership:** columnas aditivas V6 (`last_variant_id`, `page_size`, `visibility_digest`, `format_version`, `issued_at`); `blackstore_catalog_page_snapshots`; `blackstore_price_quotes`; ETag `e1_`. Un handler `GET /catalog`. Lazy delete de snapshot/quote vencidos **después** de 200/304/410. Máx. 3 generaciones vivas por clave. Advisory lock: el perdedor reutiliza la fila ganadora.
 - **Aceptación:** cursor LEGACY/manipulado/cruzado → 410; pageSize 0/201 → 400; stock cambia ETag sin invalidar `catalogVersion`; 304 sólo fotografía viva; `visibility_digest` y `format_version` persistidos y verificados.
 

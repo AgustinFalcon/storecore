@@ -62,7 +62,7 @@ class Posc002fAcceptanceMatrixTest {
     }
 
     @Test
-    fun v1ThroughV11ChecksumsAndUpgradeKeepBlackStoreDisabled() {
+    fun v1ThroughV12ChecksumsAndUpgradeKeepBlackStoreDisabled() {
         val expected = mapOf(
             "V3__capability_administration.sql" to "0D2CEBE1FBA3D43C1C33E2EA216B5D931EA57D510B967D7C471BBB8B87A65DC8",
             "V4__mp_orders_checkout.sql" to "EB677AE41202961AA1527B4AD0539A344A2620E75079241AEE9BA356209A4C5F",
@@ -71,6 +71,8 @@ class Posc002fAcceptanceMatrixTest {
             "V7__blackstore_future_optional_promotion.sql" to "6444ADB440C4B7DC8536F4BA9856AC9C041742CA67EFB91C03EC6409B5398A0C",
             "V8__posc002_shared_capability_cutover.sql" to "359CE72F8A7E8041D65DCC545440ADDE4F2F43D72160C922CD88E40110249E2C",
             "V9__posc002c_companion_admin.sql" to "23615A62517151177ADE5C8E62644EA6540C30CC6D32ADD0A29E95AB8E378F3A",
+            "V11__posc003a_catalog_revision.sql" to "39CAEFFD984446407687A2A351A93EB892179DE39C022ABB74DE1302F7287DC1",
+            "V12__posc003c_catalog_cursor_snapshot.sql" to "1352667604EFF8279C0759AA02C9A6119C7B7D446A18CE0DC6FC86AF1A60B0A5",
         )
         expected.forEach { (script, hash) ->
             assertEquals(hash, lfNormalizedSha256(Files.readAllBytes(Path.of("src/main/resources/db/migration", script))), script)
@@ -86,7 +88,7 @@ class Posc002fAcceptanceMatrixTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
         val after = JdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         assertEquals("DISABLED", after.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
-        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"), after.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String::class.java))
+        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"), after.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String::class.java))
         assertEquals(1, after.queryForObject("SELECT COUNT(*) FROM brands WHERE slug='upgrade-f'", Int::class.java))
         val slices = Files.readString(Path.of("../sdd/wip/20260927-pos-integration-convergence/3-tasks/posc002-implementation-slices.md"))
         assertTrue(slices.contains("ML RR admin-wins se registra como gate separado NO-GO"), slices)
