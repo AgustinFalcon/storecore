@@ -1,9 +1,11 @@
 package com.storecore.commerce
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.DesiredStockProjectionUseCase
 import com.storecore.commerce.domain.ChannelAccountPurpose
 import com.storecore.commerce.domain.DesiredStockOutcome
 import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.infrastructure.JdbcChannelStockOutboxAdapter
 import com.storecore.commerce.infrastructure.JdbcMarketplaceListingProjectionAdapter
 import com.storecore.configuration.CapabilityAdminTestSupport
 import com.storecore.configuration.domain.CapabilityActor
@@ -40,7 +42,7 @@ class Dsp002MonotonicSnapshotTest {
         val provisioned = CapabilityAdminTestSupport.migrateAndProvision(postgres)
         jdbc = provisioned.first
         capabilities = JdbcCapabilityService(jdbc, provisioned.second)
-        projection = DesiredStockProjectionUseCase(capabilities, JdbcMarketplaceListingProjectionAdapter(jdbc))
+        projection = DesiredStockProjectionUseCase(capabilities, JdbcMarketplaceListingProjectionAdapter(jdbc), JdbcChannelStockOutboxAdapter(jdbc, ObjectMapper()))
         val hash = Argon2PasswordHasher().hash("a-very-long-password".toCharArray())
         adminId = jdbc.queryForObject(
             "INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id",
@@ -61,9 +63,8 @@ class Dsp002MonotonicSnapshotTest {
     fun v17ShaAndFormulaIgnoresReservedQuantity() {
         val path = Path.of("src/main/resources/db/migration/V17__dsp002_listing_stock_projection.sql")
         assertEquals(V17_SHA, lfSha(Files.readAllBytes(path)))
-        assertEquals(
-            "17",
-            jdbc.queryForObject("SELECT MAX(version::int)::text FROM flyway_schema_history WHERE success", String::class.java),
+        assertTrue(
+            jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("17"),
         )
         val variantId = seedVariant("SKU-DSP002-A", available = 10, reserved = 4, safety = 2)
         val accountId = insertAccount("ml-sync-002a", ChannelAccountPurpose.ExternalMlSync.wire)
@@ -72,7 +73,7 @@ class Dsp002MonotonicSnapshotTest {
         try {
             val first = projection.project(listOf(variantId), ProjectionSourceCause.InternalAdjustment, actor())
             assertEquals(1, first.size)
-            assertEquals(DesiredStockOutcome.SnapshotAdvanced, first[0].outcome)
+            assertEquals(DesiredStockOutcome.Projected, first[0].outcome)
             assertEquals(8, first[0].desiredQuantity)
             assertEquals(1L, first[0].projectionVersion)
             assertEquals(8, jdbc.queryForObject("SELECT desired_quantity FROM channel_listing_stock_projection WHERE listing_id=?", Int::class.java, listingId))
@@ -83,7 +84,7 @@ class Dsp002MonotonicSnapshotTest {
             assertEquals(1L, replay[0].projectionVersion)
             jdbc.update("UPDATE inventory_balances SET available_quantity=6, reserved_quantity=9 WHERE variant_id=?", variantId)
             val advanced = projection.project(listOf(variantId), ProjectionSourceCause.InternalAdjustment, actor())
-            assertEquals(DesiredStockOutcome.SnapshotAdvanced, advanced[0].outcome)
+            assertEquals(DesiredStockOutcome.Projected, advanced[0].outcome)
             assertEquals(4, advanced[0].desiredQuantity)
             assertEquals(2L, advanced[0].projectionVersion)
             assertTrue(2L > 1L)
