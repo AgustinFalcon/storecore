@@ -30,6 +30,7 @@
                 <th>Listing</th>
                 <th>Variation</th>
                 <th>SKU</th>
+                <th>Account</th>
               </tr>
             </thead>
             <tbody>
@@ -40,6 +41,7 @@
                   </td>
                   <td>{{ listing.variationId }}</td>
                   <td class="sc-mono">{{ listing.sku }}</td>
+                  <td class="sc-mono">{{ listing.accountId ?? '—' }}</td>
                 </tr>
               }
             </tbody>
@@ -52,7 +54,8 @@
       <label>Listing <input required name="listingId" [ngModel]="state.listingDraft.listingId" (ngModelChange)="patch({ listingId: $event })" /></label>
       <label>Variation <input name="variationId" [ngModel]="state.listingDraft.variationId" (ngModelChange)="patch({ variationId: $event })" /></label>
       <label>SKU <input required name="sku" [ngModel]="state.listingDraft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
-      <p class="sc-callout">No se pegan tokens ni credenciales. Sólo el identificador público del listing y el SKU local.</p>
+      <label>Account id <input required name="accountId" type="number" [ngModel]="state.listingDraft.accountId" (ngModelChange)="patch({ accountId: $event === '' || $event == null ? null : Number($event) })" /></label>
+      <p class="sc-callout">No se pegan tokens ni credenciales. El mapeo exige account id explícito de una cuenta EXTERNAL_ML_SYNC.</p>
       <button type="submit" class="sc-btn sc-btn--primary">Mapear</button>
     </form>
   </div>

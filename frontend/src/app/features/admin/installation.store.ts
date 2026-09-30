@@ -22,7 +22,7 @@ export interface InstallationState {
   readonly listingDraft: MercadoLibreListing;
 }
 
-const emptyListing: MercadoLibreListing = { listingId: '', variationId: '', sku: '' };
+const emptyListing: MercadoLibreListing = { listingId: '', variationId: '', sku: '', accountId: null };
 
 @Injectable()
 export class InstallationStore extends ComponentStore<InstallationState> {
@@ -114,13 +114,13 @@ export class InstallationStore extends ComponentStore<InstallationState> {
   readonly persistListing = this.effect<void>((trigger$) =>
     trigger$.pipe(
       tap(() => {
-        if (!this.snapshot.listingDraft.listingId.trim() || !this.snapshot.listingDraft.sku.trim()) {
-          this.patchState({ errorMessage: 'Listing y SKU son obligatorios.' });
+        if (!this.snapshot.listingDraft.listingId.trim() || !this.snapshot.listingDraft.sku.trim() || !this.snapshot.listingDraft.accountId) {
+          this.patchState({ errorMessage: 'Listing, SKU y account id son obligatorios.' });
           return;
         }
         this.patchState({ errorMessage: '' });
       }),
-      filter(() => Boolean(this.snapshot.listingDraft.listingId.trim() && this.snapshot.listingDraft.sku.trim())),
+      filter(() => Boolean(this.snapshot.listingDraft.listingId.trim() && this.snapshot.listingDraft.sku.trim() && this.snapshot.listingDraft.accountId)),
       switchMap(() =>
         this.ops.saveMercadoLibreListing(this.snapshot.listingDraft).pipe(
           tapResponse({

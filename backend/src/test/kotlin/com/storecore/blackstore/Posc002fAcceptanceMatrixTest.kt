@@ -90,7 +90,7 @@ class Posc002fAcceptanceMatrixTest {
         Flyway.configure().dataSource(url, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
         val after = JdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         assertEquals("DISABLED", after.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
-        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), after.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String::class.java))
+        assertEquals(listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"), after.queryForList("SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank", String::class.java))
         assertEquals(1, after.queryForObject("SELECT COUNT(*) FROM brands WHERE slug='upgrade-f'", Int::class.java))
         val slices = Files.readString(Path.of("../sdd/wip/20260927-pos-integration-convergence/3-tasks/posc002-implementation-slices.md"))
         assertTrue(slices.contains("ML RR admin-wins se registra como gate separado NO-GO"), slices)

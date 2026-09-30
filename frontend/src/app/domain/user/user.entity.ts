@@ -63,4 +63,5 @@ export interface MercadoLibreListing {
   readonly listingId: string;
   readonly variationId: string;
   readonly sku: string;
+  readonly accountId: number | null;
 }

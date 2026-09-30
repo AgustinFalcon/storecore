@@ -2,4 +2,4 @@
 
 ## Estado
 
-`in_progress`. TASK-DSP-000A merge `#52` (`56baa2d`). TASK-DSP-000B en `feature/dsp000b-ml-capability-guard` sobre integración `d4137fb` (POSC-005 `#83`). Flyway V15. Sin dispatcher, red, secretos ni `sdd.finish`.
+`in_progress`. TASK-DSP-000A merge `#52` (`56baa2d`). TASK-DSP-000B merge `#84` (`878461f`, V15). TASK-DSP-001 en `feature/dsp001-account-purpose` sobre integración `878461f` (V16 purpose). Sin dispatcher, red, secretos, webhook binding ni `sdd.finish`.

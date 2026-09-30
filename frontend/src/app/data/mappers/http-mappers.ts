@@ -329,7 +329,12 @@ export function mapMercadoLibreAccount(value: unknown): MercadoLibreAccount {
 
 export function mapListing(value: unknown): MercadoLibreListing {
   const row = asRecord(value);
-  return { listingId: text(row['listingId']), variationId: text(row['variationId']), sku: text(row['sku']) };
+  return {
+    listingId: text(row['listingId']),
+    variationId: text(row['variationId']),
+    sku: text(row['sku']),
+    accountId: nullableNum(row['accountId']),
+  };
 }
 
 export function mapListings(value: unknown): readonly MercadoLibreListing[] {

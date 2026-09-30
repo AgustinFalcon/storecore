@@ -6,7 +6,6 @@ import com.storecore.commerce.domain.MercadoLibreAccountView
 import com.storecore.commerce.domain.MercadoLibreListingView
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
-import com.storecore.identity.application.ResourceNotFound
 import com.storecore.identity.domain.InternalUserPrincipal
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
@@ -23,15 +22,7 @@ class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper
 
     fun listings(actor: InternalUserPrincipal): List<MercadoLibreListingView> {
         capabilities.decide("MARKETPLACE_ML", "READ", CapabilityActor.Internal(actor))
-        return jdbc.query("SELECT l.external_listing_id,COALESCE(l.variation_id,'') variation,v.sku FROM channel_listings l JOIN product_variants v ON v.id=l.variant_id JOIN channel_accounts a ON a.id=l.account_id WHERE a.channel='MERCADO_LIBRE' ORDER BY l.id") { rs, _ -> MercadoLibreListingView(rs.getString("external_listing_id"), rs.getString("variation"), rs.getString("sku")) }
-    }
-
-    fun saveListing(actor: InternalUserPrincipal, listingId: String, variationId: String, sku: String): MercadoLibreListingView {
-        capabilities.decide("MARKETPLACE_ML", "SYNC", CapabilityActor.Internal(actor))
-        val accountId = jdbc.query("SELECT id FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1", { rs, _ -> rs.getLong("id") }).firstOrNull() ?: throw MercadoLibreAccountMissing()
-        val variantId = jdbc.query("SELECT id FROM product_variants WHERE sku=?", { rs, _ -> rs.getLong("id") }, sku).firstOrNull() ?: throw ResourceNotFound()
-        jdbc.update("INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,state) VALUES (?,?,?,?,'ACTIVE') ON CONFLICT (account_id,external_listing_id,variation_id) DO UPDATE SET variant_id=excluded.variant_id,updated_at=now()", accountId, listingId, variationId.ifBlank { null }, variantId)
-        return MercadoLibreListingView(listingId, variationId, sku)
+        return jdbc.query("SELECT l.account_id,l.external_listing_id,COALESCE(l.variation_id,'') variation,v.sku FROM channel_listings l JOIN product_variants v ON v.id=l.variant_id JOIN channel_accounts a ON a.id=l.account_id WHERE a.channel='MERCADO_LIBRE' ORDER BY l.id") { rs, _ -> MercadoLibreListingView(rs.getString("external_listing_id"), rs.getString("variation"), rs.getString("sku"), rs.getLong("account_id")) }
     }
 
     fun notify(sourceIp: String, topic: String?, resource: String?, body: Map<String, Any?>?, signature: String?): Map<String, Any?> {

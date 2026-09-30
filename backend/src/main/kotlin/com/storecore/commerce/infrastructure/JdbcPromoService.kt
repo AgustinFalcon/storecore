@@ -2,6 +2,7 @@ package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.PromoWindowOverlap
+import com.storecore.commerce.domain.ChannelAccountPurpose
 import com.storecore.commerce.domain.PromoView
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
@@ -34,7 +35,11 @@ class JdbcPromoService(private val jdbc: JdbcTemplate, private val capabilities:
         val approved = approvedAt ?: Instant.now()
         val variant = jdbc.query("SELECT v.id,p.id product_id,p.base_price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=?", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("product_id"), rs.getBigDecimal("base_price")) }, listingSku).firstOrNull() ?: throw com.storecore.identity.application.ResourceNotFound()
         val accountId = jdbc.query("SELECT id FROM channel_accounts WHERE account_key='manual-price-writer'", { rs, _ -> rs.getLong("id") }).firstOrNull()
-            ?: jdbc.queryForObject("INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state) VALUES ('manual-price-writer','MERCADO_LIBRE','ref:manual-price-writer','ACTIVE') RETURNING id", Long::class.java)!!
+            ?: jdbc.queryForObject(
+                "INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state,purpose) VALUES ('manual-price-writer','MERCADO_LIBRE','ref:manual-price-writer','ACTIVE',?) RETURNING id",
+                Long::class.java,
+                ChannelAccountPurpose.InternalPricePolicy.wire,
+            )!!
         val listingId = jdbc.query("SELECT id FROM channel_listings WHERE account_id=? AND variant_id=?", { rs, _ -> rs.getLong("id") }, accountId, variant.first).firstOrNull()
             ?: jdbc.queryForObject("INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,state) VALUES (?,?,?,?, 'ACTIVE') RETURNING id", Long::class.java, accountId, listingSku, listingSku, variant.first)!!
         val policyId = try {
