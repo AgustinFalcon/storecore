@@ -2,6 +2,7 @@ package com.storecore.commerce.infrastructure.mporders
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.port.output.InventoryConsumePort
+import com.storecore.commerce.application.port.output.InventoryReserveLine
 import com.storecore.commerce.application.port.output.OfficialOrderQueryPort
 import com.storecore.commerce.domain.CommercialEffect
 import com.storecore.commerce.domain.MpOrderCommercialPolicy
@@ -81,7 +82,7 @@ class MpOrderApplicationWorker(
         }
         val attempt = jdbc.query(
             """SELECT a.id,a.order_id,a.payment_id,a.external_reference,a.amount,a.currency,a.state
-               FROM mp_checkout_attempts a WHERE a.provider_order_id=? FOR UPDATE""",
+               FROM mp_checkout_attempts a WHERE a.provider_order_id=?""",
             { rs, _ ->
                 AttemptRow(
                     rs.getLong("id"), rs.getLong("order_id"), rs.getLong("payment_id"),
@@ -124,7 +125,6 @@ class MpOrderApplicationWorker(
     }
 
     private fun accredit(inboxId: Long, attempt: AttemptRow, official: OfficialOrderResource): Boolean {
-        jdbc.query("SELECT id FROM orders WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, attempt.orderId)
         val already = jdbc.query(
             "SELECT 1 FROM mp_order_commercial_applications WHERE order_id=? AND transition='PAYMENT_ACCREDITED'",
             { _, _ -> 1 },
@@ -149,7 +149,7 @@ class MpOrderApplicationWorker(
         }
         persistTransactions(attempt.id, official)
         jdbc.update("UPDATE payments SET status='APPROVED',updated_at=now() WHERE id=? AND order_id=?", attempt.paymentId, attempt.orderId)
-        val stock = consumeOrReview(attempt.orderId)
+        val stock = consumeOrReview(attempt.orderId, attempt.id)
         val orderStatus = if (stock) "PAID" else "PAID_STOCK_REVIEW"
         jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=?", orderStatus, attempt.orderId)
         jdbc.update("UPDATE mp_checkout_attempts SET state='ACCREDITED',updated_at=now() WHERE id=?", attempt.id)
@@ -195,8 +195,8 @@ class MpOrderApplicationWorker(
         }
     }
 
-    private fun consumeOrReview(orderId: Long): Boolean {
-        val snapshot = jdbc.queryForObject("SELECT checkout_snapshot::text FROM orders WHERE id=? FOR UPDATE", String::class.java, orderId)
+    private fun consumeOrReview(orderId: Long, attemptId: Long): Boolean {
+        val snapshot = jdbc.queryForObject("SELECT checkout_snapshot::text FROM orders WHERE id=?", String::class.java, orderId)
             ?: return false
         val tree = mapper.readTree(snapshot)
         val sagaText = tree.path("reservationSagaKey").asText(null) ?: return false
@@ -204,7 +204,7 @@ class MpOrderApplicationWorker(
         val expectedLines = jdbc.queryForObject("SELECT COUNT(*) FROM order_items WHERE order_id=?", Int::class.java, orderId) ?: 0
         if (expectedLines <= 0) return false
         val reservations = jdbc.query(
-            "SELECT id,status,expires_at,variant_id,quantity FROM inventory_reservations WHERE reservation_saga_key=? FOR UPDATE",
+            "SELECT id,status,expires_at,variant_id,quantity FROM inventory_reservations WHERE reservation_saga_key=?",
             { rs, _ ->
                 ReservationRow(rs.getLong("id"), rs.getString("status"), rs.getTimestamp("expires_at")?.toInstant(), rs.getLong("variant_id"), rs.getInt("quantity"))
             },
@@ -212,28 +212,27 @@ class MpOrderApplicationWorker(
         )
         val usable = reservations.filter { it.status == "ACTIVE" && it.expiresAt != null && it.expiresAt.isAfter(java.time.Instant.now()) }
         if (usable.size == expectedLines) {
-            val consumed = inventory.consumeSaga(saga, "MP_ORDERS:$orderId")
+            val consumed = inventory.consumeSaga(saga, "MP_ORDERS:$orderId", orderId, attemptId)
             if (consumed != expectedLines) error("CONSUME_COUNT_MISMATCH")
             return true
         }
         val items = jdbc.query(
-            "SELECT variant_id,quantity FROM order_items WHERE order_id=?",
+            "SELECT variant_id,quantity FROM order_items WHERE order_id=? ORDER BY variant_id",
             { rs, _ -> rs.getLong("variant_id") to rs.getInt("quantity") },
             orderId,
         )
         items.forEach { (variantId, quantity) ->
             val balance = jdbc.query(
-                "SELECT available_quantity,safety_stock FROM inventory_balances WHERE variant_id=? FOR UPDATE",
+                "SELECT available_quantity,safety_stock FROM inventory_balances WHERE variant_id=?",
                 { rs, _ -> rs.getInt("available_quantity") to rs.getInt("safety_stock") },
                 variantId,
             ).firstOrNull() ?: return false
             if (balance.first - balance.second < quantity) return false
         }
         val newSaga = UUID.randomUUID()
-        items.forEach { (variantId, quantity) ->
-            inventory.reserve(newSaga, UUID.randomUUID(), variantId, quantity, "MP_ORDERS_RERESERVE:$orderId")
-        }
-        val consumed = inventory.consumeSaga(newSaga, "MP_ORDERS:$orderId")
+        val lines = items.map { (variantId, quantity) -> InventoryReserveLine(UUID.randomUUID(), variantId, quantity) }
+        inventory.reserveAll(newSaga, lines, "MP_ORDERS_RERESERVE:$orderId")
+        val consumed = inventory.consumeSaga(newSaga, "MP_ORDERS:$orderId", orderId, attemptId)
         if (consumed != expectedLines) error("CONSUME_COUNT_MISMATCH")
         return true
     }
@@ -253,6 +252,9 @@ class MpOrderApplicationWorker(
             inboxId, attempt.id, attempt.orderId, official.providerOrderId, "PAYMENT_$paymentStatus", official.paidAmount,
         ).firstOrNull()
         if (applicationId != null) emitVerified(applicationId, official, "PAYMENT_$paymentStatus")
+        sagaOf(attempt.orderId)?.let { saga ->
+            inventory.releaseSaga(saga, "MP_ORDERS:${attempt.orderId}", attempt.orderId, attempt.id)
+        }
         markProcessed(inboxId)
         return true
     }
@@ -335,6 +337,13 @@ class MpOrderApplicationWorker(
             "UPDATE mp_order_notification_processing SET status='PROCESSED',locked_by=NULL,lease_expires_at=NULL,last_error=NULL,updated_at=now() WHERE inbox_id=?",
             inboxId,
         )
+    }
+
+    private fun sagaOf(orderId: Long): UUID? {
+        val snapshot = jdbc.queryForObject("SELECT checkout_snapshot::text FROM orders WHERE id=?", String::class.java, orderId)
+            ?: return null
+        val text = mapper.readTree(snapshot).path("reservationSagaKey").asText(null) ?: return null
+        return runCatching { UUID.fromString(text) }.getOrNull()
     }
 
     private fun release(inboxId: Long) {

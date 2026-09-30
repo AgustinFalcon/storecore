@@ -7,6 +7,7 @@ class ProjectionSourceCause private constructor(val wire: String) {
 
     companion object {
         val WebReserve = ProjectionSourceCause("WEB_RESERVE")
+        val WebConsume = ProjectionSourceCause("WEB_CONSUME")
         val WebRelease = ProjectionSourceCause("WEB_RELEASE")
         val WebExpiry = ProjectionSourceCause("WEB_EXPIRY")
         val InternalAdjustment = ProjectionSourceCause("INTERNAL_ADJUSTMENT")
@@ -24,7 +25,7 @@ class ProjectionSourceCause private constructor(val wire: String) {
         val UpgradeQuarantine = ProjectionSourceCause("UPGRADE_QUARANTINE")
         val Unknown = ProjectionSourceCause("unknown")
         private val known = listOf(
-            WebReserve, WebRelease, WebExpiry, InternalAdjustment, ListingActivated,
+            WebReserve, WebConsume, WebRelease, WebExpiry, InternalAdjustment, ListingActivated,
             ListingMappingConfirmed, ListingRemapped, ListingPaused, ListingReactivated,
             ProductDeactivated, VariantDeactivated, ProductReactivated, VariantReactivated,
             AccountReactivated, CapabilityReactivated, UpgradeQuarantine,

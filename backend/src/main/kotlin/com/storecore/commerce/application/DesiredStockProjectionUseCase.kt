@@ -20,13 +20,13 @@ import java.security.MessageDigest
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class DesiredStockProjectionUseCase(
+open class DesiredStockProjectionUseCase(
     private val capabilities: CapabilityDecisionPort,
     private val listings: MarketplaceListingProjectionPort,
     private val outbox: ChannelStockOutboxPort,
 ) {
     @Transactional
-    fun project(variantIds: Collection<Long>, cause: ProjectionSourceCause, actor: CapabilityActor): List<DesiredStockProjectionResult> {
+    open fun project(variantIds: Collection<Long>, cause: ProjectionSourceCause, actor: CapabilityActor): List<DesiredStockProjectionResult> {
         if (cause === ProjectionSourceCause.Unknown) throw CommerceValidation("PROJECTION_CAUSE_UNKNOWN")
         val unique = variantIds.distinct().sorted()
         if (unique.isEmpty()) return emptyList()
