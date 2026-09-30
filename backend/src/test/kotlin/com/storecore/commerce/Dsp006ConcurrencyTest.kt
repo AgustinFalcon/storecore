@@ -8,14 +8,12 @@ import com.storecore.commerce.application.port.output.InventoryReserveLine
 import com.storecore.commerce.domain.ChannelAccountPurpose
 import com.storecore.commerce.domain.ChannelOutboxKind
 import com.storecore.commerce.domain.ListingLifecycleAction
-import com.storecore.commerce.domain.ProjectionSourceCause
 import com.storecore.commerce.infrastructure.JdbcChannelListingMappingAdapter
 import com.storecore.commerce.infrastructure.JdbcChannelStockOutboxAdapter
 import com.storecore.commerce.infrastructure.JdbcInventoryService
 import com.storecore.commerce.infrastructure.JdbcMarketplaceAccountSelector
 import com.storecore.commerce.infrastructure.JdbcMarketplaceListingProjectionAdapter
 import com.storecore.configuration.CapabilityAdminTestSupport
-import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
@@ -139,16 +137,10 @@ class Dsp006ConcurrencyTest {
             )!!
             assertEquals(1, stale)
             val errors = AtomicReference<Throwable?>(null)
-            val workers = (1..2).map {
+            val workers = listOf("WEB:dsp006-c", "WEB:dsp006-d").map { actorName ->
                 Thread {
                     try {
-                        transactions.executeWithoutResult {
-                            projection.project(
-                                listOf(variantId),
-                                ProjectionSourceCause.InternalAdjustment,
-                                CapabilityActor.Internal(actor()),
-                            )
-                        }
+                        inventory.adjust(variantId, -1, actorName, "overlap")
                     } catch (thrown: Throwable) {
                         errors.compareAndSet(null, thrown)
                     }
@@ -157,12 +149,14 @@ class Dsp006ConcurrencyTest {
             workers.forEach { it.start() }
             workers.forEach { it.join(8_000) }
             assertEquals(null, errors.get())
+            assertEquals(6, available(variantId))
             val after = jdbc.queryForObject(
                 "SELECT projection_version FROM channel_listing_stock_projection WHERE listing_id=?",
                 Long::class.java,
                 listingId,
             )!!
-            assertEquals(current, after)
+            assertEquals(4L, after)
+            assertTrue(after > current)
             assertEquals(1, jdbc.queryForObject(
                 """
                 SELECT COUNT(*) FROM channel_outbox o
@@ -173,6 +167,16 @@ class Dsp006ConcurrencyTest {
                 Int::class.java,
                 listingId,
                 ChannelOutboxKind.StockDesiredChanged.wire,
+            ))
+            assertEquals(3, jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM channel_outbox
+                WHERE listing_id=? AND kind=? AND projection_version < ?
+                """.trimIndent(),
+                Int::class.java,
+                listingId,
+                ChannelOutboxKind.StockDesiredChanged.wire,
+                after,
             ))
         } finally {
             disableMl()
@@ -234,49 +238,45 @@ class Dsp006ConcurrencyTest {
         assertTrue(timedOut.get())
         release.countDown()
         holder.join(5_000)
-        val heldAgain = CountDownLatch(1)
-        val releaseAgain = CountDownLatch(1)
-        val killId = AtomicReference<Long?>(null)
-        val killError = AtomicReference<Throwable?>(null)
-        val holder2 = Thread {
-            DriverManager.getConnection(postgres.jdbcUrl, runtimeLogin, runtimePassword).use { connection ->
-                connection.autoCommit = false
-                connection.createStatement().use { it.execute("SELECT public.marketplace_ml_sync_snapshot()") }
-                heldAgain.countDown()
-                assertTrue(releaseAgain.await(10, TimeUnit.SECONDS))
-                connection.commit()
-            }
+        val created = capabilities.createKill(
+            actor(),
+            "MARKETPLACE_ML",
+            "SYNC",
+            "ops",
+            "dsp006 freeze",
+            Instant.now().plusSeconds(3600),
+            "DSP006-TICKET",
+            UUID.randomUUID(),
+        )
+        val replaced = AtomicReference<Long>(created)
+        awaitBlockedOnSnapshot {
+            replaced.set(
+                capabilities.replaceKill(
+                    actor(),
+                    replaced.get(),
+                    "ops",
+                    "dsp006 replace",
+                    Instant.now().plusSeconds(7200),
+                    "DSP006-TICKET-R",
+                    UUID.randomUUID(),
+                ),
+            )
         }
-        holder2.start()
-        assertTrue(heldAgain.await(10, TimeUnit.SECONDS))
-        val killer = Thread {
-            try {
-                killId.set(
-                    capabilities.createKill(
-                        actor(),
-                        "MARKETPLACE_ML",
-                        "SYNC",
-                        "ops",
-                        "dsp006 freeze",
-                        Instant.now().plusSeconds(3600),
-                        "DSP006-TICKET",
-                        UUID.randomUUID(),
-                    ),
-                )
-            } catch (thrown: Throwable) {
-                killError.set(thrown)
-            }
+        awaitBlockedOnSnapshot {
+            capabilities.removeKill(actor(), replaced.get(), "dsp006 unfreeze", UUID.randomUUID())
         }
-        killer.start()
-        Thread.sleep(400)
-        assertTrue(killer.isAlive)
-        releaseAgain.countDown()
-        holder2.join(5_000)
-        killer.join(8_000)
-        assertEquals(null, killError.get())
-        val created = killId.get()
-        assertTrue(created != null && created > 0L)
-        capabilities.removeKill(actor(), created!!, "dsp006 unfreeze", UUID.randomUUID())
+        enableMl()
+        awaitBlockedOnSnapshot {
+            val version = jdbc.queryForObject(
+                "SELECT config_version FROM module_configurations WHERE module_code='MARKETPLACE_ML'",
+                Int::class.java,
+            )!!
+            capabilities.changeState(actor(), "MARKETPLACE_ML", CapabilityState.DISABLED, version, "dsp006 snapshot-disable", UUID.randomUUID())
+        }
+        assertEquals(
+            "DISABLED",
+            jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='MARKETPLACE_ML'", String::class.java),
+        )
     }
 
     @Test
@@ -344,6 +344,88 @@ class Dsp006ConcurrencyTest {
     }
 
     @Test
+    fun consumeReleaseExpiryRaceInverseMultiSkuReserve() {
+        val high = seedVariant("SKU-DSP006-CX", 40, 0, 0)
+        val low = seedVariant("SKU-DSP006-CL", 40, 0, 0)
+        val accountId = insertAccount("ml-sync-006cx", ChannelAccountPurpose.ExternalMlSync.wire)
+        val listingHigh = insertListing(accountId, high, "MLA-006-CX")
+        val listingLow = insertListing(accountId, low, "MLA-006-CL")
+        enableMl()
+        try {
+            val consumeSaga = UUID.randomUUID()
+            val releaseSaga = UUID.randomUUID()
+            inventory.reserveAll(
+                consumeSaga,
+                listOf(InventoryReserveLine(UUID.randomUUID(), high, 1), InventoryReserveLine(UUID.randomUUID(), low, 1)),
+                "WEB:dsp006-cx-seed",
+            )
+            inventory.reserveAll(
+                releaseSaga,
+                listOf(InventoryReserveLine(UUID.randomUUID(), high, 1), InventoryReserveLine(UUID.randomUUID(), low, 1)),
+                "WEB:dsp006-cx-unpaid",
+            )
+            jdbc.update(
+                """INSERT INTO inventory_reservations(variant_id,reservation_saga_key,reservation_line_key,quantity,status,expires_at,created_at)
+                   VALUES (?,?,?,1,'ACTIVE', now() - interval '1 minute', now() - interval '40 minutes')""",
+                high,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+            )
+            jdbc.update("UPDATE inventory_balances SET available_quantity=available_quantity-1, reserved_quantity=reserved_quantity+1 WHERE variant_id=?", high)
+            val errors = AtomicReference<Throwable?>(null)
+            val reserver = Thread {
+                try {
+                    inventory.reserveAll(
+                        UUID.randomUUID(),
+                        listOf(InventoryReserveLine(UUID.randomUUID(), low, 1), InventoryReserveLine(UUID.randomUUID(), high, 1)),
+                        "WEB:dsp006-cx-new",
+                    )
+                } catch (thrown: Throwable) {
+                    errors.compareAndSet(null, thrown)
+                }
+            }
+            val consumer = Thread {
+                try {
+                    inventory.consumeSaga(consumeSaga, "WEB:dsp006-cx-consume")
+                } catch (thrown: Throwable) {
+                    errors.compareAndSet(null, thrown)
+                }
+            }
+            val releaser = Thread {
+                try {
+                    inventory.releaseSaga(releaseSaga, "WEB:dsp006-cx-release")
+                } catch (thrown: Throwable) {
+                    errors.compareAndSet(null, thrown)
+                }
+            }
+            val expirer = Thread {
+                try {
+                    inventory.expireOverdue()
+                } catch (thrown: Throwable) {
+                    errors.compareAndSet(null, thrown)
+                }
+            }
+            listOf(reserver, consumer, releaser, expirer).forEach { it.start() }
+            listOf(reserver, consumer, releaser, expirer).forEach { it.join(20_000) }
+            assertEquals(null, errors.get())
+            assertEquals(38, available(high))
+            assertEquals(38, available(low))
+            assertEquals(1, candidateCount(listingHigh))
+            assertEquals(1, candidateCount(listingLow))
+            val highVersion = jdbc.queryForObject("SELECT projection_version FROM channel_listing_stock_projection WHERE listing_id=?", Long::class.java, listingHigh)!!
+            val highMaxOutbox = jdbc.queryForObject(
+                "SELECT MAX(projection_version) FROM channel_outbox WHERE listing_id=? AND kind=?",
+                Long::class.java,
+                listingHigh,
+                ChannelOutboxKind.StockDesiredChanged.wire,
+            )!!
+            assertEquals(highMaxOutbox, highVersion)
+        } finally {
+            disableMl()
+        }
+    }
+
+    @Test
     fun pauseDoesNotLeaveEmittedOnPausedListing() {
         val variantId = seedVariant("SKU-DSP006-PAUSE", 9, 0, 1)
         val accountId = insertAccount("ml-sync-006pause", ChannelAccountPurpose.ExternalMlSync.wire)
@@ -378,15 +460,15 @@ class Dsp006ConcurrencyTest {
             reserver.join(15_000)
             pauser.join(15_000)
             assertEquals(null, errors.get())
-            val state = jdbc.queryForObject("SELECT state FROM channel_listings WHERE id=?", String::class.java, listingId)
-            val projectionState = jdbc.queryForObject(
-                "SELECT projection_state FROM channel_listing_stock_projection WHERE listing_id=?",
-                String::class.java,
-                listingId,
+            assertEquals("PAUSED", jdbc.queryForObject("SELECT state FROM channel_listings WHERE id=?", String::class.java, listingId))
+            assertEquals(
+                "WITHHELD",
+                jdbc.queryForObject(
+                    "SELECT projection_state FROM channel_listing_stock_projection WHERE listing_id=?",
+                    String::class.java,
+                    listingId,
+                ),
             )
-            if (state == "PAUSED") {
-                assertEquals("WITHHELD", projectionState)
-            }
         } finally {
             disableMl()
         }
@@ -468,7 +550,13 @@ class Dsp006ConcurrencyTest {
                     assertTrue(it.next())
                     it.getString(1)
                 }
-                assertTrue(photo.contains("MARKETPLACE_ML"), photo)
+                val node = ObjectMapper().readTree(photo)
+                assertEquals("MARKETPLACE_ML", node.path("moduleCode").asText())
+                assertEquals("SYNC", node.path("actionCode").asText())
+                assertTrue(node.path("actionKind").asText().isNotBlank(), photo)
+                assertEquals("DISABLED", node.path("state").asText())
+                assertTrue(node.path("configVersion").asInt() >= 1, photo)
+                assertTrue(node.path("switches").isArray, photo)
                 assertFalse(
                     statement.executeQuery(
                         "SELECT has_table_privilege('storecore_runtime','public.module_configurations','UPDATE')",
@@ -535,6 +623,54 @@ class Dsp006ConcurrencyTest {
     }
 
     private fun actor() = InternalUserPrincipal(adminSession, adminId, setOf(InternalRole.ADMIN))
+
+    private fun candidateCount(listingId: Long): Int =
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*) FROM channel_outbox o
+            JOIN channel_listing_stock_projection p
+              ON p.listing_id = o.listing_id AND p.projection_version = o.projection_version
+            WHERE o.listing_id=? AND o.kind=?
+            """.trimIndent(),
+            Int::class.java,
+            listingId,
+            ChannelOutboxKind.StockDesiredChanged.wire,
+        )!!
+
+    private fun awaitBlockedOnSnapshot(block: () -> Unit) {
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val error = AtomicReference<Throwable?>(null)
+        val finished = AtomicBoolean(false)
+        val holder = Thread {
+            DriverManager.getConnection(postgres.jdbcUrl, runtimeLogin, runtimePassword).use { connection ->
+                connection.autoCommit = false
+                connection.createStatement().use { it.execute("SELECT public.marketplace_ml_sync_snapshot()") }
+                held.countDown()
+                assertTrue(release.await(10, TimeUnit.SECONDS))
+                connection.commit()
+            }
+        }
+        holder.start()
+        assertTrue(held.await(10, TimeUnit.SECONDS))
+        val worker = Thread {
+            try {
+                block()
+                finished.set(true)
+            } catch (thrown: Throwable) {
+                error.set(thrown)
+            }
+        }
+        worker.start()
+        Thread.sleep(400)
+        assertTrue(worker.isAlive)
+        assertFalse(finished.get())
+        release.countDown()
+        holder.join(8_000)
+        worker.join(8_000)
+        assertEquals(null, error.get())
+        assertTrue(finished.get())
+    }
 
     private fun available(variantId: Long): Int =
         jdbc.queryForObject("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId)!!
