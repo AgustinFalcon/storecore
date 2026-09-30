@@ -3,7 +3,6 @@ package com.storecore.blackstore
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
 import com.storecore.blackstore.application.port.PosCompanionGuardPort
-import com.storecore.blackstore.domain.CompanionScope
 import com.storecore.blackstore.domain.RequestHashAlgorithm
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.catalog.application.port.output.PriceQuotePort
@@ -34,6 +33,10 @@ class JdbcBlackStoreSagaEngine(
     private val readTx = TransactionTemplate(transactionManager).apply {
         isolationLevel = TransactionDefinition.ISOLATION_REPEATABLE_READ
         isReadOnly = true
+    }
+    private val deniedAuditTx = TransactionTemplate(transactionManager).apply {
+        isolationLevel = TransactionDefinition.ISOLATION_READ_COMMITTED
+        propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
     }
 
     override fun reserve(
@@ -130,10 +133,27 @@ class JdbcBlackStoreSagaEngine(
                 livePrice == null || PriceVersion.fromWire(line.priceVersion) !is PriceVersion.Quoted || line.priceVersion != livePrice.priceVersion.wire
             }
             if (catalogStale || priceStale) {
-                val decision = authorizeOverride(principal, quadruple, sorted, quoted, override, liveCatalog)
-                if (!decision) {
-                    deleteClaim(existing.id)
-                    return@execute TxOutcome(null, BlackStoreSagaException.stale())
+                when (val verdict = decideOverride(principal, quadruple, catalogVersion, sorted, quoted, override, liveCatalog, catalogStale)) {
+                    OverrideVerdict.Missing, OverrideVerdict.QuoteMissing, OverrideVerdict.CatalogUnproven -> {
+                        if (override != null) {
+                            persistDeniedAudit(principal, quadruple, catalogVersion, sorted, quoted, override, liveCatalog, verdict.reasonCode)
+                        }
+                        deleteClaim(existing.id)
+                        return@execute TxOutcome(null, BlackStoreSagaException.stale())
+                    }
+                    OverrideVerdict.ReasonInvalid, OverrideVerdict.RoleInvalid -> {
+                        persistDeniedAudit(principal, quadruple, catalogVersion, sorted, quoted, override, liveCatalog, verdict.reasonCode)
+                        deleteClaim(existing.id)
+                        return@execute TxOutcome(null, BlackStoreSagaException.validation())
+                    }
+                    OverrideVerdict.ScopeDenied -> {
+                        persistDeniedAudit(principal, quadruple, catalogVersion, sorted, quoted, override, liveCatalog, verdict.reasonCode)
+                        throw com.storecore.blackstore.application.BlackStoreForbidden()
+                    }
+                    OverrideVerdict.Allowed -> {
+                        companionGuard.authorizeForEffect(principal, "PRICE_OVERRIDE")
+                        auditOverride(principal, quadruple, catalogVersion, sorted, quoted, override, liveCatalog, "ALLOWED", "OVERRIDE_ACCEPTED")
+                    }
                 }
             }
             val failures = mutableListOf<BlackStoreLineFailure>()
@@ -631,28 +651,26 @@ class JdbcBlackStoreSagaEngine(
         }
     }
 
-    private fun authorizeOverride(
+    private fun decideOverride(
         principal: VerifiedCompanionPrincipal,
         quadruple: BlackStoreQuadruple,
+        catalogRequested: String,
         lines: List<BlackStoreReserveLine>,
         quoted: Map<Long, com.storecore.catalog.domain.PriceQuote>,
         override: PriceOverrideAttempt?,
         liveCatalog: String,
-    ): Boolean {
-        if (override == null) return false
-        val reason = override.reason.trim()
+        catalogStale: Boolean,
+    ): OverrideVerdict {
+        if (override == null) return OverrideVerdict.Missing
+        if (override.reason.trim().length !in 3..500) return OverrideVerdict.ReasonInvalid
         val role = override.declaredRole?.trim().orEmpty()
-        if (reason.length !in 3..500) {
-            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "REASON_INVALID")
-            throw BlackStoreSagaException.validation()
-        }
-        if (role.isNotEmpty() && role !in setOf("SUPERVISOR", "OWNER")) {
-            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "ROLE_INVALID")
-            throw BlackStoreSagaException.validation()
-        }
-        if (CompanionScope.PRICE_OVERRIDE !in principal.scopes) {
-            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "SCOPE_DENIED")
-            throw com.storecore.blackstore.application.BlackStoreForbidden()
+        if (role.isNotEmpty() && role !in setOf("SUPERVISOR", "OWNER")) return OverrideVerdict.RoleInvalid
+        try {
+            companionGuard.authorizeForEffect(principal, "PRICE_OVERRIDE")
+        } catch (_: com.storecore.blackstore.application.BlackStoreForbidden) {
+            return OverrideVerdict.ScopeDenied
+        } catch (_: com.storecore.blackstore.application.BlackStoreCapabilityDisabled) {
+            return OverrideVerdict.ScopeDenied
         }
         val quotesOwned = lines.all { line ->
             jdbc.queryForObject(
@@ -666,24 +684,62 @@ class JdbcBlackStoreSagaEngine(
                 line.priceVersion,
             )!! > 0
         }
-        if (!quotesOwned) {
-            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "QUOTE_NOT_OWNED")
-            return false
+        if (!quotesOwned) return OverrideVerdict.QuoteMissing
+        if (catalogStale && !catalogIssuedToCompanion(quadruple.clientInstanceId, catalogRequested)) {
+            return OverrideVerdict.CatalogUnproven
         }
-        auditOverride(principal, quadruple, lines, quoted, liveCatalog, "ALLOWED", "OVERRIDE_ACCEPTED")
-        return true
+        return OverrideVerdict.Allowed
+    }
+
+    private fun catalogIssuedToCompanion(clientInstanceId: UUID, catalogVersion: String): Boolean {
+        val cursors = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM blackstore_catalog_cursors WHERE client_instance_id=? AND catalog_version=?",
+            Int::class.java,
+            clientInstanceId,
+            catalogVersion,
+        ) ?: 0
+        val snapshots = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM blackstore_catalog_page_snapshots WHERE client_instance_id=? AND catalog_version=?",
+            Int::class.java,
+            clientInstanceId,
+            catalogVersion,
+        ) ?: 0
+        return cursors + snapshots > 0
+    }
+
+    private fun persistDeniedAudit(
+        principal: VerifiedCompanionPrincipal,
+        quadruple: BlackStoreQuadruple,
+        catalogRequested: String,
+        lines: List<BlackStoreReserveLine>,
+        quoted: Map<Long, com.storecore.catalog.domain.PriceQuote>,
+        override: PriceOverrideAttempt?,
+        liveCatalog: String,
+        reasonCode: String,
+    ) {
+        deniedAuditTx.execute {
+            auditOverride(principal, quadruple, catalogRequested, lines, quoted, override, liveCatalog, "DENIED", reasonCode)
+        }
     }
 
     private fun auditOverride(
         principal: VerifiedCompanionPrincipal,
         quadruple: BlackStoreQuadruple,
+        catalogRequested: String,
         lines: List<BlackStoreReserveLine>,
         quoted: Map<Long, com.storecore.catalog.domain.PriceQuote>,
+        override: PriceOverrideAttempt?,
         liveCatalog: String,
         result: String,
         reasonCode: String,
     ) {
-        val payload = """{"result":"$result","reasonCode":"$reasonCode","declaredRole":"${overrideRole(principal)}","catalogRequested":"${quadruple.operationId}","liveCatalog":"$liveCatalog","lines":${lines.size}}"""
+        val declaredRole = override?.declaredRole?.trim().orEmpty()
+        val reason = jsonEscape(override?.reason?.trim().orEmpty().take(200))
+        val lineJson = lines.joinToString(",", "[", "]") { line ->
+            val live = quoted[line.variantId]?.priceVersion?.wire.orEmpty()
+            """{"variantId":${line.variantId},"requested":"${jsonEscape(line.priceVersion)}","live":"${jsonEscape(live)}"}"""
+        }
+        val payload = """{"result":"$result","reasonCode":"$reasonCode","declaredRole":"${jsonEscape(declaredRole)}","serviceRole":"${jsonEscape(principal.serviceRole.wire)}","reason":"$reason","catalogRequested":"${jsonEscape(catalogRequested)}","liveCatalog":"${jsonEscape(liveCatalog)}","deviceId":"${jsonEscape(quadruple.deviceId)}","saleId":"${jsonEscape(quadruple.saleId)}","lines":$lineJson}"""
         jdbc.queryForObject(
             "SELECT public.storecore_blackstore_audit_override(?,?,?,?,?,?,?,?::jsonb)",
             Long::class.java,
@@ -698,7 +754,18 @@ class JdbcBlackStoreSagaEngine(
         )
     }
 
-    private fun overrideRole(principal: VerifiedCompanionPrincipal): String = principal.serviceRole.wire
+    private fun jsonEscape(raw: String): String =
+        raw.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", " ")
+
+    private enum class OverrideVerdict(val reasonCode: String) {
+        Missing(""),
+        ReasonInvalid("REASON_INVALID"),
+        RoleInvalid("ROLE_INVALID"),
+        ScopeDenied("SCOPE_DENIED"),
+        QuoteMissing("QUOTE_NOT_OWNED"),
+        CatalogUnproven("CATALOG_NOT_ISSUED"),
+        Allowed("OVERRIDE_ACCEPTED"),
+    }
 
     private fun actor(quadruple: BlackStoreQuadruple): String = "BLACKSTORE:${quadruple.clientInstanceId}"
 

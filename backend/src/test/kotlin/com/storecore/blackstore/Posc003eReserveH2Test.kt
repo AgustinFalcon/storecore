@@ -169,13 +169,150 @@ class Posc003eReserveH2Test {
         assertEquals("CATALOG_VERSION_STALE", assertThrows(BlackStoreSagaException::class.java) {
             engine.reserve(principal, BlackStoreQuadruple(client, "POS-E", "sale-stale", UUID.randomUUID()), "c1_" + "A".repeat(43), listOf(BlackStoreReserveLine(variantId, sku, 1, quote.priceVersion.wire)))
         }.message)
+        val deniedOp = UUID.randomUUID()
         assertThrows(BlackStoreForbidden::class.java) {
             engine.reserve(
                 principal,
-                BlackStoreQuadruple(client, "POS-E", "sale-ov", UUID.randomUUID()),
+                BlackStoreQuadruple(client, "POS-E", "sale-ov", deniedOp),
                 "c1_" + "B".repeat(43),
                 listOf(BlackStoreReserveLine(variantId, sku, 1, quote.priceVersion.wire)),
                 PriceOverrideAttempt("need override now", "SUPERVISOR"),
+            )
+        }
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_events WHERE event_type='BLACKSTORE_PRICE_OVERRIDE' AND reason_code='SCOPE_DENIED' AND correlation_id=?",
+                Int::class.java,
+                deniedOp,
+            ),
+        )
+        assertEquals(
+            "PENDING",
+            jdbc.queryForObject("SELECT state FROM blackstore_integration_operations WHERE operation_id=?", String::class.java, deniedOp),
+        )
+        val badReasonOp = UUID.randomUUID()
+        assertEquals("VALIDATION", assertThrows(BlackStoreSagaException::class.java) {
+            engine.reserve(
+                principal,
+                BlackStoreQuadruple(client, "POS-E", "sale-reason", badReasonOp),
+                "c1_" + "C".repeat(43),
+                listOf(BlackStoreReserveLine(variantId, sku, 1, quote.priceVersion.wire)),
+                PriceOverrideAttempt("no", "SUPERVISOR"),
+            )
+        }.message)
+        assertEquals(
+            1,
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_events WHERE event_type='BLACKSTORE_PRICE_OVERRIDE' AND reason_code='REASON_INVALID' AND correlation_id=?",
+                Int::class.java,
+                badReasonOp,
+            ),
+        )
+        assertEquals(
+            0,
+            jdbc.queryForObject(
+                "SELECT COUNT(*) FROM blackstore_integration_operations WHERE operation_id=?",
+                Int::class.java,
+                badReasonOp,
+            ),
+        )
+    }
+
+    @Test
+    fun catalogStaleWithLivePricesRequiresOverride() {
+        val sku = "SKU-STALE-${UUID.randomUUID()}".take(24)
+        val variantId = seedVariant(sku, 6)
+        val page = catalog.readPage(client, null, 200, false)
+        val item = page.items.single { it.variantId == variantId }
+        jdbc.update("UPDATE products SET name = name || 'x' WHERE id=(SELECT product_id FROM product_variants WHERE id=?)", variantId)
+        assertEquals("CATALOG_VERSION_STALE", assertThrows(BlackStoreSagaException::class.java) {
+            engine.reserve(
+                principal,
+                BlackStoreQuadruple(client, "POS-E", "sale-stale-live", UUID.randomUUID()),
+                page.catalogVersion,
+                listOf(BlackStoreReserveLine(variantId, sku, 1, item.priceVersion)),
+            )
+        }.message)
+    }
+
+    @Test
+    fun allowedOverrideUsesIssuedCatalogAndPersistsAudit() {
+        val sku = "SKU-ALW-${UUID.randomUUID()}".take(24)
+        val variantId = seedVariant(sku, 6)
+        val page = catalog.readPage(client, null, 200, false)
+        val item = page.items.single { it.variantId == variantId }
+        jdbc.update("UPDATE products SET name = name || 'x' WHERE id=(SELECT product_id FROM product_variants WHERE id=?)", variantId)
+        val withOverride = VerifiedCompanionPrincipal.of(
+            client,
+            principal.companionId,
+            principal.credentialId,
+            principal.credentialVersion,
+            CompanionServiceRole.SERVICE,
+            principal.scopes + CompanionScope.PRICE_OVERRIDE,
+            CompanionLifecycleStatus.ACTIVE,
+        )
+        try {
+            jdbc.update(
+                "UPDATE blackstore_companion_credentials SET scopes = array_append(scopes, 'price:override') WHERE token_fingerprint=?",
+                "e".repeat(64),
+            )
+            val q = BlackStoreQuadruple(client, "POS-E", "sale-allow", UUID.randomUUID())
+            val reserved = engine.reserve(
+                withOverride,
+                q,
+                page.catalogVersion,
+                listOf(BlackStoreReserveLine(variantId, sku, 1, item.priceVersion)),
+                PriceOverrideAttempt("supervisor matches issued quote", "SUPERVISOR"),
+            )
+            assertEquals("RESERVED", reserved.state)
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM audit_events WHERE event_type='BLACKSTORE_PRICE_OVERRIDE' AND reason_code='OVERRIDE_ACCEPTED' AND correlation_id=?",
+                    Int::class.java,
+                    q.operationId,
+                ),
+            )
+            val payload = jdbc.queryForObject(
+                "SELECT payload_redacted::text FROM audit_events WHERE correlation_id=? AND reason_code='OVERRIDE_ACCEPTED'",
+                String::class.java,
+                q.operationId,
+            )!!
+            assertTrue(payload.contains("SUPERVISOR"), payload)
+            assertTrue(payload.contains(page.catalogVersion), payload)
+            assertTrue(payload.contains("supervisor matches issued quote"), payload)
+            val unissuedOp = UUID.randomUUID()
+            assertEquals("CATALOG_VERSION_STALE", assertThrows(BlackStoreSagaException::class.java) {
+                engine.reserve(
+                    withOverride,
+                    BlackStoreQuadruple(client, "POS-E", "sale-unissued", unissuedOp),
+                    "c1_" + "D".repeat(43),
+                    listOf(BlackStoreReserveLine(variantId, sku, 1, item.priceVersion)),
+                    PriceOverrideAttempt("override without issued catalog", "OWNER"),
+                )
+            }.message)
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM audit_events WHERE event_type='BLACKSTORE_PRICE_OVERRIDE' AND reason_code='CATALOG_NOT_ISSUED' AND correlation_id=?",
+                    Int::class.java,
+                    unissuedOp,
+                ),
+            )
+            assertEquals(
+                0,
+                jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM blackstore_integration_operations WHERE operation_id=?",
+                    Int::class.java,
+                    unissuedOp,
+                ),
+            )
+        } finally {
+            jdbc.update(
+                "UPDATE blackstore_companion_credentials SET scopes = ?::text[] WHERE token_fingerprint=?",
+                "{catalog:read,stock:read,stock:reserve,stock:commit,stock:release}",
+                "e".repeat(64),
             )
         }
     }
