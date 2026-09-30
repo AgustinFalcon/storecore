@@ -3,7 +3,7 @@
   "stack_profile": "backend",
   "project_type": "production",
   "execution_strategy": "sequential_gated_cuts",
-  "status": "posc002_slices_complete_residuals_posc003_spec_approved",
+  "status": "posc003_slices_complete_posc004_in_progress",
   "stats": { "total": 9, "done": 3, "by_layer": { "1": 1, "2": 8 } },
   "tasks": [
     {
@@ -50,7 +50,7 @@
     {
       "id": "TASK-POSC-003",
       "title": "Portar catálogo, stock read y reserva Tx-A/Tx-B",
-      "status": "spec_approved",
+      "status": "slices_complete",
       "layer": 2,
       "depends_on": ["TASK-POSC-002"],
       "acceptance_criteria": ["Un handler por cada ruta portada", "Cursor/ETag/304 y stock sellable correctos", "Una cuádruple, una reserva y respuesta coherente en retries/concurrencia"],
@@ -59,13 +59,13 @@
         {"id":"TASK-POSC-003B","status":"merged","depends_on":["TASK-POSC-003A"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv18-sdd.md"},
         {"id":"TASK-POSC-003C","status":"merged","depends_on":["TASK-POSC-003B"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv19-sdd.md"},
         {"id":"TASK-POSC-003D","status":"merged","depends_on":["TASK-POSC-003C"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv20-sdd.md"},
-        {"id":"TASK-POSC-003E","status":"dual_approved_pending_pr","depends_on":["TASK-POSC-003D"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv21-sdd-r2.md"}
+        {"id":"TASK-POSC-003E","status":"merged","depends_on":["TASK-POSC-003D"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv21-sdd-r2.md"}
       ]
     },
     {
       "id": "TASK-POSC-004",
       "title": "Portar commit, release y GET/reconcile sobre adapter elegido",
-      "status": "blocked_by_predecessor_gate",
+      "status": "in_progress",
       "layer": 2,
       "depends_on": ["TASK-POSC-003"],
       "acceptance_criteria": ["Un solo STOCK_COMMIT_EXTERNAL y cero SALE en StoreCore", "Un handler por GET/reconcile y 410 tombstone; falta PIC-006A para certificar RO", "Bridge #52 conserva NOT_ELIGIBLE y cero LISTING_STOCK/desired_quantity directos nuevos"]
