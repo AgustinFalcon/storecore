@@ -8,8 +8,9 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003A — revisión de catálogo, audit port y triggers (SQL)
 
+- **Estado:** dual Grok 4.7 código APPROVED (`sdd/reviews/20260930-grok-prv17-sdd.md`, `prv17-scope.md`). V11 SHA-256 LF `39CAEFFD984446407687A2A351A93EB892179DE39C022ABB74DE1302F7287DC1`. Local `Posc003aCatalogRevisionTest` 5/5.
 - **Dependencia:** dual spec APPROVED. Siguiente versión Flyway libre (p.ej. `V11` si `flyway_schema_history` lo confirma); no reescribe V1–V10 ni capability.
-- **Ownership:** singleton `blackstore_catalog_revision`; triggers INSERT/UPDATE/DELETE en `products`, `product_variants`, `product_images`, `offers`, `offer_products`, `installation_settings`. Trigger: `UPDATE … SET revision=revision+1 WHERE id=1` (row lock) antes de completar el writer. Función `SECURITY DEFINER` `storecore_blackstore_audit_override` (`search_path=pg_catalog, pg_temp`) para `BLACKSTORE_PRICE_OVERRIDE` y `BLACKSTORE_CATALOG_SKU_EXCLUDED`. Runtime sin `INSERT` directo a `audit_events`.
+- **Ownership:** singleton `blackstore_catalog_revision`; triggers INSERT/UPDATE/DELETE en `products`, `product_variants`, `product_images`, `offers`, `offer_products`, `installation_settings`. Trigger: `UPDATE … SET revision=revision+1 WHERE id=1` (row lock) antes de completar el writer. `blackstore_catalog_revision_share()` SECURITY DEFINER (PG exige UPDATE para `FOR SHARE`; runtime no recibe UPDATE directo). Función `storecore_blackstore_audit_override` (`search_path=pg_catalog, pg_temp`) para `BLACKSTORE_PRICE_OVERRIDE` y `BLACKSTORE_CATALOG_SKU_EXCLUDED`. Runtime sin `INSERT` directo a `audit_events`.
 - **Aceptación:** writers estáticos incrementan revisión; rollback no deja revisión espuria; `inventory_balances` no dispara revisión; checksum pinneado; BLACKSTORE DISABLED; limpia + upgrade; preflight SKU >64 audita un evento por revisión. Prueba PG16 de deadlock/timeout: writer WEB + GET + Tx-B dummy + Tx-C capability concurrente no invierte locks.
 
 ## POSC-003B — `catalogVersion` / `priceVersion` y `PriceQuotePort`
