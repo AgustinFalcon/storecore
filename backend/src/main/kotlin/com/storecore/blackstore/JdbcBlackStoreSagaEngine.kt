@@ -299,12 +299,8 @@ class JdbcBlackStoreSagaEngine(
         return expired
     }
 
-    fun deleteStalePending(): Int = jdbc.update(
-        """
-        DELETE FROM blackstore_integration_operations
-        WHERE state='PENDING' AND receipt IS NULL AND created_at < now() - interval '60 seconds'
-        """.trimIndent(),
-    )
+    override fun deleteStalePending(): Int =
+        jdbc.queryForObject("SELECT public.storecore_blackstore_delete_stale_pending()", Int::class.java) ?: 0
 
     override fun get(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt = unwrapSaga {
         readTx.execute {
@@ -347,32 +343,21 @@ class JdbcBlackStoreSagaEngine(
     }
 
     fun purge(quadruple: BlackStoreQuadruple) {
-        tx.execute {
-            lockQuadruple(quadruple)
-            if (tombstoneExists(quadruple)) throw BlackStoreSagaException.retired()
-            val row = loadRow(quadruple, forUpdate = true) ?: throw BlackStoreSagaException.notFound()
-            if (row.state !in TERMINAL) throw BlackStoreSagaException.stateConflict()
-            if (row.updatedAt.isAfter(Instant.now().minus(Duration.ofDays(BlackStoreSagaPolicy.PURGE_AFTER_DAYS)))) {
-                throw BlackStoreSagaException("RETENTION_ACTIVE", 409, retryable = false)
+        unwrapSaga {
+            tx.execute {
+                try {
+                    jdbc.query(
+                        "SELECT public.storecore_blackstore_purge_terminal(?::uuid,?::varchar,?::varchar,?::uuid)",
+                        { _, _ -> },
+                        quadruple.clientInstanceId,
+                        quadruple.deviceId,
+                        quadruple.saleId,
+                        quadruple.operationId,
+                    )
+                } catch (ex: RuntimeException) {
+                    throw translateWorker(ex)
+                }
             }
-            jdbc.update(
-                """
-                INSERT INTO blackstore_integration_operation_tombstones(
-                  client_instance_id, device_id, sale_id, operation_id, request_hash, final_state,
-                  receipt, reservation_ref, retired_at, retention_until
-                ) VALUES (?,?,?,?,?,?,?,?, now(), now() + interval '7 years')
-                """.trimIndent(),
-                quadruple.clientInstanceId,
-                quadruple.deviceId,
-                quadruple.saleId,
-                quadruple.operationId,
-                row.requestHash,
-                row.state,
-                row.receipt,
-                row.reservationRef,
-            )
-            jdbc.update("DELETE FROM blackstore_integration_reservation_lines WHERE operation_pk=?", row.id)
-            jdbc.update("DELETE FROM blackstore_integration_operations WHERE id=?", row.id)
         }
     }
 
@@ -765,6 +750,19 @@ class JdbcBlackStoreSagaEngine(
         QuoteMissing("QUOTE_NOT_OWNED"),
         CatalogUnproven("CATALOG_NOT_ISSUED"),
         Allowed("OVERRIDE_ACCEPTED"),
+    }
+
+    private fun translateWorker(ex: Throwable): RuntimeException {
+        var current: Throwable? = ex
+        while (current != null) {
+            val message = current.message.orEmpty()
+            if (message.contains("OPERATION_RETIRED")) return BlackStoreSagaException.retired()
+            if (message.contains("NOT_FOUND")) return BlackStoreSagaException.notFound()
+            if (message.contains("OPERATION_STATE_CONFLICT")) return BlackStoreSagaException.stateConflict()
+            if (message.contains("RETENTION_ACTIVE")) return BlackStoreSagaException("RETENTION_ACTIVE", 409, retryable = false)
+            current = current.cause
+        }
+        return if (ex is RuntimeException) ex else RuntimeException(ex)
     }
 
     private fun actor(quadruple: BlackStoreQuadruple): String = "BLACKSTORE:${quadruple.clientInstanceId}"

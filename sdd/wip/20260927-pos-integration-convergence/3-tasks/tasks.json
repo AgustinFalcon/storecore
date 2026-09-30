@@ -65,7 +65,7 @@
     {
       "id": "TASK-POSC-004",
       "title": "Portar commit, release y GET/reconcile sobre adapter elegido",
-      "status": "dual_approved_pending_pr",
+      "status": "merged",
       "layer": 2,
       "depends_on": ["TASK-POSC-003"],
       "acceptance_criteria": ["Un solo STOCK_COMMIT_EXTERNAL y cero SALE en StoreCore", "Un handler por GET/reconcile y 410 tombstone; falta PIC-006A para certificar RO", "Bridge #52 conserva NOT_ELIGIBLE y cero LISTING_STOCK/desired_quantity directos nuevos"]
@@ -73,7 +73,7 @@
     {
       "id": "TASK-POSC-004A",
       "title": "Worker EXTERNAL_BLACKSTORE, retry/poison y purge con privilegio mínimo",
-      "status": "blocked_by_predecessor_gate",
+      "status": "dual_approved_pending_pr",
       "layer": 2,
       "depends_on": ["TASK-POSC-004"],
       "acceptance_criteria": ["WEB/PIC owner separados y carrera commit/expire/WEB sin doble descuento", "Purge tombstone >=7y antes de retry/lines/saga con rollback/race; ledger/audit intactos", "Worker-only función/rol y revocación DELETE runtime sin romper PENDING; ACL positiva/negativa PG16"]
