@@ -2,4 +2,4 @@
 
 ## Estado
 
-`in_progress`. 000A `#52` … 007 `#91` (`0f8b653`). TASK-DSP-008 dual prv34 APPROVED (`sdd/reviews/20260930-grok-prv34-sdd.md`, `sdd/reviews/20260930-grok-prv34-scope.md`). Merge 008 pendiente. Techo Flyway V18; siguiente libre V19. Sin dispatcher, red, secretos ni `sdd.finish`.
+`in_progress`. DAG 000A–008 `#92` (`246662a`) más follow-up de orden global (R01 prv35, R02 prv36 ambos APPROVED). `ChannelProjectionLockOrder` serializa lifecycle/remap con `acquireScope`. Suite combinada DSP Dsp000b–008 exit 0; `git diff --check` exit 0; no es CI verde. WIP abierto; sin dispatcher, red, secretos ni `sdd.finish`.

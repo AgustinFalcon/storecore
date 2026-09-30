@@ -4,6 +4,7 @@ import com.storecore.commerce.application.port.ChannelListingMappingPort
 import com.storecore.commerce.application.port.MarketplaceAccountSelectorPort
 import com.storecore.commerce.domain.ListingLifecycleAction
 import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.infrastructure.ChannelProjectionLockOrder
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.domain.InternalUserPrincipal
@@ -37,6 +38,8 @@ class ListingLifecycleUseCase(
             capabilities.decide("MARKETPLACE_ML", "SYNC", CapabilityActor.Internal(actor))
             accounts.requireExternalMlSync(accountId)
             val listingId = mappings.requireListingId(accountId, command.externalListingId, command.variationId)
+            val currentVariant = jdbc.queryForObject("SELECT variant_id FROM channel_listings WHERE id=?", Long::class.java, listingId)!!
+            ChannelProjectionLockOrder(jdbc).lock(accountId, listOf(currentVariant))
             val variantId = when (command.action) {
                 ListingLifecycleAction.Activate -> mappings.lockAndSetState(listingId, "ACTIVE", requireNoIntervention = true)
                 ListingLifecycleAction.Pause -> mappings.lockAndSetState(listingId, "PAUSED")
