@@ -2,10 +2,7 @@ package com.storecore.blackstore
 
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
-import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -53,24 +50,18 @@ class BlackStoreSchemaMigrationTest {
             Long::class.java,
         )!!
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            CapabilityState.ACTIVE,
-            version,
-            "testcontainers temporary active",
-            UUID.randomUUID(),
+        jdbc.update(
+            """UPDATE module_configurations
+               SET state='ACTIVE', config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+               WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            adminId,
         )
         capabilities.decide("BLACKSTORE_INTEGRATION", "STOCK_RESERVE", CapabilityActor.System)
-        val activeVersion = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            CapabilityState.DISABLED,
-            activeVersion,
-            "restore disabled baseline",
-            UUID.randomUUID(),
+        jdbc.update(
+            """UPDATE module_configurations
+               SET state='DISABLED', config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+               WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            adminId,
         )
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
         assertThrows(CapabilityDisabled::class.java) {

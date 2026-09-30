@@ -6,9 +6,6 @@ import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionResult
 import com.storecore.configuration.domain.CapabilityState
-import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -35,7 +32,6 @@ import java.util.concurrent.TimeUnit
 class BlackStoreHttpContractTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
-    @Autowired private val capabilities: JdbcCapabilityService,
     @Autowired private val worker: BlackStoreExpiryWorker,
     @Autowired private val mapper: ObjectMapper,
     @Autowired private val projectionBridge: LegacyBlackStoreProjectionBridgePort,
@@ -384,14 +380,12 @@ class BlackStoreHttpContractTest(
             Long::class.java,
         )!!
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            state,
-            version,
-            reason,
-            UUID.randomUUID(),
+        jdbc.update(
+            """UPDATE module_configurations
+               SET state=?, config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+               WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            state.name,
+            adminId,
         )
     }
 

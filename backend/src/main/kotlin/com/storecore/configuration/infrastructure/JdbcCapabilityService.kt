@@ -2,7 +2,14 @@ package com.storecore.configuration.infrastructure
 
 import com.storecore.configuration.application.CapabilityActionNotAllowed
 import com.storecore.configuration.application.CapabilityActorNotAuthorized
+import com.storecore.configuration.application.CapabilityAdminIntentMissing
+import com.storecore.configuration.application.CapabilityAdminPayloadConflict
+import com.storecore.configuration.application.CapabilityAdminPoolMissing
+import com.storecore.configuration.application.CapabilityAdminSessionDenied
+import com.storecore.configuration.application.CapabilityAdminCommandPort
 import com.storecore.configuration.application.CapabilityAdministrationPort
+import com.storecore.configuration.application.CapabilityCommandAborted
+import com.storecore.configuration.application.CapabilityException
 import com.storecore.configuration.application.CapabilityConfigInvalid
 import com.storecore.configuration.application.CapabilityConfigVersionConflict
 import com.storecore.configuration.application.CapabilityConfigurationMissing
@@ -16,22 +23,28 @@ import com.storecore.configuration.application.CapabilityPaused
 import com.storecore.configuration.application.CapabilityReadOnly
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityActionKind
+import com.storecore.configuration.domain.CapabilityAdminCommand
+import com.storecore.configuration.domain.CapabilityAdminOperation
 import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
+import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
-import javax.sql.DataSource
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDecisionPort, CapabilityAdministrationPort {
+open class JdbcCapabilityService(
+    private val jdbc: JdbcTemplate,
+    @Autowired(required = false) private val adminJdbc: CapabilityAdminJdbc? = null,
+) : CapabilityDecisionPort, CapabilityAdministrationPort, CapabilityAdminCommandPort {
     @Transactional(isolation = Isolation.REPEATABLE_READ)
     override fun decide(module: String, action: String, actor: CapabilityActor) {
         val kills = jdbc.queryForList(
@@ -91,7 +104,6 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         "SELECT module_code, state, config_version FROM module_configurations ORDER BY module_code",
     ) { rs, _ -> CapabilityModuleView(rs.getString("module_code"), CapabilityState.valueOf(rs.getString("state")), rs.getInt("config_version")) }
 
-    @Transactional
     override fun changeState(actor: InternalUserPrincipal, module: String, state: CapabilityState, expectedVersion: Int?, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles || reason.isBlank()) throw CapabilityActorNotAuthorized()
         if (state.name.contains("FLAG", ignoreCase = true)) throw CapabilityConfigInvalid()
@@ -99,59 +111,171 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "SELECT config_version FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
             Int::class.java, module,
         ) ?: throw CapabilityConfigurationMissing()
-        val configPayload = if (module == BLACKSTORE_MODULE) {
-            jdbc.queryForObject(
-                "SELECT config::text FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
-                String::class.java,
-                module,
-            ) ?: throw CapabilityConfigurationMissing()
-        } else {
-            "{}"
+        val command = CapabilityAdminCommand.ChangeState(correlation, module, expected, state, reason.trim())
+        admit(actor, command)
+        commit(actor, command)
+    }
+
+    override fun createKill(actor: InternalUserPrincipal, module: String, action: String, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
+        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+        val command = CapabilityAdminCommand.KillCreate(correlation, module, action, owner, reason, expiresAt, ticket)
+        admit(actor, command)
+        return killId(commit(actor, command))
+    }
+
+    override fun removeKill(actor: InternalUserPrincipal, expectedActiveId: Long, reason: String, correlation: UUID) {
+        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+        val module = jdbc.queryForObject(
+            "SELECT module_code FROM capability_kill_switches WHERE id=?",
+            String::class.java,
+            expectedActiveId,
+        ) ?: throw CapabilityKillSwitchVersionConflict()
+        val command = CapabilityAdminCommand.KillRemove(correlation, module, expectedActiveId, reason)
+        admit(actor, command)
+        commit(actor, command)
+    }
+
+    override fun replaceKill(actor: InternalUserPrincipal, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
+        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+        val module = jdbc.queryForObject(
+            "SELECT module_code FROM capability_kill_switches WHERE id=?",
+            String::class.java,
+            expectedActiveId,
+        ) ?: throw CapabilityKillSwitchVersionConflict()
+        val command = CapabilityAdminCommand.KillReplace(correlation, module, expectedActiveId, owner, reason, expiresAt, ticket)
+        admit(actor, command)
+        return killId(commit(actor, command))
+    }
+
+    override fun admit(actor: InternalUserPrincipal, command: CapabilityAdminCommand) {
+        if (command.operation is CapabilityAdminOperation.Unknown) throw CapabilityConfigInvalid()
+        val hash = command.requestHash()
+        val existing = jdbc.queryForList(
+            """SELECT actor_user_id, session_id, module_code, operation_code, request_hash
+               FROM capability_admin_intents WHERE correlation_id=?""",
+            command.correlation,
+        )
+        if (existing.isNotEmpty()) {
+            val row = existing.single()
+            val same = (row["actor_user_id"] as Number).toLong() == actor.userId &&
+                row["session_id"].toString() == actor.sessionId.toString() &&
+                row["module_code"] == command.module &&
+                row["operation_code"] == command.operation.wire &&
+                row["request_hash"] == hash
+            if (!same) throw CapabilityAdminPayloadConflict()
+            return
         }
-        try {
-            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.name, configPayload, correlation, reason.trim())
+        when (command) {
+            is CapabilityAdminCommand.ChangeState -> jdbc.update(
+                """INSERT INTO capability_admin_intents(
+                     correlation_id, actor_user_id, session_id, module_code, operation_code, request_hash,
+                     expected_config_version, next_state, reason)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                command.correlation, actor.userId, actor.sessionId, command.module, command.operation.wire, hash,
+                command.expectedConfigVersion, command.nextState.name, command.reason,
+            )
+            is CapabilityAdminCommand.KillCreate -> jdbc.update(
+                """INSERT INTO capability_admin_intents(
+                     correlation_id, actor_user_id, session_id, module_code, operation_code, request_hash,
+                     action_code, kill_owner, reason, expires_at, removal_ticket)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                command.correlation, actor.userId, actor.sessionId, command.module, command.operation.wire, hash,
+                command.action, command.owner, command.reason, Timestamp.from(command.expiresAt), command.ticket,
+            )
+            is CapabilityAdminCommand.KillReplace -> jdbc.update(
+                """INSERT INTO capability_admin_intents(
+                     correlation_id, actor_user_id, session_id, module_code, operation_code, request_hash,
+                     kill_owner, reason, expires_at, removal_ticket, expected_active_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                command.correlation, actor.userId, actor.sessionId, command.module, command.operation.wire, hash,
+                command.owner, command.reason, Timestamp.from(command.expiresAt), command.ticket, command.expectedActiveId,
+            )
+            is CapabilityAdminCommand.KillRemove -> jdbc.update(
+                """INSERT INTO capability_admin_intents(
+                     correlation_id, actor_user_id, session_id, module_code, operation_code, request_hash,
+                     reason, expected_active_id)
+                   VALUES (?,?,?,?,?,?,?,?)""",
+                command.correlation, actor.userId, actor.sessionId, command.module, command.operation.wire, hash,
+                command.reason, command.expectedActiveId,
+            )
+        }
+    }
+
+    override fun commit(actor: InternalUserPrincipal, command: CapabilityAdminCommand): String {
+        val admin = adminJdbc ?: throw CapabilityAdminPoolMissing()
+        return try {
+            val json = admin.jdbc.queryForObject(
+                "SELECT capability_tx_c_execute(?::uuid, ?, ?::uuid, ?)::text",
+                String::class.java,
+                command.correlation, actor.userId, actor.sessionId, command.module,
+            ) ?: throw CapabilityAdminIntentMissing()
+            interpret(command, json)
         } catch (exception: Exception) {
             throw mapAdminError(exception)
         }
     }
 
-    @Transactional
-    override fun createKill(actor: InternalUserPrincipal, module: String, action: String, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
-        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+    override fun commandStatus(actor: InternalUserPrincipal, correlation: UUID): String? {
+        val admin = adminJdbc ?: throw CapabilityAdminPoolMissing()
         return try {
-            jdbc.queryForObject(
-                "SELECT capability_admin_create_kill_switch(?,?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, module, action, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
-            ) ?: throw CapabilityActorNotAuthorized()
-        } catch (exception: Exception) { throw mapAdminError(exception) }
+            admin.jdbc.queryForObject(
+                "SELECT capability_tx_c_status(?::uuid, ?, ?::uuid)::text",
+                String::class.java,
+                correlation, actor.userId, actor.sessionId,
+            )
+        } catch (exception: Exception) {
+            throw mapAdminError(exception)
+        }
     }
 
-    @Transactional
-    override fun removeKill(actor: InternalUserPrincipal, expectedActiveId: Long, reason: String, correlation: UUID) {
-        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
-        try {
-            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?)", { _, _ -> }, actor.userId, expectedActiveId, reason, correlation)
-        } catch (exception: Exception) { throw mapAdminError(exception) }
+    override fun abortCommand(actor: InternalUserPrincipal, correlation: UUID): String {
+        val admin = adminJdbc ?: throw CapabilityAdminPoolMissing()
+        return try {
+            admin.jdbc.queryForObject(
+                "SELECT capability_tx_c_abort(?::uuid, ?, ?::uuid)::text",
+                String::class.java,
+                correlation, actor.userId, actor.sessionId,
+            ) ?: throw CapabilityCommandAborted()
+        } catch (exception: Exception) {
+            throw mapAdminError(exception)
+        }
     }
 
-    @Transactional
-    override fun replaceKill(actor: InternalUserPrincipal, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
-        if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
-        return try {
-            jdbc.queryForObject(
-                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
-            ) ?: throw CapabilityKillSwitchVersionConflict()
-        } catch (exception: Exception) { throw mapAdminError(exception) }
+    private fun interpret(command: CapabilityAdminCommand, json: String): String {
+        if (json.contains("ABORTED") && json.contains("status")) {
+            if (command is CapabilityAdminCommand.ChangeState) {
+                val current = jdbc.queryForObject(
+                    "SELECT config_version FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
+                    Int::class.java,
+                    command.module,
+                )
+                if (current != null && current != command.expectedConfigVersion) throw CapabilityConfigVersionConflict()
+                if (command.module == BLACKSTORE_MODULE) throw CapabilityConfigInvalid()
+            }
+            if (command is CapabilityAdminCommand.KillCreate || command is CapabilityAdminCommand.KillReplace || command is CapabilityAdminCommand.KillRemove) {
+                throw CapabilityKillSwitchVersionConflict()
+            }
+            throw CapabilityCommandAborted()
+        }
+        return json
+    }
+
+    private fun killId(json: String): Long {
+        val match = Regex("\"killSwitchId\"\\s*:\\s*(\\d+)").find(json) ?: throw CapabilityCommandAborted()
+        return match.groupValues[1].toLong()
     }
 
     private fun mapAdminError(exception: Exception): RuntimeException {
+        if (exception is CapabilityException) return exception
         val text = generateSequence(exception as Throwable) { it.cause }.mapNotNull { it.message }.joinToString(" ")
         return when {
             text.contains("CAPABILITY_CONFIG_VERSION_CONFLICT") -> CapabilityConfigVersionConflict()
             text.contains("CAPABILITY_ACTOR_NOT_AUTHORIZED") -> CapabilityActorNotAuthorized()
             text.contains("CAPABILITY_KILL_SWITCH_VERSION_CONFLICT") -> CapabilityKillSwitchVersionConflict()
-            text.contains("unsupported capability configuration schema") || text.contains("secret") || text.contains("flag") -> CapabilityConfigInvalid()
+            text.contains("CAPABILITY_PAYLOAD_CONFLICT") -> CapabilityAdminPayloadConflict()
+            text.contains("CAPABILITY_SESSION_DENIED") -> CapabilityAdminSessionDenied()
+            text.contains("CAPABILITY_INTENT_MISSING") -> CapabilityAdminIntentMissing()
+            text.contains("unsupported capability configuration schema") || text.contains("secret") || text.contains("flag") || text.contains("future optional") -> CapabilityConfigInvalid()
             else -> CapabilityConfigInvalid()
         }
     }

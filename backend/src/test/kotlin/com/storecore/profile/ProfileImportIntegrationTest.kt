@@ -3,7 +3,9 @@ package com.storecore.profile
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.infrastructure.JdbcProfileService
+import com.storecore.configuration.CapabilityAdminTestSupport
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.infrastructure.CapabilityAdminJdbc
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
@@ -126,8 +128,13 @@ class ProfileImportIntegrationTest {
                 Long::class.java, "profile-admin@example.com", hash,
             )!!
             jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code='ADMIN'", actorId)
-            actor = InternalUserPrincipal(UUID.randomUUID(), actorId, setOf(InternalRole.ADMIN))
-            val capabilities = JdbcCapabilityService(jdbc)
+            val sessionId = CapabilityAdminTestSupport.liveAdminSession(jdbc, actorId)
+            actor = InternalUserPrincipal(sessionId, actorId, setOf(InternalRole.ADMIN))
+            CapabilityAdminTestSupport.provisionLogin(postgres)
+            val adminJdbc = CapabilityAdminJdbc(
+                JdbcTemplate(DriverManagerDataSource(postgres.jdbcUrl, CapabilityAdminTestSupport.LOGIN, CapabilityAdminTestSupport.PASSWORD)),
+            )
+            val capabilities = JdbcCapabilityService(jdbc, adminJdbc)
             val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='PROFILE_CONTENT'", Int::class.java)!!
             capabilities.changeState(actor, "PROFILE_CONTENT", CapabilityState.ACTIVE, version, "profile import test", UUID.randomUUID())
             service = JdbcProfileService(jdbc, mapper, capabilities)
