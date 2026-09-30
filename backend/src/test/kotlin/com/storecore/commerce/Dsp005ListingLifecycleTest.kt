@@ -1,16 +1,19 @@
 package com.storecore.commerce
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.catalog.infrastructure.JdbcCatalogService
 import com.storecore.commerce.application.CreateListingMappingCommand
 import com.storecore.commerce.application.CreateListingMappingUseCase
 import com.storecore.commerce.application.DesiredStockProjectionUseCase
 import com.storecore.commerce.application.ListingLifecycleCommand
 import com.storecore.commerce.application.ListingLifecycleUseCase
+import com.storecore.commerce.application.port.output.EffectivePriceQueryPort
 import com.storecore.commerce.domain.ChannelAccountPurpose
 import com.storecore.commerce.domain.ChannelOutboxKind
 import com.storecore.commerce.domain.ListingLifecycleAction
 import com.storecore.commerce.infrastructure.JdbcChannelListingMappingAdapter
 import com.storecore.commerce.infrastructure.JdbcChannelStockOutboxAdapter
+import com.storecore.commerce.infrastructure.JdbcInventoryService
 import com.storecore.commerce.infrastructure.JdbcMarketplaceAccountSelector
 import com.storecore.commerce.infrastructure.JdbcMarketplaceListingProjectionAdapter
 import com.storecore.configuration.CapabilityAdminTestSupport
@@ -38,6 +41,7 @@ class Dsp005ListingLifecycleTest {
     private lateinit var capabilities: JdbcCapabilityService
     private lateinit var mapping: CreateListingMappingUseCase
     private lateinit var lifecycle: ListingLifecycleUseCase
+    private lateinit var catalog: JdbcCatalogService
     private lateinit var transactions: TransactionTemplate
     private var adminId: Long = 0
     private lateinit var adminSession: UUID
@@ -58,6 +62,10 @@ class Dsp005ListingLifecycleTest {
         val accounts = JdbcMarketplaceAccountSelector(jdbc)
         mapping = CreateListingMappingUseCase(capabilities, accounts, mappings, projection, jdbc, transactions)
         lifecycle = ListingLifecycleUseCase(capabilities, accounts, mappings, projection, jdbc, transactions)
+        val inventory = JdbcInventoryService(jdbc, transactions, projection)
+        catalog = JdbcCatalogService(jdbc, ObjectMapper(), inventory, transactions, object : EffectivePriceQueryPort {
+            override fun findBySkus(skus: Collection<String>) = emptyMap<String, com.storecore.commerce.domain.EffectivePrice>()
+        })
         val hash = Argon2PasswordHasher().hash("a-very-long-password".toCharArray())
         adminId = jdbc.queryForObject(
             "INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id",
@@ -95,6 +103,7 @@ class Dsp005ListingLifecycleTest {
             assertEquals("EMITTED", jdbc.queryForObject("SELECT projection_state FROM channel_listing_stock_projection WHERE listing_id=?", String::class.java, listingId))
             lifecycle.execute(actor(), ListingLifecycleCommand(accountId, "MLA-005", "", ListingLifecycleAction.Pause))
             assertEquals("PAUSED", jdbc.queryForObject("SELECT state FROM channel_listings WHERE id=?", String::class.java, listingId))
+            assertEquals("WITHHELD", jdbc.queryForObject("SELECT projection_state FROM channel_listing_stock_projection WHERE listing_id=?", String::class.java, listingId))
             assertEquals(1, stockOutbox(listingId))
             mapping.execute(actor(), CreateListingMappingCommand(accountId, "MLA-005", "", "SKU-DSP005-B"))
             assertEquals(true, jdbc.queryForObject("SELECT manual_intervention_required FROM channel_listings WHERE id=?", Boolean::class.java, listingId))
@@ -112,6 +121,61 @@ class Dsp005ListingLifecycleTest {
         }
         assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM channel_outbox WHERE kind='LISTING_STOCK'", Int::class.java))
+    }
+
+    @Test
+    fun saveProductDeliveryFailureRollsBackCatalogBalanceAndOutbox() {
+        val variantId = seedVariant("SKU-DSP005-RB", 6, 0, 1)
+        val accountId = insertAccount("ml-sync-005rb", ChannelAccountPurpose.ExternalMlSync.wire)
+        enableMl()
+        try {
+            mapping.execute(actor(), CreateListingMappingCommand(accountId, "MLA-005-RB", "", "SKU-DSP005-RB"))
+            lifecycle.execute(actor(), ListingLifecycleCommand(accountId, "MLA-005-RB", "", ListingLifecycleAction.Activate))
+            val listingId = jdbc.queryForObject("SELECT id FROM channel_listings WHERE external_listing_id='MLA-005-RB'", Long::class.java)!!
+            assertEquals(1, stockOutbox(listingId))
+            jdbc.execute(
+                """
+                CREATE OR REPLACE FUNCTION dsp005_fail_stock_delivery() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'}
+                BEGIN
+                  IF EXISTS (SELECT 1 FROM public.channel_outbox o WHERE o.id = NEW.outbox_id AND o.kind = 'STOCK_DESIRED_CHANGED') THEN
+                    RAISE EXCEPTION 'DSP005_DELIVERY_FAIL';
+                  END IF;
+                  RETURN NEW;
+                END;
+                ${'$'}${'$'}
+                """.trimIndent(),
+            )
+            jdbc.execute(
+                """
+                CREATE TRIGGER trg_dsp005_fail_stock_delivery
+                  BEFORE INSERT ON public.channel_outbox_delivery
+                  FOR EACH ROW EXECUTE FUNCTION dsp005_fail_stock_delivery()
+                """.trimIndent(),
+            )
+            val error = assertThrows(Exception::class.java) {
+                catalog.saveProduct(
+                    sku = "SKU-DSP005-RB",
+                    name = "RolledBack",
+                    description = "should not stick",
+                    brand = "Dsp005",
+                    category = "Dsp005",
+                    images = emptyList(),
+                    variants = listOf(mapOf("sku" to "SKU-DSP005-RB", "name" to "RolledBack", "availableQuantity" to 3, "stockAdjustmentReason" to "dsp005-rb")),
+                    price = mapOf("base" to 10),
+                    active = true,
+                    actor = adminId,
+                )
+            }
+            assertTrue(error.message.orEmpty().contains("DSP005_DELIVERY_FAIL") || error.cause?.message.orEmpty().contains("DSP005_DELIVERY_FAIL"), error.toString())
+            assertEquals("SKU-DSP005-RB", jdbc.queryForObject("SELECT name FROM products p JOIN product_variants v ON v.product_id=p.id WHERE v.id=?", String::class.java, variantId))
+            assertEquals(6, jdbc.queryForObject("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", Int::class.java, variantId))
+            assertEquals(1, stockOutbox(listingId))
+            assertEquals(5, jdbc.queryForObject("SELECT desired_quantity FROM channel_listing_stock_projection WHERE listing_id=?", Int::class.java, listingId))
+        } finally {
+            jdbc.execute("DROP TRIGGER IF EXISTS trg_dsp005_fail_stock_delivery ON public.channel_outbox_delivery")
+            jdbc.execute("DROP FUNCTION IF EXISTS dsp005_fail_stock_delivery()")
+            disableMl()
+        }
     }
 
     private fun stockOutbox(listingId: Long): Int =
