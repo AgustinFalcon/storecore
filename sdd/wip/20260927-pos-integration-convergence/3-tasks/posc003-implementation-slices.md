@@ -15,7 +15,8 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003B — `catalogVersion` / `priceVersion` y `PriceQuotePort`
 
-- **Dependencia:** 003A mergeado.
+- **Estado:** implementación local en `feature/posc003b-price-quote`. Tipos `c1_`/`p1_`, `PriceQuotePort`, intervalo `[starts_at, ends_at)`, `includeCost` → `FORBIDDEN`. Maven: `Posc003bCatalogVersionTest`, `Posc003bPriceQuoteTest`, `BlackStoreSagaEngineTest`, `CatalogEffectiveOfferTest` exit 0.
+- **Dependencia:** 003A mergeado (`6cc7ffa`).
 - **Ownership:** tipos cerrados `c1_`/`p1_`; un `PriceQuotePort`. Refactor de `JdbcEffectivePriceQueryAdapter` y filtro de ofertas en `CatalogService` al intervalo canónico `[starts_at, ends_at)` (`starts_at <= asOf < ends_at`). Storefront y POS/Tx-B usan el mismo selector.
 - **Aceptación:** oferta vigente = storefront; `asOf == ends_at` no aplica la oferta; empate `priority DESC,id ASC`; includeCost fail-closed; `COST_SCOPE_REQUIRED` no se emite.
 

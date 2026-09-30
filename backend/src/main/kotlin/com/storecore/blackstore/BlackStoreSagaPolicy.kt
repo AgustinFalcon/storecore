@@ -164,7 +164,7 @@ class BlackStoreSagaException(
         fun notFound() = BlackStoreSagaException("NOT_FOUND", 404, retryable = false)
         fun validation(code: String = "VALIDATION") = BlackStoreSagaException(code, 400, retryable = false)
         fun cursorExpired() = BlackStoreSagaException("CURSOR_EXPIRED", 410, retryable = false)
-        fun costForbidden() = BlackStoreSagaException("COST_SCOPE_REQUIRED", 403, retryable = false)
+        fun costForbidden() = BlackStoreSagaException("FORBIDDEN", 403, retryable = false)
         fun rateLimited(retryAfterSeconds: Int = 1) =
             BlackStoreSagaException("RATE_LIMITED", 429, retryable = true, retryAfterSeconds = retryAfterSeconds)
     }

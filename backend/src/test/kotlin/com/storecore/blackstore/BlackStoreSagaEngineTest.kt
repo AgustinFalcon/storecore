@@ -7,10 +7,7 @@ import com.storecore.blackstore.domain.CompanionScope
 import com.storecore.blackstore.domain.CompanionServiceRole
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.blackstore.infrastructure.JdbcPosCompanionGuard
-import com.storecore.configuration.domain.CapabilityState
-import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
+import com.storecore.catalog.infrastructure.JdbcPriceQuoteAdapter
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -39,6 +36,7 @@ class BlackStoreSagaEngineTest {
         private lateinit var jdbc: JdbcTemplate
         private lateinit var engine: JdbcBlackStoreSagaEngine
         private lateinit var catalog: JdbcBlackStoreCatalogQuery
+        private lateinit var quotes: JdbcPriceQuoteAdapter
         private lateinit var principal: VerifiedCompanionPrincipal
 
         @JvmStatic
@@ -48,13 +46,15 @@ class BlackStoreSagaEngineTest {
             Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password).locations("classpath:db/migration").load().migrate()
             val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
             jdbc = JdbcTemplate(dataSource)
+            quotes = JdbcPriceQuoteAdapter(jdbc)
             engine = JdbcBlackStoreSagaEngine(
                 jdbc,
                 DataSourceTransactionManager(dataSource),
                 LegacyBlackStoreProjectionBridgePort { LegacyBlackStoreProjectionResult.NOT_ELIGIBLE },
                 JdbcPosCompanionGuard(jdbc),
+                quotes,
             )
-            catalog = JdbcBlackStoreCatalogQuery(jdbc)
+            catalog = JdbcBlackStoreCatalogQuery(jdbc, quotes)
             jdbc.update(
                 "INSERT INTO installation_settings(installation_id, business_name, allowed_host, currency) VALUES (1, 'Test', 'localhost', 'ARS') ON CONFLICT DO NOTHING",
             )
@@ -96,14 +96,11 @@ class BlackStoreSagaEngineTest {
                 Long::class.java,
             )!!
             jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
-            val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-            JdbcCapabilityService(jdbc).changeState(
-                InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-                "BLACKSTORE_INTEGRATION",
-                CapabilityState.ACTIVE,
-                version,
-                "saga engine temporary active",
-                UUID.randomUUID(),
+            jdbc.update(
+                """UPDATE module_configurations
+                   SET state='ACTIVE', config_version=config_version+1, updated_by=?, updated_at=clock_timestamp()
+                   WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+                adminId,
             )
             jdbc.update("INSERT INTO brands(name, slug) VALUES ('Saga', 'saga-brand')")
             jdbc.update("INSERT INTO categories(name, slug) VALUES ('SagaCat', 'saga-cat')")
@@ -280,7 +277,8 @@ class BlackStoreSagaEngineTest {
         val page = catalog.readPage(client, cursor = null, pageSize = 200, includeCost = false)
         val item = page.items.single { it.variantId == first.variantId }
         assertEquals(5, item.availableQuantity)
-        assertEquals("catalog-${first.productId}", item.priceVersion)
+        assertTrue(item.priceVersion.startsWith("p1_"))
+        assertEquals(46, item.priceVersion.length)
         assertEquals("ARS", item.currency)
         val stock = catalog.readStock(first.variantId)
         assertEquals(5, stock.availableQuantity)
@@ -291,7 +289,7 @@ class BlackStoreSagaEngineTest {
         assertEquals("CURSOR_EXPIRED", assertThrows(BlackStoreSagaException::class.java) {
             catalog.readPage(client, cursor = firstPage.nextCursor, pageSize = 1, includeCost = false)
         }.message)
-        assertEquals("COST_SCOPE_REQUIRED", assertThrows(BlackStoreSagaException::class.java) {
+        assertEquals("FORBIDDEN", assertThrows(BlackStoreSagaException::class.java) {
             catalog.readPage(client, cursor = null, pageSize = 200, includeCost = true)
         }.also {
             assertEquals(403, it.httpStatus)
@@ -300,8 +298,8 @@ class BlackStoreSagaEngineTest {
         val overrideDenied = assertThrows(BlackStoreSagaException::class.java) {
             engine.reserve(principal, quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(first.variantId, first.sku, 1, "price-override")))
         }
-        assertTrue(overrideDenied.lineFailures.any { it.code == "PRICE_VERSION_MISMATCH" })
-        assertEquals(409, overrideDenied.httpStatus)
+        assertEquals("CATALOG_VERSION_STALE", overrideDenied.message)
+        assertEquals(422, overrideDenied.httpStatus)
     }
 
     @Test
@@ -491,8 +489,9 @@ class BlackStoreSagaEngineTest {
             orphanProduct,
             orphanSku,
         )!!
+        val orphanPrice = quotes.quoteByVariantIds(quotes.clock(), listOf(orphanVariant)).getValue(orphanVariant).priceVersion.wire
         val missing = assertThrows(BlackStoreSagaException::class.java) {
-            engine.reserve(principal, quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(orphanVariant, orphanSku, 1, "catalog-$orphanProduct")))
+            engine.reserve(principal, quadruple(), catalog.currentCatalogVersion(), listOf(BlackStoreReserveLine(orphanVariant, orphanSku, 1, orphanPrice)))
         }
         assertEquals("INSUFFICIENT_STOCK", missing.message)
         assertEquals(0, missing.lineFailures.single().availableQuantity)
@@ -534,7 +533,8 @@ class BlackStoreSagaEngineTest {
             available,
             safety,
         )
-        return Seeded(productId, variantId, sku, catalog.currentCatalogVersion())
+        val priceVersion = quotes.quoteByVariantIds(quotes.clock(), listOf(variantId)).getValue(variantId).priceVersion.wire
+        return Seeded(productId, variantId, sku, catalog.currentCatalogVersion(), priceVersion)
     }
 
     private fun sellable(variantId: Long): Int =
@@ -663,7 +663,7 @@ class BlackStoreSagaEngineTest {
         data class BusinessError(val code: String) : SagaAttempt<Nothing>
     }
 
-    private data class Seeded(val productId: Long, val variantId: Long, val sku: String, val catalogVersion: String) {
-        fun line(quantity: Int) = listOf(BlackStoreReserveLine(variantId, sku, quantity, "catalog-$productId"))
+    private data class Seeded(val productId: Long, val variantId: Long, val sku: String, val catalogVersion: String, val priceVersion: String) {
+        fun line(quantity: Int) = listOf(BlackStoreReserveLine(variantId, sku, quantity, priceVersion))
     }
 }

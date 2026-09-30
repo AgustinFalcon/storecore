@@ -55,7 +55,8 @@
       "depends_on": ["TASK-POSC-002"],
       "acceptance_criteria": ["Un handler por cada ruta portada", "Cursor/ETag/304 y stock sellable correctos", "Una cuádruple, una reserva y respuesta coherente en retries/concurrencia"],
       "implementation_slices": [
-        {"id":"TASK-POSC-003A","status":"pending_merge","depends_on":[],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv17-sdd.md"}
+        {"id":"TASK-POSC-003A","status":"merged","depends_on":[],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv17-sdd.md"},
+        {"id":"TASK-POSC-003B","status":"pending_merge","depends_on":["TASK-POSC-003A"],"plan_ref":"3-tasks/posc003-implementation-slices.md","evidence_ref":"sdd/reviews/20260930-grok-prv18-sdd.md"}
       ]
     },
     {

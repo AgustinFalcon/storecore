@@ -1,6 +1,7 @@
 package com.storecore.blackstore
 
 import com.storecore.blackstore.application.port.BlackStoreCatalogPort
+import com.storecore.catalog.application.port.output.PriceQuotePort
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -10,7 +11,10 @@ import java.time.Instant
 import java.util.UUID
 
 @Component
-class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCatalogPort {
+class JdbcBlackStoreCatalogQuery(
+    private val jdbc: JdbcTemplate,
+    private val quotes: PriceQuotePort,
+) : BlackStoreCatalogPort {
     override fun readPage(
         clientInstanceId: UUID,
         cursor: String?,
@@ -19,7 +23,9 @@ class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCat
     ): BlackStoreCatalogPage {
         if (includeCost) throw BlackStoreSagaException.costForbidden()
         val size = pageSize.coerceIn(1, BlackStoreSagaPolicy.CATALOG_PAGE_MAX)
-        val catalogVersion = currentCatalogVersion()
+        quotes.shareRevision()
+        val asOf = quotes.clock()
+        val catalogVersion = quotes.catalogVersion(asOf).wire
         val afterId = decodeCursor(clientInstanceId, catalogVersion, cursor)
         val rows = jdbc.query(
             """
@@ -50,6 +56,7 @@ class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCat
             size + 1,
         )
         val pageRows = rows.take(size)
+        val priced = quotes.quoteByVariantIds(asOf, pageRows.map { it.variantId })
         val next = rows.getOrNull(size)?.let { encodeAndStore(clientInstanceId, catalogVersion, pageRows.last().variantId) }
         val generatedAt = Instant.now()
         val imagesByProduct = if (pageRows.isEmpty()) {
@@ -81,8 +88,9 @@ class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCat
                     barcode = barcodeOf(row.attributes),
                     name = row.name,
                     images = imagesByProduct[row.productId].orEmpty(),
-                    unitPrice = row.basePrice,
-                    priceVersion = "catalog-${row.productId}",
+                    unitPrice = priced[row.variantId]?.effectivePrice ?: row.basePrice,
+                    priceVersion = priced[row.variantId]?.priceVersion?.wire
+                        ?: throw BlackStoreSagaException.validation("PRICE_QUOTE_MISSING"),
                     currency = currency,
                     availableQuantity = row.sellable,
                     active = row.active,
@@ -110,8 +118,10 @@ class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCat
         )
     }
 
-    fun currentCatalogVersion(): String =
-        jdbc.queryForObject("SELECT COALESCE(MAX(updated_at)::text, 'empty') FROM products", String::class.java)!!
+    fun currentCatalogVersion(): String {
+        quotes.shareRevision()
+        return quotes.catalogVersion(quotes.clock()).wire
+    }
 
     private fun decodeCursor(clientInstanceId: UUID, catalogVersion: String, cursor: String?): Long {
         if (cursor.isNullOrBlank()) return 0L

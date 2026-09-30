@@ -108,7 +108,7 @@ class BlackStoreHttpContractTest(
                 HttpEntity<Void>(clientHeaders()),
                 String::class.java,
             )
-            assertEnvelope(cost, 403, "COST_SCOPE_REQUIRED", retryable = false)
+            assertEnvelope(cost, 403, "FORBIDDEN", retryable = false)
 
             val stale = reserve(UUID.randomUUID(), catalogVersion = "stale-version", variantId = variant, priceVersion = priceVersion)
             assertEnvelope(stale, 422, "CATALOG_VERSION_STALE", retryable = false)
