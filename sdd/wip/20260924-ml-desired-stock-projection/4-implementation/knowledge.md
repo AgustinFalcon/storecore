@@ -1,6 +1,6 @@
 # Knowledge — proyección de stock deseado ML
 
-Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/AgustinFalcon/storecore/issues/49), TASK-DSP-009 [#96](https://github.com/AgustinFalcon/storecore/issues/96), SHA stamp [#98](https://github.com/AgustinFalcon/storecore/issues/98), residual release/expiry [#100](https://github.com/AgustinFalcon/storecore/issues/100). No reabrir issues 1–13 (tenancy SaaS superseded). Cada corte mergeado a `integration/storecore-int` queda en CHANGELOG y aquí. Hosted CI `steps=[]` no es pass. Sin dispatcher, live ML, grant `INSERT(variant_id)` ni `sdd.finish`.
+Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/AgustinFalcon/storecore/issues/49), TASK-DSP-009 [#96](https://github.com/AgustinFalcon/storecore/issues/96), SHA stamp [#98](https://github.com/AgustinFalcon/storecore/issues/98), residual release/expiry [#100](https://github.com/AgustinFalcon/storecore/issues/100), SHA stamp [#102](https://github.com/AgustinFalcon/storecore/issues/102). No reabrir issues 1–13 (tenancy SaaS superseded). Cada corte mergeado a `integration/storecore-int` queda en CHANGELOG y aquí. Hosted CI `steps=[]` no es pass. Sin dispatcher, live ML, grant `INSERT(variant_id)` ni `sdd.finish`.
 
 | Issue SDD | PR | SHA | Dual review | CHANGELOG |
 |---|---|---|---|---|
@@ -18,7 +18,7 @@ Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/
 | TASK-DSP-R01 / R02 | [#93](https://github.com/AgustinFalcon/storecore/pull/93) | `9ee37d7` | prv35 + prv36 | `ChannelProjectionLockOrder` |
 | suite local V3/Tx-C | [#94](https://github.com/AgustinFalcon/storecore/pull/94) | `b735a9a` | prv37 SDD+SCOPE APPROVED | fixtures SQL; V3 ML deny intacto |
 | TASK-DSP-009 | [#97](https://github.com/AgustinFalcon/storecore/pull/97) / issue [#96](https://github.com/AgustinFalcon/storecore/issues/96) | `8da8392` | prv39 SDD+SCOPE APPROVED | bridge local en la Tx de saga; V19 source_cause |
-| TASK-DSP-009 residual release/expiry | (PR al merge) / issue [#100](https://github.com/AgustinFalcon/storecore/issues/100) | (squash al merge) | prv pendiente | `Dsp009BlackStoreBridgeTest` release/expiry PENDING |
+| TASK-DSP-009 residual release/expiry | [#101](https://github.com/AgustinFalcon/storecore/pull/101) / issue [#100](https://github.com/AgustinFalcon/storecore/issues/100) | `7d576b3` | prv41 SDD+SCOPE APPROVED | `Dsp009BlackStoreBridgeTest` release/expiry PENDING |
 
 SHA stamp de `#97`: issue [#98](https://github.com/AgustinFalcon/storecore/issues/98) / PR [#99](https://github.com/AgustinFalcon/storecore/pull/99) (`41966d4`).
 
