@@ -26,4 +26,6 @@
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
 | Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`. PIC-001..010 y L3 locales done: HTTP 200/304/409/410/429 en Testcontainers, V7 deja `future_optional=false` y el módulo `DISABLED`, outbox local PIC-009. Companion live, fiscal y `/sdd.finish` NO-GO |
+| ML desired-stock local | `20260924-ml-desired-stock-projection` | DAG 14/14 en integración `#93` `9ee37d7`; PENDING local; dispatcher/live NO-GO; `4-implementation/knowledge.md` |
+| Contrato POS convergencia | `20260927-pos-integration-convergence` | 000–006 mergeados; 002 residual `INSERT(variant_id)`=false; live/fiscal NO-GO; `4-implementation/knowledge.md` |
 | POS BlackStore | repo `BlackStore` | ADP-001..010 + L3 locales en `master` (PR #1). Release disabled. Companion live NO-GO |

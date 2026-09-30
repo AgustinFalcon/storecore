@@ -5,3 +5,5 @@
 StoreCore metrics for this WIP count `PROJECTED`, `UNCHANGED`, `WITHHELD`, and `NO_LISTING`. They may also count withheld snapshots and the age of local PENDING rows. None of those numbers mean a remote publish succeeded. There is no dispatcher in this feature: PENDING is never advanced to SENT here.
 
 Logs emit outcome, listing id, and projection version. They must not include OAuth tokens, credentials, PII, sale payloads, or a claim of remote success.
+
+PR/SHA ledger: `sdd/wip/20260924-ml-desired-stock-projection/4-implementation/knowledge.md`. Pause vs reserve lock order: PR [#93](https://github.com/AgustinFalcon/storecore/pull/93) (`9ee37d7`).

@@ -9,6 +9,10 @@ import org.springframework.jdbc.core.JdbcTemplate
  * take listings before products/variants/balances.
  */
 class ChannelProjectionLockOrder(private val jdbc: JdbcTemplate) {
+    /**
+     * @param accountId listing account, locked before products
+     * @param variantIds candidates (remap passes previous and next); distinct+sorted
+     */
     fun lock(accountId: Long, variantIds: Collection<Long>) {
         jdbc.queryForObject("SELECT public.marketplace_ml_sync_snapshot()::text", String::class.java)
         jdbc.query("SELECT id FROM channel_accounts WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, accountId)
@@ -37,6 +41,7 @@ class ChannelProjectionLockOrder(private val jdbc: JdbcTemplate) {
         )
     }
 
+    /** Table names are compile-time literals (`products`, `product_variants`), never caller input. */
     private fun lockIds(table: String, ids: Collection<Long>) {
         val sorted = ids.distinct().sorted()
         if (sorted.isEmpty()) return
