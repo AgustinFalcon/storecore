@@ -51,8 +51,12 @@ class BlackStoreIntegrationController(
         @RequestHeader(value = "X-Device-Id", required = false) deviceId: String?,
         @RequestHeader(value = "X-Sale-Id", required = false) saleId: String?,
         @RequestHeader(value = "X-Operation-Id", required = false) operationId: String?,
+        @RequestHeader(value = "X-Override-Reason", required = false) overrideReason: String?,
+        @RequestHeader(value = "X-Actor-Role", required = false) overrideRole: String?,
         @RequestBody(required = false) body: BlackStoreReservationRequest?,
-    ): BaseResponse<*> = BaseResponse.ok(integration.reserve(principal(request), clientInstanceId, deviceId, saleId, operationId, body))
+    ): BaseResponse<*> = BaseResponse.ok(
+        integration.reserve(principal(request), clientInstanceId, deviceId, saleId, operationId, body, overrideReason, overrideRole),
+    )
 
     @PostMapping("/reservations/{reservationRef}/commit")
     fun commit(

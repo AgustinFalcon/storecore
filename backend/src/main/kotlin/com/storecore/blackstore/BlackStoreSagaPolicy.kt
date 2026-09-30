@@ -2,6 +2,7 @@ package com.storecore.blackstore
 
 import com.storecore.blackstore.application.BlackStoreIntegrationException
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Instant
@@ -50,6 +51,27 @@ internal object BlackStoreSagaPolicy {
         return MessageDigest.getInstance("SHA-256")
             .digest(canonical.toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    fun requestHashH2(catalogVersion: String, lines: List<BlackStoreReserveLine>): String {
+        val sha = MessageDigest.getInstance("SHA-256")
+        sha.update("BS-RESERVE-H2".toByteArray(StandardCharsets.UTF_8))
+        sha.update(0)
+        fun putString(value: String) {
+            val bytes = value.toByteArray(StandardCharsets.UTF_8)
+            sha.update(ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(bytes.size).array())
+            sha.update(bytes)
+        }
+        putString(catalogVersion.trim())
+        val ordered = lines.sortedBy { it.variantId }
+        sha.update(ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(ordered.size).array())
+        ordered.forEach { line ->
+            sha.update(ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putLong(line.variantId).array())
+            putString(line.sku.trim())
+            sha.update(ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(line.quantity).array())
+            putString(line.priceVersion.trim())
+        }
+        return sha.digest().joinToString("") { "%02x".format(it) }
     }
 
     fun receiptFor(quadruple: BlackStoreQuadruple): String =

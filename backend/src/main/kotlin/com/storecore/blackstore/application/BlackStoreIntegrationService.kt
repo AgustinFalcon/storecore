@@ -6,6 +6,7 @@ import com.storecore.blackstore.BlackStoreQuadruple
 import com.storecore.blackstore.BlackStoreRateLimiter
 import com.storecore.blackstore.BlackStoreReconcileResult
 import com.storecore.blackstore.BlackStoreReserveLine
+import com.storecore.blackstore.PriceOverrideAttempt
 import com.storecore.blackstore.BlackStoreSagaException
 import com.storecore.blackstore.BlackStoreSagaPolicy
 import com.storecore.blackstore.BlackStoreVariantStock
@@ -68,6 +69,8 @@ class BlackStoreIntegrationService(
         saleId: String?,
         operationId: String?,
         body: BlackStoreReservationRequest?,
+        overrideReason: String? = null,
+        overrideRole: String? = null,
     ): BlackStoreOperationReceipt {
         requireEnabled("STOCK_RESERVE")
         val quadruple = quadruple(clientInstanceId, deviceId, saleId, operationId)
@@ -88,7 +91,11 @@ class BlackStoreIntegrationService(
             BlackStoreReserveLine(line.variantId, sku, quantity, priceVersion)
         }
         if (lines.isEmpty()) throw BlackStoreSagaException.validation()
-        return saga.reserve(principal, quadruple, catalogVersion, lines)
+        if (lines.any { it.sku.length !in 1..64 }) throw BlackStoreSagaException.validation()
+        val override = overrideReason?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            PriceOverrideAttempt(it, overrideRole)
+        }
+        return saga.reserve(principal, quadruple, catalogVersion, lines, override)
     }
 
     fun commit(

@@ -3,6 +3,8 @@ package com.storecore.blackstore
 import com.storecore.blackstore.application.port.LegacyBlackStoreProjectionBridgePort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
 import com.storecore.blackstore.application.port.PosCompanionGuardPort
+import com.storecore.blackstore.domain.CompanionScope
+import com.storecore.blackstore.domain.RequestHashAlgorithm
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.catalog.application.port.output.PriceQuotePort
 import com.storecore.catalog.domain.PriceVersion
@@ -34,14 +36,20 @@ class JdbcBlackStoreSagaEngine(
         isReadOnly = true
     }
 
-    override fun reserve(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+    override fun reserve(
+        principal: VerifiedCompanionPrincipal,
+        quadruple: BlackStoreQuadruple,
+        catalogVersion: String,
+        lines: List<BlackStoreReserveLine>,
+        override: PriceOverrideAttempt?,
+    ): BlackStoreOperationReceipt {
         claimPending(principal, quadruple, catalogVersion, lines)
-        return finishReserve(principal, quadruple, catalogVersion, lines)
+        return finishReserve(principal, quadruple, catalogVersion, lines, override)
     }
 
     fun claimPending(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
         validateReserve(catalogVersion, lines)
-        val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
+        val requestHash = BlackStoreSagaPolicy.requestHashH2(catalogVersion, lines)
         return unwrapSaga {
         tx.execute {
             companionGuard.authorizeForEffect(principal, "STOCK_RESERVE")
@@ -52,7 +60,7 @@ class JdbcBlackStoreSagaEngine(
                 when (existing.state) {
                     "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
                     "EXPIRED" -> throw BlackStoreSagaException.expired()
-                    else -> if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                    else -> if (!hashMatches(existing, catalogVersion, lines)) throw BlackStoreSagaException.mismatch()
                 }
                 return@execute toReceipt(existing)
             }
@@ -60,14 +68,15 @@ class JdbcBlackStoreSagaEngine(
                 jdbc.update(
                     """
                     INSERT INTO blackstore_integration_operations(
-                      client_instance_id, device_id, sale_id, operation_id, request_hash, catalog_version, state
-                    ) VALUES (?,?,?,?,?,?, 'PENDING')
+                      client_instance_id, device_id, sale_id, operation_id, request_hash, request_hash_algorithm, catalog_version, state
+                    ) VALUES (?,?,?,?,?,?,?,'PENDING')
                     """.trimIndent(),
                     quadruple.clientInstanceId,
                     quadruple.deviceId,
                     quadruple.saleId,
                     quadruple.operationId,
                     requestHash,
+                    RequestHashAlgorithm.H2.wire,
                     catalogVersion,
                 )
             } catch (_: DuplicateKeyException) {
@@ -77,7 +86,7 @@ class JdbcBlackStoreSagaEngine(
                 when (raced.state) {
                     "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
                     "EXPIRED" -> throw BlackStoreSagaException.expired()
-                    else -> if (raced.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                    else -> if (!hashMatches(raced, catalogVersion, lines)) throw BlackStoreSagaException.mismatch()
                 }
                 return@execute toReceipt(raced)
             }
@@ -86,9 +95,14 @@ class JdbcBlackStoreSagaEngine(
         }
     }
 
-    fun finishReserve(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple, catalogVersion: String, lines: List<BlackStoreReserveLine>): BlackStoreOperationReceipt {
+    fun finishReserve(
+        principal: VerifiedCompanionPrincipal,
+        quadruple: BlackStoreQuadruple,
+        catalogVersion: String,
+        lines: List<BlackStoreReserveLine>,
+        override: PriceOverrideAttempt? = null,
+    ): BlackStoreOperationReceipt {
         validateReserve(catalogVersion, lines)
-        val requestHash = BlackStoreSagaPolicy.requestHash(catalogVersion, lines)
         val outcome = unwrapSaga {
         tx.execute {
             companionGuard.authorizeForEffect(principal, "STOCK_RESERVE")
@@ -99,32 +113,36 @@ class JdbcBlackStoreSagaEngine(
                 "COMMITTED", "RELEASED" -> throw BlackStoreSagaException.stateConflict()
                 "EXPIRED" -> throw BlackStoreSagaException.expired()
                 "RESERVED" -> {
-                    if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                    if (!hashMatches(existing, catalogVersion, lines)) throw BlackStoreSagaException.mismatch()
                     return@execute TxOutcome(toReceipt(existing), null)
                 }
-                "PENDING" -> if (existing.requestHash != requestHash) throw BlackStoreSagaException.mismatch()
+                "PENDING" -> if (!hashMatches(existing, catalogVersion, lines)) throw BlackStoreSagaException.mismatch()
                 else -> throw BlackStoreSagaException.stateConflict()
             }
             quotes.shareRevision()
             val asOf = quotes.clock()
-            if (quotes.catalogVersion(asOf).wire != catalogVersion) {
-                deleteClaim(existing.id)
-                return@execute TxOutcome(null, BlackStoreSagaException.stale())
-            }
+            val liveCatalog = quotes.catalogVersion(asOf).wire
             val sorted = lines.sortedBy { it.variantId }
             val quoted = quotes.quoteByVariantIds(asOf, sorted.map { it.variantId })
+            val catalogStale = liveCatalog != catalogVersion
+            val priceStale = sorted.any { line ->
+                val livePrice = quoted[line.variantId]
+                livePrice == null || PriceVersion.fromWire(line.priceVersion) !is PriceVersion.Quoted || line.priceVersion != livePrice.priceVersion.wire
+            }
+            if (catalogStale || priceStale) {
+                val decision = authorizeOverride(principal, quadruple, sorted, quoted, override, liveCatalog)
+                if (!decision) {
+                    deleteClaim(existing.id)
+                    return@execute TxOutcome(null, BlackStoreSagaException.stale())
+                }
+            }
             val failures = mutableListOf<BlackStoreLineFailure>()
             val locked = lockBalances(sorted.map { it.variantId })
             sorted.forEachIndexed { index, line ->
                 val stock = locked[line.variantId]
-                if (stock == null || stock.sku != line.sku) {
-                    failures += BlackStoreLineFailure(index, line.variantId, line.sku, line.quantity, 0, "VARIANT_NOT_FOUND")
-                    return@forEachIndexed
-                }
-                val livePrice = quoted[line.variantId]
-                if (livePrice == null || PriceVersion.fromWire(line.priceVersion) !is PriceVersion.Quoted || line.priceVersion != livePrice.priceVersion.wire) {
+                if (stock == null || stock.sku != line.sku || !stock.active || stock.sku.length !in 1..64) {
                     deleteClaim(existing.id)
-                    return@execute TxOutcome(null, BlackStoreSagaException.stale())
+                    return@execute TxOutcome(null, BlackStoreSagaException.validation())
                 }
                 val sellable = maxOf(0, stock.available - stock.safety)
                 if (line.quantity > sellable) {
@@ -133,12 +151,7 @@ class JdbcBlackStoreSagaEngine(
             }
             if (failures.isNotEmpty()) {
                 deleteClaim(existing.id)
-                val error = if (failures.any { it.code == "INSUFFICIENT_STOCK" }) {
-                    BlackStoreSagaException.insufficient(failures)
-                } else {
-                    BlackStoreSagaException("LINE_VALIDATION_FAILED", 409, retryable = false, lineFailures = failures)
-                }
-                return@execute TxOutcome(null, error)
+                return@execute TxOutcome(null, BlackStoreSagaException.insufficient(failures))
             }
             val reservationRef = BlackStoreSagaPolicy.reservationRefFor(quadruple)
             val receipt = BlackStoreSagaPolicy.receiptFor(quadruple)
@@ -457,7 +470,7 @@ class JdbcBlackStoreSagaEngine(
         return jdbc.query(
             """
             SELECT v.id AS variant_id, COALESCE(i.available_quantity, 0) AS available_quantity,
-                   COALESCE(i.safety_stock, 0) AS safety_stock, v.sku, p.id AS product_id
+                   COALESCE(i.safety_stock, 0) AS safety_stock, v.sku, v.active, p.id AS product_id, p.status
             FROM product_variants v
             JOIN products p ON p.id = v.product_id
             LEFT JOIN inventory_balances i ON i.variant_id = v.id
@@ -471,6 +484,7 @@ class JdbcBlackStoreSagaEngine(
                     available = rs.getInt("available_quantity"),
                     safety = rs.getInt("safety_stock"),
                     sku = rs.getString("sku"),
+                    active = rs.getBoolean("active") && rs.getString("status") == "ACTIVE",
                     productId = rs.getLong("product_id"),
                 )
             },
@@ -519,7 +533,7 @@ class JdbcBlackStoreSagaEngine(
         }
         return jdbc.query(
             """
-            SELECT id, request_hash, catalog_version, state, reservation_ref, receipt, expires_at, updated_at
+            SELECT id, request_hash, request_hash_algorithm, catalog_version, state, reservation_ref, receipt, expires_at, updated_at
             FROM blackstore_integration_operations
             WHERE client_instance_id=? AND device_id=? AND sale_id=? AND operation_id=?
             $suffix
@@ -528,6 +542,7 @@ class JdbcBlackStoreSagaEngine(
                 OperationRow(
                     id = rs.getLong("id"),
                     requestHash = rs.getString("request_hash"),
+                    algorithm = RequestHashAlgorithm.fromWire(rs.getString("request_hash_algorithm")),
                     catalogVersion = rs.getString("catalog_version"),
                     state = rs.getString("state"),
                     reservationRef = rs.getObject("reservation_ref", UUID::class.java),
@@ -590,11 +605,100 @@ class JdbcBlackStoreSagaEngine(
     private fun validateReserve(catalogVersion: String, lines: List<BlackStoreReserveLine>) {
         if (catalogVersion.isBlank() || catalogVersion.length > 64) throw BlackStoreSagaException.validation()
         if (lines.isEmpty() || lines.size > 200) throw BlackStoreSagaException.validation()
-        if (lines.map { it.variantId }.distinct().size != lines.size) throw BlackStoreSagaException.validation("DUPLICATE_VARIANT")
+        if (lines.map { it.variantId }.distinct().size != lines.size) throw BlackStoreSagaException.validation()
         lines.forEach { line ->
-            if (line.quantity < 1 || line.sku.isBlank() || line.priceVersion.isBlank()) throw BlackStoreSagaException.validation()
+            if (line.quantity < 1 || line.sku.isBlank() || line.sku.length !in 1..64 || line.priceVersion.isBlank()) {
+                throw BlackStoreSagaException.validation()
+            }
         }
     }
+
+    private fun hashMatches(row: OperationRow, catalogVersion: String, lines: List<BlackStoreReserveLine>): Boolean {
+        return when (row.algorithm) {
+            RequestHashAlgorithm.H2 -> row.requestHash.equals(BlackStoreSagaPolicy.requestHashH2(catalogVersion, lines), ignoreCase = true)
+            RequestHashAlgorithm.H1 -> {
+                if (!row.requestHash.equals(BlackStoreSagaPolicy.requestHash(catalogVersion, lines), ignoreCase = true)) return false
+                if (row.state != "RESERVED" && row.state != "COMMITTED") return true
+                val stored = loadLines(row.id)
+                stored.size == lines.size && stored.all { saved ->
+                    lines.any { line ->
+                        line.variantId == saved.variantId && line.sku == saved.sku &&
+                            line.quantity == saved.quantity && line.priceVersion == saved.priceVersion
+                    }
+                }
+            }
+            is RequestHashAlgorithm.Unknown -> false
+        }
+    }
+
+    private fun authorizeOverride(
+        principal: VerifiedCompanionPrincipal,
+        quadruple: BlackStoreQuadruple,
+        lines: List<BlackStoreReserveLine>,
+        quoted: Map<Long, com.storecore.catalog.domain.PriceQuote>,
+        override: PriceOverrideAttempt?,
+        liveCatalog: String,
+    ): Boolean {
+        if (override == null) return false
+        val reason = override.reason.trim()
+        val role = override.declaredRole?.trim().orEmpty()
+        if (reason.length !in 3..500) {
+            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "REASON_INVALID")
+            throw BlackStoreSagaException.validation()
+        }
+        if (role.isNotEmpty() && role !in setOf("SUPERVISOR", "OWNER")) {
+            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "ROLE_INVALID")
+            throw BlackStoreSagaException.validation()
+        }
+        if (CompanionScope.PRICE_OVERRIDE !in principal.scopes) {
+            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "SCOPE_DENIED")
+            throw com.storecore.blackstore.application.BlackStoreForbidden()
+        }
+        val quotesOwned = lines.all { line ->
+            jdbc.queryForObject(
+                """
+                SELECT COUNT(*) FROM blackstore_price_quotes
+                 WHERE client_instance_id=? AND variant_id=? AND price_version=? AND expires_at > clock_timestamp()
+                """.trimIndent(),
+                Int::class.java,
+                quadruple.clientInstanceId,
+                line.variantId,
+                line.priceVersion,
+            )!! > 0
+        }
+        if (!quotesOwned) {
+            auditOverride(principal, quadruple, lines, quoted, liveCatalog, "DENIED", "QUOTE_NOT_OWNED")
+            return false
+        }
+        auditOverride(principal, quadruple, lines, quoted, liveCatalog, "ALLOWED", "OVERRIDE_ACCEPTED")
+        return true
+    }
+
+    private fun auditOverride(
+        principal: VerifiedCompanionPrincipal,
+        quadruple: BlackStoreQuadruple,
+        lines: List<BlackStoreReserveLine>,
+        quoted: Map<Long, com.storecore.catalog.domain.PriceQuote>,
+        liveCatalog: String,
+        result: String,
+        reasonCode: String,
+    ) {
+        val payload = """{"result":"$result","reasonCode":"$reasonCode","declaredRole":"${overrideRole(principal)}","catalogRequested":"${quadruple.operationId}","liveCatalog":"$liveCatalog","lines":${lines.size}}"""
+        jdbc.queryForObject(
+            "SELECT public.storecore_blackstore_audit_override(?,?,?,?,?,?,?,?::jsonb)",
+            Long::class.java,
+            "BLACKSTORE_PRICE_OVERRIDE",
+            "COMPANION",
+            principal.clientInstanceId.toString(),
+            "BLACKSTORE_OPERATION",
+            0L,
+            quadruple.operationId,
+            reasonCode,
+            payload,
+        )
+    }
+
+    private fun overrideRole(principal: VerifiedCompanionPrincipal): String = principal.serviceRole.wire
 
     private fun actor(quadruple: BlackStoreQuadruple): String = "BLACKSTORE:${quadruple.clientInstanceId}"
 
@@ -617,6 +721,7 @@ class JdbcBlackStoreSagaEngine(
 
     private data class OperationRow(
         val id: Long,
+        val algorithm: RequestHashAlgorithm,
         val requestHash: String,
         val catalogVersion: String,
         val state: String,
@@ -643,6 +748,7 @@ class JdbcBlackStoreSagaEngine(
         val available: Int,
         val safety: Int,
         val sku: String,
+        val active: Boolean,
         val productId: Long,
     )
 
