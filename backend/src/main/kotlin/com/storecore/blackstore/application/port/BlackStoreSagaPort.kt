@@ -20,5 +20,6 @@ interface BlackStoreSagaPort {
     fun get(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt
     fun reconcile(principal: VerifiedCompanionPrincipal, knownReceipts: List<String>): BlackStoreReconcileResult
     fun expireDue(limit: Int = 100): Int
+    fun deleteStalePending(): Int
     fun purgeDue(limit: Int = 100): Int
 }

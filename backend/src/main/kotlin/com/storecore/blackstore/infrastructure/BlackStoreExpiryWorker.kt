@@ -9,6 +9,9 @@ class BlackStoreExpiryWorker(private val integration: BlackStoreIntegrationServi
     @Scheduled(fixedDelayString = "\${storecore.blackstore.expiry-interval-ms:30000}")
     fun expireReserved(): Int = integration.expireDue()
 
+    @Scheduled(fixedDelayString = "\${storecore.blackstore.pending-drain-interval-ms:30000}")
+    fun drainStalePending(): Int = integration.drainStalePending()
+
     @Scheduled(fixedDelayString = "\${storecore.blackstore.purge-interval-ms:3600000}")
     fun purgeTerminal(): Int = integration.purgeDue()
 }

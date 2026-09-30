@@ -70,6 +70,7 @@ class BlackStoreIntegrationServiceTest {
             service.reconcile(principal, client, BlackStoreReconcileRequest(listOf("r1")))
         }
         assertEquals(0, service.expireDue())
+        assertEquals(0, service.drainStalePending())
         assertEquals(0, service.purgeDue())
         assertEquals(0, limiter.checks)
         assertEquals(0, catalog.calls)
@@ -203,6 +204,11 @@ class BlackStoreIntegrationServiceTest {
         }
 
         override fun expireDue(limit: Int): Int {
+            calls += 1
+            return 1
+        }
+
+        override fun deleteStalePending(): Int {
             calls += 1
             return 1
         }

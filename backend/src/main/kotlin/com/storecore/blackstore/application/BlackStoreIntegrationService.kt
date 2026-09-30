@@ -166,6 +166,8 @@ class BlackStoreIntegrationService(
 
     fun expireDue(): Int = runWhenEnabled("STOCK_RELEASE") { saga.expireDue() }
 
+    fun drainStalePending(): Int = runWhenEnabled("STOCK_RELEASE") { saga.deleteStalePending() }
+
     fun purgeDue(): Int = runWhenEnabled("STOCK_READ") { saga.purgeDue() }
 
     private fun runWhenEnabled(action: String, body: () -> Int): Int =
