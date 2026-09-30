@@ -4,7 +4,7 @@
 
 ## POSC-004 — commit, release, GET, reconcile
 
-- **Estado:** implementación local en `feature/posc004-commit-release`. Maven `Posc004CommitReleaseTest,BlackStoreSagaEngineTest` exit 0. Dual Grok prv22 pendiente.
+- **Estado:** dual Grok 4.7 prv22 APPROVED (`sdd/reviews/20260930-grok-prv22-sdd.md`, `prv22-scope.md`) @ `11a8a3c`. PR pendiente. P1 no bloqueantes: GET 410 y deadlock 409 no están en el test nuevo (sí en `BlackStoreSagaEngineTest`). No es merge ni CI verde. No desbloquea 004A.
 - **Dependencia:** 003E mergeado (`1f81f1f`).
 - **Ownership:** un handler por `POST /reservations/{reservationRef}/commit`, `POST …/release`, `GET /operations/{operationId}`, `POST /operations/reconcile`. El engine ya porta Tx-B commit/release y lecturas; este corte prueba y cierra el contrato sobre V13, sin worker.
 - **Aceptación:** exactamente un `STOCK_COMMIT_EXTERNAL` por línea y cero `SALE` en canal `EXTERNAL_BLACKSTORE`; replay de commit/release no mueve saldo ni ledger; `reservationRef` de path debe coincidir con la cuádruple; GET PENDING 200, ausente 404, tombstone 410; reconcile 0/501 → 400, 1..500 con duplicados aceptados/deduplicados; deadlock/timeout → 409 `CONFLICT`; bridge `#52` sigue `NOT_ELIGIBLE` (cero `desired_quantity` / `LISTING_STOCK` nuevos). PIC-006A no se acredita (RO proxy Spring queda después de 004A).
