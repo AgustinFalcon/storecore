@@ -48,7 +48,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002F — matriz de aceptación y regresión
 
-- **Estado local:** matriz test-only en `feature/posc002f-acceptance-matrix`. Cubre checksums V1–V10 + upgrade con filas, revoke Tx-A/Tx-B, kill reserve/commit/release, GET tras DISABLE, cursor UPSERT, ownership HTTP 404/unknown, grants residual INSERT(variant_id)=false, ocho rutas pinneadas y ML RR NO-GO. CSRF/nueve comandos companion HTTP y Tx-S capability quedan residuales de 002B/002C (sin controller). Sin código comercial nuevo.
+- **Estado:** merge PR #70 (`bfdfb88`) con dual Grok 4.7 APPROVED. Matriz test-only: checksums V1–V10 + upgrade con filas, revoke Tx-A/Tx-B, kill reserve/commit/release, GET tras DISABLE, cursor UPSERT, ownership HTTP 404/unknown, grants residual INSERT(variant_id)=false, ocho rutas pinneadas y ML RR NO-GO. CSRF/nueve comandos companion HTTP y Tx-S capability quedan residuales de 002B/002C (sin controller). Sin código comercial nuevo.
 - **Dependencias:** 002B–002E integrados sobre un mismo head.
 - **Ownership:** tests PG16 Testcontainers y HTTP loopback, sin código comercial nuevo.
 - **Aceptación:** clean+upgrade V1–V7 con filas; diff de datos/grants/checksums; roles runtime/admin/migrator/ajeno reales; cursor UPSERT, inventory_balances INSERT(variant_id), catálogo/ajuste stock y WEB/ML sin regresión. Cubre bearer, provider outage, scopes, nueve comandos admin, CSRF, replay, revocación y kill contra Tx-A/Tx-B/commit/release, read RR y ownership A→B. No hay claim/ledger/stock al denegar; no doble descuento; digest YAML y mapa de ocho rutas sin duplicados. ML RR admin-wins se registra como gate separado NO-GO, sin convertir este test POS en su aprobación.
@@ -56,6 +56,7 @@ Cada PR apunta a integration/storecore-int y contiene evidencia local del SHA fi
 
 ## POSC-002G — rollout y transferencia al siguiente corte
 
-- **Dependencia:** 002F sin P0–P2 abiertos.
+- **Estado local:** runbook en `4-implementation/posc002g-rollout-runbook.md`. Documenta PRs #66–#70, preflight/backup, ventana V3 ya cerrada en V8, pools/provider por referencia (aún no en `application.yml`), rollback y observabilidad. Companion permanece DISABLED. Apagar/revocar/PENDING está demostrado en tests 002E/002F, no como HTTP de operador. **No** declara POSC-002 done ni desbloquea POSC-003: residuales 002B HTTP/Tx-S y 002C admin HTTP/provider siguen abiertos.
+- **Dependencia:** 002F sin P0–P2 abiertos (PR #70).
 - **Ownership:** runbook de instalación por VM, configuración del provider/pool admin por referencia, backup/preflight, ventana de cambio para V3, rollback operativo y observabilidad sin secretos.
 - **Aceptación:** companion sigue DISABLED tras migrar; capacidad de apagar, revocar y recuperar PENDING demostrada. Se registra qué PR/SHA instaló el delta shared y cuál el POS, con dos reviews de código por PR. POSC-003 sólo recibe dependencia cumplida tras evidencia completa de 002A–G; POSC-004/004A, PIC-006A, conector live, fiscal y sdd.finish mantienen gates propios.
