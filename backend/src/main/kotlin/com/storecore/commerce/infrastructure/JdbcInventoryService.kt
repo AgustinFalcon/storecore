@@ -35,6 +35,16 @@ class JdbcInventoryService(
         jdbc.query("SELECT id FROM product_variants WHERE sku=?", { rs, _ -> rs.getLong("id") }, sku).firstOrNull()
             ?: throw ResourceNotFound()
 
+    fun reproject(variantIds: Collection<Long>, cause: ProjectionSourceCause, forceBaseline: Boolean = false) {
+        val ids = variantIds.distinct().sorted()
+        if (ids.isEmpty()) return
+        transactions.executeWithoutResult {
+            val emit = acquireScope(ids)
+            if (!emit) return@executeWithoutResult
+            projection.project(ids, cause, CapabilityActor.System, forceBaseline)
+        }
+    }
+
     override fun reserve(saga: UUID, lineKey: UUID, variantId: Long, quantity: Int, actor: String): Long =
         reserveAll(saga, listOf(InventoryReserveLine(lineKey, variantId, quantity)), actor).single()
 
