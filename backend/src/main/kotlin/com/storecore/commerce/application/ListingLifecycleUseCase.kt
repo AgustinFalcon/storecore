@@ -20,6 +20,10 @@ data class ListingLifecycleCommand(
     val action: ListingLifecycleAction,
 )
 
+/**
+ * Activate, pause, and confirm mapping. Acquires [ChannelProjectionLockOrder] before
+ * `lockAndSetState` so pause serializes with inventory `acquireScope` (TASK-DSP-R02 / PR #93).
+ */
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class ListingLifecycleUseCase(

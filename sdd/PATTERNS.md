@@ -16,6 +16,8 @@ Cada módulo tiene configuración tipada y estado `DISABLED | READ_ONLY | ACTIVE
 
 SKU es la identidad canónica. WEB reserva/consume/libera mediante operation key y ledger append-only. ML se vincula explícitamente por account/listing/variation; inbox durable precede ACK, refetch oficial precede efectos y reconciliación es acotada/auditable. ML puede reflejar ventas publicadas, pero StoreCore registra una sola venta local y no duplica decremento. POS no es módulo del core: el companion opcional BlackStore usa `storecore-pos-integration-contract-v1` (prefijo `/blackstore-integration/v1`, tablas `blackstore_integration_*`, delta **no** aprobado). Prohibido `channel=POS`, `store_id` y acceso cruzado a DB.
 
+Todo caller que proyecta stock deseado usa un orden de locks único: snapshot `MARKETPLACE_ML/SYNC`, cuentas, productos, variants, (orders/attempts/reservas si aplican), balances, listings ASC. Lifecycle y remap no toman `channel_listings` antes de products/variants/balances (`ChannelProjectionLockOrder`, PR #93).
+
 ## Commercial safety
 
 Precio base, desired, observed y effective promo son valores distintos. Sólo un writer local de precio puede estar `ACTIVE` por listing; automatización ML y writer manual son mutuamente excluyentes. Market intelligence usa únicamente señales oficiales/read-only permitidas; no scraping, elusión de términos ni supuesto “top 5”. Campañas requieren vigencia, prioridad, margen, auditoría, aprobación y rollback. Black Friday es un evento configurable, no una regla hardcodeada.

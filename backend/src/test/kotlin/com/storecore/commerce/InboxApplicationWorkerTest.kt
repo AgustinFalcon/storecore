@@ -5,6 +5,8 @@ import com.storecore.commerce.domain.OfficialMlItem
 import com.storecore.commerce.domain.OfficialMlResource
 import com.storecore.commerce.domain.OfficialPaymentResource
 import com.storecore.commerce.infrastructure.InboxApplicationWorker
+import com.storecore.configuration.CapabilityAdminTestSupport
+import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -37,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap
 class InboxApplicationWorkerTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
-    @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
+    @Autowired private val passwords: Argon2PasswordHasher,
     @Autowired private val worker: InboxApplicationWorker,
     @LocalServerPort private val port: Int,
 ) {
@@ -144,6 +146,10 @@ class InboxApplicationWorkerTest(
     private fun activate(module: String) {
         val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?", String::class.java, module)
         if (state == "ACTIVE") return
+        if (module == "MARKETPLACE_ML") {
+            CapabilityAdminTestSupport.activateMarketplaceMl(jdbc, adminUserId())
+            return
+        }
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
         jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
     }

@@ -2,10 +2,8 @@ package com.storecore.blackstore
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.blackstore.infrastructure.InMemoryCompanionSecretProvider
+import com.storecore.configuration.CapabilityAdminTestSupport
 import com.storecore.configuration.domain.CapabilityState
-import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -26,7 +24,6 @@ import java.util.UUID
 class Posc002fHttpLoopbackTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
-    @Autowired private val capabilities: JdbcCapabilityService,
     @Autowired private val secrets: InMemoryCompanionSecretProvider,
     @Autowired private val mapper: ObjectMapper,
 ) {
@@ -114,15 +111,7 @@ class Posc002fHttpLoopbackTest(
             Long::class.java,
         )!!
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            state,
-            version,
-            reason,
-            UUID.randomUUID(),
-        )
+        CapabilityAdminTestSupport.setBlackStoreStateForTest(jdbc, state, adminId)
     }
 
     private fun headers(token: String) = HttpHeaders().apply {

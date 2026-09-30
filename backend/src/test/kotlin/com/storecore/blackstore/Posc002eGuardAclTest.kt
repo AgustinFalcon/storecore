@@ -1,9 +1,7 @@
 package com.storecore.blackstore
 
+import com.storecore.configuration.CapabilityAdminTestSupport
 import com.storecore.configuration.domain.CapabilityState
-import com.storecore.configuration.infrastructure.JdbcCapabilityService
-import com.storecore.identity.domain.InternalRole
-import com.storecore.identity.domain.InternalUserPrincipal
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.MigrationVersion
 import org.junit.jupiter.api.AfterAll
@@ -292,15 +290,7 @@ class Posc002eGuardAclTest {
     private fun activate(state: CapabilityState, reason: String) {
         val jdbc = jdbc(database)
         val adminId = jdbc.queryForObject("SELECT id FROM users WHERE email='e10-admin@example.test'", Long::class.java)!!
-        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
-        JdbcCapabilityService(jdbc).changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
-            "BLACKSTORE_INTEGRATION",
-            state,
-            version,
-            reason,
-            UUID.randomUUID(),
-        )
+        CapabilityAdminTestSupport.setBlackStoreStateForTest(jdbc, state, adminId)
     }
 
     private fun blackstoreConfig(): String =

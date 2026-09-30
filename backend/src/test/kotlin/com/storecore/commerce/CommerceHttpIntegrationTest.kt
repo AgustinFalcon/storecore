@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.infrastructure.InboxApplicationWorker
 import com.storecore.commerce.infrastructure.JdbcInventoryService
+import com.storecore.configuration.CapabilityAdminTestSupport
+import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -31,7 +33,7 @@ import java.util.UUID
 class CommerceHttpIntegrationTest(
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
-    @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
+    @Autowired private val passwords: Argon2PasswordHasher,
     @Autowired private val inventory: JdbcInventoryService,
     @Autowired private val inboxWorker: InboxApplicationWorker,
     @LocalServerPort private val port: Int,
@@ -407,6 +409,10 @@ class CommerceHttpIntegrationTest(
     private fun activate(module: String) {
         val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?", String::class.java, module)
         if (state == "ACTIVE") return
+        if (module == "MARKETPLACE_ML") {
+            CapabilityAdminTestSupport.activateMarketplaceMl(jdbc, adminUserId())
+            return
+        }
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
         jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
     }

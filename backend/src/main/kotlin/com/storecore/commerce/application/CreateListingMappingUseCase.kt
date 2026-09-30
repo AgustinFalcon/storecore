@@ -13,6 +13,10 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
 
+/**
+ * Creates or remaps a listing. Locks both current and target variants before upsert
+ * so remap cannot take `channel_listings` before products/variants/balances (PR #93).
+ */
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class CreateListingMappingUseCase(

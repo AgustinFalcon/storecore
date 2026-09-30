@@ -2,4 +2,4 @@
 
 ## Estado
 
-`in_progress`. DAG 000A–008 `#92` (`246662a`) más follow-up de orden global (R01 prv35, R02 prv36 ambos APPROVED). `ChannelProjectionLockOrder` serializa lifecycle/remap con `acquireScope`. Suite combinada DSP Dsp000b–008 exit 0; `git diff --check` exit 0; no es CI verde. WIP abierto; sin dispatcher, red, secretos ni `sdd.finish`.
+`in_progress`. DAG 000A–R02 merge `#93` (`9ee37d7`). Suite local V3/Tx-C merge `#94`, dual prv37 APPROVED (fixtures SQL; sin dispatcher). Registro: `knowledge.md`. Suite combinada DSP Dsp000b–008 exit 0 en el follow-up de locks. WIP abierto; sin dispatcher, red, secretos ni `sdd.finish`.
