@@ -39,7 +39,7 @@ TASK-DSP-000A selló ese writer en PR #52, mergeado sólo a integración en `56b
 | 1 — Functional Spec | `ready_for_implementation` (R00 GO documental) |
 | 2 — Technical Spec | `ready_for_implementation` (R00 GO documental) |
 | 3 — Tasks | `ready_for_implementation` (R00 GO documental) |
-| 4 — Implementation | `in_progress` (000A `#52` `56baa2d`; 000B `#84` `878461f`; 001 en curso; resto pendiente) |
+| 4 — Implementation | `in_progress` (000A `#52`; 000B `#84`; 001 `#85` `715f37d`; 002 en curso; resto pendiente) |
 
 ## Gate de salida
 
