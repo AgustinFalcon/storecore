@@ -29,7 +29,7 @@ Orden obligatorio **003A → 003B → 003C → 003D → 003E**. Un PR por slice 
 
 ## POSC-003D — stock read
 
-- **Estado:** implementación local en `feature/posc003d-stock-read`. `GET /stock/variants/{variantId}`: ausente y SKU 65..128 → 404; SKU 64 y sellable físico; inactivo visible en catálogo (`active=false`) y stock reporta cantidad física; reserve usa saldo vivo, no la página. Sin Flyway. Dual Grok prv20 pendiente.
+- **Estado:** dual Grok 4.7 APPROVED (`sdd/reviews/20260930-grok-prv20-sdd.md`, `prv20-scope.md`). Pending PR merge. Sin Flyway.
 - **Dependencia:** 003C mergeado (`21780e4`).
 - **Ownership:** un handler `GET /stock/variants/{variantId}`.
 - **Aceptación:** ausente 404; SKU 65..128 → 404; inactivo visible en catálogo con `active=false` pero stock read reporta sellable físico; reserve no confía en cantidad de catálogo.
