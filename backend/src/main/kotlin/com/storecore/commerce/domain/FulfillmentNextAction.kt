@@ -2,23 +2,26 @@ package com.storecore.commerce.domain
 
 /** Read-model hints for the next admin ship or RMA step. POST transitions stay in the order service. */
 object FulfillmentNextAction {
-    fun ship(orderStatus: String, shipmentStatus: String): String? {
-        if (orderStatus == "PAID_STOCK_REVIEW") return null
-        return when (shipmentStatus) {
-            "PENDING" -> "PACKED"
-            "PREPARING" -> "SHIPPED"
-            "SHIPPED" -> "DELIVERED"
-            else -> null
+    fun ship(orderStatus: String, shipmentStatus: String): String? =
+        ship(OrderStatus.fromWire(orderStatus), ShipmentStatus.fromWire(shipmentStatus))?.wire
+
+    fun rma(orderStatus: String, rmaStatus: String?): String? =
+        rma(OrderStatus.fromWire(orderStatus), RmaStatus.fromOptionalWire(rmaStatus))?.wire
+
+    fun ship(orderStatus: OrderStatus, shipmentStatus: ShipmentStatus): ShipmentTransition? {
+        if (orderStatus === OrderStatus.PaidStockReview) {
+            return null
         }
+        return shipmentStatus.nextShipAction
     }
 
-    fun rma(orderStatus: String, rmaStatus: String?): String? {
-        if (orderStatus == "PAID_STOCK_REVIEW") return null
-        return when (rmaStatus) {
-            null -> "RECEIVED"
-            "RETURN_RECEIVED" -> "INSPECTED"
-            "INSPECTED" -> "ADJUSTED"
-            else -> null
+    fun rma(orderStatus: OrderStatus, rmaStatus: RmaStatus?): RmaTransition? {
+        if (orderStatus === OrderStatus.PaidStockReview) {
+            return null
         }
+        if (rmaStatus == null) {
+            return RmaTransition.Received
+        }
+        return rmaStatus.nextRmaAction
     }
 }
