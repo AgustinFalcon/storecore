@@ -1,24 +1,43 @@
 package com.storecore.commerce.domain
 
-class OrderStatus private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is OrderStatus && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class OrderStatus {
+    abstract val wire: String
+
+    data object Created : OrderStatus() {
+        override val wire: String = "CREATED"
+    }
+    data object PendingPayment : OrderStatus() {
+        override val wire: String = "PENDING_PAYMENT"
+    }
+    data object Paid : OrderStatus() {
+        override val wire: String = "PAID"
+    }
+    data object PaidStockReview : OrderStatus() {
+        override val wire: String = "PAID_STOCK_REVIEW"
+    }
+    data object Cancelled : OrderStatus() {
+        override val wire: String = "CANCELLED"
+    }
+    data object Expired : OrderStatus() {
+        override val wire: String = "EXPIRED"
+    }
+    data object Refunded : OrderStatus() {
+        override val wire: String = "REFUNDED"
+    }
+    data object Unknown : OrderStatus() {
+        override val wire: String = "unknown"
+    }
 
     companion object {
-        val Created = OrderStatus("CREATED")
-        val PendingPayment = OrderStatus("PENDING_PAYMENT")
-        val Paid = OrderStatus("PAID")
-        val PaidStockReview = OrderStatus("PAID_STOCK_REVIEW")
-        val Cancelled = OrderStatus("CANCELLED")
-        val Expired = OrderStatus("EXPIRED")
-        val Refunded = OrderStatus("REFUNDED")
-        val Unknown = OrderStatus("unknown")
-        private val known = listOf(Created, PendingPayment, Paid, PaidStockReview, Cancelled, Expired, Refunded)
-
-        fun fromWire(raw: String?): OrderStatus {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): OrderStatus = when (raw?.trim()) {
+            "CREATED" -> Created
+            "PENDING_PAYMENT" -> PendingPayment
+            "PAID" -> Paid
+            "PAID_STOCK_REVIEW" -> PaidStockReview
+            "CANCELLED" -> Cancelled
+            "EXPIRED" -> Expired
+            "REFUNDED" -> Refunded
+            else -> Unknown
         }
     }
 }

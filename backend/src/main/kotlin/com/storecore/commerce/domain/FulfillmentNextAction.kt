@@ -9,14 +9,14 @@ object FulfillmentNextAction {
         rma(OrderStatus.fromWire(orderStatus), RmaStatus.fromOptionalWire(rmaStatus))?.wire
 
     fun ship(orderStatus: OrderStatus, shipmentStatus: ShipmentStatus): ShipmentTransition? {
-        if (orderStatus === OrderStatus.PaidStockReview) {
+        if (orderStatus is OrderStatus.PaidStockReview) {
             return null
         }
         return shipmentStatus.nextShipAction
     }
 
     fun rma(orderStatus: OrderStatus, rmaStatus: RmaStatus?): RmaTransition? {
-        if (orderStatus === OrderStatus.PaidStockReview) {
+        if (orderStatus is OrderStatus.PaidStockReview) {
             return null
         }
         if (rmaStatus == null) {

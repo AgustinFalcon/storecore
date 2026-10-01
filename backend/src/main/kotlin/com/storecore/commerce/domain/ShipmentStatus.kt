@@ -1,44 +1,68 @@
 package com.storecore.commerce.domain
 
-class ShipmentTransition private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ShipmentTransition && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ShipmentTransition {
+    abstract val wire: String
+
+    data object Packed : ShipmentTransition() {
+        override val wire: String = "PACKED"
+    }
+    data object Shipped : ShipmentTransition() {
+        override val wire: String = "SHIPPED"
+    }
+    data object Delivered : ShipmentTransition() {
+        override val wire: String = "DELIVERED"
+    }
+    data object Unknown : ShipmentTransition() {
+        override val wire: String = "unknown"
+    }
 
     companion object {
-        val Packed = ShipmentTransition("PACKED")
-        val Shipped = ShipmentTransition("SHIPPED")
-        val Delivered = ShipmentTransition("DELIVERED")
-        val Unknown = ShipmentTransition("unknown")
-        private val known = listOf(Packed, Shipped, Delivered)
-
-        fun fromWire(raw: String?): ShipmentTransition {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ShipmentTransition = when (raw?.trim()) {
+            "PACKED" -> Packed
+            "SHIPPED" -> Shipped
+            "DELIVERED" -> Delivered
+            else -> Unknown
         }
     }
 }
 
-class ShipmentStatus private constructor(
-    val wire: String,
-    val nextShipAction: ShipmentTransition?,
-) {
-    override fun equals(other: Any?) = other is ShipmentStatus && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ShipmentStatus {
+    abstract val wire: String
+    abstract val nextShipAction: ShipmentTransition?
+
+    data object Pending : ShipmentStatus() {
+        override val wire: String = "PENDING"
+        override val nextShipAction: ShipmentTransition? = ShipmentTransition.Packed
+    }
+    data object Preparing : ShipmentStatus() {
+        override val wire: String = "PREPARING"
+        override val nextShipAction: ShipmentTransition? = ShipmentTransition.Shipped
+    }
+    data object Shipped : ShipmentStatus() {
+        override val wire: String = "SHIPPED"
+        override val nextShipAction: ShipmentTransition? = ShipmentTransition.Delivered
+    }
+    data object Delivered : ShipmentStatus() {
+        override val wire: String = "DELIVERED"
+        override val nextShipAction: ShipmentTransition? = null
+    }
+    data object Cancelled : ShipmentStatus() {
+        override val wire: String = "CANCELLED"
+        override val nextShipAction: ShipmentTransition? = null
+    }
+    data object Unknown : ShipmentStatus() {
+        override val wire: String = "unknown"
+        override val nextShipAction: ShipmentTransition? = null
+    }
 
     companion object {
-        val Pending = ShipmentStatus("PENDING", ShipmentTransition.Packed)
-        val Preparing = ShipmentStatus("PREPARING", ShipmentTransition.Shipped)
-        val Shipped = ShipmentStatus("SHIPPED", ShipmentTransition.Delivered)
-        val Delivered = ShipmentStatus("DELIVERED", null)
-        val Cancelled = ShipmentStatus("CANCELLED", null)
-        val Unknown = ShipmentStatus("unknown", null)
-        private val known = listOf(Pending, Preparing, Shipped, Delivered, Cancelled)
-
-        fun fromWire(raw: String?): ShipmentStatus {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ShipmentStatus = when (raw?.trim()) {
+            "PENDING" -> Pending
+            "PREPARING" -> Preparing
+            "SHIPPED" -> Shipped
+            "DELIVERED" -> Delivered
+            "CANCELLED" -> Cancelled
+            else -> Unknown
         }
     }
 }
