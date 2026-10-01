@@ -6,7 +6,7 @@
 - **Mode:** `standard`
 - **Project type / stack:** producción / backend Kotlin-Spring Boot + PostgreSQL 16
 - **Related baseline:** `sdd/features/20260921-single-tenant-installation-baseline/`
-- **Related WIP:** `20260922-ml-inbox-integrity` persiste la evidencia de una venta ML, pero no es caller de esta feature. Un futuro `ml-inbox-to-projection`, condicionado a binding oficial y refetch, definirá la unión. `20260921-storecore-pos-integration-contract-v1` sigue bloqueado y no es caller de esta feature.
+- **Related WIP:** `20260922-ml-inbox-integrity` persiste la evidencia de una venta ML, pero no es caller de esta feature. Un futuro `ml-inbox-to-projection`, condicionado a binding oficial y refetch, definirá la unión. `20260921-storecore-pos-integration-contract-v1` sólo aporta el bridge local in-saga integrado por TASK-DSP-009; no habilita companion live ni red.
 
 ## Objetivo
 
@@ -18,13 +18,13 @@ La proyección no consume un caller ML activo en esta feature. Una fila durable 
 
 ## Límites y precondiciones
 
-- Base documental inicial verificada el 2026-09-27: `integration/storecore-int` en `ab817891abb6c7b710bca809804d924401ed74f0`, con PIC-009 `69f209b` como ancestro y Flyway V1–V7; V8 libre en esa base. Tras PR #52, integración avanzó a `56baa2db2d6fabbd683ce41459414c556cb5246d`. El checkout de redacción de este WIP sigue en `a886f48`; antes de 000B se revalidan HEAD, migraciones y permisos reales.
+- Base documental inicial verificada el 2026-09-27: `integration/storecore-int` en `ab817891abb6c7b710bca809804d924401ed74f0`, con PIC-009 `69f209b` como ancestro y Flyway V1–V7; V8 libre en esa base. Tras PR #52, integración avanzó a `56baa2db2d6fabbd683ce41459414c556cb5246d`. El checkout de redacción inicial estaba en `a886f48`; esos snapshots documentan el diseño histórico. 000B está integrado y, antes de cualquier delta nuevo, se revalidan HEAD, migraciones y permisos reales.
 
-- Una instalación continúa siendo un comercio, una VM y una base. No hay `store_id`, cross-DB, shared runtime, POS ni BlackStore.
+- Una instalación continúa siendo un comercio, una VM y una base. No hay `store_id`, cross-DB ni shared runtime. El bridge local BlackStore de TASK-DSP-009 puede solicitar la proyección en la transacción de saga; no convierte POS/BlackStore en live ni comparte bases.
 - La proyección se limita a cuentas de propósito externo Mercado Libre autorizadas y capability `MARKETPLACE_ML` en `ACTIVE`. Una cuenta interna que soporte precios/promos manuales no es elegible aunque comparta tablas de listings.
 - La rama de integración puede conservar temporalmente el literal histórico `manual-price-writer`; esta feature no lo toma como contrato. Toda cuenta histórica queda `UNCLASSIFIED` y fail-closed hasta clasificación auditada; cada operación usa `account_id` explícito y valida propósito tipado antes de crear proyecciones.
 - No modifica la evidencia comercial `SALE_APPLIED`, no cambia `channel_sales` ni intenta despachar outbox. El despacho real, credenciales, OAuth, API oficial y reintentos remotos se difieren.
-- Ningún flujo BlackStore consume esta proyección ni puede provocarla hasta que PIC-005 tenga GO explícito.
+- TASK-DSP-009 integró el bridge local BlackStore dentro de la saga, después de los cortes POSC aplicables. Con `MARKETPLACE_ML` no ACTIVE devuelve `NOT_ELIGIBLE`; no hay dispatcher, credenciales, red ni activación BlackStore live.
 
 ## Compatibilidad explícita con PIC-009
 
@@ -39,12 +39,12 @@ TASK-DSP-000A selló ese writer en PR #52, mergeado sólo a integración en `56b
 | 1 — Functional Spec | `ready_for_implementation` (R00 GO documental) |
 | 2 — Technical Spec | `ready_for_implementation` (R00 GO documental) |
 | 3 — Tasks | `ready_for_implementation` (R00 GO documental) |
-| 4 — Implementation | `in_progress` (DAG 000A–R02 14/14 en integración tras este follow-up de lock-order; WIP abierto, `sdd.finish` NO-GO) |
+| 4 — Implementation | `implementable_dag_merged` (15/15 registros de tarea done, incluido TASK-DSP-009; WIP abierto, dispatcher/live/`sdd.finish` NO-GO) |
 
 ## Gate de salida
 
-El GO documental Astra de TASK-DSP-R00 está en `sdd/reviews/20260927-astra-ml-desired-stock-r00-go.md` y habilita iniciar 000A/000B, no otros pasos fuera del DAG. Después de implementar: tests PG16/Testcontainers y dos reviews de código independientes, con correcciones y nueva revisión si aparecen hallazgos. Cada PR va a la rama de integración tras esos gates y verificaciones locales; el paso de integración a master exige CI remoto verde. Este WIP no está aprobado, no autoriza `sdd.finish`, release, deploy ni activación ML/BlackStore.
+El GO documental Astra de TASK-DSP-R00 está en `sdd/reviews/20260927-astra-ml-desired-stock-r00-go.md` y habilitó 000A/000B, no pasos fuera del DAG. Los cortes implementables 000A–009 se integraron con pruebas y reviews por PR. Hosted CI verde es condición necesaria, no autorización de promoción: sólo un dossier Carril A con sus gates puede promover comercio web; companion permanece en integración. Este WIP no autoriza `sdd.finish`, release, deploy, dispatcher ni activación ML/BlackStore.
 
-El dictamen R00 vigente ya se pronunció sobre snapshot único action/config/kill mediante SECURITY DEFINER y permisos PG16, orden de locks de callers, releaseSaga WEB y base/Flyway de integración. Antes de aplicar la migración 000B se revalida la base real y sus permisos; ese GO documental no aprueba código, PR, release ni activación live.
+El dictamen R00 se pronunció sobre snapshot único action/config/kill mediante SECURITY DEFINER y permisos PG16, orden de locks de callers, releaseSaga WEB y base/Flyway de integración. El gate previo a 000B exigió revalidar la base real y sus permisos; aquel GO documental no sustituye evidencia de código ni autoriza release o activación live.
 
-La evidencia de PR #52 y de sus pruebas/reviews está en `sdd/reviews/20260927-ml-dsp-000a-pr52-integration.md`. Su CI alojado falló con `steps=[]` y no es verde; el merge a integración no cambia el estado WIP ni habilita `sdd.finish`.
+La evidencia de PR #52 y de sus pruebas/reviews está en `sdd/reviews/20260927-ml-dsp-000a-pr52-integration.md`. Su CI alojado histórico falló con `steps=[]`; Verify posterior #118/#120 ejecutó steps y pasó, sin convertir aquel run en pass ni habilitar `sdd.finish`, master o live.
