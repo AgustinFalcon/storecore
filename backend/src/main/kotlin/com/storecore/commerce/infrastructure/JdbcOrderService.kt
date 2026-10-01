@@ -2,8 +2,14 @@ package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.FulfillmentRejected
 import com.storecore.commerce.domain.CartLineView
+import com.storecore.commerce.domain.FulfillmentCommand
 import com.storecore.commerce.domain.FulfillmentNextAction
+import com.storecore.commerce.domain.OrderStatus
 import com.storecore.commerce.domain.OrderView
+import com.storecore.commerce.domain.RmaStatus
+import com.storecore.commerce.domain.RmaTransition
+import com.storecore.commerce.domain.ShipmentStatus
+import com.storecore.commerce.domain.ShipmentTransition
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.application.ResourceNotFound
@@ -31,23 +37,24 @@ class JdbcOrderService(
         capabilities.decide("MANUAL_FULFILLMENT", "MANAGE", CapabilityActor.Internal(actor))
         val orderStatus = jdbc.query("SELECT status FROM orders WHERE id=?", { rs, _ -> rs.getString("status") }, orderId).firstOrNull()
             ?: throw ResourceNotFound()
-        if (orderStatus == "PAID_STOCK_REVIEW") throw FulfillmentRejected()
         val shipment = jdbc.query("SELECT id,status,tracking_code,shipped_at FROM shipments WHERE order_id=? FOR UPDATE", { rs, _ -> mapOf("id" to rs.getLong("id"), "status" to rs.getString("status"), "tracking" to rs.getString("tracking_code"), "shipped" to rs.getTimestamp("shipped_at")) }, orderId).firstOrNull()
             ?: jdbc.query("SELECT id FROM orders WHERE id=?", { rs, _ -> rs.getLong("id") }, orderId).firstOrNull()?.let {
-                jdbc.queryForObject("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING') RETURNING id", Long::class.java, orderId)?.let { mapOf("id" to it, "status" to "PENDING", "tracking" to null, "shipped" to null) }
+                jdbc.queryForObject("INSERT INTO shipments(order_id,status) VALUES (?,?) RETURNING id", Long::class.java, orderId, ShipmentStatus.Pending.wire)?.let { mapOf("id" to it, "status" to ShipmentStatus.Pending.wire, "tracking" to null, "shipped" to null) }
             } ?: throw ResourceNotFound()
-        val mapped = when (status) { "PACKED" -> "PREPARING"; "SHIPPED" -> "SHIPPED"; "DELIVERED" -> "DELIVERED"; else -> throw FulfillmentRejected() }
-        val expected = when (mapped) { "PREPARING" -> "PENDING"; "SHIPPED" -> "PREPARING"; else -> "SHIPPED" }
-        if (shipment["status"] != expected) throw FulfillmentRejected()
+        val stored = FulfillmentCommand.storedShipment(
+            OrderStatus.fromWire(orderStatus),
+            ShipmentStatus.fromWire(shipment["status"] as String?),
+            ShipmentTransition.fromWire(status),
+        ) ?: throw FulfillmentRejected()
         val now = Instant.now()
-        val shippedAt = when (mapped) {
-            "SHIPPED", "DELIVERED" -> shipment["shipped"] ?: java.sql.Timestamp.from(now)
+        val shippedAt = when (stored) {
+            is ShipmentStatus.Shipped, is ShipmentStatus.Delivered -> shipment["shipped"] ?: java.sql.Timestamp.from(now)
             else -> null
         }
-        val deliveredAt = if (mapped == "DELIVERED") java.sql.Timestamp.from(now) else null
+        val deliveredAt = if (stored is ShipmentStatus.Delivered) java.sql.Timestamp.from(now) else null
         val code = tracking ?: shipment["tracking"] as String?
-        jdbc.update("UPDATE shipments SET status=?,tracking_code=?,shipped_at=?,delivered_at=?,updated_at=now() WHERE id=?", mapped, code, shippedAt, deliveredAt, shipment["id"])
-        jdbc.update("INSERT INTO fulfillment_events(shipment_id,event_type,actor,details) VALUES (?,?,?, '{}'::jsonb)", shipment["id"], mapped, "USER:${actor.userId}")
+        jdbc.update("UPDATE shipments SET status=?,tracking_code=?,shipped_at=?,delivered_at=?,updated_at=now() WHERE id=?", stored.wire, code, shippedAt, deliveredAt, shipment["id"])
+        jdbc.update("INSERT INTO fulfillment_events(shipment_id,event_type,actor,details) VALUES (?,?,?, '{}'::jsonb)", shipment["id"], stored.wire, "USER:${actor.userId}")
         return adminOrder(orderId)
     }
 
@@ -55,13 +62,25 @@ class JdbcOrderService(
         capabilities.decide("MANUAL_FULFILLMENT", "MANAGE", CapabilityActor.Internal(actor))
         val orderStatus = jdbc.query("SELECT status FROM orders WHERE id=?", { rs, _ -> rs.getString("status") }, orderId).firstOrNull()
             ?: throw ResourceNotFound()
-        if (orderStatus == "PAID_STOCK_REVIEW") throw FulfillmentRejected()
         val current = jdbc.query("SELECT id,status FROM returns WHERE order_id=? ORDER BY id DESC LIMIT 1 FOR UPDATE", { rs, _ -> rs.getLong("id") to rs.getString("status") }, orderId).firstOrNull()
-        val mapped = when (status) { "RECEIVED" -> "RETURN_RECEIVED"; "INSPECTED" -> "INSPECTED"; "ADJUSTED" -> "CLOSED"; else -> throw FulfillmentRejected() }
-        val next = when {
-            current == null && mapped == "RETURN_RECEIVED" -> createReturn(orderId)
-            current != null && current.second == "RETURN_RECEIVED" && mapped == "INSPECTED" -> { jdbc.update("UPDATE returns SET status='INSPECTED',inspection_result='RESTOCK',updated_at=now() WHERE id=?", current.first); current.first }
-            current != null && current.second == "INSPECTED" && mapped == "CLOSED" -> { restock(current.first, actor.userId); jdbc.update("UPDATE returns SET status='CLOSED',updated_at=now() WHERE id=?", current.first); current.first }
+        val stored = FulfillmentCommand.storedRma(
+            OrderStatus.fromWire(orderStatus),
+            RmaStatus.fromOptionalWire(current?.second),
+            RmaTransition.fromWire(status),
+        ) ?: throw FulfillmentRejected()
+        val next = when (stored) {
+            is RmaStatus.ReturnReceived -> if (current == null) createReturn(orderId) else throw FulfillmentRejected()
+            is RmaStatus.Inspected -> {
+                val id = current?.first ?: throw FulfillmentRejected()
+                jdbc.update("UPDATE returns SET status=?,inspection_result='RESTOCK',updated_at=now() WHERE id=?", stored.wire, id)
+                id
+            }
+            is RmaStatus.Closed -> {
+                val id = current?.first ?: throw FulfillmentRejected()
+                restock(id, actor.userId)
+                jdbc.update("UPDATE returns SET status=?,updated_at=now() WHERE id=?", stored.wire, id)
+                id
+            }
             else -> throw FulfillmentRejected()
         }
         check(next > 0)
@@ -69,7 +88,7 @@ class JdbcOrderService(
     }
 
     private fun createReturn(orderId: Long): Long {
-        val id = jdbc.queryForObject("INSERT INTO returns(rma_number,order_id,status,received_at) VALUES (?,?, 'RETURN_RECEIVED', now()) RETURNING id", Long::class.java, "RMA-$orderId", orderId)!!
+        val id = jdbc.queryForObject("INSERT INTO returns(rma_number,order_id,status,received_at) VALUES (?,?, ?, now()) RETURNING id", Long::class.java, "RMA-$orderId", orderId, RmaStatus.ReturnReceived.wire)!!
         jdbc.query("SELECT id,quantity FROM order_items WHERE order_id=?", { rs, _ -> rs.getLong("id") to rs.getInt("quantity") }, orderId).forEach { (itemId, qty) ->
             jdbc.update("INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,?)", id, itemId, qty)
         }
