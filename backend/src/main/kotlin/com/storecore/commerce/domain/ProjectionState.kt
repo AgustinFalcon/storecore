@@ -1,20 +1,25 @@
 package com.storecore.commerce.domain
 
-class ProjectionState private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ProjectionState && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ProjectionState {
+    abstract val wire: String
+
+    data object Withheld : ProjectionState() {
+        override val wire: String = "WITHHELD"
+    }
+    data object Emitted : ProjectionState() {
+        override val wire: String = "EMITTED"
+    }
+    data object Unknown : ProjectionState() {
+        override val wire: String = "unknown"
+    }
 
     fun isWithheld(): Boolean = this === Withheld
 
     companion object {
-        val Withheld = ProjectionState("WITHHELD")
-        val Emitted = ProjectionState("EMITTED")
-        val Unknown = ProjectionState("unknown")
-        private val known = listOf(Withheld, Emitted)
-        fun fromWire(raw: String?): ProjectionState {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ProjectionState = when (raw?.trim()) {
+            "WITHHELD" -> Withheld
+            "EMITTED" -> Emitted
+            else -> Unknown
         }
     }
 }

@@ -1,21 +1,35 @@
 package com.storecore.commerce.domain
 
-class DesiredStockOutcome private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is DesiredStockOutcome && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class DesiredStockOutcome {
+    abstract val wire: String
+
+    data object SnapshotAdvanced : DesiredStockOutcome() {
+        override val wire: String = "SNAPSHOT_ADVANCED"
+    }
+    data object Projected : DesiredStockOutcome() {
+        override val wire: String = "PROJECTED"
+    }
+    data object Unchanged : DesiredStockOutcome() {
+        override val wire: String = "UNCHANGED"
+    }
+    data object Withheld : DesiredStockOutcome() {
+        override val wire: String = "WITHHELD"
+    }
+    data object NoListing : DesiredStockOutcome() {
+        override val wire: String = "NO_LISTING"
+    }
+    data object Unknown : DesiredStockOutcome() {
+        override val wire: String = "unknown"
+    }
 
     companion object {
-        val SnapshotAdvanced = DesiredStockOutcome("SNAPSHOT_ADVANCED")
-        val Projected = DesiredStockOutcome("PROJECTED")
-        val Unchanged = DesiredStockOutcome("UNCHANGED")
-        val Withheld = DesiredStockOutcome("WITHHELD")
-        val NoListing = DesiredStockOutcome("NO_LISTING")
-        val Unknown = DesiredStockOutcome("unknown")
-        private val known = listOf(SnapshotAdvanced, Projected, Unchanged, Withheld, NoListing)
-        fun fromWire(raw: String?): DesiredStockOutcome {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): DesiredStockOutcome = when (raw?.trim()) {
+            "SNAPSHOT_ADVANCED" -> SnapshotAdvanced
+            "PROJECTED" -> Projected
+            "UNCHANGED" -> Unchanged
+            "WITHHELD" -> Withheld
+            "NO_LISTING" -> NoListing
+            else -> Unknown
         }
     }
 }

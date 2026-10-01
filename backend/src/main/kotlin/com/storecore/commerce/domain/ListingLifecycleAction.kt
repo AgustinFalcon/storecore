@@ -1,19 +1,27 @@
 package com.storecore.commerce.domain
 
-class ListingLifecycleAction private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ListingLifecycleAction && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ListingLifecycleAction {
+    abstract val wire: String
+
+    data object Activate : ListingLifecycleAction() {
+        override val wire: String = "ACTIVATE"
+    }
+    data object Pause : ListingLifecycleAction() {
+        override val wire: String = "PAUSE"
+    }
+    data object ConfirmMapping : ListingLifecycleAction() {
+        override val wire: String = "CONFIRM_MAPPING"
+    }
+    data object Unknown : ListingLifecycleAction() {
+        override val wire: String = "unknown"
+    }
 
     companion object {
-        val Activate = ListingLifecycleAction("ACTIVATE")
-        val Pause = ListingLifecycleAction("PAUSE")
-        val ConfirmMapping = ListingLifecycleAction("CONFIRM_MAPPING")
-        val Unknown = ListingLifecycleAction("unknown")
-        private val known = listOf(Activate, Pause, ConfirmMapping)
-        fun fromWire(raw: String?): ListingLifecycleAction {
-            val normalized = raw?.trim()?.uppercase().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ListingLifecycleAction = when (raw?.trim()?.uppercase()) {
+            "ACTIVATE" -> Activate
+            "PAUSE" -> Pause
+            "CONFIRM_MAPPING" -> ConfirmMapping
+            else -> Unknown
         }
     }
 }

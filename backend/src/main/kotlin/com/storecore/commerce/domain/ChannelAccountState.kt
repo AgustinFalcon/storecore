@@ -1,25 +1,37 @@
 package com.storecore.commerce.domain
 
-class ChannelAccountState private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ChannelAccountState && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ChannelAccountState {
+    abstract val wire: String
+
+    data object Disabled : ChannelAccountState() {
+        override val wire: String = "DISABLED"
+    }
+    data object ReadOnly : ChannelAccountState() {
+        override val wire: String = "READ_ONLY"
+    }
+    data object Active : ChannelAccountState() {
+        override val wire: String = "ACTIVE"
+    }
+    data object Paused : ChannelAccountState() {
+        override val wire: String = "PAUSED"
+    }
+    data object Error : ChannelAccountState() {
+        override val wire: String = "ERROR"
+    }
+    data object Unknown : ChannelAccountState() {
+        override val wire: String = "unknown"
+    }
 
     fun isActive(): Boolean = this === Active
 
     companion object {
-        val Disabled = ChannelAccountState("DISABLED")
-        val ReadOnly = ChannelAccountState("READ_ONLY")
-        val Active = ChannelAccountState("ACTIVE")
-        val Paused = ChannelAccountState("PAUSED")
-        val Error = ChannelAccountState("ERROR")
-        val Unknown = ChannelAccountState("unknown")
-
-        private val known = listOf(Disabled, ReadOnly, Active, Paused, Error)
-
-        fun fromWire(raw: String?): ChannelAccountState {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ChannelAccountState = when (raw?.trim()) {
+            "DISABLED" -> Disabled
+            "READ_ONLY" -> ReadOnly
+            "ACTIVE" -> Active
+            "PAUSED" -> Paused
+            "ERROR" -> Error
+            else -> Unknown
         }
     }
 }
