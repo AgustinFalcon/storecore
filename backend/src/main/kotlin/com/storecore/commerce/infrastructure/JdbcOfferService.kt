@@ -2,6 +2,8 @@ package com.storecore.commerce.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.CommerceValidation
+import com.storecore.commerce.domain.DiscountType
+import com.storecore.commerce.domain.OfferStatus
 import com.storecore.commerce.domain.OfferView
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
@@ -44,11 +46,13 @@ class JdbcOfferService(
         capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor))
         val name = request.name.trim()
         if (name.isEmpty() || name.length > 160) throw CommerceValidation("OFFER_NAME_INVALID")
-        if (request.status != "DRAFT" && request.status != "ACTIVE") throw CommerceValidation("OFFER_STATUS_INVALID")
+        val status = OfferStatus.fromWire(request.status)
+        if (!status.writableOnCreate) throw CommerceValidation("OFFER_STATUS_INVALID")
         val starts = instant(request.startsAt)
         val ends = instant(request.endsAt)
         if (!ends.isAfter(starts)) throw CommerceValidation("OFFER_WINDOW_INVALID")
-        if (request.discountType != "PERCENT" && request.discountType != "FIXED") throw CommerceValidation("OFFER_DISCOUNT_INVALID")
+        val discountType = DiscountType.fromWire(request.discountType)
+        if (discountType is DiscountType.Unknown) throw CommerceValidation("OFFER_DISCOUNT_INVALID")
         val discount = request.discountValue ?: throw CommerceValidation("OFFER_DISCOUNT_INVALID")
         if (discount.signum() <= 0) throw CommerceValidation("OFFER_DISCOUNT_INVALID")
         val margin = request.minMarginPercent ?: throw CommerceValidation("OFFER_MARGIN_INVALID")
@@ -64,18 +68,18 @@ class JdbcOfferService(
             ).firstOrNull() ?: throw ResourceNotFound()
             productIds += productId
         }
-        val id = if (request.status == "ACTIVE") {
+        val id = if (status is OfferStatus.Active) {
             val approvedAt = Instant.now()
             jdbc.queryForObject(
                 """INSERT INTO offers(name,status,priority,starts_at,ends_at,discount_type,discount_value,min_margin_percent,created_by,approved_by,approved_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",
                 Long::class.java,
                 name,
-                request.status,
+                status.wire,
                 request.priority,
                 Timestamp.from(starts),
                 Timestamp.from(ends),
-                request.discountType,
+                discountType.wire,
                 discount,
                 margin,
                 actor.userId,
@@ -88,11 +92,11 @@ class JdbcOfferService(
                    VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL) RETURNING id""",
                 Long::class.java,
                 name,
-                request.status,
+                status.wire,
                 request.priority,
                 Timestamp.from(starts),
                 Timestamp.from(ends),
-                request.discountType,
+                discountType.wire,
                 discount,
                 margin,
                 actor.userId,
@@ -107,18 +111,21 @@ class JdbcOfferService(
 
     fun changeStatus(actor: InternalUserPrincipal, id: Long, status: String): OfferView {
         capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor))
-        if (status !in OFFER_STATUSES) throw CommerceValidation("OFFER_STATUS_INVALID")
+        val nextStatus = OfferStatus.fromWire(status)
+        if (nextStatus is OfferStatus.Unknown) throw CommerceValidation("OFFER_STATUS_INVALID")
         val approvedAt = Timestamp.from(Instant.now())
         val updated = jdbc.update(
             """UPDATE offers
                SET status=?,
-                   approved_by=CASE WHEN ?='ACTIVE' THEN ? ELSE approved_by END,
-                   approved_at=CASE WHEN ?='ACTIVE' THEN ? ELSE approved_at END
+                   approved_by=CASE WHEN ?= ? THEN ? ELSE approved_by END,
+                   approved_at=CASE WHEN ?= ? THEN ? ELSE approved_at END
                WHERE id=?""",
-            status,
-            status,
+            nextStatus.wire,
+            nextStatus.wire,
+            OfferStatus.Active.wire,
             actor.userId,
-            status,
+            nextStatus.wire,
+            OfferStatus.Active.wire,
             approvedAt,
             id,
         )
@@ -165,9 +172,6 @@ class JdbcOfferService(
         throw CommerceValidation("OFFER_WINDOW_INVALID")
     }
 
-    private companion object {
-        val OFFER_STATUSES = setOf("DRAFT", "ACTIVE", "PAUSED", "ENDED")
-    }
 }
 
 data class OfferWrite(
