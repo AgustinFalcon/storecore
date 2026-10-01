@@ -35,4 +35,5 @@
 | MANUAL offer write types | merge [#112](https://github.com/AgustinFalcon/storecore/pull/112) (`2f156eb`) | sealed `OfferStatus`/`DiscountType`; create only draft/active |
 | MP payment write types | merge [#114](https://github.com/AgustinFalcon/storecore/pull/114) (`10db2fb`) | sealed `PaymentStatus`; MP-LIVE-05 NO-GO |
 | Carril A stay-on-integration GO | head `39d6501`; reviews `20261001-grok-int-carrila-sdd.md` + `20261001-grok-int-carrila-scope.md` | dual Grok APPROVED para permanecer en `integration/storecore-int`; no master, no live, no `/sdd.finish` |
-| Hosted Verify techo V19 | issue [#117](https://github.com/AgustinFalcon/storecore/issues/117) | POSC-002F + DSP-003 aceptan V19; `npm run verify` sin axe prematuro; push a `integration/storecore-int` dispara workflow; no es CI verde hasta jobs PASS |
+| Hosted Verify techo V19 | issue [#117](https://github.com/AgustinFalcon/storecore/issues/117) merge [#118](https://github.com/AgustinFalcon/storecore/pull/118) (`f8f5eb6`) | POSC-002F + DSP-003 aceptan V19; axe después de Chromium; run `36824318135` backend+frontend SUCCESS |
+| Inventory ledger closed types | issue [#119](https://github.com/AgustinFalcon/storecore/issues/119) | sealed event/channel/reservation; wires V1/V6 intactos |

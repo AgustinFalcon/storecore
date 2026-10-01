@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-**Estado actualizado:** 2026-10-01; `origin/integration/storecore-int` verificado en `39d6501` (stamp #112/#113/#114). Carril A implementable: dual Grok GO para quedarse en integración (`sdd/reviews/20261001-grok-int-carrila-sdd.md`, `sdd/reviews/20261001-grok-int-carrila-scope.md`). Revalidar head antes de migrar.
+**Estado actualizado:** 2026-10-01; `origin/integration/storecore-int` en `f8f5eb6` (#118 Verify V19+axe; run `36824318135` SUCCESS). Carril A implementable: dual Grok GO para quedarse en integración (`sdd/reviews/20261001-grok-int-carrila-sdd.md`, `sdd/reviews/20261001-grok-int-carrila-scope.md`). Revalidar head antes de migrar.
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  
 **Git:** el baseline core está archivado; los deltas backend posteriores se integran por PR separado. No hay tag, deploy ni publish de 1.0.0.
@@ -28,7 +28,7 @@ Carriles de homologación: `sdd/wip/20260923-storecore-frontend-ux-system-v1/2-t
 
 UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones. En `ef2fc5b` Verify **sí ejecutó** steps (run `36821352445`) y falló de verdad: techo Flyway V18 vs V19 y axe antes de Chromium. Issue [#117](https://github.com/AgustinFalcon/storecore/issues/117) corrige eso; tampoco es verde hasta que ambos jobs pasen.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones. En `ef2fc5b` Verify **sí ejecutó** steps (run `36821352445`) y falló de verdad: techo Flyway V18 vs V19 y axe antes de Chromium. Issue [#117](https://github.com/AgustinFalcon/storecore/issues/117) merge [#118](https://github.com/AgustinFalcon/storecore/pull/118) (`f8f5eb6`): run `36824318135` backend+frontend **SUCCESS**. Eso no autoriza `master`, live ni `/sdd.finish`.
 
 ## Backend posterior al baseline core
 

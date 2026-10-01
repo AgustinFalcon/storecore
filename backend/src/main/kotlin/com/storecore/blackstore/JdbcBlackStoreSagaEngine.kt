@@ -7,7 +7,10 @@ import com.storecore.blackstore.domain.RequestHashAlgorithm
 import com.storecore.blackstore.domain.VerifiedCompanionPrincipal
 import com.storecore.catalog.application.port.output.PriceQuotePort
 import com.storecore.catalog.domain.PriceVersion
+import com.storecore.commerce.domain.InventoryChannel
+import com.storecore.commerce.domain.InventoryEventType
 import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.domain.ReservationStatus
 import com.storecore.commerce.infrastructure.ChannelProjectionLockOrder
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
@@ -188,17 +191,17 @@ class JdbcBlackStoreSagaEngine(
                 val reservationId = jdbc.queryForObject(
                     """
                     INSERT INTO inventory_reservations(variant_id, reservation_saga_key, reservation_line_key, quantity, status, expires_at)
-                    VALUES (?,?,?,?,'ACTIVE',?) RETURNING id
+                    VALUES (?,?,?,?,?,?) RETURNING id
                     """.trimIndent(),
                     Long::class.java,
-                    line.variantId, reservationRef, reservationKey, line.quantity, Timestamp.from(expiresAt),
+                    line.variantId, reservationRef, reservationKey, line.quantity, ReservationStatus.Active.wire, Timestamp.from(expiresAt),
                 )!!
                 appendLedger(
                     variantId = line.variantId,
                     reservationId = reservationId,
-                    eventType = "RESERVATION",
+                    eventType = InventoryEventType.Reservation,
                     delta = -line.quantity,
-                    key = BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RESERVATION"),
+                    key = BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, InventoryEventType.Reservation.wire),
                     actor = actor(quadruple),
                 )
                 jdbc.update(
@@ -216,9 +219,9 @@ class JdbcBlackStoreSagaEngine(
                     line.quantity,
                     line.priceVersion,
                     reservationKey,
-                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RESERVATION"),
-                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "STOCK_COMMIT_EXTERNAL"),
-                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, "RELEASE"),
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, InventoryEventType.Reservation.wire),
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, InventoryEventType.StockCommitExternal.wire),
+                    BlackStoreSagaPolicy.ledgerKey(reservationRef, line.variantId, InventoryEventType.Release.wire),
                 )
             }
             jdbc.update(
@@ -244,12 +247,12 @@ class JdbcBlackStoreSagaEngine(
                 appendLedger(
                     variantId = line.variantId,
                     reservationId = reservation,
-                    eventType = "STOCK_COMMIT_EXTERNAL",
+                    eventType = InventoryEventType.StockCommitExternal,
                     delta = -line.quantity,
-                    key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, "STOCK_COMMIT_EXTERNAL"),
+                    key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, InventoryEventType.StockCommitExternal.wire),
                     actor = actor(quadruple),
                 )
-                jdbc.update("UPDATE inventory_reservations SET status='CONSUMED' WHERE id=?", reservation)
+                jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", ReservationStatus.Consumed.wire, reservation)
             }
             jdbc.update(
                 "UPDATE blackstore_integration_operations SET state='COMMITTED', expires_at=NULL, updated_at=now() WHERE id=?",
@@ -259,7 +262,7 @@ class JdbcBlackStoreSagaEngine(
 
     override fun release(principal: VerifiedCompanionPrincipal, quadruple: BlackStoreQuadruple): BlackStoreOperationReceipt =
         mutateReserved(quadruple, already = "RELEASED", principal = principal, action = "STOCK_RELEASE") { row, lines ->
-            releaseStock(quadruple, row, lines, reservationStatus = "RELEASED", sagaState = "RELEASED")
+            releaseStock(quadruple, row, lines, reservationStatus = ReservationStatus.Released, sagaState = "RELEASED")
         }
 
     override fun expireDue(limit: Int): Int {
@@ -285,7 +288,7 @@ class JdbcBlackStoreSagaEngine(
         candidates.forEach { quadruple ->
             try {
                 mutateReserved(quadruple, already = "EXPIRED", skipLocked = true) { row, lines ->
-                    releaseStock(quadruple, row, lines, reservationStatus = "EXPIRED", sagaState = "EXPIRED")
+                    releaseStock(quadruple, row, lines, reservationStatus = ReservationStatus.Expired, sagaState = "EXPIRED")
                 }
                 expired += 1
             } catch (_: BlackStoreSagaException) {
@@ -422,7 +425,7 @@ class JdbcBlackStoreSagaEngine(
         quadruple: BlackStoreQuadruple,
         row: OperationRow,
         lines: List<LineRow>,
-        reservationStatus: String,
+        reservationStatus: ReservationStatus,
         sagaState: String,
     ) {
         lines.forEach { line ->
@@ -434,12 +437,12 @@ class JdbcBlackStoreSagaEngine(
             appendLedger(
                 variantId = line.variantId,
                 reservationId = reservation,
-                eventType = "RELEASE",
+                eventType = InventoryEventType.Release,
                 delta = line.quantity,
-                key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, "RELEASE"),
+                key = BlackStoreSagaPolicy.ledgerKey(row.reservationRef, line.variantId, InventoryEventType.Release.wire),
                 actor = actor(quadruple),
             )
-            jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", reservationStatus, reservation)
+            jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", reservationStatus.wire, reservation)
         }
         jdbc.update(
             "UPDATE blackstore_integration_operations SET state=?, updated_at=now() WHERE id=?",
@@ -447,22 +450,23 @@ class JdbcBlackStoreSagaEngine(
         )
     }
 
-    private fun appendLedger(variantId: Long, reservationId: Long, eventType: String, delta: Int, key: UUID, actor: String) {
+    private fun appendLedger(variantId: Long, reservationId: Long, eventType: InventoryEventType, delta: Int, key: UUID, actor: String) {
         jdbc.update(
             """
             INSERT INTO inventory_ledger(variant_id, reservation_id, event_idempotency_key, event_type, channel, quantity_delta, actor)
-            VALUES (?,?,?,?, 'EXTERNAL_BLACKSTORE', ?, ?)
+            VALUES (?,?,?,?,?,?,?)
             """.trimIndent(),
-            variantId, reservationId, key, eventType, delta, actor,
+            variantId, reservationId, key, eventType.wire, InventoryChannel.ExternalCompanion.wire, delta, actor,
         )
     }
 
     private fun lockReservation(reservationRef: UUID, variantId: Long): Long =
         jdbc.query(
-            "SELECT id FROM inventory_reservations WHERE reservation_saga_key=? AND variant_id=? AND status='ACTIVE' FOR UPDATE",
+            "SELECT id FROM inventory_reservations WHERE reservation_saga_key=? AND variant_id=? AND status=? FOR UPDATE",
             { rs, _ -> rs.getLong("id") },
             reservationRef,
             variantId,
+            ReservationStatus.Active.wire,
         ).singleOrNull() ?: throw BlackStoreSagaException.conflict()
 
     private fun lockBalances(variantIds: List<Long>): Map<Long, StockRow> {

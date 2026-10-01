@@ -6,8 +6,11 @@ import com.storecore.commerce.application.InsufficientInventory
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.application.port.output.InventoryReserveLine
+import com.storecore.commerce.domain.InventoryChannel
+import com.storecore.commerce.domain.InventoryEventType
 import com.storecore.commerce.domain.InventoryRow
 import com.storecore.commerce.domain.ProjectionSourceCause
+import com.storecore.commerce.domain.ReservationStatus
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.application.ResourceNotFound
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -69,17 +72,17 @@ class JdbcInventoryService(
         val emit = acquireScope(discovered, orderId, attemptId, reservationSaga = saga)
         val rows = jdbc.query(
             "SELECT id,variant_id,quantity,status FROM inventory_reservations WHERE reservation_saga_key=? ORDER BY variant_id, id",
-            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), rs.getString("status")) },
+            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), ReservationStatus.fromWire(rs.getString("status"))) },
             saga,
         )
-        val active = rows.filter { it.status == "ACTIVE" }
+        val active = rows.filter { it.status is ReservationStatus.Active }
         active.forEach { row ->
             jdbc.update("UPDATE inventory_balances SET reserved_quantity=reserved_quantity-?,updated_at=now() WHERE variant_id=?", row.quantity, row.variantId)
             jdbc.update(
-                "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'SALE','WEB',?,?)",
-                row.variantId, row.id, distinctKeys(1).single(), -row.quantity, actor,
+                "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,?,?,?,?)",
+                row.variantId, row.id, distinctKeys(1).single(), InventoryEventType.Sale.wire, InventoryChannel.Web.wire, -row.quantity, actor,
             )
-            jdbc.update("UPDATE inventory_reservations SET status='CONSUMED' WHERE id=?", row.id)
+            jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", ReservationStatus.Consumed.wire, row.id)
         }
         projectIfEligible(emit, discovered, ProjectionSourceCause.WebConsume)
         active.size
@@ -88,33 +91,33 @@ class JdbcInventoryService(
     override fun releaseSaga(saga: UUID, actor: String, orderId: Long?, attemptId: Long?): Int = transactions.execute {
         val discovered = jdbc.query(
             "SELECT id,variant_id,quantity,status FROM inventory_reservations WHERE reservation_saga_key=?",
-            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), rs.getString("status")) },
+            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), ReservationStatus.fromWire(rs.getString("status"))) },
             saga,
         )
         if (discovered.isEmpty()) return@execute 0
-        if (discovered.any { it.status == "CONSUMED" }) return@execute 0
+        if (discovered.any { it.status is ReservationStatus.Consumed }) return@execute 0
         val emit = acquireScope(discovered.map { it.variantId }, orderId, attemptId, reservationSaga = saga)
         val rows = jdbc.query(
             "SELECT id,variant_id,quantity,status FROM inventory_reservations WHERE reservation_saga_key=? ORDER BY variant_id, id",
-            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), rs.getString("status")) },
+            { rs, _ -> ReservationRow(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity"), ReservationStatus.fromWire(rs.getString("status"))) },
             saga,
         )
-        if (rows.any { it.status == "CONSUMED" }) return@execute 0
-        val active = rows.filter { it.status == "ACTIVE" }
+        if (rows.any { it.status is ReservationStatus.Consumed }) return@execute 0
+        val active = rows.filter { it.status is ReservationStatus.Active }
         if (active.isEmpty()) {
             projectIfEligible(emit, rows.map { it.variantId }, ProjectionSourceCause.WebRelease)
             return@execute 0
         }
         active.forEach { row ->
             jdbc.update(
-                "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'RELEASE','WEB',?,?)",
-                row.variantId, row.id, distinctKeys(1).single(), row.quantity, actor,
+                "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,?,?,?,?)",
+                row.variantId, row.id, distinctKeys(1).single(), InventoryEventType.Release.wire, InventoryChannel.Web.wire, row.quantity, actor,
             )
             jdbc.update(
                 "UPDATE inventory_balances SET available_quantity=available_quantity+?,reserved_quantity=reserved_quantity-?,updated_at=now() WHERE variant_id=?",
                 row.quantity, row.quantity, row.variantId,
             )
-            jdbc.update("UPDATE inventory_reservations SET status='RELEASED' WHERE id=?", row.id)
+            jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", ReservationStatus.Released.wire, row.id)
         }
         projectIfEligible(emit, rows.map { it.variantId }, ProjectionSourceCause.WebRelease)
         active.size
@@ -129,9 +132,9 @@ class JdbcInventoryService(
         variationId: String?,
     ): Long = transactions.execute {
         val existing = jdbc.query(
-            "SELECT id FROM inventory_ledger WHERE channel='MERCADO_LIBRE' AND external_order_id=? AND external_order_item_id=? AND variation_id IS NOT DISTINCT FROM ?",
+            "SELECT id FROM inventory_ledger WHERE channel=? AND external_order_id=? AND external_order_item_id=? AND variation_id IS NOT DISTINCT FROM ?",
             { rs, _ -> rs.getLong(1) },
-            externalOrderId, externalOrderItemId, variationId,
+            InventoryChannel.MercadoLibre.wire, externalOrderId, externalOrderItemId, variationId,
         ).firstOrNull()
         if (existing != null) return@execute existing
         val balance = lockBalance(variantId)
@@ -139,9 +142,9 @@ class JdbcInventoryService(
         jdbc.update("UPDATE inventory_balances SET available_quantity=available_quantity-?,updated_at=now() WHERE variant_id=?", quantity, variantId)
         jdbc.queryForObject(
             """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,external_order_id,external_order_item_id,variation_id,quantity_delta,actor)
-               VALUES (?,?,'SALE','MERCADO_LIBRE',?,?,?,?,?) RETURNING id""",
+               VALUES (?,?,?,?,?,?,?,?,?) RETURNING id""",
             Long::class.java,
-            variantId, distinctKeys(1).single(), externalOrderId, externalOrderItemId, variationId, -quantity, actor,
+            variantId, distinctKeys(1).single(), InventoryEventType.Sale.wire, InventoryChannel.MercadoLibre.wire, externalOrderId, externalOrderItemId, variationId, -quantity, actor,
         )!!
     }!!
 
@@ -149,23 +152,24 @@ class JdbcInventoryService(
     fun expireOverdue() {
         transactions.executeWithoutResult {
             val overdue = jdbc.query(
-                "SELECT id,variant_id,quantity FROM inventory_reservations WHERE status='ACTIVE' AND expires_at<=clock_timestamp() ORDER BY variant_id, id LIMIT 50",
+                "SELECT id,variant_id,quantity FROM inventory_reservations WHERE status=? AND expires_at<=clock_timestamp() ORDER BY variant_id, id LIMIT 50",
                 { rs, _ -> Triple(rs.getLong("id"), rs.getLong("variant_id"), rs.getInt("quantity")) },
+                ReservationStatus.Active.wire,
             )
             if (overdue.isEmpty()) return@executeWithoutResult
             val emit = acquireScope(overdue.map { it.second }, reservationIds = overdue.map { it.first })
             overdue.forEach { (id, variantId, quantity) ->
-                val status = jdbc.queryForObject("SELECT status FROM inventory_reservations WHERE id=?", String::class.java, id)
-                if (status != "ACTIVE") return@forEach
+                val status = ReservationStatus.fromWire(jdbc.queryForObject("SELECT status FROM inventory_reservations WHERE id=?", String::class.java, id))
+                if (status !is ReservationStatus.Active) return@forEach
                 jdbc.update(
-                    "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'RELEASE','WEB',?,?)",
-                    variantId, id, distinctKeys(1).single(), quantity, "EXPIRY",
+                    "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,?,?,?,?)",
+                    variantId, id, distinctKeys(1).single(), InventoryEventType.Release.wire, InventoryChannel.Web.wire, quantity, "EXPIRY",
                 )
                 jdbc.update(
                     "UPDATE inventory_balances SET available_quantity=available_quantity+?,reserved_quantity=reserved_quantity-?,updated_at=now() WHERE variant_id=?",
                     quantity, quantity, variantId,
                 )
-                jdbc.update("UPDATE inventory_reservations SET status='EXPIRED' WHERE id=?", id)
+                jdbc.update("UPDATE inventory_reservations SET status=? WHERE id=?", ReservationStatus.Expired.wire, id)
             }
             projectIfEligible(emit, overdue.map { it.second }, ProjectionSourceCause.WebExpiry)
         }
@@ -218,12 +222,12 @@ class JdbcInventoryService(
             line.quantity, line.quantity, line.variantId,
         )
         val reservationId = jdbc.queryForObject(
-            "INSERT INTO inventory_reservations(variant_id,reservation_saga_key,reservation_line_key,quantity,status,expires_at) VALUES (?,?,?,?,'ACTIVE',now()+interval '30 minutes') RETURNING id",
-            Long::class.java, line.variantId, saga, line.lineKey, line.quantity,
+            "INSERT INTO inventory_reservations(variant_id,reservation_saga_key,reservation_line_key,quantity,status,expires_at) VALUES (?,?,?,?,?,now()+interval '30 minutes') RETURNING id",
+            Long::class.java, line.variantId, saga, line.lineKey, line.quantity, ReservationStatus.Active.wire,
         )!!
         jdbc.update(
-            "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,'RESERVATION','WEB',?,?)",
-            line.variantId, reservationId, distinctKeys(1).single(), -line.quantity, actor,
+            "INSERT INTO inventory_ledger(variant_id,reservation_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,?,?,?,?)",
+            line.variantId, reservationId, distinctKeys(1).single(), InventoryEventType.Reservation.wire, InventoryChannel.Web.wire, -line.quantity, actor,
         )
         return reservationId
     }
@@ -320,7 +324,16 @@ class JdbcInventoryService(
     }
 
     private fun appendAdjustment(variantId: Long, delta: Int, actor: String, reason: String): Long {
-        val ledgerId = jdbc.queryForObject("INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,'ADJUSTMENT','INTERNAL',?,?) RETURNING id", Long::class.java, variantId, distinctKeys(1).single(), delta, actor)!!
+        val ledgerId = jdbc.queryForObject(
+            "INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor) VALUES (?,?,?,?,?,?) RETURNING id",
+            Long::class.java,
+            variantId,
+            distinctKeys(1).single(),
+            InventoryEventType.Adjustment.wire,
+            InventoryChannel.Internal.wire,
+            delta,
+            actor,
+        )!!
         jdbc.update(
             "INSERT INTO audit_events(actor_type,actor_id,event_type,aggregate_type,aggregate_id,payload_redacted) VALUES ('USER',?,'INVENTORY_ADJUSTED','INVENTORY_VARIANT',?,jsonb_build_object('ledgerId',?,'quantityDelta',?,'reason',?))",
             actor.removePrefix("USER:"), variantId, ledgerId, delta, reason,
@@ -332,5 +345,5 @@ class JdbcInventoryService(
         if (it.isEmpty() || it.length > 500) throw CommerceValidation("INVENTORY_ADJUSTMENT_REASON_REQUIRED")
     }
 
-    private data class ReservationRow(val id: Long, val variantId: Long, val quantity: Int, val status: String)
+    private data class ReservationRow(val id: Long, val variantId: Long, val quantity: Int, val status: ReservationStatus)
 }

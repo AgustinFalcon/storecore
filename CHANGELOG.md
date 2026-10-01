@@ -4,6 +4,7 @@
 
 Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-041.
 
+- Inventario: writes de ledger y reserva usan sealed `InventoryEventType` / `InventoryChannel` / `ReservationStatus` con `fromWire` + `Unknown`. Wires V1/V6 no cambian. Issue [#119](https://github.com/AgustinFalcon/storecore/issues/119). Sin Flyway ni live.
 - POSC-006 / PIC-006A: suite PG16 Spring de GET/reconcile RO (`Posc006aGetReconcileRoTest`); sin cambios productivos. Merge [#82](https://github.com/AgustinFalcon/storecore/pull/82).
 - POSC-005: topología HTTP OpenAPI pinneada y envelope 401 (`Posc005WireTopologyTest`); merge [#83](https://github.com/AgustinFalcon/storecore/pull/83).
 - TASK-DSP-000B: snapshot SECURITY DEFINER `MARKETPLACE_ML/SYNC` (V15); `decide` consume la foto; V3 genérico rechaza ML. Merge [#84](https://github.com/AgustinFalcon/storecore/pull/84).
