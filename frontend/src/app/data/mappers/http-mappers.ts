@@ -5,6 +5,11 @@ import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalo
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
+import { OrderStatus } from '../../domain/order/order-status';
+import { PaymentStatus } from '../../domain/order/payment-status';
+import { RmaStatus } from '../../domain/order/rma-status';
+import { ShipmentStatus } from '../../domain/order/shipment-status';
+import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import {
   CapabilityModule,
   CapabilityState,
@@ -226,8 +231,8 @@ export function mapReceipt(value: unknown): CheckoutReceipt {
   const row = asRecord(value);
   return {
     orderId: text(row['orderId']),
-    paymentStatus: text(row['paymentStatus']),
-    orderStatus: text(row['orderStatus']),
+    paymentStatus: PaymentStatus.fromWire(text(row['paymentStatus'])),
+    orderStatus: OrderStatus.fromWire(text(row['orderStatus'])),
     checkoutUrl: text(row['checkoutUrl']) || null,
   };
 }
@@ -236,9 +241,9 @@ function mapOrder(value: unknown): CustomerOrder {
   const row = asRecord(value);
   return {
     id: text(row['id']),
-    orderStatus: text(row['orderStatus']),
-    paymentStatus: text(row['paymentStatus']),
-    shipmentStatus: text(row['shipmentStatus']),
+    orderStatus: OrderStatus.fromWire(text(row['orderStatus'])),
+    paymentStatus: PaymentStatus.fromWire(text(row['paymentStatus'])),
+    shipmentStatus: ShipmentStatus.fromWire(text(row['shipmentStatus'])),
     tracking: text(row['tracking']) || null,
     total: num(row['total']),
     lines: items(row['lines']).map(mapCartLine),
@@ -255,7 +260,7 @@ export function mapCustomerOrders(value: unknown): readonly CustomerOrder[] {
 
 export function mapAdminOrder(value: unknown): AdminOrder {
   const row = asRecord(value);
-  return { ...mapOrder(value), rmaStatus: text(row['rmaStatus']) || null };
+  return { ...mapOrder(value), rmaStatus: RmaStatus.fromOptionalWire(text(row['rmaStatus'])) };
 }
 
 export function mapAdminOrders(value: unknown): readonly AdminOrder[] {
@@ -291,14 +296,12 @@ export function mapPreview(value: unknown): ProfilePreview {
   };
 }
 
-const CAPABILITY_STATES: readonly CapabilityState[] = ['DISABLED', 'READ_ONLY', 'ACTIVE', 'PAUSED', 'ERROR'];
-
 export function mapCapability(value: unknown): CapabilityModule {
   const row = asRecord(value);
-  const state = text(row['state']) as CapabilityState;
+  const state = CapabilityModuleState.fromWire(text(row['state']));
   return {
     module: text(row['module']),
-    state: CAPABILITY_STATES.includes(state) ? state : 'DISABLED',
+    state: (state === CapabilityModuleState.Unknown ? CapabilityModuleState.Disabled.wire : state.wire) as CapabilityState,
   };
 }
 

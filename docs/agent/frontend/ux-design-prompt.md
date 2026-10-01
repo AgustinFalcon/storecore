@@ -37,7 +37,7 @@ Hay **dos identidades que nunca se mezclan**:
 
 Misma paleta. Distinto ritmo.
 
-**Prohibido diseñar ahora:** POS/BlackStore, facturación ARCA, Mercado Pago wallet/checkout embebido, loyalty, favoritos, carriers, calendario comercial, automatización de precios ML, kits, banners DEMO, selector de tenant, `store_id`, marketplace multi-comercio, dark mode.
+**Prohibido diseñar ahora:** venta física / POS companion, facturación ARCA, Mercado Pago wallet/checkout embebido, loyalty, favoritos, carriers, calendario comercial, automatización de precios ML, kits, banners DEMO, selector de tenant, `store_id`, marketplace multi-comercio, dark mode.
 
 **Prohibido visual:**
 

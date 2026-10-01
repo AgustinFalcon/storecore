@@ -52,4 +52,4 @@ Estados globales de **todas**: default / loading / vacío / error+Reintentar / d
 
 ## Fuera de este WIP
 
-BlackStore/POS, fiscal, favoritos, loyalty, carriers, calendario, automatización ML, kits, DEMO, tenancy.
+Venta física / POS companion, fiscal, favoritos, loyalty, carriers, calendario, automatización ML, kits, DEMO, tenancy.

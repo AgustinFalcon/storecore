@@ -28,4 +28,4 @@ CUSTOMER y USER no comparten cookie. Browser no guarda Bearer/JWT. Production `a
 
 ## Fuera
 
-No Flyway, no Kotlin, no BlackStore UI, no secretos, no deploy.
+No Flyway, no Kotlin, no UI de venta física / POS companion, no secretos, no deploy.

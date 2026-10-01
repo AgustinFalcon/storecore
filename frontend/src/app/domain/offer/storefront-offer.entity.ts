@@ -1,12 +1,15 @@
+import { DiscountType } from './discount-type';
+import { OfferStatus } from './offer-status';
+
 /** Row of the offers table: storefront vitrina / happy hour. The browser does not price it. */
 export interface StorefrontOffer {
   readonly id: string;
   readonly name: string;
-  readonly status: string;
+  readonly status: OfferStatus;
   readonly priority: number;
   readonly startsAt: string;
   readonly endsAt: string;
-  readonly discountType: string;
+  readonly discountType: DiscountType;
   readonly discountValue: string;
   readonly minMarginPercent: string;
   readonly skus: readonly string[];
@@ -14,17 +17,17 @@ export interface StorefrontOffer {
   readonly approvedAt: string | null;
 }
 
-export type StorefrontOfferStatus = 'DRAFT' | 'ACTIVE';
-export type StorefrontDiscountType = 'PERCENT' | 'FIXED';
+export type StorefrontOfferStatus = OfferStatus;
+export type StorefrontDiscountType = DiscountType;
 
 /** Write body for POST /api/v1/user/offers. Discount fields stay operator text. */
 export interface StorefrontOfferWrite {
   readonly name: string;
-  readonly status: StorefrontOfferStatus;
+  readonly status: OfferStatus;
   readonly priority: number;
   readonly startsAt: string;
   readonly endsAt: string;
-  readonly discountType: StorefrontDiscountType;
+  readonly discountType: DiscountType;
   readonly discountValue: string;
   readonly minMarginPercent: string;
   readonly skus: readonly string[];
@@ -32,11 +35,11 @@ export interface StorefrontOfferWrite {
 
 export interface StorefrontOfferDraft {
   readonly name: string;
-  readonly status: StorefrontOfferStatus;
+  readonly status: OfferStatus;
   readonly priority: number;
   readonly startsAt: string;
   readonly endsAt: string;
-  readonly discountType: StorefrontDiscountType;
+  readonly discountType: DiscountType;
   readonly discountValue: string;
   readonly minMarginPercent: string;
   readonly skusText: string;

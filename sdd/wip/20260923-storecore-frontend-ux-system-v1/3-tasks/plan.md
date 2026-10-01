@@ -10,6 +10,6 @@
 | UX-STITCH-P | P-01 vacío/retail, P-02, P-03, C-01/C-02, flujo compra | Done en Stitch |
 | UX-STITCH-CU | C-01…C-09 y U-01…U-10, una pieza por ruta | Done en Stitch `6473866243657965808` |
 | UX-ANG | Volcar a Angular | Done bajo Sol CONDITIONAL_GO 2026-09-23: layout/tokens en rutas existentes. Sin archive. |
-| UX-BS | BlackStore back/front | Fuera de este WIP |
+| UX-BS | Venta física / POS companion | Fuera de este WIP; solo `integration/storecore-int`, nunca `master` |
 
 No hay `/sdd.finish` archive. UX-ANG quedó en las views existentes; el cierre del WIP sigue bloqueado por gates live.

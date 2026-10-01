@@ -10,7 +10,7 @@
 
 ## Fuera de este frontend
 
-- Adapter BlackStore y `/blackstore-integration/v1`.
+- Adapter de venta física / POS companion y su contrato HTTP interno.
 - Fiscal / ARCA.
 - Live vendor HTTP (credenciales MP/ML). TODO-041 worker+fake está in-repo; la UI U-07/U-08 sigue read-only + mapping.
 - Marketplace, feature flags, `store_id`.

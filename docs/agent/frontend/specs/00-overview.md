@@ -17,7 +17,7 @@ Plan frontend del core `storecore-core-v1.0.0`. Patrón AssistTime `release/1.4`
 | TASK-013..015 | Reviews de calidad | Fuera de este frontend |
 | Hardening API | Mappers, validación, 401, login navigate | Hecho |
 
-Prohibido: fixtures, Universal Tools hardcodeado, `store_id`, BlackStore, fiscal, credenciales reales.
+Prohibido: fixtures, Universal Tools hardcodeado, `store_id`, venta física / POS companion, fiscal, credenciales reales.
 
 Inventario UX (todas las pantallas): `docs/agent/frontend/screens.md`.
 Prompt de diseño (copiar a la IA de UX): `docs/agent/frontend/ux-design-prompt.md`.

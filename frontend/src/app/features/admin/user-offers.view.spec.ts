@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { DiscountType } from '../../domain/offer/discount-type';
+import { OfferStatus } from '../../domain/offer/offer-status';
 import { UserOffersState } from './user-offers.store';
 import { UserOffersViewComponent } from './user-offers.view';
 
@@ -33,11 +35,11 @@ describe('UserOffersView', () => {
           {
             id: '4',
             name: 'Happy hour',
-            status: 'ACTIVE',
+            status: OfferStatus.Active,
             priority: 10,
             startsAt: '2026-09-26T21:00:00.000Z',
             endsAt: '2026-09-26T23:00:00.000Z',
-            discountType: 'PERCENT',
+            discountType: DiscountType.Percent,
             discountValue: '12.50',
             minMarginPercent: '5',
             skus: ['SKU-1'],
@@ -63,11 +65,11 @@ function state(overrides: Partial<UserOffersState> = {}): UserOffersState {
     offers: [],
     draft: {
       name: '',
-      status: 'DRAFT',
+      status: OfferStatus.Draft,
       priority: 0,
       startsAt: '',
       endsAt: '',
-      discountType: 'PERCENT',
+      discountType: DiscountType.Percent,
       discountValue: '',
       minMarginPercent: '',
       skusText: '',

@@ -1,49 +1,26 @@
-import { RmaTransition, ShipmentTransition } from './order.entity';
+import { RmaStatus, RmaTransition } from './rma-status';
+import { ShipmentStatus, ShipmentTransition } from './shipment-status';
 
-export function nextShipment(status: string): ShipmentTransition | null {
-  switch (status) {
-    case 'PREPARING':
-      return 'SHIPPED';
-    case 'SHIPPED':
-      return 'DELIVERED';
-    case 'DELIVERED':
-      return null;
-    default:
-      return 'PACKED';
-  }
+export function nextShipment(status: ShipmentStatus | string): ShipmentTransition | null {
+  const current = status instanceof ShipmentStatus ? status : ShipmentStatus.fromWire(status);
+  return current.next;
 }
 
-export function nextRma(status: string | null): RmaTransition | null {
-  switch (status) {
-    case 'RETURN_RECEIVED':
-      return 'INSPECTED';
-    case 'INSPECTED':
-      return 'ADJUSTED';
-    case 'CLOSED':
-      return null;
-    default:
-      return 'RECEIVED';
+export function nextRma(status: RmaStatus | string | null): RmaTransition | null {
+  if (status instanceof RmaStatus) {
+    return status.next;
   }
+  const current = RmaStatus.fromOptionalWire(status);
+  if (current == null) {
+    return RmaTransition.Received;
+  }
+  return current.next;
 }
 
 export function shipmentLabel(status: ShipmentTransition): string {
-  switch (status) {
-    case 'PACKED':
-      return 'Empacar';
-    case 'SHIPPED':
-      return 'Enviar';
-    case 'DELIVERED':
-      return 'Entregar';
-  }
+  return status.label;
 }
 
 export function rmaLabel(status: RmaTransition): string {
-  switch (status) {
-    case 'RECEIVED':
-      return 'RMA recibido';
-    case 'INSPECTED':
-      return 'Inspeccionar';
-    case 'ADJUSTED':
-      return 'Ajustar stock';
-  }
+  return status.label;
 }

@@ -50,4 +50,4 @@ Shell: skip-link, nav Storefront / Catálogo / Carrito / Customer / User, estado
 
 ## No pedir a UX ahora
 
-BlackStore/POS, fiscal/ARCA, favorites, loyalty, carriers reales, calendario comercial, automatización ML de precios, kits virtuales, fixtures DEMO.
+Venta física / POS companion, fiscal/ARCA, favorites, loyalty, carriers reales, calendario comercial, automatización ML de precios, kits virtuales, fixtures DEMO.

@@ -19,4 +19,12 @@ export class UserMercadoLibreViewComponent {
   patch(partial: Partial<MercadoLibreListing>): void {
     this.draftChange.emit({ ...this.state.listingDraft, ...partial });
   }
+
+  parseAccountId(value: string | number | null): number | null {
+    if (value === '' || value == null) {
+      return null;
+    }
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
 }

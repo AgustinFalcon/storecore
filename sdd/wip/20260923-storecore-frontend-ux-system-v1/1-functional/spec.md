@@ -8,7 +8,7 @@ Las views Angular DS-00…U-10 existen en master, pero el sistema visual no esta
 
 ## Objetivo
 
-Documentar y diseñar (Stitch) el sistema visual y **todas** las superficies del core: tokens, primitivas, dialogos, errores, formatos, tipografía, y las 22 rutas. Implementación Angular: otro GO. BlackStore: otro repo/tramo.
+Documentar y diseñar (Stitch) el sistema visual y **todas** las superficies del core: tokens, primitivas, dialogos, errores, formatos, tipografía, y las 22 rutas. Implementación Angular: otro GO. Venta física / POS companion: otro repo/tramo, no este dossier.
 
 ## Inventario (obligatorio)
 
@@ -28,7 +28,7 @@ Ver `docs/agent/frontend/screens.md` + `1-functional/product-decision-home-carou
 
 ## No alcance
 
-POS/BlackStore UI, fiscal, favoritos, loyalty, carriers reales, calendario, automatización ML, kits, DEMO, tenancy, deploy.
+UI de venta física / POS companion, fiscal, favoritos, loyalty, carriers reales, calendario, automatización ML, kits, DEMO, tenancy, deploy.
 
 ## AC
 

@@ -1,6 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { AdminOrder } from '../../domain/order/order.entity';
+import { OrderStatus } from '../../domain/order/order-status';
+import { PaymentStatus } from '../../domain/order/payment-status';
+import { RmaStatus, RmaTransition } from '../../domain/order/rma-status';
+import { ShipmentStatus, ShipmentTransition } from '../../domain/order/shipment-status';
 import { FulfillmentViewComponent } from './fulfillment.view';
 
 const SHIP_LABELS = ['Empacar', 'Enviar', 'Entregar'] as const;
@@ -9,12 +13,12 @@ const RMA_LABELS = ['RMA recibido', 'Inspeccionar', 'Ajustar stock'] as const;
 function order(id: string, shipmentStatus: string, rmaStatus: string | null): AdminOrder {
   return {
     id,
-    orderStatus: 'PAID',
-    paymentStatus: 'APPROVED',
-    shipmentStatus,
-    tracking: shipmentStatus === 'SHIPPED' ? 'TRK-1' : null,
+    orderStatus: OrderStatus.Paid,
+    paymentStatus: PaymentStatus.Approved,
+    shipmentStatus: ShipmentStatus.fromWire(shipmentStatus),
+    tracking: ShipmentStatus.fromWire(shipmentStatus) === ShipmentStatus.Shipped ? 'TRK-1' : null,
     total: 100,
-    rmaStatus,
+    rmaStatus: RmaStatus.fromOptionalWire(rmaStatus),
     lines: [
       {
         sku: 'SKU-1',
@@ -85,15 +89,15 @@ describe('FulfillmentViewComponent', () => {
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    const shipped: Array<{ orderId: string; status: string; tracking: string | null }> = [];
-    const returned: Array<{ orderId: string; status: string }> = [];
+    const shipped: Array<{ orderId: string; status: ShipmentTransition; tracking: string | null }> = [];
+    const returned: Array<{ orderId: string; status: RmaTransition }> = [];
     fixture.componentInstance.ship.subscribe((event) => shipped.push(event));
     fixture.componentInstance.rma.subscribe((event) => returned.push(event));
 
     (actions.querySelector('button.sc-btn--primary') as HTMLButtonElement).click();
     (actions.querySelector('button.sc-btn--ghost') as HTMLButtonElement).click();
 
-    expect(shipped).toEqual([{ orderId: 'ord-9', status: 'SHIPPED', tracking: 'ANDES-9' }]);
-    expect(returned).toEqual([{ orderId: 'ord-9', status: 'INSPECTED' }]);
+    expect(shipped).toEqual([{ orderId: 'ord-9', status: ShipmentTransition.Shipped, tracking: 'ANDES-9' }]);
+    expect(returned).toEqual([{ orderId: 'ord-9', status: RmaTransition.Inspected }]);
   });
 });

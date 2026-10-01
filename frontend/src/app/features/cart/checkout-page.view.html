@@ -39,8 +39,8 @@
       @if (state.receipt) {
         <p>
           Orden {{ state.receipt.orderId }}
-          · <span class="sc-badge sc-badge--info">pago {{ state.receipt.paymentStatus }}</span>
-          · <span class="sc-badge">orden {{ state.receipt.orderStatus }}</span>
+          · <span class="sc-badge sc-badge--info">pago {{ state.receipt.paymentStatus.label }}</span>
+          · <span class="sc-badge">orden {{ state.receipt.orderStatus.label }}</span>
         </p>
       }
     </aside>

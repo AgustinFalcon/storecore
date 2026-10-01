@@ -4,6 +4,8 @@ import { tapResponse } from '@ngrx/operators';
 import { filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
+import { DiscountType } from '../../domain/offer/discount-type';
+import { OfferStatus } from '../../domain/offer/offer-status';
 import { StorefrontOffer, StorefrontOfferDraft, StorefrontOfferWrite } from '../../domain/offer/storefront-offer.entity';
 import { ManageStorefrontOffersUseCase } from '../../domain/offer/use-cases/manage-storefront-offers.usecase';
 
@@ -16,11 +18,11 @@ export interface UserOffersState {
 
 const emptyDraft: StorefrontOfferDraft = {
   name: '',
-  status: 'DRAFT',
+  status: OfferStatus.Draft,
   priority: 0,
   startsAt: '',
   endsAt: '',
-  discountType: 'PERCENT',
+  discountType: DiscountType.Percent,
   discountValue: '',
   minMarginPercent: '',
   skusText: '',
@@ -104,10 +106,10 @@ function offerDraftError(draft: StorefrontOfferDraft): string {
   if (!draft.name.trim() || !draft.startsAt.trim() || !draft.endsAt.trim() || !draft.discountValue.trim() || !draft.minMarginPercent.trim() || skus.length === 0) {
     return 'Nombre, vigencia, descuento, margen y al menos un SKU son obligatorios.';
   }
-  if (draft.status !== 'DRAFT' && draft.status !== 'ACTIVE') {
+  if (!draft.status.writable) {
     return 'El estado tiene que ser borrador o activa.';
   }
-  if (draft.discountType !== 'PERCENT' && draft.discountType !== 'FIXED') {
+  if (draft.discountType === DiscountType.Unknown) {
     return 'El descuento tiene que ser porcentaje o monto fijo.';
   }
   if (!isValidOfferWindow(draft.startsAt, draft.endsAt)) {

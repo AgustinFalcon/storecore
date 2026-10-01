@@ -24,6 +24,8 @@
 
 ## Gate actual
 
+Carriles de homologación: `sdd/wip/20260923-storecore-frontend-ux-system-v1/2-technical/homologation-lanes.md`. Dossier presentable = comercio web a `master`; el SDD de venta física/POS companion queda en `integration/storecore-int` y **no se promociona a `master`**. Issue FE↔BE [#106](https://github.com/AgustinFalcon/storecore/issues/106). Walk local Carril A (2026-09-30): FE `:4200` → proxy `/api` → BE `:8080` sobre `storecore-homolog-pg`; checkout crea orden `PENDING_PAYMENT` sin cobro MP; ML y POS companion apagados; la consola no lista el módulo companion ni muestra su código interno. ML live, competidores, precio automático, MP-LIVE-05, Correo/carriers y fiscal siguen inventariados como homologación posterior.
+
 UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
 Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones.
