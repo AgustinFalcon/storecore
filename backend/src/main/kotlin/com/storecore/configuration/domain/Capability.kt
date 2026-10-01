@@ -12,4 +12,8 @@ sealed interface CapabilityActor {
     data class Internal(val principal: InternalUserPrincipal) : CapabilityActor
 }
 
-data class CapabilityModuleView(val module: String, val state: CapabilityState, val configVersion: Int)
+data class CapabilityModuleView(
+    val module: InstallationCapabilityModule,
+    val state: CapabilityState,
+    val configVersion: Int,
+)

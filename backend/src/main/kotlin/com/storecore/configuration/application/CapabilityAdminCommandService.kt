@@ -23,12 +23,12 @@ class CapabilityAdminCommandService(
         val expected = if (command.expectedConfigVersion > 0) {
             command.expectedConfigVersion
         } else {
-            capabilities.list().first { it.module == command.module }.configVersion
+            capabilities.list().first { it.module.wire == command.module }.configVersion
         }
         val resolved = command.copy(expectedConfigVersion = expected)
         val nextCsrf = admit(actor, csrf, resolved)
         commands.commit(actor, resolved)
-        val view = capabilities.list().first { it.module == resolved.module }
+        val view = capabilities.list().first { it.module.wire == resolved.module }
         return CapabilityAdminMutation(view, nextCsrf)
     }
 
