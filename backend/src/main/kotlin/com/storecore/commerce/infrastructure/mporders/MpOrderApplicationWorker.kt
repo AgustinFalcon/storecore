@@ -8,6 +8,8 @@ import com.storecore.commerce.domain.CommercialEffect
 import com.storecore.commerce.domain.MpOrderCommercialPolicy
 import com.storecore.commerce.domain.OfficialOrderResource
 import com.storecore.commerce.domain.OfficialOrderStatusInput
+import com.storecore.commerce.domain.OrderStatus
+import com.storecore.commerce.domain.PaymentStatus
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import org.springframework.dao.DataIntegrityViolationException
@@ -148,10 +150,10 @@ class MpOrderApplicationWorker(
             return true
         }
         persistTransactions(attempt.id, official)
-        jdbc.update("UPDATE payments SET status='APPROVED',updated_at=now() WHERE id=? AND order_id=?", attempt.paymentId, attempt.orderId)
+        jdbc.update("UPDATE payments SET status=?,updated_at=now() WHERE id=? AND order_id=?", PaymentStatus.Approved.wire, attempt.paymentId, attempt.orderId)
         val stock = consumeOrReview(attempt.orderId, attempt.id)
-        val orderStatus = if (stock) "PAID" else "PAID_STOCK_REVIEW"
-        jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=?", orderStatus, attempt.orderId)
+        val orderStatus = if (stock) OrderStatus.Paid else OrderStatus.PaidStockReview
+        jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=?", orderStatus.wire, attempt.orderId)
         jdbc.update("UPDATE mp_checkout_attempts SET state='ACCREDITED',updated_at=now() WHERE id=?", attempt.id)
         if (!stock) {
             jdbc.update(
@@ -238,9 +240,9 @@ class MpOrderApplicationWorker(
     }
 
     private fun terminateUnpaid(inboxId: Long, attempt: AttemptRow, official: OfficialOrderResource, effect: CommercialEffect): Boolean {
-        val paymentStatus = if (effect == CommercialEffect.REJECT) "REJECTED" else "CANCELLED"
-        jdbc.update("UPDATE payments SET status=?,updated_at=now() WHERE id=? AND order_id=? AND status='PENDING'", paymentStatus, attempt.paymentId, attempt.orderId)
-        jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=now() WHERE id=? AND status='PENDING_PAYMENT'", attempt.orderId)
+        val paymentStatus = PaymentStatus.forUnpaidTermination(effect)
+        jdbc.update("UPDATE payments SET status=?,updated_at=now() WHERE id=? AND order_id=? AND status=?", paymentStatus.wire, attempt.paymentId, attempt.orderId, PaymentStatus.Pending.wire)
+        jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=? AND status=?", OrderStatus.Cancelled.wire, attempt.orderId, OrderStatus.PendingPayment.wire)
         jdbc.update("UPDATE mp_checkout_attempts SET state='TERMINAL_UNPAID_VERIFIED',updated_at=now() WHERE id=?", attempt.id)
         persistTransactions(attempt.id, official)
         val applicationId = jdbc.query(
@@ -249,9 +251,9 @@ class MpOrderApplicationWorker(
                ) VALUES (?,?,?,?,?,?, 'ARS')
                ON CONFLICT (provider_order_id,transition) DO NOTHING RETURNING id""",
             { rs, _ -> rs.getLong(1) },
-            inboxId, attempt.id, attempt.orderId, official.providerOrderId, "PAYMENT_$paymentStatus", official.paidAmount,
+            inboxId, attempt.id, attempt.orderId, official.providerOrderId, "PAYMENT_${paymentStatus.wire}", official.paidAmount,
         ).firstOrNull()
-        if (applicationId != null) emitVerified(applicationId, official, "PAYMENT_$paymentStatus")
+        if (applicationId != null) emitVerified(applicationId, official, "PAYMENT_${paymentStatus.wire}")
         sagaOf(attempt.orderId)?.let { saga ->
             inventory.releaseSaga(saga, "MP_ORDERS:${attempt.orderId}", attempt.orderId, attempt.id)
         }

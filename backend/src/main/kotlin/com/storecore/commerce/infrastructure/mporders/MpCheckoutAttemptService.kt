@@ -12,6 +12,7 @@ import com.storecore.commerce.domain.CreationDecision
 import com.storecore.commerce.domain.ExpectedOrderIdentity
 import com.storecore.commerce.domain.MpCheckoutAttemptPolicy
 import com.storecore.commerce.domain.ProposeAttemptDecision
+import com.storecore.commerce.domain.PaymentStatus
 import com.storecore.commerce.domain.ProposeAttemptInput
 import com.storecore.commerce.domain.SearchDecision
 import com.storecore.commerce.domain.SearchEvaluationInput
@@ -78,7 +79,7 @@ class MpCheckoutAttemptService(
                     attemptNo = nextNo,
                     idempotencyKey = idempotencyKey,
                     existingAttempts = existing,
-                    financialAccredited = order.paymentStatus == "APPROVED",
+                    financialAccredited = PaymentStatus.fromWire(order.paymentStatus).isApproved(),
                 ),
             )
             val snapshot = when (decision) {
