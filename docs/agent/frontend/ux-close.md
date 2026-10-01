@@ -16,7 +16,7 @@ Plan `docs/agent/frontend/ux-handoff.md` cerrado. Las 22 superficies (DS-00 + P-
 
 ## Qué no cierra esto
 
-- Release, tag, deploy, POS/BlackStore adapter, fiscal/ARCA, credenciales live de vendor.
+- Release, tag, deploy, adapter de venta física / POS companion, fiscal/ARCA, credenciales live de vendor.
 
 ## Evidencia
 

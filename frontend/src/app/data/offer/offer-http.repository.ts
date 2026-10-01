@@ -19,7 +19,11 @@ export class OfferHttpRepository implements IOfferRepository {
 
   save(offer: StorefrontOfferWrite): Observable<StorefrontOffer> {
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/offers`, offer)
+      .post<unknown>(`${environment.apiBaseUrl}/user/offers`, {
+        ...offer,
+        status: offer.status.wire,
+        discountType: offer.discountType.wire,
+      })
       .pipe(map((body) => mapStorefrontOffer(readApiBody<unknown>(body))));
   }
 }

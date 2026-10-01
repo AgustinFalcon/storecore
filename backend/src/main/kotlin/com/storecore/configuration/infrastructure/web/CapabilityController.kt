@@ -3,8 +3,10 @@ package com.storecore.configuration.infrastructure.web
 import com.storecore.configuration.application.CapabilityAdminCommandService
 import com.storecore.configuration.application.CapabilityAdministrationPort
 import com.storecore.configuration.application.CapabilityCorrelationRequired
+import com.storecore.configuration.application.CapabilityConfigurationMissing
 import com.storecore.configuration.domain.CapabilityAdminCommand
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.infrastructure.web.BaseResponse
 import com.storecore.identity.infrastructure.web.RequestAuth
 import jakarta.servlet.http.HttpServletRequest
@@ -34,11 +36,16 @@ class CapabilityController(
     @GetMapping
     fun list(http: HttpServletRequest): BaseResponse<List<Map<String, Any?>>> {
         auth.operatorOrAdmin(http)
-        return BaseResponse.ok(capabilities.list().map { mapOf("module" to it.module, "state" to it.state.name, "configVersion" to it.configVersion) })
+        return BaseResponse.ok(
+            capabilities.list()
+                .filter { InstallationCapabilityModule.fromWire(it.module).visibleOnConsole }
+                .map { mapOf("module" to it.module, "state" to it.state.name, "configVersion" to it.configVersion) },
+        )
     }
 
     @PostMapping("/{module}/state")
     fun changeState(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @Valid @RequestBody request: CapabilityStateRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        requireConsoleModule(module)
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
         val mutation = adminCommands.changeState(
@@ -52,6 +59,7 @@ class CapabilityController(
 
     @PostMapping("/{module}/kills")
     fun createKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        requireConsoleModule(module)
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
         val mutation = adminCommands.createKill(
@@ -64,6 +72,7 @@ class CapabilityController(
 
     @PostMapping("/{module}/kills/{id}/remove")
     fun removeKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillCloseRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        requireConsoleModule(module)
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
         val mutation = adminCommands.removeKill(actor, csrf, CapabilityAdminCommand.KillRemove(request.correlationId, module, id, request.reason))
@@ -72,6 +81,7 @@ class CapabilityController(
 
     @PostMapping("/{module}/kills/{id}/replace")
     fun replaceKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+        requireConsoleModule(module)
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
         val mutation = adminCommands.replaceKill(
@@ -87,6 +97,12 @@ class CapabilityController(
         val actor = auth.admin(http)
         val result = adminCommands.status(actor, correlationId)
         return BaseResponse.ok(mapOf("correlationId" to correlationId, "result" to result))
+    }
+
+    private fun requireConsoleModule(module: String) {
+        if (!InstallationCapabilityModule.fromWire(module).visibleOnConsole) {
+            throw CapabilityConfigurationMissing()
+        }
     }
 
     @PostMapping("/commands/{correlationId}/abort")

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { USER_REPOSITORY } from '../../../core/tokens/user.tokens';
+import { CapabilityModuleId } from '../capability-module-id';
 import {
   CapabilityModule,
   CapabilityState,
@@ -15,10 +16,15 @@ export class ManageInstallationUseCase {
   constructor(@Inject(USER_REPOSITORY) private readonly repo: IUserRepository) {}
 
   listCapabilities(): Observable<readonly CapabilityModule[]> {
-    return this.repo.listCapabilities();
+    return this.repo.listCapabilities().pipe(
+      map((items) => items.filter((item) => CapabilityModuleId.fromWire(item.module).homologationVisible)),
+    );
   }
 
   setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
+    if (!CapabilityModuleId.fromWire(module).homologationVisible) {
+      throw new Error('Este módulo no forma parte de la consola de homologación.');
+    }
     return this.repo.setCapability(module, state);
   }
 

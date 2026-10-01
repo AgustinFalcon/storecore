@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="cap-title">Capabilities</h1>
-    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Sin feature flags genéricos.</p>
+    <p class="sc-page__lede">Estados tipados: apagado, solo lectura, activo, pausado y error. Sin feature flags genéricos.</p>
   </header>
   <sc-feature-status
     [loading]="loading"
@@ -12,8 +12,8 @@
     (retry)="retry.emit()"
   />
   <ul class="sc-legend" aria-label="Estados de capability">
-    @for (state of states; track state) {
-      <li><span class="sc-badge">{{ state }}</span></li>
+    @for (state of states; track state.wire) {
+      <li><span class="sc-badge">{{ state.label }}</span></li>
     }
   </ul>
   @if (items.length) {
@@ -30,27 +30,27 @@
         <tbody>
           @for (item of items; track item.module) {
             <tr>
-              <td>{{ item.module }}</td>
+              <td>{{ moduleOf(item.module).label }}</td>
               <td>
                 <span
                   class="sc-badge"
-                  [class.sc-badge--info]="item.state === 'READ_ONLY'"
-                  [class.sc-badge--ok]="item.state === 'ACTIVE'"
-                  [class.sc-badge--warn]="item.state === 'PAUSED'"
-                  [class.sc-badge--err]="item.state === 'ERROR'"
-                >{{ item.state }}</span>
+                  [class.sc-badge--info]="stateOf(item.state).tone === 'info'"
+                  [class.sc-badge--ok]="stateOf(item.state).tone === 'ok'"
+                  [class.sc-badge--warn]="stateOf(item.state).tone === 'warn'"
+                  [class.sc-badge--err]="stateOf(item.state).tone === 'err'"
+                >{{ stateOf(item.state).label }}</span>
               </td>
               <td class="sc-table__actions">
-                @for (state of states; track state) {
+                @for (state of states; track state.wire) {
                   <button
                     type="button"
                     class="sc-btn sc-btn--ghost"
-                    [class.is-on]="state === item.state"
-                    [disabled]="state === item.state"
-                    [attr.title]="state === item.state ? 'Ya está en ' + state : 'Pasar a ' + state"
-                    (click)="changeState.emit({ module: item.module, state })"
+                    [class.is-on]="state.wire === item.state"
+                    [disabled]="state.wire === item.state"
+                    [attr.title]="state.wire === item.state ? 'Ya está ' + state.label : 'Pasar a ' + state.label"
+                    (click)="emitChange(item.module, state)"
                   >
-                    {{ state }}
+                    {{ state.label }}
                   </button>
                 }
               </td>

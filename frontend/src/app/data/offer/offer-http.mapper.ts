@@ -1,3 +1,5 @@
+import { DiscountType } from '../../domain/offer/discount-type';
+import { OfferStatus } from '../../domain/offer/offer-status';
 import { StorefrontOffer } from '../../domain/offer/storefront-offer.entity';
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -43,11 +45,11 @@ export function mapStorefrontOffer(value: unknown): StorefrontOffer {
   return {
     id: text(row['id']),
     name: text(row['name']),
-    status: text(row['status']),
+    status: OfferStatus.fromWire(text(row['status'])),
     priority: Number.isFinite(Number(row['priority'])) ? Math.trunc(Number(row['priority'])) : 0,
     startsAt: text(row['startsAt']),
     endsAt: text(row['endsAt']),
-    discountType: text(row['discountType']),
+    discountType: DiscountType.fromWire(text(row['discountType'])),
     discountValue: decimalText(row['discountValue']),
     minMarginPercent: decimalText(row['minMarginPercent']),
     skus: skusOf(row['skus']),

@@ -10,7 +10,7 @@
 
 ## Objetivo
 
-Cerrar documentación y diseños Stitch del storefront/ops StoreCore, y aplicar UX-ANG en las 22 rutas existentes. No es pixel-complete. No agrega rutas ni SDK de pagos. No toca BlackStore.
+Cerrar documentación y diseños Stitch del storefront/ops StoreCore, y aplicar UX-ANG en las 22 rutas existentes. No es pixel-complete. No agrega rutas ni SDK de pagos. No toca venta física / POS companion.
 
 ## Stitch
 
@@ -20,4 +20,4 @@ Cerrar documentación y diseños Stitch del storefront/ops StoreCore, y aplicar 
 
 ## Gate
 
-UX-ANG aplicado en las rutas existentes. No pixel-complete. No archive. BlackStore es otro repo.
+UX-ANG aplicado en las rutas existentes. No pixel-complete. No archive. Venta física / POS companion es otro repo y no entra a `master`.

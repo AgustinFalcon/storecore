@@ -1,3 +1,5 @@
+import { OrderStatus } from '../../domain/order/order-status';
+import { PaymentStatus } from '../../domain/order/payment-status';
 import { homeDraftSavePayload, mapCart, mapCustomerSession, mapHomeDraft, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
 
 describe('http-mappers', () => {
@@ -108,8 +110,8 @@ describe('http-mappers', () => {
       }),
     ).toEqual({
       orderId: '9',
-      paymentStatus: 'PENDING',
-      orderStatus: 'PENDING_PAYMENT',
+      paymentStatus: PaymentStatus.Pending,
+      orderStatus: OrderStatus.PendingPayment,
       checkoutUrl: 'https://www.mercadopago.com.ar/checkout/ORD-1',
     });
     expect(mapReceipt({ orderId: '9', paymentStatus: 'PENDING', orderStatus: 'PENDING_PAYMENT' }).checkoutUrl).toBeNull();

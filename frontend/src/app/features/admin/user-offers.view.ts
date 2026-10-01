@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { StorefrontDiscountType, StorefrontOffer, StorefrontOfferDraft, StorefrontOfferStatus } from '../../domain/offer/storefront-offer.entity';
+import { DiscountType } from '../../domain/offer/discount-type';
+import { OfferStatus } from '../../domain/offer/offer-status';
+import { StorefrontOffer, StorefrontOfferDraft } from '../../domain/offer/storefront-offer.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { UserOffersState } from './user-offers.store';
 
@@ -16,18 +18,26 @@ export class UserOffersViewComponent {
   @Output() readonly draftChange = new EventEmitter<StorefrontOfferDraft>();
   @Output() readonly save = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
+  readonly statuses = OfferStatus.writableOptions();
+  readonly discountTypes = DiscountType.options();
 
   patch(partial: Partial<StorefrontOfferDraft>): void {
     this.draftChange.emit({ ...this.state.draft, ...partial });
   }
 
   setStatus(value: string): void {
-    const status: StorefrontOfferStatus = value === 'ACTIVE' ? 'ACTIVE' : 'DRAFT';
+    const status = OfferStatus.fromWire(value);
+    if (!status.writable) {
+      return;
+    }
     this.patch({ status });
   }
 
   setDiscountType(value: string): void {
-    const discountType: StorefrontDiscountType = value === 'FIXED' ? 'FIXED' : 'PERCENT';
+    const discountType = DiscountType.fromWire(value);
+    if (discountType === DiscountType.Unknown) {
+      return;
+    }
     this.patch({ discountType });
   }
 
@@ -48,15 +58,6 @@ export class UserOffersViewComponent {
   }
 
   discountLabel(offer: StorefrontOffer): string {
-    if (!offer.discountValue) {
-      return offer.discountType;
-    }
-    if (offer.discountType === 'PERCENT') {
-      return `${offer.discountValue} %`;
-    }
-    if (offer.discountType === 'FIXED') {
-      return `fijo ${offer.discountValue}`;
-    }
-    return `${offer.discountType} ${offer.discountValue}`.trim();
+    return offer.discountType.format(offer.discountValue);
   }
 }

@@ -1,6 +1,6 @@
 # Contrato HTTP que consume el frontend StoreCore
 
-El browser habla sólo con `/api/v1/**` mediante el proxy local de desarrollo o el mismo origin de la instalación. No existe `store_id`, fixture, secreto ni cliente BlackStore en el browser. Todas las respuestas con cuerpo usan el envelope AssistTime `BaseResponse`:
+El browser habla sólo con `/api/v1/**` mediante el proxy local de desarrollo o el mismo origin de la instalación. No existe `store_id`, fixture, secreto ni cliente de venta física / POS companion en el browser. Todas las respuestas con cuerpo usan el envelope AssistTime `BaseResponse`:
 
 ```json
 { "code": 200, "data": {}, "message": null, "errorCode": null, "retryable": null, "traceId": null }
@@ -55,4 +55,4 @@ Cookies: `Secure; HttpOnly; SameSite=Lax; Path=/`, sin `Domain`; login/register 
 
 ## Fuera de alcance del UI
 
-BlackStore `/blackstore-integration/v1`, fiscal, Mercado Pago en el browser, `store_id`, secretos y Universal Tools hardcodeado.
+Contrato HTTP de venta física / POS companion, fiscal, Mercado Pago en el browser, `store_id`, secretos y Universal Tools hardcodeado.

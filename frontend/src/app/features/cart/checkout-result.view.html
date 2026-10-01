@@ -15,8 +15,8 @@
     <div class="sc-panel sc-result__card">
       <p class="sc-result__id">Orden {{ order.id }}</p>
       <p>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
       </p>
       <p class="sc-callout">El identificador de la orden no es un comprobante de pago.</p>
       <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>

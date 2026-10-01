@@ -1,4 +1,6 @@
 import { Observable, of } from 'rxjs';
+import { DiscountType } from '../../domain/offer/discount-type';
+import { OfferStatus } from '../../domain/offer/offer-status';
 import { StorefrontOffer, StorefrontOfferDraft, StorefrontOfferWrite } from '../../domain/offer/storefront-offer.entity';
 import { ManageStorefrontOffersUseCase } from '../../domain/offer/use-cases/manage-storefront-offers.usecase';
 import { UserOffersStore } from './user-offers.store';
@@ -33,11 +35,11 @@ describe('UserOffersStore', () => {
     const sent = save.mock.calls[0][0] as StorefrontOfferWrite;
     expect(sent).toEqual({
       name: 'Happy hour',
-      status: 'DRAFT',
+      status: OfferStatus.Draft,
       priority: 10,
       startsAt: new Date('2026-09-26T18:00').toISOString(),
       endsAt: new Date('2026-09-26T20:00').toISOString(),
-      discountType: 'PERCENT',
+      discountType: DiscountType.Percent,
       discountValue: '12.50',
       minMarginPercent: '0',
       skus: ['SKU-1', 'SKU-2'],
@@ -52,11 +54,11 @@ describe('UserOffersStore', () => {
 function draft(overrides: Partial<StorefrontOfferDraft> = {}): StorefrontOfferDraft {
   return {
     name: 'Happy hour',
-    status: 'DRAFT',
+    status: OfferStatus.Draft,
     priority: 10,
     startsAt: '2026-09-26T18:00',
     endsAt: '2026-09-26T20:00',
-    discountType: 'PERCENT',
+    discountType: DiscountType.Percent,
     discountValue: '12.50',
     minMarginPercent: '0',
     skusText: 'SKU-1',
@@ -68,11 +70,11 @@ function savedOffer(): StorefrontOffer {
   return {
     id: '1',
     name: 'Happy hour',
-    status: 'DRAFT',
+    status: OfferStatus.Draft,
     priority: 10,
     startsAt: '2026-09-26T21:00:00.000Z',
     endsAt: '2026-09-26T23:00:00.000Z',
-    discountType: 'PERCENT',
+    discountType: DiscountType.Percent,
     discountValue: '12.50',
     minMarginPercent: '0',
     skus: ['SKU-1'],

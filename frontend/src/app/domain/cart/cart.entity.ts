@@ -1,3 +1,6 @@
+import { OrderStatus } from '../order/order-status';
+import { PaymentStatus } from '../order/payment-status';
+
 export interface CartLine {
   readonly sku: string;
   readonly name: string;
@@ -22,7 +25,7 @@ export interface CheckoutCommand {
 
 export interface CheckoutReceipt {
   readonly orderId: string;
-  readonly paymentStatus: string;
-  readonly orderStatus: string;
+  readonly paymentStatus: PaymentStatus;
+  readonly orderStatus: OrderStatus;
   readonly checkoutUrl?: string | null;
 }

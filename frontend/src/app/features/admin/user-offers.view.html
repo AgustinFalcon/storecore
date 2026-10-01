@@ -39,7 +39,7 @@
                   <td>{{ offer.name }}</td>
                   <td class="sc-mono">{{ offer.skus.join(', ') }}</td>
                   <td>{{ clock(offer.startsAt) }} – {{ clock(offer.endsAt) }}</td>
-                  <td><span class="sc-badge sc-badge--info">{{ offer.status }}</span></td>
+                  <td><span class="sc-badge sc-badge--info">{{ offer.status.label }}</span></td>
                   <td>{{ discountLabel(offer) }}</td>
                   <td>{{ offer.minMarginPercent }}</td>
                   <td>{{ offer.priority }}</td>
@@ -56,9 +56,10 @@
       <label>Nombre <input required name="name" [ngModel]="state.draft.name" (ngModelChange)="patch({ name: $event })" /></label>
       <label>
         Estado
-        <select name="status" [ngModel]="state.draft.status" (ngModelChange)="setStatus($event)">
-          <option value="DRAFT">Borrador</option>
-          <option value="ACTIVE">Activa</option>
+        <select name="status" [ngModel]="state.draft.status.wire" (ngModelChange)="setStatus($event)">
+          @for (status of statuses; track status.wire) {
+            <option [value]="status.wire">{{ status.label }}</option>
+          }
         </select>
       </label>
       <div class="sc-fields-2">
@@ -68,9 +69,10 @@
       <label>Prioridad <input type="number" name="priority" [ngModel]="state.draft.priority" (ngModelChange)="patch({ priority: priorityOf($event) })" /></label>
       <label>
         Tipo de descuento
-        <select name="discountType" [ngModel]="state.draft.discountType" (ngModelChange)="setDiscountType($event)">
-          <option value="PERCENT">Porcentaje</option>
-          <option value="FIXED">Monto fijo</option>
+        <select name="discountType" [ngModel]="state.draft.discountType.wire" (ngModelChange)="setDiscountType($event)">
+          @for (type of discountTypes; track type.wire) {
+            <option [value]="type.wire">{{ type.label }}</option>
+          }
         </select>
       </label>
       <label>Descuento <input required name="discountValue" inputmode="decimal" [ngModel]="state.draft.discountValue" (ngModelChange)="patch({ discountValue: $event })" /></label>

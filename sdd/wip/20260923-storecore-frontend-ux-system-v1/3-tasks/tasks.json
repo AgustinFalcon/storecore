@@ -42,7 +42,7 @@
       "status": "done",
       "layer": 1,
       "depends_on": ["UX-STITCH-P"],
-      "acceptance_criteria": ["HTML de views ya archivado; Stitch restante no bloquea BlackStore"]
+      "acceptance_criteria": ["HTML de views ya archivado; Stitch restante no bloquea el tramo companion"]
     },
     {
       "id": "UX-ANG",

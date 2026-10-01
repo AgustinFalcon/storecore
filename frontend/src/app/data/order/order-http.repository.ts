@@ -37,13 +37,13 @@ export class OrderHttpRepository implements IOrderRepository {
 
   advanceShipment(orderId: string, status: ShipmentTransition, tracking: string | null): Observable<AdminOrder> {
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/orders/${orderId}/shipments`, { status, tracking })
+      .post<unknown>(`${environment.apiBaseUrl}/user/orders/${orderId}/shipments`, { status: status.wire, tracking })
       .pipe(map((body) => mapAdminOrder(readApiBody<unknown>(body))));
   }
 
   advanceRma(orderId: string, status: RmaTransition): Observable<AdminOrder> {
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/orders/${orderId}/rma`, { status })
+      .post<unknown>(`${environment.apiBaseUrl}/user/orders/${orderId}/rma`, { status: status.wire })
       .pipe(map((body) => mapAdminOrder(readApiBody<unknown>(body))));
   }
 }

@@ -8,6 +8,7 @@ Leer `sdd/STATUS.md`, `sdd/PROJECT.md`, `sdd/PATTERNS.md` y el WIP activo antes 
 
 - USER y CUSTOMER son identidades/rutas separadas.
 - El core sólo implementa contratos explícitos del WIP. Integraciones de venta física y fiscal son externas/diferidas: sin adapter, DDL, emisión ni evasión/ocultamiento aquí.
+- El SDD de venta física / POS companion vive en `integration/storecore-int` y no se promociona a `master`. El dossier de homologación es solo el comercio web.
 - Cualquier notificación externa futura se autentica y valida según su contrato oficial configurado, se persiste durable antes de efectos y falla retryable si no queda durable.
 - Market intelligence diferido usa fuentes permitidas/licenciadas y read-only.
 - Prototype Angular mantiene repository fixtures y banner DEMO; producción usa adapter HTTP.
