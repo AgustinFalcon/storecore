@@ -28,7 +28,7 @@ Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-04
 - POSC-001: harness PG16 test-only de rutas, upgrade V1–V7 con datos, ACL baseline y carreras idempotentes; sin migraciones ni conector.
 - Views Angular (DS-00…U-10) alineadas al pacto UX; favoritos fuera del chrome (TODO-036 diferido).
 - Playwright + axe en pantallas públicas: `frontend` `npm run test:a11y` (CI Verify instala Chromium y corre axe; `npm run verify` no lanza Playwright).
-- Verify hosted: techo Flyway V19 en POSC-002F y DSP-003; `npm run verify` sin axe prematuro; push a `integration/storecore-int` dispara el workflow.
+- Verify hosted: techo Flyway V19 en POSC-002F y DSP-003; `npm run verify` sin axe prematuro; push a `integration/storecore-int` dispara el workflow. Axe de home espera el `h1` `Inicio` (UX-ANG), no el copy anterior.
 - Worker de inbox aplica solo después de refetch oficial; sin credenciales live, unconfigured deja `RECEIVED`.
 - Runbook de flota: backup, restore y rollback.
 - Worker: claim/refetch fuera del lock, PENDING no cierra el inbox, fallos ML aislados por fila.
