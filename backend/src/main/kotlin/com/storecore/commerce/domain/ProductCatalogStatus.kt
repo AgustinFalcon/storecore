@@ -1,21 +1,29 @@
 package com.storecore.commerce.domain
 
-class ProductCatalogStatus private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ProductCatalogStatus && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ProductCatalogStatus {
+    abstract val wire: String
+
+    data object Draft : ProductCatalogStatus() {
+        override val wire: String = "DRAFT"
+    }
+    data object Active : ProductCatalogStatus() {
+        override val wire: String = "ACTIVE"
+    }
+    data object Archived : ProductCatalogStatus() {
+        override val wire: String = "ARCHIVED"
+    }
+    data object Unknown : ProductCatalogStatus() {
+        override val wire: String = "unknown"
+    }
 
     fun isActive(): Boolean = this === Active
 
     companion object {
-        val Draft = ProductCatalogStatus("DRAFT")
-        val Active = ProductCatalogStatus("ACTIVE")
-        val Archived = ProductCatalogStatus("ARCHIVED")
-        val Unknown = ProductCatalogStatus("unknown")
-        private val known = listOf(Draft, Active, Archived)
-        fun fromWire(raw: String?): ProductCatalogStatus {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ProductCatalogStatus = when (raw?.trim()) {
+            "DRAFT" -> Draft
+            "ACTIVE" -> Active
+            "ARCHIVED" -> Archived
+            else -> Unknown
         }
     }
 }

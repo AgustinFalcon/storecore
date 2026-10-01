@@ -1,23 +1,29 @@
 package com.storecore.commerce.domain
 
-class ChannelAccountPurpose private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is ChannelAccountPurpose && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class ChannelAccountPurpose {
+    abstract val wire: String
+
+    data object Unclassified : ChannelAccountPurpose() {
+        override val wire: String = "UNCLASSIFIED"
+    }
+    data object ExternalMlSync : ChannelAccountPurpose() {
+        override val wire: String = "EXTERNAL_ML_SYNC"
+    }
+    data object InternalPricePolicy : ChannelAccountPurpose() {
+        override val wire: String = "INTERNAL_PRICE_POLICY"
+    }
+    data object Unknown : ChannelAccountPurpose() {
+        override val wire: String = "unknown"
+    }
 
     fun allowsExternalMlSync(): Boolean = this === ExternalMlSync
 
     companion object {
-        val Unclassified = ChannelAccountPurpose("UNCLASSIFIED")
-        val ExternalMlSync = ChannelAccountPurpose("EXTERNAL_ML_SYNC")
-        val InternalPricePolicy = ChannelAccountPurpose("INTERNAL_PRICE_POLICY")
-        val Unknown = ChannelAccountPurpose("unknown")
-
-        private val known = listOf(Unclassified, ExternalMlSync, InternalPricePolicy)
-
-        fun fromWire(raw: String?): ChannelAccountPurpose {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): ChannelAccountPurpose = when (raw?.trim()) {
+            "UNCLASSIFIED" -> Unclassified
+            "EXTERNAL_ML_SYNC" -> ExternalMlSync
+            "INTERNAL_PRICE_POLICY" -> InternalPricePolicy
+            else -> Unknown
         }
     }
 }

@@ -1,21 +1,21 @@
 package com.storecore.commerce.domain
 
-class MarketplaceChannel private constructor(val wire: String) {
-    override fun equals(other: Any?) = other is MarketplaceChannel && other.wire == wire
-    override fun hashCode() = wire.hashCode()
-    override fun toString() = wire
+sealed class MarketplaceChannel {
+    abstract val wire: String
+
+    data object MercadoLibre : MarketplaceChannel() {
+        override val wire: String = "MERCADO_LIBRE"
+    }
+    data object Unknown : MarketplaceChannel() {
+        override val wire: String = "unknown"
+    }
 
     fun isMercadoLibre(): Boolean = this === MercadoLibre
 
     companion object {
-        val MercadoLibre = MarketplaceChannel("MERCADO_LIBRE")
-        val Unknown = MarketplaceChannel("unknown")
-
-        private val known = listOf(MercadoLibre)
-
-        fun fromWire(raw: String?): MarketplaceChannel {
-            val normalized = raw?.trim().orEmpty()
-            return known.firstOrNull { it.wire == normalized } ?: Unknown
+        fun fromWire(raw: String?): MarketplaceChannel = when (raw?.trim()) {
+            "MERCADO_LIBRE" -> MercadoLibre
+            else -> Unknown
         }
     }
 }
