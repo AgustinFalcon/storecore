@@ -15,7 +15,7 @@ Las ventas online de StoreCore podrían acreditar “coins”/puntos de página.
 - `sdd/STATUS.md`: gate de Carril A en integración; checkout local deja la orden en `PENDING_PAYMENT` sin cobro MP; ML y companion apagados.
 - `sdd/backlog.md` TODO-037: `[medium] [deferred] Loyalty ledger`. TODO-033 cross-sell, TODO-042 MP-LIVE-05 y TODO-020 fiscal siguen diferidos o bloqueados.
 - `sdd/TRACEABILITY.md`: favorites/loyalty/carriers = TODO-036..038, sin DDL ni tarea de core.
-- Baseline archivado `sdd/features/20260921-single-tenant-installation-baseline/1-functional/spec.md`: loyalty ledger fuera del core. Fiscal no oculta ni evasióna ventas. Sol (`sdd/reviews/20260923-sol-after-pr17-next-work.md`) prohíbe implementar loyalty por inferencia del backlog.
+- Baseline archivado `sdd/features/20260921-single-tenant-installation-baseline/1-functional/spec.md`: loyalty ledger fuera del core. Fiscal no oculta ni evade ventas. Sol (`sdd/reviews/20260923-sol-after-pr17-next-work.md`) prohíbe implementar loyalty por inferencia del backlog.
 - Identidad: `IdentityRealm.USER` y `IdentityRealm.CUSTOMER` son rutas distintas. `orders.customer_id` referencia `customers`, no `users`.
 - Pago: `PaymentStatus` sellado (`PENDING`, `APPROVED`, `REJECTED`, `CANCELLED`, `REFUNDED`, `CHARGED_BACK`, `Unknown` vía `fromWire`). `OrderStatus` sellado incluye `PENDING_PAYMENT` y `PAID`. `orders.total = subtotal + shipping_cost`, moneda `ARS`. `payments.provider` es `MERCADO_PAGO`.
 - Ofertas: `offers.discount_type` es `PERCENT` o `FIXED`; `DiscountType` sellado con `Unknown`. El writer de precio de canal es `MANUAL`.
