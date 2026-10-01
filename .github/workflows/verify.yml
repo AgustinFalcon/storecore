@@ -3,7 +3,7 @@ name: Verify
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [master, integration/storecore-int]
 
 permissions:
   contents: read

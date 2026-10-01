@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const publicScreens = [
-  { path: '/', heading: /Storefront|StoreCore|En esta tienda/i },
+  { path: '/', heading: /Inicio/i },
   { path: '/catalog', heading: /Catálogo/i },
   { path: '/customer/session', heading: /Sesión customer/i },
   { path: '/customer/register', heading: /Crear cuenta customer/i },
