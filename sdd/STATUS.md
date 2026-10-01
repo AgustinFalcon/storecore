@@ -24,6 +24,8 @@
 
 ## Gate actual
 
+Carriles de homologación: `sdd/wip/20260923-storecore-frontend-ux-system-v1/2-technical/homologation-lanes.md`. Dossier core = `master` con BlackStore `DISABLED`; SDD companion queda en integración/BlackStore (no se borra). Issue FE↔BE [#106](https://github.com/AgustinFalcon/storecore/issues/106).
+
 UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
 Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones.

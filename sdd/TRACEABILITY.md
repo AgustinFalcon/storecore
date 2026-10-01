@@ -30,3 +30,4 @@
 | Contrato POS convergencia | `20260927-pos-integration-convergence` | 000–006 mergeados; 002 residual `INSERT(variant_id)`=false; live/fiscal NO-GO; `4-implementation/knowledge.md` |
 | POS BlackStore | repo `BlackStore` | ADP-001..010 + L3 locales en `master` (PR #1). Release disabled. Companion live NO-GO |
 | Dispatcher IO futuro | issue [#104](https://github.com/AgustinFalcon/storecore/issues/104) | inyectar `DispatcherProvider` en el primer HTTP de salida; no ahora; no dominio/`@Scheduled`/dispatcher ML |
+| Homologación FE↔BE | issue [#106](https://github.com/AgustinFalcon/storecore/issues/106) | 22 rutas vs API real; dossier `master` sin companion; SDD BlackStore no se borra |
