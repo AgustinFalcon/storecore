@@ -28,7 +28,7 @@ Carriles de homologación: `sdd/wip/20260923-storecore-frontend-ux-system-v1/2-t
 
 UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
-Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones.
+Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; MP-LIVE-05, fiscal y live siguen NO-GO. Los jobs alojados de los PR recientes también fallaron con `steps=[]`: no se interpreta como CI verde ni autoriza promover integración a `master`, cerrar WIPs con `sdd.finish`, publicar o activar integraciones. En `ef2fc5b` Verify **sí ejecutó** steps (run `36821352445`) y falló de verdad: techo Flyway V18 vs V19 y axe antes de Chromium. Issue [#117](https://github.com/AgustinFalcon/storecore/issues/117) corrige eso; tampoco es verde hasta que ambos jobs pasen.
 
 ## Backend posterior al baseline core
 
