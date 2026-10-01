@@ -5,6 +5,7 @@ import com.storecore.configuration.application.CapabilityAdministrationPort
 import com.storecore.configuration.application.CapabilityCorrelationRequired
 import com.storecore.configuration.application.CapabilityConfigurationMissing
 import com.storecore.configuration.domain.CapabilityAdminCommand
+import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.infrastructure.web.BaseResponse
@@ -36,11 +37,7 @@ class CapabilityController(
     @GetMapping
     fun list(http: HttpServletRequest): BaseResponse<List<Map<String, Any?>>> {
         auth.operatorOrAdmin(http)
-        return BaseResponse.ok(
-            capabilities.list()
-                .filter { InstallationCapabilityModule.fromWire(it.module).visibleOnConsole }
-                .map { mapOf("module" to it.module, "state" to it.state.name, "configVersion" to it.configVersion) },
-        )
+        return BaseResponse.ok(consoleCapabilityPayload(capabilities.list()))
     }
 
     @PostMapping("/{module}/state")
@@ -54,7 +51,7 @@ class CapabilityController(
             CapabilityAdminCommand.ChangeState(request.correlationId, module, request.expectedConfigVersion ?: 0, CapabilityState.valueOf(request.state), request.reason),
         )
         return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf)
-            .body(BaseResponse.ok(mapOf("module" to mutation.value.module, "state" to mutation.value.state.name, "configVersion" to mutation.value.configVersion)))
+            .body(BaseResponse.ok(mapOf("module" to mutation.value.module.wire, "state" to mutation.value.state.name, "configVersion" to mutation.value.configVersion)))
     }
 
     @PostMapping("/{module}/kills")
@@ -130,3 +127,8 @@ data class KillRequest(
     @field:NotNull val correlationId: UUID,
 )
 data class KillCloseRequest(@field:NotBlank val reason: String, @field:NotNull val correlationId: UUID)
+
+internal fun consoleCapabilityPayload(capabilities: List<CapabilityModuleView>): List<Map<String, Any?>> =
+    capabilities
+        .filter { it.module.visibleOnConsole }
+        .map { mapOf("module" to it.module.wire, "state" to it.state.name, "configVersion" to it.configVersion) }
