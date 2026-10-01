@@ -17,7 +17,7 @@
 - TODO-034 [medium] [deferred] `commercial-calendar`: eventos/campañas definidos por merchant, timezone/preflight/activación/kill switch/rollback; Black Friday configurable, nunca autónomo/hardcodeado.
 - TODO-035 [medium] [deferred] ML virtual kits.
 - TODO-036 [low] [deferred] Favorites.
-- TODO-037 [medium] [deferred] Loyalty ledger. IDEA futura pedida 2026-10-01: monedas o puntos de tienda configurables por el dueño (no cripto on-chain). Sin WIP. Issue GitHub: pending GitHub issue.
+- TODO-037 [medium] [deferred] Loyalty ledger. IDEA 2026-10-01: coins/puntos de tienda configurables por el dueño (no cripto on-chain). Sin WIP. Issue [#127](https://github.com/AgustinFalcon/storecore/issues/127). Validación: `sdd/reviews/20261001-loyalty-coins-idea-validation.md`.
 - TODO-038 [medium] [deferred] Integraciones reales de carrier.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
 - TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..010 + L3 locales done; módulo vuelve a DISABLED. Companion live y activación siguen NO-GO. BlackStore ADP-001..010 + L3 locales done; dual Grok APPROVED; release disabled. No altera las 14 tasks de core 1.0.0.
