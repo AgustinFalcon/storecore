@@ -22,6 +22,7 @@
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
 - TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..010 + L3 locales done; módulo vuelve a DISABLED. Companion live y activación siguen NO-GO. BlackStore ADP-001..010 + L3 locales done; dual Grok APPROVED; release disabled. No altera las 14 tasks de core 1.0.0.
 - TODO-042 [high] [blocked] `storecore-mp-live-checkout-v1`: 01/02/02A/03/04 in-repo fail-closed. 05 y pagos reales NO-GO hasta cuenta sandbox + Sol GO de activación.
+- TODO-043 [medium] [deferred] `dispatcher-provider-outbound-http`: issue [#104](https://github.com/AgustinFalcon/storecore/issues/104). Implementar sólo cuando exista un adapter HTTP de salida autorizado. Espejo BlackStore [#16](https://github.com/AgustinFalcon/blackstore/issues/16) para clientes HTTP nuevos. No hop en saga ni `@Scheduled`. No es dispatcher ML.
 
 ## Histórico
 
