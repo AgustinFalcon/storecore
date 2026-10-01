@@ -45,7 +45,7 @@
       "depends_on": ["TASK-LT5-004"],
       "files": ["CHANGELOG.md", "sdd/wip/20260927-login-limiter-top5/", "sdd/reviews/"],
       "acceptance_criteria": ["PR acotado hacia integration/storecore-int con dos reviews finales y changelog", "Integración, promoción a master y sdd.finish sólo con sus gates aplicables", "No declarar GO de release mientras CI alojado no ejecute pruebas verdes"],
-      "evidence": "PR #57 merged b6f37df; sdd/reviews/20260927-login-top5-pr57-integration.md. Pending: Verify alojado verde y gates de cierre SDD."
+      "evidence": "PR #57 merged b6f37df; sdd/reviews/20260927-login-top5-pr57-integration.md. Hosted Verify now executes and can be green (#118 run 36824318135 SUCCESS; #120 run 36824922048 SUCCESS). Pending: sdd.finish / master / release."
     }
   ]
 }
