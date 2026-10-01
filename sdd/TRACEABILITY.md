@@ -29,3 +29,4 @@
 | ML desired-stock local | `20260924-ml-desired-stock-projection` | DAG 000A–R02 en `#93`; TASK-DSP-009 issue [#96](https://github.com/AgustinFalcon/storecore/issues/96); V19; dispatcher/live NO-GO; `4-implementation/knowledge.md` |
 | Contrato POS convergencia | `20260927-pos-integration-convergence` | 000–006 mergeados; 002 residual `INSERT(variant_id)`=false; live/fiscal NO-GO; `4-implementation/knowledge.md` |
 | POS BlackStore | repo `BlackStore` | ADP-001..010 + L3 locales en `master` (PR #1). Release disabled. Companion live NO-GO |
+| Dispatcher IO futuro | issue [#104](https://github.com/AgustinFalcon/storecore/issues/104) | inyectar `DispatcherProvider` en el primer HTTP de salida; no ahora; no dominio/`@Scheduled`/dispatcher ML |

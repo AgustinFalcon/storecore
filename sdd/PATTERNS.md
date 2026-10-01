@@ -22,6 +22,10 @@ Todo caller que proyecta stock deseado usa un orden de locks único: snapshot `M
 
 Precio base, desired, observed y effective promo son valores distintos. Sólo un writer local de precio puede estar `ACTIVE` por listing; automatización ML y writer manual son mutuamente excluyentes. Market intelligence usa únicamente señales oficiales/read-only permitidas; no scraping, elusión de términos ni supuesto “top 5”. Campañas requieren vigencia, prioridad, margen, auditoría, aprobación y rollback. Black Friday es un evento configurable, no una regla hardcodeada.
 
+## Backend threads
+
+Spring owns the servlet request thread, `@Transactional` JDBC, and `@Scheduled` (`InboxApplicationWorker`, `MpOrderApplicationWorker`, `BlackStoreExpiryWorker`, inventory expiry). Do not inject a coroutine dispatcher there. The first authorized production outbound HTTP adapter (future issue [#104](https://github.com/AgustinFalcon/storecore/issues/104)) receives `DispatcherProvider.io` only, like BlackStore loopback. There is no Android `Main` and no Mercado Libre outbox dispatcher.
+
 ## Frontend production path
 
 Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. UX DS-00…U-10 está en código; axe corre con `npm run test:a11y`.

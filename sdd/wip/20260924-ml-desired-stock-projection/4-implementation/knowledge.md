@@ -1,6 +1,6 @@
 # Knowledge — proyección de stock deseado ML
 
-Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/AgustinFalcon/storecore/issues/49), TASK-DSP-009 [#96](https://github.com/AgustinFalcon/storecore/issues/96), SHA stamp [#98](https://github.com/AgustinFalcon/storecore/issues/98), residual release/expiry [#100](https://github.com/AgustinFalcon/storecore/issues/100), SHA stamp [#102](https://github.com/AgustinFalcon/storecore/issues/102). No reabrir issues 1–13 (tenancy SaaS superseded). Cada corte mergeado a `integration/storecore-int` queda en CHANGELOG y aquí. Hosted CI `steps=[]` no es pass. Sin dispatcher, live ML, grant `INSERT(variant_id)` ni `sdd.finish`.
+Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/AgustinFalcon/storecore/issues/49), TASK-DSP-009 [#96](https://github.com/AgustinFalcon/storecore/issues/96), SHA stamp [#98](https://github.com/AgustinFalcon/storecore/issues/98), residual release/expiry [#100](https://github.com/AgustinFalcon/storecore/issues/100), SHA stamp [#102](https://github.com/AgustinFalcon/storecore/issues/102) / PR [#103](https://github.com/AgustinFalcon/storecore/pull/103) (`46db87d`). Futuro I/O: [#104](https://github.com/AgustinFalcon/storecore/issues/104) — inyectar `DispatcherProvider` sólo en el primer adapter HTTP de salida autorizado; no es el dispatcher ML. No reabrir issues 1–13 (tenancy SaaS superseded). Cada corte mergeado a `integration/storecore-int` queda en CHANGELOG y aquí. Hosted CI `steps=[]` no es pass. Sin dispatcher ML, live ML, grant `INSERT(variant_id)` ni `sdd.finish`.
 
 | Issue SDD | PR | SHA | Dual review | CHANGELOG |
 |---|---|---|---|---|
@@ -20,6 +20,8 @@ Issue canónico = id SDD (`TASK-DSP-*`). GitHub: login [#49](https://github.com/
 | TASK-DSP-009 | [#97](https://github.com/AgustinFalcon/storecore/pull/97) / issue [#96](https://github.com/AgustinFalcon/storecore/issues/96) | `8da8392` | prv39 SDD+SCOPE APPROVED | bridge local en la Tx de saga; V19 source_cause |
 | TASK-DSP-009 residual release/expiry | [#101](https://github.com/AgustinFalcon/storecore/pull/101) / issue [#100](https://github.com/AgustinFalcon/storecore/issues/100) | `7d576b3` | prv41 SDD+SCOPE APPROVED | `Dsp009BlackStoreBridgeTest` release/expiry PENDING |
 
-SHA stamp de `#97`: issue [#98](https://github.com/AgustinFalcon/storecore/issues/98) / PR [#99](https://github.com/AgustinFalcon/storecore/pull/99) (`41966d4`).
+SHA stamp de `#97`: issue [#98](https://github.com/AgustinFalcon/storecore/issues/98) / PR [#99](https://github.com/AgustinFalcon/storecore/pull/99) (`41966d4`). SHA stamp de `#101`: issue [#102](https://github.com/AgustinFalcon/storecore/issues/102) / PR [#103](https://github.com/AgustinFalcon/storecore/pull/103) (`46db87d`).
+
+Futuro (sin código ahora): issue [#104](https://github.com/AgustinFalcon/storecore/issues/104). StoreCore no tiene `HttpClient` de producción; el inbox usa `UnconfiguredOfficialResourceAdapter`. Cuando exista un adapter HTTP oficial autorizado, inyectar `DispatcherProvider` (io only) en ese borde, como BlackStore issue [#12](https://github.com/AgustinFalcon/blackstore/issues/12). No hop en dominio, saga ni `@Scheduled`. No es `STOCK_DESIRED_CHANGED` remoto.
 
 Espejo agent: `docs/agent/ml-desired-stock-local-intent.md`.
