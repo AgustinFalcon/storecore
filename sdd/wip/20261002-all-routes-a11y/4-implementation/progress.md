@@ -51,3 +51,11 @@ Local PASS: architecture, lint, strict fixture/manifest/policy typecheck, all el
 The principal reported run 37061721418: backend passed, twelve auxiliary checks passed, all 24 route cases still failed only on unmatched Google Fonts requests. Hosted frontend is still failed. No policy expansion was made: catch-all unexpected entries now serialize kind, request method, resourceType and complete URL.href as JSON, with username/password removed from a copy before serialization and no headers/cookies. Negative boundary tests assert those exact diagnostic fields and credential redaction. The diagnostic is intended to identify the actual failing request on the next hosted run, not to claim resolution.
 
 Local PASS: architecture, lint, strict fixture/manifest/policy typecheck, four focused fixture-policy regressions (final sanitized version: 1.2s), git diff --check. Runner exited normally; no Angular server started. Hosted route failure remains unresolved pending the new diagnostic.
+
+## Diagnosed XHR font policy
+
+The principal supplied the exact run 37062853587 diagnostic: GET, resourceType=xhr, https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap. The run was cancelled after frontend for resource conservation; it is not a successful hosted result. The mismatch was resource type, not query encoding.
+
+Restored strict semantic family/display query and admitted only Stylesheet/Xhr through the closed OfflineFontResource class (private constructor, static cases, Unknown, unique fromWire, rule on the type). Both cases always abort offline. Tests share static instances and cover translation, encoding/order, extra/duplicate/missing/changed query, fetch/document/Unknown, POST, host/path/http/port/credentials/hash and API negatives. Sanitized diagnostic remains unchanged.
+
+Local PASS final class version: architecture, lint, strict fixture/manifest/policy typecheck, twelve focused regressions (4.8s), git diff --check. No Angular server started; focused runner exited normally. Hosted 24-route success still requires rerun; no commit/push/merge in this turn.

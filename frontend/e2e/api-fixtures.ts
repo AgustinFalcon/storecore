@@ -3,6 +3,17 @@ import { FAVORITES_STORAGE_KEY } from '../src/app/core/favorites/session-favorit
 import { ScreenRealm } from './route-manifest';
 
 const fixtureOrigin = 'http://127.0.0.1:4300';
+export class OfflineFontResource {
+  static readonly Stylesheet = new OfflineFontResource('stylesheet', true);
+  static readonly Xhr = new OfflineFontResource('xhr', true);
+  static readonly Unknown = new OfflineFontResource('unknown', false);
+
+  private constructor(readonly wire: string, readonly canAbortOffline: boolean) {}
+
+  static fromWire(value: unknown): OfflineFontResource {
+    return [this.Stylesheet, this.Xhr].find((type) => type.wire === value) ?? this.Unknown;
+  }
+}
 
 const line = { sku: 'TEST-SKU', name: 'Producto de prueba', quantity: 1, originalUnitPrice: 100,
   discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 100 };
@@ -53,11 +64,13 @@ export async function installApiFixtures(page: Page, realm: ScreenRealm): Promis
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    // The optional stylesheet is always aborted offline. Its variable query is not a trust boundary:
-    // method, resource type, origin and path stay exact; nothing is fetched or fulfilled.
-    if (request.method() === 'GET' && request.resourceType() === 'stylesheet' &&
+    const resource = OfflineFontResource.fromWire(request.resourceType());
+    // axe's CSS inspection uses XHR; both known resource types remain strictly offline.
+    if (request.method() === 'GET' && resource.canAbortOffline &&
       url.origin === 'https://fonts.googleapis.com' && url.pathname === '/css2' &&
-      !url.username && !url.password && !url.hash) {
+      !url.username && !url.password && !url.hash && url.searchParams.size === 2 &&
+      url.searchParams.getAll('family').length === 1 && url.searchParams.getAll('display').length === 1 &&
+      url.searchParams.get('family') === 'Inter:wght@400;500;600;650;700' && url.searchParams.get('display') === 'swap') {
       await route.abort('blockedbyclient');
       return;
     }
