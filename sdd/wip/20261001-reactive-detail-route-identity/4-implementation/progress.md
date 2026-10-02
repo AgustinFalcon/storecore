@@ -27,5 +27,8 @@ cover pending ship/RMA success/error after the returned A GET finishes, rejectio
 of both repeated command types, and release permitting a later command. A fifth
 test verifies concurrent different-order shipments retain separate occupancy.
 
-No commit, push, PR, merge, deploy, archive or release performed. Required
-reviews and hosted verification remain pending.
+Published as PR #147. Hosted Verify PASS for commit `85d9d6e` in GitHub Actions
+run `37034813222`: frontend 1m31s and backend 6m10s. Independent Falcon review
+found the shared-loading P2, verified its correction, and reported no remaining
+P0-P3. Dual Grok reviews, revalidation after any base change, merge, deploy,
+archive and release remain pending.
