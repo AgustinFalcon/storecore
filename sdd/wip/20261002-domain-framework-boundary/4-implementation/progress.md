@@ -1,6 +1,6 @@
 # Implementation and incremental evidence — 2026-10-02
 
-Base a8874ad, branch fix/int-domain-framework-boundary; uncommitted changes for principal review. No commits, push, PR, merge, deploy, role changes or external approvals are asserted.
+Base a8874ad, branch fix/int-domain-framework-boundary; published as PR #150. No merge, deploy, role changes or external approvals are asserted.
 
 - DFB-001: 31 use cases are plain classes; Angular/core tokens removed. Seven session-dependent cases consume CustomerSessionPort/UserSessionPort. Core signal-backed sessions implement those ports. RxJS algorithms and repository contracts are preserved.
 - DFB-002: core/providers/use-case.providers.ts owns 31 explicit factories/deps; app.config uses that registry. Nine Angular composition/session tests use actual appConfig with substituted repository ports, cover resolution, realm separation, failed sign-in/registration, probe CSRF ordering, and logout success/error behavior. The existing customer sign-in domain test now uses a pure port fake.
@@ -15,7 +15,9 @@ Passed local checks:
 - Read-only in-memory TypeScript transpilation and Node/RxJS execution verified all seven framework-free session use cases: successful/failed sign-in and registration, probe delayed until CSRF, logout success and failed CSRF/logout cleanup. This diagnostic used pure session-port objects; it is not evidence of Angular DI composition passing.
 - A separate read-only in-memory transpilation diagnostic loaded the actual USE_CASE_PROVIDERS, DI tokens and signal-backed core sessions into Angular Injector.create with substituted repositories. All 31 actual factory registrations resolved; customer/user sign-in and customer logout used distinct sessions. This verifies the registry's runtime wiring; it does not substitute for the full Angular TestBed/appConfig suite.
 
-Full npm run verify reached ng test but native esbuild failed before compiling/executing the suite: Cannot read directory ../../../../../../..: Acceso denegado, followed by unresolved source/dependency entries across the suite. Consequently Angular test execution, composition tests, production build and hosted CI remain unverified. This environment-blocked run is not a pass; principal/hosted verification is still needed.
+Full npm run verify reached ng test locally but native esbuild failed before compiling/executing the suite: Cannot read directory ../../../../../../..: Acceso denegado, followed by unresolved source/dependency entries across the suite. This environment-blocked run is not a local pass.
+
+Hosted Verify PASS for commit `66a334b` in GitHub Actions run `37037871974`: frontend 2m2s and backend 5m7s. Independent Falcon review found the triple-slash P2, verified its correction, and reported no remaining P0-P3. Dual Grok review and revalidation after any base change remain pending.
 
 Dependencies are reused through an ignored node_modules junction to the existing validation checkout. No package version or lockfile change. The package script change only adds Node gate tests to the existing architecture check.
 
