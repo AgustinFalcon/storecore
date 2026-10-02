@@ -25,6 +25,7 @@ describe('CheckoutResultComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
+            paramMap: of(convertToParamMap({ orderId: 'ord-77' })),
             snapshot: {
               paramMap: convertToParamMap({ orderId: 'ord-77' }),
               queryParamMap: convertToParamMap({

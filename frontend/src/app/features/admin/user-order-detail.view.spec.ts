@@ -107,4 +107,16 @@ describe('UserOrderDetailViewComponent', () => {
     expect(summary.querySelectorAll('button')).toHaveLength(0);
     expect(summary.querySelectorAll('input')).toHaveLength(0);
   });
+
+  it('clears tracking for a different order and disables busy transitions', () => {
+    fixture.componentRef.setInput('order', order('PREPARING', null));
+    fixture.detectChanges();
+    fixture.componentInstance.tracking = 'OLD-TRACKING';
+    fixture.componentRef.setInput('order', { ...order('PREPARING', null), id: 'ord-2' });
+    fixture.componentRef.setInput('loading', true);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.tracking).toBe('');
+    const buttons = fixture.nativeElement.querySelectorAll('aside.sc-summary button') as NodeListOf<HTMLButtonElement>;
+    expect([...buttons].every((button) => button.disabled)).toBe(true);
+  });
 });
