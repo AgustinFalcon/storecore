@@ -59,3 +59,9 @@ The principal supplied the exact run 37062853587 diagnostic: GET, resourceType=x
 Restored strict semantic family/display query and admitted only Stylesheet/Xhr through the closed OfflineFontResource class (private constructor, static cases, Unknown, unique fromWire, rule on the type). Both cases always abort offline. Tests share static instances and cover translation, encoding/order, extra/duplicate/missing/changed query, fetch/document/Unknown, POST, host/path/http/port/credentials/hash and API negatives. Sanitized diagnostic remains unchanged.
 
 Local PASS final class version: architecture, lint, strict fixture/manifest/policy typecheck, twelve focused regressions (4.8s), git diff --check. No Angular server started; focused runner exited normally. Hosted 24-route success still requires rerun; no commit/push/merge in this turn.
+
+## Hosted verification completed — PR #151
+
+The principal confirmed run 37064069828 SUCCESS in full: frontend 1m38 (verify, Chromium and all 24 route accessibility cases passed), backend 6m8. This supersedes the pending hosted-validation status above while preserving each prior failed/cancelled attempt and its diagnosis. The local esbuild ACL limitation did not prevent hosted verification.
+
+This update changes SDD evidence only; no application/test/CI code changes, commit, push, merge, release or live action in this turn. Successful CI alone does not assert required review completion, Sol GO or integration authorization.
