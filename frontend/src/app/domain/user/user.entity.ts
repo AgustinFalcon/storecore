@@ -1,3 +1,5 @@
+import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
+
 export interface UserSessionResult {
   readonly id: string;
   readonly roles: readonly string[];
@@ -56,7 +58,7 @@ export interface InventoryRow {
 export interface MercadoLibreAccount {
   readonly authorized: boolean;
   readonly accountRef: string;
-  readonly status: string;
+  readonly status: MercadoLibreAccountStatus;
 }
 
 export interface MercadoLibreListing {

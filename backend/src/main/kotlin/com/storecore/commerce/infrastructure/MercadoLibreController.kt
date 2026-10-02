@@ -32,7 +32,7 @@ class MercadoLibreController(
     private val auth: RequestAuth,
     private val mutations: IdentityMutationCoordinator,
 ) {
-    @GetMapping("/api/v1/user/mercadolibre/account") fun account(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.account(auth.operatorOrAdmin(http)))
+    @GetMapping("/api/v1/user/mercadolibre/account") fun account(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.account(auth.operatorOrAdmin(http)).toWire())
     @GetMapping("/api/v1/user/mercadolibre/listings") fun listings(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.listings(auth.operatorOrAdmin(http)))
 
     @PutMapping("/api/v1/user/mercadolibre/listings/{listingId}")

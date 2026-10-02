@@ -3,6 +3,7 @@ package com.storecore.commerce.infrastructure
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.MercadoLibreAccountMissing
 import com.storecore.commerce.domain.MercadoLibreAccountView
+import com.storecore.commerce.domain.ChannelAccountState
 import com.storecore.commerce.domain.MercadoLibreListingView
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
@@ -16,8 +17,8 @@ import org.springframework.stereotype.Service
 class JdbcMercadoLibreService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val capabilities: CapabilityDecisionPort, private val limiter: WebhookInboxLimiter) {
     fun account(actor: InternalUserPrincipal): MercadoLibreAccountView {
         capabilities.decide("MARKETPLACE_ML", "READ", CapabilityActor.Internal(actor))
-        val row = jdbc.query("SELECT account_key,state FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1", { rs, _ -> rs.getString("account_key") to rs.getString("state") }).firstOrNull()
-        return if (row == null) MercadoLibreAccountView(false, "", "DISABLED") else MercadoLibreAccountView(true, row.first, row.second)
+        return jdbc.query("SELECT account_key,state FROM channel_accounts WHERE channel='MERCADO_LIBRE' AND state='ACTIVE' AND account_key<>'manual-price-writer' ORDER BY id LIMIT 1", { rs, _ -> MercadoLibreAccountView(rs.getString("account_key"), ChannelAccountState.fromWire(rs.getString("state"))) }).firstOrNull()
+            ?: MercadoLibreAccountView("", ChannelAccountState.Disabled)
     }
 
     fun listings(actor: InternalUserPrincipal): List<MercadoLibreListingView> {
