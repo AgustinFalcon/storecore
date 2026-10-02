@@ -9,6 +9,7 @@ import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/pro
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
 import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
+import { UserSessionResult } from '../../domain/user/user.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { CustomerSession } from '../auth/customer-session';
 import { UserSession } from '../auth/user-session';
@@ -24,7 +25,7 @@ import { USE_CASE_PROVIDERS } from './use-case.providers';
 describe('use case composition and session boundaries', () => {
   const credentials = { email: 'test@example.test', password: 'test' };
   const customerResult = { id: 'customer', email: credentials.email, firstName: 'Test', lastName: 'Customer' };
-  const userResult = { id: 'user', roles: [UserRole.Admin] };
+  const userResult: UserSessionResult = { id: 'user', roles: [UserRole.Operator] };
   let customerRepo: ReturnType<typeof customerRepository>;
   let userRepo: ReturnType<typeof userRepository>;
   let customer: CustomerSession;
@@ -82,7 +83,8 @@ describe('use case composition and session boundaries', () => {
     userRepo.signIn.mockReturnValueOnce(throwError(() => new Error('denied')));
     await expect(firstValueFrom(signIn.execute(credentials))).rejects.toThrow('denied');
     expect(user.authenticated()).toBe(false);
-    await firstValueFrom(signIn.execute(credentials));
+    const result = await firstValueFrom(signIn.execute(credentials));
+    expect(result.roles).toEqual([UserRole.Operator]);
     expect(user.authenticated()).toBe(true); expect(customer.authenticated()).toBe(false);
   });
 
@@ -96,6 +98,28 @@ describe('use case composition and session boundaries', () => {
     expect(customer.authenticated()).toBe(true); expect(user.authenticated()).toBe(false);
     userCsrf.next(undefined);
     expect(user.authenticated()).toBe(true);
+    expect(customerRepo.readCsrf).toHaveBeenCalledTimes(1);
+    expect(userRepo.readCsrf).toHaveBeenCalledTimes(1);
+  });
+
+  it('composed user sign in and probe reject empty or Unknown-only roles without affecting customer identity', async () => {
+    for (const roles of [[], [UserRole.Unknown]] as readonly (readonly UserRole[])[]) {
+      customer.markAuthenticated(); customer.setCsrf('customer-csrf');
+      user.markAuthenticated(); user.setCsrf('user-csrf');
+      userRepo.signIn.mockReturnValueOnce(of({ ...userResult, roles }));
+      await expect(firstValueFrom(TestBed.inject(SignInUserUseCase).execute(credentials)))
+        .rejects.toThrow('Sesión interna sin rol reconocido.');
+      expect(user.authenticated()).toBe(false); expect(user.csrf()).toBe('');
+      expect(customer.authenticated()).toBe(true); expect(customer.csrf()).toBe('customer-csrf');
+
+      user.markAuthenticated(); user.setCsrf('user-csrf');
+      userRepo.readMe.mockReturnValueOnce(of({ ...userResult, roles }));
+      await expect(firstValueFrom(TestBed.inject(ProbeUserSessionUseCase).execute()))
+        .rejects.toThrow('Sesión interna sin rol reconocido.');
+      expect(user.authenticated()).toBe(false); expect(user.csrf()).toBe('');
+      expect(customer.authenticated()).toBe(true); expect(customer.csrf()).toBe('customer-csrf');
+      expect(userRepo.readCsrf).not.toHaveBeenCalled();
+    }
   });
 
   it('probe failures do not mark either session authenticated', async () => {
