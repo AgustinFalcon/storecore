@@ -37,3 +37,11 @@ The principal reported hosted run 37059532423: architecture/lint/unit/build pass
 Replaced textual equality with a strict semantic predicate: GET stylesheet, exact HTTPS fonts.googleapis.com origin and /css2 pathname, exactly one expected family and display parameter, no extras/duplicates/credentials/fragments. Added encoded/reordered positive cases and extra/duplicate/wrong-value/protocol/port/credential/fragment negatives. Network remains aborted. A hosted rerun remains required; no commit/push/merge is authorized by these local results.
 
 Local PASS for this follow-up: architecture; lint; strict standalone TypeScript check of fixture/manifest/policy; all eleven focused tests (4.6s); rerun of the final four fixture-policy tests (1.0s); collection of all 36 tests; git diff --check. No Angular webServer started; focused runners exited normally. Full 24-route hosted success remains pending.
+
+## Stable font boundary follow-up
+
+The principal reported run 37060592203: all 24 route cases failed only on Unmatched request https://fonts.googleapis.com/css2; twelve auxiliary tests passed and no axe/readiness failure recurred. This hosted run is failed. The prior strict query predicate remains unsuitable for the request observed in Chromium.
+
+At the principal's explicit direction, classify the font as expected offline abort by the stable boundary only: GET, stylesheet, exact HTTPS fonts.googleapis.com origin and /css2 pathname, no username/password/hash. Any query is accepted solely for aborting, never for fetching/fulfilling. Regressions cover canonical/encoded/reordered/empty/extra/duplicate/varied-value query forms and reject boundary changes and API requests. Hosted 24-route success remains pending; no commit/push/merge in this follow-up.
+
+Local PASS: architecture, lint, strict fixture/manifest/policy typecheck, all eleven focused tests (5.3s), git diff --check. No Angular server started; focused runner exited normally. These focused checks are not a successful 24-route hosted run.

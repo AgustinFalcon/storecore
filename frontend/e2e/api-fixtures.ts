@@ -53,13 +53,11 @@ export async function installApiFixtures(page: Page, realm: ScreenRealm): Promis
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    // Compare decoded parameters, not Chromium's canonicalized URL encoding/order.
-    // Exactly one family and display are allowed; this remains an offline static-resource exception.
+    // The optional stylesheet is always aborted offline. Its variable query is not a trust boundary:
+    // method, resource type, origin and path stay exact; nothing is fetched or fulfilled.
     if (request.method() === 'GET' && request.resourceType() === 'stylesheet' &&
       url.origin === 'https://fonts.googleapis.com' && url.pathname === '/css2' &&
-      !url.username && !url.password && !url.hash && url.searchParams.size === 2 &&
-      url.searchParams.getAll('family').length === 1 && url.searchParams.getAll('display').length === 1 &&
-      url.searchParams.get('family') === 'Inter:wght@400;500;600;650;700' && url.searchParams.get('display') === 'swap') {
+      !url.username && !url.password && !url.hash) {
       await route.abort('blockedbyclient');
       return;
     }
