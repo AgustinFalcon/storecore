@@ -7,7 +7,7 @@ import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import {
   CapabilityModule,
-  CapabilityState,
+  CapabilityStateCommand,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -126,9 +126,13 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
   }
 
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
+  setCapability(command: CapabilityStateCommand): Observable<CapabilityModule> {
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${module}/state`, { state })
+      .post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${command.module.wire}/state`, {
+        state: command.state.wire,
+        correlationId: command.correlationId,
+        expectedConfigVersion: command.expectedConfigVersion,
+      })
       .pipe(map((body) => mapCapability(readApiBody<unknown>(body))));
   }
 
