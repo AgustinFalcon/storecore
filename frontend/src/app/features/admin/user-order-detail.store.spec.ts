@@ -16,7 +16,7 @@ function order(id: string): AdminOrder {
 describe('UserOrderDetailStore route identity', () => {
   for (const mutation of ['ship', 'rma'] as const) {
     for (const outcome of ['success', 'error'] as const) {
-      it('ignores late ' + mutation + ' ' + outcome + ' after navigation, including A to B to A', () => {
+      it('refreshes after late ' + mutation + ' ' + outcome + ' when navigation returns to A', () => {
         const reads = new Map<string, Subject<AdminOrder>>();
         const getAdmin = { execute: vi.fn((id: string) => {
           const response = new Subject<AdminOrder>();
@@ -39,6 +39,7 @@ describe('UserOrderDetailStore route identity', () => {
         expect(advance.rma).toHaveBeenCalledTimes(mutation === 'rma' ? 1 : 0);
         reads.get('B')!.next(order('B'));
         store.load('A');
+        const beforeCommitRead = reads.get('A')!;
         const before = store.snapshot();
         if (outcome === 'success') {
           response.next(order('A'));
@@ -46,6 +47,10 @@ describe('UserOrderDetailStore route identity', () => {
         }
         else response.error(new Error('old mutation failed'));
         expect(store.snapshot()).toEqual({ ...before, mutatingOrderIds: [] });
+        expect(getAdmin.execute).toHaveBeenCalledTimes(4);
+        expect(beforeCommitRead.observed).toBe(false);
+        beforeCommitRead.next({ ...order('A'), tracking: 'STALE' });
+        expect(store.snapshot().order).toBeNull();
         reads.get('A')!.next(order('A'));
         expect(store.snapshot().order?.id).toBe('A');
         expect(store.snapshot().errorMessage).toBe('');
@@ -121,9 +126,16 @@ describe('UserOrderDetailStore route identity', () => {
           pending.next({ ...order('A'), tracking: 'OLD' });
           pending.complete();
         } else pending.error(new Error('old mutation failed'));
-        expect(store.snapshot().order).toEqual(order('A'));
+        expect(store.snapshot().order).toBeNull();
         expect(store.snapshot().errorMessage).toBe('');
         expect(store.snapshot().mutatingOrderIds).toEqual([]);
+        expect(busy).toBe(true);
+        expect(getAdmin.execute).toHaveBeenCalledTimes(4);
+        store.rma({ orderId: 'A', status: RmaTransition.Received });
+        expect(advance.rma).toHaveBeenCalledTimes(mutation === 'rma' ? 1 : 0);
+        const committed = { ...order('A'), shipmentStatus: ShipmentStatus.Shipped, tracking: 'COMMITTED' };
+        reads.get('A')!.next(committed);
+        expect(store.snapshot().order).toEqual(committed);
         expect(busy).toBe(false);
         advance.rma.mockReturnValue(next);
         store.rma({ orderId: 'A', status: RmaTransition.Received });
@@ -162,5 +174,45 @@ describe('UserOrderDetailStore route identity', () => {
     expect(store.snapshot().mutatingOrderIds).toEqual([]);
     expect(store.snapshot().order?.id).toBe('B');
     store.ngOnDestroy();
+  });
+
+  it('leaves actions blocked if the post-mutation reconciliation fails', () => {
+    const reads: Subject<AdminOrder>[] = [];
+    const getAdmin = { execute: vi.fn(() => {
+      const read = new Subject<AdminOrder>();
+      reads.push(read);
+      return read;
+    }) };
+    const pending = new Subject<AdminOrder>();
+    const advance = { ship: vi.fn(() => pending), rma: vi.fn() };
+    const store = new TestOrderStore(getAdmin as unknown as GetAdminOrderUseCase, advance as unknown as AdvanceFulfillmentUseCase);
+    store.load('A');
+    reads[0].next(order('A'));
+    store.ship({ orderId: 'A', status: ShipmentTransition.Shipped, tracking: null });
+    store.load('B');
+    store.load('A');
+    reads[2].next(order('A'));
+    pending.complete();
+    reads[3].error(new Error('refresh unavailable'));
+    expect(store.snapshot().order).toBeNull();
+    expect(store.snapshot().errorMessage).not.toBe('');
+    store.rma({ orderId: 'A', status: RmaTransition.Received });
+    expect(advance.rma).not.toHaveBeenCalled();
+    store.ngOnDestroy();
+  });
+
+  it('does not refresh a disposed store with a pending mutation', () => {
+    const read = new Subject<AdminOrder>();
+    const pending = new Subject<AdminOrder>();
+    const getAdmin = { execute: vi.fn(() => read) };
+    const store = new TestOrderStore(getAdmin as unknown as GetAdminOrderUseCase,
+      { ship: () => pending } as unknown as AdvanceFulfillmentUseCase);
+    store.load('A');
+    read.next(order('A'));
+    store.ship({ orderId: 'A', status: ShipmentTransition.Shipped, tracking: null });
+    store.load('A');
+    store.ngOnDestroy();
+    pending.complete();
+    expect(getAdmin.execute).toHaveBeenCalledTimes(2);
   });
 });
