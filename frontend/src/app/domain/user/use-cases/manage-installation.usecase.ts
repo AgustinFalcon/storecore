@@ -1,6 +1,4 @@
-import { Inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { USER_REPOSITORY } from '../../../core/tokens/user.tokens';
 import {
   CapabilityModule,
   CapabilityState,
@@ -10,9 +8,8 @@ import {
 } from '../user.entity';
 import { IUserRepository } from '../user.repository';
 
-@Injectable()
 export class ManageInstallationUseCase {
-  constructor(@Inject(USER_REPOSITORY) private readonly repo: IUserRepository) {}
+  constructor(private readonly repo: IUserRepository) {}
 
   listCapabilities(): Observable<readonly CapabilityModule[]> {
     return this.repo.listCapabilities();
