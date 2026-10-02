@@ -1,5 +1,7 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { distinctUntilChanged, map } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { CartStore } from '../cart/cart.store';
 import { CatalogStore } from './catalog.store';
@@ -24,6 +26,7 @@ import { ProductPageViewComponent } from './product-page.view';
   `,
 })
 export class ProductPageComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   constructor(
     readonly store: CatalogStore,
     readonly cart: CartStore,
@@ -31,11 +34,19 @@ export class ProductPageComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.reload();
+    this.route.paramMap.pipe(
+      map((params) => params.get('sku') ?? ''),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((sku) => this.loadProduct(sku));
   }
 
   reload(): void {
-    this.store.loadProduct(this.route.snapshot.paramMap.get('sku') ?? '');
+    this.loadProduct(this.route.snapshot.paramMap.get('sku') ?? '');
+  }
+
+  private loadProduct(sku: string): void {
+    this.store.loadProduct(sku);
     if (this.cart.authority().canMutate) {
       this.cart.load();
     }

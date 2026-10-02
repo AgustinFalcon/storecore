@@ -1,0 +1,101 @@
+{
+  "feature": "20261001-reactive-detail-route-identity",
+  "issue": 142,
+  "stack_profile": "frontend",
+  "project_type": "production",
+  "execution_strategy": "incremental-gated",
+  "status": "building",
+  "stats": {
+    "total": 5,
+    "done": 3,
+    "pending": 2
+  },
+  "tasks": [
+    {
+      "id": "TASK-RDI-001",
+      "title": "React to detail route identity",
+      "status": "done",
+      "depends_on": [],
+      "files": [
+        "frontend/src/app/features/storefront/product-page.component.ts",
+        "frontend/src/app/features/orders/customer-order-detail.component.ts",
+        "frontend/src/app/features/admin/user-order-detail.component.ts",
+        "frontend/src/app/features/cart/checkout-result.component.ts"
+      ],
+      "acceptance_criteria": [
+        "AC-RDI-1",
+        "AC-RDI-2",
+        "AC-RDI-6"
+      ],
+      "evidence": "Implementation local; Angular app/spec compilation passes. Runtime tests pending host access resolution."
+    },
+    {
+      "id": "TASK-RDI-002",
+      "title": "Fence fulfillment outcomes and commands by current route",
+      "status": "done",
+      "depends_on": [
+        "TASK-RDI-001"
+      ],
+      "files": [
+        "frontend/src/app/features/admin/user-order-detail.store.ts"
+      ],
+      "acceptance_criteria": [
+        "AC-RDI-3",
+        "AC-RDI-4"
+      ],
+      "evidence": "Generation fence and command identity/loading guard implemented; delayed outcome tests authored, execution pending."
+    },
+    {
+      "id": "TASK-RDI-003",
+      "title": "Reset tracking and disable busy fulfillment",
+      "status": "done",
+      "depends_on": [
+        "TASK-RDI-001"
+      ],
+      "files": [
+        "frontend/src/app/features/admin/user-order-detail.view.ts",
+        "frontend/src/app/features/admin/user-order-detail.view.html"
+      ],
+      "acceptance_criteria": [
+        "AC-RDI-5"
+      ],
+      "evidence": "View implementation and regression test authored; ngc and lint pass."
+    },
+    {
+      "id": "TASK-RDI-004",
+      "title": "Execute navigation and race regression suite",
+      "status": "pending",
+      "depends_on": [
+        "TASK-RDI-001",
+        "TASK-RDI-002",
+        "TASK-RDI-003"
+      ],
+      "files": [
+        "frontend/src/app/features/detail-route-navigation.spec.ts",
+        "frontend/src/app/features/detail-read-cancellation.spec.ts",
+        "frontend/src/app/features/admin/user-order-detail.store.spec.ts",
+        "frontend/src/app/features/admin/user-order-detail.view.spec.ts",
+        "frontend/src/app/features/cart/checkout-result.component.spec.ts"
+      ],
+      "acceptance_criteria": [
+        "AC-RDI-1 through AC-RDI-6 pass runtime tests"
+      ],
+      "evidence": "22 regression tests authored plus checkout adaptation, including the review P2 A-to-B-to-A occupancy sequence and separate in-flight orders. ngc app/spec, tsc app/spec, lint and architecture pass; ng test and ng build blocked by host filesystem access in esbuild."
+    },
+    {
+      "id": "TASK-RDI-005",
+      "title": "Review and integrate only under applicable gates",
+      "status": "pending",
+      "depends_on": [
+        "TASK-RDI-004"
+      ],
+      "files": [
+        "sdd/wip/20261001-reactive-detail-route-identity/"
+      ],
+      "acceptance_criteria": [
+        "Required dual reviews and hosted checks recorded before integration; no master/live/archive authorization inferred"
+      ],
+      "evidence": "No commit, push, PR or merge authorized in this subtask."
+    }
+  ]
+}
