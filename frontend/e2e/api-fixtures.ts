@@ -53,9 +53,13 @@ export async function installApiFixtures(page: Page, realm: ScreenRealm): Promis
   await page.route('**/*', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    // The index's one optional font stylesheet is deliberately offline, not an API exception.
+    // Compare decoded parameters, not Chromium's canonicalized URL encoding/order.
+    // Exactly one family and display are allowed; this remains an offline static-resource exception.
     if (request.method() === 'GET' && request.resourceType() === 'stylesheet' &&
-      url.href === 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap') {
+      url.origin === 'https://fonts.googleapis.com' && url.pathname === '/css2' &&
+      !url.username && !url.password && !url.hash && url.searchParams.size === 2 &&
+      url.searchParams.getAll('family').length === 1 && url.searchParams.getAll('display').length === 1 &&
+      url.searchParams.get('family') === 'Inter:wght@400;500;600;650;700' && url.searchParams.get('display') === 'swap') {
       await route.abort('blockedbyclient');
       return;
     }

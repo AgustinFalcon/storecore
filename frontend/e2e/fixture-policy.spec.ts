@@ -29,15 +29,30 @@ async function invokeApiHandler(url: string, realm = ScreenRealm.Public, method 
   return { api, actions, statuses };
 }
 
-test('only the exact optional font stylesheet is silently aborted without network', async () => {
+test('only the semantic optional font stylesheet is silently aborted without network', async () => {
   const font = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap';
-  const result = await invokeApiHandler(font, ScreenRealm.Public, Method.Get, Handler.CatchAll, Resource.Stylesheet);
-  expect(result.actions).toEqual([RequestAction.Aborted]);
-  expect(result.statuses).toEqual([]);
-  expect(result.api.unexpected).toEqual([]);
-  expect(result.api.seen.size).toBe(0);
+  for (const url of [font,
+    'https://fonts.googleapis.com/css2?family=Inter%3Awght%40400%3B500%3B600%3B650%3B700&display=swap',
+    'https://fonts.googleapis.com/css2?display=swap&family=Inter:wght@400;500;600;650;700',
+    'https://fonts.googleapis.com/css2?display=swap&family=Inter%3Awght%40400%3B500%3B600%3B650%3B700',
+  ]) {
+    const result = await invokeApiHandler(url, ScreenRealm.Public, Method.Get, Handler.CatchAll, Resource.Stylesheet);
+    expect(result.actions).toEqual([RequestAction.Aborted]);
+    expect(result.statuses).toEqual([]);
+    expect(result.api.unexpected).toEqual([]);
+    expect(result.api.seen.size).toBe(0);
+  }
   for (const [url, method, resource] of [
     [font + '&extra=1', Method.Get, Resource.Stylesheet],
+    [font + '&family=Inter%3Awght%40400%3B500%3B600%3B650%3B700', Method.Get, Resource.Stylesheet],
+    [font + '&display=swap', Method.Get, Resource.Stylesheet],
+    [font.replace('Inter:wght', 'Roboto:wght'), Method.Get, Resource.Stylesheet],
+    [font.replace('display=swap', 'display=block'), Method.Get, Resource.Stylesheet],
+    [font.replace('&display=swap', ''), Method.Get, Resource.Stylesheet],
+    [font.replace('https:', 'http:'), Method.Get, Resource.Stylesheet],
+    [font.replace('fonts.googleapis.com', 'fonts.googleapis.com:444'), Method.Get, Resource.Stylesheet],
+    [font.replace('fonts.googleapis.com', 'test@fonts.googleapis.com'), Method.Get, Resource.Stylesheet],
+    [font + '#fragment', Method.Get, Resource.Stylesheet],
     [font.replace('fonts.googleapis.com', 'foreign.example.invalid'), Method.Get, Resource.Stylesheet],
     ['https://fonts.googleapis.com/other.css', Method.Get, Resource.Stylesheet],
     [font, Method.Post, Resource.Stylesheet],
