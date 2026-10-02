@@ -1,7 +1,7 @@
 # Corte — transiciones desconocidas fail-closed
 
 - Feature ID: `20261001-unknown-transitions-fail-closed`.
-- Estado: implementación local, revisión estática realizada; validación ejecutable pendiente; WIP abierto.
+- Estado: implementación publicada y validada por CI; reviews obligatorios pendientes; WIP abierto.
 - Base: integración `a8874ad0466d9c26b982aba36368ab6f20018be8`.
 - Fuente: hallazgo en `frontend/src/app/domain/order/shipment-status.ts` y `rma-status.ts`: `Unknown.next` exponía `Packed` y `Received` respectivamente.
 - Lenguaje: es. Sin fuentes sensibles ni datos de runtime.
@@ -28,4 +28,5 @@ Sin cambios de navegación, capabilities, Mercado Libre, dependencias, backend, 
 - TypeScript: PASS mediante `npx tsc --noEmit -p tsconfig.spec.json`.
 - Build: PASS mediante `npm run build`.
 - Tests enfocados: BLOCKED; el runner Angular falla antes de assertions al resolver rutas absolutas por ACL del workspace Windows. Suites preparadas: `shipment-status.spec.ts`, `rma-status.spec.ts`, `fulfillment-transition.spec.ts`, `fulfillment.view.spec.ts`, `user-order-detail.view.spec.ts`.
-- Falcon Bugbot/Security: INCOMPLETE por validación ejecutable pendiente; inspección local del diff sin hallazgos adicionales en el alcance, sin equivalencia a gates Grok ni CI. Estándar Angular aplicado a la arquitectura existente con ComponentStore, sin migración de estado.
+- GitHub Actions Verify run `36948363166`: PASS en frontend (1m22s) y backend (4m58s) para commit `5faca5b`.
+- Falcon Bugbot/Security: revisión estática sin hallazgos P0-P2; el P3 de evidencia SDD fue corregido. No equivale a los gates Grok obligatorios. Estándar Angular aplicado a la arquitectura existente con ComponentStore, sin migración de estado.
