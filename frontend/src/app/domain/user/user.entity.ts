@@ -1,8 +1,9 @@
 import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
+import { UserRole } from './user-role';
 
 export interface UserSessionResult {
   readonly id: string;
-  readonly roles: readonly string[];
+  readonly roles: readonly UserRole[];
 }
 
 export interface UserCredentials {

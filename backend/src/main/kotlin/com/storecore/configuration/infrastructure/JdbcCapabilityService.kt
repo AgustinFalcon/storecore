@@ -97,7 +97,7 @@ open class JdbcCapabilityService(
             CapabilityActor.Public -> if (kind != CapabilityActionKind.READ) throw CapabilityActorNotAuthorized()
             CapabilityActor.System -> if (kind == CapabilityActionKind.PUBLISH) throw CapabilityActorNotAuthorized()
             is CapabilityActor.Internal -> {
-                if (actor.principal.roles.isEmpty()) throw CapabilityActorNotAuthorized()
+                if (!actor.principal.hasKnownRole) throw CapabilityActorNotAuthorized()
                 if (kind in setOf(CapabilityActionKind.WRITE, CapabilityActionKind.PUBLISH) &&
                     actor.principal.roles.none { it == InternalRole.ADMIN || it == InternalRole.OPERATOR }
                 ) throw CapabilityActorNotAuthorized()
@@ -144,7 +144,7 @@ open class JdbcCapabilityService(
             CapabilityActor.Public -> if (kind != CapabilityActionKind.READ) throw CapabilityActorNotAuthorized()
             CapabilityActor.System -> if (kind == CapabilityActionKind.PUBLISH) throw CapabilityActorNotAuthorized()
             is CapabilityActor.Internal -> {
-                if (actor.principal.roles.isEmpty()) throw CapabilityActorNotAuthorized()
+                if (!actor.principal.hasKnownRole) throw CapabilityActorNotAuthorized()
                 if (kind in setOf(CapabilityActionKind.WRITE, CapabilityActionKind.PUBLISH) &&
                     actor.principal.roles.none { it == InternalRole.ADMIN || it == InternalRole.OPERATOR }
                 ) throw CapabilityActorNotAuthorized()

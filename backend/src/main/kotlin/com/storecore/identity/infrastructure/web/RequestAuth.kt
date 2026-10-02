@@ -23,8 +23,11 @@ class RequestAuth(
     fun customer(http: HttpServletRequest): CustomerPrincipal =
         identity.authenticate(IdentityRealm.CUSTOMER, cookie(http, CUSTOMER_COOKIE)) as CustomerPrincipal
 
-    fun internal(http: HttpServletRequest): InternalUserPrincipal =
-        identity.authenticate(IdentityRealm.USER, cookie(http, INTERNAL_COOKIE)) as InternalUserPrincipal
+    fun internal(http: HttpServletRequest): InternalUserPrincipal {
+        val principal = identity.authenticate(IdentityRealm.USER, cookie(http, INTERNAL_COOKIE)) as InternalUserPrincipal
+        if (!principal.hasKnownRole) throw AuthenticationFailed()
+        return principal
+    }
 
     fun admin(http: HttpServletRequest): InternalUserPrincipal {
         val principal = internal(http)

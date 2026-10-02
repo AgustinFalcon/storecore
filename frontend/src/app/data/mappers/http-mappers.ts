@@ -11,6 +11,7 @@ import { PaymentStatus } from '../../domain/order/payment-status';
 import { RmaStatus } from '../../domain/order/rma-status';
 import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
+import { UserRole } from '../../domain/user/user-role';
 import {
   CapabilityModule,
   CapabilityState,
@@ -63,7 +64,7 @@ export function mapUserSession(value: unknown): UserSessionResult {
   const row = asRecord(value);
   return {
     id: text(row['id']),
-    roles: items(row['roles']).map(text),
+    roles: items(row['roles']).map(UserRole.fromWire),
   };
 }
 
