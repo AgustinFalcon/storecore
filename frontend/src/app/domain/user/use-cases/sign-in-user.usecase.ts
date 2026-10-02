@@ -1,16 +1,13 @@
-import { Inject, Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { UserSession } from '../../../core/auth/user-session';
-import { USER_REPOSITORY } from '../../../core/tokens/user.tokens';
+import { UserSessionPort } from '../user-session.port';
 import { UserCredentials, UserSessionResult } from '../user.entity';
 import { IUserRepository } from '../user.repository';
 import { UserRole } from '../user-role';
 
-@Injectable()
 export class SignInUserUseCase {
   constructor(
-    @Inject(USER_REPOSITORY) private readonly repo: IUserRepository,
-    private readonly session: UserSession,
+    private readonly repo: IUserRepository,
+    private readonly session: UserSessionPort,
   ) {}
 
   execute(credentials: UserCredentials): Observable<UserSessionResult> {

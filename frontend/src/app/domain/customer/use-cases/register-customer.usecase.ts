@@ -1,15 +1,12 @@
-import { Inject, Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { CustomerSession } from '../../../core/auth/customer-session';
-import { CUSTOMER_REPOSITORY } from '../../../core/tokens/customer.tokens';
+import { CustomerSessionPort } from '../customer-session.port';
 import { CustomerRegistration, CustomerSessionResult } from '../customer.entity';
 import { ICustomerRepository } from '../customer.repository';
 
-@Injectable()
 export class RegisterCustomerUseCase {
   constructor(
-    @Inject(CUSTOMER_REPOSITORY) private readonly repo: ICustomerRepository,
-    private readonly session: CustomerSession,
+    private readonly repo: ICustomerRepository,
+    private readonly session: CustomerSessionPort,
   ) {}
 
   execute(registration: CustomerRegistration): Observable<CustomerSessionResult> {
