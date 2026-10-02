@@ -64,6 +64,13 @@ test('the optional font stylesheet query can vary but its boundary stays offline
     const rejected = await invokeApiHandler(url, ScreenRealm.Public, method, Handler.CatchAll, resource);
     expect(rejected.actions).toEqual([RequestAction.Aborted]);
     expect(rejected.api.unexpected).toHaveLength(1);
+    const diagnosticUrl = new URL(url);
+    diagnosticUrl.username = '';
+    diagnosticUrl.password = '';
+    expect(JSON.parse(rejected.api.unexpected[0])).toEqual({ kind: 'Unmatched request', method,
+      resourceType: resource, url: diagnosticUrl.href });
+    expect(rejected.api.unexpected[0]).not.toContain('test@');
+    expect(rejected.api.unexpected[0]).not.toContain('secret@');
   }
   const api = await invokeApiHandler('https://fonts.googleapis.com/api/v1/health');
   expect(api.actions).toEqual([RequestAction.Aborted]);

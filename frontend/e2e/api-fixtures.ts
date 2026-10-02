@@ -62,7 +62,11 @@ export async function installApiFixtures(page: Page, realm: ScreenRealm): Promis
       return;
     }
     if (url.origin !== fixtureOrigin || url.pathname.startsWith('/api')) {
-      unexpected.push('Unmatched request ' + url.origin + url.pathname);
+      const diagnosticUrl = new URL(url.href);
+      diagnosticUrl.username = '';
+      diagnosticUrl.password = '';
+      unexpected.push(JSON.stringify({ kind: 'Unmatched request', method: request.method(),
+        resourceType: request.resourceType(), url: diagnosticUrl.href }));
       await route.abort('blockedbyclient');
       return;
     }

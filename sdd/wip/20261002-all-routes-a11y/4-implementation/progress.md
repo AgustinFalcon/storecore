@@ -45,3 +45,9 @@ The principal reported run 37060592203: all 24 route cases failed only on Unmatc
 At the principal's explicit direction, classify the font as expected offline abort by the stable boundary only: GET, stylesheet, exact HTTPS fonts.googleapis.com origin and /css2 pathname, no username/password/hash. Any query is accepted solely for aborting, never for fetching/fulfilling. Regressions cover canonical/encoded/reordered/empty/extra/duplicate/varied-value query forms and reject boundary changes and API requests. Hosted 24-route success remains pending; no commit/push/merge in this follow-up.
 
 Local PASS: architecture, lint, strict fixture/manifest/policy typecheck, all eleven focused tests (5.3s), git diff --check. No Angular server started; focused runner exited normally. These focused checks are not a successful 24-route hosted run.
+
+## Diagnostic-only follow-up
+
+The principal reported run 37061721418: backend passed, twelve auxiliary checks passed, all 24 route cases still failed only on unmatched Google Fonts requests. Hosted frontend is still failed. No policy expansion was made: catch-all unexpected entries now serialize kind, request method, resourceType and complete URL.href as JSON, with username/password removed from a copy before serialization and no headers/cookies. Negative boundary tests assert those exact diagnostic fields and credential redaction. The diagnostic is intended to identify the actual failing request on the next hosted run, not to claim resolution.
+
+Local PASS: architecture, lint, strict fixture/manifest/policy typecheck, four focused fixture-policy regressions (final sanitized version: 1.2s), git diff --check. Runner exited normally; no Angular server started. Hosted route failure remains unresolved pending the new diagnostic.
