@@ -7,8 +7,8 @@
   "status": "building",
   "stats": {
     "total": 5,
-    "done": 3,
-    "pending": 2
+    "done": 4,
+    "pending": 1
   },
   "tasks": [
     {
@@ -27,7 +27,7 @@
         "AC-RDI-2",
         "AC-RDI-6"
       ],
-      "evidence": "Implementation local; Angular app/spec compilation passes. Runtime tests pending host access resolution."
+      "evidence": "Angular app/spec compilation passed locally; historical runtime ACL failure preserved in progress.md. Hosted Verify PASS for 85d9d6e in PR #147, run 37034813222."
     },
     {
       "id": "TASK-RDI-002",
@@ -43,7 +43,7 @@
         "AC-RDI-3",
         "AC-RDI-4"
       ],
-      "evidence": "Generation fence and command identity/loading guard implemented; delayed outcome tests authored, execution pending."
+      "evidence": "Generation fence and command identity/loading guard implemented; delayed outcome tests covered by hosted Verify PASS for 85d9d6e, run 37034813222. Later session-mutation reconciliation is a separate corrective delta requiring its own gates."
     },
     {
       "id": "TASK-RDI-003",
@@ -64,7 +64,7 @@
     {
       "id": "TASK-RDI-004",
       "title": "Execute navigation and race regression suite",
-      "status": "pending",
+      "status": "done",
       "depends_on": [
         "TASK-RDI-001",
         "TASK-RDI-002",
@@ -80,7 +80,7 @@
       "acceptance_criteria": [
         "AC-RDI-1 through AC-RDI-6 pass runtime tests"
       ],
-      "evidence": "22 regression tests authored plus checkout adaptation, including the review P2 A-to-B-to-A occupancy sequence and separate in-flight orders. ngc app/spec, tsc app/spec, lint and architecture pass; ng test and ng build blocked by host filesystem access in esbuild."
+      "evidence": "22 regression tests authored plus checkout adaptation, including the review P2 A-to-B-to-A occupancy sequence and separate in-flight orders. ngc app/spec, tsc app/spec, lint and architecture passed locally; historical ng test/ng build attempts were blocked by esbuild ACL before execution. Hosted Verify PASS for 85d9d6e in PR #147, run 37034813222, executed the frontend suite/build. Later corrective tests and final HEAD still require their own verification/review gates."
     },
     {
       "id": "TASK-RDI-005",
@@ -95,7 +95,7 @@
       "acceptance_criteria": [
         "Required dual reviews and hosted checks recorded before integration; no master/live/archive authorization inferred"
       ],
-      "evidence": "No commit, push, PR or merge authorized in this subtask."
+      "evidence": "The original delegated subtask performed no commit/push/PR/merge. Subsequently published as PR #147 with hosted Verify PASS for 85d9d6e (run 37034813222). Required dual Grok reviews, revalidation after changes and integration remain pending."
     }
   ]
 }

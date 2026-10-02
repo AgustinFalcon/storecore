@@ -1,6 +1,6 @@
 # Functional Spec — `storecore-frontend-ux-system-v1`
 
-**Status:** `ready_for_sol_review` · **Fecha:** 2026-09-23 · **Sin código**
+**Snapshot histórico:** `ready_for_sol_review` · **Fecha:** 2026-09-23 · **Sin código en esa fotografía inicial**. El estado posterior vive en `../meta.md` y `../3-tasks/`: UX-ANG obtuvo `CONDITIONAL_GO` y se aplicaron tokens/layout a las 22 rutas existentes. El WIP sigue abierto, sin archive ni declaración pixel-complete.
 
 ## Problema
 
@@ -8,7 +8,7 @@ Las views Angular DS-00…U-10 existen en master, pero el sistema visual no esta
 
 ## Objetivo
 
-Documentar y diseñar (Stitch) el sistema visual y **todas** las superficies del core: tokens, primitivas, dialogos, errores, formatos, tipografía, y las 22 rutas. Implementación Angular: otro GO. Venta física / POS companion: otro repo/tramo, no este dossier.
+Objetivo de la fotografía inicial: documentar y diseñar (Stitch) el sistema visual y **todas** las superficies del core: tokens, primitivas, dialogos, errores, formatos, tipografía, y las 22 rutas. En esa fase la implementación Angular requería otro GO; el `CONDITIONAL_GO` UX-ANG y la implementación posterior están registrados en meta/plan/tasks. Venta física / POS companion: otro repo/tramo, no este dossier.
 
 ## Inventario (obligatorio)
 
