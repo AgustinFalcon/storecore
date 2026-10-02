@@ -39,7 +39,7 @@ export class RmaStatus {
   static readonly Inspected = new RmaStatus('INSPECTED', 'Inspeccionado', RmaTransition.Adjusted);
   static readonly Rejected = new RmaStatus('REJECTED', 'Rechazado', RmaTransition.Received);
   static readonly Closed = new RmaStatus('CLOSED', 'Cerrado', null);
-  static readonly Unknown = new RmaStatus('', 'Estado de RMA no reconocido', RmaTransition.Received);
+  static readonly Unknown = new RmaStatus('', 'Estado de RMA no reconocido', null);
 
   static fromWire(raw: string | null | undefined): RmaStatus {
     const wire = raw?.trim() ?? '';

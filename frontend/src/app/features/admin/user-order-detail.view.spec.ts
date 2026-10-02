@@ -59,7 +59,7 @@ describe('UserOrderDetailViewComponent', () => {
       ['SHIPPED', 'RETURN_RECEIVED', 'Entregar', 'Inspeccionar'],
       ['DELIVERED', 'INSPECTED', null, 'Ajustar stock'],
       ['DELIVERED', 'CLOSED', null, null],
-      ['PACKED', 'ADJUSTED', 'Empacar', 'RMA recibido'],
+      ['PACKED', 'ADJUSTED', null, null],
     ];
 
     for (const [shipmentStatus, rmaStatus, shipLabel, rmaLabel] of cases) {
@@ -90,5 +90,21 @@ describe('UserOrderDetailViewComponent', () => {
 
     expect(shipped).toEqual([{ orderId: 'ord-1', status: ShipmentTransition.Shipped, tracking: 'ANDES-1' }]);
     expect(returned).toEqual([{ orderId: 'ord-1', status: RmaTransition.Inspected }]);
+  });
+
+  it('shows fixed unknown labels without offering fulfillment actions', () => {
+    fixture.componentRef.setInput('order', {
+      ...order(ShipmentStatus.Pending.wire, null),
+      shipmentStatus: ShipmentStatus.Unknown,
+      rmaStatus: RmaStatus.Unknown,
+    });
+    fixture.detectChanges();
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.textContent).toContain(ShipmentStatus.Unknown.label);
+    expect(root.textContent).toContain(RmaStatus.Unknown.label);
+    const summary = root.querySelector('aside.sc-summary') as HTMLElement;
+    expect(summary.querySelectorAll('button')).toHaveLength(0);
+    expect(summary.querySelectorAll('input')).toHaveLength(0);
   });
 });

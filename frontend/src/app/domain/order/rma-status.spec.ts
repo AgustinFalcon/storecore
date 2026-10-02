@@ -13,5 +13,18 @@ describe('RmaStatus', () => {
     const status = RmaStatus.fromWire('RESTOCKED');
     expect(status).toBe(RmaStatus.Unknown);
     expect(status.label).toBe('Estado de RMA no reconocido');
+    expect(status.next).toBeNull();
+  });
+
+  it.each([null, undefined, '', '   ', 'ADJUSTED', 'RESTOCKED'])('fails closed for wire %s', (wire) => {
+    const status = RmaStatus.fromWire(wire);
+    expect(status).toBe(RmaStatus.Unknown);
+    expect(status.next).toBeNull();
+  });
+
+  it('preserves an unknown optional wire as a blocked state', () => {
+    const status = RmaStatus.fromOptionalWire('RESTOCKED');
+    expect(status).toBe(RmaStatus.Unknown);
+    expect(status?.next).toBeNull();
   });
 });

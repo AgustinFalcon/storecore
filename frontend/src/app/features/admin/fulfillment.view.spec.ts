@@ -58,7 +58,7 @@ describe('FulfillmentViewComponent', () => {
       ['SHIPPED', 'RETURN_RECEIVED', 'Entregar', 'Inspeccionar'],
       ['DELIVERED', 'INSPECTED', null, 'Ajustar stock'],
       ['DELIVERED', 'CLOSED', null, null],
-      ['PACKED', 'ADJUSTED', 'Empacar', 'RMA recibido'],
+      ['PACKED', 'ADJUSTED', null, null],
     ];
     fixture.componentInstance.orders = cases.map(([shipmentStatus, rmaStatus], index) =>
       order(`ord-${index}`, shipmentStatus, rmaStatus),
@@ -99,5 +99,20 @@ describe('FulfillmentViewComponent', () => {
 
     expect(shipped).toEqual([{ orderId: 'ord-9', status: ShipmentTransition.Shipped, tracking: 'ANDES-9' }]);
     expect(returned).toEqual([{ orderId: 'ord-9', status: RmaTransition.Inspected }]);
+  });
+
+  it('shows fixed unknown labels without offering fulfillment actions', () => {
+    fixture.componentInstance.orders = [{
+      ...order('ord-unknown', ShipmentStatus.Pending.wire, null),
+      shipmentStatus: ShipmentStatus.Unknown,
+      rmaStatus: RmaStatus.Unknown,
+    }];
+    fixture.detectChanges();
+
+    const row = fixture.nativeElement.querySelector('tbody tr') as HTMLTableRowElement;
+    expect(row.textContent).toContain(ShipmentStatus.Unknown.label);
+    expect(row.textContent).toContain(RmaStatus.Unknown.label);
+    expect(row.querySelectorAll('.sc-table__actions button')).toHaveLength(0);
+    expect(row.querySelectorAll('input')).toHaveLength(0);
   });
 });

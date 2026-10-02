@@ -1,8 +1,15 @@
 import { nextRma, nextShipment } from './fulfillment-transition';
-import { RmaTransition } from './rma-status';
-import { ShipmentTransition } from './shipment-status';
+import { RmaStatus, RmaTransition } from './rma-status';
+import { ShipmentStatus, ShipmentTransition } from './shipment-status';
 
 describe('fulfillment transitions', () => {
+  it('does not expose transitions for unknown domain states or wire values', () => {
+    expect(nextShipment(ShipmentStatus.Unknown)).toBeNull();
+    expect(nextShipment('IN_TRANSIT')).toBeNull();
+    expect(nextRma(RmaStatus.Unknown)).toBeNull();
+    expect(nextRma('RESTOCKED')).toBeNull();
+  });
+
   it('does not skip shipment states', () => {
     expect(nextShipment('PENDING')).toBe(ShipmentTransition.Packed);
     expect(nextShipment('PREPARING')).toBe(ShipmentTransition.Shipped);
