@@ -35,7 +35,12 @@ export const screens: readonly Screen[] = [
   }),
   screen('/customer/addresses', ScreenRealm.Customer, 'Direcciones', '.sc-address-list li'),
   screen('/customer/favorites', ScreenRealm.Customer, 'Favoritos', '.sc-fav-list a'),
-  screen('/customer/orders', ScreenRealm.Customer, 'Mis órdenes', 'tbody tr'),
+  screen('/customer/orders', ScreenRealm.Customer, 'Mis órdenes', '.sc-order-list > .sc-order-card', {
+    loadedValues: [], loadedTexts: [
+      { selector: '.sc-order-card a[href="/customer/orders/test-order"]', text: 'test-order' },
+      { selector: '.sc-order-card__lines', text: 'Producto de prueba' },
+    ],
+  }),
   screen('/customer/orders/:id', ScreenRealm.Customer, 'Orden test-order', 'tbody tr'),
   screen('/user/session', ScreenRealm.Public, 'Sesión user', 'input[name="userEmail"]'),
   screen('/user/content', ScreenRealm.User, 'Contenido del home', 'input[name="homeTitle"]', {

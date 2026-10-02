@@ -76,6 +76,9 @@ describe('FulfillmentViewComponent', () => {
       expect(buttonLabels(actions!, RMA_LABELS)).toEqual(cases[index][3] ? [cases[index][3]] : []);
       const trackingInputs = row.querySelectorAll('input');
       expect(trackingInputs).toHaveLength(cases[index][0] === 'PREPARING' ? 1 : 0);
+      trackingInputs.forEach((input) => {
+        expect(input.getAttribute('aria-label')).toBe(`Tracking de la orden ord-${index}`);
+      });
     });
   });
 

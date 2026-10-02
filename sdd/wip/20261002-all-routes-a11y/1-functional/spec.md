@@ -5,3 +5,6 @@ AC-148-2: every route renders its expected heading and representative loaded con
 AC-148-3: page errors, unexpected API or external requests and serious/critical axe violations fail. Unexpected mutations cannot reach a backend.
 AC-148-4: fixtures are test-only; guards, HTTP repositories, CSRF paths and production providers remain in use. No backend, credential or live integration is required.
 AC-148-5: UX22 is distinct from runtime24. Favorites is observed as an existing browser-only prototype, not authorized or promoted; offers is an existing operator route. Coverage is not visual homologation, mobile QA or server authorization assurance.
+
+AC-148-6: the index's exact optional Google Fonts stylesheet is explicitly aborted offline, without treating it as an unexpected request. No font-network access is permitted; different URLs, methods, resource types and API requests remain failures.
+AC-148-7: secondary text remains readable on the canvas and informational callout backgrounds; every editable fulfillment tracking field has an accessible name identifying its order. No domain transition, authorization or wire contract changes.

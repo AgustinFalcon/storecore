@@ -30,7 +30,7 @@
               <td><span class="sc-badge sc-badge--warn">{{ order.shipmentStatus.label }}</span></td>
               <td>
                 @if (nextShip(order)?.requiresTracking) {
-                  <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
+                  <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" [attr.aria-label]="'Tracking de la orden ' + order.id" />
                 } @else {
                   {{ order.tracking || '—' }}
                 }

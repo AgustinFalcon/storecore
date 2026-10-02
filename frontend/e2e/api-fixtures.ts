@@ -51,7 +51,14 @@ export async function installApiFixtures(page: Page, realm: ScreenRealm): Promis
   await page.addInitScript(({ key, item }) => sessionStorage.setItem(key, JSON.stringify([item])),
     { key: FAVORITES_STORAGE_KEY, item: { sku: line.sku, name: line.name } });
   await page.route('**/*', async (route) => {
-    const url = new URL(route.request().url());
+    const request = route.request();
+    const url = new URL(request.url());
+    // The index's one optional font stylesheet is deliberately offline, not an API exception.
+    if (request.method() === 'GET' && request.resourceType() === 'stylesheet' &&
+      url.href === 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap') {
+      await route.abort('blockedbyclient');
+      return;
+    }
     if (url.origin !== fixtureOrigin || url.pathname.startsWith('/api')) {
       unexpected.push('Unmatched request ' + url.origin + url.pathname);
       await route.abort('blockedbyclient');

@@ -5,8 +5,11 @@ import { ScreenRealm } from './route-manifest';
 
 enum RequestAction { Aborted, Fulfilled, Continued }
 enum Method { Get = 'GET', Post = 'POST' }
+enum Handler { CatchAll, Api }
+enum Resource { Stylesheet = 'stylesheet', Fetch = 'fetch' }
 
-async function invokeApiHandler(url: string, realm = ScreenRealm.Public, method = Method.Get) {
+async function invokeApiHandler(url: string, realm = ScreenRealm.Public, method = Method.Get,
+  handler = Handler.Api, resource = Resource.Fetch) {
   const handlers: Array<(route: Route) => Promise<void>> = [];
   const page = {
     addInitScript: async () => undefined,
@@ -16,15 +19,38 @@ async function invokeApiHandler(url: string, realm = ScreenRealm.Public, method 
   const actions: RequestAction[] = [];
   const statuses: number[] = [];
   const route = {
-    request: () => ({ url: () => url, method: () => method }),
+    request: () => ({ url: () => url, method: () => method, resourceType: () => resource }),
     abort: async () => { actions.push(RequestAction.Aborted); },
     fulfill: async (response: { status: number }) => { actions.push(RequestAction.Fulfilled); statuses.push(response.status); },
     continue: async () => { actions.push(RequestAction.Continued); },
   } as unknown as Route;
   // Playwright dispatches the last registered matching handler first.
-  await handlers[handlers.length - 1](route);
+  await handlers[handler === Handler.Api ? handlers.length - 1 : 0](route);
   return { api, actions, statuses };
 }
+
+test('only the exact optional font stylesheet is silently aborted without network', async () => {
+  const font = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap';
+  const result = await invokeApiHandler(font, ScreenRealm.Public, Method.Get, Handler.CatchAll, Resource.Stylesheet);
+  expect(result.actions).toEqual([RequestAction.Aborted]);
+  expect(result.statuses).toEqual([]);
+  expect(result.api.unexpected).toEqual([]);
+  expect(result.api.seen.size).toBe(0);
+  for (const [url, method, resource] of [
+    [font + '&extra=1', Method.Get, Resource.Stylesheet],
+    [font.replace('fonts.googleapis.com', 'foreign.example.invalid'), Method.Get, Resource.Stylesheet],
+    ['https://fonts.googleapis.com/other.css', Method.Get, Resource.Stylesheet],
+    [font, Method.Post, Resource.Stylesheet],
+    [font, Method.Get, Resource.Fetch],
+  ] as const) {
+    const rejected = await invokeApiHandler(url, ScreenRealm.Public, method, Handler.CatchAll, resource);
+    expect(rejected.actions).toEqual([RequestAction.Aborted]);
+    expect(rejected.api.unexpected).toHaveLength(1);
+  }
+  const api = await invokeApiHandler('https://fonts.googleapis.com/api/v1/health');
+  expect(api.actions).toEqual([RequestAction.Aborted]);
+  expect(api.api.unexpected).toHaveLength(1);
+});
 
 test('known API paths on a foreign origin never receive fixtures or authentication', async () => {
   for (const origin of ['https://foreign.example.invalid', 'http://127.0.0.1:8080', 'https://127.0.0.1:4300']) {
