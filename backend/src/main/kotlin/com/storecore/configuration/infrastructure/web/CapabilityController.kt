@@ -67,9 +67,9 @@ class CapabilityController(
     fun removeKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillCloseRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
-        requireConsoleModule(module)
+        val capabilityModule = requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
-            capabilities.removeKill(actor, id, request.reason, request.correlationId)
+            capabilities.removeKill(actor, capabilityModule, id, request.reason, request.correlationId)
             mapOf("id" to id, "removed" to true)
         }
         return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mutation.value))
@@ -79,9 +79,9 @@ class CapabilityController(
     fun replaceKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
-        requireConsoleModule(module)
+        val capabilityModule = requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
-            capabilities.replaceKill(actor, id, request.owner, request.reason, Instant.parse(request.expiresAt), request.ticket, request.correlationId)
+            capabilities.replaceKill(actor, capabilityModule, id, request.owner, request.reason, Instant.parse(request.expiresAt), request.ticket, request.correlationId)
         }
         return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(mapOf("id" to mutation.value)))
     }

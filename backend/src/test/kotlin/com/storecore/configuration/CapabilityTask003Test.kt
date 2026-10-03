@@ -7,10 +7,12 @@ import com.storecore.configuration.application.CapabilityConfigVersionConflict
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.application.CapabilityErrorState
 import com.storecore.configuration.application.CapabilityKillSwitchActive
+import com.storecore.configuration.application.CapabilityKillSwitchVersionConflict
 import com.storecore.configuration.application.CapabilityPaused
 import com.storecore.configuration.application.CapabilityReadOnly
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
@@ -34,7 +36,7 @@ class CapabilityTask003Test {
         capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public)
         val killId = capabilities.createKill(admin(), "STOREFRONT", "SERVE", "ops", "freeze", Instant.now().plusSeconds(3600), "TICKET-1", UUID.randomUUID())
         assertThrows(CapabilityKillSwitchActive::class.java) { capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public) }
-        capabilities.removeKill(admin(), killId, "thaw", UUID.randomUUID())
+        capabilities.removeKill(admin(), InstallationCapabilityModule.Storefront, killId, "thaw", UUID.randomUUID())
         capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public)
         setState("CATALOG", CapabilityState.ACTIVE)
         assertThrows(CapabilityActionNotAllowed::class.java) { capabilities.decide("CATALOG", "MISSING", CapabilityActor.Internal(admin())) }
@@ -66,10 +68,18 @@ class CapabilityTask003Test {
         capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.ACTIVE, version, "enable", UUID.randomUUID())
         assertThrows(CapabilityConfigVersionConflict::class.java) { capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.READ_ONLY, version, "stale", UUID.randomUUID()) }
         val created = capabilities.createKill(admin(), "PROFILE_CONTENT", "MANAGE", "ops", "hold", Instant.now().plusSeconds(7200), "TICKET-2", UUID.randomUUID())
-        val replaced = capabilities.replaceKill(admin(), created, "ops-2", "replace", Instant.now().plusSeconds(7200), "TICKET-3", UUID.randomUUID())
+        assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
+            capabilities.replaceKill(admin(), InstallationCapabilityModule.Catalog, created, "ops-2", "wrong module", Instant.now().plusSeconds(7200), "TICKET-X", UUID.randomUUID())
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
+        val replaced = capabilities.replaceKill(admin(), InstallationCapabilityModule.ProfileContent, created, "ops-2", "replace", Instant.now().plusSeconds(7200), "TICKET-3", UUID.randomUUID())
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, replaced))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
-        capabilities.removeKill(admin(), replaced, "done", UUID.randomUUID())
+        assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
+            capabilities.removeKill(admin(), InstallationCapabilityModule.Catalog, replaced, "wrong module", UUID.randomUUID())
+        }
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, replaced))
+        capabilities.removeKill(admin(), InstallationCapabilityModule.ProfileContent, replaced, "done", UUID.randomUUID())
         val expired = capabilities.createKill(admin(), "PROFILE_CONTENT", "READ", "ops", "expire-me", Instant.now().plusSeconds(3600), "TICKET-4", UUID.randomUUID())
         jdbc.update("ALTER TABLE capability_kill_switches DISABLE TRIGGER trg_enforce_kill_switch_lifecycle")
         jdbc.update("UPDATE capability_kill_switches SET created_at=now()-interval '2 minutes', expires_at=now()-interval '1 minute' WHERE id=?", expired)
