@@ -32,10 +32,12 @@ El corte incluye seguridad Angular, separación dominio/framework, composition r
 - GitHub Verify `37084138782`: frontend completo PASS (arquitectura, lint, 67 tests, build, Chromium y 5 rutas a11y). Backend detectó dos defectos de composición/test: el transporte Apache de `IdentityHttpIntegrationTest` reintentó automáticamente el primer `429` respetando `Retry-After: 900`, y el smoke sin DataSource intentó construir seis beans JDBC BlackStore aun con identidad deshabilitada.
 - Correcciones backend: el test HTTP usa un request factory sin reintentos y demuestra sexto y séptimo `429` inmediatos con `Retry-After` positivo; el grafo de infraestructura/aplicación BlackStore comparte la frontera `storecore.identity.enabled` ya utilizada por su controller, sin introducir Spring en dominio ni mocks JDBC en el smoke test. Requiere Verify completo sobre el nuevo head.
 - GitHub Verify `37085753884`: frontend completo PASS y `StoreCoreApplicationTest` quedó reparado. Backend terminó en 2m28s, confirmando que ya no esperó 900 segundos, pero el request factory JDK descartó headers CORS restringidos y alteró respuestas 401; fallaron cinco casos CSRF/CORS y un cuerpo 401. Se conserva Apache HttpClient y se deshabilita únicamente su retry automático dentro del test, cerrando el cliente tras cada caso. Requiere nuevo Verify completo.
+- GitHub Verify `37086067689` sobre `54b72cb1e21608752cd85e8ae7174e781fd86ab3`: PASS completo; backend y frontend verdes, incluidos 117 tests backend, arquitectura/lint/build, 67 tests frontend y 5 rutas públicas a11y.
+- Reviews finales GPT-6.1 Sol funcional/arquitectura/SDD y seguridad sobre `54b72cb`: `APPROVED`, sin P0-P3. Son evidencia complementaria y no sustituyen los dos Grok 4.7 obligatorios.
 
 ## Gates pendientes
 
-- GitHub Verify completo y verde sobre el head final, incluido backend y accesibilidad.
-- Repetir reviews GPT-6.1 Sol sobre el head final y resolver todo P0–P3.
+- Repetir GitHub Verify sobre el commit documental final que registra esta evidencia.
+- Repetir reviews GPT-6.1 Sol sólo si el diff deja de ser exclusivamente documental.
 - Dos reviews Grok 4.7 `APPROVED` sobre el diff final, exigidas por el repositorio. Las reviews Sol no las sustituyen.
 - Close-out SDD honesto sin archivar WIP de integración ni declarar `release/1.0` listo.
