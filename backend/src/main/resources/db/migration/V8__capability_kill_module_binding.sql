@@ -10,7 +10,7 @@ CREATE FUNCTION capability_admin_remove_kill_switch(
 ) RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path=pg_catalog,public
+SET search_path=pg_catalog,public,pg_temp
 AS $_$
 DECLARE
   old_row capability_kill_switches%ROWTYPE;
@@ -68,7 +68,7 @@ CREATE FUNCTION capability_admin_replace_kill_switch(
 ) RETURNS BIGINT
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path=pg_catalog,public
+SET search_path=pg_catalog,public,pg_temp
 AS $_$
 DECLARE
   old_row capability_kill_switches%ROWTYPE;

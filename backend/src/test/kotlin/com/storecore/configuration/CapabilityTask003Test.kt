@@ -69,7 +69,28 @@ class CapabilityTask003Test {
         capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.ACTIVE, version, "enable", UUID.randomUUID())
         assertThrows(CapabilityConfigVersionConflict::class.java) { capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.READ_ONLY, version, "stale", UUID.randomUUID()) }
         val created = capabilities.createKill(admin(), "PROFILE_CONTENT", "MANAGE", "ops", "hold", Instant.now().plusSeconds(7200), "TICKET-2", UUID.randomUUID())
-        val replaced = withRuntimeCapabilities { runtimeCapabilities ->
+        val forgedAdminId = jdbc.queryForObject(
+            "INSERT INTO users(email,password_hash,first_name,last_name) SELECT ?,password_hash,'Forged','Admin' FROM users WHERE id=? RETURNING id",
+            Long::class.java,
+            "capability-forged-admin@example.com",
+            adminId,
+        )!!
+        withRuntimeCapabilities { runtimeCapabilities, runtimeJdbc ->
+            runtimeJdbc.execute("CREATE TEMP TABLE users(id BIGINT, active BOOLEAN)")
+            runtimeJdbc.execute("CREATE TEMP TABLE roles(id BIGINT, code VARCHAR(64))")
+            runtimeJdbc.execute("CREATE TEMP TABLE user_roles(user_id BIGINT, role_id BIGINT)")
+            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles TO storecore_migrator")
+            runtimeJdbc.update("INSERT INTO users(id,active) VALUES(?,TRUE)", forgedAdminId)
+            runtimeJdbc.update("INSERT INTO roles(id,code) VALUES(1,'ADMIN')")
+            runtimeJdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(?,1)", forgedAdminId)
+
+            val forgedPrincipal = InternalUserPrincipal(UUID.randomUUID(), forgedAdminId, setOf(InternalRole.ADMIN))
+            assertThrows(CapabilityActorNotAuthorized::class.java) {
+                runtimeCapabilities.removeKill(forgedPrincipal, InstallationCapabilityModule.ProfileContent, created, "forged admin", UUID.randomUUID())
+            }
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
+        }
+        val replaced = withRuntimeCapabilities { runtimeCapabilities, _ ->
             assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
                 runtimeCapabilities.replaceKill(admin(), InstallationCapabilityModule.Catalog, created, "ops-2", "wrong module", Instant.now().plusSeconds(7200), "TICKET-X", UUID.randomUUID())
             }
@@ -78,7 +99,7 @@ class CapabilityTask003Test {
         }
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, replaced))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
-        withRuntimeCapabilities { runtimeCapabilities ->
+        withRuntimeCapabilities { runtimeCapabilities, _ ->
             assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
                 runtimeCapabilities.removeKill(admin(), InstallationCapabilityModule.Catalog, replaced, "wrong module", UUID.randomUUID())
             }
@@ -109,12 +130,12 @@ class CapabilityTask003Test {
 
     private fun admin() = InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN))
 
-    private fun <T> withRuntimeCapabilities(block: (JdbcCapabilityService) -> T): T {
+    private fun <T> withRuntimeCapabilities(block: (JdbcCapabilityService, JdbcTemplate) -> T): T {
         val dataSource = SingleConnectionDataSource(postgres.jdbcUrl, postgres.username, postgres.password, true)
         val runtimeJdbc = JdbcTemplate(dataSource)
         return try {
             runtimeJdbc.execute("SET ROLE storecore_runtime")
-            block(JdbcCapabilityService(runtimeJdbc))
+            block(JdbcCapabilityService(runtimeJdbc), runtimeJdbc)
         } finally {
             runtimeJdbc.execute("RESET ROLE")
             dataSource.destroy()
