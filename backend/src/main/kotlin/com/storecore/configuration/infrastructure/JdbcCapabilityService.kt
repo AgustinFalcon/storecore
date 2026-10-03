@@ -18,6 +18,7 @@ import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityActionKind
 import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -62,7 +63,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         } else if (schema != 1 || configJson != "{}") {
             throw CapabilityConfigInvalid()
         }
-        val state = CapabilityState.valueOf(config["state"].toString())
+        val state = CapabilityState.fromWire(config["state"]?.toString())
         val actionRow = jdbc.queryForList(
             "SELECT action_kind, allows_write, allowed_when_paused FROM capability_actions WHERE module_code=? AND action_code=? FOR SHARE",
             module, action,
@@ -74,6 +75,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             CapabilityState.PAUSED -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityPaused()
             CapabilityState.ERROR -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityErrorState()
             CapabilityState.ACTIVE -> Unit
+            CapabilityState.UNKNOWN -> throw CapabilityConfigInvalid()
         }
         when (actor) {
             CapabilityActor.Public -> if (kind != CapabilityActionKind.READ) throw CapabilityActorNotAuthorized()
@@ -89,12 +91,12 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
 
     override fun list(): List<CapabilityModuleView> = jdbc.query(
         "SELECT module_code, state, config_version FROM module_configurations ORDER BY module_code",
-    ) { rs, _ -> CapabilityModuleView(rs.getString("module_code"), CapabilityState.valueOf(rs.getString("state")), rs.getInt("config_version")) }
+    ) { rs, _ -> capabilityModuleView(rs.getString("module_code"), rs.getString("state"), rs.getInt("config_version")) }
 
     @Transactional
     override fun changeState(actor: InternalUserPrincipal, module: String, state: CapabilityState, expectedVersion: Int?, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles || reason.isBlank()) throw CapabilityActorNotAuthorized()
-        if (state.name.contains("FLAG", ignoreCase = true)) throw CapabilityConfigInvalid()
+        if (!state.isKnown || state.wire.contains("FLAG", ignoreCase = true)) throw CapabilityConfigInvalid()
         val expected = expectedVersion ?: jdbc.queryForObject(
             "SELECT config_version FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
             Int::class.java, module,
@@ -109,7 +111,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "{}"
         }
         try {
-            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.name, configPayload, correlation, reason.trim())
+            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.wire, configPayload, correlation, reason.trim())
         } catch (exception: Exception) {
             throw mapAdminError(exception)
         }
@@ -127,20 +129,22 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
     }
 
     @Transactional
-    override fun removeKill(actor: InternalUserPrincipal, expectedActiveId: Long, reason: String, correlation: UUID) {
+    override fun removeKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+        if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         try {
-            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?)", { _, _ -> }, actor.userId, expectedActiveId, reason, correlation)
+            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?,?)", { _, _ -> }, actor.userId, module.wire, expectedActiveId, reason, correlation)
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }
 
     @Transactional
-    override fun replaceKill(actor: InternalUserPrincipal, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
+    override fun replaceKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
+        if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         return try {
             jdbc.queryForObject(
-                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
+                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?,?)",
+                Long::class.java, actor.userId, module.wire, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
             ) ?: throw CapabilityKillSwitchVersionConflict()
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }
@@ -187,3 +191,10 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         )
     }
 }
+
+internal fun capabilityModuleView(moduleCode: String?, stateWire: String?, configVersion: Int): CapabilityModuleView =
+    CapabilityModuleView(
+        module = InstallationCapabilityModule.fromWire(moduleCode),
+        state = CapabilityState.fromWire(stateWire),
+        configVersion = configVersion,
+    )
