@@ -1,5 +1,9 @@
 # Estado canónico del SDD — StoreCore
 
+## Política de revisión vigente
+
+Desde 2026-10-03, el gate de revisión para PRs nuevos es **dos revisiones independientes GPT-6.1 Sol en paralelo**, con proveedor, modelo, esfuerzo, SHA base/head, checks y límites registrados. Las referencias a Grok en documentos históricos describen evidencia de cortes anteriores y no son un requisito vigente para nuevos PRs.
+
 **Validado:** 2026-09-23  
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  

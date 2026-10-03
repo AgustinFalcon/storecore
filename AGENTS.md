@@ -20,4 +20,4 @@ Leer `sdd/STATUS.md`, `sdd/PROJECT.md`, `sdd/PATTERNS.md` y el WIP activo antes 
 2. Terra actualiza specs, plan, trazabilidad y docs.
 3. Sol declara GO/NO-GO.
 4. Luna implementa únicamente tareas con GO.
-5. Todo PR se mergea sólo tras dos reviews Grok 4.7 en paralelo (ver `.cursor/rules/pr-dual-grok-review.mdc`): leen descripción, diff y motivo, validan, revisan código; si piden mejoras se implementan; ambos `APPROVED` y close-out SDD honesto antes del merge. El approve no es un click humano en GitHub.
+5. Todo PR se mergea sólo tras dos reviews independientes GPT-6.1 Sol en paralelo (ver `.cursor/rules/pr-dual-sol-review.mdc`): leen descripción, diff y motivo, validan, revisan código y registran proveedor/modelo/esfuerzo/SHA; si piden mejoras se implementan; ambos `APPROVED` y close-out SDD honesto antes del merge. El approve no es un click humano en GitHub.
