@@ -1,7 +1,11 @@
 package com.storecore.configuration.infrastructure.web
 
 import com.storecore.configuration.application.CapabilityAdministrationPort
+import com.storecore.configuration.application.CapabilityConfigInvalid
+import com.storecore.configuration.application.CapabilityConfigurationMissing
+import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.infrastructure.web.BaseResponse
 import com.storecore.identity.infrastructure.web.IdentityMutationCoordinator
 import com.storecore.identity.infrastructure.web.RequestAuth
@@ -32,25 +36,27 @@ class CapabilityController(
     @GetMapping
     fun list(http: HttpServletRequest): BaseResponse<List<Map<String, Any?>>> {
         auth.operatorOrAdmin(http)
-        return BaseResponse.ok(capabilities.list().map { mapOf("module" to it.module, "state" to it.state.name, "configVersion" to it.configVersion) })
+        return BaseResponse.ok(consoleCapabilityPayload(capabilities.list()))
     }
 
     @PostMapping("/{module}/state")
     fun changeState(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @Valid @RequestBody request: CapabilityStateRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
+        requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
-            capabilities.changeState(actor, module, CapabilityState.valueOf(request.state), request.expectedConfigVersion, request.reason, request.correlationId ?: UUID.randomUUID())
-            capabilities.list().first { it.module == module }
+            capabilities.changeState(actor, module, requireCapabilityState(request.state), request.expectedConfigVersion, request.reason, request.correlationId ?: UUID.randomUUID())
+            capabilities.list().first { it.module.wire == module }
         }
         return ResponseEntity.ok().header(RequestAuth.CSRF_HEADER, mutation.nextCsrf)
-            .body(BaseResponse.ok(mapOf("module" to mutation.value.module, "state" to mutation.value.state.name, "configVersion" to mutation.value.configVersion)))
+            .body(BaseResponse.ok(capabilityPayload(mutation.value)))
     }
 
     @PostMapping("/{module}/kills")
     fun createKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
+        requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
             capabilities.createKill(actor, module, request.action, request.owner, request.reason, Instant.parse(request.expiresAt), request.ticket, request.correlationId)
         }
@@ -58,9 +64,10 @@ class CapabilityController(
     }
 
     @PostMapping("/{module}/kills/{id}/remove")
-    fun removeKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: KillCloseRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+    fun removeKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillCloseRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
+        requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
             capabilities.removeKill(actor, id, request.reason, request.correlationId)
             mapOf("id" to id, "removed" to true)
@@ -69,9 +76,10 @@ class CapabilityController(
     }
 
     @PostMapping("/{module}/kills/{id}/replace")
-    fun replaceKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
+    fun replaceKill(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable module: String, @PathVariable id: Long, @Valid @RequestBody request: KillRequest): ResponseEntity<BaseResponse<Map<String, Any?>>> {
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
+        requireConsoleModule(module)
         val mutation = mutations.execute(actor, csrf) {
             capabilities.replaceKill(actor, id, request.owner, request.reason, Instant.parse(request.expiresAt), request.ticket, request.correlationId)
         }
@@ -82,3 +90,23 @@ class CapabilityController(
 data class CapabilityStateRequest(@field:NotBlank val state: String, val expectedConfigVersion: Int? = null, val reason: String = "ADMIN_STATE_CHANGE", val correlationId: UUID? = null)
 data class KillRequest(@field:NotBlank val action: String, @field:NotBlank val owner: String, @field:NotBlank val reason: String, @field:NotBlank val expiresAt: String, @field:NotBlank val ticket: String, val correlationId: UUID)
 data class KillCloseRequest(@field:NotBlank val reason: String, val correlationId: UUID)
+
+internal fun consoleCapabilityPayload(capabilities: List<CapabilityModuleView>): List<Map<String, Any?>> =
+    capabilities
+        .filter { it.module.visibleOnConsole }
+        .map(::capabilityPayload)
+
+internal fun capabilityPayload(capability: CapabilityModuleView): Map<String, Any?> =
+    mapOf(
+        "module" to capability.module.wire,
+        "state" to capability.state.wire,
+        "configVersion" to capability.configVersion,
+    )
+
+internal fun requireConsoleModule(module: String): InstallationCapabilityModule =
+    InstallationCapabilityModule.fromWire(module).takeIf { it.visibleOnConsole }
+        ?: throw CapabilityConfigurationMissing()
+
+internal fun requireCapabilityState(state: String): CapabilityState =
+    CapabilityState.fromWire(state).takeIf { it.isKnown }
+        ?: throw CapabilityConfigInvalid()
