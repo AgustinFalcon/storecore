@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { domainBoundaryFailures } from './domain-boundary.mjs';
 
 const root = join(import.meta.dirname, '..');
 const src = join(root, 'src', 'app');
@@ -18,11 +19,7 @@ for (const file of files) {
   const rel = relative(src, file).replaceAll('\\', '/');
   const text = readFileSync(file, 'utf8');
 
-  if (rel.includes('/domain/') && (rel.endsWith('.entity.ts') || rel.endsWith('.repository.ts'))) {
-    if (text.includes('@angular/') || text.includes('@ngrx/')) {
-      failures.push(`${rel}: domain entity/port must not import Angular or NgRx`);
-    }
-  }
+  failures.push(...domainBoundaryFailures(rel, text));
 
   if (/(class\s+\w*(Fixture|InMemory)\w*|universal-tools-profile|store_id\s*[:=])/i.test(text)) {
     failures.push(`${rel}: production lane cannot register fixtures, Universal Tools or store_id`);

@@ -19,10 +19,12 @@ import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class BlackStoreIntegrationService(
     private val capabilities: CapabilityDecisionPort,
     private val companions: BlackStoreCompanionGuard,

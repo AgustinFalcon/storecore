@@ -5,6 +5,7 @@ import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalo
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
+import { UserRole } from '../../domain/user/user-role';
 import {
   CapabilityModule,
   CapabilityState,
@@ -56,7 +57,7 @@ export function mapUserSession(value: unknown): UserSessionResult {
   const row = asRecord(value);
   return {
     id: text(row['id']),
-    roles: items(row['roles']).map(text),
+    roles: items(row['roles']).map(UserRole.fromWire),
   };
 }
 
