@@ -29,6 +29,8 @@ El corte incluye seguridad Angular, separación dominio/framework, composition r
 - GitHub Verify `37083606853`: arquitectura, lint, 25 archivos/67 tests y build PASS. Frontend FAIL porque `verify` lanzó Playwright antes del paso de instalación de Chromium; backend continuaba en ejecución al registrar esta evidencia.
 - Corrección: `verify` queda limitado a arquitectura, lint, unit tests y build. El workflow instala Chromium y ejecuta `test:a11y` en el paso dedicado posterior.
 - GitHub Verify `37083852538`: arquitectura, lint, 67 tests, build e instalación de Chromium PASS; accesibilidad 4/5 PASS. La ruta `/` falló antes de axe porque el fixture esperaba un título histórico y la pantalla vigente renderiza `Inicio`. Se alineó la expectativa con el contrato visible actual; requiere rerun completo sobre el nuevo head.
+- GitHub Verify `37084138782`: frontend completo PASS (arquitectura, lint, 67 tests, build, Chromium y 5 rutas a11y). Backend detectó dos defectos de composición/test: el transporte Apache de `IdentityHttpIntegrationTest` reintentó automáticamente el primer `429` respetando `Retry-After: 900`, y el smoke sin DataSource intentó construir seis beans JDBC BlackStore aun con identidad deshabilitada.
+- Correcciones backend: el test HTTP usa un request factory sin reintentos y demuestra sexto y séptimo `429` inmediatos con `Retry-After` positivo; el grafo de infraestructura/aplicación BlackStore comparte la frontera `storecore.identity.enabled` ya utilizada por su controller, sin introducir Spring en dominio ni mocks JDBC en el smoke test. Requiere Verify completo sobre el nuevo head.
 
 ## Gates pendientes
 

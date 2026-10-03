@@ -2,6 +2,7 @@
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -12,6 +13,7 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
+import org.springframework.http.client.SimpleClientHttpRequestFactory
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
@@ -24,6 +26,11 @@ class IdentityHttpIntegrationTest(
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
     @LocalServerPort private val port: Int,
 ) {
+    @BeforeEach
+    fun disableTransportRetries() {
+        http.restTemplate.requestFactory = SimpleClientHttpRequestFactory()
+    }
+
     @Test
     fun `customer identity uses http-only opaque cookie csrf rotation and owned addresses`() {
         val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"person@example.com","password":"a-very-long-password","firstName":"Person","lastName":"One"}""")
@@ -129,7 +136,11 @@ class IdentityHttpIntegrationTest(
         val limited = exchange("/api/v1/customer/auth/login", HttpMethod.POST, """{"email":"limited@example.com","password":"wrong-password-xx"}""")
         assertEquals(429, limited.statusCode.value())
         assertEquals(true, limited.body!!.contains("AUTH_RATE_LIMITED"))
-        assertNotNull(limited.headers.getFirst("Retry-After"))
+        val retryAfter = limited.headers.getFirst("Retry-After")
+        assertNotNull(retryAfter)
+        assertEquals(true, retryAfter!!.toLong() > 0)
+        val stillLimited = exchange("/api/v1/customer/auth/login", HttpMethod.POST, """{"email":"limited@example.com","password":"wrong-password-xx"}""")
+        assertEquals(429, stillLimited.statusCode.value())
     }
 
     @Test

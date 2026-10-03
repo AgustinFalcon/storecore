@@ -6,11 +6,13 @@ import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.util.UUID
 
 @Component
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcBlackStoreMlListingAdapter(
     private val jdbc: JdbcTemplate,
     private val capabilities: CapabilityDecisionPort,
