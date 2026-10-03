@@ -18,3 +18,11 @@
 - [ ] Fleet/backup/rollback, redacción y allowlist aprobados.
 
 No se crea tag, release, importación ni publicación hasta completar estos checks y tener aprobación explícita.
+
+## Gate `release/1.0` de integración BlackStore
+
+- [ ] `master` homologado con CI y reviews sobre el SHA final de cada corte core.
+- [ ] Facturación/ARCA homologada con contrato oficial, adapter, credenciales por referencia y E2E aprobado.
+- [ ] Correo Argentino homologado con contrato oficial, adapter, credenciales por referencia y E2E aprobado.
+- [ ] Crear `release/1.0` desde el `master` homologado e integrar allí POSC/DSP/BlackStore por cortes revisables; no promover la rama de integración en bloque.
+- [ ] Validar instalación limpia, upgrade Flyway, rollback, kill switch y ausencia de secretos antes de cualquier activación.
