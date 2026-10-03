@@ -131,58 +131,22 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
     @Transactional
     override fun removeKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
-        lockActiveKillForModule(module, expectedActiveId)
+        if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         try {
-            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?)", { _, _ -> }, actor.userId, expectedActiveId, reason, correlation)
+            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?,?)", { _, _ -> }, actor.userId, module.wire, expectedActiveId, reason, correlation)
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }
 
     @Transactional
     override fun replaceKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long {
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
-        lockActiveKillForModule(module, expectedActiveId)
+        if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         return try {
             jdbc.queryForObject(
-                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
+                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?,?)",
+                Long::class.java, actor.userId, module.wire, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
             ) ?: throw CapabilityKillSwitchVersionConflict()
         } catch (exception: Exception) { throw mapAdminError(exception) }
-    }
-
-    private fun lockActiveKillForModule(expectedModule: InstallationCapabilityModule, expectedActiveId: Long) {
-        if (!expectedModule.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
-
-        val snapshot = killIdentity(expectedActiveId, lock = false) ?: throw CapabilityKillSwitchVersionConflict()
-        requireMatchingKillModule(expectedModule, snapshot.module)
-
-        val actionExists = jdbc.query(
-            "SELECT action_code FROM capability_actions WHERE module_code=? AND action_code=? FOR UPDATE",
-            { rs, _ -> rs.getString("action_code") },
-            snapshot.module.wire,
-            snapshot.action,
-        ).singleOrNull()
-        if (actionExists == null) throw CapabilityKillSwitchVersionConflict()
-
-        val locked = killIdentity(expectedActiveId, lock = true) ?: throw CapabilityKillSwitchVersionConflict()
-        requireMatchingKillModule(expectedModule, locked.module)
-        if (!locked.active || locked.module != snapshot.module || locked.action != snapshot.action) {
-            throw CapabilityKillSwitchVersionConflict()
-        }
-    }
-
-    private fun killIdentity(id: Long, lock: Boolean): CapabilityKillIdentity? {
-        val lockClause = if (lock) " FOR UPDATE" else ""
-        return jdbc.query(
-            "SELECT module_code, action_code, active FROM capability_kill_switches WHERE id=?$lockClause",
-            { rs, _ ->
-                CapabilityKillIdentity(
-                    module = InstallationCapabilityModule.fromWire(rs.getString("module_code")),
-                    action = rs.getString("action_code"),
-                    active = rs.getBoolean("active"),
-                )
-            },
-            id,
-        ).singleOrNull()
     }
 
     private fun mapAdminError(exception: Exception): RuntimeException {
@@ -226,19 +190,6 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "stock_read_rate_limit_rps",
         )
     }
-}
-
-private data class CapabilityKillIdentity(
-    val module: InstallationCapabilityModule,
-    val action: String,
-    val active: Boolean,
-)
-
-internal fun requireMatchingKillModule(
-    expected: InstallationCapabilityModule,
-    actual: InstallationCapabilityModule,
-) {
-    if (!expected.visibleOnConsole || expected != actual) throw CapabilityKillSwitchVersionConflict()
 }
 
 internal fun capabilityModuleView(moduleCode: String?, stateWire: String?, configVersion: Int): CapabilityModuleView =

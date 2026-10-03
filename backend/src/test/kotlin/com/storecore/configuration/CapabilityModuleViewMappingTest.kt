@@ -2,11 +2,9 @@ package com.storecore.configuration
 
 import com.storecore.configuration.application.CapabilityConfigInvalid
 import com.storecore.configuration.application.CapabilityConfigurationMissing
-import com.storecore.configuration.application.CapabilityKillSwitchVersionConflict
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.configuration.infrastructure.capabilityModuleView
-import com.storecore.configuration.infrastructure.requireMatchingKillModule
 import com.storecore.configuration.infrastructure.web.consoleCapabilityPayload
 import com.storecore.configuration.infrastructure.web.requireCapabilityState
 import com.storecore.configuration.infrastructure.web.requireConsoleModule
@@ -65,18 +63,4 @@ class CapabilityModuleViewMappingTest {
         assertThrows(CapabilityConfigInvalid::class.java) { requireCapabilityState(" active ") }
     }
 
-    @Test
-    fun `kill mutation boundary binds id ownership to the visible module`() {
-        requireMatchingKillModule(InstallationCapabilityModule.Catalog, InstallationCapabilityModule.Catalog)
-
-        assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
-            requireMatchingKillModule(InstallationCapabilityModule.Catalog, InstallationCapabilityModule.Storefront)
-        }
-        assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
-            requireMatchingKillModule(InstallationCapabilityModule.Catalog, InstallationCapabilityModule.BlackStoreIntegration)
-        }
-        assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
-            requireMatchingKillModule(InstallationCapabilityModule.BlackStoreIntegration, InstallationCapabilityModule.BlackStoreIntegration)
-        }
-    }
 }
