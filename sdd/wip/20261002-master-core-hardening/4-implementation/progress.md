@@ -28,6 +28,7 @@ El corte incluye seguridad Angular, separación dominio/framework, composition r
 - Unit tests y Maven locales: BLOCKED por ACL/ownership del runner Windows; no se contabilizan como PASS.
 - GitHub Verify `37083606853`: arquitectura, lint, 25 archivos/67 tests y build PASS. Frontend FAIL porque `verify` lanzó Playwright antes del paso de instalación de Chromium; backend continuaba en ejecución al registrar esta evidencia.
 - Corrección: `verify` queda limitado a arquitectura, lint, unit tests y build. El workflow instala Chromium y ejecuta `test:a11y` en el paso dedicado posterior.
+- GitHub Verify `37083852538`: arquitectura, lint, 67 tests, build e instalación de Chromium PASS; accesibilidad 4/5 PASS. La ruta `/` falló antes de axe porque el fixture esperaba un título histórico y la pantalla vigente renderiza `Inicio`. Se alineó la expectativa con el contrato visible actual; requiere rerun completo sobre el nuevo head.
 
 ## Gates pendientes
 
