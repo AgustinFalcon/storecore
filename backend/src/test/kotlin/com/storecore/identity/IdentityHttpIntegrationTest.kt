@@ -1,7 +1,9 @@
 ﻿package com.storecore.identity
 
+import org.apache.hc.client5.http.impl.classic.HttpClients
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -13,7 +15,7 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
-import org.springframework.http.client.SimpleClientHttpRequestFactory
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
@@ -26,9 +28,16 @@ class IdentityHttpIntegrationTest(
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
     @LocalServerPort private val port: Int,
 ) {
+    private val noRetryHttpClient = HttpClients.custom().disableAutomaticRetries().build()
+
     @BeforeEach
     fun disableTransportRetries() {
-        http.restTemplate.requestFactory = SimpleClientHttpRequestFactory()
+        http.restTemplate.requestFactory = HttpComponentsClientHttpRequestFactory(noRetryHttpClient)
+    }
+
+    @AfterEach
+    fun closeTransport() {
+        noRetryHttpClient.close()
     }
 
     @Test
