@@ -2,7 +2,6 @@ import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { ApplicationConfig } from '@angular/core';
-import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { CART_REPOSITORY } from './core/tokens/cart.tokens';
