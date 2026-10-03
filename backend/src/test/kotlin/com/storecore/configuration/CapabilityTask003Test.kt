@@ -7,10 +7,12 @@ import com.storecore.configuration.application.CapabilityConfigVersionConflict
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.application.CapabilityErrorState
 import com.storecore.configuration.application.CapabilityKillSwitchActive
+import com.storecore.configuration.application.CapabilityKillSwitchVersionConflict
 import com.storecore.configuration.application.CapabilityPaused
 import com.storecore.configuration.application.CapabilityReadOnly
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
@@ -23,6 +25,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.time.Instant
 import java.util.UUID
@@ -34,7 +37,7 @@ class CapabilityTask003Test {
         capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public)
         val killId = capabilities.createKill(admin(), "STOREFRONT", "SERVE", "ops", "freeze", Instant.now().plusSeconds(3600), "TICKET-1", UUID.randomUUID())
         assertThrows(CapabilityKillSwitchActive::class.java) { capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public) }
-        capabilities.removeKill(admin(), killId, "thaw", UUID.randomUUID())
+        capabilities.removeKill(admin(), InstallationCapabilityModule.Storefront, killId, "thaw", UUID.randomUUID())
         capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public)
         setState("CATALOG", CapabilityState.ACTIVE)
         assertThrows(CapabilityActionNotAllowed::class.java) { capabilities.decide("CATALOG", "MISSING", CapabilityActor.Internal(admin())) }
@@ -66,10 +69,43 @@ class CapabilityTask003Test {
         capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.ACTIVE, version, "enable", UUID.randomUUID())
         assertThrows(CapabilityConfigVersionConflict::class.java) { capabilities.changeState(admin(), "PROFILE_CONTENT", CapabilityState.READ_ONLY, version, "stale", UUID.randomUUID()) }
         val created = capabilities.createKill(admin(), "PROFILE_CONTENT", "MANAGE", "ops", "hold", Instant.now().plusSeconds(7200), "TICKET-2", UUID.randomUUID())
-        val replaced = capabilities.replaceKill(admin(), created, "ops-2", "replace", Instant.now().plusSeconds(7200), "TICKET-3", UUID.randomUUID())
+        val forgedAdminId = jdbc.queryForObject(
+            "INSERT INTO users(email,password_hash,first_name,last_name) SELECT ?,password_hash,'Forged','Admin' FROM users WHERE id=? RETURNING id",
+            Long::class.java,
+            "capability-forged-admin@example.com",
+            adminId,
+        )!!
+        withRuntimeCapabilities { runtimeCapabilities, runtimeJdbc ->
+            runtimeJdbc.execute("CREATE TEMP TABLE users(id BIGINT, active BOOLEAN)")
+            runtimeJdbc.execute("CREATE TEMP TABLE roles(id BIGINT, code VARCHAR(64))")
+            runtimeJdbc.execute("CREATE TEMP TABLE user_roles(user_id BIGINT, role_id BIGINT)")
+            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles TO storecore_migrator")
+            runtimeJdbc.update("INSERT INTO users(id,active) VALUES(?,TRUE)", forgedAdminId)
+            runtimeJdbc.update("INSERT INTO roles(id,code) VALUES(1,'ADMIN')")
+            runtimeJdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(?,1)", forgedAdminId)
+
+            val forgedPrincipal = InternalUserPrincipal(UUID.randomUUID(), forgedAdminId, setOf(InternalRole.ADMIN))
+            assertThrows(CapabilityActorNotAuthorized::class.java) {
+                runtimeCapabilities.removeKill(forgedPrincipal, InstallationCapabilityModule.ProfileContent, created, "forged admin", UUID.randomUUID())
+            }
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
+        }
+        val replaced = withRuntimeCapabilities { runtimeCapabilities, _ ->
+            assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
+                runtimeCapabilities.replaceKill(admin(), InstallationCapabilityModule.Catalog, created, "ops-2", "wrong module", Instant.now().plusSeconds(7200), "TICKET-X", UUID.randomUUID())
+            }
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
+            runtimeCapabilities.replaceKill(admin(), InstallationCapabilityModule.ProfileContent, created, "ops-2", "replace", Instant.now().plusSeconds(7200), "TICKET-3", UUID.randomUUID())
+        }
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, replaced))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, created))
-        capabilities.removeKill(admin(), replaced, "done", UUID.randomUUID())
+        withRuntimeCapabilities { runtimeCapabilities, _ ->
+            assertThrows(CapabilityKillSwitchVersionConflict::class.java) {
+                runtimeCapabilities.removeKill(admin(), InstallationCapabilityModule.Catalog, replaced, "wrong module", UUID.randomUUID())
+            }
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches WHERE id=? AND active", Int::class.java, replaced))
+            runtimeCapabilities.removeKill(admin(), InstallationCapabilityModule.ProfileContent, replaced, "done", UUID.randomUUID())
+        }
         val expired = capabilities.createKill(admin(), "PROFILE_CONTENT", "READ", "ops", "expire-me", Instant.now().plusSeconds(3600), "TICKET-4", UUID.randomUUID())
         jdbc.update("ALTER TABLE capability_kill_switches DISABLE TRIGGER trg_enforce_kill_switch_lifecycle")
         jdbc.update("UPDATE capability_kill_switches SET created_at=now()-interval '2 minutes', expires_at=now()-interval '1 minute' WHERE id=?", expired)
@@ -93,6 +129,18 @@ class CapabilityTask003Test {
     }
 
     private fun admin() = InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN))
+
+    private fun <T> withRuntimeCapabilities(block: (JdbcCapabilityService, JdbcTemplate) -> T): T {
+        val dataSource = SingleConnectionDataSource(postgres.jdbcUrl, postgres.username, postgres.password, true)
+        val runtimeJdbc = JdbcTemplate(dataSource)
+        return try {
+            runtimeJdbc.execute("SET ROLE storecore_runtime")
+            block(JdbcCapabilityService(runtimeJdbc), runtimeJdbc)
+        } finally {
+            runtimeJdbc.execute("RESET ROLE")
+            dataSource.destroy()
+        }
+    }
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
