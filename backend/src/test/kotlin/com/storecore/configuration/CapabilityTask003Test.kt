@@ -32,6 +32,36 @@ import java.util.UUID
 
 class CapabilityTask003Test {
     @Test
+    fun `runtime configuration and creation reject temporary forged admin relations`() {
+        val forgedId = jdbc.queryForObject(
+            "INSERT INTO users(email,password_hash,first_name,last_name) SELECT ?,password_hash,'Forged','User' FROM users WHERE id=? RETURNING id",
+            Long::class.java, "capability-definer-forged@example.com", adminId,
+        )!!
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='CATALOG'", Int::class.java)!!
+        val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='CATALOG'", String::class.java)!!
+        val nextState = if (CapabilityState.fromWire(state) == CapabilityState.ACTIVE) CapabilityState.READ_ONLY else CapabilityState.ACTIVE
+        val killsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches", Int::class.java)!!
+        withRuntimeCapabilities { runtimeCapabilities, runtimeJdbc ->
+            runtimeJdbc.execute("CREATE TEMP TABLE users(id BIGINT, active BOOLEAN)")
+            runtimeJdbc.execute("CREATE TEMP TABLE roles(id BIGINT, code VARCHAR(64))")
+            runtimeJdbc.execute("CREATE TEMP TABLE user_roles(user_id BIGINT, role_id BIGINT)")
+            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles TO storecore_migrator")
+            runtimeJdbc.update("INSERT INTO users(id,active) VALUES(?,TRUE)", forgedId)
+            runtimeJdbc.update("INSERT INTO roles(id,code) VALUES(1,'ADMIN')")
+            runtimeJdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(?,1)", forgedId)
+            val forged = InternalUserPrincipal(UUID.randomUUID(), forgedId, setOf(InternalRole.ADMIN))
+            assertThrows(CapabilityActorNotAuthorized::class.java) {
+                runtimeCapabilities.changeState(forged, "CATALOG", nextState, version, "forged", UUID.randomUUID())
+            }
+            assertThrows(CapabilityActorNotAuthorized::class.java) {
+                runtimeCapabilities.createKill(forged, "CATALOG", "MANAGE", "ops", "forged", Instant.now().plusSeconds(3600), "TICKET-FORGED", UUID.randomUUID())
+            }
+        }
+        assertEquals(version, jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='CATALOG'", Int::class.java))
+        assertEquals(killsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM capability_kill_switches", Int::class.java))
+    }
+
+    @Test
     fun `decide precedence is kill then state then action then actor`() {
         activate("STOREFRONT")
         capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public)
