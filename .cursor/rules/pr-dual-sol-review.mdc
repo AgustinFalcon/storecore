@@ -1,0 +1,21 @@
+---
+description: Two independent GPT-6.1 Sol reviews replace literal GitHub human approve before any PR merge.
+alwaysApply: true
+---
+
+# Dual GPT-6.1 Sol review before merge
+
+GitHub "approve" is **not** a literal human click. For every StoreCore PR Luna creates or lands:
+
+1. Launch **two independent GPT-6.1 Sol reviews in parallel** at medium effort, recording provider, model, effort, head SHA and base SHA.
+2. Each agent must, in order: read PR title/body and SDD why; read the full `origin/master...HEAD` diff; run/record focused validations; only then review implementation.
+3. Apply existing tech reviews (`sdd/reviews/`, backend/frontend/architecture standards) and list new gaps.
+4. Write `sdd/reviews/YYYYMMDD-sol-pr<N>-<lane>.md` starting with `VERDICT: APPROVED | CHANGES_REQUIRED | NO-GO` and include the evidence identity fields.
+5. If either asks for improvements, implement them, re-run both agents, and do not merge.
+6. Merge only when **both** verdicts are `APPROVED`. Then do honest SDD close-out: update STATUS/plan/meta; run `/sdd.finish` **only** if every plan task is complete and archive is Sol-allowed. If a residual stays NO-GO (e.g. MP-LIVE-05), keep the WIP `documented_deferred` and do **not** move it to `sdd/features/`.
+7. Do not self-approve on GitHub. Do not call CI green when jobs never ran (billing/spending limit is a recorded exception, not a pass). No tag, deploy, secrets, or publish.
+
+```text
+❌ BAD: merge after one local test or a GitHub self-approve
+✅ GOOD: two independent GPT-6.1 Sol APPROVED files → implement gaps → both APPROVED → close-out → merge
+```
