@@ -1,0 +1,40 @@
+openapi: 3.0.3
+info:
+  title: StoreCore unified access entry
+  version: 1.0.0-wip
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Verify credentials and resolve access context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string, writeOnly: true }
+                returnPath: { type: string }
+      responses:
+        '200':
+          description: Authenticated or context selection required
+        '401': { description: Generic authentication rejection }
+        '429': { description: Shared authentication budget exhausted }
+  /api/v1/auth/context-selection:
+    post:
+      summary: Consume a verified context challenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge, context]
+              properties:
+                challenge: { type: string, writeOnly: true }
+                context: { type: string, enum: [CUSTOMER, USER] }
+      responses:
+        '200': { description: One realm session issued }
+        '401': { description: Generic invalid or expired challenge }
