@@ -1,6 +1,7 @@
 package com.storecore.blackstore
 
 import com.storecore.blackstore.application.port.BlackStoreCatalogPort
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
@@ -10,6 +11,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Component
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcBlackStoreCatalogQuery(private val jdbc: JdbcTemplate) : BlackStoreCatalogPort {
     override fun readPage(
         clientInstanceId: UUID,

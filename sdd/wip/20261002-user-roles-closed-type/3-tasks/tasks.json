@@ -1,0 +1,89 @@
+{
+  "feature": "20261002-user-roles-closed-type",
+  "issue": 144,
+  "stack_profile": "backend-frontend",
+  "project_type": "production",
+  "execution_strategy": "incremental-gated",
+  "status": "building",
+  "stats": {
+    "total": 4,
+    "done": 2,
+    "pending": 2
+  },
+  "tasks": [
+    {
+      "id": "TASK-ROLE-001",
+      "title": "Closed backend role translator and known identity checks",
+      "status": "done",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "AC-ROLE-1",
+        "AC-ROLE-2",
+        "AC-ROLE-3"
+      ],
+      "files": [
+        "backend/src/main/kotlin/com/storecore/identity/domain/Identity.kt",
+        "backend/src/main/kotlin/com/storecore/identity/infrastructure/persistence/JdbcIdentityService.kt",
+        "backend/src/main/kotlin/com/storecore/identity/infrastructure/web/RequestAuth.kt",
+        "backend/src/main/kotlin/com/storecore/configuration/infrastructure/JdbcCapabilityService.kt"
+      ],
+      "evidence": "Implemented locally; backend compilation/runtime execution blocked by host Maven real-path access."
+    },
+    {
+      "id": "TASK-ROLE-002",
+      "title": "Closed frontend roles and session identity boundary",
+      "status": "done",
+      "depends_on": [
+        "TASK-ROLE-001"
+      ],
+      "acceptance_criteria": [
+        "AC-ROLE-1",
+        "AC-ROLE-4",
+        "AC-ROLE-5"
+      ],
+      "files": [
+        "frontend/src/app/domain/user/user-role.ts",
+        "frontend/src/app/domain/user/user.entity.ts",
+        "frontend/src/app/data/mappers/http-mappers.ts",
+        "frontend/src/app/domain/user/use-cases/sign-in-user.usecase.ts",
+        "frontend/src/app/domain/user/use-cases/probe-user-session.usecase.ts"
+      ],
+      "evidence": "tsc app/spec, ngc app/spec, architecture and lint pass."
+    },
+    {
+      "id": "TASK-ROLE-003",
+      "title": "Run collection and no-escalation regression tests",
+      "status": "pending",
+      "depends_on": [
+        "TASK-ROLE-001",
+        "TASK-ROLE-002"
+      ],
+      "acceptance_criteria": [
+        "Known, unknown, mixed and Unknown-only role collections; no elevation to ADMIN; no Unknown-only internal identity"
+      ],
+      "files": [
+        "backend/src/test/kotlin/com/storecore/identity/InternalRoleTest.kt",
+        "backend/src/test/kotlin/com/storecore/configuration/InternalRoleCapabilityTest.kt",
+        "frontend/src/app/domain/user/user-role.spec.ts",
+        "frontend/src/app/data/mappers/user-role.mapper.spec.ts",
+        "frontend/src/app/domain/user/use-cases/user-role-session.spec.ts"
+      ],
+      "evidence": "Five backend/eight frontend tests authored. Runtime backend tests and Angular tests blocked by host access failures; not marked successful."
+    },
+    {
+      "id": "TASK-ROLE-004",
+      "title": "Required reviews and hosted gates before integration",
+      "status": "pending",
+      "depends_on": [
+        "TASK-ROLE-003"
+      ],
+      "acceptance_criteria": [
+        "Record reviews and real executed verification; no promotion, archive or release inferred"
+      ],
+      "files": [
+        "sdd/wip/20261002-user-roles-closed-type/"
+      ],
+      "evidence": "No commit/push/PR/merge."
+    }
+  ]
+}

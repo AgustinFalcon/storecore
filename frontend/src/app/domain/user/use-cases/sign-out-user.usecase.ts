@@ -1,14 +1,11 @@
-import { Inject, Injectable } from '@angular/core';
 import { catchError, Observable, switchMap, tap, throwError } from 'rxjs';
-import { UserSession } from '../../../core/auth/user-session';
-import { USER_REPOSITORY } from '../../../core/tokens/user.tokens';
+import { UserSessionPort } from '../user-session.port';
 import { IUserRepository } from '../user.repository';
 
-@Injectable()
 export class SignOutUserUseCase {
   constructor(
-    @Inject(USER_REPOSITORY) private readonly repo: IUserRepository,
-    private readonly session: UserSession,
+    private readonly repo: IUserRepository,
+    private readonly session: UserSessionPort,
   ) {}
 
   execute(): Observable<void> {

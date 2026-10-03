@@ -2,6 +2,7 @@ package com.storecore.blackstore
 
 import com.storecore.blackstore.application.port.BlackStoreMlListingPort
 import com.storecore.blackstore.application.port.BlackStoreSagaPort
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.dao.CannotAcquireLockException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -14,6 +15,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Component
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcBlackStoreSagaEngine(
     private val jdbc: JdbcTemplate,
     transactionManager: PlatformTransactionManager,

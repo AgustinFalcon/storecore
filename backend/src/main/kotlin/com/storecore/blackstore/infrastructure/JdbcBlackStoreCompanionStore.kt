@@ -2,11 +2,13 @@ package com.storecore.blackstore.infrastructure
 
 import com.storecore.blackstore.BlackStoreSagaException
 import com.storecore.blackstore.application.port.BlackStoreCompanionGuard
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.util.UUID
 
 @Component
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcBlackStoreCompanionStore(
     private val jdbc: JdbcTemplate,
 ) : BlackStoreCompanionGuard {

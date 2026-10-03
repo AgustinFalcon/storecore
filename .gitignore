@@ -33,6 +33,7 @@
 # Build and dependency outputs stay out of the allowlist
 backend/target/
 frontend/node_modules/
+frontend/.npm-cache/
 frontend/dist/
 frontend/.angular/
 frontend/playwright-report/

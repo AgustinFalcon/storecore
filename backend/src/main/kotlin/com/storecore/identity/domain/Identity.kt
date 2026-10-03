@@ -5,7 +5,22 @@ import java.util.UUID
 
 enum class IdentityRealm { USER, CUSTOMER }
 
-enum class InternalRole { ADMIN, OPERATOR }
+enum class InternalRole(val isKnown: Boolean) {
+    ADMIN(true),
+    OPERATOR(true),
+    Unknown(false);
+
+    companion object {
+        /** Exact persisted role codes only; unknown input never gains a permission. */
+        fun fromWire(raw: String?): InternalRole = when (raw) {
+            "ADMIN" -> ADMIN
+            "OPERATOR" -> OPERATOR
+            else -> Unknown
+        }
+
+        fun hasKnownRole(roles: Iterable<InternalRole>): Boolean = roles.any { it.isKnown }
+    }
+}
 
 sealed interface AuthenticatedPrincipal {
     val sessionId: UUID
@@ -25,6 +40,7 @@ data class InternalUserPrincipal(
     val roles: Set<InternalRole>,
 ) : AuthenticatedPrincipal {
     override val realm = IdentityRealm.USER
+    val hasKnownRole: Boolean get() = InternalRole.hasKnownRole(roles)
 }
 
 data class IssuedCredentials(
