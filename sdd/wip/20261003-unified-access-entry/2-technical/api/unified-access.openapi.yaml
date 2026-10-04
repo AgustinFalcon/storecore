@@ -25,7 +25,12 @@ paths:
             X-CSRF-Token: { schema: { type: string } }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/LoginResolution' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/LoginResolution' }
         '401': { description: Generic authentication rejection }
         '429': { description: Shared authentication budget exhausted }
   /api/v1/auth/context-selection:
@@ -42,11 +47,33 @@ paths:
                 challenge: { type: string, writeOnly: true }
                 context: { type: string, enum: [CUSTOMER, USER] }
       responses:
-        '200': { description: One realm session issued }
+        '200':
+          description: One realm session issued
+          headers:
+            Set-Cookie: { schema: { type: string } }
+            X-CSRF-Token: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Authenticated' }
         '401': { description: Generic invalid or expired challenge }
         '403': { description: Invalid origin or challenge binding }
 components:
   schemas:
+    BaseResponse:
+      type: object
+      required: [code, data, message, errorCode, retryable, traceId]
+      properties:
+        code: { type: string }
+        data: { nullable: true }
+        message: { type: string }
+        errorCode: { type: string, nullable: true }
+        retryable: { type: boolean }
+        traceId: { type: string }
     LoginResolution:
       oneOf:
         - $ref: '#/components/schemas/Authenticated'
@@ -65,9 +92,10 @@ components:
         home: { type: string, enum: [STOREFRONT, OPERATIONS] }
     ContextSelectionRequired:
       type: object
-      required: [kind, contexts, expiresAt]
+      required: [kind, challenge, contexts, expiresAt]
       properties:
         kind: { type: string, enum: [CONTEXT_SELECTION_REQUIRED] }
+        challenge: { type: string, writeOnly: true }
         contexts:
           type: array
           minItems: 2

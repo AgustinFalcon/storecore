@@ -5,3 +5,5 @@
 - 2026-10-03: Implementation intentionally not started until the pending integration backlog is sequenced and the contract review is recorded.
 
 - 2026-10-04: Astra review found four P2 contract gaps; corrected API schemas, challenge binding, disclosure rules and shared rate-limit semantics.
+
+- 2026-10-04: Second Astra pass identified challenge transport/BaseResponse and rate-limit reset contradictions; corrected contract and policy.

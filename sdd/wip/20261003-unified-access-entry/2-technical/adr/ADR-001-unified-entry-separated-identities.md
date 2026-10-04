@@ -5,6 +5,9 @@
 Expose one public login entry while retaining independent USER and CUSTOMER
 principals, cookies, sessions, CSRF state, rate limits, and authorization.
 
+Rate limiting has per-realm failure counters layered under a non-resetting
+shared logical-attempt budget. A success never clears another realm's failures.
+
 The backend authenticates candidate identities through ports. It never infers
 identity ownership from a shared email. A dual-valid result creates a server-
 side challenge with a 120-second TTL and single-use consumption. The anonymous

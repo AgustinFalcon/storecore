@@ -2,11 +2,12 @@
 
 - Preserve Argon2id verification, dummy work, generic authentication errors,
   and bounded request size.
-- Use one shared logical-attempt budget across the unified endpoint and legacy
-  endpoints, keyed by source IP plus canonical-email hash. A unified attempt
-  may verify both realms but consumes one budget unit; alternating endpoints
-  cannot bypass it. Success clears only the exact key after the attempt and
-  never erases the other realm's failure history.
+- Use per-realm failure counters plus a shared logical-attempt budget across the
+  unified and legacy endpoints, keyed by source IP plus canonical-email hash.
+  A unified attempt may verify both realms but consumes one shared budget unit;
+  alternating endpoints cannot bypass it. Success never resets any failure
+  counter; expiry is time-based only. This preserves USER failures after a
+  successful CUSTOMER login for the same email.
 - For rejected or unverified credentials, do not reveal candidate count, realm,
   account existence, or timing details. A selection response may reveal only
   already-verified eligible contexts and never an account identifier. A valid
