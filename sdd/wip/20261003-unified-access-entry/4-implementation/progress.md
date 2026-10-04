@@ -7,3 +7,5 @@
 - 2026-10-04: Astra review found four P2 contract gaps; corrected API schemas, challenge binding, disclosure rules and shared rate-limit semantics.
 
 - 2026-10-04: Second Astra pass identified challenge transport/BaseResponse and rate-limit reset contradictions; corrected contract and policy.
+
+- 2026-10-04: Final Astra pass aligned challenge response transport and BaseResponse with IdentityController (code Int, nullable fields, error envelopes).

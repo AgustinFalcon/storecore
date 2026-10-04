@@ -31,8 +31,14 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/LoginResolution' }
-        '401': { description: Generic authentication rejection }
-        '429': { description: Shared authentication budget exhausted }
+        '401':
+          description: Generic authentication rejection
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '429':
+          description: Shared authentication budget exhausted
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
   /api/v1/auth/context-selection:
     post:
       summary: Consume a verified context challenge
@@ -60,20 +66,26 @@ paths:
                   - type: object
                     properties:
                       data: { $ref: '#/components/schemas/Authenticated' }
-        '401': { description: Generic invalid or expired challenge }
-        '403': { description: Invalid origin or challenge binding }
+        '401':
+          description: Generic invalid or expired challenge
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '403':
+          description: Invalid origin or challenge binding
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
 components:
   schemas:
     BaseResponse:
       type: object
       required: [code, data, message, errorCode, retryable, traceId]
       properties:
-        code: { type: string }
+        code: { type: integer, format: int32, nullable: true }
         data: { nullable: true }
-        message: { type: string }
+        message: { type: string, nullable: true }
         errorCode: { type: string, nullable: true }
-        retryable: { type: boolean }
-        traceId: { type: string }
+        retryable: { type: boolean, nullable: true }
+        traceId: { type: string, nullable: true }
     LoginResolution:
       oneOf:
         - $ref: '#/components/schemas/Authenticated'
@@ -95,7 +107,7 @@ components:
       required: [kind, challenge, contexts, expiresAt]
       properties:
         kind: { type: string, enum: [CONTEXT_SELECTION_REQUIRED] }
-        challenge: { type: string, writeOnly: true }
+        challenge: { type: string, readOnly: true }
         contexts:
           type: array
           minItems: 2
