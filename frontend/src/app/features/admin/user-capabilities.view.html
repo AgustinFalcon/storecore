@@ -28,27 +28,27 @@
           </tr>
         </thead>
         <tbody>
-          @for (item of items; track item.module) {
+          @for (item of items; track item.module.wire) {
             <tr>
-              <td>{{ moduleOf(item.module).label }}</td>
+              <td>{{ item.module.label }}</td>
               <td>
                 <span
                   class="sc-badge"
-                  [class.sc-badge--info]="stateOf(item.state).tone === 'info'"
-                  [class.sc-badge--ok]="stateOf(item.state).tone === 'ok'"
-                  [class.sc-badge--warn]="stateOf(item.state).tone === 'warn'"
-                  [class.sc-badge--err]="stateOf(item.state).tone === 'err'"
-                >{{ stateOf(item.state).label }}</span>
+                  [class.sc-badge--info]="item.state.tone === 'info'"
+                  [class.sc-badge--ok]="item.state.tone === 'ok'"
+                  [class.sc-badge--warn]="item.state.tone === 'warn'"
+                  [class.sc-badge--err]="item.state.tone === 'err'"
+                >{{ item.state.label }}</span>
               </td>
               <td class="sc-table__actions">
                 @for (state of states; track state.wire) {
                   <button
                     type="button"
                     class="sc-btn sc-btn--ghost"
-                    [class.is-on]="state.wire === item.state"
-                    [disabled]="state.wire === item.state"
-                    [attr.title]="state.wire === item.state ? 'Ya está ' + state.label : 'Pasar a ' + state.label"
-                    (click)="emitChange(item.module, state)"
+                    [class.is-on]="state === item.state"
+                    [disabled]="state === item.state || !item.state.isCurrent || item.configVersion === null || !item.module.homologationVisible"
+                    [attr.title]="state === item.state ? 'Ya está ' + state.label : 'Pasar a ' + state.label"
+                    (click)="emitChange(item, state)"
                   >
                     {{ state.label }}
                   </button>

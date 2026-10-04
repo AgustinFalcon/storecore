@@ -40,15 +40,11 @@ export class CapabilityModuleId {
   static readonly Unknown = new CapabilityModuleId('', false, 'Módulo no disponible');
 
   static fromWire(raw: string | null | undefined): CapabilityModuleId {
-    const wire = raw?.trim() ?? '';
-    if (!wire) {
-      return CapabilityModuleId.Unknown;
-    }
-    return BY_WIRE.get(wire) ?? new CapabilityModuleId(wire, false, 'Módulo no disponible');
+    return BY_WIRE.get(raw ?? '') ?? CapabilityModuleId.Unknown;
   }
 
   get isUnknown(): boolean {
-    return this === CapabilityModuleId.Unknown || !BY_WIRE.has(this.wire);
+    return this === CapabilityModuleId.Unknown;
   }
 }
 

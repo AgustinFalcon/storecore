@@ -1,3 +1,6 @@
+import { CapabilityModuleId } from './capability-module-id';
+import { CapabilityModuleState } from './capability-module-state';
+
 export interface UserSessionResult {
   readonly id: string;
   readonly roles: readonly string[];
@@ -39,11 +42,20 @@ export interface ProfilePreview {
   readonly diff: string;
 }
 
-export type CapabilityState = 'DISABLED' | 'READ_ONLY' | 'ACTIVE' | 'PAUSED' | 'ERROR';
-
 export interface CapabilityModule {
-  readonly module: string;
-  readonly state: CapabilityState;
+  readonly module: CapabilityModuleId;
+  readonly state: CapabilityModuleState;
+  readonly configVersion: number | null;
+}
+
+export interface CapabilityChange {
+  readonly module: CapabilityModuleId;
+  readonly state: CapabilityModuleState;
+}
+
+export interface CapabilityStateCommand extends CapabilityChange {
+  readonly correlationId: string;
+  readonly expectedConfigVersion: number;
 }
 
 export interface InventoryRow {

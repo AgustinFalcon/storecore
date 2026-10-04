@@ -1,0 +1,10 @@
+{
+  "feature": "20261001-capability-command-closed-type",
+  "stack_profile": "frontend",
+  "status": "building",
+  "tasks": [
+    { "id": "TASK-CAP-001", "title": "Cerrar frontera module/state y preservar configVersion", "status": "implemented_unverified", "spec": "CAP-01", "acceptance_criteria": ["Unknown fijo sin raw", "Mapper preserva Unknown state y versión válida", "Vista/store/usecase usan tipos"] },
+    { "id": "TASK-CAP-002", "title": "Enviar comando correlacionado con versión actual", "status": "implemented_unverified", "spec": "CAP-02", "depends_on": ["TASK-CAP-001"], "acceptance_criteria": ["UUID estable por intento", "expectedConfigVersion del snapshot actual", "Payload wire serializado en HTTP", "Errores no matan effect"] },
+    { "id": "TASK-CAP-003", "title": "Verificar frontend y gates de integración", "status": "pending", "depends_on": ["TASK-CAP-002"], "acceptance_criteria": ["Tests enfocados pasan", "Lint/build frontend pasan", "Dual Grok auténtico y Verify del head final antes del merge", "Sin sdd.finish/master/live"] }
+  ]
+}

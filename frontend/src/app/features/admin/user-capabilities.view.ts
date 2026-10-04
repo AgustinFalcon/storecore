@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
-import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
-import { CapabilityModule, CapabilityState } from '../../domain/user/user.entity';
+import { CapabilityChange, CapabilityModule } from '../../domain/user/user.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
 @Component({
@@ -22,21 +21,13 @@ export class UserCapabilitiesViewComponent {
     CapabilityModuleState.Error,
   ];
 
-  @Output() readonly changeState = new EventEmitter<{ module: string; state: CapabilityState }>();
+  @Output() readonly changeState = new EventEmitter<CapabilityChange>();
   @Output() readonly retry = new EventEmitter<void>();
 
-  moduleOf(module: string): CapabilityModuleId {
-    return CapabilityModuleId.fromWire(module);
-  }
-
-  stateOf(state: string): CapabilityModuleState {
-    return CapabilityModuleState.fromWire(state);
-  }
-
-  emitChange(module: string, state: CapabilityModuleState): void {
-    if (state === CapabilityModuleState.Unknown) {
+  emitChange(item: CapabilityModule, state: CapabilityModuleState): void {
+    if (!item.module.homologationVisible || !item.state.isCurrent || !state.isCurrent || item.configVersion === null) {
       return;
     }
-    this.changeState.emit({ module, state: state.wire as CapabilityState });
+    this.changeState.emit({ module: item.module, state });
   }
 }

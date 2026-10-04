@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, forkJoin, switchMap, tap } from 'rxjs';
+import { defer, EMPTY, exhaustMap, filter, forkJoin, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import {
   CapabilityModule,
-  CapabilityState,
+  CapabilityChange,
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
@@ -67,12 +67,23 @@ export class InstallationStore extends ComponentStore<InstallationState> {
     ),
   );
 
-  readonly changeCapability = this.effect<{ module: string; state: CapabilityState }>((cmd$) =>
+  readonly changeCapability = this.effect<CapabilityChange>((cmd$) =>
     cmd$.pipe(
-      switchMap((cmd) =>
-        this.ops.setCapability(cmd.module, cmd.state).pipe(
+      exhaustMap((cmd) =>
+        defer(() => {
+          const current = this.snapshot.capabilities.find((item) => item.module === cmd.module);
+          if (!current) {
+            this.patchState({ errorMessage: 'Recargá la configuración antes de cambiar el estado.' });
+            return EMPTY;
+          }
+          this.patchState({ errorMessage: '' });
+          return this.ops.setCapability(current, cmd.state);
+        }).pipe(
           tapResponse({
-            next: () => this.loadCapabilities(),
+            next: (updated) => {
+              this.patchState({ capabilities: this.snapshot.capabilities.map((item) => item.module === updated.module ? updated : item) });
+              this.loadCapabilities();
+            },
             error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
           }),
         ),
