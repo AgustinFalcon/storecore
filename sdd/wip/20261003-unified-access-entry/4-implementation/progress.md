@@ -11,3 +11,4 @@
 - 2026-10-04: Final Astra pass aligned challenge response transport and BaseResponse with IdentityController (code Int, nullable fields, error envelopes).
 
 - 2026-10-04: Removed the final nullable mismatch from BaseResponse.code after Astra P3 review.
+- 2026-10-04: Added closed validated destination to login and challenge responses after independent security review.

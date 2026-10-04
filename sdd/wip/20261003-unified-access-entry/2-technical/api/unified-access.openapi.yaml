@@ -97,11 +97,12 @@ components:
           CONTEXT_SELECTION_REQUIRED: '#/components/schemas/ContextSelectionRequired'
     Authenticated:
       type: object
-      required: [kind, context, home]
+      required: [kind, context, home, destination]
       properties:
         kind: { type: string, enum: [AUTHENTICATED] }
         context: { type: string, enum: [CUSTOMER, USER] }
         home: { type: string, enum: [STOREFRONT, OPERATIONS] }
+        destination: { $ref: '#/components/schemas/ReturnDestination' }
     ContextSelectionRequired:
       type: object
       required: [kind, challenge, contexts, expiresAt]
@@ -114,3 +115,12 @@ components:
           maxItems: 2
           items: { type: string, enum: [CUSTOMER, USER] }
         expiresAt: { type: string, format: date-time }
+        destination: { $ref: '#/components/schemas/ReturnDestination' }
+    ReturnDestination:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [HOME, CATALOG, CUSTOMER_PROFILE, CUSTOMER_ORDERS, USER_ORDERS]
+        resourceId: { type: string }
