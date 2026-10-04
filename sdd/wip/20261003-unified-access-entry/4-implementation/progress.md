@@ -9,3 +9,5 @@
 - 2026-10-04: Second Astra pass identified challenge transport/BaseResponse and rate-limit reset contradictions; corrected contract and policy.
 
 - 2026-10-04: Final Astra pass aligned challenge response transport and BaseResponse with IdentityController (code Int, nullable fields, error envelopes).
+
+- 2026-10-04: Removed the final nullable mismatch from BaseResponse.code after Astra P3 review.

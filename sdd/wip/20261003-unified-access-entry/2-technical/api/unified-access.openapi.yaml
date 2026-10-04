@@ -80,7 +80,7 @@ components:
       type: object
       required: [code, data, message, errorCode, retryable, traceId]
       properties:
-        code: { type: integer, format: int32, nullable: true }
+        code: { type: integer, format: int32 }
         data: { nullable: true }
         message: { type: string, nullable: true }
         errorCode: { type: string, nullable: true }
