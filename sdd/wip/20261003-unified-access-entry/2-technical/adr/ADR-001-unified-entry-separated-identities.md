@@ -7,8 +7,11 @@ principals, cookies, sessions, CSRF state, rate limits, and authorization.
 
 The backend authenticates candidate identities through ports. It never infers
 identity ownership from a shared email. A dual-valid result creates a server-
-side challenge with a 120-second TTL, single-use consumption, binding to the
-same browser session and request risk context, and atomic consume-and-issue.
+side challenge with a 120-second TTL and single-use consumption. The anonymous
+login response sets a `__Host-storecore_access_challenge` HttpOnly, Secure,
+SameSite=Lax cookie containing only a random binding nonce; the server stores
+its hash with the challenge, checks the exact Origin on selection, and
+atomically consumes nonce and challenge before issuing one realm session.
 
 ## Alternatives rejected
 
