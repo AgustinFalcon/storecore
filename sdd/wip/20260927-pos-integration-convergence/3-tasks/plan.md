@@ -1,6 +1,6 @@
 # Plan de convergencia POS — gates secuenciales
 
-Este plan está en `ready_for_posc002_implementation_plan_review`: POSC-000/000A/001 están done (3/9 tareas). POSC-001 cerró el harness test-only con 32 suites/142 tests locales y dos GO Astra de código (`sdd/reviews/20260927-posc001-dual-code-go.md`). POSC-002 tiene GO documental Astra acotado al camino POS sobre `d8dc971` (`sdd/reviews/20260928-posc002-shared-pos-spec-go.md`); los subcortes revisables 002A–G están en `3-tasks/posc002-implementation-slices.md` y requieren review propia del plan, pruebas y dos reviews de código por PR. La migración SECURITY DEFINER fue autorizada expresamente por el usuario, pero no está implementada. La referencia ML `ab81789` quedó atrás de `origin/integration/storecore-int=9ce355b`, con V1–V7; se revalida head/Flyway/YAML/rutas antes de tocar DDL. ML REPEATABLE READ y TASK-DSP-000B mantienen gate separado. PIC-006A conserva su alcance de lectura; PIC-008A histórico (SKU 128/129) sigue pendiente al conservar baseline 64/65.
+**Estado reconciliado 2026-10-01:** `slices_complete_residuals`. POSC-000/000A/001 están done; 002A–G y 003A–E están integrados; 004/004A/005/006 están mergeados sólo a `integration/storecore-int`. Las secciones siguientes conservan el plan secuencial y sus criterios como registro histórico, no como afirmación de trabajo aún no iniciado. PIC-006A baseline RO quedó certificado por TASK-POSC-006 / PR #82 (`dc23b45`). PIC-008A dirty (SKU 128/129), runtime `INSERT(variant_id)=false`, companion live y `/sdd.finish` siguen pendientes o NO-GO según su gate.
 
 ## Corte 0 — adjudicación contractual y ownership (POSC-000, done documental)
 
@@ -26,7 +26,7 @@ Seleccionar y portar read model/cursor/ETag/stock y reserva Tx-A/Tx-B, retirando
 
 ## Corte 4 — commit, release y recovery
 
-Portar commit/release y lectura GET/reconcile sobre el esquema migrado con un único owner por ruta. Verificar exactamente un `STOCK_COMMIT_EXTERNAL`, sin `SALE`, y que los reintentos no duplican decrementos. Conservar el bridge del PR #52: `NOT_ELIGIBLE`, cero escritura nueva directa a `desired_quantity` y `LISTING_STOCK`, histórico intacto. **Salida:** pruebas de saldo/ledger, 409/410 y timeout. GET/reconcile todavía requieren el subcorte PIC-006A para certificar read-only.
+Portar commit/release y lectura GET/reconcile sobre el esquema migrado con un único owner por ruta. Verificar exactamente un `STOCK_COMMIT_EXTERNAL`, sin `SALE`, y que los reintentos no duplican decrementos. Conservar el bridge del PR #52: `NOT_ELIGIBLE`, cero escritura nueva directa a `desired_quantity` y `LISTING_STOCK`, histórico intacto. **Salida:** pruebas de saldo/ledger, 409/410 y timeout. GET/reconcile quedaron certificados read-only por el subcorte PIC-006A / TASK-POSC-006 sobre el baseline; la variante dirty sigue diferida.
 
 ## Subcorte worker y purge (POSC-004A)
 
@@ -43,6 +43,6 @@ Después de PIC-006A y worker/purge, unificar error envelope `BaseResponse`, Ope
 ## Bloqueos honestos
 
 - No existe GO actual para traer el worktree POS dirty ni para activar BlackStore. Los tests 288/48 del 24-Sep no prueban la base de integración 2026-09-27.
-- GitHub CI puede no iniciar jobs por billing. Los tests locales se registran con comando, SHA y alcance; no se presentan como CI remoto verde.
+- Los `steps=[]` históricos siguen siendo fallos registrados. Verify posterior ejecutó steps y pasó en #118 y #120; esos runs no autorizan master, live ni cierre del WIP.
 - Toda migración que afecte funciones `SECURITY DEFINER` o privilegios necesita revisión de superficie/roles y pruebas PG16 explícitas antes de aplicarse. La compatibilidad de la base instalada decide el delta, no el nombre de archivo de la rama fuente.
 - El YAML dirty no es equivalente al pin de BlackStore por compartir `1.0.0-draft`. ADR-001 conservó el pin integrado y POSC-000A lo validó; sin el gate de porteo no se transporta un contrato mixto. PIC-008A histórico permanece pendiente/diferido; no se marca done por el gate baseline.
