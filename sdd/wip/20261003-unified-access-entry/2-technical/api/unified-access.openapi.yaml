@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: StoreCore unified access entry
+  version: 1.0.0-wip
+paths:
+  /api/v1/auth/login:
+    post:
+      summary: Verify credentials and resolve access context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string, writeOnly: true }
+                returnPath: { type: string }
+      responses:
+        '200':
+          description: Authenticated or context selection required
+          headers:
+            Set-Cookie: { schema: { type: string } }
+            X-CSRF-Token: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/LoginResolution' }
+        '401':
+          description: Generic authentication rejection
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '429':
+          description: Shared authentication budget exhausted
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+  /api/v1/auth/context-selection:
+    post:
+      summary: Consume a verified context challenge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [challenge, context]
+              properties:
+                challenge: { type: string, writeOnly: true }
+                context: { type: string, enum: [CUSTOMER, USER] }
+      responses:
+        '200':
+          description: One realm session issued
+          headers:
+            Set-Cookie: { schema: { type: string } }
+            X-CSRF-Token: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Authenticated' }
+        '401':
+          description: Generic invalid or expired challenge
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '403':
+          description: Invalid origin or challenge binding
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+components:
+  schemas:
+    BaseResponse:
+      type: object
+      required: [code, data, message, errorCode, retryable, traceId]
+      properties:
+        code: { type: integer, format: int32 }
+        data: { nullable: true }
+        message: { type: string, nullable: true }
+        errorCode: { type: string, nullable: true }
+        retryable: { type: boolean, nullable: true }
+        traceId: { type: string, nullable: true }
+    LoginResolution:
+      oneOf:
+        - $ref: '#/components/schemas/Authenticated'
+        - $ref: '#/components/schemas/ContextSelectionRequired'
+      discriminator:
+        propertyName: kind
+        mapping:
+          AUTHENTICATED: '#/components/schemas/Authenticated'
+          CONTEXT_SELECTION_REQUIRED: '#/components/schemas/ContextSelectionRequired'
+    Authenticated:
+      type: object
+      required: [kind, context, home, destination]
+      properties:
+        kind: { type: string, enum: [AUTHENTICATED] }
+        context: { type: string, enum: [CUSTOMER, USER] }
+        home: { type: string, enum: [STOREFRONT, OPERATIONS] }
+        destination: { $ref: '#/components/schemas/ReturnDestination' }
+    ContextSelectionRequired:
+      type: object
+      required: [kind, challenge, contexts, expiresAt]
+      properties:
+        kind: { type: string, enum: [CONTEXT_SELECTION_REQUIRED] }
+        challenge: { type: string, readOnly: true }
+        contexts:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { type: string, enum: [CUSTOMER, USER] }
+        expiresAt: { type: string, format: date-time }
+        destination: { $ref: '#/components/schemas/ReturnDestination' }
+    ReturnDestination:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [HOME, CATALOG, CUSTOMER_PROFILE, CUSTOMER_ORDERS, USER_ORDERS]
+        resourceId: { type: string }
