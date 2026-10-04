@@ -28,6 +28,7 @@ import com.storecore.configuration.domain.CapabilityAdminCommand
 import com.storecore.configuration.domain.CapabilityAdminOperation
 import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import org.springframework.beans.factory.annotation.Autowired
@@ -159,7 +160,7 @@ open class JdbcCapabilityService(
 
     override fun list(): List<CapabilityModuleView> = jdbc.query(
         "SELECT module_code, state, config_version FROM module_configurations ORDER BY module_code",
-    ) { rs, _ -> CapabilityModuleView(rs.getString("module_code"), CapabilityState.valueOf(rs.getString("state")), rs.getInt("config_version")) }
+    ) { rs, _ -> capabilityModuleView(rs.getString("module_code"), rs.getString("state"), rs.getInt("config_version")) }
 
     override fun changeState(actor: InternalUserPrincipal, module: String, state: CapabilityState, expectedVersion: Int?, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles || reason.isBlank()) throw CapabilityActorNotAuthorized()
@@ -370,3 +371,10 @@ open class JdbcCapabilityService(
         )
     }
 }
+
+internal fun capabilityModuleView(moduleCode: String?, state: String, configVersion: Int): CapabilityModuleView =
+    CapabilityModuleView(
+        module = InstallationCapabilityModule.fromWire(moduleCode),
+        state = CapabilityState.valueOf(state),
+        configVersion = configVersion,
+    )
