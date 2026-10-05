@@ -18,7 +18,7 @@
 
 ## Alcance y gates
 
-Sin cambios de navegación, capabilities, Mercado Libre, dependencias, backend, live, release ni `sdd.finish`. No cambia la autorización del servidor: ocultar UI no sustituye validación backend. No se declara review Grok, merge ni CI alojado.
+Sin cambios de navegación, capabilities, Mercado Libre, dependencias, backend, live, release ni `sdd.finish`. No cambia la autorización del servidor: ocultar UI no sustituye validación backend. La evidencia histórica de Verify alojado se registra abajo; no equivale a declarar aprobado el SHA final ni sustituye las reviews requeridas.
 
 ## Validación
 
