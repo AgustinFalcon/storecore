@@ -9,6 +9,7 @@ import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/pro
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
 import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
+import { UserRole } from '../../domain/user/user-role';
 import { CustomerSession } from '../auth/customer-session';
 import { UserSession } from '../auth/user-session';
 import { CART_REPOSITORY } from '../tokens/cart.tokens';
@@ -23,7 +24,7 @@ import { USE_CASE_PROVIDERS } from './use-case.providers';
 describe('use case composition and session boundaries', () => {
   const credentials = { email: 'test@example.test', password: 'test' };
   const customerResult = { id: 'customer', email: credentials.email, firstName: 'Test', lastName: 'Customer' };
-  const userResult = { id: 'user', roles: [] };
+  const userResult = { id: 'user', roles: [UserRole.Admin] };
   let customerRepo: ReturnType<typeof customerRepository>;
   let userRepo: ReturnType<typeof userRepository>;
   let customer: CustomerSession;
