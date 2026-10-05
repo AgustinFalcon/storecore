@@ -102,7 +102,7 @@ open class JdbcIdentityService(
             IdentityRealm.CUSTOMER -> CustomerPrincipal(sessionId, row.requiredLong("customer_id"))
             IdentityRealm.USER -> {
                 val roles = loadRoles(row.requiredLong("user_id"))
-                if (roles.isEmpty()) throw AuthenticationFailed()
+                if (!InternalRole.hasKnownRole(roles)) throw AuthenticationFailed()
                 InternalUserPrincipal(sessionId, row.requiredLong("user_id"), roles)
             }
         }
@@ -249,7 +249,7 @@ open class JdbcIdentityService(
     }
     private fun issueSession(realm: IdentityRealm, subjectId: Long): IssuedCredentials {
         val roles = if (realm == IdentityRealm.USER) loadRoles(subjectId) else emptySet()
-        if (realm == IdentityRealm.USER && roles.isEmpty()) throw AuthenticationFailed()
+        if (realm == IdentityRealm.USER && !InternalRole.hasKnownRole(roles)) throw AuthenticationFailed()
         val sessionId = UUID.randomUUID()
         val rawSession = tokens.nextRawToken()
         jdbc.update(
@@ -290,7 +290,7 @@ open class JdbcIdentityService(
 
     private fun loadRoles(userId: Long): Set<InternalRole> = jdbc.queryForList(
         "SELECT r.code FROM roles r JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=?", userId,
-    ).mapTo(linkedSetOf()) { InternalRole.valueOf(it.requiredString("code")) }
+    ).mapTo(linkedSetOf()) { InternalRole.fromWire(it["code"] as? String) }
 
     private fun appendRevocationAudit(target: Map<String, Any?>, actor: AuthenticatedPrincipal, correlation: UUID, reasonCode: String, kind: String) {
         val subjectId = if (target["subject_kind"] == "USER") target.requiredLong("user_id") else target.requiredLong("customer_id")
