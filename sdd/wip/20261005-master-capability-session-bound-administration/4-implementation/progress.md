@@ -6,10 +6,11 @@
   test obligations and tasks. CSA-001 is documentation-complete; implementation,
   test execution and reviews are pending. This entry is not implementation evidence.
 - 2026-10-05: Implemented master-only V10 and coordinated JDBC/fixture cut. The
-  four new entry points acquire their business locks before the final live
-  USER/active-user/current-ADMIN check; all six actor-only runtime grants are
-  revoked and SET-reachable privilege drift aborts the migration. CSA-002 and
-  CSA-003 are implementation-complete.
+  four new entry points validate and lock the session/user/membership first,
+  acquire their business locks, then repeat the live USER/active-user/current-
+  ADMIN and deadline check before any effect. All six actor-only runtime grants
+  are revoked and SET-reachable privilege drift aborts the migration. CSA-002
+  and CSA-003 are implementation-complete.
 - 2026-10-05: Local `mvn -DskipTests test-compile` succeeded from an isolated
   staging checkout. Testcontainers could not access the Docker named pipe from
   the sandbox, so no database test is marked passed locally; GitHub CI remains
@@ -20,6 +21,19 @@
   reserved alias, deadline-before-business-lock race, null module binding,
   incomplete four-operation denial matrix and owner-only legacy fixtures. These
   verdicts are not approvals and cannot satisfy CSA-006.
+- 2026-10-05: Second independent GPT-6.1 Sol functional/security reviews of
+  `db5ce76dd42a05e847e83b54c3956baeebedea71` both requested changes for the
+  business→session lock inversion against HTTP CSRF's session→business order;
+  functional review also required the revocation race through the production
+  JDBC caller. The working revision now uses session→user→role→business plus a
+  post-wait authorization recheck, proves a prelocked session does not retain a
+  business lock, and revokes an already-built `InternalUserPrincipal` while
+  `JdbcCapabilityService.changeState` waits. These verdicts remain historical,
+  not approvals; the final SHA still requires two new independent reviews.
+- 2026-10-05: Re-ran isolated local `mvn -DskipTests test-compile` after the
+  concurrency regressions and production-caller adjustment: BUILD SUCCESS.
+  Database execution remains delegated to GitHub CI because the local Docker
+  named pipe is unavailable to this sandbox.
 
 ## Evidence to record after implementation
 

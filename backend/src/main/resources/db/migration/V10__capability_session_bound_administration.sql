@@ -73,8 +73,9 @@ SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
 BEGIN
-  -- Business lock first: after it is acquired, the session deadline is checked
-  -- and no later lock wait can carry an admitted request past its expiry.
+  -- Keep the same session-first order as HTTP CSRF verification. Re-run the
+  -- helper after any business-lock wait so expired/revoked authority cannot act.
+  PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   PERFORM 1
     FROM public.module_configurations c
    WHERE c.module_code=p_module
@@ -104,6 +105,7 @@ SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
 BEGIN
+  PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   PERFORM 1
     FROM public.capability_actions a
    WHERE a.module_code=p_module AND a.action_code=p_action
@@ -130,6 +132,7 @@ AS $_$
 DECLARE
   expected_action VARCHAR;
 BEGIN
+  PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   SELECT k.action_code INTO expected_action
     FROM public.capability_kill_switches k
    WHERE k.id=p_expected_active_id AND k.module_code=p_expected_module;
@@ -175,6 +178,7 @@ AS $_$
 DECLARE
   expected_action VARCHAR;
 BEGIN
+  PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   SELECT k.action_code INTO expected_action
     FROM public.capability_kill_switches k
    WHERE k.id=p_expected_active_id AND k.module_code=p_expected_module;

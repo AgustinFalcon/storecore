@@ -1,6 +1,10 @@
 package com.storecore.configuration
 
+import com.storecore.configuration.application.CapabilityActorNotAuthorized
+import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
+import com.storecore.identity.domain.InternalUserPrincipal
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.FlywayException
 import org.flywaydb.core.api.MigrationVersion
@@ -185,6 +189,107 @@ class CapabilitySessionAdministrationMigrationTest {
     }
 
     @Test
+    fun `session-first lock order stays compatible with HTTP csrf coordination`() {
+        val database = createDatabase()
+        migrateTo(database, "10")
+        val jdbc = jdbc(database)
+        val adminId = createUser(jdbc, "v10-order-admin@example.com", InternalRole.ADMIN)
+        val liveSession = createUserSession(jdbc, adminId)
+        val stableVersion = version(jdbc)
+        val executor = Executors.newSingleThreadExecutor()
+
+        try {
+            DriverManager.getConnection(databaseUrl(database), postgres.username, postgres.password).use { sessionPrelock ->
+                sessionPrelock.autoCommit = false
+                sessionPrelock.prepareStatement("SELECT id FROM identity_sessions WHERE id=? FOR UPDATE").use { statement ->
+                    statement.setObject(1, liveSession)
+                    statement.executeQuery().close()
+                }
+                val future = executor.submit<Unit> {
+                    DriverManager.getConnection(databaseUrl(database), postgres.username, postgres.password).use { connection ->
+                        connection.createStatement().use {
+                            it.execute("SET application_name='v10-session-order'")
+                            it.execute("SET ROLE storecore_runtime")
+                        }
+                        JdbcTemplate(SingleConnectionDataSource(connection, true)).query(
+                            sessionChangeSql,
+                            { _, _ -> },
+                            adminId, liveSession, "CATALOG", stableVersion, "ACTIVE", "{}", UUID.randomUUID(), "lock order",
+                        )
+                    }
+                }
+                awaitLockWait(jdbc, "v10-session-order")
+                DriverManager.getConnection(databaseUrl(database), postgres.username, postgres.password).use { contender ->
+                    contender.autoCommit = false
+                    contender.createStatement().use {
+                        it.executeQuery("SELECT id FROM module_configurations WHERE module_code='CATALOG' FOR UPDATE NOWAIT").close()
+                    }
+                    contender.rollback()
+                }
+                sessionPrelock.commit()
+                future.get(10, TimeUnit.SECONDS)
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(stableVersion + 1, version(jdbc))
+    }
+
+    @Test
+    fun `revocation committed after authentication but before mutation fails closed`() {
+        val database = createDatabase()
+        migrateTo(database, "10")
+        val jdbc = jdbc(database)
+        val adminId = createUser(jdbc, "v10-revoked-admin@example.com", InternalRole.ADMIN)
+        val stalePrincipalSession = createUserSession(jdbc, adminId)
+        val stableVersion = version(jdbc)
+        val auditsBefore = auditCount(jdbc)
+        val executor = Executors.newSingleThreadExecutor()
+        val authenticatedPrincipal = InternalUserPrincipal(stalePrincipalSession, adminId, setOf(InternalRole.ADMIN))
+
+        try {
+            DriverManager.getConnection(databaseUrl(database), postgres.username, postgres.password).use { revoker ->
+                revoker.autoCommit = false
+                revoker.prepareStatement(
+                    """UPDATE identity_sessions
+                          SET revoked_at=clock_timestamp(),revocation_kind='SELF',revoked_by_user_id=?,
+                              revocation_correlation_id=?,revoked_reason='concurrent revoke'
+                        WHERE id=?""",
+                ).use { statement ->
+                    statement.setLong(1, adminId)
+                    statement.setObject(2, UUID.randomUUID())
+                    statement.setObject(3, stalePrincipalSession)
+                    assertEquals(1, statement.executeUpdate())
+                }
+                val future = executor.submit<Unit> {
+                    DriverManager.getConnection(databaseUrl(database), postgres.username, postgres.password).use { connection ->
+                        connection.createStatement().use {
+                            it.execute("SET application_name='v10-revocation-order'")
+                            it.execute("SET ROLE storecore_runtime")
+                        }
+                        JdbcCapabilityService(JdbcTemplate(SingleConnectionDataSource(connection, true))).changeState(
+                            authenticatedPrincipal,
+                            "CATALOG",
+                            CapabilityState.ACTIVE,
+                            stableVersion,
+                            "stale principal",
+                            UUID.randomUUID(),
+                        )
+                    }
+                }
+                awaitLockWait(jdbc, "v10-revocation-order")
+                revoker.commit()
+                val failure = assertThrows(ExecutionException::class.java) { future.get(10, TimeUnit.SECONDS) }
+                check(generateSequence<Throwable>(failure) { it.cause }.any { it is CapabilityActorNotAuthorized })
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(stableVersion, version(jdbc))
+        assertEquals(auditsBefore, auditCount(jdbc))
+    }
+
+    @Test
     fun `SET-reachable legacy grant aborts V10 transactionally`() {
         val database = createDatabase()
         migrateTo(database, "9")
@@ -330,6 +435,19 @@ class CapabilitySessionAdministrationMigrationTest {
     )!!
 
     private fun killCount(jdbc: JdbcTemplate) = jdbc.queryForObject("SELECT count(*) FROM capability_kill_switches", Int::class.java)!!
+
+    private fun awaitLockWait(jdbc: JdbcTemplate, applicationName: String) {
+        repeat(50) {
+            val waiting = jdbc.queryForObject(
+                "SELECT count(*) FROM pg_stat_activity WHERE application_name=? AND wait_event_type='Lock'",
+                Int::class.java,
+                applicationName,
+            )!!
+            if (waiting == 1) return
+            Thread.sleep(100)
+        }
+        error("$applicationName did not reach a lock wait")
+    }
 
     private data class DeniedPrincipal(val label: String, val actorId: Long?, val sessionId: UUID?)
 

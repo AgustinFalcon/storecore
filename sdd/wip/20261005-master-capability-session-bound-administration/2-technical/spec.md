@@ -27,10 +27,12 @@ The UUID comes from the server-authenticated principal, never an HTTP body/heade
 This verifies current session binding; it does not claim protection against a
 fully compromised runtime database principal able to read real session identifiers.
 
-Keep authorization and mutation in one database transaction. Identity/session
-locks and business locks must have a consistent order; acquire locks before the
-final deadline/role check so waits do not admit an already expired session. Record
-and test the resulting serialization with session revocation where applicable.
+Keep authorization and mutation in one database transaction. Use the same
+session→user→role→business order already established by HTTP CSRF verification,
+then repeat the locked authorization/deadline check after every business-lock
+wait and before effects. This prevents both lock-order inversion and admission of
+an authority that expired while waiting. Record and test the resulting
+serialization with session revocation where applicable.
 Do not turn this slice into a global identity locking redesign.
 
 All new SECURITY DEFINER signatures remain owned by `storecore_migrator`, with
