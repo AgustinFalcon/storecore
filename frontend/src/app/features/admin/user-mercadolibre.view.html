@@ -4,18 +4,24 @@
     <h1 id="ml-title">Mercado Libre</h1>
     <p class="sc-page__lede">Cuenta autorizada y mapa listing/variation → SKU. Sin secretos.</p>
   </header>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
-  @if (state.mlAccount) {
+  <sc-feature-status
+    [loading]="state.loading"
+    [error]="state.errorMessage"
+    [empty]="installationEmpty"
+    emptyText="No hay cuenta ni listings en esta instalación."
+    (retry)="retry.emit()"
+  />
+  @if (hasRealAccount && state.mlAccount; as account) {
     <article class="sc-panel" aria-labelledby="ml-account-title">
       <h2 id="ml-account-title">Cuenta vinculada</h2>
       <p>
-        {{ state.mlAccount.accountRef || '—' }}
-        @if (state.mlAccount.authorized) {
+        {{ account.accountRef || '—' }}
+        @if (account.authorized) {
           <span class="sc-badge sc-badge--ok">AUTHORIZED</span>
         } @else {
           <span class="sc-badge sc-badge--warn">no autorizada</span>
         }
-        · {{ state.mlAccount.status.label }}
+        · {{ account.status.label }}
       </p>
     </article>
   }

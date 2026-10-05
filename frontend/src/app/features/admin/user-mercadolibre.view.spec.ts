@@ -45,4 +45,17 @@ describe('MercadoLibre account wire to render', () => {
       expect(panel.textContent).not.toContain('FUTURE_ACCOUNT');
     }
   });
+
+  it('shows an honest empty state when the disabled account has no account reference', () => {
+    const state: InstallationState = {
+      loading: false, errorMessage: '', capabilities: [], inventory: [], listings: [],
+      listingDraft: { listingId: '', variationId: '', sku: '', accountId: null },
+      mlAccount: mapMercadoLibreAccount({ authorized: false, accountRef: '', status: 'DISABLED' }),
+    };
+    fixture.componentRef.setInput('state', state);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('No hay cuenta ni listings en esta instalación.');
+    expect(fixture.componentInstance.installationEmpty).toBe(true);
+    expect(fixture.nativeElement.querySelector('article')).toBeNull();
+  });
 });
