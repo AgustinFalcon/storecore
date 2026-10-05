@@ -56,5 +56,6 @@ describe('MercadoLibre account wire to render', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('No hay cuenta ni listings en esta instalación.');
     expect(fixture.componentInstance.installationEmpty).toBe(true);
+    expect(fixture.nativeElement.querySelector('article')).toBeNull();
   });
 });

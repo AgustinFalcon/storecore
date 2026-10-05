@@ -30,9 +30,12 @@ export class UserMercadoLibreViewComponent {
   }
 
   get installationEmpty(): boolean {
+    return !this.state.loading && !this.state.errorMessage && !this.hasRealAccount && this.state.listings.length === 0;
+  }
+
+  get hasRealAccount(): boolean {
     const account = this.state.mlAccount;
-    const noRealAccount = !account
-      || (account.status === MercadoLibreAccountStatus.Disabled && account.accountRef.trim() === '');
-    return !this.state.loading && !this.state.errorMessage && noRealAccount && this.state.listings.length === 0;
+    return account !== null
+      && !(account.status === MercadoLibreAccountStatus.Disabled && account.accountRef.trim() === '');
   }
 }

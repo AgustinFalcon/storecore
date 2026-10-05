@@ -11,7 +11,7 @@
     emptyText="No hay cuenta ni listings en esta instalación."
     (retry)="retry.emit()"
   />
-  @if (state.mlAccount) {
+  @if (hasRealAccount) {
     <article class="sc-panel" aria-labelledby="ml-account-title">
       <h2 id="ml-account-title">Cuenta vinculada</h2>
       <p>
