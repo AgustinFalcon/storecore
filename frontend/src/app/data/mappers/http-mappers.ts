@@ -1,4 +1,5 @@
 import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { HomeContent, HomeBlock } from '../../domain/catalog/home-content.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
@@ -323,10 +324,11 @@ export function mapInventory(value: unknown): readonly InventoryRow[] {
 
 export function mapMercadoLibreAccount(value: unknown): MercadoLibreAccount {
   const row = asRecord(value);
+  const status = MercadoLibreAccountStatus.fromWire(row['status']);
   return {
-    authorized: row['authorized'] === true,
+    authorized: row['authorized'] === true && status.isActive,
     accountRef: text(row['accountRef']),
-    status: text(row['status']),
+    status,
   };
 }
 
