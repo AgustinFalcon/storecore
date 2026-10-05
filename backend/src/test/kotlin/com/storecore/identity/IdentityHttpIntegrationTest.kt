@@ -244,7 +244,12 @@ class IdentityHttpIntegrationTest(
         var csrf = login.headers.getFirst("X-CSRF-Token")!!
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='STOREFRONT'", Int::class.java)
         val userId = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long::class.java, email)
-        jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, userId, "STOREFRONT", version, "ACTIVE", "{}", java.util.UUID.randomUUID(), "test")
+        val sessionId = jdbc.queryForObject(
+            "SELECT id FROM identity_sessions WHERE subject_kind='USER' AND user_id=? AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1",
+            java.util.UUID::class.java,
+            userId,
+        )
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, userId, sessionId, "STOREFRONT", version, "ACTIVE", "{}", java.util.UUID.randomUUID(), "test")
         val expires = java.time.Instant.now().plusSeconds(3600)
         val created = exchange(
             "/api/v1/user/capabilities/STOREFRONT/kills",

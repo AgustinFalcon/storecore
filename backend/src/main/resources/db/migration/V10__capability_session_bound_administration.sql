@@ -73,6 +73,14 @@ SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
 BEGIN
+  -- Business lock first: after it is acquired, the session deadline is checked
+  -- and no later lock wait can carry an admitted request past its expiry.
+  PERFORM 1
+    FROM public.module_configurations c
+   WHERE c.module_code=p_module
+     AND c.scope_kind='INSTALLATION'
+     AND c.scope_key='DEFAULT'
+   FOR UPDATE;
   PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   PERFORM public.capability_admin_change_configuration(
     p_actor,p_module,p_expected,p_state,p_config,p_correlation,p_reason
@@ -96,6 +104,10 @@ SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
 BEGIN
+  PERFORM 1
+    FROM public.capability_actions a
+   WHERE a.module_code=p_module AND a.action_code=p_action
+   FOR UPDATE;
   PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   RETURN public.capability_admin_create_kill_switch(
     p_actor,p_module,p_action,p_owner,p_reason,p_expires,p_ticket,p_correlation
@@ -115,7 +127,29 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
+DECLARE
+  expected_action VARCHAR;
 BEGIN
+  SELECT k.action_code INTO expected_action
+    FROM public.capability_kill_switches k
+   WHERE k.id=p_expected_active_id AND k.module_code=p_expected_module;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CAPABILITY_KILL_SWITCH_VERSION_CONFLICT';
+  END IF;
+  PERFORM 1
+    FROM public.capability_actions a
+   WHERE a.module_code=p_expected_module AND a.action_code=expected_action
+   FOR UPDATE;
+  PERFORM 1
+    FROM public.capability_kill_switches k
+   WHERE k.id=p_expected_active_id
+     AND k.module_code=p_expected_module
+     AND k.action_code=expected_action
+     AND k.active
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CAPABILITY_KILL_SWITCH_VERSION_CONFLICT';
+  END IF;
   PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   PERFORM public.capability_admin_remove_kill_switch(
     p_actor,p_expected_module,p_expected_active_id,p_reason,p_correlation
@@ -138,7 +172,29 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path=pg_catalog,public,pg_temp
 AS $_$
+DECLARE
+  expected_action VARCHAR;
 BEGIN
+  SELECT k.action_code INTO expected_action
+    FROM public.capability_kill_switches k
+   WHERE k.id=p_expected_active_id AND k.module_code=p_expected_module;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CAPABILITY_KILL_SWITCH_VERSION_CONFLICT';
+  END IF;
+  PERFORM 1
+    FROM public.capability_actions a
+   WHERE a.module_code=p_expected_module AND a.action_code=expected_action
+   FOR UPDATE;
+  PERFORM 1
+    FROM public.capability_kill_switches k
+   WHERE k.id=p_expected_active_id
+     AND k.module_code=p_expected_module
+     AND k.action_code=expected_action
+     AND k.active
+   FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'CAPABILITY_KILL_SWITCH_VERSION_CONFLICT';
+  END IF;
   PERFORM public.capability_assert_live_admin_session(p_actor,p_live_session);
   RETURN public.capability_admin_replace_kill_switch(
     p_actor,p_expected_module,p_expected_active_id,p_owner,p_reason,p_expires,p_ticket,p_correlation
@@ -181,8 +237,8 @@ BEGIN
     SELECT oid FROM pg_catalog.pg_roles WHERE rolname='storecore_runtime'
     UNION
     SELECT memberships.roleid
-      FROM reachable current_role
-      JOIN pg_catalog.pg_auth_members memberships ON memberships.member=current_role.role_oid
+      FROM reachable reachable_role
+      JOIN pg_catalog.pg_auth_members memberships ON memberships.member=reachable_role.role_oid
      WHERE memberships.set_option
   ), legacy_functions(function_oid) AS (
     SELECT p.oid
@@ -210,7 +266,7 @@ BEGIN
      AND pg_catalog.has_function_privilege('storecore_runtime',p.oid,'EXECUTE')
      AND NOT EXISTS (
        SELECT 1
-         FROM pg_catalog.aclexplode(pg_catalog.coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
+         FROM pg_catalog.aclexplode(coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) acl
         WHERE acl.grantee=0 AND acl.privilege_type='EXECUTE'
      )
      AND p.prosecdef

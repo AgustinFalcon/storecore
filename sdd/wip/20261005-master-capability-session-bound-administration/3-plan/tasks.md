@@ -2,9 +2,9 @@
 
 - [x] CSA-001 Document master-only scope, inherited actor-only boundary, functional
   acceptance and V10 technical contract in this WIP.
-- [ ] CSA-002 Implement forward-only V10 with four session-bound entry points,
+- [x] CSA-002 Implement forward-only V10 with four session-bound entry points,
   current USER/ADMIN validation, safe definer settings and legacy privilege revocation.
-- [ ] CSA-003 Pass authenticated principal session IDs from JDBC administration
+- [x] CSA-003 Pass authenticated principal session IDs from JDBC administration
   and update direct-SQL fixtures to use real sessions without broadening HTTP inputs.
 - [ ] CSA-004 Verify fresh/upgrade migrations, V1–V9 immutability, catalog privileges,
   runtime denials and the four-operation session rejection matrix.
