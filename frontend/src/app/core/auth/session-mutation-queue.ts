@@ -1,6 +1,13 @@
 import { Injectable } from '@angular/core';
 import { catchError, concatMap, defer, EMPTY, Observable, Subject, Subscriber, tap } from 'rxjs';
 
+export class SessionMutationCancelledError extends Error {
+  constructor() {
+    super('La mutación fue cancelada porque cambió la identidad de sesión.');
+    this.name = 'SessionMutationCancelledError';
+  }
+}
+
 /** Owns a dispatched request until its response updates the session's rotating CSRF token. */
 class QueuedMutation<T> {
   constructor(
@@ -13,7 +20,7 @@ class QueuedMutation<T> {
   execute(): Observable<T> {
     if (this.observer.closed) return EMPTY;
     if (this.currentGeneration() !== this.generation) {
-      this.observer.complete();
+      this.observer.error(new SessionMutationCancelledError());
       return EMPTY;
     }
     return defer(this.request).pipe(

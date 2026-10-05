@@ -188,7 +188,8 @@ describe('authInterceptor', () => {
     const http = TestBed.inject(HttpClient);
     const ctrl = TestBed.inject(HttpTestingController);
     const active = firstValueFrom(http.put('/api/v1/customer/me', { name: 'A' }));
-    const queued = firstValueFrom(http.post('/api/v1/customer/me/addresses', { street: 'A' }));
+    const queued = firstValueFrom(http.post('/api/v1/customer/me/addresses', { street: 'A' }))
+      .catch((error: unknown) => error);
     const login = firstValueFrom(http.post('/api/v1/customer/auth/login', {}));
     const activeRequest = ctrl.expectOne('/api/v1/customer/me');
     ctrl.expectOne('/api/v1/customer/auth/login').flush({ id: 'customer-b' });
@@ -198,7 +199,8 @@ describe('authInterceptor', () => {
 
     ctrl.expectNone('/api/v1/customer/me/addresses');
     activeRequest.flush({}, { headers: { [CSRF_HEADER]: 'stale-a' } });
-    await Promise.all([active, queued]);
+    const [, queuedResult] = await Promise.all([active, queued]);
+    expect(queuedResult).toEqual(expect.objectContaining({ name: 'SessionMutationCancelledError' }));
     expect(session.csrf()).toBe('csrf-b');
     ctrl.expectNone('/api/v1/customer/me/addresses');
     ctrl.verify();
