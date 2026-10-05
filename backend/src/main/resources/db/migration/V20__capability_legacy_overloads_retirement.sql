@@ -5,6 +5,7 @@
 DO $$
 DECLARE
   signature text;
+  set_reachable_execute boolean;
   signatures text[] := ARRAY[
     'public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)',
     'public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)',
@@ -34,11 +35,24 @@ DECLARE
   ];
 BEGIN
   FOREACH signature IN ARRAY signatures LOOP
-    IF to_regprocedure(signature) IS NOT NULL AND (
-      has_function_privilege('public', signature, 'EXECUTE')
-      OR has_function_privilege('storecore_runtime', signature, 'EXECUTE')
-    ) THEN
-      RAISE EXCEPTION 'legacy capability signature remains executable: %', signature;
+    IF to_regprocedure(signature) IS NOT NULL THEN
+      WITH RECURSIVE set_reachable(role_oid) AS (
+        SELECT oid FROM pg_roles WHERE rolname = 'storecore_runtime'
+        UNION
+        SELECT membership.roleid
+        FROM pg_auth_members membership
+        JOIN set_reachable reachable ON reachable.role_oid = membership.member
+        WHERE membership.set_option
+      )
+      SELECT EXISTS (
+        SELECT 1
+        FROM set_reachable reachable
+        WHERE has_function_privilege(reachable.role_oid, signature, 'EXECUTE')
+      ) INTO set_reachable_execute;
+
+      IF has_function_privilege('public', signature, 'EXECUTE') OR set_reachable_execute THEN
+        RAISE EXCEPTION 'legacy capability signature remains executable: %', signature;
+      END IF;
     END IF;
   END LOOP;
 END $$;

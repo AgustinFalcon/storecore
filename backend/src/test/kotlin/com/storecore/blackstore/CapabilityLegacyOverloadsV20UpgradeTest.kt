@@ -52,9 +52,17 @@ class CapabilityLegacyOverloadsV20UpgradeTest {
         installModuleBoundOverloads(jdbc)
         jdbc.execute("CREATE ROLE v20_legacy_parent")
         jdbc.execute("GRANT EXECUTE ON FUNCTION public.capability_admin_remove_kill_switch(BIGINT,VARCHAR,BIGINT,VARCHAR,UUID) TO v20_legacy_parent")
-        jdbc.execute("GRANT v20_legacy_parent TO storecore_runtime")
+        jdbc.execute("GRANT v20_legacy_parent TO storecore_runtime WITH INHERIT FALSE, SET TRUE")
+        assertFalse(
+            jdbc.queryForObject(
+                "SELECT has_function_privilege('storecore_runtime', ?, 'EXECUTE')",
+                Boolean::class.java,
+                moduleBoundSignatures().first(),
+            )!!,
+        )
 
-        assertThrows(FlywayException::class.java) { migrateTo(database, "20") }
+        val error = assertThrows(FlywayException::class.java) { migrateTo(database, "20") }
+        check(generateSequence<Throwable>(error) { it.cause }.any { it.message?.contains("legacy capability signature remains executable") == true })
         assertFalse(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("20"))
     }
 

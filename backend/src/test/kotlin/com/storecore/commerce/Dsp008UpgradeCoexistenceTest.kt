@@ -108,6 +108,8 @@ class Dsp008UpgradeCoexistenceTest {
             "public.capability_admin_replace_kill_switch(bigint,character varying,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
         )
         signatures.forEach { signature ->
+            val exists = jdbc.queryForObject("SELECT to_regprocedure(?) IS NOT NULL", Boolean::class.java, signature)!!
+            if (!exists) return@forEach
             val publicExecute = jdbc.queryForObject(
                 "SELECT has_function_privilege('public', ?, 'EXECUTE')",
                 Boolean::class.java,
