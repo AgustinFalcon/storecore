@@ -21,6 +21,28 @@ BEGIN
   END LOOP;
 END $$;
 
+DO $$
+DECLARE
+  signature text;
+  signatures text[] := ARRAY[
+    'public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)',
+    'public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)',
+    'public.capability_admin_remove_kill_switch(bigint,bigint,character varying,uuid)',
+    'public.capability_admin_replace_kill_switch(bigint,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)',
+    'public.capability_admin_remove_kill_switch(bigint,character varying,bigint,character varying,uuid)',
+    'public.capability_admin_replace_kill_switch(bigint,character varying,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)'
+  ];
+BEGIN
+  FOREACH signature IN ARRAY signatures LOOP
+    IF to_regprocedure(signature) IS NOT NULL AND (
+      has_function_privilege('public', signature, 'EXECUTE')
+      OR has_function_privilege('storecore_runtime', signature, 'EXECUTE')
+    ) THEN
+      RAISE EXCEPTION 'legacy capability signature remains executable: %', signature;
+    END IF;
+  END LOOP;
+END $$;
+
 -- Do not grant a fallback path. The Tx-C role remains the only runtime
 -- capability-admin entry point and its effective privileges are asserted by
 -- the upgrade/security test suite.

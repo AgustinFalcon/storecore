@@ -98,6 +98,32 @@ class Dsp008UpgradeCoexistenceTest {
     }
 
     @Test
+    fun v20RetiresEffectiveLegacyCapabilityPrivileges() {
+        val signatures = listOf(
+            "public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)",
+            "public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)",
+            "public.capability_admin_remove_kill_switch(bigint,bigint,character varying,uuid)",
+            "public.capability_admin_replace_kill_switch(bigint,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
+            "public.capability_admin_remove_kill_switch(bigint,character varying,bigint,character varying,uuid)",
+            "public.capability_admin_replace_kill_switch(bigint,character varying,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
+        )
+        signatures.forEach { signature ->
+            val publicExecute = jdbc.queryForObject(
+                "SELECT has_function_privilege('public', ?, 'EXECUTE')",
+                Boolean::class.java,
+                signature,
+            )!!
+            val runtimeExecute = jdbc.queryForObject(
+                "SELECT has_function_privilege('storecore_runtime', ?, 'EXECUTE')",
+                Boolean::class.java,
+                signature,
+            )!!
+            assertFalse(publicExecute, signature)
+            assertFalse(runtimeExecute, signature)
+        }
+    }
+
+    @Test
     fun upgradeQuarantineHistoricListingStockAndRemapKeepImmutableSnapshots() {
         val first = seedVariant("SKU-DSP008-A", 8, 0, 0)
         val second = seedVariant("SKU-DSP008-B", 4, 0, 0)
