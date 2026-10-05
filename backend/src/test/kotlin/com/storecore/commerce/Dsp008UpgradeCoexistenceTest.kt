@@ -24,6 +24,7 @@ import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -82,18 +83,47 @@ class Dsp008UpgradeCoexistenceTest {
     fun stop() = postgres.stop()
 
     @Test
-    fun flywayCeilingIsV19AndNextFreeIsV20() {
+    fun flywayCeilingIsV20AndNextFreeIsV21() {
         val dir = Path.of("src/main/resources/db/migration")
         val versions = Files.list(dir).use { stream ->
             stream.asSequence().map { it.fileName.toString() }.filter { it.startsWith("V") && it.contains("__") }.sorted().toList()
         }
         assertTrue(versions.any { it.startsWith("V19__") }, versions.toString())
-        assertTrue(versions.none { it.startsWith("V20__") }, versions.toString())
-        assertTrue(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("19"))
+        assertTrue(versions.any { it.startsWith("V20__") }, versions.toString())
+        assertTrue(versions.none { it.startsWith("V21__") }, versions.toString())
+        assertTrue(jdbc.queryForList("SELECT version FROM flyway_schema_history WHERE success", String::class.java).contains("20"))
         assertEquals(
             "DISABLED",
             jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", String::class.java),
         )
+    }
+
+    @Test
+    fun v20RetiresEffectiveLegacyCapabilityPrivileges() {
+        val signatures = listOf(
+            "public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)",
+            "public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)",
+            "public.capability_admin_remove_kill_switch(bigint,bigint,character varying,uuid)",
+            "public.capability_admin_replace_kill_switch(bigint,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
+            "public.capability_admin_remove_kill_switch(bigint,character varying,bigint,character varying,uuid)",
+            "public.capability_admin_replace_kill_switch(bigint,character varying,bigint,character varying,character varying,timestamp with time zone,character varying,uuid)",
+        )
+        signatures.forEach { signature ->
+            val exists = jdbc.queryForObject("SELECT to_regprocedure(?) IS NOT NULL", Boolean::class.java, signature)!!
+            if (!exists) return@forEach
+            val publicExecute = jdbc.queryForObject(
+                "SELECT has_function_privilege('public', ?, 'EXECUTE')",
+                Boolean::class.java,
+                signature,
+            )!!
+            val runtimeExecute = jdbc.queryForObject(
+                "SELECT has_function_privilege('storecore_runtime', ?, 'EXECUTE')",
+                Boolean::class.java,
+                signature,
+            )!!
+            assertFalse(publicExecute, signature)
+            assertFalse(runtimeExecute, signature)
+        }
     }
 
     @Test
