@@ -193,4 +193,30 @@ describe('use case composition and session boundaries', () => {
     expect(user.authenticated()).toBe(true);
     expect(user.csrf()).toBe('user-csrf-b');
   });
+
+  it('stale successful customer CSRF probe never invokes logout for the new session', async () => {
+    const csrf = new Subject<undefined>();
+    customer.markAuthenticated();
+    customerRepo.readCsrf.mockReturnValueOnce(csrf);
+    const pending = firstValueFrom(TestBed.inject(SignOutCustomerUseCase).execute()).catch((error: unknown) => error);
+    customer.markAuthenticated(); customer.setCsrf('customer-csrf-b');
+    csrf.next(undefined);
+    await pending;
+    expect(customerRepo.logout).not.toHaveBeenCalled();
+    expect(customer.authenticated()).toBe(true);
+    expect(customer.csrf()).toBe('customer-csrf-b');
+  });
+
+  it('stale successful user CSRF probe never invokes logout for the new session', async () => {
+    const csrf = new Subject<undefined>();
+    user.markAuthenticated();
+    userRepo.readCsrf.mockReturnValueOnce(csrf);
+    const pending = firstValueFrom(TestBed.inject(SignOutUserUseCase).execute()).catch((error: unknown) => error);
+    user.markAuthenticated(); user.setCsrf('user-csrf-b');
+    csrf.next(undefined);
+    await pending;
+    expect(userRepo.logout).not.toHaveBeenCalled();
+    expect(user.authenticated()).toBe(true);
+    expect(user.csrf()).toBe('user-csrf-b');
+  });
 });

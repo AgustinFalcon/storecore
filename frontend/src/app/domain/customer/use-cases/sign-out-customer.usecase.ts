@@ -1,6 +1,7 @@
 import { catchError, Observable, switchMap, tap, throwError } from 'rxjs';
 import { CustomerSessionPort } from '../customer-session.port';
 import { ICustomerRepository } from '../customer.repository';
+import { SessionMutationCancelledError } from '../../session-mutation-cancelled.error';
 
 export class SignOutCustomerUseCase {
   constructor(
@@ -14,7 +15,9 @@ export class SignOutCustomerUseCase {
       if (this.session.generation() === generation) this.session.clear();
     };
     return this.repo.readCsrf().pipe(
-      switchMap(() => this.repo.logout()),
+      switchMap(() => this.session.generation() === generation
+        ? this.repo.logout()
+        : throwError(() => new SessionMutationCancelledError())),
       tap(() => clearIfCurrent()),
       catchError((err: unknown) => {
         clearIfCurrent();
