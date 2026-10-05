@@ -10,7 +10,7 @@
     "build": "ng build",
     "test": "ng test --watch=false",
     "test:a11y": "playwright test",
-    "lint": "eslint src",
+    "lint": "eslint src e2e",
     "check:architecture": "node --test scripts/domain-boundary.test.mjs && node scripts/check-architecture.mjs",
     "verify": "npm run check:architecture && npm run lint && npm run test && npm run build"
   },

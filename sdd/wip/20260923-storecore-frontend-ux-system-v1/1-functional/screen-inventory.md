@@ -4,6 +4,8 @@ Una pantalla = una ruta = un `*.view.html`. HTML **en repo** (views Angular actu
 
 Estados globales de **todas**: default / loading / vacío / error+Reintentar / disabled / éxito. Idioma: español rioplatense.
 
+Nota de inventario runtime (issue #148): este WIP conserva 22 superficies UX. `app.routes.ts` contiene 24 leaf routes: agrega `/customer/favorites` (boceto browser-only, fuera del alcance/autorización de este WIP) y `/user/offers` (ruta operador existente). La cobertura de navegador de esas rutas se documenta por separado en `sdd/wip/20261002-all-routes-a11y/`; no promociona favoritos ni declara homologación visual completa.
+
 ## Design system (no son rutas)
 
 | ID | Qué define | HTML en repo |
