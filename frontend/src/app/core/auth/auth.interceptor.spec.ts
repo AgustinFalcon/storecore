@@ -181,4 +181,26 @@ describe('authInterceptor', () => {
     await Promise.all([first, probe, customer]);
     ctrl.verify();
   });
+
+  it('invalidates queued CUSTOMER writes and stale CSRF responses after an identity change', async () => {
+    const session = TestBed.inject(CustomerSession);
+    session.setCsrf('csrf-a');
+    const http = TestBed.inject(HttpClient);
+    const ctrl = TestBed.inject(HttpTestingController);
+    const active = firstValueFrom(http.put('/api/v1/customer/me', { name: 'A' }));
+    const queued = firstValueFrom(http.post('/api/v1/customer/me/addresses', { street: 'A' }));
+    const login = firstValueFrom(http.post('/api/v1/customer/auth/login', {}));
+    const activeRequest = ctrl.expectOne('/api/v1/customer/me');
+    ctrl.expectOne('/api/v1/customer/auth/login').flush({ id: 'customer-b' });
+    await login;
+    session.markAuthenticated();
+    session.setCsrf('csrf-b');
+
+    ctrl.expectNone('/api/v1/customer/me/addresses');
+    activeRequest.flush({}, { headers: { [CSRF_HEADER]: 'stale-a' } });
+    await Promise.all([active, queued]);
+    expect(session.csrf()).toBe('csrf-b');
+    ctrl.expectNone('/api/v1/customer/me/addresses');
+    ctrl.verify();
+  });
 });

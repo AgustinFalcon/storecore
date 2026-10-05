@@ -49,6 +49,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const internalMutations = inject(UserMutationQueue);
   const customerMutations = inject(CustomerMutationQueue);
   const path = requestPath(req.url);
+  const customerGeneration = customer.generation();
+  const userGeneration = user.generation();
+  const generationIsCurrent = () => path.includes('/customer/')
+    ? customer.generation() === customerGeneration
+    : user.generation() === userGeneration;
 
   const dispatch = () => defer(() => {
     let outgoing = req.clone({ withCredentials: true });
@@ -70,14 +75,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           return;
         }
         if (path.includes('/customer/')) {
-          customer.setCsrf(csrf);
+          if (generationIsCurrent()) customer.setCsrf(csrf);
         }
         if (path.includes('/internal/') || path.includes('/user/')) {
-          user.setCsrf(csrf);
+          if (generationIsCurrent()) user.setCsrf(csrf);
         }
       }),
       catchError((err: unknown) => {
         if (err instanceof HttpErrorResponse) {
+          if (!generationIsCurrent()) {
+            return throwError(() => err);
+          }
           if (err.status === 401) {
             if (path.includes('/customer/')) {
               customer.clear();
@@ -89,12 +97,16 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           if (err.status === 403 && errorCodeOf(err) === 'CSRF_INVALID' && !isCsrfProbe(path)) {
             if (path.includes('/customer/')) {
               customer.setCsrf('');
-              return refreshCsrf(backend, `${environment.apiBaseUrl}/customer/auth/csrf`, (token) => customer.setCsrf(token))
+              return refreshCsrf(backend, `${environment.apiBaseUrl}/customer/auth/csrf`, (token) => {
+                if (generationIsCurrent()) customer.setCsrf(token);
+              })
                 .pipe(mergeMap(() => throwError(() => err)));
             } else if (path.includes('/internal/') || path.includes('/user/')) {
               user.setCsrf('');
               // Keep the queue occupied until recovery completes; never replay the failed write.
-              return refreshCsrf(backend, `${environment.apiBaseUrl}/internal/auth/csrf`, (token) => user.setCsrf(token))
+              return refreshCsrf(backend, `${environment.apiBaseUrl}/internal/auth/csrf`, (token) => {
+                if (generationIsCurrent()) user.setCsrf(token);
+              })
                 .pipe(mergeMap(() => throwError(() => err)));
             }
           }
@@ -106,10 +118,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const internal = path.includes('/internal/') || path.includes('/user/');
   if (internal && ((isMutation(req.method) && !isInternalPublicAuth(path)) || isCsrfProbe(path))) {
-    return internalMutations.enqueue(dispatch);
+    return internalMutations.enqueue(dispatch, user.generation(), () => user.generation());
   }
   if (path.includes('/customer/') && ((isMutation(req.method) && !isCustomerPublicAuth(path)) || isCsrfProbe(path))) {
-    return customerMutations.enqueue(dispatch);
+    return customerMutations.enqueue(dispatch, customer.generation(), () => customer.generation());
   }
   return dispatch();
 };

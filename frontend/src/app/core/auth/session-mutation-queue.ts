@@ -3,10 +3,19 @@ import { catchError, concatMap, defer, EMPTY, Observable, Subject, Subscriber, t
 
 /** Owns a dispatched request until its response updates the session's rotating CSRF token. */
 class QueuedMutation<T> {
-  constructor(private readonly request: () => Observable<T>, private readonly observer: Subscriber<T>) {}
+  constructor(
+    private readonly request: () => Observable<T>,
+    private readonly observer: Subscriber<T>,
+    private readonly generation: number,
+    private readonly currentGeneration: () => number,
+  ) {}
 
   execute(): Observable<T> {
     if (this.observer.closed) return EMPTY;
+    if (this.currentGeneration() !== this.generation) {
+      this.observer.complete();
+      return EMPTY;
+    }
     return defer(this.request).pipe(
       tap({
         next: (value) => this.observer.next(value),
@@ -26,9 +35,9 @@ class SessionMutationQueue {
     this.requests.pipe(concatMap((request) => request.execute())).subscribe();
   }
 
-  enqueue<T>(request: () => Observable<T>): Observable<T> {
+  enqueue<T>(request: () => Observable<T>, generation: number, currentGeneration: () => number): Observable<T> {
     return new Observable<T>((observer) => {
-      this.requests.next(new QueuedMutation(request, observer));
+      this.requests.next(new QueuedMutation(request, observer, generation, currentGeneration));
       // Unsubscribing skips work still queued, but cannot abort an already dispatched write.
     });
   }

@@ -5,10 +5,16 @@ import { CustomerSessionPort } from '../../domain/customer/customer-session.port
 export class CustomerSession implements CustomerSessionPort {
   private readonly signedIn = signal(false);
   private readonly csrfToken = signal('');
+  private readonly identityGeneration = signal(0);
   readonly authenticated = computed(() => this.signedIn());
 
   markAuthenticated(): void {
+    this.identityGeneration.update((generation) => generation + 1);
     this.signedIn.set(true);
+  }
+
+  generation(): number {
+    return this.identityGeneration();
   }
 
   setCsrf(value: string): void {
@@ -20,6 +26,7 @@ export class CustomerSession implements CustomerSessionPort {
   }
 
   clear(): void {
+    this.identityGeneration.update((generation) => generation + 1);
     this.signedIn.set(false);
     this.csrfToken.set('');
   }
