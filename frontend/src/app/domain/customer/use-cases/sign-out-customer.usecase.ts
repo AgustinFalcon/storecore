@@ -9,11 +9,15 @@ export class SignOutCustomerUseCase {
   ) {}
 
   execute(): Observable<void> {
+    const generation = this.session.generation();
+    const clearIfCurrent = (): void => {
+      if (this.session.generation() === generation) this.session.clear();
+    };
     return this.repo.readCsrf().pipe(
       switchMap(() => this.repo.logout()),
-      tap(() => this.session.clear()),
+      tap(() => clearIfCurrent()),
       catchError((err: unknown) => {
-        this.session.clear();
+        clearIfCurrent();
         return throwError(() => err);
       }),
     );

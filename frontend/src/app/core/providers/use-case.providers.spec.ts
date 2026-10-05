@@ -13,6 +13,7 @@ import { UserSessionResult } from '../../domain/user/user.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { CustomerSession } from '../auth/customer-session';
 import { UserSession } from '../auth/user-session';
+import { SessionMutationCancelledError } from '../auth/session-mutation-queue';
 import { CART_REPOSITORY } from '../tokens/cart.tokens';
 import { CATALOG_REPOSITORY } from '../tokens/catalog.tokens';
 import { CUSTOMER_REPOSITORY } from '../tokens/customer.tokens';
@@ -167,5 +168,29 @@ describe('use case composition and session boundaries', () => {
     await expect(firstValueFrom(TestBed.inject(SignOutUserUseCase).execute())).rejects.toThrow('csrf');
     expect(user.authenticated()).toBe(false); expect(user.csrf()).toBe('');
     expect(customer.authenticated()).toBe(true); expect(userRepo.logout).not.toHaveBeenCalled();
+  });
+
+  it('stale customer logout cannot clear a newly authenticated customer session', async () => {
+    const csrf = new Subject<undefined>();
+    customer.markAuthenticated();
+    customerRepo.readCsrf.mockReturnValueOnce(csrf);
+    const pending = firstValueFrom(TestBed.inject(SignOutCustomerUseCase).execute()).catch((error: unknown) => error);
+    customer.markAuthenticated(); customer.setCsrf('customer-csrf-b');
+    csrf.error(new SessionMutationCancelledError());
+    await pending;
+    expect(customer.authenticated()).toBe(true);
+    expect(customer.csrf()).toBe('customer-csrf-b');
+  });
+
+  it('stale user logout cannot clear a newly authenticated user session', async () => {
+    const csrf = new Subject<undefined>();
+    user.markAuthenticated();
+    userRepo.readCsrf.mockReturnValueOnce(csrf);
+    const pending = firstValueFrom(TestBed.inject(SignOutUserUseCase).execute()).catch((error: unknown) => error);
+    user.markAuthenticated(); user.setCsrf('user-csrf-b');
+    csrf.error(new SessionMutationCancelledError());
+    await pending;
+    expect(user.authenticated()).toBe(true);
+    expect(user.csrf()).toBe('user-csrf-b');
   });
 });

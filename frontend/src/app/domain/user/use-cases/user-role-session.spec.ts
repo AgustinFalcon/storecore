@@ -9,6 +9,7 @@ class TestSession {
   private signedIn = false;
   authenticated(): boolean { return this.signedIn; }
   markAuthenticated(): void { this.signedIn = true; }
+  generation(): number { return 0; }
   clear(): void { this.signedIn = false; }
 }
 
