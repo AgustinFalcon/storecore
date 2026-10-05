@@ -34,14 +34,29 @@
   concurrency regressions and production-caller adjustment: BUILD SUCCESS.
   Database execution remains delegated to GitHub CI because the local Docker
   named pipe is unavailable to this sandbox.
+- 2026-10-05: GitHub Verify run `37337967180` passed both jobs on exact head
+  `c5926cb2b8618d6a025970dd9a6904e485de4777`: frontend SUCCESS and backend
+  SUCCESS with PostgreSQL/Testcontainers. This satisfies the authoritative
+  fresh/upgrade, runtime privilege, session matrix and business regression run.
+- 2026-10-05: Two new independent OpenAI GPT-6.1 Sol reviews at medium effort
+  approved base `fcb431144278ab6cb4836df2e348710f88fa4dae` → exact head
+  `c5926cb2b8618d6a025970dd9a6904e485de4777` with no P0–P3 findings. Functional
+  review additionally ran its required Bugbot delegate. Both confirmed V1–V9
+  blob immutability, caller/session cut, lock-order regressions and no productive
+  actor-only fallback. The security review confirmed owners, search path, grants,
+  SET-reachable postcondition, revocation/deadline handling and atomic effects.
+- 2026-10-05: CSA-004 through CSA-007 are complete. PR #164 remains open and
+  unmerged while this honest close-out/archive-only commit receives fresh
+  exact-head CI and dual-Sol validation. No deploy, tag, publish, activation or
+  release occurred.
 
-## Evidence to record after implementation
+## Recorded evidence
 
-Record master base SHA, change head SHA, migration checksum comparison, fresh and
-V9→V10 upgrade results, runtime privilege assertions, session rejection matrix,
-business regression results and exact commands. Review records must identify
-provider/model/effort, base/head, checks, limits and two independent Sol verdicts.
-Do not mark tests, CI, reviews, merge or archive complete without actual evidence.
+Master base and approved implementation head are recorded above. V1–V9 Git blobs
+were identical across that comparison; V10 is the only added migration. GitHub
+CI is the authoritative database execution. Review records identify provider,
+model, effort, exact base/head, checks and local Docker/network limits. The feature
+is archived by the documentation commit; merge remains unclaimed until it occurs.
 
 ## Persistent limits
 
