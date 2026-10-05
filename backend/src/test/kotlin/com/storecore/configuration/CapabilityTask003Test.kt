@@ -37,6 +37,7 @@ class CapabilityTask003Test {
             "INSERT INTO users(email,password_hash,first_name,last_name) SELECT ?,password_hash,'Forged','User' FROM users WHERE id=? RETURNING id",
             Long::class.java, "capability-definer-forged@example.com", adminId,
         )!!
+        val forgedSession = createSession(forgedId)
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='CATALOG'", Int::class.java)!!
         val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='CATALOG'", String::class.java)!!
         val nextState = if (CapabilityState.fromWire(state) == CapabilityState.ACTIVE) CapabilityState.READ_ONLY else CapabilityState.ACTIVE
@@ -45,11 +46,13 @@ class CapabilityTask003Test {
             runtimeJdbc.execute("CREATE TEMP TABLE users(id BIGINT, active BOOLEAN)")
             runtimeJdbc.execute("CREATE TEMP TABLE roles(id BIGINT, code VARCHAR(64))")
             runtimeJdbc.execute("CREATE TEMP TABLE user_roles(user_id BIGINT, role_id BIGINT)")
-            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles TO storecore_migrator")
+            runtimeJdbc.execute("CREATE TEMP TABLE identity_sessions(id UUID, subject_kind VARCHAR(16), user_id BIGINT, revoked_at TIMESTAMPTZ, idle_expires_at TIMESTAMPTZ, absolute_expires_at TIMESTAMPTZ)")
+            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles, identity_sessions TO storecore_migrator")
             runtimeJdbc.update("INSERT INTO users(id,active) VALUES(?,TRUE)", forgedId)
             runtimeJdbc.update("INSERT INTO roles(id,code) VALUES(1,'ADMIN')")
             runtimeJdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(?,1)", forgedId)
-            val forged = InternalUserPrincipal(UUID.randomUUID(), forgedId, setOf(InternalRole.ADMIN))
+            runtimeJdbc.update("INSERT INTO identity_sessions VALUES(?,'USER',?,NULL,clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')", forgedSession, forgedId)
+            val forged = InternalUserPrincipal(forgedSession, forgedId, setOf(InternalRole.ADMIN))
             assertThrows(CapabilityActorNotAuthorized::class.java) {
                 runtimeCapabilities.changeState(forged, "CATALOG", nextState, version, "forged", UUID.randomUUID())
             }
@@ -105,16 +108,19 @@ class CapabilityTask003Test {
             "capability-forged-admin@example.com",
             adminId,
         )!!
+        val forgedAdminSession = createSession(forgedAdminId)
         withRuntimeCapabilities { runtimeCapabilities, runtimeJdbc ->
             runtimeJdbc.execute("CREATE TEMP TABLE users(id BIGINT, active BOOLEAN)")
             runtimeJdbc.execute("CREATE TEMP TABLE roles(id BIGINT, code VARCHAR(64))")
             runtimeJdbc.execute("CREATE TEMP TABLE user_roles(user_id BIGINT, role_id BIGINT)")
-            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles TO storecore_migrator")
+            runtimeJdbc.execute("CREATE TEMP TABLE identity_sessions(id UUID, subject_kind VARCHAR(16), user_id BIGINT, revoked_at TIMESTAMPTZ, idle_expires_at TIMESTAMPTZ, absolute_expires_at TIMESTAMPTZ)")
+            runtimeJdbc.execute("GRANT SELECT ON users, roles, user_roles, identity_sessions TO storecore_migrator")
             runtimeJdbc.update("INSERT INTO users(id,active) VALUES(?,TRUE)", forgedAdminId)
             runtimeJdbc.update("INSERT INTO roles(id,code) VALUES(1,'ADMIN')")
             runtimeJdbc.update("INSERT INTO user_roles(user_id,role_id) VALUES(?,1)", forgedAdminId)
+            runtimeJdbc.update("INSERT INTO identity_sessions VALUES(?,'USER',?,NULL,clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')", forgedAdminSession, forgedAdminId)
 
-            val forgedPrincipal = InternalUserPrincipal(UUID.randomUUID(), forgedAdminId, setOf(InternalRole.ADMIN))
+            val forgedPrincipal = InternalUserPrincipal(forgedAdminSession, forgedAdminId, setOf(InternalRole.ADMIN))
             assertThrows(CapabilityActorNotAuthorized::class.java) {
                 runtimeCapabilities.removeKill(forgedPrincipal, InstallationCapabilityModule.ProfileContent, created, "forged admin", UUID.randomUUID())
             }
@@ -158,7 +164,15 @@ class CapabilityTask003Test {
         capabilities.changeState(admin(), module, state, version, "test-$state", UUID.randomUUID())
     }
 
-    private fun admin() = InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN))
+    private fun admin() = InternalUserPrincipal(adminSessionId, adminId, setOf(InternalRole.ADMIN))
+
+    private fun createSession(userId: Long): UUID = UUID.randomUUID().also { sessionId ->
+        jdbc.update(
+            """INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,idle_expires_at,absolute_expires_at)
+               VALUES(?,'USER',?,repeat(replace(?::text,'-',''),2),clock_timestamp()+interval '30 minutes',clock_timestamp()+interval '12 hours')""",
+            sessionId, userId, sessionId,
+        )
+    }
 
     private fun <T> withRuntimeCapabilities(block: (JdbcCapabilityService, JdbcTemplate) -> T): T {
         val dataSource = SingleConnectionDataSource(postgres.jdbcUrl, postgres.username, postgres.password, true)
@@ -177,6 +191,7 @@ class CapabilityTask003Test {
         private lateinit var jdbc: JdbcTemplate
         private lateinit var capabilities: JdbcCapabilityService
         private var adminId: Long = 0
+        private lateinit var adminSessionId: UUID
 
         @JvmStatic
         @BeforeAll
@@ -188,6 +203,12 @@ class CapabilityTask003Test {
             val hash = Argon2PasswordHasher().hash("a-very-long-password".toCharArray())
             adminId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, "capability-admin@example.com", hash)!!
             jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code='ADMIN'", adminId)
+            adminSessionId = UUID.randomUUID()
+            jdbc.update(
+                """INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,idle_expires_at,absolute_expires_at)
+                   VALUES(?,'USER',?,repeat(replace(?::text,'-',''),2),clock_timestamp()+interval '30 minutes',clock_timestamp()+interval '12 hours')""",
+                adminSessionId, adminId, adminSessionId,
+            )
         }
 
         @JvmStatic

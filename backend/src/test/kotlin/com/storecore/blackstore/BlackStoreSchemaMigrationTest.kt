@@ -53,9 +53,16 @@ class BlackStoreSchemaMigrationTest {
             Long::class.java,
         )!!
         jdbc.update("INSERT INTO user_roles(user_id, role_id) SELECT ?, id FROM roles WHERE code='ADMIN' ON CONFLICT DO NOTHING", adminId)
+        val sessionId = UUID.randomUUID()
+        jdbc.update(
+            """INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,idle_expires_at,absolute_expires_at)
+               VALUES(?,'USER',?,repeat(replace(?::text,'-',''),2),clock_timestamp()+interval '30 minutes',clock_timestamp()+interval '12 hours')""",
+            sessionId, adminId, sessionId,
+        )
+        val admin = InternalUserPrincipal(sessionId, adminId, setOf(InternalRole.ADMIN))
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
         capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
+            admin,
             "BLACKSTORE_INTEGRATION",
             CapabilityState.ACTIVE,
             version,
@@ -65,7 +72,7 @@ class BlackStoreSchemaMigrationTest {
         capabilities.decide("BLACKSTORE_INTEGRATION", "STOCK_RESERVE", CapabilityActor.System)
         val activeVersion = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='BLACKSTORE_INTEGRATION'", Int::class.java)!!
         capabilities.changeState(
-            InternalUserPrincipal(UUID.randomUUID(), adminId, setOf(InternalRole.ADMIN)),
+            admin,
             "BLACKSTORE_INTEGRATION",
             CapabilityState.DISABLED,
             activeVersion,
