@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CustomerOrder } from '../../domain/order/order.entity';
+import { OrderStatus } from '../../domain/order/order-status';
+import { PaymentStatus } from '../../domain/order/payment-status';
+import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { CustomerOrderDetailViewComponent } from './customer-order-detail.view';
 import { CustomerOrdersViewComponent } from './customer-orders.view';
 import { moneyWasSent } from './order-line-money';
@@ -28,9 +31,9 @@ function line(partial: Partial<CustomerOrder['lines'][number]> = {}): CustomerOr
 function order(overrides: Partial<CustomerOrder> = {}): CustomerOrder {
   return {
     id: ORDER_ID,
-    orderStatus: 'PENDING_PAYMENT',
-    paymentStatus: 'REJECTED',
-    shipmentStatus: 'PREPARING',
+    orderStatus: OrderStatus.PendingPayment,
+    paymentStatus: PaymentStatus.Rejected,
+    shipmentStatus: ShipmentStatus.Preparing,
     tracking: null,
     total: TOTAL,
     lines: [line()],
@@ -69,10 +72,10 @@ describe('customer order snapshot', () => {
     const root = fixture.nativeElement as HTMLElement;
 
     expect(root.textContent).toContain('Sólo las órdenes de esta cuenta customer');
-    expect(text(root, '[data-fact="order"]')).toContain('orden PENDING_PAYMENT');
-    expect(text(root, '[data-fact="payment"]')).toContain('pago REJECTED');
-    expect(text(root, '[data-fact="order"]')).not.toContain('REJECTED');
-    expect(text(root, '[data-fact="payment"]')).not.toContain('PENDING_PAYMENT');
+    expect(text(root, '[data-fact="order"]')).toContain(`orden ${OrderStatus.PendingPayment.label}`);
+    expect(text(root, '[data-fact="payment"]')).toContain(`pago ${PaymentStatus.Rejected.label}`);
+    expect(text(root, '[data-fact="order"]')).not.toContain(PaymentStatus.Rejected.label);
+    expect(text(root, '[data-fact="payment"]')).not.toContain(OrderStatus.PendingPayment.label);
     expect(root.querySelector('a')?.getAttribute('href')).toBe(`/customer/orders/${ORDER_ID}`);
     expect(root.textContent).toContain(String(TOTAL));
     expect(root.textContent).toContain(String(EFFECTIVE));
@@ -112,10 +115,10 @@ describe('customer order snapshot', () => {
 
     expect(root.textContent).toContain(`Orden ${ORDER_ID}`);
     expect(root.textContent).toContain('La orden y el pago son datos distintos');
-    expect(text(root, '[data-fact="order"]')).toContain('orden PENDING_PAYMENT');
-    expect(text(root, '[data-fact="payment"]')).toContain('pago REJECTED');
-    expect(text(root, '[data-fact="order"]')).not.toContain('REJECTED');
-    expect(text(root, '[data-fact="payment"]')).not.toContain('PENDING_PAYMENT');
+    expect(text(root, '[data-fact="order"]')).toContain(`orden ${OrderStatus.PendingPayment.label}`);
+    expect(text(root, '[data-fact="payment"]')).toContain(`pago ${PaymentStatus.Rejected.label}`);
+    expect(text(root, '[data-fact="order"]')).not.toContain(PaymentStatus.Rejected.label);
+    expect(text(root, '[data-fact="payment"]')).not.toContain(OrderStatus.PendingPayment.label);
     expect(text(root, '[data-fact="original"]')).toContain('Original');
     expect(text(root, '[data-fact="original"]')).toContain(String(ORIGINAL));
     expect(text(root, '[data-fact="discount"]')).toContain('Descuento');
