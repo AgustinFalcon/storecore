@@ -133,7 +133,8 @@ class CommerceHttpIntegrationTest(
         val allowed = exchange("/api/v1/user/orders", HttpMethod.GET, null, admin.cookie)
         assertEquals(200, allowed.statusCode.value(), allowed.body)
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, "MANUAL_FULFILLMENT")
-        jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), "MANUAL_FULFILLMENT", version, "PAUSED", "{}", UUID.randomUUID(), "test")
+        val actorId = adminUserId()
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), "MANUAL_FULFILLMENT", version, "PAUSED", "{}", UUID.randomUUID(), "test")
         val denied = exchange("/api/v1/user/orders", HttpMethod.GET, null, admin.cookie)
         assertEquals(409, denied.statusCode.value(), denied.body)
         assertTrue(denied.body!!.contains("CAPABILITY_PAUSED"))
@@ -222,8 +223,15 @@ class CommerceHttpIntegrationTest(
         val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?", String::class.java, module)
         if (state == "ACTIVE") return
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
-        jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, adminUserId(), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
+        val actorId = adminUserId()
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
     }
+
+    private fun adminSessionId(actorId: Long): UUID = jdbc.queryForObject(
+        "SELECT id FROM identity_sessions WHERE subject_kind='USER' AND user_id=? AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1",
+        UUID::class.java,
+        actorId,
+    )!!
 
     private fun provisionAdmin(email: String): Session {
         val hash = passwords.hash("a-very-long-password".toCharArray())

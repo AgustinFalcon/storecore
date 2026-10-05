@@ -111,7 +111,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "{}"
         }
         try {
-            jdbc.query("SELECT capability_admin_change_configuration(?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, module, expected, state.wire, configPayload, correlation, reason.trim())
+            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor.userId, actor.sessionId, module, expected, state.wire, configPayload, correlation, reason.trim())
         } catch (exception: Exception) {
             throw mapAdminError(exception)
         }
@@ -122,8 +122,8 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
         return try {
             jdbc.queryForObject(
-                "SELECT capability_admin_create_kill_switch(?,?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, module, action, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
+                "SELECT capability_session_create_kill_switch(?,?,?,?,?,?,?,?,?)",
+                Long::class.java, actor.userId, actor.sessionId, module, action, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
             ) ?: throw CapabilityActorNotAuthorized()
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }
@@ -133,7 +133,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         if (InternalRole.ADMIN !in actor.roles) throw CapabilityActorNotAuthorized()
         if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         try {
-            jdbc.query("SELECT capability_admin_remove_kill_switch(?,?,?,?,?)", { _, _ -> }, actor.userId, module.wire, expectedActiveId, reason, correlation)
+            jdbc.query("SELECT capability_session_remove_kill_switch(?,?,?,?,?,?)", { _, _ -> }, actor.userId, actor.sessionId, module.wire, expectedActiveId, reason, correlation)
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }
 
@@ -143,8 +143,8 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         if (!module.visibleOnConsole) throw CapabilityKillSwitchVersionConflict()
         return try {
             jdbc.queryForObject(
-                "SELECT capability_admin_replace_kill_switch(?,?,?,?,?,?,?,?)",
-                Long::class.java, actor.userId, module.wire, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
+                "SELECT capability_session_replace_kill_switch(?,?,?,?,?,?,?,?,?)",
+                Long::class.java, actor.userId, actor.sessionId, module.wire, expectedActiveId, owner, reason, java.sql.Timestamp.from(expiresAt), ticket, correlation,
             ) ?: throw CapabilityKillSwitchVersionConflict()
         } catch (exception: Exception) { throw mapAdminError(exception) }
     }

@@ -18,7 +18,7 @@ class CapabilityDefinerMigrationTest {
             flyway.target("8").load().migrate()
             val jdbc = JdbcTemplate(DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password))
             assertEquals(4, jdbc.queryForObject(publicExecutionCount, Int::class.java))
-            flyway.target("latest").load().migrate()
+            flyway.target("9").load().migrate()
             assertEquals(0, jdbc.queryForObject(publicExecutionCount, Int::class.java))
             assertEquals(6, jdbc.queryForObject("""
                 SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
