@@ -1,0 +1,32 @@
+# Corte — transiciones desconocidas fail-closed
+
+- Feature ID: `20261001-unknown-transitions-fail-closed`.
+- Estado: implementación publicada y validada por CI; reviews obligatorios pendientes; WIP abierto.
+- Base: integración `a8874ad0466d9c26b982aba36368ab6f20018be8`.
+- Fuente: hallazgo en `frontend/src/app/domain/order/shipment-status.ts` y `rma-status.ts`: `Unknown.next` exponía `Packed` y `Received` respectivamente.
+- Lenguaje: es. Sin fuentes sensibles ni datos de runtime.
+
+## Contrato y aceptación
+
+`ShipmentStatus.Unknown.next` y `RmaStatus.Unknown.next` son `null`. El traductor mantiene el caso cerrado `Unknown` para wire no reconocido; su etiqueta fija no refleja el texto crudo. Los helpers y las dos vistas de fulfillment no ofrecen la acción correspondiente a un estado desconocido. Las transiciones reconocidas y la ausencia opcional de RMA conservan su comportamiento existente.
+
+## Plan mínimo
+
+1. Reemplazar únicamente las transiciones de los dos casos `Unknown` por `null`.
+2. Cubrir wire desconocido/vacío en el dominio y la delegación de helpers; corregir la expectativa de acciones desconocidas en tabla y detalle.
+3. Ejecutar tests enfocados, compilación TypeScript y build disponibles; registrar resultados reales aquí.
+
+## Alcance y gates
+
+Sin cambios de navegación, capabilities, Mercado Libre, dependencias, backend, live, release ni `sdd.finish`. No cambia la autorización del servidor: ocultar UI no sustituye validación backend. La evidencia histórica de Verify alojado se registra abajo; no equivale a declarar aprobado el SHA final ni sustituye las reviews requeridas.
+
+## Validación
+
+- `git diff --check`: PASS, sin errores de whitespace (Git informa conversión LF → CRLF).
+- Revisión estática: traducción wire → tipo cerrado → helpers → `@if(next)` en tabla y detalle; `Unknown` sin transición, etiquetas fijas y sin cambio de contratos externos.
+- Arquitectura y lint: PASS mediante `npm run verify` antes de que el runner llegara a tests.
+- TypeScript: PASS mediante `npx tsc --noEmit -p tsconfig.spec.json`.
+- Build: PASS mediante `npm run build`.
+- Tests enfocados: BLOCKED; el runner Angular falla antes de assertions al resolver rutas absolutas por ACL del workspace Windows. Suites preparadas: `shipment-status.spec.ts`, `rma-status.spec.ts`, `fulfillment-transition.spec.ts`, `fulfillment.view.spec.ts`, `user-order-detail.view.spec.ts`.
+- GitHub Actions Verify run `36948363166`: PASS en frontend (1m22s) y backend (4m58s) para commit `5faca5b`.
+- Falcon Bugbot/Security: revisión estática sin hallazgos P0-P2; el P3 de evidencia SDD fue corregido. No equivale a los gates Grok obligatorios. Estándar Angular aplicado a la arquitectura existente con ComponentStore, sin migración de estado.

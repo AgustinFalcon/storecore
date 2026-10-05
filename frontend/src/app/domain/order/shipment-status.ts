@@ -39,7 +39,7 @@ export class ShipmentStatus {
   static readonly Shipped = new ShipmentStatus('SHIPPED', 'Enviado', ShipmentTransition.Delivered);
   static readonly Delivered = new ShipmentStatus('DELIVERED', 'Entregado', null);
   static readonly Cancelled = new ShipmentStatus('CANCELLED', 'Cancelado', ShipmentTransition.Packed);
-  static readonly Unknown = new ShipmentStatus('', 'Estado de envío no reconocido', ShipmentTransition.Packed);
+  static readonly Unknown = new ShipmentStatus('', 'Estado de envío no reconocido', null);
 
   static fromWire(raw: string | null | undefined): ShipmentStatus {
     const wire = raw?.trim() ?? '';
