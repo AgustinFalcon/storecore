@@ -18,6 +18,7 @@ export interface UserOrderDetailState {
 export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
   private currentOrderId = '';
   private routeGeneration = 0;
+  private destroyed = false;
   constructor(
     private readonly getAdmin: GetAdminOrderUseCase,
     private readonly advance: AdvanceFulfillmentUseCase,
@@ -62,7 +63,7 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
               if (generation === this.routeGeneration) this.patchState({ errorMessage: getApiErrorMessage(err) });
             },
           }),
-          finalize(() => this.endMutation(cmd.orderId)),
+          finalize(() => this.finishMutation(cmd.orderId, generation)),
         );
       }),
     ),
@@ -83,7 +84,7 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
               if (generation === this.routeGeneration) this.patchState({ errorMessage: getApiErrorMessage(err) });
             },
           }),
-          finalize(() => this.endMutation(cmd.orderId)),
+          finalize(() => this.finishMutation(cmd.orderId, generation)),
         );
       }),
     ),
@@ -98,7 +99,17 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
     this.patchState((state) => ({ mutatingOrderIds: [...state.mutatingOrderIds, orderId], errorMessage: '' }));
   }
 
-  private endMutation(orderId: string): void {
+  private finishMutation(orderId: string, generation: number): void {
+    // A read made after returning to A may predate A's commit. Replace it with a fresh read
+    // before releasing the busy state, including failures with an uncertain server outcome.
+    if (!this.destroyed && this.currentOrderId === orderId && generation !== this.routeGeneration) {
+      this.load(orderId);
+    }
     this.patchState((state) => ({ mutatingOrderIds: state.mutatingOrderIds.filter((id) => id !== orderId) }));
+  }
+
+  override ngOnDestroy(): void {
+    this.destroyed = true;
+    super.ngOnDestroy();
   }
 }

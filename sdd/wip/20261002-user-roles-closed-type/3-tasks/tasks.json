@@ -68,7 +68,7 @@
         "frontend/src/app/data/mappers/user-role.mapper.spec.ts",
         "frontend/src/app/domain/user/use-cases/user-role-session.spec.ts"
       ],
-      "evidence": "Five backend/eight frontend tests authored. Runtime backend tests and Angular tests blocked by host access failures; not marked successful."
+      "evidence": "Five backend/eight frontend tests authored. Historical local runtime backend/Angular attempts were blocked by host access failures before execution, not successful. Hosted Verify subsequently passed for commit 8108f5d in run 37037483113 (frontend 1m31s, backend 5m30s); combined PR #135 passed at 24230790702903b367b56bc9dc15feb508c7423f in run 37065984512. Required reviews and integration gates remain pending."
     },
     {
       "id": "TASK-ROLE-004",
@@ -83,7 +83,7 @@
       "files": [
         "sdd/wip/20261002-user-roles-closed-type/"
       ],
-      "evidence": "No commit/push/PR/merge."
+      "evidence": "Published as PR #149 with hosted Verify success for 8108f5d (run 37037483113); combined PR #135 hosted Verify success for 24230790702903b367b56bc9dc15feb508c7423f (run 37065984512). Historical local Maven/esbuild access failures remain recorded in 4-implementation/progress.md. Dual Grok reviews and revalidation after changes remain required; no completed review, merge, promotion, release or live authorization is asserted."
     }
   ]
 }

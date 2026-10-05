@@ -8,5 +8,7 @@
 4. ROLE-004: required review gates before integration.
 
 Implementation and test authoring are local. Runtime and hosted evidence remain
-pending unless recorded explicitly in progress.md. No commit/push/PR/merge in
-this delegated cut.
+pending unless recorded explicitly in progress.md. Historically, the original
+delegated implementation performed no commit/push/PR/merge. Subsequent publication
+as PR #149 and hosted verification are recorded in progress.md and tasks.json;
+required reviews and integration remain pending.
