@@ -51,6 +51,7 @@ class CapabilityLegacyOverloadsV20UpgradeTest {
         val jdbc = jdbc(database)
         installModuleBoundOverloads(jdbc)
         jdbc.execute("CREATE ROLE v20_legacy_parent")
+        jdbc.execute("REVOKE ALL ON FUNCTION public.capability_admin_remove_kill_switch(BIGINT,VARCHAR,BIGINT,VARCHAR,UUID) FROM PUBLIC, storecore_runtime")
         jdbc.execute("GRANT EXECUTE ON FUNCTION public.capability_admin_remove_kill_switch(BIGINT,VARCHAR,BIGINT,VARCHAR,UUID) TO v20_legacy_parent")
         jdbc.execute("GRANT v20_legacy_parent TO storecore_runtime WITH INHERIT FALSE, SET TRUE")
         assertFalse(

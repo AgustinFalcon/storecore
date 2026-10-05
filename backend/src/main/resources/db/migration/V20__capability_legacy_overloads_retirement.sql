@@ -5,7 +5,6 @@
 DO $$
 DECLARE
   signature text;
-  set_reachable_execute boolean;
   signatures text[] := ARRAY[
     'public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)',
     'public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)',
@@ -25,6 +24,7 @@ END $$;
 DO $$
 DECLARE
   signature text;
+  set_reachable_execute boolean;
   signatures text[] := ARRAY[
     'public.capability_admin_change_configuration(bigint,character varying,integer,character varying,jsonb,uuid,character varying)',
     'public.capability_admin_create_kill_switch(bigint,character varying,character varying,character varying,character varying,timestamp with time zone,character varying,uuid)',
