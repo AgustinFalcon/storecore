@@ -1,7 +1,8 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { CustomerSessionPort } from '../../domain/customer/customer-session.port';
 
 @Injectable({ providedIn: 'root' })
-export class CustomerSession {
+export class CustomerSession implements CustomerSessionPort {
   private readonly signedIn = signal(false);
   private readonly csrfToken = signal('');
   readonly authenticated = computed(() => this.signedIn());
