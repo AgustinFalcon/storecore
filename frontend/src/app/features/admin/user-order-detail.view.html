@@ -50,13 +50,13 @@
                 <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
               </label>
             }
-            <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
+            <button type="button" class="sc-btn sc-btn--primary" [disabled]="loading" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
               {{ shipmentLabel(next) }}
             </button>
           </form>
         }
         @if (nextReturn(order); as next) {
-          <button type="button" class="sc-btn sc-btn--ghost" (click)="rma.emit({ orderId: order.id, status: next })">
+          <button type="button" class="sc-btn sc-btn--ghost" [disabled]="loading" (click)="rma.emit({ orderId: order.id, status: next })">
             {{ rmaLabel(next) }}
           </button>
         }
