@@ -15,8 +15,9 @@
   principal/roles/CSRF publication, isolated logout and role-derived USER home.
 - Redirected legacy UI session routes to `/login` with closed validated return
   destinations; retained the supported realm-specific HTTP endpoints.
-- Added 139 frontend unit/architecture tests, accessibility coverage and a
-  12-scenario real PostgreSQL/Spring/Angular HTTPS/Chromium matrix.
+- Validated the feature within the complete 139-test frontend suite, the
+  architecture checks, accessibility coverage and a 12-scenario real
+  PostgreSQL/Spring/Angular HTTPS/Chromium matrix.
 
 The implementation reached `master` through PRs #165–#169. The final functional
 commit is `99380a656562c784dc8fc4805eccc2a835a2ea48`. PR #169 exact head
