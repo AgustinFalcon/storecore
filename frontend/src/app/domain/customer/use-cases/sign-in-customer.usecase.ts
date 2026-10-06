@@ -10,6 +10,6 @@ export class SignInCustomerUseCase {
   ) {}
 
   execute(credentials: CustomerCredentials): Observable<CustomerSessionResult> {
-    return this.repo.signIn(credentials).pipe(tap(() => this.session.markAuthenticated()));
+    return this.repo.signIn(credentials).pipe(tap((principal) => this.session.markAuthenticated(principal)));
   }
 }

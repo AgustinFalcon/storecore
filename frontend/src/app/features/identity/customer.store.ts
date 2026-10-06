@@ -248,11 +248,11 @@ export class CustomerStore extends ComponentStore<CustomerState> {
           tapResponse({
             next: () => {
               this.setState({ ...INITIAL });
-              void this.router.navigateByUrl('/customer/session');
+              void this.router.navigateByUrl('/login');
             },
             error: () => {
               this.setState({ ...INITIAL });
-              void this.router.navigateByUrl('/customer/session');
+              void this.router.navigateByUrl('/login');
             },
           }),
         ),

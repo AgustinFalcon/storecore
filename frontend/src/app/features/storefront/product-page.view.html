@@ -64,7 +64,7 @@
           @if (signedIn) {
             <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
           } @else {
-            <p><a routerLink="/customer/session">Entrar para agregar</a></p>
+            <p><a routerLink="/login">Entrar para agregar</a></p>
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>

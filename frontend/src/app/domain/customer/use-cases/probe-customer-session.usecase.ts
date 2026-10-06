@@ -12,7 +12,7 @@ export class ProbeCustomerSessionUseCase {
   execute(): Observable<CustomerProfile> {
     return this.repo.readProfile().pipe(
       switchMap((profile) => this.repo.readCsrf().pipe(map(() => profile))),
-      tap(() => this.session.markAuthenticated()),
+      tap((profile) => this.session.markAuthenticated(profile)),
     );
   }
 }

@@ -2,7 +2,7 @@
   <div class="sc-auth__card">
     <p class="sc-kicker">Alta de compra</p>
     <h1 id="register-title">Crear cuenta customer</h1>
-    <p class="sc-page__lede">Alta de compra. Separada del login de operadores.</p>
+    <p class="sc-page__lede">Creá tu cuenta para comprar en la tienda.</p>
     <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="submitRegister.emit()" />
     @if (authenticated) {
       <p>Sesión customer activa. <a routerLink="/customer/profile">Ir al perfil</a></p>
@@ -24,8 +24,7 @@
         </label>
         <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Registrarme</button>
       </form>
-      <p>¿Ya tenés cuenta? <a routerLink="/customer/session">Ya tengo cuenta</a></p>
+      <p>¿Ya tenés cuenta? <a routerLink="/login">Ya tengo cuenta</a></p>
     }
-    <p><a routerLink="/user/session">¿Operás la tienda? Ir al acceso de personal</a></p>
   </div>
 </section>

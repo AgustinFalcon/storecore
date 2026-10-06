@@ -10,6 +10,8 @@ import { CUSTOMER_REPOSITORY } from './core/tokens/customer.tokens';
 import { HEALTH_REPOSITORY } from './core/tokens/health.tokens';
 import { ORDER_REPOSITORY } from './core/tokens/order.tokens';
 import { USER_REPOSITORY } from './core/tokens/user.tokens';
+import { ACCESS_REPOSITORY } from './core/tokens/access.tokens';
+import { AccessHttpRepository } from './data/access/access-http.repository';
 import { CartHttpRepository } from './data/cart/cart-http.repository';
 import { CatalogHttpRepository } from './data/catalog/catalog-http.repository';
 import { CustomerHttpRepository } from './data/customer/customer-http.repository';
@@ -27,6 +29,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
+    { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],
 };

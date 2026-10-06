@@ -1,19 +1,13 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
-import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/probe-customer-session.usecase';
-import { CustomerSession } from './customer-session';
+import { map } from 'rxjs';
+import { AccessContext } from '../../domain/access/access-context';
+import { ReturnDestination } from '../../domain/access/return-destination';
+import { AccessCoordinator } from './access-coordinator';
 
-export const customerGuard: CanActivateFn = () => {
-  const session = inject(CustomerSession);
+export const customerGuard: CanActivateFn = (_route, state) => {
   const router = inject(Router);
-  if (session.authenticated()) {
-    return true;
-  }
-  return inject(ProbeCustomerSessionUseCase)
-    .execute()
-    .pipe(
-      map(() => true),
-      catchError(() => of(router.parseUrl('/customer/session'))),
-    );
+  const destination = ReturnDestination.fromPath(state.url);
+  return inject(AccessCoordinator).rehydrate().pipe(map((access) => access.activeContext === AccessContext.Customer && access.permits(AccessContext.Customer) ? true
+    : router.createUrlTree(['/login'], { queryParams: { returnTo: destination === ReturnDestination.Unknown ? ReturnDestination.Home.wire : destination.wire } })));
 };

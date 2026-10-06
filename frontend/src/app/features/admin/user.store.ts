@@ -102,7 +102,7 @@ export class UserStore extends ComponentStore<UserState> {
             tapResponse({
             next: () => {
               this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
-              void this.router.navigateByUrl('/user/content');
+              void this.router.navigateByUrl('/user/home');
             },
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
@@ -124,7 +124,7 @@ export class UserStore extends ComponentStore<UserState> {
                 errorMessage: '',
                 preview: null,
               });
-              void this.router.navigateByUrl('/user/session');
+              void this.router.navigateByUrl('/login');
             },
             error: () => {
               this.patchState({
@@ -134,7 +134,7 @@ export class UserStore extends ComponentStore<UserState> {
                 errorMessage: '',
                 preview: null,
               });
-              void this.router.navigateByUrl('/user/session');
+              void this.router.navigateByUrl('/login');
             },
           }),
         ),
