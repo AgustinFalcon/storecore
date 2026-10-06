@@ -2,6 +2,8 @@
 
 Copiar este documento entero a la IA de diseño. Pedir **una pieza por mensaje** usando el bloque “Generar ahora” del final.
 
+Acceso vigente: `/login` es la única entrada visual según el [WIP unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md). C-01/U-01 conservan sólo redirects compatibles; no generar dos formularios de login. Los POST legacy siguen soportados y no deprecados mientras UA-007 esté abierto. BlackStore tiene identidad propia y no se federa con StoreCore.
+
 Sos un diseñador de producto senior + implementador de HTML/CSS. Tenés que diseñar el sistema visual y **todas** las pantallas de StoreCore, un comercio electrónico **single-tenant** (una instalación = un comercio = un dominio). El frontend Angular ya existe: vos no inventás pantallas nuevas. Entregás HTML+CSS que un ingeniero va a pegar en views Angular (`*.view.html`).
 
 ---
@@ -177,7 +179,7 @@ Estados de sesión en header siempre visibles, aunque el usuario esté en catál
 
 ---
 
-## 5. Pantallas — inventario cerrado (22 + chrome)
+## 5. Pantallas — inventario cerrado (22 + chrome; C-01/U-01 son redirects)
 
 Datos de ejemplo: SKU `SKU-100`, nombre “Lámpara de escritorio”, marca “Casa”, categoría “Iluminación”, effective `12500`, original `14900`, dto `2400`, oferta `OF-21`, campaña `BF-MANUAL`. Orden `ord-1042`. **No uses nombres de comercios reales.**
 
@@ -218,24 +220,28 @@ Cada pantalla debe contemplar: loading (skeleton o banner), vacío, error con Re
 **CTA:**
 
 - Con sesión customer: botón “Agregar al carrito” (disabled si `active === false`, badge “Inactivo”).
-- Sin sesión: no fingir add. Link “Entrar para agregar al carrito” → `/customer/session`.
+- Sin sesión: no fingir add. Link “Entrar para agregar al carrito” → `/login`. Cart/detalle no son destinos restaurables en v1; no inventar un return path.
 - Link “Ver carrito”.
 
 **Vacío:** “Producto no disponible.”
 
 **Precio:** mostrar effective. No mostrar base/desired/observed al comprador.
 
-### C-01 Login customer — `/customer/session` — `customer-session.view.html`
+### A-01 Acceso unificado — `/login` — `login.view.html`
 
-Auth card. H1 “Sesión customer”. Lede: “Identidad de compra. No es el acceso de operadores.” Campos: Email, Contraseña. Primary “Entrar”. Link “Crear cuenta”.
+Auth card. H1 “Ingresar”. Lede: “Ingresá con tu email y contraseña para continuar.” Campos: Email, Contraseña. Primary “Ingresar”. Link “Crear cuenta” a `/customer/register`. No elegir CUSTOMER/USER antes de verificar credenciales.
 
-**Autenticado:** mensaje “Sesión customer activa en esta instalación” + ghost “Cerrar sesión”.
+**Selección verificada:** H2 “Elegí cómo continuar”, con foco accesible y botones sólo para contextos verificados. El challenge fresco se consume en el backend; dos sesiones ya verificadas se seleccionan localmente. Ocultar y limpiar contraseña. CUSTOMER continúa al storefront; USER con roles conocidos a `/user/home`. Bloquear submits duplicados mientras la request esté en vuelo.
 
 Sin “login with Google”. Sin credenciales de ejemplo en el UI.
 
+### C-01 Compatibilidad — `/customer/session`
+
+Redirect a `/login` con sólo un destino cerrado validado. No tiene formulario propio.
+
 ### C-02 Registro — `/customer/register` — `customer-register.view.html`
 
-Auth card. H1 “Crear cuenta customer”. Campos: Nombre, Email, Contraseña. Primary “Registrarme”. Link “Ya tengo cuenta”.
+Auth card. H1 “Crear cuenta customer”. Campos: Nombre, Email, Contraseña. Primary “Registrarme”. Link “Ya tengo cuenta” a `/login`.
 
 Autenticado: “Sesión activa” + link a perfil.
 
@@ -297,11 +303,13 @@ Link volver. H1 “Orden {id}”. Badges: orden, pago, envío. Tracking o “—
 
 Vacío: “Orden no disponible para este customer.”
 
-### U-01 Login user — `/user/session` — `user-session.view.html`
+### U-01 Compatibilidad — `/user/session`
 
-Igual anatomía que C-01 pero **ops**: H1 “Sesión user”. Lede: “Operadores internos. No comparte sesión con customer.” Sin link de registro (los users no se auto-alta). Email + password + Entrar. Autenticado + Cerrar sesión.
+Redirect a `/login` con sólo un destino cerrado validado. No tiene formulario propio ni auto-alta USER.
 
-Fondo canvas, card más “herramienta” (menos aire que customer).
+### U-HOME Inicio de operaciones — `/user/home`
+
+H1 “Inicio de operaciones”. Lista de acciones permitidas por los roles USER actuales conocidos; roles desconocidos no muestran acciones ni conceden rutas. Estado sin acciones y link al catálogo público. Cookies y logout siguen separados de CUSTOMER.
 
 ### U-02 Contenido home — `/user/content` — `user-content.view.html`
 
@@ -412,7 +420,7 @@ DS-00-design-system.html
 P-01-home.html
 P-02-catalog.html
 P-03-product.html
-C-01-customer-session.html
+A-01-login.html
 C-02-customer-register.html
 C-03-customer-profile.html
 C-04-customer-addresses.html
@@ -421,7 +429,7 @@ C-06-checkout.html
 C-07-checkout-result.html
 C-08-customer-orders.html
 C-09-customer-order-detail.html
-U-01-user-session.html
+U-HOME-operations.html
 U-02-user-content.html
 U-03-user-catalog.html
 U-04-user-promos.html
@@ -442,7 +450,7 @@ Placeholders Angular que el HTML debe respetar (dejar comentarios HTML):
 
 ## 9. Criterio de aceptación del diseño
 
-- 22 pantallas + DS-00, desktop y mobile.
+- 22 pantallas + DS-00, desktop y mobile: incluyen A-01 y U-HOME; C-01/U-01 son redirects sin HTML propio.
 - Customer y User se distinguen por densidad, no por otra paleta.
 - Precio effective es el único precio “de venta” en storefront.
 - Checkout sin Mercado Pago en el browser.
@@ -461,7 +469,7 @@ Pegá el maestro + **una** de estas líneas:
 2. `Generá AHORA sólo P-01 Home.`
 3. `Generá AHORA sólo P-02 Catálogo.`
 4. `Generá AHORA sólo P-03 Producto.`
-5. `Generá AHORA sólo C-01 Login customer.`
+5. `Generá AHORA sólo A-01 Acceso unificado, con credenciales y selección de contextos verificados.`
 6. `Generá AHORA sólo C-02 Registro customer.`
 7. `Generá AHORA sólo C-03 Perfil customer.`
 8. `Generá AHORA sólo C-04 Direcciones.`
@@ -470,7 +478,7 @@ Pegá el maestro + **una** de estas líneas:
 11. `Generá AHORA sólo C-07 Resultado de pedido.`
 12. `Generá AHORA sólo C-08 Listado de órdenes customer.`
 13. `Generá AHORA sólo C-09 Detalle de orden customer.`
-14. `Generá AHORA sólo U-01 Login user/operador.`
+14. `Generá AHORA sólo U-HOME Inicio de operaciones, con acciones de los roles USER actuales.`
 15. `Generá AHORA sólo U-02 Contenido home admin.`
 16. `Generá AHORA sólo U-03 Catálogo admin (productos + marcas + categorías).`
 17. `Generá AHORA sólo U-04 Promos MANUAL.`

@@ -59,3 +59,63 @@ jobs:
       - name: Public-page accessibility smoke (backend-less)
         working-directory: frontend
         run: npm run test:a11y
+
+  unified-access-real-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: storecore_ua_e2e
+          POSTGRES_USER: storecore
+          POSTGRES_PASSWORD: storecore
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U storecore -d storecore_ua_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5434'
+      PGDATABASE: storecore_ua_e2e
+      PGUSER: storecore
+      PGPASSWORD: storecore
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install database client and test certificate tool
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client openssl
+      - name: Package real backend
+        working-directory: backend
+        run: mvn -B -DskipTests package
+      - name: Install browser dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Real PostgreSQL, Spring, Angular HTTPS and browser UA matrix
+        working-directory: frontend
+        run: |
+          npm run check:ua-real
+          npm run test:ua-real
+      - name: Save browser and server evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-access-real-e2e-${{ github.sha }}
+          path: frontend/ua-real-results/
+          if-no-files-found: ignore
+          retention-days: 7
