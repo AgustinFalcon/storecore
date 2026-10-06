@@ -645,7 +645,11 @@ class MpOrdersCheckoutIntegrationTest(
 
     private fun addAddress(session: Session): Session {
         val customerId = jdbc.queryForObject("SELECT id FROM customers ORDER BY id DESC LIMIT 1", Long::class.java)!!
-        val addressId = jdbc.queryForObject(
+        val addressId = jdbc.query(
+            "SELECT id FROM customer_addresses WHERE customer_id=? AND is_default=TRUE ORDER BY id LIMIT 1",
+            { rs, _ -> rs.getLong("id") },
+            customerId,
+        ).firstOrNull() ?: jdbc.queryForObject(
             "INSERT INTO customer_addresses(customer_id,street,number,city,province,postal_code,is_default) VALUES (?,'Main','1','City','Province','1000',TRUE) RETURNING id",
             Long::class.java,
             customerId,

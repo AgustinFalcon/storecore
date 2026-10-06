@@ -172,3 +172,24 @@ Estas aprobaciones cubren el source manifestado. PostgreSQL/concurrencia, HTTPS
 E2E, clean/upgrade, bundle final y CI del head Git siguen pendientes; por eso
 CFE-T05 continúa blocked y CFE-T06 in_progress hasta CI exact-head. No se
 convirtió ninguna limitación local en PASS ni se autorizó publicación live.
+
+## 2026-10-06 — Primer CI hospedado del PR
+
+El PR `#171` ejecutó Verify `37541585529` sobre
+`320277736e8cb9dc6498272c93b86045e8837327`. Frontend y
+`unified-access-real-e2e` pasaron. Backend compiló y ejecutó 190 pruebas, pero
+falló con dos errores de fixture: dos escenarios nuevos llamaban varias veces
+al helper `addAddress`, que intentaba insertar otra dirección default para el
+mismo customer y violaba `uq_customer_default_address` antes de probar el
+dominio. No fue un fallo de fulfillment productivo.
+
+El helper ahora reutiliza la dirección default durable ya existente y sólo
+inserta cuando falta. Este cambio material invalida las aprobaciones exactas del
+head anterior: requiere validación focalizada, nuevo fingerprint/review y CI
+completo sobre el nuevo head. El run fallido permanece como evidencia histórica.
+
+La recompilación local posterior mediante `work/validate-cfe-backend.ps1`
+terminó exit 0: producción y tests Kotlin compilaron y el JUnit focalizado quedó
+21/21 PASS. Nuevo fingerprint source:
+`2C9F45E0D0151DA6E046511AF080242CA75A8499E7A43F30E34423AEF38A1A55`, calculado
+como SHA-256 de líneas UTF-8 `path NUL file-sha256` en el orden del manifest.
