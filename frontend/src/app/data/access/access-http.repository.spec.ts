@@ -99,6 +99,20 @@ describe('unified access HTTP repository', () => {
     expect(user.csrf()).toBe('previous-user');
     expect(staging.take(AccessContext.Customer)).toBeNull();
   });
+  it('discards a stale context-selection challenge before it reaches flow state', async () => {
+    const fence = TestBed.inject(AccessMutationFence);
+    const pending = firstValueFrom(repository.signIn({ email: 'test@example.test', password: 'sample-password' }));
+    const request = ctrl.expectOne(`${environment.apiBaseUrl}/auth/login`);
+    fence.advance(AccessContext.User);
+    request.flush(envelope({
+      kind: LoginResolution.ContextSelectionRequired.wire,
+      challenge: 'a'.repeat(40),
+      contexts: [AccessContext.Customer.wire, AccessContext.User.wire],
+      expiresAt: '2026-10-06T10:00:00Z',
+      destination: { kind: ReturnDestination.Home.wire },
+    }));
+    expect(await pending).toBe(LoginResult.Unknown);
+  });
   it('never retries rejection, rate limiting or unavailable transport and preserves realm state', async () => {
     for (const status of [401, 403, 429, 500, 0]) {
       const pending = firstValueFrom(repository.selectContext('a'.repeat(40), AccessContext.User));

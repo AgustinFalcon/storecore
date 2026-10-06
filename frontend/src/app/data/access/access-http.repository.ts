@@ -31,10 +31,12 @@ export class AccessHttpRepository implements IAccessRepository {
     ]);
     return this.http.post<unknown>(`${environment.apiBaseUrl}${path}`, body, { observe: 'response', withCredentials: true }).pipe(
       map((response) => {
+        const current = this.mutationFence.accepts(AccessContext.Customer, generations.get(AccessContext.Customer) ?? -1)
+          && this.mutationFence.accepts(AccessContext.User, generations.get(AccessContext.User) ?? -1);
+        if (!current) return LoginResult.Unknown;
         const result = mapAccessResponse(response.body);
         if (selectedContext && (result.resolution !== LoginResolution.Authenticated || result.context !== selectedContext)) return LoginResult.Unknown;
         if (result.resolution === LoginResolution.Authenticated) {
-          if (!this.mutationFence.accepts(result.context, generations.get(result.context) ?? -1)) return LoginResult.Unknown;
           const csrf = response.headers.get(CSRF_HEADER)?.trim();
           if (!csrf) return LoginResult.Unknown;
           if (!this.staging.stage(result.context, csrf)) return LoginResult.Unknown;
