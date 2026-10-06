@@ -4,17 +4,22 @@ import com.storecore.identity.application.AuthenticationFailed
 import com.storecore.identity.application.AuthorizationDenied
 import com.storecore.identity.application.CsrfInvalid
 import com.storecore.identity.application.IdentityUseCases
+import com.storecore.identity.application.CandidateAuthenticationPort
+import com.storecore.identity.application.RealmSessionIssuer
 import com.storecore.identity.infrastructure.security.LoginRateLimiter
+import com.storecore.identity.infrastructure.security.LoginAttemptBudget
 import com.storecore.identity.application.RegistrationRejected
 import com.storecore.identity.application.ResourceNotFound
 import com.storecore.identity.domain.AuthenticatedPrincipal
 import com.storecore.identity.domain.CustomerAddress
 import com.storecore.identity.domain.CustomerPrincipal
 import com.storecore.identity.domain.CustomerProfile
+import com.storecore.identity.domain.CanonicalEmail
 import com.storecore.identity.domain.IdentityRealm
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.identity.domain.IssuedCredentials
+import com.storecore.identity.domain.VerifiedAccessCandidate
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import com.storecore.identity.infrastructure.security.OpaqueTokenFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -22,8 +27,6 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.text.Normalizer
-import java.util.Locale
 import javax.sql.DataSource
 import java.util.UUID
 
@@ -34,7 +37,8 @@ open class JdbcIdentityService(
     private val passwords: Argon2PasswordHasher,
     private val tokens: OpaqueTokenFactory,
     private val loginRateLimiter: LoginRateLimiter,
-) : IdentityUseCases {
+    private val loginAttemptBudget: LoginAttemptBudget,
+) : IdentityUseCases, CandidateAuthenticationPort, RealmSessionIssuer {
     @Transactional
     override fun registerCustomer(email: String, password: String, firstName: String, lastName: String): IssuedCredentials {
         val canonical = canonicalEmail(email)
@@ -44,7 +48,7 @@ open class JdbcIdentityService(
                 """INSERT INTO customers(email, password_hash, first_name, last_name)
                    VALUES (?, ?, ?, ?) RETURNING id""",
                 Long::class.java,
-                canonical,
+                canonical.value,
                 passwords.hash(password.toCharArray()),
                 firstName.trim(),
                 lastName.trim(),
@@ -58,28 +62,46 @@ open class JdbcIdentityService(
     @Transactional
     override fun login(realm: IdentityRealm, email: String, password: String, sourceIp: String): IssuedCredentials {
         val canonical = canonicalEmail(email)
-        loginRateLimiter.checkAllowed(realm, sourceIp, canonical)
+        loginAttemptBudget.acquire(sourceIp, canonical.value)
+        loginRateLimiter.checkAllowed(realm, sourceIp, canonical.value)
         try {
-            val row = when (realm) {
-                IdentityRealm.CUSTOMER -> jdbc.queryForList("SELECT id, password_hash, active FROM customers WHERE email=?", canonical).singleOrNull()
-                IdentityRealm.USER -> jdbc.queryForList("SELECT id, password_hash, active FROM users WHERE email=?", canonical).singleOrNull()
-            }
-            // Invalid length follows the same dummy Argon2 path and public 401 as any other bad credential.
-            if (!isPasswordLengthValid(password)) {
-                passwords.dummyVerify(password.toCharArray())
-                throw AuthenticationFailed()
-            }
-            if (row == null) {
-                passwords.dummyVerify(password.toCharArray())
-                throw AuthenticationFailed()
-            }
-            val verified = passwords.verify(row.requiredString("password_hash"), password.toCharArray())
-            if (!verified || !row.isActive()) throw AuthenticationFailed()
-            loginRateLimiter.clear(realm, sourceIp, canonical)
-            return issueSession(realm, row.requiredLong("id"))
+            val candidate = verify(realm, canonical, password) ?: throw AuthenticationFailed()
+            return issue(candidate)
         } catch (failure: AuthenticationFailed) {
-            loginRateLimiter.recordFailure(realm, sourceIp, canonical)
+            loginRateLimiter.recordFailure(realm, sourceIp, canonical.value)
             throw failure
+        }
+    }
+
+    override fun verify(realm: IdentityRealm, canonicalEmail: CanonicalEmail, password: String): VerifiedAccessCandidate? {
+        val row = when (realm) {
+            IdentityRealm.CUSTOMER -> jdbc.queryForList("SELECT id, password_hash, active FROM customers WHERE email=?", canonicalEmail.value).singleOrNull()
+            IdentityRealm.USER -> jdbc.queryForList("SELECT id, password_hash, active FROM users WHERE email=?", canonicalEmail.value).singleOrNull()
+        }
+        if (!isPasswordLengthValid(password) || row == null) {
+            passwords.dummyVerify(password.toCharArray())
+            return null
+        }
+        if (!passwords.verify(row.requiredString("password_hash"), password.toCharArray()) || !row.isActive()) return null
+        val subjectId = row.requiredLong("id")
+        return when (realm) {
+            IdentityRealm.CUSTOMER -> VerifiedAccessCandidate.Customer(subjectId)
+            IdentityRealm.USER -> VerifiedAccessCandidate.User(subjectId, loadRoles(subjectId)).takeIf { it.eligible }
+        }
+    }
+
+    @Transactional
+    override fun issue(candidate: VerifiedAccessCandidate): IssuedCredentials = when (candidate) {
+        is VerifiedAccessCandidate.Customer -> {
+            val active = jdbc.queryForObject("SELECT active FROM customers WHERE id=? FOR SHARE", Boolean::class.java, candidate.subjectId) == true
+            if (!active) throw AuthenticationFailed()
+            issueSession(IdentityRealm.CUSTOMER, candidate.subjectId)
+        }
+        is VerifiedAccessCandidate.User -> {
+            val active = jdbc.queryForObject("SELECT active FROM users WHERE id=? FOR SHARE", Boolean::class.java, candidate.subjectId) == true
+            val roles = loadRolesForIssuance(candidate.subjectId)
+            if (!active || !InternalRole.hasKnownRole(roles)) throw AuthenticationFailed()
+            issueSession(IdentityRealm.USER, candidate.subjectId)
         }
     }
     @Transactional
@@ -205,7 +227,7 @@ open class JdbcIdentityService(
     @Transactional
     override fun updateCustomerProfile(principal: CustomerPrincipal, email: String, firstName: String, lastName: String, phone: String?): CustomerProfile {
         val row = try {
-            jdbc.queryForList("UPDATE customers SET email=?,first_name=?,last_name=?,phone=?,updated_at=clock_timestamp() WHERE id=? AND active=TRUE RETURNING id,email,first_name,last_name,phone", canonicalEmail(email), firstName.trim(), lastName.trim(), phone?.trim(), principal.customerId).singleOrNull()
+            jdbc.queryForList("UPDATE customers SET email=?,first_name=?,last_name=?,phone=?,updated_at=clock_timestamp() WHERE id=? AND active=TRUE RETURNING id,email,first_name,last_name,phone", canonicalEmail(email).value, firstName.trim(), lastName.trim(), phone?.trim(), principal.customerId).singleOrNull()
         } catch (exception: DataIntegrityViolationException) { throw RegistrationRejected() } ?: throw AuthenticationFailed()
         return CustomerProfile(row.requiredLong("id"), row.requiredString("email"), row.requiredString("first_name"), row.requiredString("last_name"), row["phone"]?.toString())
     }
@@ -292,6 +314,16 @@ open class JdbcIdentityService(
         "SELECT r.code FROM roles r JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=?", userId,
     ).mapTo(linkedSetOf()) { InternalRole.fromWire(it["code"] as? String) }
 
+    /** Locks current memberships until session issuance commits, closing role-removal races. */
+    private fun loadRolesForIssuance(userId: Long): Set<InternalRole> = jdbc.queryForList(
+        """SELECT r.code FROM users u
+           JOIN user_roles ur ON ur.user_id=u.id
+           JOIN roles r ON r.id=ur.role_id
+           WHERE u.id=? AND u.active
+           FOR SHARE OF u,ur,r""",
+        userId,
+    ).mapTo(linkedSetOf()) { InternalRole.fromWire(it["code"] as? String) }
+
     private fun appendRevocationAudit(target: Map<String, Any?>, actor: AuthenticatedPrincipal, correlation: UUID, reasonCode: String, kind: String) {
         val subjectId = if (target["subject_kind"] == "USER") target.requiredLong("user_id") else target.requiredLong("customer_id")
         val actorId = when (actor) { is CustomerPrincipal -> actor.customerId.toString(); is InternalUserPrincipal -> actor.userId.toString() }
@@ -303,9 +335,7 @@ open class JdbcIdentityService(
         )
     }
 
-    private fun canonicalEmail(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFKC).trim().lowercase(Locale.ROOT).also {
-        if (it.isBlank() || it.length > 320 || !it.contains('@')) throw AuthenticationFailed()
-    }
+    private fun canonicalEmail(value: String): CanonicalEmail = CanonicalEmail.fromWire(value) ?: throw AuthenticationFailed()
 
     private fun validatePassword(password: String) {
         if (!isPasswordLengthValid(password)) throw RegistrationRejected()

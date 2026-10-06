@@ -35,10 +35,12 @@ class LoginRateLimiterTest {
     }
 
     @Test
-    fun `successful login path can clear a bucket`() {
+    fun `successful login path never clears a bucket`() {
         val limiter = LoginRateLimiter(Clock.systemUTC())
         repeat(5) { limiter.recordFailure(IdentityRealm.CUSTOMER, "10.0.0.1", "buyer@example.com") }
         limiter.clear(IdentityRealm.CUSTOMER, "10.0.0.1", "buyer@example.com")
-        limiter.checkAllowed(IdentityRealm.CUSTOMER, "10.0.0.1", "buyer@example.com")
+        assertFailsWith<LoginRateLimited> {
+            limiter.checkAllowed(IdentityRealm.CUSTOMER, "10.0.0.1", "buyer@example.com")
+        }
     }
 }
