@@ -4,7 +4,7 @@
 
 `/login` usa el repository de acceso unificado: `POST /api/v1/auth/login`, seguido de `POST /api/v1/auth/context-selection` sólo si el backend emite un challenge. No pide elegir realm antes de verificar credenciales. CUSTOMER vuelve a `/`; USER con roles conocidos a `/user/home`. Dos sesiones existentes verificadas se seleccionan localmente, sin challenge. El coordinador publica principal, roles y CSRF juntos por realm y preserva el otro realm ante login o logout aislado. Valores wire desconocidos se traducen a `Unknown` y no conceden acceso.
 
-`/customer/session` y `/user/session` conservan redirects compatibles a `/login` con destino cerrado validado. Los endpoints HTTP legacy siguen soportados y no deprecados mientras UA-007 permanezca abierto; su retiro requiere inventario y E2E con backend real. BlackStore autentica a su personal de forma independiente, sin federación StoreCore. Prevalece el [addendum frontend del WIP](../../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
+`/customer/session` y `/user/session` conservan redirects compatibles a `/login` con destino cerrado validado. UA-007 completó inventario y E2E real; como encontró consumidores ejecutables, los endpoints HTTP legacy siguen soportados y no deprecados. Un retiro futuro requiere el gate separado `TODO-043`. BlackStore autentica a su personal de forma independiente, sin federación StoreCore. Prevalece el [addendum frontend archivado](../../../../sdd/features/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
 
 ## CUSTOMER `/customer`
 

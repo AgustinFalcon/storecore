@@ -18,6 +18,11 @@ Kotlin domain has no Spring/JPA/HTTP imports. Application owns ports/use cases; 
 ## Identity boundary TASK-004
 
 Domain declares the cookie/CSRF, opaque-token and bootstrap contracts above. Domain declares `InternalUser`, `Customer`, `Session` and sealed `AuthenticatedPrincipal` (`InternalUserPrincipal(userId, roles)` or `CustomerPrincipal(customerId)`) without Spring/HTTP/JPA. Application owns register/login/authenticate/logout/self-profile/self-address/admin-session-revoke/bootstrap ports plus password hasher, random, clock, audit, rate limiter and transaction. Public routes are customer register/login and internal login. CUSTOMER routes are `/api/customer/me` and owned addresses; USER routes are internal session/login/logout; ADMIN alone may revoke a session with non-empty reason and correlation ID. Missing, expired, revoked or wrong-realm session is generic 401; insufficient role 403; foreign address 404; logout is idempotent 204 after database revocation then cookie deletion. TASK-004 does not expose commercial admin operations.
+
+The archived [unified access addendum](../../20261003-unified-access-entry/README.md)
+adds `/api/v1/auth/login` and one-use context selection while preserving these
+principals, cookies, CSRF and authorization boundaries. The realm-specific
+credential routes below remain supported and non-deprecated.
 ### HTTP matrix and ownership contract (TASK-004)
 
 All routes are `/api/v1`. A success body and every error use `BaseResponse { code, data, message, errorCode, retryable, traceId }`; `POST logout` is the sole 204/no-body exception. Login/register authenticate only credentials and are CSRF-exempt; every authenticated mutation (including logout) requires the current `X-CSRF-Token` and exact permitted Origin. Authentication and all auth responses are `Cache-Control: no-store`; login/register set the realm cookie and send a CSRF header, never a token in JSON.

@@ -8,6 +8,14 @@ StoreCore serves internal staff and storefront customers, whose authority and da
 
 Use two explicit realms: internal `USER` with `ADMIN|OPERATOR` roles and storefront `CUSTOMER`. They may share an email string but never a principal, role or session. Authentication yields an opaque server-side session whose SHA-256 token hash is durable and revocable; every request checks idle/absolute expiry, revocation, subject activity and current USER roles. Passwords are Argon2id PHC. `customer_id` always derives from `CustomerPrincipal`; paths and bodies do not select it.
 
+## Addendum — unified public entry
+
+[ADR-001 of unified access](../../../20261003-unified-access-entry/2-technical/adr/ADR-001-unified-entry-separated-identities.md)
+adds one public `/login` and backend candidate resolution without changing this
+decision. A same-credential dual match yields an opaque short-lived selection
+challenge; it never yields a shared principal. Realm-specific HTTP login remains
+supported because the completed consumer inventory found executable consumers.
+
 Bootstrap of the first ADMIN is a local, interactive, one-time deployment command protected by an advisory lock and append-only audit. It has no HTTP surface and never accepts credentials by environment, arguments or logs.
 
 ## Consequences

@@ -22,6 +22,7 @@
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
 - TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..010 + L3 locales done; módulo vuelve a DISABLED. Companion live y activación siguen NO-GO. BlackStore ADP-001..010 + L3 locales done; dual Grok APPROVED; release disabled. No altera las 14 tasks de core 1.0.0.
 - TODO-042 [high] [blocked] `storecore-mp-live-checkout-v1`: 01/02/02A/03/04 in-repo fail-closed. 05 y pagos reales NO-GO hasta cuenta sandbox + Sol GO de activación.
+- TODO-043 [low] [deferred] Evaluar retiro futuro de los POST de credenciales CUSTOMER/USER específicos por realm. Requiere migrar o conservar explícitamente cada consumidor ejecutable, inventario de instalaciones/clientes soportados, E2E real y aprobación independiente sobre el corte propuesto. Mientras tanto son compatibles, soportados y no deprecados; no bloquea el acceso visual único `/login`.
 
 ## Histórico
 

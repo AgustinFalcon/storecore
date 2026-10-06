@@ -19,13 +19,13 @@ Un error conserva el status HTTP en `code`, `data: null`, `errorCode` estable y 
 | GET | `/api/v1/catalog/categories` | no | `{ id, name }[]` |
 | GET | `/api/v1/content/home` | no | `{ title, blocks }` |
 
-## Acceso unificado (UA-005; UA-007 abierto)
+## Acceso unificado (UA-005–UA-007 cerrados)
 
-`/login` es la única entrada visual. Usa `POST /api/v1/auth/login` con `{ email, password, returnPath? }` y, sólo ante un challenge verificado, `POST /api/v1/auth/context-selection` con `{ challenge, context }`. Ambos validan el Origin exacto configurado y no se reintentan automáticamente. El contrato de respuestas, destinos cerrados y errores está en [OpenAPI unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/api/unified-access.openapi.yaml).
+`/login` es la única entrada visual. Usa `POST /api/v1/auth/login` con `{ email, password, returnPath? }` y, sólo ante un challenge verificado, `POST /api/v1/auth/context-selection` con `{ challenge, context }`. Ambos validan el Origin exacto configurado y no se reintentan automáticamente. El contrato de respuestas, destinos cerrados y errores está en [OpenAPI unified access](../../../sdd/features/20261003-unified-access-entry/2-technical/api/unified-access.openapi.yaml).
 
 El mapper traduce a tipos cerrados antes de efectos. Sólo un resultado autenticado instala principal y CSRF en su realm; un challenge no crea sesión ni instala CSRF. Con dos sesiones existentes verificadas, la elección es local y no consume un challenge. Cookies, roles y logout siguen separados. BlackStore tiene identidad propia: este flujo no federa ni emite acceso BlackStore.
 
-`/customer/session` y `/user/session` son redirects compatibles a `/login`, conservando sólo un destino cerrado validado. Los dos POST de login realm-specific listados abajo siguen soportados y no están deprecados. UA-007 requiere inventario de consumidores y E2E contra backend real antes de cualquier deprecación; una suite con HTTP mockeado no cierra ese gate. Ver [addendum frontend](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
+`/customer/session` y `/user/session` son redirects compatibles a `/login`, conservando sólo un destino cerrado validado. Los dos POST de login realm-specific listados abajo siguen soportados y no están deprecados. UA-007 completó inventario y E2E real: el inventario encontró consumidores ejecutables y decidió retener compatibilidad. Cualquier retiro futuro pertenece a `TODO-043`. Ver [addendum frontend](../../../sdd/features/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
 
 ## Sesiones CUSTOMER (TASK-004)
 

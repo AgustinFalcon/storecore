@@ -31,5 +31,8 @@ atomically consumes nonce and challenge before issuing one realm session.
 ## Consequences
 
 The public UX is unified, but protected navigation remains realm-specific. The
-legacy login endpoints remain compatible during migration and are deprecated
-only after consumer inventory and E2E evidence.
+repository inventory and real-backend E2E were completed. The inventory found
+supported executable consumers of the realm-specific credential endpoints, so
+those HTTP endpoints remain compatible, supported and non-deprecated. A future
+removal is a separate decision with its own consumer, E2E and review gate
+(`TODO-043`).
