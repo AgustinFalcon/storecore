@@ -193,3 +193,15 @@ terminó exit 0: producción y tests Kotlin compilaron y el JUnit focalizado que
 21/21 PASS. Nuevo fingerprint source:
 `2C9F45E0D0151DA6E046511AF080242CA75A8499E7A43F30E34423AEF38A1A55`, calculado
 como SHA-256 de líneas UTF-8 `path NUL file-sha256` en el orden del manifest.
+
+El segundo CI exact-head `37542791261` confirmó frontend y E2E real PASS, pero
+backend volvió a exponer una segunda precondición del mismo helper: tras el
+primer checkout no conservaba el token CSRF rotado por esa mutación. El checkout
+siguiente usaba el token consumido y el helper hacía `!!` sobre una respuesta
+rechazada sin header. Ahora cada PUT/checkout exige HTTP 200, exige la rotación
+CSRF con mensaje diagnóstico y conserva el token nuevo antes de continuar. Se
+requiere otro head, reviews y CI; ambos runs fallidos permanecen históricos.
+
+La validación local posterior terminó exit 0: producción/tests Kotlin compilan
+y JUnit focalizado 21/21 PASS. Fingerprint actualizado:
+`59AB25B767934997B233ECD455A1C261E6B26391C3CE2F24132092C3780C0982`.

@@ -62,7 +62,7 @@
       "path": "backend/src/test/kotlin/com/storecore/commerce/FulfillmentUseCaseTest.kt"
     },
     {
-      "sha256": "E0D1BA8040B2EE40306D795D7DA4C2D26203EFB43DDC9F927B21D35EC0315DCC",
+      "sha256": "C35F28DEBFC86E19A7E5FCD07EB6F7C2C4DFD10D9E8D572C6C1A0A121DF4CA11",
       "path": "backend/src/test/kotlin/com/storecore/commerce/MpOrdersCheckoutIntegrationTest.kt"
     },
     {
@@ -150,8 +150,8 @@
       "path": "frontend/src/app/features/orders/customer-orders.view.html"
     }
   ],
-  "source_revision_sha256": "2C9F45E0D0151DA6E046511AF080242CA75A8499E7A43F30E34423AEF38A1A55",
+  "source_revision_sha256": "59AB25B767934997B233ECD455A1C261E6B26391C3CE2F24132092C3780C0982",
   "revision_kind": "sha256-of-utf8-path-nul-file-sha256-lines",
   "baseline": "de6a0d7cce780d3db3785468489b237b322b82d9",
-  "supersedes_source_revision_sha256": "A32AC6027A133696B2A816B168CBC11CFBE83F033A0124F2A87C4802383AB93D"
+  "supersedes_source_revision_sha256": "2C9F45E0D0151DA6E046511AF080242CA75A8499E7A43F30E34423AEF38A1A55"
 }

@@ -546,8 +546,11 @@ class MpOrdersCheckoutIntegrationTest(
         putProduct(sku, "Paid Item", available = 5)
         customer = addAddress(customer)
         val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":$quantity}""", customer.cookie, customer.csrf)
-        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(200, added.statusCode.value(), added.body)
+        customer = customer.copy(csrf = requireNotNull(added.headers.getFirst("X-CSRF-Token")) { "cart mutation must rotate CSRF" })
         val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        customer = customer.copy(csrf = requireNotNull(checkout.headers.getFirst("X-CSRF-Token")) { "checkout must rotate CSRF" })
         return Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
     }
 
