@@ -69,7 +69,9 @@ Cart, checkout, addresses, detail routes and other administration routes are
 deliberately not restored in v1; they fall back to the selected realm home.
 `ReturnDestination` v1 has no generic `resourceId`. External origins, schemes,
 protocol-relative paths, backslashes, encoded ambiguity, fragments, unknown
-query parameters and values over 2,048 characters also fall back to home.
+query parameters and return paths over 2,048 characters also fall back to home.
+The transport accepts at most 4,096 characters so the bounded request can reach
+that policy; larger payloads are rejected as request validation failures.
 
 ## Rehydration and CSRF ownership
 
