@@ -17,6 +17,14 @@ unit although it evaluates both realms. Acquisition and expiry pruning occur
 under one per-key lock; concurrent requests cannot all pass the same remaining
 slot. Success never clears or decrements this budget or a realm failure bucket.
 Realm failure buckets remain separate and record only a rejected candidate.
+
+`sourceIp` is resolved once at the HTTP boundary. Forwarding headers are ignored
+for direct peers and are accepted only when `remoteAddr` belongs to the explicit
+`STORECORE_TRUSTED_PROXIES` CIDR allow-list. The resolver walks the chain from
+the trusted right-hand edge and rejects missing, malformed or ambiguous evidence
+from a trusted proxy. Nginx must append `X-Forwarded-For` with
+`$proxy_add_x_forwarded_for`; an empty allow-list is the safe direct-connection
+default.
 No key contains a raw email. Expired process-local buckets are removed
 opportunistically and the store is bounded by expiry plus a maximum key count;
 when capacity is exhausted, new keys fail closed with the generic 429.

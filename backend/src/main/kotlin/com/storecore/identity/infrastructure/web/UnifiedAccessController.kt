@@ -34,12 +34,13 @@ class UnifiedAccessController(
     private val access: UnifiedAccessUseCases,
     private val auth: RequestAuth,
     private val cookies: IdentityCookieWriter,
+    private val clientAddresses: ClientAddressResolver,
 ) {
     @PostMapping("/login")
     fun login(http: HttpServletRequest, @Valid @RequestBody request: UnifiedLoginRequest): ResponseEntity<BaseResponse<UnifiedLoginView>> {
         requireUnifiedOrigin(http)
         val origin = http.getHeader(HttpHeaders.ORIGIN) ?: throw AuthenticationFailed()
-        return when (val result = access.login(request.email, request.password, request.returnPath, sourceIp(http), origin)) {
+        return when (val result = access.login(request.email, request.password, request.returnPath, clientAddresses.resolve(http), origin)) {
             is LoginResolution.Authenticated -> authenticated(result)
             is LoginResolution.ContextSelectionRequired -> ResponseEntity.ok()
                 .cacheControl(org.springframework.http.CacheControl.noStore())
@@ -57,7 +58,7 @@ class UnifiedAccessController(
     ): ResponseEntity<BaseResponse<UnifiedLoginView>> {
         requireUnifiedOrigin(http)
         val origin = http.getHeader(HttpHeaders.ORIGIN) ?: throw AuthenticationFailed()
-        val result = access.select(request.challenge, bindingNonce ?: "", request.context, sourceIp(http), origin)
+        val result = access.select(request.challenge, bindingNonce ?: "", request.context, clientAddresses.resolve(http), origin)
         return authenticated(result)
     }
 
@@ -71,7 +72,6 @@ class UnifiedAccessController(
             .header(RequestAuth.CSRF_HEADER, result.credentials.csrfToken)
             .body(BaseResponse.ok(AuthenticatedAccessView(result.context, result.home, ReturnDestinationView(result.destination))))
 
-    private fun sourceIp(http: HttpServletRequest): String = http.remoteAddr ?: "unknown"
     private fun requireUnifiedOrigin(http: HttpServletRequest) {
         try { auth.requireSameOrigin(http) } catch (_: com.storecore.identity.application.CsrfInvalid) { throw UnifiedOriginRejected() }
     }

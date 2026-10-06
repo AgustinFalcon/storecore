@@ -30,6 +30,7 @@ class IdentityController(
     private val mutations: IdentityMutationCoordinator,
     private val auth: RequestAuth,
     private val cookies: IdentityCookieWriter,
+    private val clientAddresses: ClientAddressResolver,
 ) {
     @PostMapping("/customer/auth/register")
     fun registerCustomer(@Valid @RequestBody request: RegisterRequest): ResponseEntity<BaseResponse<PrincipalView>> {
@@ -39,11 +40,11 @@ class IdentityController(
 
     @PostMapping("/customer/auth/login")
     fun loginCustomer(http: HttpServletRequest, @Valid @RequestBody request: LoginRequest): ResponseEntity<BaseResponse<PrincipalView>> =
-        issuedResponse(identity.login(IdentityRealm.CUSTOMER, request.email, request.password, http.remoteAddr ?: "unknown"), HttpStatus.OK)
+        issuedResponse(identity.login(IdentityRealm.CUSTOMER, request.email, request.password, clientAddresses.resolve(http)), HttpStatus.OK)
 
     @PostMapping("/internal/auth/login")
     fun loginInternal(http: HttpServletRequest, @Valid @RequestBody request: LoginRequest): ResponseEntity<BaseResponse<PrincipalView>> =
-        issuedResponse(identity.login(IdentityRealm.USER, request.email, request.password, http.remoteAddr ?: "unknown"), HttpStatus.OK)
+        issuedResponse(identity.login(IdentityRealm.USER, request.email, request.password, clientAddresses.resolve(http)), HttpStatus.OK)
 
     @GetMapping("/customer/auth/csrf")
     fun customerCsrf(http: HttpServletRequest): ResponseEntity<BaseResponse<Unit>> = csrfResponse(auth.customer(http))
