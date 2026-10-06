@@ -1,4 +1,7 @@
-import { Routes } from '@angular/router';
+import { RedirectFunction, Routes } from '@angular/router';
+import { ReturnDestination } from './domain/access/return-destination';
+import { LoginComponent } from './features/access/login.component';
+import { UserHomeComponent } from './features/admin/user-home.component';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
 import { FulfillmentComponent } from './features/admin/fulfillment.component';
@@ -11,7 +14,6 @@ import { UserLayoutComponent } from './features/admin/user-layout.component';
 import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
 import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
 import { UserPromosComponent } from './features/admin/user-promos.component';
-import { UserSessionComponent } from './features/admin/user-session.component';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
 import { CheckoutResultComponent } from './features/cart/checkout-result.component';
@@ -19,7 +21,6 @@ import { CustomerAddressesComponent } from './features/identity/customer-address
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
 import { CustomerProfileComponent } from './features/identity/customer-profile.component';
 import { CustomerRegisterComponent } from './features/identity/customer-register.component';
-import { CustomerSessionComponent } from './features/identity/customer-session.component';
 import { CustomerOrderDetailComponent } from './features/orders/customer-order-detail.component';
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
 import { ShellComponent } from './features/shell/shell.component';
@@ -27,12 +28,18 @@ import { CatalogPageComponent } from './features/storefront/catalog-page.compone
 import { ProductPageComponent } from './features/storefront/product-page.component';
 import { StorefrontHomeComponent } from './features/storefront/storefront-home.component';
 
+const legacyLoginRedirect: RedirectFunction = ({ queryParams }) => {
+  const destination = ReturnDestination.fromWire(queryParams['returnTo']);
+  return destination !== ReturnDestination.Unknown ? `/login?returnTo=${encodeURIComponent(destination.wire)}` : '/login';
+};
+
 export const routes: Routes = [
   {
     path: '',
     component: ShellComponent,
     children: [
       { path: '', component: StorefrontHomeComponent, title: 'StoreCore' },
+      { path: 'login', component: LoginComponent, title: 'Ingresar' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },
@@ -42,8 +49,8 @@ export const routes: Routes = [
         path: 'customer',
         component: CustomerLayoutComponent,
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'session' },
-          { path: 'session', component: CustomerSessionComponent, title: 'Customer' },
+          { path: '', pathMatch: 'full', redirectTo: '/login' },
+          { path: 'session', redirectTo: legacyLoginRedirect },
           { path: 'register', component: CustomerRegisterComponent, title: 'Registro' },
           { path: 'profile', component: CustomerProfileComponent, title: 'Perfil', canActivate: [customerGuard] },
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
@@ -55,8 +62,9 @@ export const routes: Routes = [
         path: 'user',
         component: UserLayoutComponent,
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'session' },
-          { path: 'session', component: UserSessionComponent, title: 'User' },
+          { path: '', pathMatch: 'full', redirectTo: 'home' },
+          { path: 'session', redirectTo: legacyLoginRedirect },
+          { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
           { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard] },
           { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
           { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },

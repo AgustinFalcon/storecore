@@ -19,7 +19,7 @@ export class ProbeUserSessionUseCase {
         }
       }),
       switchMap((profile) => this.repo.readCsrf().pipe(map(() => profile))),
-      tap(() => this.session.markAuthenticated()),
+      tap((profile) => this.session.markAuthenticated(profile)),
     );
   }
 }

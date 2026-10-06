@@ -10,6 +10,6 @@ export class RegisterCustomerUseCase {
   ) {}
 
   execute(registration: CustomerRegistration): Observable<CustomerSessionResult> {
-    return this.repo.register(registration).pipe(tap(() => this.session.markAuthenticated()));
+    return this.repo.register(registration).pipe(tap((principal) => this.session.markAuthenticated(principal)));
   }
 }

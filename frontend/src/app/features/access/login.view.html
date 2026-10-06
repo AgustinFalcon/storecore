@@ -1,0 +1,31 @@
+<section class="sc-page sc-auth" aria-labelledby="login-title" [attr.aria-busy]="state.busy"><div class="sc-auth__card">
+  <p class="sc-eyebrow">StoreCore</p>
+  <h1 id="login-title">Ingresar</h1>
+  @if (state.stage === stages.SelectContext) {
+    <h2 #selectionHeading tabindex="-1">Elegí cómo continuar</h2>
+    <p>Estos accesos están verificados. Elegí el que querés usar ahora.</p>
+    <div class="sc-actions" role="group" aria-label="Accesos verificados">
+      @for (context of state.contexts; track context) {
+        <button class="sc-btn sc-btn--primary" type="button" [disabled]="state.busy" (click)="selectContext.emit(context)">{{ context.label }}</button>
+      }
+    </div>
+  } @else if (state.stage === stages.CompleteAccess) {
+    <p role="status">{{ state.stage.label }}</p>
+  } @else {
+    <p>Ingresá con tu email y contraseña para continuar.</p>
+    <form class="sc-auth__form" (ngSubmit)="submitCredentials.emit()">
+      <div class="sc-field">
+        <label for="access-email">Email</label>
+        <input id="access-email" name="email" type="email" autocomplete="username" maxlength="320" required [disabled]="state.busy" [ngModel]="state.email" (ngModelChange)="emailChange.emit($event)" />
+      </div>
+      <div class="sc-field">
+        <label for="access-password">Contraseña</label>
+        <input id="access-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required [disabled]="state.busy" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" aria-describedby="password-help" />
+        <p id="password-help" class="sc-muted">Entre 12 y 128 caracteres.</p>
+      </div>
+      <button class="sc-btn sc-btn--primary" type="submit" [disabled]="state.busy">{{ state.stage === stages.Authenticate ? state.stage.label : 'Ingresar' }}</button>
+    </form>
+    <p>¿Todavía no tenés cuenta? <a routerLink="/customer/register">Crear cuenta</a></p>
+  }
+  <div aria-live="polite" aria-atomic="true">@if (state.message) { <p class="sc-notice sc-notice--error" role="alert">{{ state.message }}</p> }</div>
+</div></section>

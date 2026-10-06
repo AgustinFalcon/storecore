@@ -1,60 +1,30 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
-import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/probe-customer-session.usecase';
-import { CustomerSession } from './customer-session';
+import { firstValueFrom, Observable, of } from 'rxjs';
+import { AccessContext } from '../../domain/access/access-context';
+import { ReturnDestination } from '../../domain/access/return-destination';
+import { AccessState, SessionProbe } from '../../domain/access/session-probe';
+import { AccessCoordinator } from './access-coordinator';
 import { customerGuard } from './customer.guard';
 
 describe('customerGuard', () => {
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        {
-          provide: ProbeCustomerSessionUseCase,
-          useValue: { execute: () => throwError(() => new Error('no cookie')) },
-        },
-      ],
-    });
+  function run(access: AccessState, url: string): Promise<unknown> {
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AccessCoordinator, useValue: { rehydrate: () => of(access) } }] });
+    return firstValueFrom(TestBed.runInInjectionContext(() => customerGuard({} as never, { url } as never)) as Observable<unknown>);
+  }
+  it('redirects to unified login with a closed return destination', async () => {
+    expect(String(await run(AccessState.Anonymous, '/customer/orders'))).toBe('/login?returnTo=' + ReturnDestination.CustomerOrders.wire);
   });
-
-  it('redirects to customer session when /me fails', () => {
-    const result = TestBed.runInInjectionContext(() => customerGuard({} as never, {} as never));
-    if (typeof result === 'object' && result && 'subscribe' in result) {
-      let url = '';
-      result.subscribe((value) => {
-        url = String(value);
-      });
-      expect(url).toContain('/customer/session');
-      return;
-    }
-    expect(String(result)).toContain('/customer/session');
+  it('does not replay arbitrary protected URLs', async () => {
+    expect(String(await run(AccessState.Indeterminate, '/customer/details/secret?context=USER'))).toBe('/login?returnTo=' + ReturnDestination.Home.wire);
   });
-
-  it('allows the route when the customer session is already marked', () => {
-    TestBed.inject(CustomerSession).markAuthenticated();
-    const result = TestBed.runInInjectionContext(() => customerGuard({} as never, {} as never));
-    expect(result).toBe(true);
+  it('allows only accepted realm authority', async () => {
+    const authenticated = SessionProbe.authenticated({ email: 'a@b.c', firstName: 'A', lastName: 'B', phone: '' }, 'csrf');
+    expect(await run(AccessState.resolve(authenticated, SessionProbe.Anonymous, AccessContext.Unknown), '/customer/orders')).toBe(true);
   });
-
-  it('allows the route after a successful /me probe', () => {
-    TestBed.overrideProvider(ProbeCustomerSessionUseCase, {
-      useValue: {
-        execute: () => {
-          TestBed.inject(CustomerSession).markAuthenticated();
-          return of({ email: 'a@b.c', firstName: 'A', lastName: 'B', phone: '' });
-        },
-      },
-    });
-    const result = TestBed.runInInjectionContext(() => customerGuard({} as never, {} as never));
-    if (typeof result === 'object' && result && 'subscribe' in result) {
-      let allowed = false;
-      result.subscribe((value) => {
-        allowed = value === true;
-      });
-      expect(allowed).toBe(true);
-      return;
-    }
-    expect(result).toBe(true);
+  it('requires explicit choice when both realm sessions are valid without a hint', async () => {
+    const authenticated = SessionProbe.authenticated({ email: 'a@b.c', firstName: 'A', lastName: 'B', phone: '' }, 'csrf');
+    expect(String(await run(AccessState.resolve(authenticated, authenticated, AccessContext.Unknown), '/customer/orders')))
+      .toBe('/login?returnTo=' + ReturnDestination.CustomerOrders.wire);
   });
 });

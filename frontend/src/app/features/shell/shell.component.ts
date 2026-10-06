@@ -5,8 +5,10 @@ import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router
 import { filter, map, startWith } from 'rxjs';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { UserSession } from '../../core/auth/user-session';
-import { ProbeCustomerSessionUseCase } from '../../domain/customer/use-cases/probe-customer-session.usecase';
-import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { AccessContext } from '../../domain/access/access-context';
+import { AccessStateKind } from '../../domain/access/session-probe';
+import { ReturnDestination } from '../../domain/access/return-destination';
 import { ThemeAppearance } from '../../core/theme/theme-appearance';
 import { CartStore } from '../cart/cart.store';
 import { ShellStore } from './shell.store';
@@ -34,19 +36,27 @@ export class ShellComponent implements OnInit {
     readonly customer: CustomerSession,
     readonly user: UserSession,
     private readonly theme: ThemeAppearance,
-    private readonly probeCustomer: ProbeCustomerSessionUseCase,
-    private readonly probeUser: ProbeUserSessionUseCase,
+    readonly access: AccessCoordinator,
   ) {}
 
   ngOnInit(): void {
     this.theme.apply();
     this.store.loadHealth();
     this.store.loadFacets();
-    this.probeCustomer.execute().subscribe({
-      next: () => this.cart.load(),
+    this.access.rehydrate().subscribe({
+      next: (state) => {
+        if (state.permits(AccessContext.Customer)) this.cart.load();
+        if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login')) {
+          const path = this.router.url.split(/[?#]/, 1)[0];
+          const destination = ReturnDestination.fromPath(path);
+          void this.router.navigate(['/login'], {
+            queryParams: destination === ReturnDestination.Unknown ? undefined : { returnTo: destination.wire },
+          });
+        }
+        else if (state.activeContext === AccessContext.User && this.router.url === '/') void this.router.navigateByUrl('/user/home');
+      },
       error: () => undefined,
     });
-    this.probeUser.execute().subscribe({ error: () => undefined });
   }
 
   search(): void {
