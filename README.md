@@ -11,6 +11,11 @@ StoreCore se orienta a `storecore-core-v1.0.0`: e-commerce de producción, singl
 3. `sdd/features/20260921-single-tenant-installation-baseline/` contiene specs, ADRs, modelo y plan archivados.
 4. Siguiente carril: `docs/agent/frontend/ux-handoff.md`.
 
+Acceso vigente: `/login` es la única entrada visual. CUSTOMER y USER mantienen
+identidades, cookies, CSRF, sesiones y permisos separados; el diseño y evidencia
+están archivados en `sdd/features/20261003-unified-access-entry/`. Los endpoints
+HTTP de credenciales por realm siguen soportados; BlackStore no está federado.
+
 El core 1.0.0 incluye storefront productivo, catálogo/búsqueda, marca/categoría/ofertas, contenido configurable de home, carrito, checkout, customer/profile/address, órdenes, fulfillment manual básico, stock WEB y sincronización ML autorizada, más administración de catálogo/contenido/promos manuales.
 
 `universal-tools-profile@1.0.0` es un perfil de configuración/fixtures importable y versionado, compatible con core 1.x. No es un fork, una release de código, un cliente especial ni una regla hardcodeada.

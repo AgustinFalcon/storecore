@@ -27,3 +27,4 @@
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
 | Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`. PIC-001..010 y L3 locales done: HTTP 200/304/409/410/429 en Testcontainers, V7 deja `future_optional=false` y el módulo `DISABLED`, outbox local PIC-009. Companion live, fiscal y `/sdd.finish` NO-GO |
 | POS BlackStore | repo `BlackStore` | ADP-001..010 + L3 locales en `master` (PR #1). Release disabled. Companion live NO-GO |
+| acceso visual unificado, identidades separadas | `sdd/features/20261003-unified-access-entry/` — UA-001..008 | PRs #165–#169; `/login`, challenge 120 s one-use, home USER por rol, logout aislado; Verify #169 `37526296154` 12/12 + dual GPT-6.1 Sol. HTTP legacy soportado; retiro diferido `TODO-043` |

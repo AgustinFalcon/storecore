@@ -2,7 +2,7 @@
 
 Copiar este documento entero a la IA de diseño. Pedir **una pieza por mensaje** usando el bloque “Generar ahora” del final.
 
-Acceso vigente: `/login` es la única entrada visual según el [WIP unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md). C-01/U-01 conservan sólo redirects compatibles; no generar dos formularios de login. Los POST legacy siguen soportados y no deprecados mientras UA-007 esté abierto. BlackStore tiene identidad propia y no se federa con StoreCore.
+Acceso vigente: `/login` es la única entrada visual según el [unified access archivado](../../../sdd/features/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md). C-01/U-01 conservan sólo redirects compatibles; no generar dos formularios de login. UA-007 cerró reteniendo los POST legacy como soportados y no deprecados porque el inventario encontró consumidores ejecutables. BlackStore tiene identidad propia y no se federa con StoreCore.
 
 Sos un diseñador de producto senior + implementador de HTML/CSS. Tenés que diseñar el sistema visual y **todas** las pantallas de StoreCore, un comercio electrónico **single-tenant** (una instalación = un comercio = un dominio). El frontend Angular ya existe: vos no inventás pantallas nuevas. Entregás HTML+CSS que un ingeniero va a pegar en views Angular (`*.view.html`).
 

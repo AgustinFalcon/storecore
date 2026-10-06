@@ -11,3 +11,12 @@
 - Integration: https://github.com/AgustinFalcon/storecore/pull/14
 - Validation: frontend 42 unit tests + `npm run test:a11y`; `InboxApplicationWorkerTest` + unconfigured RECEIVED. No autoriza deploy, tag, POS adapter ni fiscal.
 - Next: features with Sol GO (POS contract, fiscal). No live vendor credentials in CI.
+
+## Unified access — 2026-10-06
+
+- Archive: `sdd/features/20261003-unified-access-entry/`.
+- Delivery: PRs #165–#169; final functional master commit `99380a656562c784dc8fc4805eccc2a835a2ea48`.
+- PR #169 exact-head Verify `37526296154`: backend, frontend and real E2E SUCCESS; 12/12 PostgreSQL/Spring/Angular HTTPS/Chromium scenarios. Post-merge `master` Verify `37528646167` repeated all three jobs successfully on `99380a656562c784dc8fc4805eccc2a835a2ea48`.
+- Reviews: `sdd/reviews/20261006-sol-pr169-architecture.md` and `sdd/reviews/20261006-sol-pr169-security.md`, independent OpenAI GPT-6.1 Sol medium, exact head `d20556baabe22f6a8227283215945baabe188fb0`, APPROVED.
+- Compatibility: legacy UI routes redirect to `/login`; realm-specific HTTP credential endpoints remain supported/non-deprecated after inventory. Future removal is `TODO-043`.
+- Non-claims: no BlackStore federation, deploy, release, fiscal/ARCA or Correo Argentino homologation.

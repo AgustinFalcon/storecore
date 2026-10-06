@@ -39,6 +39,20 @@ UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `che
 
 La promoción vigente se registra en `sdd/wip/20261002-master-core-hardening/4-implementation/progress.md`; ese addendum separa la procedencia de integración de la evidencia ejecutada sobre el diff real de `master`.
 
+### Acceso unificado StoreCore
+
+`unified-access-entry` está implementado mediante PRs #165–#169 y archivado en
+`sdd/features/20261003-unified-access-entry/`. `/login` es la única entrada
+visual, pero CUSTOMER y USER conservan principals, cookies, CSRF, sesiones y
+autorización separados. El corte funcional de #169 es
+`99380a656562c784dc8fc4805eccc2a835a2ea48`; la evidencia real está en Verify
+`37526296154` (12/12 PostgreSQL/Spring/Angular HTTPS/Chromium), repetida en
+`master` por `37528646167`, y en dos reviews
+independientes GPT-6.1 Sol del head exacto. El inventario UA-007 encontró
+consumidores ejecutables de los endpoints de credenciales por realm: permanecen
+soportados y no deprecados. Su eventual retiro es `TODO-043`. BlackStore no está
+federado y este estado no autoriza deploy ni homologación fiscal/carrier.
+
 Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED). El WIP sigue `documented_deferred`; no hay `/sdd.finish` archive mientras MP-LIVE-05 esté bloqueado. Evidencia POS local está registrada abajo y el companion sigue disabled. Fiscal y live siguen NO-GO. No autoriza live vendor credentials, activación ni CI con secretos. GitHub Verify de #16–#18 falló por billing/spending limit (jobs no arrancaron); no se trata como CI verde.
 
 ## WIP POS (paralelo, no es el baseline)

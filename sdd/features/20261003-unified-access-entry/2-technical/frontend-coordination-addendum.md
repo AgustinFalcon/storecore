@@ -77,8 +77,10 @@ not guess. Only an authenticated mapped response may apply the response CSRF
 header, and it applies it to the response's closed authenticated context. A
 challenge, anonymous, unavailable or unknown result applies no CSRF token.
 
-Legacy realm-specific calls keep their existing realm-specific CSRF handling
-until UA-007. Logout revokes and clears only the selected realm.
+Legacy realm-specific calls keep their existing realm-specific CSRF handling.
+The UA-007 inventory found supported executable consumers, so this feature does
+not deprecate or remove those HTTP endpoints. Logout revokes and clears only the
+selected realm.
 
 A fresh `ContextSelectionRequired` result preserves every already accepted
 realm session and CSRF value; it adds only the ephemeral challenge flow state.
@@ -91,7 +93,8 @@ challenge clears only challenge flow state and cannot log out either realm.
 
 `/login` is the single visible login entry. Legacy UI session routes redirect
 to `/login`, preserving only a validated closed return destination. Backend
-legacy credential endpoints remain available through UA-007.
+legacy credential endpoints remain available, supported and non-deprecated.
+Their possible future removal is a separate deferred change (`TODO-043`).
 
 `/user/home` renders actions derived from the closed current USER roles returned
 by `/api/v1/internal/me`; the USER session store may not discard those roles.
@@ -108,7 +111,9 @@ tests, duplicate-submit tests, response-realm CSRF tests, isolated logout,
 role-loss and guard tests, plus accessibility coverage for both login stages and
 the dynamic USER home.
 
-UA-007 remains blocked until a real-backend browser E2E covers CUSTOMER-only,
+UA-007 completes when a real-backend browser E2E covers CUSTOMER-only,
 USER-only, dual-realm challenge, dual pre-existing sessions, challenge replay,
-expiry, logout isolation and role loss, and until the repository-wide consumer
-inventory proves no supported client still depends on a legacy login entry.
+expiry, logout isolation and role loss, and the repository-wide consumer
+inventory records a compatibility decision. The inventory found supported
+legacy consumers; therefore the accepted decision is retention, not silent
+deprecation. Any future removal must satisfy `TODO-043` independently.

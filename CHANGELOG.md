@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — 2026-10-06
+
+- Una única entrada visual `/login` para CUSTOMER y USER, preservando realms,
+  cookies, CSRF, sesiones y permisos separados.
+- Challenge dual opaco, one-use y de 120 segundos; home USER derivado de roles,
+  rehidratación con generation fencing y logout aislado.
+- Gate CI real PostgreSQL/Spring/Angular HTTPS/Chromium con 12/12 escenarios.
+- Endpoints HTTP legacy conservados y no deprecados tras inventario; eventual
+  retiro diferido en `TODO-043`.
+
+No federa BlackStore ni autoriza deploy, release, fiscal/ARCA o carrier.
+
 ## Unreleased — 2026-09-22
 
 Cierra el plan frontend UX y los residuales in-repo TASK-013, TODO-003 y TODO-041.

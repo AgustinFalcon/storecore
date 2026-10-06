@@ -5,7 +5,7 @@ La estructura Angular ya está: container → view → store → use case → HT
 UX reemplaza el HTML de la view; no toca stores ni dominio.
 Prompt para la IA de diseño (todas las pantallas): `docs/agent/frontend/ux-design-prompt.md`.
 Handoff: `docs/agent/frontend/ux-handoff.md`.
-Identidades: **customer** (compra) y **user** (operador). No se mezclan. `/login` es la única entrada visual; las rutas de sesión legacy son redirects compatibles y no nuevas pantallas. Los endpoints HTTP legacy siguen soportados, no deprecados, hasta cerrar el gate UA-007. BlackStore no se federa con este acceso. Prevalece el [WIP unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
+Identidades: **customer** (compra) y **user** (operador). No se mezclan. `/login` es la única entrada visual; las rutas de sesión legacy son redirects compatibles y no nuevas pantallas. UA-007 cerró con inventario y E2E reales: los endpoints HTTP legacy siguen soportados y no deprecados porque existen consumidores ejecutables. BlackStore no se federa con este acceso. Prevalece el [unified access archivado](../../../sdd/features/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
 
 ## Público
 

@@ -24,6 +24,19 @@ Precio base, desired, observed y effective promo son valores distintos. Sólo un
 
 Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. UX DS-00…U-10 está en código; axe corre con `npm run test:a11y`.
 
+## Unified access without identity merging
+
+Una entrada visual no es un principal compartido. Realm, rol, destino, etapa,
+resultado de probe y navegación son tipos cerrados; el wire se traduce una vez y
+`Unknown` falla cerrado. El challenge fresco y la selección local entre dos
+sesiones existentes son fuentes distintas y no comparten comando. Los probes
+por realm son independientes, pero principal, roles y CSRF se publican juntos
+bajo una generación; una respuesta vieja nunca pisa login, logout o
+rehidratación nuevos. Logout afecta sólo su realm. El presupuesto lógico de
+login es atómico, compartido y no se resetea por éxito; la identidad de red sólo
+confía en proxies configurados. Compatibilidad HTTP legacy se retira únicamente
+mediante inventario, E2E real y revisión de un cambio separado.
+
 ## Compliance boundary
 
 No ocultar ventas, alterar montos, evadir ni bypass fiscal. El adapter fiscal no se implementa en StoreCore core: queda como integración/biblioteca externa diferida y auditable.

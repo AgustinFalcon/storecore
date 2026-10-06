@@ -97,7 +97,9 @@ passwords, challenge/cookie/CSRF tokens; they must never be populated with live
 credentials. Backend unit, HTTP/schema tests, frontend architecture/lint/unit/build
 and backend-less accessibility retain their independent jobs.
 
-Creating this harness is not passing UA-007. Record local/hosted results and exact
-SHA honestly in SDD after execution. Removing legacy credential endpoints also
-requires the repository-wide consumer inventory and applicable reviews; this
-harness does not remove or deprecate them, nor change WIP completion boxes.
+Durable execution evidence: PR #169 head
+`d20556baabe22f6a8227283215945baabe188fb0`, GitHub Verify `37526296154`,
+12/12 scenarios passed in 2.4 minutes. Two independent GPT-6.1 Sol reviews
+approved that exact head. The separate consumer inventory found supported
+legacy consumers, so UA-007 closes with compatibility retained, not with HTTP
+endpoint removal; see `sdd/features/20261003-unified-access-entry/VALIDATION_REPORT.md`.
