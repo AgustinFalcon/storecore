@@ -70,11 +70,15 @@ export async function uiLogin(page: Page, email: string): Promise<LoginResult> {
   await expect(page.getByLabel('Email', { exact: true })).toBeEnabled();
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Contraseña', { exact: true }).fill(password);
-  const response = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/auth/login');
+  // Read the payload as soon as Playwright observes it. Angular may navigate
+  // immediately after login, at which point Chromium no longer exposes the
+  // response body through Network.getResponseBody.
+  const response = page.waitForResponse((candidate) => new URL(candidate.url()).pathname === '/api/v1/auth/login')
+    .then(async (completed) => ({ status: completed.status(), body: await completed.json() }));
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   const completed = await response;
-  expect(completed.status()).toBe(200);
-  const result = mapAccessResponse(await completed.json());
+  expect(completed.status).toBe(200);
+  const result = mapAccessResponse(completed.body);
   expect(result.resolution).not.toBe(LoginResolution.Unknown);
   return result;
 }
