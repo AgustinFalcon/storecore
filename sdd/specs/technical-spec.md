@@ -234,6 +234,12 @@ docker-compose.yml
 
 ### Variables de entorno (.env, nunca en git)
 
+- `STORECORE_TRUSTED_PROXIES`: CIDR internos exactos de los reverse proxies que
+  pueden aportar identidad de cliente. Vacío mantiene modo conexión directa.
+- Nginx debe enviar `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`.
+  La API ignora headers reenviados de peers no confiables y rechaza cadenas
+  ausentes, ambiguas o inválidas provenientes de un proxy configurado.
+
 ```env
 # Base de datos
 POSTGRES_DB=storecore_cliente1
@@ -271,7 +277,8 @@ CLOUDINARY_API_SECRET=...
 ### Checklist pre-deploy por cliente
 Ver `07-RUNBOOK-DEPLOY-CLIENTE.md` completo. Los pasos críticos son:
 1. Crear VM (Ubuntu 22.04), instalar Docker + GitHub Actions runner
-2. Configurar Nginx en MAIN (proxy + SSL + Certbot)
+2. Configurar Nginx en MAIN (proxy + SSL + Certbot, `X-Forwarded-For`) y declarar
+   su red interna en `STORECORE_TRUSTED_PROXIES`
 3. Generar RSA keypair para JWT
 4. Completar `.env` con variables del cliente
 5. Primer deploy via GitHub Actions

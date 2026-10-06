@@ -291,6 +291,255 @@ class IdentityHttpIntegrationTest(
         assertEquals("no-store", response.headers.cacheControl)
         assertEquals(null, response.headers.getFirst(HttpHeaders.SET_COOKIE))
     }
+
+    @Test
+    fun unifiedLoginIssuesOnlyTheSingleCustomerRealm() {
+        val email = "unified-customer-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Unified","lastName":"Customer"}""")
+
+        val response = exchange(
+            "/api/v1/auth/login",
+            HttpMethod.POST,
+            """{"email":"$email","password":"a-very-long-password","returnPath":"/customer/profile"}""",
+        )
+
+        assertEquals(200, response.statusCode.value(), response.body)
+        assertEquals(true, response.body!!.contains("AUTHENTICATED"))
+        assertEquals(true, response.body!!.contains("CUSTOMER_PROFILE"))
+        assertEquals(true, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).any { it.contains("__Host-storecore-customer=") })
+        assertEquals(false, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).any { it.contains("__Host-storecore-internal=") })
+        assertNotNull(response.headers.getFirst("X-CSRF-Token"))
+    }
+
+    @Test
+    fun unifiedLoginRequiresOneUseContextSelectionForDualRealmCredentials() {
+        val email = "unified-dual-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Dual","lastName":"Customer"}""")
+        provisionAdmin(email)
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+
+        val login = exchange(
+            "/api/v1/auth/login",
+            HttpMethod.POST,
+            """{"email":"$email","password":"a-very-long-password","returnPath":"/user/orders"}""",
+        )
+        assertEquals(200, login.statusCode.value(), login.body)
+        assertEquals(true, login.body!!.contains("CONTEXT_SELECTION_REQUIRED"))
+        assertEquals(null, login.headers.getFirst("X-CSRF-Token"))
+        assertEquals(sessionsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+        val bindingCookie = login.headers.getValuesAsList(HttpHeaders.SET_COOKIE).single { it.contains("__Host-storecore_access_challenge=") }.substringBefore(';')
+        val challenge = Regex("\\\"challenge\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"").find(login.body!!)!!.groupValues[1]
+
+        val selected = exchange(
+            "/api/v1/auth/context-selection",
+            HttpMethod.POST,
+            """{"challenge":"$challenge","context":"USER"}""",
+            bindingCookie,
+        )
+        assertEquals(200, selected.statusCode.value(), selected.body)
+        assertEquals(true, selected.body!!.contains("USER_ORDERS"))
+        assertNotNull(selected.headers.getFirst("X-CSRF-Token"))
+        assertEquals(true, selected.headers.getValuesAsList(HttpHeaders.SET_COOKIE).any { it.contains("__Host-storecore-internal=") })
+        assertEquals(sessionsBefore + 1, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+
+        val replay = exchange(
+            "/api/v1/auth/context-selection",
+            HttpMethod.POST,
+            """{"challenge":"$challenge","context":"USER"}""",
+            bindingCookie,
+        )
+        assertEquals(401, replay.statusCode.value())
+        assertEquals(true, replay.headers.getValuesAsList(HttpHeaders.SET_COOKIE).any { it.contains("__Host-storecore_access_challenge=") && it.contains("Max-Age=0") })
+        assertEquals(sessionsBefore + 1, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+    }
+
+    @Test
+    fun concurrentContextSelectionsIssueAtMostOneSession() {
+        val email = "unified-race-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Race","lastName":"Customer"}""")
+        provisionAdmin(email)
+        val login = exchange("/api/v1/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        val bindingCookie = login.headers.getValuesAsList(HttpHeaders.SET_COOKIE).single { it.contains("__Host-storecore_access_challenge=") }.substringBefore(';')
+        val challenge = Regex("\\\"challenge\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"").find(login.body!!)!!.groupValues[1]
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+        val ready = java.util.concurrent.CountDownLatch(2)
+        val go = java.util.concurrent.CountDownLatch(1)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val futures = listOf("CUSTOMER", "USER").map { context ->
+                executor.submit<Int> {
+                    ready.countDown()
+                    check(go.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                    exchange(
+                        "/api/v1/auth/context-selection",
+                        HttpMethod.POST,
+                        """{"challenge":"$challenge","context":"$context"}""",
+                        bindingCookie,
+                    ).statusCode.value()
+                }
+            }
+            check(ready.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            go.countDown()
+            assertEquals(listOf(200, 401), futures.map { it.get(15, java.util.concurrent.TimeUnit.SECONDS) }.sorted())
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(sessionsBefore + 1, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM unified_access_challenges WHERE challenge_hash=? AND consumed_at IS NOT NULL", Int::class.java, com.storecore.identity.infrastructure.security.OpaqueTokenFactory().sha256(challenge)))
+    }
+
+    @Test
+    fun failedUserRevalidationRollsBackChallengeConsumption() {
+        val email = "unified-role-rollback-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Rollback","lastName":"Customer"}""")
+        provisionAdmin(email)
+        val login = exchange("/api/v1/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        val bindingCookie = login.headers.getValuesAsList(HttpHeaders.SET_COOKIE).single { it.contains("__Host-storecore_access_challenge=") }.substringBefore(';')
+        val challenge = Regex("\\\"challenge\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"").find(login.body!!)!!.groupValues[1]
+        val challengeHash = com.storecore.identity.infrastructure.security.OpaqueTokenFactory().sha256(challenge)
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+        jdbc.update("DELETE FROM user_roles WHERE user_id=(SELECT id FROM users WHERE email=?)", email)
+
+        val rejected = exchange("/api/v1/auth/context-selection", HttpMethod.POST, """{"challenge":"$challenge","context":"USER"}""", bindingCookie)
+        assertEquals(401, rejected.statusCode.value())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM unified_access_challenges WHERE challenge_hash=? AND consumed_at IS NOT NULL", Int::class.java, challengeHash))
+        assertEquals(sessionsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+
+        val customer = exchange("/api/v1/auth/context-selection", HttpMethod.POST, """{"challenge":"$challenge","context":"CUSTOMER"}""", bindingCookie)
+        assertEquals(200, customer.statusCode.value(), customer.body)
+        assertEquals(sessionsBefore + 1, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+    }
+
+    @Test
+    fun unknownContextAndWrongNonceNeverConsumeTheChallenge() {
+        val email = "unified-binding-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Binding","lastName":"Customer"}""")
+        provisionAdmin(email)
+        val login = exchange("/api/v1/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        val bindingCookie = login.headers.getValuesAsList(HttpHeaders.SET_COOKIE).single { it.contains("__Host-storecore_access_challenge=") }.substringBefore(';')
+        val challenge = Regex("\\\"challenge\\\"\\s*:\\s*\\\"([^\\\"]+)\\\"").find(login.body!!)!!.groupValues[1]
+        val challengeHash = com.storecore.identity.infrastructure.security.OpaqueTokenFactory().sha256(challenge)
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+
+        assertEquals(401, exchange("/api/v1/auth/context-selection", HttpMethod.POST, """{"challenge":"$challenge","context":"UNKNOWN"}""", bindingCookie).statusCode.value())
+        assertEquals(401, exchange("/api/v1/auth/context-selection", HttpMethod.POST, """{"challenge":"$challenge","context":"CUSTOMER"}""", "__Host-storecore_access_challenge=wrong-nonce").statusCode.value())
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM unified_access_challenges WHERE challenge_hash=? AND consumed_at IS NOT NULL", Int::class.java, challengeHash))
+        assertEquals(sessionsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+
+        assertEquals(200, exchange("/api/v1/auth/context-selection", HttpMethod.POST, """{"challenge":"$challenge","context":"CUSTOMER"}""", bindingCookie).statusCode.value())
+    }
+
+    @Test
+    fun expiredChallengeCannotBeConsumedRetroactively() {
+        val customerEmail = "expired-customer-${System.nanoTime()}@example.com"
+        val userEmail = "expired-user-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$customerEmail","password":"a-very-long-password","firstName":"Expired","lastName":"Customer"}""")
+        provisionAdmin(userEmail)
+        val rawChallenge = "expired-challenge-${java.util.UUID.randomUUID()}"
+        val rawNonce = "expired-nonce-${java.util.UUID.randomUUID()}"
+        val tokenFactory = com.storecore.identity.infrastructure.security.OpaqueTokenFactory()
+        jdbc.update(
+            """WITH issued AS (SELECT clock_timestamp()-interval '180 seconds' value)
+               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds' FROM issued""",
+            java.util.UUID.randomUUID(), tokenFactory.sha256(rawChallenge), tokenFactory.sha256(rawNonce), "http://localhost:4200", customerEmail, userEmail,
+        )
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+        val response = exchange(
+            "/api/v1/auth/context-selection",
+            HttpMethod.POST,
+            """{"challenge":"$rawChallenge","context":"CUSTOMER"}""",
+            "__Host-storecore_access_challenge=$rawNonce",
+        )
+        assertEquals(401, response.statusCode.value())
+        assertEquals(sessionsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+    }
+
+    @Test
+    fun challengeExpiryIsRecheckedAfterWaitingForTheRowLock() {
+        val customerEmail = "waiting-customer-${System.nanoTime()}@example.com"
+        val userEmail = "waiting-user-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$customerEmail","password":"a-very-long-password","firstName":"Waiting","lastName":"Customer"}""")
+        provisionAdmin(userEmail)
+        val rawChallenge = "waiting-challenge-${java.util.UUID.randomUUID()}"
+        val rawNonce = "waiting-nonce-${java.util.UUID.randomUUID()}"
+        val tokenFactory = com.storecore.identity.infrastructure.security.OpaqueTokenFactory()
+        val challengeHash = tokenFactory.sha256(rawChallenge)
+        jdbc.update(
+            """WITH issued AS (SELECT clock_timestamp()-interval '118 seconds' value)
+               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds' FROM issued""",
+            java.util.UUID.randomUUID(), challengeHash, tokenFactory.sha256(rawNonce), "http://localhost:4200", customerEmail, userEmail,
+        )
+        val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            jdbc.dataSource!!.connection.use { blocker ->
+                blocker.autoCommit = false
+                blocker.prepareStatement("SELECT id FROM unified_access_challenges WHERE challenge_hash=? FOR UPDATE").use {
+                    it.setString(1, challengeHash)
+                    it.executeQuery().close()
+                }
+                val future = executor.submit<Int> {
+                    exchange(
+                        "/api/v1/auth/context-selection",
+                        HttpMethod.POST,
+                        """{"challenge":"$rawChallenge","context":"CUSTOMER"}""",
+                        "__Host-storecore_access_challenge=$rawNonce",
+                    ).statusCode.value()
+                }
+                Thread.sleep(2_500)
+                blocker.commit()
+                assertEquals(401, future.get(10, java.util.concurrent.TimeUnit.SECONDS))
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(sessionsBefore, jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM unified_access_challenges WHERE challenge_hash=? AND consumed_at IS NOT NULL", Int::class.java, challengeHash))
+    }
+
+    @Test
+    fun unifiedPasswordTransportIsBoundedByUnicodeCodePoints() {
+        val response = exchange(
+            "/api/v1/auth/login",
+            HttpMethod.POST,
+            """{"email":"bounded-password@example.com","password":"${"x".repeat(129)}"}""",
+        )
+        assertEquals(400, response.statusCode.value(), response.body)
+        assertEquals(true, response.body!!.contains("REQUEST_VALIDATION_FAILED"))
+    }
+
+    @Test
+    fun unifiedAndLegacyCredentialEndpointsShareOneAttemptBudget() {
+        val email = "shared-budget-${System.nanoTime()}@example.com"
+        val payload = """{"email":"$email","password":"wrong-password-xx"}"""
+        val paths = listOf(
+            "/api/v1/auth/login",
+            "/api/v1/customer/auth/login",
+            "/api/v1/internal/auth/login",
+            "/api/v1/auth/login",
+            "/api/v1/customer/auth/login",
+        )
+        paths.forEach { path -> assertEquals(401, exchange(path, HttpMethod.POST, payload).statusCode.value(), path) }
+        val sixth = exchange("/api/v1/internal/auth/login", HttpMethod.POST, payload)
+        assertEquals(429, sixth.statusCode.value(), sixth.body)
+        assertNotNull(sixth.headers.getFirst("Retry-After"))
+    }
+
+    @Test
+    fun corsRejectsDisallowedUnifiedOriginBeforeControllerHandling() {
+        val response = exchange(
+            "/api/v1/auth/login",
+            HttpMethod.POST,
+            """{"email":"origin-unified@example.com","password":"a-very-long-password"}""",
+            origin = "https://evil.example",
+        )
+        assertEquals(403, response.statusCode.value())
+        assertEquals(null, response.headers.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        assertEquals(0, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).size)
+    }
+
     private fun provisionAdmin(email: String) {
         val hash = passwords.hash("a-very-long-password".toCharArray())
         val userId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, email, hash)
