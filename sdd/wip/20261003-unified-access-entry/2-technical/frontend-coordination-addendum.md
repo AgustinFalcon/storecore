@@ -20,7 +20,7 @@ Adding a later step does not modify the behavior of prior steps.
 ## Selection has two distinct sources
 
 Context selection after a fresh unified login challenge submits the opaque,
-single-use challenge to `POST /api/v1/auth/context`. It is never synthesized
+single-use challenge to `POST /api/v1/auth/context-selection`. It is never synthesized
 from browser state and is not automatically retried.
 
 Context selection after rehydrating two already-valid realm sessions is local
