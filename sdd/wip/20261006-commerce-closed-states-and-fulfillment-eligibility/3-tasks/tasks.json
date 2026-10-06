@@ -1,0 +1,110 @@
+{
+  "feature": "20261006-commerce-closed-states-and-fulfillment-eligibility",
+  "stack_profile": "backend-frontend",
+  "project_type": "production",
+  "execution_strategy": "incremental-gated",
+  "status": "implementation_in_progress",
+  "stats": {
+    "total": 6,
+    "done": 0,
+    "in_progress": 5,
+    "blocked": 1,
+    "pending": 0
+  },
+  "tasks": [
+    {
+      "id": "CFE-T01",
+      "title": "Consumer inventory and red regressions after Sol GO",
+      "status": "in_progress",
+      "depends_on": [],
+      "requirements": [
+        "CFE-R01",
+        "CFE-R08"
+      ],
+      "evidence": "Sol documental APPROVED/GO registrado; inventario consumer-inventory.md completo; regresión sin pago corregida y compila, pero rojo PostgreSQL inicial NOT_RUN por ACL/Docker."
+    },
+    {
+      "id": "CFE-T02",
+      "title": "Closed backend states, boundaries and eligibility policy",
+      "status": "in_progress",
+      "depends_on": [
+        "CFE-T01"
+      ],
+      "requirements": [
+        "CFE-R01",
+        "CFE-R02"
+      ],
+      "evidence": "Tipos/backend snapshot/política/puertos implementados; full Kotlin production/test compile y JUnit local enfocado PASS (ver progress.md); no cierre hasta gates completos."
+    },
+    {
+      "id": "CFE-T03",
+      "title": "Authoritative evidence, locked transitions and no automatic restock",
+      "status": "in_progress",
+      "depends_on": [
+        "CFE-T02"
+      ],
+      "requirements": [
+        "CFE-R02",
+        "CFE-R03",
+        "CFE-R04",
+        "CFE-R05",
+        "CFE-R06"
+      ],
+      "evidence": "Evidencia durable/order-first/recepción única/sin restock implementados; tests PostgreSQL authored y compilan; ejecución real/concurrencia/rollback BLOCKED Docker ACL."
+    },
+    {
+      "id": "CFE-T04",
+      "title": "Closed frontend state consumers and fail-closed controls",
+      "status": "in_progress",
+      "depends_on": [
+        "CFE-T02",
+        "CFE-T03"
+      ],
+      "requirements": [
+        "CFE-R01",
+        "CFE-R05",
+        "CFE-R07"
+      ],
+      "evidence": "Tipos/mappers/views/stores implementados; Vitest 20 PASS, lint/tsc/ngc/architecture PASS; build inicial PASS, build final BLOCKED por ACL del ancestro; E2E pendiente."
+    },
+    {
+      "id": "CFE-T05",
+      "title": "Real wiring, race, migration and negative evidence",
+      "status": "blocked",
+      "depends_on": [
+        "CFE-T03",
+        "CFE-T04"
+      ],
+      "requirements": [
+        "CFE-R01",
+        "CFE-R02",
+        "CFE-R03",
+        "CFE-R04",
+        "CFE-R05",
+        "CFE-R06",
+        "CFE-R07",
+        "CFE-R08"
+      ],
+      "evidence": "E01–E09 no cerrados: PostgreSQL/Docker pipe/config ACL; Maven realpath y ng test/final bundle ACL. HTTPS real, clean/upgrade y matrices E08/E09 NOT_RUN; CI no solicitado."
+    },
+    {
+      "id": "CFE-T06",
+      "title": "Exact-head dual Sol review and honest SDD close-out",
+      "status": "in_progress",
+      "depends_on": [
+        "CFE-T05"
+      ],
+      "requirements": [
+        "CFE-R01",
+        "CFE-R02",
+        "CFE-R03",
+        "CFE-R04",
+        "CFE-R05",
+        "CFE-R06",
+        "CFE-R07",
+        "CFE-R08"
+      ],
+      "evidence": "Dos re-reviews independientes GPT-6.1 Sol medium aprobaron el fingerprint A32AC6027A133696B2A816B168CBC11CFBE83F033A0124F2A87C4802383AB93D sin P0-P3, después de corregir cuatro P2. CI exact-head NOT_RUN; T05 permanece blocked; no publicación."
+    }
+  ]
+}

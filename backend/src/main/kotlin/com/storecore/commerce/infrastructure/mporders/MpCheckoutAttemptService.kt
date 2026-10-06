@@ -8,6 +8,8 @@ import com.storecore.commerce.application.port.output.OfficialOrderSearchQuery
 import com.storecore.commerce.domain.BindDecision
 import com.storecore.commerce.domain.CheckoutAttemptSnapshot
 import com.storecore.commerce.domain.CheckoutAttemptState
+import com.storecore.commerce.domain.OrderStatus
+import com.storecore.commerce.domain.PaymentStatus
 import com.storecore.commerce.domain.CreationDecision
 import com.storecore.commerce.domain.ExpectedOrderIdentity
 import com.storecore.commerce.domain.MpCheckoutAttemptPolicy
@@ -54,10 +56,10 @@ class MpCheckoutAttemptService(
             val order = jdbc.query(
                 "SELECT o.id,o.status,o.total,o.currency,p.id payment_id,p.status payment_status FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=? FOR UPDATE OF o",
                 { rs, _ ->
-                    OrderLock(rs.getLong("id"), rs.getString("status"), rs.getBigDecimal("total"), rs.getString("currency"), rs.getLong("payment_id"), rs.getString("payment_status"))
+                    OrderLock(rs.getLong("id"), OrderStatus.fromWire(rs.getString("status")), rs.getBigDecimal("total"), rs.getString("currency"), rs.getLong("payment_id"), PaymentStatus.fromWire(rs.getString("payment_status")))
                 },
                 orderId,
-            ).firstOrNull() ?: throw CommerceValidation("ORDER_NOT_FOUND")
+            ).singleOrNull() ?: throw CommerceValidation("ORDER_NOT_FOUND")
             val existing = jdbc.query(
                 "SELECT order_id,attempt_no,external_reference,idempotency_key,state FROM mp_checkout_attempts WHERE order_id=? ORDER BY attempt_no",
                 { rs, _ ->
@@ -66,7 +68,7 @@ class MpCheckoutAttemptService(
                         attemptNo = rs.getInt("attempt_no"),
                         externalReference = rs.getString("external_reference"),
                         idempotencyKey = rs.getObject("idempotency_key", UUID::class.java),
-                        state = CheckoutAttemptState.valueOf(rs.getString("state")),
+                        state = CheckoutAttemptState.fromWire(rs.getString("state")),
                     )
                 },
                 orderId,
@@ -78,7 +80,7 @@ class MpCheckoutAttemptService(
                     attemptNo = nextNo,
                     idempotencyKey = idempotencyKey,
                     existingAttempts = existing,
-                    financialAccredited = order.paymentStatus == "APPROVED",
+                    financialAccredited = order.paymentStatus == PaymentStatus.APPROVED || order.paymentStatus == PaymentStatus.UNKNOWN,
                 ),
             )
             val snapshot = when (decision) {
@@ -111,6 +113,7 @@ class MpCheckoutAttemptService(
         val attempt = load(attemptId)
         if (!commands.configured() && properties.adapter != "fake") throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
         transactions.execute {
+            lockAttemptOrder(attemptId)
             jdbc.update("UPDATE mp_checkout_attempts SET state='POSTING',updated_at=now() WHERE id=? AND state IN ('CREATED','POSTING')", attemptId)
         }
         val observation = commands.create(
@@ -163,8 +166,10 @@ class MpCheckoutAttemptService(
 
     private fun bind(attemptId: Long, providerOrderId: String, checkoutUrl: String?): Map<String, Any?> {
         return transactions.execute {
-            val current = jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE id=? FOR UPDATE", String::class.java, attemptId)
-            when (val decision = MpCheckoutAttemptPolicy.bind(current, providerOrderId)) {
+            lockAttemptOrder(attemptId)
+            val current = jdbc.query("SELECT provider_order_id,state,checkout_url FROM mp_checkout_attempts WHERE id=? FOR UPDATE", { rs, _ -> Triple(rs.getString("provider_order_id"), CheckoutAttemptState.fromWire(rs.getString("state")), rs.getString("checkout_url")) }, attemptId).singleOrNull() ?: throw CommerceValidation("ATTEMPT_NOT_FOUND")
+            if (!current.second.allowsRemoteBinding) return@execute mapOf("state" to current.second.name, "providerOrderId" to current.first, "checkoutUrl" to current.third)
+            when (val decision = MpCheckoutAttemptPolicy.bind(current.first, providerOrderId)) {
                 is BindDecision.Bind, is BindDecision.Replay -> {
                     val url = checkoutUrl ?: jdbc.queryForObject("SELECT checkout_url FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId)
                     jdbc.update(
@@ -186,10 +191,18 @@ class MpCheckoutAttemptService(
     }
 
     private fun markRecovery(attemptId: Long, reason: String) {
-        jdbc.update(
-            "UPDATE mp_checkout_attempts SET state='RECOVERY_REQUIRED',error_sanitized=?,updated_at=now() WHERE id=?",
-            reason.take(200), attemptId,
-        )
+        transactions.executeWithoutResult {
+            lockAttemptOrder(attemptId)
+            jdbc.update(
+                "UPDATE mp_checkout_attempts SET state='RECOVERY_REQUIRED',error_sanitized=?,updated_at=now() WHERE id=? AND state IN ('CREATED','POSTING','RECOVERY_REQUIRED','READY_FOR_REDIRECT','AWAITING_RESULT')",
+                reason.take(200), attemptId,
+            )
+        }
+    }
+
+    private fun lockAttemptOrder(attemptId: Long) {
+        val orderId = jdbc.query("SELECT order_id FROM mp_checkout_attempts WHERE id=?", { rs, _ -> rs.getLong("order_id") }, attemptId).singleOrNull() ?: throw CommerceValidation("ATTEMPT_NOT_FOUND")
+        jdbc.query("SELECT id FROM orders WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong("id") }, orderId)
     }
 
     private fun load(attemptId: Long): StoredAttempt = jdbc.query(
@@ -206,11 +219,11 @@ class MpCheckoutAttemptService(
 
     private data class OrderLock(
         val id: Long,
-        val status: String,
+        val status: OrderStatus,
         val total: BigDecimal,
         val currency: String,
         val paymentId: Long,
-        val paymentStatus: String,
+        val paymentStatus: PaymentStatus,
     )
 
     private data class StoredAttempt(

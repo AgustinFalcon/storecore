@@ -61,6 +61,18 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
+## Fulfillment comercial — WIP local 2026-10-06
+
+`sdd/wip/20261006-commerce-closed-states-and-fulfillment-eligibility/` tiene
+Sol GO documental registrado y código sin commit en
+`fix/commerce-fulfillment-eligibility` sobre `de6a0d7`. Implementa tipos cerrados,
+prueba durable de acreditación/SALE WEB, locks order-first y recepción completa
+sin inspección ni reposición. Unit/compilación local parcial verificada; gates
+PostgreSQL, carreras/rollback real, HTTPS Angular→Spring→DB, clean/upgrade,
+bundle final y review dual siguen abiertos/bloqueados. No cierre, archive,
+CI verde ni cambio publicado. Progreso/evidencia y límites están en el WIP.
+Disposición/reposición por ítem se difiere al backlog `TODO-045`.
+
 ## Fiscal externo
 
 - `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Addendum 2026-09-22 de pago/fiscal es propuesta Open. Sin código, DDL, worker ni secretos.

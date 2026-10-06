@@ -145,6 +145,9 @@ enum class CheckoutAttemptState(val blocksAnotherAttempt: Boolean) {
     ACCREDITED(true),
     SUPERSEDED(false),
     TERMINAL_UNPAID_VERIFIED(false),
+    UNKNOWN(true);
+    val allowsRemoteBinding: Boolean get() = this in setOf(CREATED, POSTING, RECOVERY_REQUIRED, READY_FOR_REDIRECT, AWAITING_RESULT)
+    companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value } ?: UNKNOWN }
 }
 
 enum class AttemptBlockReason {

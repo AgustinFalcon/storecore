@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { switchMap, tap } from 'rxjs';
+import { exhaustMap, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { AdvanceFulfillmentUseCase } from '../../domain/order/use-cases/advance-fulfillment.usecase';
@@ -43,11 +43,11 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
   readonly ship = this.effect<{ orderId: string; status: ShipmentTransition; tracking: string | null }>((cmd$) =>
     cmd$.pipe(
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap((cmd) =>
+      exhaustMap((cmd) =>
         this.advance.ship(cmd.orderId, cmd.status, cmd.tracking).pipe(
           tapResponse({
             next: (order) => this.patchState({ order, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => { this.load(cmd.orderId); this.patchState({ errorMessage: getApiErrorMessage(err) }); },
           }),
         ),
       ),
@@ -57,11 +57,11 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
   readonly rma = this.effect<{ orderId: string; status: RmaTransition }>((cmd$) =>
     cmd$.pipe(
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap((cmd) =>
+      exhaustMap((cmd) =>
         this.advance.rma(cmd.orderId, cmd.status).pipe(
           tapResponse({
             next: (order) => this.patchState({ order, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => { this.load(cmd.orderId); this.patchState({ errorMessage: getApiErrorMessage(err) }); },
           }),
         ),
       ),

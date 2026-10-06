@@ -12,10 +12,10 @@
       <p class="sc-kicker">Consola</p>
       <h1 id="admin-order-title">Fulfillment {{ order.id }}</h1>
       <p>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
-        <span class="sc-badge">rma {{ order.rmaStatus || '—' }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
+        <span class="sc-badge">rma {{ order.rmaStatus.label }}</span>
       </p>
       <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
     </header>
@@ -45,7 +45,7 @@
         <h2>Siguiente transición</h2>
         @if (nextShip(order); as next) {
           <form class="sc-panel" (submit)="$event.preventDefault()">
-            @if (next === 'SHIPPED') {
+            @if (next.requiresTracking) {
               <label>Tracking
                 <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
               </label>
@@ -60,7 +60,7 @@
             {{ rmaLabel(next) }}
           </button>
         }
-        <p class="sc-callout">Una transición por vez. El tracking es informativo.</p>
+        <p class="sc-callout">Una transición por vez. El tracking es informativo. La recepción no repone stock; inspección, disposición y reposición están pendientes de implementación.</p>
       </aside>
     </div>
   }

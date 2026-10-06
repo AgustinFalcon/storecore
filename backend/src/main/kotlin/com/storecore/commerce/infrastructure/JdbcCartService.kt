@@ -6,6 +6,8 @@ import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.domain.CartLineView
 import com.storecore.commerce.domain.CartView
 import com.storecore.commerce.domain.CheckoutReceipt
+import com.storecore.commerce.domain.OrderStatus
+import com.storecore.commerce.domain.PaymentStatus
 import com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
@@ -48,7 +50,7 @@ class JdbcCartService(
             val original = mapper.readTree(existing.third)
             if (original.path("addressId").asLong() != addressId || original.path("currency").asText() != currency) throw CheckoutConflict()
             if (cart.lines.isNotEmpty() && existing.second != hash) throw CheckoutConflict()
-            val replayed = jdbc.query("SELECT o.id,o.status,p.status payment FROM orders o LEFT JOIN payments p ON p.order_id=o.id WHERE o.checkout_claim_id=?", { rs, _ -> CheckoutReceipt(rs.getLong("id").toString(), rs.getString("payment") ?: "PENDING", rs.getString("status")) }, existing.first).firstOrNull()
+            val replayed = replayReceipt(existing.first)
             if (replayed != null) return withRemoteCheckout(replayed)
             throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
@@ -63,7 +65,7 @@ class JdbcCartService(
         } catch (exception: org.springframework.dao.DataIntegrityViolationException) {
             val raced = jdbc.query("SELECT id,request_hash FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", { rs, _ -> rs.getLong("id") to rs.getString("request_hash") }, customer.customerId, idempotencyKey).firstOrNull() ?: throw CheckoutConflict()
             if (raced.second != hash) throw CheckoutConflict()
-            val replayed = jdbc.query("SELECT o.id,o.status,p.status payment FROM orders o LEFT JOIN payments p ON p.order_id=o.id WHERE o.checkout_claim_id=?", { rs, _ -> CheckoutReceipt(rs.getLong("id").toString(), rs.getString("payment") ?: "PENDING", rs.getString("status")) }, raced.first).firstOrNull()
+            val replayed = replayReceipt(raced.first)
             return replayed?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
         }
         cart.lines.forEach { line ->
@@ -83,7 +85,14 @@ class JdbcCartService(
         jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING')", orderId)
         jdbc.update("UPDATE checkout_idempotency_claims SET state='COMPLETED',updated_at=now() WHERE id=?", claimId)
         jdbc.update("DELETE FROM cart_items WHERE cart_id=?", ensureCart(customer.customerId))
-        return withRemoteCheckout(CheckoutReceipt(orderId.toString(), "PENDING", "PENDING_PAYMENT"))
+        return withRemoteCheckout(CheckoutReceipt(orderId.toString(), PaymentStatus.PENDING, OrderStatus.PENDING_PAYMENT))
+    }
+
+    private fun replayReceipt(claimId: Long): CheckoutReceipt? {
+        val order = jdbc.query("SELECT id,status FROM orders WHERE checkout_claim_id=?", { rs, _ -> rs.getLong("id") to OrderStatus.fromWire(rs.getString("status")) }, claimId).singleOrNull() ?: return null
+        val accredited = jdbc.query("SELECT p.status FROM mp_order_commercial_applications c JOIN mp_checkout_attempts a ON a.id=c.attempt_id AND a.order_id=c.order_id JOIN payments p ON p.id=a.payment_id AND p.order_id=c.order_id WHERE c.order_id=? AND c.transition='PAYMENT_ACCREDITED'", { rs, _ -> PaymentStatus.fromWire(rs.getString("status")) }, order.first)
+        val payments = if (accredited.isNotEmpty()) accredited else jdbc.query("SELECT status FROM payments WHERE order_id=? ORDER BY id", { rs, _ -> PaymentStatus.fromWire(rs.getString("status")) }, order.first)
+        return CheckoutReceipt(order.first.toString(), payments.singleOrNull() ?: PaymentStatus.UNKNOWN, order.second)
     }
 
     private fun withRemoteCheckout(receipt: CheckoutReceipt): CheckoutReceipt {

@@ -22,7 +22,8 @@ export interface CheckoutCommand {
 
 export interface CheckoutReceipt {
   readonly orderId: string;
-  readonly paymentStatus: string;
-  readonly orderStatus: string;
+  readonly paymentStatus: PaymentStatus;
+  readonly orderStatus: OrderStatus;
   readonly checkoutUrl?: string | null;
 }
+import { OrderStatus, PaymentStatus } from '../order/commerce-states';
