@@ -32,6 +32,29 @@ export function loseRoles(email: string): void {
   if (!/^ua-[a-z-]+@example\.test$/.test(email)) throw new Error('Only named UA fixtures may lose roles');
   database(`DELETE FROM user_roles WHERE user_id=(SELECT id FROM users WHERE email='${email}');`);
 }
+export function pendingChallengeExpiry(email: string): string {
+  if (!/^ua-[a-z-]+@example\.test$/.test(email)) throw new Error('Only named UA fixtures may inspect challenges');
+  const expiresAt = database(`
+    SELECT to_char(ch.expires_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+      FROM unified_access_challenges ch
+      JOIN customers c ON c.id=ch.customer_id
+      JOIN users u ON u.id=ch.user_id
+     WHERE c.email='${email}' AND u.email='${email}' AND ch.consumed_at IS NULL
+     ORDER BY ch.issued_at DESC LIMIT 1;
+  `);
+  if (!Number.isFinite(Date.parse(expiresAt))) throw new Error('Pending fixture challenge expiry was not found');
+  return expiresAt;
+}
+export function expiredUnconsumedChallengeCount(email: string): number {
+  if (!/^ua-[a-z-]+@example\.test$/.test(email)) throw new Error('Only named UA fixtures may inspect challenges');
+  return Number(database(`
+    SELECT count(*) FROM unified_access_challenges ch
+      JOIN customers c ON c.id=ch.customer_id
+      JOIN users u ON u.id=ch.user_id
+     WHERE c.email='${email}' AND u.email='${email}'
+       AND ch.consumed_at IS NULL AND ch.expires_at <= clock_timestamp();
+  `));
+}
 export function sessionCount(): number { return Number(database('SELECT count(*) FROM identity_sessions;')); }
 
 export async function decoded(response: APIResponse): Promise<LoginResult> {

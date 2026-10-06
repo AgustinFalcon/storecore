@@ -77,16 +77,17 @@ unified-response mapper; SQL is the fixture persistence boundary.
 The serial browser suite covers CUSTOMER-only profile mutation with real CSRF,
 USER-only ADMIN and OPERATOR homes, each dual challenge choice, dual existing
 session rehydration with local selection and no session issuance, consumed
-challenge replay, actual 120-second expiry, logout isolation in both directions,
+challenge replay, actual 120-second expiry with UI reset, logout isolation in both directions,
 live USER role loss and role loss between challenge issuance and selection.
 Each test has a fresh browser context and scenario-specific fixtures. The runner
 restarts the provisioning process before tests so registration budgets cannot
 pollute login budgets.
 
-Expiry waits for the server's actual `expiresAt`; it also submits the original
-binding nonce after expiry to distinguish server TTL enforcement from browser
-cookie expiry. No challenge timestamp or immutable trigger is changed. Expect
-the suite to include at least two minutes of intentional waiting.
+Expiry waits for the immutable database row's actual `expires_at`, clicks the
+real UI selection after that deadline, verifies the rejected HTTP response and
+the return to the credential form, and confirms the row remains expired and
+unconsumed. No challenge timestamp or immutable trigger is changed. Expect the
+suite to include at least two minutes of intentional waiting.
 
 Logs, HTML report and failure-only traces/screenshots are under
 `frontend/ua-real-results/` (ignored by Git). GitHub's separate

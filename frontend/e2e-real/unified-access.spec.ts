@@ -3,7 +3,8 @@ import { UserRole } from '../src/app/domain/user/user-role';
 import { UserAction } from '../src/app/features/admin/user-action';
 import {
   AccessContext, LoginResolution, RealmFixture, apiLogin, assertRealm, challengeCookie,
-  chooseExisting, decoded, establishBoth, loseRoles, secureCookies, select, sessionCount, uiLogin,
+  chooseExisting, decoded, establishBoth, expiredUnconsumedChallengeCount, loseRoles,
+  pendingChallengeExpiry, secureCookies, select, sessionCount, uiLogin,
 } from './support/fixtures';
 
 test('CUSTOMER-only: browser cookie, owned CSRF and real profile mutation', async ({ page, context }) => {
@@ -94,21 +95,23 @@ test('consumed challenge replay issues no new session and preserves both live se
   await assertRealm(page, RealmFixture.User);
 });
 
-test('real 120-second expiry rejects browser selection and preserves existing sessions', async ({ page, context }) => {
+test('real 120-second expiry rejects UI selection and resets the login flow', async ({ page }) => {
   test.setTimeout(165_000);
-  const pending = await apiLogin(page, 'ua-expiry@example.test');
-  expect(pending.resolution).toBe(LoginResolution.ContextSelectionRequired);
-  const binding = (await context.cookies()).find((cookie) => cookie.name === challengeCookie)!.value;
-  await establishBoth(page, 'ua-expiry@example.test');
+  const email = 'ua-expiry@example.test';
+  await uiLogin(page, email);
+  await expect(page.getByRole('heading', { name: 'Elegí cómo continuar' })).toBeVisible();
   const before = sessionCount();
-  const delay = Date.parse(pending.expiresAt!) - Date.now() + 1500;
+  const delay = Date.parse(pendingChallengeExpiry(email)) - Date.now() + 1500;
   expect(delay).toBeGreaterThan(0);
   await new Promise((resolveDelay) => setTimeout(resolveDelay, delay));
-  // Sending the original nonce explicitly also proves server expiry, independently of cookie expiry.
-  expect((await select(page, pending.challenge!, AccessContext.Customer, binding)).status()).toBe(401);
+  const rejected = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/v1/auth/context-selection');
+  await page.getByRole('button', { name: AccessContext.Customer.label, exact: true }).click();
+  expect((await rejected).status()).toBe(401);
+  await expect(page.getByLabel('Email', { exact: true })).toBeEnabled();
   expect(sessionCount()).toBe(before);
-  await assertRealm(page, RealmFixture.Customer);
-  await assertRealm(page, RealmFixture.User);
+  expect(expiredUnconsumedChallengeCount(email)).toBeGreaterThanOrEqual(1);
+  await assertRealm(page, RealmFixture.Customer, 401);
+  await assertRealm(page, RealmFixture.User, 401);
 });
 
 for (const realm of [RealmFixture.Customer, RealmFixture.User]) {
