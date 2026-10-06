@@ -24,8 +24,9 @@ atomically consumes nonce and challenge before issuing one realm session.
 - Browser-supplied role or actor ID: untrusted and incompatible with closed
   identity types.
 - Implicit USER priority: privilege escalation risk.
-- StoreCore-to-BlackStore federation in this change: BlackStore has its own
-  staff-role contract and currently trusts request headers.
+- StoreCore-to-BlackStore federation in this change: BlackStore now has its own
+  reviewed staff identity and durable runtime; federation remains deliberately
+  out of scope.
 
 ## Consequences
 
