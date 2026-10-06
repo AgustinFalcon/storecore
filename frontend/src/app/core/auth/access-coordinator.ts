@@ -1,6 +1,6 @@
 import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
-import { catchError, defer, finalize, forkJoin, map, Observable, of, shareReplay, switchMap, tap, timeout } from 'rxjs';
+import { catchError, defer, finalize, forkJoin, map, Observable, of, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessState, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
@@ -12,6 +12,7 @@ import { CSRF_HEADER } from './csrf';
 import { CustomerSession } from './customer-session';
 import { UserSession } from './user-session';
 import { AccessMutationFence } from './access-mutation-fence';
+import { AccessSessionStaging } from './access-session-staging';
 
 /** A browser hint is navigation preference only. No identity or secrets are persisted. */
 @Injectable({ providedIn: 'root' })
@@ -31,6 +32,7 @@ export class ActiveContextHint {
 @Injectable({ providedIn: 'root' })
 export class AccessCoordinator {
   private readonly http: HttpClient;
+  private readonly cancelProbes = new Subject<void>();
   private generation = 0;
   private flight: Observable<AccessState> | null = null;
   private customerProbe = SessionProbe.Unknown;
@@ -44,6 +46,7 @@ export class AccessCoordinator {
     private readonly user: UserSession,
     private readonly hint: ActiveContextHint,
     private readonly mutationFence: AccessMutationFence,
+    private readonly staging: AccessSessionStaging,
   ) {
     // Staging must bypass the legacy interceptor's eager CSRF/401 session effects.
     this.http = new HttpClient(backend);
@@ -70,18 +73,25 @@ export class AccessCoordinator {
   }
 
   /** Call when a login starts, before its response may supersede a reload flight. */
-  supersedeProbes(): void {
+  supersedeProbes(context: AccessContext = AccessContext.Unknown): void {
+    this.cancelProbes.next();
     ++this.generation;
-    this.mutationFence.advance();
+    this.mutationFence.advance(context);
     this.flight = null;
   }
 
   /** Unified login has no principal: complete it with a fresh atomic realm probe. */
   acceptAuthenticated(context: AccessContext): Observable<AccessState> {
-    this.supersedeProbes();
     if (!context.isKnown) return of(AccessState.Indeterminate);
+    const stagedCsrf = this.staging.take(context);
+    this.supersedeProbes(context);
+    this.apply(context, SessionProbe.Anonymous);
+    if (context === AccessContext.Customer) this.customerProbe = SessionProbe.Unknown;
+    else this.userProbe = SessionProbe.Unknown;
+    this.publish();
+    if (!stagedCsrf) return of(AccessState.Indeterminate);
     const generation = this.generation;
-    return this.probe(context).pipe(map((result) => {
+    return this.probeWithStagedCsrf(context, stagedCsrf).pipe(map((result) => {
       if (generation !== this.generation) return AccessState.Indeterminate;
       this.apply(context, result);
       if (context === AccessContext.Customer) this.customerProbe = result;
@@ -101,7 +111,8 @@ export class AccessCoordinator {
 
   logout(context: AccessContext = this.state().activeContext): Observable<void> {
     if (!context.isKnown) return of(undefined);
-    this.supersedeProbes();
+    this.staging.clear(context);
+    this.supersedeProbes(context);
     const generation = this.generation;
     const csrf = context === AccessContext.Customer ? this.customer.csrf() : this.user.csrf();
     return this.http.post(`${environment.apiBaseUrl}/${this.realmPath(context)}/auth/logout`, {},
@@ -153,6 +164,20 @@ export class AccessCoordinator {
       catchError((error: unknown) => of(error instanceof HttpErrorResponse && error.status === 401 ? SessionProbe.Anonymous
         : error instanceof HttpErrorResponse && error.status > 0 && error.status < 500 ? SessionProbe.Unknown
         : error instanceof HttpErrorResponse || (error instanceof Error && error.name === 'TimeoutError') ? SessionProbe.Unavailable : SessionProbe.Unknown)),
+      takeUntil(this.cancelProbes),
+    );
+  }
+
+  private probeWithStagedCsrf(context: AccessContext, csrf: string): Observable<SessionProbe> {
+    const base = `${environment.apiBaseUrl}/${this.realmPath(context)}`;
+    return this.http.get<unknown>(`${base}/me`, { withCredentials: true }).pipe(
+      map((body) => this.principal(context, readApiBody<unknown>(body))),
+      map((principal) => principal === null ? SessionProbe.Unknown : SessionProbe.authenticated(principal, csrf)),
+      timeout(10_000),
+      catchError((error: unknown) => of(error instanceof HttpErrorResponse && error.status === 401 ? SessionProbe.Anonymous
+        : error instanceof HttpErrorResponse && error.status > 0 && error.status < 500 ? SessionProbe.Unknown
+        : error instanceof HttpErrorResponse || (error instanceof Error && error.name === 'TimeoutError') ? SessionProbe.Unavailable : SessionProbe.Unknown)),
+      takeUntil(this.cancelProbes),
     );
   }
 

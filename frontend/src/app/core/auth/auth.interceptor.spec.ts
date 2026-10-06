@@ -6,6 +6,8 @@ import { authInterceptor } from './auth.interceptor';
 import { CSRF_HEADER } from './csrf';
 import { CustomerSession } from './customer-session';
 import { UserSession } from './user-session';
+import { AccessMutationFence } from './access-mutation-fence';
+import { AccessContext } from '../../domain/access/access-context';
 
 describe('authInterceptor', () => {
   beforeEach(() => {
@@ -79,5 +81,36 @@ describe('authInterceptor', () => {
     csrf.flush({ code: 200, data: {}, message: null, errorCode: null, retryable: null, traceId: null }, { headers: { [CSRF_HEADER]: 'fresh' } });
     expect(session.csrf()).toBe('fresh');
     ctrl.verify();
+  });
+
+  it('cancels a legacy CSRF refresh superseded by a newer realm session', async () => {
+    const session = TestBed.inject(CustomerSession);
+    session.setCsrf('stale');
+    const http = TestBed.inject(HttpClient);
+    const ctrl = TestBed.inject(HttpTestingController);
+    const pending = firstValueFrom(http.put('/api/v1/customer/me', {})).catch((err) => err);
+    ctrl.expectOne('/api/v1/customer/me').flush(
+      { errorCode: 'CSRF_INVALID' }, { status: 403, statusText: 'Forbidden' },
+    );
+    await pending;
+    const refresh = ctrl.expectOne('/api/v1/customer/auth/csrf');
+    TestBed.inject(AccessMutationFence).advance(AccessContext.Customer);
+    expect(refresh.cancelled).toBe(true);
+    expect(session.csrf()).toBe('');
+    ctrl.verify();
+  });
+
+  it('does not apply a stale response token or 401 to a newer realm generation', async () => {
+    const session = TestBed.inject(CustomerSession);
+    session.commit({ email: 'new@example.test', firstName: 'N', lastName: 'U', phone: '' }, 'new-csrf');
+    const http = TestBed.inject(HttpClient);
+    const ctrl = TestBed.inject(HttpTestingController);
+    const pending = firstValueFrom(http.get('/api/v1/customer/me')).catch((err) => err);
+    const request = ctrl.expectOne('/api/v1/customer/me');
+    TestBed.inject(AccessMutationFence).advance(AccessContext.Customer);
+    request.flush({ message: 'old session' }, { status: 401, statusText: 'Unauthorized', headers: { [CSRF_HEADER]: 'old-csrf' } });
+    await pending;
+    expect(session.authenticated()).toBe(true);
+    expect(session.csrf()).toBe('new-csrf');
   });
 });

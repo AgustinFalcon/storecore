@@ -11,6 +11,7 @@ import { ReturnDestination } from '../../domain/access/return-destination';
 import { AccessState, SessionProbe } from '../../domain/access/session-probe';
 import { UserRole } from '../../domain/user/user-role';
 import { LoginStore } from './login.store';
+import { CredentialCaptureStep } from './login-steps';
 
 const customerProbe = SessionProbe.authenticated({ email: 'buyer@example.test', firstName: '', lastName: '', phone: '' }, 'customer-csrf');
 const userProbe = SessionProbe.authenticated({ id: 'user-1', roles: [UserRole.Operator] }, 'user-csrf');
@@ -98,5 +99,15 @@ describe('LoginStore', () => {
     expect(store.snapshot.password).toBe('');
     expect(store.snapshot.busy).toBe(false);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('CredentialCaptureStep', () => {
+  const step = new CredentialCaptureStep();
+
+  it('matches the backend password limit in Unicode code points', () => {
+    expect(step.capture('buyer@example.test', '😀'.repeat(128), ReturnDestination.Home)).not.toBeNull();
+    expect(step.capture('buyer@example.test', '😀'.repeat(129), ReturnDestination.Home)).toBeNull();
+    expect(step.capture('buyer@example.test', '😀'.repeat(11), ReturnDestination.Home)).toBeNull();
   });
 });

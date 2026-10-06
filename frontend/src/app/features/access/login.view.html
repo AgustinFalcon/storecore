@@ -20,7 +20,7 @@
       </div>
       <div class="sc-field">
         <label for="access-password">Contraseña</label>
-        <input id="access-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required [disabled]="state.busy" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" aria-describedby="password-help" />
+        <input id="access-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="256" required [disabled]="state.busy" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" aria-describedby="password-help" />
         <p id="password-help" class="sc-muted">Entre 12 y 128 caracteres.</p>
       </div>
       <button class="sc-btn sc-btn--primary" type="submit" [disabled]="state.busy">{{ state.stage === stages.Authenticate ? state.stage.label : 'Ingresar' }}</button>

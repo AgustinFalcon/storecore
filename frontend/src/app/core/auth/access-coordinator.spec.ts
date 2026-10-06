@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessState, AccessStateKind, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
@@ -10,6 +10,7 @@ import { AccessCoordinator, ActiveContextHint } from './access-coordinator';
 import { CustomerSession } from './customer-session';
 import { UserSession } from './user-session';
 import { CSRF_HEADER } from './csrf';
+import { AccessSessionStaging } from './access-session-staging';
 
 const customer = { email: 'customer@example.test', firstName: 'C', lastName: 'P', phone: '' };
 const user = { id: 'user-1', roles: [UserRole.Operator] };
@@ -38,6 +39,7 @@ describe('AccessCoordinator', () => {
   let customerSession: CustomerSession;
   let userSession: UserSession;
   let hint: AccessContext;
+  let staging: AccessSessionStaging;
   const url = (path: string): string => `${environment.apiBaseUrl}/${path}`;
   beforeEach(() => {
     hint = AccessContext.Unknown;
@@ -47,6 +49,7 @@ describe('AccessCoordinator', () => {
     http = TestBed.inject(HttpTestingController);
     customerSession = TestBed.inject(CustomerSession);
     userSession = TestBed.inject(UserSession);
+    staging = TestBed.inject(AccessSessionStaging);
   });
   afterEach(() => http.verify());
   function flushCustomer(): void {
@@ -140,19 +143,35 @@ describe('AccessCoordinator', () => {
     expect(userSession.csrf()).toBe('old-user');
   });
   it('suppresses stale results after a newer authenticated login', async () => {
-    const oldResult = firstValueFrom(access.rehydrate());
+    const oldResult = lastValueFrom(access.rehydrate(), { defaultValue: AccessState.Indeterminate });
     const oldCustomer = http.expectOne(url('customer/me'));
     const oldUser = http.expectOne(url('internal/me'));
+    staging.stage(AccessContext.User, 'user-csrf');
     const newResult = firstValueFrom(access.acceptAuthenticated(AccessContext.User));
-    flushUser();
+    expect(oldCustomer.cancelled).toBe(true);
+    expect(oldUser.cancelled).toBe(true);
+    http.expectOne(url('internal/me')).flush({ id: user.id, roles: user.roles.map((role) => role.wire) });
+    http.expectNone(url('internal/auth/csrf'));
     await newResult;
-    oldCustomer.flush(customer);
-    http.expectOne(url('customer/auth/csrf')).flush({}, { headers: { [CSRF_HEADER]: 'stale' } });
-    oldUser.flush({}, { status: 401, statusText: 'Unauthorized' });
+    http.expectNone(url('customer/auth/csrf'));
     expect((await oldResult).kind).toBe(AccessStateKind.Indeterminate);
     expect(userSession.csrf()).toBe('user-csrf');
     expect(customerSession.authenticated()).toBe(false);
     expect(access.state().activeContext).toBe(AccessContext.User);
+  });
+  it('removes the previous same-realm actor before probing a newly issued session', async () => {
+    userSession.commit(user, 'actor-a-csrf');
+    customerSession.commit(customer, 'customer-csrf');
+    staging.stage(AccessContext.User, 'actor-b-csrf');
+    const result = firstValueFrom(access.acceptAuthenticated(AccessContext.User));
+    expect(userSession.authenticated()).toBe(false);
+    expect(userSession.principal()).toBeNull();
+    expect(userSession.csrf()).toBe('');
+    expect(customerSession.principal()).toEqual(customer);
+    http.expectOne(url('internal/me')).flush({}, { status: 503, statusText: 'Unavailable' });
+    expect((await result).kind).toBe(AccessStateKind.Indeterminate);
+    expect(userSession.authenticated()).toBe(false);
+    expect(customerSession.csrf()).toBe('customer-csrf');
   });
   it('requires local choice for two sessions and sends no context-selection request', async () => {
     const result = firstValueFrom(access.rehydrate());
@@ -177,13 +196,13 @@ describe('AccessCoordinator', () => {
   });
   it('suppresses an in-flight probe after logout', async () => {
     userSession.commit(user, 'accepted');
-    const result = firstValueFrom(access.rehydrate());
+    const result = lastValueFrom(access.rehydrate(), { defaultValue: AccessState.Indeterminate });
     const pending = http.expectOne(url('internal/me'));
     absent('customer/me');
     const logout = firstValueFrom(access.logout(AccessContext.User));
+    expect(pending.cancelled).toBe(true);
     http.expectOne(url('internal/auth/logout')).flush({}); await logout;
-    pending.flush({ id: user.id, roles: [UserRole.Operator.wire] });
-    http.expectOne(url('internal/auth/csrf')).flush({}, { headers: { [CSRF_HEADER]: 'stale' } });
+    http.expectNone(url('internal/auth/csrf'));
     await result;
     expect(userSession.authenticated()).toBe(false);
     expect(userSession.csrf()).toBe('');

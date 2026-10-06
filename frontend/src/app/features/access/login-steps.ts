@@ -8,7 +8,8 @@ import { ReturnDestination } from '../../domain/access/return-destination';
 /** Captures only a validated destination and never keeps a credential copy. */
 export class CredentialCaptureStep {
   capture(email: string, password: string, destination: ReturnDestination): AccessCredentials | null {
-    if (!email.trim() || email.length > 320 || password.length < 12 || password.length > 128) return null;
+    const passwordCodePoints = [...password].length;
+    if (!email.trim() || email.length > 320 || passwordCodePoints < 12 || passwordCodePoints > 128) return null;
     const returnPath = destination === ReturnDestination.Unknown ? '/' : destination.routeFor(AccessContext.Customer) ?? destination.routeFor(AccessContext.User) ?? '/';
     return { email: email.trim(), password, returnPath };
   }
