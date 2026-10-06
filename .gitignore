@@ -38,3 +38,6 @@ frontend/dist/
 frontend/.angular/
 frontend/playwright-report/
 frontend/test-results/
+frontend/ua-real-results/
+!/docs/testing/
+!/docs/testing/**

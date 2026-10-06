@@ -5,7 +5,7 @@ La estructura Angular ya está: container → view → store → use case → HT
 UX reemplaza el HTML de la view; no toca stores ni dominio.
 Prompt para la IA de diseño (todas las pantallas): `docs/agent/frontend/ux-design-prompt.md`.
 Handoff: `docs/agent/frontend/ux-handoff.md`.
-Identidades: **customer** (compra) y **user** (operador). No se mezclan.
+Identidades: **customer** (compra) y **user** (operador). No se mezclan. `/login` es la única entrada visual; las rutas de sesión legacy son redirects compatibles y no nuevas pantallas. Los endpoints HTTP legacy siguen soportados, no deprecados, hasta cerrar el gate UA-007. BlackStore no se federa con este acceso. Prevalece el [WIP unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
 
 ## Público
 
@@ -14,12 +14,13 @@ Identidades: **customer** (compra) y **user** (operador). No se mezclan.
 | P-01 | `/` | `storefront-home.view.html` | Home configurable (bloques). Vacío si no hay contenido. |
 | P-02 | `/catalog` | `catalog-page.view.html` | Búsqueda, marca, categoría, sólo ofertas, listado. |
 | P-03 | `/catalog/:sku` | `product-page.view.html` | Detalle: imágenes, variantes, precio **effective**, agregar al carrito. |
+| A-01 | `/login` | `login.view.html` | Credenciales; selección sólo de contextos verificados. |
 
 ## Customer
 
 | ID | Ruta | Guard | HTML | Qué pide UX |
 |---|---|---|---|---|
-| C-01 | `/customer/session` | no | `customer-session.view.html` | Login. |
+| C-01 | `/customer/session` | no | — | Redirect compatible a `/login`; conserva sólo destino cerrado validado. |
 | C-02 | `/customer/register` | no | `customer-register.view.html` | Alta de cuenta (nombre, email, password). |
 | C-03 | `/customer/profile` | sí | `customer-profile.view.html` | Editar nombre/email/teléfono. |
 | C-04 | `/customer/addresses` | sí | `customer-addresses.view.html` | Listar, alta y edición de entrega. |
@@ -33,7 +34,8 @@ Identidades: **customer** (compra) y **user** (operador). No se mezclan.
 
 | ID | Ruta | Guard | HTML | Qué pide UX |
 |---|---|---|---|---|
-| U-01 | `/user/session` | no | `user-session.view.html` | Login operador. |
+| U-01 | `/user/session` | no | — | Redirect compatible a `/login`; conserva sólo destino cerrado validado. |
+| U-HOME | `/user/home` | sí | Template de `user-home.component.ts` | Acciones derivadas de los roles USER actuales conocidos. |
 | U-02 | `/user/content` | sí | `user-content.view.html` | Editar home. |
 | U-03 | `/user/catalog` | sí | `user-catalog.view.html` | Productos (SKU, imágenes, variantes, precios separados) + marcas + categorías. |
 | U-04 | `/user/promos` | sí | `user-promos.view.html` | Promos MANUAL: vigencia, prioridad, margen, aprobador. |

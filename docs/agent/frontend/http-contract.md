@@ -19,6 +19,14 @@ Un error conserva el status HTTP en `code`, `data: null`, `errorCode` estable y 
 | GET | `/api/v1/catalog/categories` | no | `{ id, name }[]` |
 | GET | `/api/v1/content/home` | no | `{ title, blocks }` |
 
+## Acceso unificado (UA-005; UA-007 abierto)
+
+`/login` es la única entrada visual. Usa `POST /api/v1/auth/login` con `{ email, password, returnPath? }` y, sólo ante un challenge verificado, `POST /api/v1/auth/context-selection` con `{ challenge, context }`. Ambos validan el Origin exacto configurado y no se reintentan automáticamente. El contrato de respuestas, destinos cerrados y errores está en [OpenAPI unified access](../../../sdd/wip/20261003-unified-access-entry/2-technical/api/unified-access.openapi.yaml).
+
+El mapper traduce a tipos cerrados antes de efectos. Sólo un resultado autenticado instala principal y CSRF en su realm; un challenge no crea sesión ni instala CSRF. Con dos sesiones existentes verificadas, la elección es local y no consume un challenge. Cookies, roles y logout siguen separados. BlackStore tiene identidad propia: este flujo no federa ni emite acceso BlackStore.
+
+`/customer/session` y `/user/session` son redirects compatibles a `/login`, conservando sólo un destino cerrado validado. Los dos POST de login realm-specific listados abajo siguen soportados y no están deprecados. UA-007 requiere inventario de consumidores y E2E contra backend real antes de cualquier deprecación; una suite con HTTP mockeado no cierra ese gate. Ver [addendum frontend](../../../sdd/wip/20261003-unified-access-entry/2-technical/frontend-coordination-addendum.md).
+
 ## Sesiones CUSTOMER (TASK-004)
 
 El cliente usa `fetch`/`HttpClient` con `credentials: 'include'`. No hay `Authorization`, Bearer, JWT, refresh token ni token de sesión en JSON, storage, URL, telemetry o logs. El backend elige exclusivamente la cookie `__Host-storecore-customer`; recibir la cookie interna o un realm equivocado es `401` genérico.
@@ -26,7 +34,7 @@ El cliente usa `fetch`/`HttpClient` con `credentials: 'include'`. No hay `Author
 | Método | Ruta | CSRF | Body/resultado |
 |---|---|---|---|
 | POST | `/api/v1/customer/auth/register` | no | `{ email, password, firstName, lastName }` → `201`, `Set-Cookie`, `X-CSRF-Token`, `data: { id, email, firstName, lastName }` |
-| POST | `/api/v1/customer/auth/login` | no | `{ email, password }` → `200`, `Set-Cookie`, `Cache-Control: no-store`, `X-CSRF-Token`, perfil mínimo |
+| POST | `/api/v1/customer/auth/login` | no | Compatibilidad legacy soportada, no deprecada: `{ email, password }` → `200`, `Set-Cookie`, `Cache-Control: no-store`, `X-CSRF-Token`, perfil mínimo |
 | POST | `/api/v1/customer/auth/logout` | sí | `204`, revoca una vez y expira la misma cookie (`Path=/`) |
 | GET | `/api/v1/customer/auth/csrf` | cookie | `200`, `Cache-Control: no-store`, header `X-CSRF-Token`; no rota |
 | GET/PUT | `/api/v1/customer/me` | PUT sí | PUT `{ email, firstName, lastName, phone }`; perfil propio |
@@ -41,7 +49,7 @@ La sesión interna usa sólo `__Host-storecore-internal`, nunca se comparte con 
 
 | Método | Ruta | CSRF | Body/resultado |
 |---|---|---|---|
-| POST | `/api/v1/internal/auth/login` | no | `{ email, password }` → `200`, `Set-Cookie`, `Cache-Control: no-store`, `X-CSRF-Token`, perfil/roles actuales |
+| POST | `/api/v1/internal/auth/login` | no | Compatibilidad legacy soportada, no deprecada: `{ email, password }` → `200`, `Set-Cookie`, `Cache-Control: no-store`, `X-CSRF-Token`, perfil/roles actuales |
 | POST | `/api/v1/internal/auth/logout` | sí | `204`, revoca una vez y expira la misma cookie |
 | GET | `/api/v1/internal/auth/csrf` | cookie | `200`, `Cache-Control: no-store`, `X-CSRF-Token`; no rota |
 | GET | `/api/v1/internal/me` | no | `{ id, email, firstName, lastName, roles }` |
