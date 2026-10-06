@@ -6,10 +6,12 @@
 - Reviewed head: `d20556baabe22f6a8227283215945baabe188fb0`
 - Verdict: **APPROVED**
 
-The independent reviewer inspected the complete diff and final delta. Database
-queries introduced by the harness are SELECT-only, accept only regex-restricted
-fixture emails, never read challenge tokens or passwords and do not mutate TTL,
-consumption or triggers. Expiry uses the real UI and confirms rejection, reset,
+The independent reviewer inspected the complete diff and final delta. The
+challenge-inspection queries introduced by the final expiry delta are
+SELECT-only, accept only regex-restricted fixture emails, never read challenge
+tokens or passwords and do not mutate TTL, consumption or triggers. The wider
+test harness intentionally provisions fixtures and removes fixture USER roles
+for its role-loss cases. Expiry uses the real UI and confirms rejection, reset,
 no new sessions and an expired, unconsumed row. No P0–P3 security findings
 remain.
 
