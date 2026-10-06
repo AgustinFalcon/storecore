@@ -19,7 +19,7 @@ import java.util.UUID
 
 @Repository
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcAccessChallengeStore(
+open class JdbcAccessChallengeStore(
     private val jdbc: JdbcTemplate,
     private val tokens: OpaqueTokenFactory,
 ) : AccessChallengePort {
