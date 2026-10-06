@@ -15,8 +15,8 @@ paths:
               required: [email, password]
               properties:
                 email: { type: string }
-                password: { type: string, writeOnly: true }
-                returnPath: { type: string }
+                password: { type: string, minLength: 12, maxLength: 128, writeOnly: true }
+                returnPath: { type: string, maxLength: 2048 }
       responses:
         '200':
           description: Authenticated or context selection required
@@ -35,6 +35,10 @@ paths:
           description: Generic authentication rejection
           content:
             application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '403':
+          description: Invalid or absent exact Origin
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
         '429':
           description: Shared authentication budget exhausted
           content:
@@ -50,7 +54,7 @@ paths:
               type: object
               required: [challenge, context]
               properties:
-                challenge: { type: string, writeOnly: true }
+                challenge: { type: string, minLength: 32, maxLength: 256, writeOnly: true }
                 context: { type: string, enum: [CUSTOMER, USER] }
       responses:
         '200':
@@ -72,6 +76,10 @@ paths:
             application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
         '403':
           description: Invalid origin or challenge binding
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
+        '429':
+          description: Challenge abuse budget exhausted
           content:
             application/json: { schema: { $ref: '#/components/schemas/BaseResponse' } }
 components:
@@ -123,4 +131,3 @@ components:
         kind:
           type: string
           enum: [HOME, CATALOG, CUSTOMER_PROFILE, CUSTOMER_ORDERS, USER_ORDERS]
-        resourceId: { type: string }

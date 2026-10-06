@@ -12,3 +12,6 @@
 
 - 2026-10-04: Removed the final nullable mismatch from BaseResponse.code after Astra P3 review.
 - 2026-10-04: Added closed validated destination to login and challenge responses after independent security review.
+
+- 2026-10-06: Astra master audit and Sol gate found four implementation blockers: atomic shared budget, concrete USER home/destination matrix, rehydration/CSRF ownership, and stale BlackStore dependency.
+- 2026-10-06: Added `implementation-decisions.md` closing those contracts before code. Implementation remains blocked until two independent Sol reviews approve this exact addendum SHA.
