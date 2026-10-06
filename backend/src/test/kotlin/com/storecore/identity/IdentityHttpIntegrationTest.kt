@@ -528,7 +528,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
-    fun unifiedEndpointsRequireTheConfiguredExactOrigin() {
+    fun corsRejectsDisallowedUnifiedOriginBeforeControllerHandling() {
         val response = exchange(
             "/api/v1/auth/login",
             HttpMethod.POST,
@@ -536,8 +536,8 @@ class IdentityHttpIntegrationTest(
             origin = "https://evil.example",
         )
         assertEquals(403, response.statusCode.value())
-        assertEquals(true, response.body!!.contains("CSRF_INVALID"))
-        assertEquals(true, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).any { it.contains("__Host-storecore_access_challenge=") && it.contains("Max-Age=0") })
+        assertEquals(null, response.headers.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
+        assertEquals(0, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).size)
     }
 
     private fun provisionAdmin(email: String) {
