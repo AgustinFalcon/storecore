@@ -1,3 +1,5 @@
+VERDICT: APPROVED
+
 # GPT-6.1 Sol architecture review — PR #166
 
 - Date: 2026-10-06
@@ -15,9 +17,12 @@ domain types, SOLID boundaries, candidate verification versus session issuance,
 transactional challenge consumption, legacy compatibility, trusted proxies,
 V11, tests and SDD traceability.
 
-- `git diff --check 8e72bb4c..fae95f9`: PASS
-- local focused evidence: 38 tests, zero failures/errors
-- GitHub Verify `37497935693` on the reviewed head:
+- reviewer-executed `git diff --check 8e72bb4c..fae95f9`: PASS
+- coordinator-provided local evidence: 38 focused tests, zero failures/errors;
+  the reviewer inspected the existing Surefire reports, while an attempted Maven
+  rerun was blocked by local launcher access permissions
+- coordinator-verified GitHub Verify `37497935693` on the reviewed head (the
+  reviewer did not query the run directly):
   - backend SUCCESS, full PostgreSQL/Testcontainers suite
   - frontend SUCCESS, architecture/lint/tests/build/Chromium accessibility
 
@@ -31,8 +36,6 @@ The domain fails closed on unknown values, verification does not issue sessions,
 challenge consumption and issuance share one transaction, identity and USER
 roles are revalidated, and realm cookies/CSRF/authorization remain separate.
 
-## Verdict
-
-**APPROVED** for the exact reviewed head. This is the backend cut only;
+The approval applies to the exact reviewed head. This is the backend cut only;
 UA-005–UA-007 remain open and this verdict does not claim the unified frontend
 or complete WIP closure.

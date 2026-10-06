@@ -1,3 +1,5 @@
+VERDICT: APPROVED
+
 # GPT-6.1 Sol security review — PR #166
 
 - Date: 2026-10-06
@@ -15,7 +17,8 @@ nonce binding, replay/races, rollback, subject/role revalidation, V11 ACL and
 trigger behavior, SQLSTATE translation, validation and adversarial tests.
 
 - `git diff --check 8e72bb4c..fae95f9`: PASS
-- GitHub Verify `37497935693` on the reviewed head: backend and frontend SUCCESS
+- coordinator-verified GitHub Verify `37497935693` on the reviewed head: backend
+  and frontend SUCCESS
 - Hosted backend evidence includes the full PostgreSQL/Testcontainers suite
 
 ## Findings
@@ -33,6 +36,4 @@ Challenge evidence is hash-only, immutable to runtime except the allowed consume
 transition, locked and rechecked against database time, and consumed in the same
 transaction as session issuance. Infrastructure errors are not masked.
 
-## Verdict
-
-**APPROVED** for the exact reviewed head.
+The approval applies to the exact reviewed head.
