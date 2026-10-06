@@ -32,22 +32,36 @@ challenge endpoint because no challenge exists and no new session is needed.
 
 CUSTOMER and USER session probes are independent. Their closed outcomes are:
 
-- `Authenticated`: the realm is valid and its CSRF token may be installed;
+- `Authenticated`: the realm is valid and its CSRF token is installed atomically;
 - `Anonymous`: HTTP 401 invalidates only that realm and clears only its CSRF;
 - `Unavailable`: timeout, transport failure or HTTP 5xx leaves that realm
   unknown for the current attempt and never erases a successfully probed realm;
 - `Unknown`: malformed or unsupported payload fails closed for that realm.
 
-Zero authenticated sessions yields anonymous state. One authenticated session
-selects that realm. Two authenticated sessions use the active-context hint only
-when it names one of those probed realms; otherwise the UI asks the person to
-choose. `Unavailable` and `Unknown` never grant authority and never turn another
-realm's successful probe into anonymous state.
+Two `Anonymous` results yield confirmed anonymous state and clear both realms.
+When no realm is authenticated and either result is `Unavailable` or `Unknown`,
+the aggregate result is the closed `Indeterminate` case: it grants no authority,
+does not claim that logout occurred and preserves the last accepted local state
+until an explicit successful probe, login or logout supersedes it. One
+authenticated session selects that realm even when the other probe is
+anonymous, unavailable or unknown; the latter cannot erase the successful
+realm. Two authenticated sessions use the active-context hint only when it
+names one of those probed realms; otherwise the UI asks the person to choose.
+`Unavailable`, `Unknown` and `Indeterminate` never grant authority.
+
+Each realm probe is one atomic accepted result consisting of `/me` principal
+(and closed USER roles when applicable) plus its realm-specific CSRF response.
+The coordinator stages both responses under the same generation and publishes
+`Authenticated` only after both succeed. If `/me` succeeds but CSRF is 401,
+timeout, 5xx, malformed or stale, that staged principal is not published; the
+realm yields `Anonymous`, `Unavailable`, `Unknown` or is discarded as stale as
+appropriate. There is no partially authenticated/read-only realm state.
 
 Only one rehydration flight may run at a time. Concurrent callers share its
 result. Each flight carries a monotonically increasing generation; a response
-from an older generation cannot overwrite a newer login, logout or probe. CSRF
-rotation is applied once per accepted result and per realm.
+from an older generation cannot overwrite a newer login, logout or probe.
+Principal, roles and CSRF are committed together once per accepted result and
+per realm.
 
 ## Mutation and CSRF rules
 
@@ -66,6 +80,13 @@ challenge, anonymous, unavailable or unknown result applies no CSRF token.
 Legacy realm-specific calls keep their existing realm-specific CSRF handling
 until UA-007. Logout revokes and clears only the selected realm.
 
+A fresh `ContextSelectionRequired` result preserves every already accepted
+realm session and CSRF value; it adds only the ephemeral challenge flow state.
+An immediate authenticated login or a completed challenge selection replaces
+only the principal, roles and CSRF of the realm named by the authenticated
+closed result. The other realm remains untouched. A rejected or expired
+challenge clears only challenge flow state and cannot log out either realm.
+
 ## Navigation and authorization
 
 `/login` is the single visible login entry. Legacy UI session routes redirect
@@ -80,7 +101,8 @@ coordinator's accepted closed state and redirect unauthenticated entry to
 
 ## Verification gate
 
-UA-005 is complete only with mapper/domain tests (including `Unknown`), the
+UA-005 is complete only with mapper/domain tests (including `Unknown`), an HTTP
+contract test for the exact `/api/v1/auth/context-selection` path, the
 zero/one/two-session rehydration matrix, partial-failure and stale-response
 tests, duplicate-submit tests, response-realm CSRF tests, isolated logout,
 role-loss and guard tests, plus accessibility coverage for both login stages and
