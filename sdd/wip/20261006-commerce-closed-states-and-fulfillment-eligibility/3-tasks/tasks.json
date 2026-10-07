@@ -7,8 +7,8 @@
   "stats": {
     "total": 6,
     "done": 0,
-    "in_progress": 5,
-    "blocked": 1,
+    "in_progress": 6,
+    "blocked": 0,
     "pending": 0
   },
   "tasks": [
@@ -21,7 +21,7 @@
         "CFE-R01",
         "CFE-R08"
       ],
-      "evidence": "Sol documental APPROVED/GO registrado; inventario consumer-inventory.md completo; regresión sin pago corregida y compila, pero rojo PostgreSQL inicial NOT_RUN por ACL/Docker."
+      "evidence": "Inventario completo y regresión integrada por PR #171; backend exact-head 37630043935 success. Rojo inicial no reproducido; no se lo declara retroactivamente. Aceptación completa sigue abierta."
     },
     {
       "id": "CFE-T02",
@@ -34,7 +34,7 @@
         "CFE-R01",
         "CFE-R02"
       ],
-      "evidence": "Tipos/backend snapshot/política/puertos implementados; full Kotlin production/test compile y JUnit local enfocado PASS (ver progress.md); no cierre hasta gates completos."
+      "evidence": "Tipos/backend snapshot/política/puertos integrados por PR #171; backend CI exact-head 37630043935 success y dual GPT-6.1 Sol APPROVED sin P0-P3. No cierre hasta gates completos."
     },
     {
       "id": "CFE-T03",
@@ -50,7 +50,7 @@
         "CFE-R05",
         "CFE-R06"
       ],
-      "evidence": "Evidencia durable/order-first/recepción única/sin restock implementados; tests PostgreSQL authored y compilan; ejecución real/concurrencia/rollback BLOCKED Docker ACL."
+      "evidence": "Evidencia durable/order-first/recepción única/sin restock integrados; backend hospedado exact-head 37630043935 success supera bloqueo local para su suite. Ver progress.md; variantes no acreditadas y gates de aceptación siguen pendientes."
     },
     {
       "id": "CFE-T04",
@@ -65,12 +65,12 @@
         "CFE-R05",
         "CFE-R07"
       ],
-      "evidence": "Tipos/mappers/views/stores implementados; Vitest 20 PASS, lint/tsc/ngc/architecture PASS; build inicial PASS, build final BLOCKED por ACL del ancestro; E2E pendiente."
+      "evidence": "Tipos/mappers/views/stores integrados; frontend exact-head 37630043935 success y dual review APPROVED. Browser CFE específico pendiente; unified-access-real-e2e success sólo acredita su flujo de acceso."
     },
     {
       "id": "CFE-T05",
       "title": "Real wiring, race, migration and negative evidence",
-      "status": "blocked",
+      "status": "in_progress",
       "depends_on": [
         "CFE-T03",
         "CFE-T04"
@@ -85,7 +85,7 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "E01–E09 no cerrados: PostgreSQL/Docker pipe/config ACL; Maven realpath y ng test/final bundle ACL. HTTPS real, clean/upgrade y matrices E08/E09 NOT_RUN; CI no solicitado."
+      "evidence": "CI hospedado exact-head 37630043935 frontend/backend/unified-access-real-e2e success. Browser CFE específico, Flyway clean/upgrade y matriz E01–E09 no acreditada permanecen pendientes; no CI push master ni homologación."
     },
     {
       "id": "CFE-T06",
@@ -104,7 +104,7 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "Dos re-reviews independientes GPT-6.1 Sol medium aprobaron el fingerprint A32AC6027A133696B2A816B168CBC11CFBE83F033A0124F2A87C4802383AB93D sin P0-P3, después de corregir cuatro P2. CI exact-head NOT_RUN; T05 permanece blocked; no publicación."
+      "evidence": "PR #171 MERGED: head b3e4b3baa47f3abdabd4140b3bbcee975e4c3474, merge 84f1b02531609b93376cc61f15374b5f0f682363; CI 37630043935 success. Reviews /root/storecore_exacthead_bug_review y /root/storecore_fulfillment_sdd_review, GPT-6.1 Sol medium, APPROVED sin P0-P3 sobre fingerprint 459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572. Close-out completo pendiente de T05; no archive ni homologación."
     }
   ]
 }
