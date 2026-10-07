@@ -205,3 +205,25 @@ requiere otro head, reviews y CI; ambos runs fallidos permanecen históricos.
 La validación local posterior terminó exit 0: producción/tests Kotlin compilan
 y JUnit focalizado 21/21 PASS. Fingerprint actualizado:
 `59AB25B767934997B233ECD455A1C261E6B26391C3CE2F24132092C3780C0982`.
+
+El tercer CI exact-head `37543796525` volvió a confirmar frontend y E2E real
+PASS. Backend compiló y alcanzó los escenarios nuevos, pero dos checkouts
+posteriores dentro del mismo test reutilizaron el `providerOrderId` que el fake
+de creación había dejado configurado al hacer `bindRemote`. El segundo intento
+violó `mp_checkout_attempts_provider_order_id_key` y abortó la transacción antes
+de las assertions de carrera. Los IDs repetidos (`ORD-RERESERVE-*` y
+`ORD-WRITER-RACE-*`) y el SQLSTATE 23505 quedan conservados como evidencia; no
+se atribuyen al código productivo de idempotencia.
+
+El fixture ahora trata cada `CreationObservation.VerifiedSuccess` configurado
+por `bindRemote` como una respuesta de un solo uso y lo limpia en `finally`,
+incluso si el bind falla. Así, un checkout posterior vuelve al timeout default
+y sólo recibe el provider ID nuevo cuando su propio `bindRemote` lo configura.
+No se relajaron asserts, unicidad, carreras ni comportamiento productivo.
+
+`git diff --check` PASS. Maven local no pudo iniciar por el mismo ACL heredado
+ya documentado (`Error computing real path` / `Acceso denegado` sobre backend),
+por lo que no se declara una validación local nueva. El gate efectivo será el
+CI hospedado completo sobre el próximo head. Fingerprint actualizado de 37
+archivos: `229A7DBF47089E1B892C8DCC00CE9723E6F1D4992BB226371D33CD2782F9BE70`;
+supersede al anterior y requiere reviews duales exact-head más CI verde.

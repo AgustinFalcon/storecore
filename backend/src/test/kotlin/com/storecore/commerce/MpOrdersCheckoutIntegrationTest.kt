@@ -572,10 +572,14 @@ class MpOrdersCheckoutIntegrationTest(
             Fakes.createResult.set(
                 CreationObservation.VerifiedSuccess(providerOrderId, "https://www.mercadopago.com.ar/checkout/$providerOrderId"),
             )
-            val attemptId = if (existing != null && existing.third.isNullOrBlank()) existing.first else attempts.prepare(orderId, UUID.randomUUID())
-            val bound = attempts.postAndBind(attemptId)
-            assertEquals("READY_FOR_REDIRECT", bound["state"], bound.toString())
-            jdbc.queryForObject("SELECT external_reference FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId)!!
+            try {
+                val attemptId = if (existing != null && existing.third.isNullOrBlank()) existing.first else attempts.prepare(orderId, UUID.randomUUID())
+                val bound = attempts.postAndBind(attemptId)
+                assertEquals("READY_FOR_REDIRECT", bound["state"], bound.toString())
+                jdbc.queryForObject("SELECT external_reference FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId)!!
+            } finally {
+                Fakes.createResult.set(null)
+            }
         } else {
             existing.second
         }
