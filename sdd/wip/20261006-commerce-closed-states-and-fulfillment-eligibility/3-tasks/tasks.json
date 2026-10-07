@@ -85,7 +85,7 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "CI hospedado exact-head 37630043935 frontend/backend/unified-access-real-e2e success. Browser CFE específico, Flyway clean/upgrade y matriz E01–E09 no acreditada permanecen pendientes; no CI push master ni homologación."
+      "evidence": "CI hospedado exact-head 37630043935 corresponde a #171, no al diff de aceptación nuevo. Corte local 2026-10-07 agrega assertions/matrices backend y comercio browser + proveedor externo loopback. Compile backend y 21 unit existentes PASS; boundary JDBC mock 2 PASS; check:ua-real PASS con 17 descubiertos (5 CFE). Integración/browser nuevo NOT_RUN por jar ausente/Maven ACL/Docker acceso. Unknown MockHttp separado. Gates E01–E09, clean/upgrade explícito y reviews del nuevo head abiertos; ver progress.md y docs/testing/commerce-fulfillment-real-e2e.md."
     },
     {
       "id": "CFE-T06",

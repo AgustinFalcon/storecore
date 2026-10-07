@@ -171,6 +171,7 @@ class CommerceHttpIntegrationTest(
         val orderId = receipt.path("orderId").asText().toLong()
         assertTrue(orderId > 0)
         assertEquals(com.storecore.commerce.domain.OrderStatus.PENDING_PAYMENT.name, receipt.path("orderStatus").asText())
+        assertEquals(com.storecore.commerce.domain.PaymentStatus.PENDING.name, receipt.path("paymentStatus").asText())
         val before = jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId)
         val ledgerBefore = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku)
         for ((route, commands) in listOf("shipments" to listOf("PACKED", "SHIPPED", "DELIVERED"), "rma" to listOf("RECEIVED", "INSPECTED", "ADJUSTED"))) {
@@ -178,6 +179,8 @@ class CommerceHttpIntegrationTest(
                 val denied = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST, """{"status":"$command"}""", admin.cookie, admin.csrf)
                 assertEquals(400, denied.statusCode.value(), denied.body)
                 assertTrue(denied.body!!.contains("FULFILLMENT_TRANSITION_REJECTED"))
+                val customerDenied = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST, """{"status":"$command"}""", customer.cookie, customer.csrf)
+                assertEquals(401, customerDenied.statusCode.value(), customerDenied.body)
                 assertEquals(before, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM returns WHERE order_id=?", Int::class.java, orderId))
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=?", Int::class.java, orderId))

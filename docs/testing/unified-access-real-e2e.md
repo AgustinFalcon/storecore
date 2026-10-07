@@ -1,8 +1,11 @@
 # Unified access real browser verification
 
 `frontend/npm run test:ua-real` runs the UA-007 acceptance matrix against a real
-PostgreSQL database, Spring Boot application and Angular HTTPS server. It uses no
-HTTP interception or mock responses. This is separate from `test:a11y` and its
+PostgreSQL database, Spring Boot application and Angular HTTPS server. The UA
+suite uses no HTTP interception or mock responses. CFE acceptance now shares
+this harness; its separate Unknown case is explicitly MockHttp, and its lost
+response case forwards a real committed command before dropping the response.
+This is separate from `test:a11y` and its
 backend-less fixtures. No live integration credentials are needed.
 
 ## Prerequisites and commands
@@ -11,7 +14,8 @@ Use Java 17, Maven, Node >=22.12, psql, OpenSSL and a fresh PostgreSQL 16 databa
 named **storecore_ua_e2e**. The fixture account must be able to execute Flyway's
 existing role/ownership migrations. The CI PostgreSQL container user has that
 authority; it is not a production runtime account. Ports 5434, 8080 and 4301 must
-be available. Do not point this harness at an installation database.
+be available, as must loopback port 4302 for the CFE provider simulation. Do not
+point this harness at an installation database.
 
 For a disposable local database, with Docker available:
 
