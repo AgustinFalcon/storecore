@@ -171,9 +171,13 @@ test('CFE E06/E08: committed response loss recovers by authoritative GET and ses
     await route.abort('failed');
   }, { times: 1 });
   const row = await open(page, id);
+  const authoritativeReload = page.waitForResponse((candidate) =>
+    candidate.request().method() === 'GET' && new URL(candidate.url()).pathname === '/api/v1/user/orders');
   await row.getByRole('button', { name: ShipmentTransition.Packed.label, exact: true }).click();
-  await expect.poll(async () => (await read(page, id)).shipmentStatus).toBe(ShipmentStatus.Preparing);
-  await expect((await open(page, id)).getByRole('button', { name: ShipmentTransition.Shipped.label, exact: true })).toBeVisible();
+  expect((await authoritativeReload).status()).toBe(200);
+  await expect(row).toContainText(ShipmentStatus.Preparing.label);
+  await expect(row.getByRole('button', { name: ShipmentTransition.Shipped.label, exact: true })).toBeVisible();
+  expect((await read(page, id)).shipmentStatus).toBe(ShipmentStatus.Preparing);
   expect((await mutate(page, RealmFixture.User, path, { status: ShipmentTransition.Packed.wire })).status()).toBe(400);
   expect(eventCount(id)).toBe(1);
   await advance(page, id, ShipmentTransition.Shipped, ShipmentStatus.Shipped);
