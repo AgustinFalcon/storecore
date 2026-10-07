@@ -6,6 +6,7 @@ import { AccessContext, RealmFixture, apiLogin, assertRealm, database, origin, p
 
 enum FixtureModule { Storefront = 'STOREFRONT', Catalog = 'CATALOG', Payments = 'PAYMENTS_MP', Fulfillment = 'MANUAL_FULFILLMENT', Profile = 'PROFILE_CONTENT' }
 enum FixtureCapabilityState { Active = 'ACTIVE' }
+const cfeAdminEmail = 'cfe-user-admin@example.test';
 
 async function mutate(page: Page, realm: RealmFixture, path: string, data: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<APIResponse> {
   const csrf = await page.request.get(`/api/v1/${realm.path}/auth/csrf`);
@@ -14,11 +15,12 @@ async function mutate(page: Page, realm: RealmFixture, path: string, data: unkno
 }
 
 async function checkout(page: Page): Promise<string> {
-  await apiLogin(page, 'ua-user-admin@example.test');
+  await apiLogin(page, cfeAdminEmail);
   for (const module of Object.values(FixtureModule)) {
     database(`SELECT capability_session_change_configuration(u.id,s.id,'${module}',m.config_version,'${FixtureCapabilityState.Active}','{}'::jsonb,'${randomUUID()}'::uuid,'CFE browser fixture')
       FROM users u JOIN identity_sessions s ON s.user_id=u.id AND s.subject_kind='USER' AND s.revoked_at IS NULL
-      CROSS JOIN module_configurations m WHERE u.email='ua-user-admin@example.test' AND m.module_code='${module}'
+      CROSS JOIN module_configurations m WHERE u.email='${cfeAdminEmail}' AND m.module_code='${module}'
+        AND (m.state<>'${FixtureCapabilityState.Active}' OR m.config<>'{}'::jsonb)
       ORDER BY s.issued_at DESC LIMIT 1;`);
   }
   const sku = `CFE-${randomUUID()}`;
@@ -191,7 +193,7 @@ test('CFE E06/E08: committed response loss recovers by authoritative GET and ses
 });
 
 test('CFE E02/E07 MockHttp only: malformed future states render Unknown safely without commands', async ({ page }) => {
-  await uiLogin(page, 'ua-user-admin@example.test');
+  await uiLogin(page, cfeAdminEmail);
   const raw = 'UNRECOGNIZED_FUTURE_STATE';
   await page.route('**/api/v1/user/orders', (route) => route.fulfill({ json: { status: 200, data: [{
     id: 'unknown-fixture', orderStatus: raw, paymentStatus: raw, shipmentStatus: raw, rmaStatus: raw,
