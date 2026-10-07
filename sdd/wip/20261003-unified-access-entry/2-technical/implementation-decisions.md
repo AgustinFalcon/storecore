@@ -45,7 +45,10 @@ successful consumption and terminal rejection.
 
 Both unified POST endpoints require the configured exact Origin. Challenge
 selection also has a separate bounded abuse budget of ten rejected selections
-per IP plus challenge-hash key in fifteen minutes and returns generic 429.
+per source IP in fifteen minutes and returns generic 429. The supplied
+challenge hash is validated but is deliberately not part of the budget key:
+inventing distinct challenge values cannot allocate distinct buckets or
+exhaust capacity for legitimate sources.
 
 ## Concrete homes and return destinations
 

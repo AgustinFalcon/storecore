@@ -14,6 +14,8 @@
 - Challenge is opaque, server-side, 120 seconds, single-use, atomically
   consumed, bound to the nonce cookie and exact Origin, and invalidated after
   issuance.
+- Bound rejected challenge selections by source IP, not by attacker-controlled
+  challenge value; distinct invented challenges share one rolling budget.
 - Revalidate active identity and current USER roles at challenge consumption.
 - Keep `__Host-` cookies, CSRF generation, SameSite, origin checks, and realm
   guards unchanged.

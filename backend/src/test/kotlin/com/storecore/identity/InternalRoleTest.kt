@@ -85,6 +85,10 @@ class InternalRoleTest {
                     sql.contains("FROM users WHERE email") -> listOf(mapOf("id" to 1L, "password_hash" to "test-hash", "active" to true))
                     else -> error("Unexpected query: $sql")
                 }
+                "queryForObject" -> when {
+                    sql.contains("SELECT active FROM users") -> true
+                    else -> null
+                }
                 "update" -> { writes.add(sql); 1 }
                 else -> null
             }
@@ -92,6 +96,6 @@ class InternalRoleTest {
         val passwords = mock(Argon2PasswordHasher::class.java) { invocation ->
             if (invocation.method.name == "verify") true else null
         }
-        return JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter())
+        return JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter(), com.storecore.identity.infrastructure.security.LoginAttemptBudget())
     }
 }

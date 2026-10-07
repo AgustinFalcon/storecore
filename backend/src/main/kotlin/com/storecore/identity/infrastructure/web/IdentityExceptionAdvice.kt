@@ -1,6 +1,8 @@
 package com.storecore.identity.infrastructure.web
 
 import com.storecore.identity.application.AuthenticationFailed
+import com.storecore.identity.application.AccessChallengeRejected
+import com.storecore.identity.application.UnifiedOriginRejected
 import com.storecore.identity.application.AuthorizationDenied
 import com.storecore.identity.application.CsrfInvalid
 import com.storecore.identity.application.IdentityException
@@ -16,16 +18,26 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
-class IdentityExceptionAdvice {
+class IdentityExceptionAdvice(private val cookies: IdentityCookieWriter) {
     @ExceptionHandler(LoginRateLimited::class)
     fun loginRateLimited(exception: LoginRateLimited): ResponseEntity<BaseResponse<Nothing>> =
         ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
             .cacheControl(org.springframework.http.CacheControl.noStore())
             .header("Retry-After", exception.retryAfterSeconds.toString())
+            .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookies.expireChallenge().toString())
             .body(BaseResponse(429, null, "Request rejected", "AUTH_RATE_LIMITED", false, null))
 
     @ExceptionHandler(AuthenticationFailed::class)
     fun authenticationFailed(): ResponseEntity<BaseResponse<Nothing>> = error(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED")
+
+    @ExceptionHandler(AccessChallengeRejected::class)
+    fun challengeRejected(): ResponseEntity<BaseResponse<Nothing>> = authenticationError()
+
+    @ExceptionHandler(UnifiedOriginRejected::class)
+    fun unifiedOriginRejected(): ResponseEntity<BaseResponse<Nothing>> = ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookies.expireChallenge().toString())
+        .body(BaseResponse(403, null, "Request rejected", "CSRF_INVALID", false, null))
 
     @ExceptionHandler(AuthorizationDenied::class)
     fun authorizationDenied(): ResponseEntity<BaseResponse<Nothing>> = error(HttpStatus.FORBIDDEN, "AUTHORIZATION_DENIED")
@@ -56,4 +68,9 @@ class IdentityExceptionAdvice {
     private fun error(status: HttpStatus, errorCode: String) =
         ResponseEntity.status(status).cacheControl(org.springframework.http.CacheControl.noStore())
             .body(BaseResponse<Nothing>(status.value(), null, "Request rejected", errorCode, false, null))
+
+    private fun authenticationError() = ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .cacheControl(org.springframework.http.CacheControl.noStore())
+        .header(org.springframework.http.HttpHeaders.SET_COOKIE, cookies.expireChallenge().toString())
+        .body(BaseResponse<Nothing>(401, null, "Request rejected", "AUTHENTICATION_FAILED", false, null))
 }
