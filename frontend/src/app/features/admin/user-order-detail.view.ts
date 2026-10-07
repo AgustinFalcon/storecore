@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { nextRma, nextShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
+import { allowedRma, allowedShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -25,10 +25,10 @@ export class UserOrderDetailViewComponent {
   readonly rmaLabel = rmaLabel;
 
   nextShip(order: AdminOrder) {
-    return nextShipment(order.shipmentStatus);
+    return this.loading ? null : allowedShipment(order);
   }
 
   nextReturn(order: AdminOrder) {
-    return nextRma(order.rmaStatus);
+    return this.loading ? null : allowedRma(order);
   }
 }

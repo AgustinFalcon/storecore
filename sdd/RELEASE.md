@@ -19,6 +19,13 @@
 
 No se crea tag, release, importación ni publicación hasta completar estos checks y tener aprobación explícita.
 
+El corte local CFE de 2026-10-06 tiene GO documental y diff sin commit. No
+autoriza release: faltan PostgreSQL/E2E/carreras/rollback/clean/upgrade, bundle
+final y review dual/CI del head. Ante un eventual fallo, el rollback no puede
+reabrir despacho sin pago: detener escrituras mediante la capability existente,
+con autorización operativa separada. Disposición/restock sigue diferido; no hay
+migración nueva ni homologación externa en este corte.
+
 ## Gate `release/1.0` de integración BlackStore
 
 - [ ] `master` homologado con CI y reviews sobre el SHA final de cada corte core.

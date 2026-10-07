@@ -198,8 +198,8 @@ export function mapReceipt(value: unknown): CheckoutReceipt {
   const row = asRecord(value);
   return {
     orderId: text(row['orderId']),
-    paymentStatus: text(row['paymentStatus']),
-    orderStatus: text(row['orderStatus']),
+    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
+    orderStatus: OrderStatus.fromWire(row['orderStatus']),
     checkoutUrl: text(row['checkoutUrl']) || null,
   };
 }
@@ -208,9 +208,9 @@ function mapOrder(value: unknown): CustomerOrder {
   const row = asRecord(value);
   return {
     id: text(row['id']),
-    orderStatus: text(row['orderStatus']),
-    paymentStatus: text(row['paymentStatus']),
-    shipmentStatus: text(row['shipmentStatus']),
+    orderStatus: OrderStatus.fromWire(row['orderStatus']),
+    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
+    shipmentStatus: ShipmentStatus.fromWire(row['shipmentStatus']),
     tracking: text(row['tracking']) || null,
     total: num(row['total']),
     lines: items(row['lines']).map(mapCartLine),
@@ -227,7 +227,7 @@ export function mapCustomerOrders(value: unknown): readonly CustomerOrder[] {
 
 export function mapAdminOrder(value: unknown): AdminOrder {
   const row = asRecord(value);
-  return { ...mapOrder(value), rmaStatus: text(row['rmaStatus']) || null };
+  return { ...mapOrder(value), rmaStatus: RmaStatus.fromWire(row['rmaStatus']), fulfillmentEligibility: FulfillmentEligibility.fromWire(row['fulfillmentEligibility']), shipmentAction: row['shipmentAction'] == null ? null : ShipmentTransition.fromWire(row['shipmentAction']), rmaAction: row['rmaAction'] == null ? null : RmaTransition.fromWire(row['rmaAction']) };
 }
 
 export function mapAdminOrders(value: unknown): readonly AdminOrder[] {
@@ -307,3 +307,4 @@ export function mapListing(value: unknown): MercadoLibreListing {
 export function mapListings(value: unknown): readonly MercadoLibreListing[] {
   return items(value).map(mapListing);
 }
+import { OrderStatus, PaymentStatus, ShipmentStatus, RmaStatus, FulfillmentEligibility, ShipmentTransition, RmaTransition } from '../../domain/order/commerce-states';

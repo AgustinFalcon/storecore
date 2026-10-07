@@ -26,6 +26,7 @@ import java.util.UUID
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = ["storecore.installation-guard.enabled=false"])
 class CommerceHttpIntegrationTest(
+    @Autowired private val mapper: com.fasterxml.jackson.databind.ObjectMapper,
     @Autowired private val http: TestRestTemplate,
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
@@ -141,7 +142,7 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
-    fun `promo overlap conflicts and fulfillment rma stays ordered`() {
+    fun `promo overlap conflicts`() {
         val sku = "SKU-PROMO-${UUID.randomUUID()}"
         putProduct(sku, "Promo Item", available = 5, safety = 0)
         val from = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
@@ -155,40 +156,34 @@ class CommerceHttpIntegrationTest(
         assertEquals(409, overlap.statusCode.value())
         assertTrue(overlap.body!!.contains("PROMO_WINDOW_OVERLAP"))
         admin = admin.copy(csrf = overlap.headers.getFirst("X-CSRF-Token") ?: admin.csrf)
+    }
+
+    @Test
+    fun `checkout without official accreditation rejects every fulfillment command without effects`() {
+        val sku = "SKU-UNPAID-${UUID.randomUUID()}"
+        putProduct(sku, "Unpaid item", available = 5, safety = 0)
         customer = addAddress(customer)
         val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
         customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
         val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
-        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1]
-        val skipped = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"DELIVERED","tracking":null}""", admin.cookie, admin.csrf)
-        assertEquals(400, skipped.statusCode.value())
-        val packed = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"PACKED","tracking":null}""", admin.cookie, admin.csrf)
-        assertEquals(200, packed.statusCode.value())
-        assertTrue(packed.body!!.contains("PREPARING"))
-        admin = admin.copy(csrf = packed.headers.getFirst("X-CSRF-Token")!!)
-        val shipped = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"SHIPPED","tracking":"TRK-1"}""", admin.cookie, admin.csrf)
-        assertTrue(shipped.body!!.contains("SHIPPED"))
-        admin = admin.copy(csrf = shipped.headers.getFirst("X-CSRF-Token")!!)
-        val delivered = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"DELIVERED","tracking":"TRK-1"}""", admin.cookie, admin.csrf)
-        assertTrue(delivered.body!!.contains("DELIVERED"))
-        admin = admin.copy(csrf = delivered.headers.getFirst("X-CSRF-Token")!!)
-        val regressed = exchange("/api/v1/user/orders/$orderId/shipments", HttpMethod.POST, """{"status":"PACKED","tracking":null}""", admin.cookie, admin.csrf)
-        assertEquals(400, regressed.statusCode.value())
-        val early = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"ADJUSTED"}""", admin.cookie, admin.csrf)
-        assertEquals(400, early.statusCode.value())
-        admin = admin.copy(csrf = early.headers.getFirst("X-CSRF-Token") ?: admin.csrf)
-        val received = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"RECEIVED"}""", admin.cookie, admin.csrf)
-        assertEquals(200, received.statusCode.value())
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=? AND ri.adjustment_ledger_id IS NOT NULL", Int::class.java, orderId.toLong()))
-        admin = admin.copy(csrf = received.headers.getFirst("X-CSRF-Token")!!)
-        val inspected = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"INSPECTED"}""", admin.cookie, admin.csrf)
-        admin = admin.copy(csrf = inspected.headers.getFirst("X-CSRF-Token")!!)
-        val adjusted = exchange("/api/v1/user/orders/$orderId/rma", HttpMethod.POST, """{"status":"ADJUSTED"}""", admin.cookie, admin.csrf)
-        assertEquals(200, adjusted.statusCode.value())
-        assertTrue(adjusted.body!!.contains("CLOSED") || jdbc.queryForObject("SELECT status FROM returns WHERE order_id=?", String::class.java, orderId.toLong()) == "CLOSED")
-        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='ADJUSTMENT' AND variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=? AND ri.adjustment_ledger_id IS NOT NULL", Int::class.java, orderId.toLong()))
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        val receipt = mapper.readTree(checkout.body!!).path("data")
+        val orderId = receipt.path("orderId").asText().toLong()
+        assertTrue(orderId > 0)
+        assertEquals(com.storecore.commerce.domain.OrderStatus.PENDING_PAYMENT.name, receipt.path("orderStatus").asText())
+        val before = jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId)
+        val ledgerBefore = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku)
+        for ((route, commands) in listOf("shipments" to listOf("PACKED", "SHIPPED", "DELIVERED"), "rma" to listOf("RECEIVED", "INSPECTED", "ADJUSTED"))) {
+            for (command in commands) {
+                val denied = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST, """{"status":"$command"}""", admin.cookie, admin.csrf)
+                assertEquals(400, denied.statusCode.value(), denied.body)
+                assertTrue(denied.body!!.contains("FULFILLMENT_TRANSITION_REJECTED"))
+                assertEquals(before, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
+                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM returns WHERE order_id=?", Int::class.java, orderId))
+                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=?", Int::class.java, orderId))
+                assertEquals(ledgerBefore, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+            }
+        }
     }
 
     @Test

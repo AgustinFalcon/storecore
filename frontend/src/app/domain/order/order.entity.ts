@@ -1,8 +1,11 @@
+import { OrderStatus, PaymentStatus, ShipmentStatus, RmaStatus, FulfillmentEligibility, ShipmentTransition, RmaTransition } from './commerce-states';
+export { ShipmentTransition, RmaTransition } from './commerce-states';
+
 export interface CustomerOrder {
   readonly id: string;
-  readonly orderStatus: string;
-  readonly paymentStatus: string;
-  readonly shipmentStatus: string;
+  readonly orderStatus: OrderStatus;
+  readonly paymentStatus: PaymentStatus;
+  readonly shipmentStatus: ShipmentStatus;
   readonly tracking: string | null;
   readonly total: number;
   readonly lines: readonly {
@@ -18,8 +21,8 @@ export interface CustomerOrder {
 }
 
 export interface AdminOrder extends CustomerOrder {
-  readonly rmaStatus: string | null;
+  readonly rmaStatus: RmaStatus;
+  readonly fulfillmentEligibility: FulfillmentEligibility;
+  readonly shipmentAction: ShipmentTransition | null;
+  readonly rmaAction: RmaTransition | null;
 }
-
-export type ShipmentTransition = 'PACKED' | 'SHIPPED' | 'DELIVERED';
-export type RmaTransition = 'RECEIVED' | 'INSPECTED' | 'ADJUSTED';

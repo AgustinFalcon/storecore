@@ -12,9 +12,9 @@
       <p class="sc-kicker">Snapshot</p>
       <h1 id="order-detail-title">Orden {{ order.id }}</h1>
       <p>
-        <span class="sc-badge">orden {{ order.orderStatus }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus }}</span>
+        <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
       </p>
     </header>
     <div class="sc-workbench">

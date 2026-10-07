@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { switchMap, tap } from 'rxjs';
+import { exhaustMap, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { AdvanceFulfillmentUseCase } from '../../domain/order/use-cases/advance-fulfillment.usecase';
@@ -29,7 +29,7 @@ export class FulfillmentStore extends ComponentStore<FulfillmentState> {
 
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      tap(() => this.patchState({ loading: true, errorMessage: '', orders: [] })),
       switchMap(() =>
         this.listAdmin.execute().pipe(
           tapResponse({
@@ -43,11 +43,12 @@ export class FulfillmentStore extends ComponentStore<FulfillmentState> {
 
   readonly ship = this.effect<{ orderId: string; status: ShipmentTransition; tracking: string | null }>((cmd$) =>
     cmd$.pipe(
-      switchMap((cmd) =>
+      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      exhaustMap((cmd) =>
         this.advance.ship(cmd.orderId, cmd.status, cmd.tracking).pipe(
           tapResponse({
             next: () => this.load(),
-            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => { this.load(); this.patchState({ errorMessage: getApiErrorMessage(err) }); },
           }),
         ),
       ),
@@ -56,11 +57,12 @@ export class FulfillmentStore extends ComponentStore<FulfillmentState> {
 
   readonly rma = this.effect<{ orderId: string; status: RmaTransition }>((cmd$) =>
     cmd$.pipe(
-      switchMap((cmd) =>
+      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      exhaustMap((cmd) =>
         this.advance.rma(cmd.orderId, cmd.status).pipe(
           tapResponse({
             next: () => this.load(),
-            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => { this.load(); this.patchState({ errorMessage: getApiErrorMessage(err) }); },
           }),
         ),
       ),

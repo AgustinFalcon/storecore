@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.commerce.application.port.output.InventoryConsumePort
 import com.storecore.commerce.application.port.output.OfficialOrderQueryPort
 import com.storecore.commerce.domain.CommercialEffect
+import com.storecore.commerce.domain.OrderStatus
+import com.storecore.commerce.domain.PaymentStatus
+import com.storecore.commerce.domain.CheckoutAttemptState
+import com.storecore.commerce.domain.ReservationStatus
 import com.storecore.commerce.domain.MpOrderCommercialPolicy
 import com.storecore.commerce.domain.OfficialOrderResource
 import com.storecore.commerce.domain.OfficialOrderStatusInput
@@ -79,6 +83,13 @@ class MpOrderApplicationWorker(
             quarantine(inboxId, "REFETCHED_ORDER_ID_MISMATCH")
             return false
         }
+        // All eligibility writers serialize on orders before attempts/payments/children.
+        val orderId = jdbc.query("SELECT order_id FROM mp_checkout_attempts WHERE provider_order_id=?", { rs, _ -> rs.getLong("order_id") }, official.providerOrderId).singleOrNull()
+        if (orderId == null) {
+            quarantine(inboxId, "ATTEMPT_NOT_BOUND")
+            return false
+        }
+        jdbc.query("SELECT id FROM orders WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong("id") }, orderId)
         val attempt = jdbc.query(
             """SELECT a.id,a.order_id,a.payment_id,a.external_reference,a.amount,a.currency,a.state
                FROM mp_checkout_attempts a WHERE a.provider_order_id=? FOR UPDATE""",
@@ -86,7 +97,7 @@ class MpOrderApplicationWorker(
                 AttemptRow(
                     rs.getLong("id"), rs.getLong("order_id"), rs.getLong("payment_id"),
                     rs.getString("external_reference"), rs.getBigDecimal("amount"),
-                    rs.getString("currency"), rs.getString("state"),
+                    rs.getString("currency"), CheckoutAttemptState.fromWire(rs.getString("state")),
                 )
             },
             official.providerOrderId,
@@ -150,8 +161,8 @@ class MpOrderApplicationWorker(
         persistTransactions(attempt.id, official)
         jdbc.update("UPDATE payments SET status='APPROVED',updated_at=now() WHERE id=? AND order_id=?", attempt.paymentId, attempt.orderId)
         val stock = consumeOrReview(attempt.orderId)
-        val orderStatus = if (stock) "PAID" else "PAID_STOCK_REVIEW"
-        jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=?", orderStatus, attempt.orderId)
+        val orderStatus = if (stock) OrderStatus.PAID else OrderStatus.PAID_STOCK_REVIEW
+        jdbc.update("UPDATE orders SET status=?,updated_at=now() WHERE id=?", orderStatus.name, attempt.orderId)
         jdbc.update("UPDATE mp_checkout_attempts SET state='ACCREDITED',updated_at=now() WHERE id=?", attempt.id)
         if (!stock) {
             jdbc.update(
@@ -206,11 +217,11 @@ class MpOrderApplicationWorker(
         val reservations = jdbc.query(
             "SELECT id,status,expires_at,variant_id,quantity FROM inventory_reservations WHERE reservation_saga_key=? FOR UPDATE",
             { rs, _ ->
-                ReservationRow(rs.getLong("id"), rs.getString("status"), rs.getTimestamp("expires_at")?.toInstant(), rs.getLong("variant_id"), rs.getInt("quantity"))
+                ReservationRow(rs.getLong("id"), ReservationStatus.fromWire(rs.getString("status")), rs.getTimestamp("expires_at")?.toInstant(), rs.getLong("variant_id"), rs.getInt("quantity"))
             },
             saga,
         )
-        val usable = reservations.filter { it.status == "ACTIVE" && it.expiresAt != null && it.expiresAt.isAfter(java.time.Instant.now()) }
+        val usable = reservations.filter { it.status == ReservationStatus.ACTIVE && it.expiresAt != null && it.expiresAt.isAfter(java.time.Instant.now()) }
         if (usable.size == expectedLines) {
             val consumed = inventory.consumeSaga(saga, "MP_ORDERS:$orderId")
             if (consumed != expectedLines) error("CONSUME_COUNT_MISMATCH")
@@ -239,8 +250,8 @@ class MpOrderApplicationWorker(
     }
 
     private fun terminateUnpaid(inboxId: Long, attempt: AttemptRow, official: OfficialOrderResource, effect: CommercialEffect): Boolean {
-        val paymentStatus = if (effect == CommercialEffect.REJECT) "REJECTED" else "CANCELLED"
-        jdbc.update("UPDATE payments SET status=?,updated_at=now() WHERE id=? AND order_id=? AND status='PENDING'", paymentStatus, attempt.paymentId, attempt.orderId)
+        val paymentStatus = if (effect == CommercialEffect.REJECT) PaymentStatus.REJECTED else PaymentStatus.CANCELLED
+        jdbc.update("UPDATE payments SET status=?,updated_at=now() WHERE id=? AND order_id=? AND status='PENDING'", paymentStatus.name, attempt.paymentId, attempt.orderId)
         jdbc.update("UPDATE orders SET status='CANCELLED',updated_at=now() WHERE id=? AND status='PENDING_PAYMENT'", attempt.orderId)
         jdbc.update("UPDATE mp_checkout_attempts SET state='TERMINAL_UNPAID_VERIFIED',updated_at=now() WHERE id=?", attempt.id)
         persistTransactions(attempt.id, official)
@@ -351,12 +362,12 @@ class MpOrderApplicationWorker(
         val externalReference: String,
         val amount: BigDecimal,
         val currency: String,
-        val state: String,
+        val state: CheckoutAttemptState,
     )
 
     private data class ReservationRow(
         val id: Long,
-        val status: String,
+        val status: ReservationStatus,
         val expiresAt: java.time.Instant?,
         val variantId: Long,
         val quantity: Int,

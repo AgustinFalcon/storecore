@@ -1,0 +1,157 @@
+{
+  "branch": "fix/commerce-fulfillment-eligibility",
+  "files": [
+    {
+      "sha256": "7165931A8894DEA276B65701BDBEE9D07CAA51432CD86AB5D723EF8A3F7C44CF",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/application/FulfillmentUseCase.kt"
+    },
+    {
+      "sha256": "D54E1832D9F37D73F281277936610208E2D2E71A2B0DB9B5CE6604572C40FB1F",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/domain/Commerce.kt"
+    },
+    {
+      "sha256": "52E48F75492AF3D641E0BABBAE64F39C12D813D2E84E1187E2E5F20E87061A38",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/domain/CommerceStates.kt"
+    },
+    {
+      "sha256": "8C8B46A3626039F893ED767E7851E90E55A3423DA1754DD861C284AA95E88837",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/domain/Fulfillment.kt"
+    },
+    {
+      "sha256": "7B4CDF9B9DD3DD4504B2EDEBCB6D2DBD6463B21E32C3EE4DB120CC5745687D52",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/domain/MpCheckoutAttemptPolicy.kt"
+    },
+    {
+      "sha256": "2B402FC13C21FEBC7054111ACC75BE105047558C6630A40D080A5143CF955559",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/JdbcCartService.kt"
+    },
+    {
+      "sha256": "2F6F9EABDFED6B899E030CCB0BE5A8614F6284F40509AF2365B07B8E177021EE",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/JdbcFulfillmentEvidence.kt"
+    },
+    {
+      "sha256": "08B673FB1F01E934512BF142051D6679589A5F0A5E986E3397E3CA9070EFDEEA",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/JdbcFulfillmentRecords.kt"
+    },
+    {
+      "sha256": "9D13C01D3BD0639488468D9D43F9D2B27E09814C057CF882801357BD932D8F97",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/JdbcOrderService.kt"
+    },
+    {
+      "sha256": "BCE4FA01F9923640B4592C0391A3C69B09802D455FEFFB8EDDFFC16CA4A98FD0",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/mporders/MpCheckoutAttemptService.kt"
+    },
+    {
+      "sha256": "B91A43D2380F57AED7A9AC80E7AFE1E18C6996123AFE47AFC6F600007CC8D01A",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/mporders/MpOrderApplicationWorker.kt"
+    },
+    {
+      "sha256": "40AFF15F340B16C3279DCAE7A63941212BF9DB4CE000F8776A84E0FABA7F4CAA",
+      "path": "backend/src/main/kotlin/com/storecore/commerce/infrastructure/OrderController.kt"
+    },
+    {
+      "sha256": "C7366336549FCA41DACB74DB76121C958108F61966B4F1CAEBEC919CD061DA2B",
+      "path": "backend/src/test/kotlin/com/storecore/commerce/CommerceHttpIntegrationTest.kt"
+    },
+    {
+      "sha256": "1667A76FAAA31802E3A369E3BAB7B06D477F7F37EBF2C19134B943170D36E8B3",
+      "path": "backend/src/test/kotlin/com/storecore/commerce/FulfillmentPolicyTest.kt"
+    },
+    {
+      "sha256": "599107063F13919C59E7C04A22AFC80B8801CE551936BFCD6D78CE1B4E194C5D",
+      "path": "backend/src/test/kotlin/com/storecore/commerce/FulfillmentUseCaseTest.kt"
+    },
+    {
+      "sha256": "D3F6AB8055D52E6266431BEEE74328A5681227E63F18A1E754E8C50778EDD0D4",
+      "path": "backend/src/test/kotlin/com/storecore/commerce/MpOrdersCheckoutIntegrationTest.kt"
+    },
+    {
+      "sha256": "86100AA2032F9E5C8B5EE0CF69377E6BFAA2F9381BF7977468A51DA7726AA6C0",
+      "path": "frontend/src/app/data/mappers/http-mappers.spec.ts"
+    },
+    {
+      "sha256": "DDAE3177F5B5AA3B7464AAC93D5445C32A08634E38CEC76CFD06177BF1D4C496",
+      "path": "frontend/src/app/data/mappers/http-mappers.ts"
+    },
+    {
+      "sha256": "6BC2A3B270EBC4F2F95C66201686E420D4EA27845B1E23F84C486BDB7BA859D8",
+      "path": "frontend/src/app/data/order/order-http.repository.ts"
+    },
+    {
+      "sha256": "AE3F3EDF0F83BA3A2330B715080B7BD41818E5CB1265A148CC7C7506C89589C8",
+      "path": "frontend/src/app/domain/cart/cart.entity.ts"
+    },
+    {
+      "sha256": "F79EEF9E2C537F407BF480D26B37FC960A80AFCC62F63A56FADC24E5880C4C4A",
+      "path": "frontend/src/app/domain/cart/use-cases/checkout-cart.usecase.spec.ts"
+    },
+    {
+      "sha256": "E8A55E6DABB2B66CFB953A582E1CD1BAB11900C1AFD35F40927BD369FDB14FB7",
+      "path": "frontend/src/app/domain/order/commerce-states.spec.ts"
+    },
+    {
+      "sha256": "34B685E6F332E2FE211974F3B67E900C7F9166AFBC2438FF21F9C140ABCDC804",
+      "path": "frontend/src/app/domain/order/commerce-states.ts"
+    },
+    {
+      "sha256": "549BDD66CF54DDF9640063273E0CD763208D9DF0D6767575C1DA16D24A6552C7",
+      "path": "frontend/src/app/domain/order/fulfillment-transition.spec.ts"
+    },
+    {
+      "sha256": "6DAAE22DBF44AE11A5B941AF9E245FA9E5B4C2073DBC792C8E74DDCD1A7E2C39",
+      "path": "frontend/src/app/domain/order/fulfillment-transition.ts"
+    },
+    {
+      "sha256": "F83DD05820E80E479860C71D7FE7C30540689D7AE262F3833B26F744EB431291",
+      "path": "frontend/src/app/domain/order/order.entity.ts"
+    },
+    {
+      "sha256": "6DBD0867F27AA80C770579E330BC48CA76E118DD5C37E6FA153AC5C79A766F3F",
+      "path": "frontend/src/app/features/admin/fulfillment.store.spec.ts"
+    },
+    {
+      "sha256": "2CC4AFF5DF6452B348A1ABBB3B007D06175E22010EE1EBA76A522BF1C14087CB",
+      "path": "frontend/src/app/features/admin/fulfillment.store.ts"
+    },
+    {
+      "sha256": "BCA47EE888919E89B00D7D9F2C47064ADA4F851880BEA290035B84170E413485",
+      "path": "frontend/src/app/features/admin/fulfillment.view.html"
+    },
+    {
+      "sha256": "BD3FE55DC4B3584020AE1BDF0D57A41DCD9F4920001E7A4169D5026F4EAED4DD",
+      "path": "frontend/src/app/features/admin/fulfillment.view.ts"
+    },
+    {
+      "sha256": "3B1C48A29CEC905C099CFB8F0065F77A482F4E688045ACAA8FB066814D5D5E37",
+      "path": "frontend/src/app/features/admin/user-order-detail.store.ts"
+    },
+    {
+      "sha256": "62452FB76A445C8BA9446C0FCADBF43B229F178E6CD129ECFBF901B1DE334A78",
+      "path": "frontend/src/app/features/admin/user-order-detail.view.html"
+    },
+    {
+      "sha256": "5E3F9160005B768E45D48652CD57988A69398426BD5084254B52D8AD0F4887F1",
+      "path": "frontend/src/app/features/admin/user-order-detail.view.ts"
+    },
+    {
+      "sha256": "8C274E9933AAC4DA19DDDC87E65CB102CD7D9A4322AC2154DA55BA8617CBC1EA",
+      "path": "frontend/src/app/features/cart/checkout-page.view.html"
+    },
+    {
+      "sha256": "D93E79DA84E684B804560DC19A6427AA9178E4F284564F6B3165C91287646D0F",
+      "path": "frontend/src/app/features/cart/checkout-result.view.html"
+    },
+    {
+      "sha256": "1A6839268F1988F386B1509D172C057F7A21BA8DD16D80BF3EBF48F266052856",
+      "path": "frontend/src/app/features/orders/customer-order-detail.view.html"
+    },
+    {
+      "sha256": "F38497E29C5333CD65BB4E6AAF2F5B17438BD52AB94A29EEE53B43B6F9AB96D6",
+      "path": "frontend/src/app/features/orders/customer-orders.view.html"
+    }
+  ],
+  "source_revision_sha256": "459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572",
+  "revision_kind": "sha256-of-utf8-path-nul-file-sha256-lines",
+  "baseline": "de6a0d7cce780d3db3785468489b237b322b82d9",
+  "supersedes_source_revision_sha256": "229A7DBF47089E1B892C8DCC00CE9723E6F1D4992BB226371D33CD2782F9BE70"
+}
