@@ -278,3 +278,40 @@ Ambos revisores cubrieron el head y fingerprint exactos indicados arriba.
 - WIP y tareas siguen abiertos para close-out completo; sin archive, tag,
   release, deploy, homologación fiscal/carrier/MP ni activación live.
 - TODO-045 conserva disposición/reposición por ítem diferida. No RESTOCK.
+
+## 2026-10-07 — Corte local de aceptación CFE, sin publicación
+
+Implementado en la copia `work/storecore-ua-delivery-master`, sin commit/push/PR.
+Las aprobaciones y CI de #171 no se reutilizan para este diff nuevo.
+
+- E01: `CommerceHttpIntegrationTest` agrega paymentStatus PENDING y rechazo
+  CUSTOMER sobre todos los comandos pendientes, conservando asserts sin efectos.
+- E03/E05: `MpOrdersCheckoutIntegrationTest` exige fechas de envío/entrega no
+  nulas y ordenadas; comandos fuera de orden y balances/ledger intactos alrededor
+  de la concurrencia de dos sesiones.
+- E04/E08: nuevos escenarios PostgreSQL/HTTP para cantidad incompleta/excedida,
+  variante distinta sobre re-reserva, pedido ajeno sin prueba, y matriz sin
+  sesión/CUSTOMER/rol perdido/CSRF/origen/capability/ownership. Compilados, NOT_RUN.
+- E02: `JdbcFulfillmentEvidenceBoundaryTest` ejecuta los row mappers sobre filas
+  JDBC mock para ausencia/multiplicidad/moneda/Unknown y prueba binding exacto
+  de actor SALE. MockJdbc, no PostgreSQL ni HTTP. Constraints vigentes prohíben
+  moneda inválida, doble acreditación y pago huérfano; no se relajaron constraints.
+  Ambos roles USER persistibles tienen permiso; se verifica pérdida de rol.
+- CFE-T05: `frontend/e2e-real/commerce-fulfillment.spec.ts` agrega cuatro journeys
+  reales propuestos y un quinto Unknown MockHttp separado. El harness inicia
+  proveedor externo loopback oficial simulado, configura adapters HTTP/HMAC
+  reales y mantiene worker/DB reales. Respuesta perdida usa forwarding real y
+  abort después de commit. Sin endpoint debug productivo ni credenciales live.
+
+Validaciones locales: `npm run check:ua-real` PASS (17 tests descubiertos; 5 CFE),
+syntax del stub PASS; fallback `work/validate-cfe-backend.ps1 -TestOnly` compila
+toda la suite backend y pasa 21 tests policy/usecase/architecture; runner JUnit
+separado pasa 2 tests del nuevo boundary JDBC mock. Warnings Kotlin heredados.
+`mvn -B -DskipTests test-compile` no inicia por ACL (`Acceso denegado` / real path).
+`docker info` no accede al npipe del daemon; `npm run test:ua-real` termina antes
+de crear servidores porque falta el jar requerido. No procesos propios vivos.
+
+Integración PostgreSQL y browser CFE siguen NOT_RUN para este diff. No se declara
+E01–E09 cerrado, rojo inicial, clean/upgrade nuevo, CI ni reviews exact-head.
+E09 histórico conserva su evidencia previa; este corte no cambia migraciones.
+Gates/tareas abiertos, sin archive/release/deploy/homologación/activación live.

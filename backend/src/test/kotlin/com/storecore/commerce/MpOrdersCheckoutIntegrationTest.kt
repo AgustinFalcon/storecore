@@ -251,6 +251,9 @@ class MpOrdersCheckoutIntegrationTest(
         }
         assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=?", Int::class.java, orderId))
         val dates = jdbc.queryForList("SELECT shipped_at,delivered_at FROM shipments WHERE order_id=?", orderId)
+        val shippedAt = dates.single()["shipped_at"] as java.sql.Timestamp
+        val deliveredAt = dates.single()["delivered_at"] as java.sql.Timestamp
+        assertTrue(!deliveredAt.before(shippedAt), "delivery timestamp must follow shipment")
         val received = command(orderId, "rma", "RECEIVED")
         assertEquals(200, received.statusCode.value(), received.body)
         assertTrue(received.body!!.contains("\"rmaStatus\":\"RETURN_RECEIVED\""))
@@ -300,10 +303,15 @@ class MpOrdersCheckoutIntegrationTest(
 
     @Test
     fun `two independent user sessions serialize shipment and reception with one effect`() {
-        val orderId = checkout("SKU-RACE-${UUID.randomUUID()}")
+        val sku = "SKU-RACE-${UUID.randomUUID()}"
+        val orderId = checkout(sku)
         val provider = "ORD-RACE-${UUID.randomUUID()}"
         bindRemote(orderId, provider); notify(provider, "race", "race")
         assertEquals(1, worker.process())
+        val stock = jdbc.queryForList("SELECT b.* FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=?", sku)
+        val ledger = jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN product_variants v ON v.id=l.variant_id WHERE v.sku=? ORDER BY l.id", sku)
+        assertClosedFulfillmentRejection(command(orderId, "shipments", com.storecore.commerce.domain.ShipmentCommand.DELIVERED.name))
+        assertClosedFulfillmentRejection(command(orderId, "rma", com.storecore.commerce.domain.RmaCommand.RECEIVED.name))
         val other = provisionAdmin("admin-race-${UUID.randomUUID()}@example.com")
         val packed = raceCommand(orderId, "shipments", "PACKED", other)
         assertEquals(listOf(200, 400), packed.map { it.statusCode.value() }.sorted())
@@ -316,12 +324,86 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM returns WHERE order_id=?", Int::class.java, orderId))
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Int::class.java, orderId))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=? AND adjustment_ledger_id IS NOT NULL", Int::class.java, orderId))
+        assertEquals(stock, jdbc.queryForList("SELECT b.* FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=?", sku))
+        assertEquals(ledger, jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN product_variants v ON v.id=l.variant_id WHERE v.sku=? ORDER BY l.id", sku))
     }
 
     private fun command(orderId: Long, route: String, wire: String): org.springframework.http.ResponseEntity<String> {
         val response = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST, """{"status":"$wire","tracking":"fixture-tracking"}""", admin.cookie, admin.csrf)
         response.headers.getFirst("X-CSRF-Token")?.let { admin = admin.copy(csrf = it) }
         return response
+    }
+
+    @Test
+    fun `eligible fulfillment rejects missing authority csrf origin and capability without writes`() {
+        val orderId = checkout("SKU-SECURITY-${UUID.randomUUID()}")
+        val provider = "ORD-SECURITY-${UUID.randomUUID()}"
+        bindRemote(orderId, provider); notify(provider, "security", "security")
+        assertEquals(1, worker.process())
+        val actor = adminUserId()
+        val other = provisionAdmin("admin-no-role-${UUID.randomUUID()}@example.com")
+        val otherId = adminUserId()
+        jdbc.update("DELETE FROM user_roles WHERE user_id=?", otherId)
+        val shipments = jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId)
+        val balances = jdbc.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id")
+        val ledger = jdbc.queryForList("SELECT * FROM inventory_ledger ORDER BY id")
+        for ((route, wire) in listOf("shipments" to com.storecore.commerce.domain.ShipmentCommand.PACKED.name, "rma" to com.storecore.commerce.domain.RmaCommand.RECEIVED.name)) {
+            val path = "/api/v1/user/orders/$orderId/$route"
+            val body = """{"status":"$wire"}"""
+            for (session in listOf(null, customer, other)) {
+                val denied = exchange(path, HttpMethod.POST, body, session?.cookie, session?.csrf ?: "unused")
+                assertEquals(401, denied.statusCode.value(), denied.body)
+            }
+            for (token in listOf(null, "stale-token")) assertEquals(403, exchange(path, HttpMethod.POST, body, admin.cookie, token).statusCode.value())
+            assertEquals(403, exchange(path, HttpMethod.POST, body, admin.cookie, admin.csrf, mapOf(HttpHeaders.ORIGIN to "https://foreign.example.test")).statusCode.value())
+        }
+        // The only persisted roles are ADMIN/OPERATOR, both permitted. A USER with
+        // no role is rejected as unauthenticated; there is no invented third role.
+        for (state in listOf(com.storecore.configuration.domain.CapabilityState.DISABLED, com.storecore.configuration.domain.CapabilityState.READ_ONLY)) {
+            val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
+            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, state.wire, "{}", UUID.randomUUID(), "acceptance security matrix")
+            for ((route, wire) in listOf("shipments" to com.storecore.commerce.domain.ShipmentCommand.PACKED.name, "rma" to com.storecore.commerce.domain.RmaCommand.RECEIVED.name)) {
+                assertEquals(409, command(orderId, route, wire).statusCode.value())
+            }
+        }
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, "{}", UUID.randomUUID(), "restore fixture")
+        val stranger = registerCustomer("stranger-${UUID.randomUUID()}@example.com")
+        assertEquals(404, exchange("/api/v1/customer/orders/$orderId", HttpMethod.GET, null, stranger.cookie).statusCode.value())
+        assertEquals(shipments, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM returns WHERE order_id=?", Int::class.java, orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=?", Int::class.java, orderId))
+        assertEquals(balances, jdbc.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id"))
+        assertEquals(ledger, jdbc.queryForList("SELECT * FROM inventory_ledger ORDER BY id"))
+    }
+
+    @Test
+    fun `re-reserved stock requires exact quantity variant and order actor`() {
+        val orderId = checkoutWithQuantity("SKU-EXACT-${UUID.randomUUID()}", 2)
+        val foreignId = checkout("SKU-FOREIGN-${UUID.randomUUID()}")
+        jdbc.update("UPDATE inventory_reservations SET created_at=now()-interval '2 minutes',expires_at=now()-interval '1 minute' WHERE reservation_saga_key=(SELECT (checkout_snapshot->>'reservationSagaKey')::uuid FROM orders WHERE id=?)", orderId)
+        val inventory = com.storecore.commerce.infrastructure.JdbcInventoryService(jdbc, org.springframework.transaction.support.TransactionTemplate(org.springframework.jdbc.datasource.DataSourceTransactionManager(jdbc.dataSource!!)))
+        inventory.expireOverdue()
+        val provider = "ORD-EXACT-${UUID.randomUUID()}"
+        bindRemote(orderId, provider); notify(provider, "exact", "exact")
+        assertEquals(1, worker.process())
+        val reservation = jdbc.queryForObject("SELECT reservation_id FROM inventory_ledger WHERE actor=? AND event_type='SALE'", Long::class.java, "MP_ORDERS:$orderId")!!
+        val variant = jdbc.queryForObject("SELECT variant_id FROM inventory_reservations WHERE id=?", Long::class.java, reservation)!!
+        val foreignVariant = jdbc.queryForObject("SELECT variant_id FROM order_items WHERE order_id=?", Long::class.java, foreignId)!!
+        val before = jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId)
+        for (quantity in listOf(1, 3)) {
+            jdbc.update("UPDATE inventory_reservations SET quantity=? WHERE id=?", quantity, reservation)
+            assertClosedFulfillmentRejection(command(orderId, "shipments", com.storecore.commerce.domain.ShipmentCommand.PACKED.name))
+        }
+        jdbc.update("UPDATE inventory_reservations SET quantity=2,variant_id=? WHERE id=?", foreignVariant, reservation)
+        assertClosedFulfillmentRejection(command(orderId, "shipments", com.storecore.commerce.domain.ShipmentCommand.PACKED.name))
+        jdbc.update("UPDATE inventory_reservations SET variant_id=? WHERE id=?", variant, reservation)
+        jdbc.update("UPDATE orders SET status=? WHERE id=?", com.storecore.commerce.domain.OrderStatus.PAID.name, foreignId)
+        jdbc.update("UPDATE payments SET status=? WHERE order_id=?", com.storecore.commerce.domain.PaymentStatus.APPROVED.name, foreignId)
+        assertClosedFulfillmentRejection(command(foreignId, "shipments", com.storecore.commerce.domain.ShipmentCommand.PACKED.name))
+        assertEquals(before, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id IN (?,?)", Int::class.java, orderId, foreignId))
+        assertEquals(200, command(orderId, "shipments", com.storecore.commerce.domain.ShipmentCommand.PACKED.name).statusCode.value())
     }
 
     private fun raceCommand(orderId: Long, route: String, wire: String, other: Session): List<org.springframework.http.ResponseEntity<String>> {

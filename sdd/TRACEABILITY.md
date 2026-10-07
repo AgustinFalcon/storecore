@@ -32,3 +32,11 @@
 CFE-R01–R08 → CFE-T01–T06: inventario, targets reales, evidencia local y
 escenarios E01–E09 en el WIP. Ninguna tarea cerrada; pruebas unit locales no
 sustituyen PostgreSQL/HTTPS/clean/upgrade ni reviews del head exacto.
+
+CFE aceptación local 2026-10-07: R02/R03/R06/R08 → E01/E03/E04/E05/E08 →
+CommerceHttpIntegrationTest y MpOrdersCheckoutIntegrationTest ampliados;
+compilación PASS, HTTP/DB NOT_RUN. R01/R02 → E02 → nuevo
+JdbcFulfillmentEvidenceBoundaryTest, 2 PASS MockJdbc (constraints preservados).
+R04/R05/R07/R08 → E01/E03/E06/E07/E08/E09 → commerce-fulfillment.spec.ts +
+proveedor externo loopback en harness real; TypeScript/discovery PASS, browser
+NOT_RUN. Unknown separado MockHttp. Evidencia/límites en progress y docs/testing.

@@ -63,11 +63,22 @@ async function ready(child, url, secure = false) {
 }
 function spring(guard, name) {
   return start(process.env.STORECORE_UA_JAVA ?? 'java', ['-jar', jar,
-    '--server.address=127.0.0.1', '--server.port=8080', `--storecore.installation-guard.enabled=${guard}`], name, {
+    '--server.address=127.0.0.1', '--server.port=8080', `--storecore.installation-guard.enabled=${guard}`,
+    '--storecore.integrations.refetch-delay-ms=500',
+    '--storecore.integrations.mp-orders.adapter=official',
+    '--storecore.integrations.mp-orders.accepted-topic=order',
+    '--storecore.integrations.mp-orders.expected-user-id=cfe-user',
+    '--storecore.integrations.mp-orders.expected-application-id=cfe-app',
+    '--storecore.integrations.mp-orders.checkout-url-hosts[0]=provider.example.test',
+    '--storecore.integrations.mp-orders.api-base-url=http://127.0.0.1:4302',
+    '--storecore.integrations.mp-orders.access-token-ref=CFE_LOCAL_PROVIDER_TOKEN',
+    '--storecore.integrations.mp-orders.webhook-secret-ref=CFE_LOCAL_WEBHOOK_SECRET'], name, {
     ...process.env,
     STORECORE_DB_URL: `jdbc:postgresql://${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`,
     STORECORE_DB_USERNAME: process.env.PGUSER, STORECORE_DB_PASSWORD: process.env.PGPASSWORD,
     STORECORE_INSTALLATION_ORIGIN: origin,
+    CFE_LOCAL_PROVIDER_TOKEN: 'cfe-local-provider-token',
+    CFE_LOCAL_WEBHOOK_SECRET: 'cfe-local-webhook-secret',
   });
 }
 async function run() {
@@ -76,11 +87,11 @@ async function run() {
     throw new Error('UA E2E requires a fresh empty storecore_ua_e2e database; no automatic deletion is performed');
   }
   // Never attach to an unrelated running service or reuse its authority.
-  for (const port of [8080, 4301]) {
+  for (const port of [8080, 4301, 4302]) {
     const net = await import('node:net');
     const server = net.createServer();
     await new Promise((resolveBind, rejectBind) => {
-      server.once('error', rejectBind); server.listen(port, port === 8080 ? '127.0.0.1' : 'localhost', resolveBind);
+      server.once('error', rejectBind); server.listen(port, port === 4301 ? 'localhost' : '127.0.0.1', resolveBind);
     });
     await new Promise((resolveClose) => server.close(resolveClose));
   }
@@ -91,6 +102,8 @@ async function run() {
     '-addext', 'subjectAltName=DNS:localhost'], { encoding: 'utf8', timeout: 30_000 });
   if (cert.error) throw cert.error;
   if (cert.status !== 0) throw new Error(`Test certificate creation failed: ${cert.stderr}`);
+  const provider = start(process.execPath, [join(frontend, 'scripts/cfe-official-provider.mjs')], 'cfe-provider');
+  await ready(provider, 'http://127.0.0.1:4302/health');
   const migrationServer = spring(false, 'backend-provision');
   await ready(migrationServer, 'http://127.0.0.1:8080/actuator/health');
   const registered = await fetch('http://127.0.0.1:8080/api/v1/customer/auth/register', {

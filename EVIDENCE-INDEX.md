@@ -20,3 +20,14 @@
 - Reviews: `sdd/reviews/20261006-sol-pr169-architecture.md` and `sdd/reviews/20261006-sol-pr169-security.md`, independent OpenAI GPT-6.1 Sol medium, exact head `d20556baabe22f6a8227283215945baabe188fb0`, APPROVED.
 - Compatibility: legacy UI routes redirect to `/login`; realm-specific HTTP credential endpoints remain supported/non-deprecated after inventory. Future removal is `TODO-043`.
 - Non-claims: no BlackStore federation, deploy, release, fiscal/ARCA or Correo Argentino homologation.
+
+## Commerce acceptance local — 2026-10-07
+
+- Scope: CFE WIP `4-implementation/progress.md` acceptance addendum and
+  `docs/testing/commerce-fulfillment-real-e2e.md`.
+- Backend suite compilation + 21 existing unit checks PASS via cached compiler;
+  2 new mocked JDBC boundary tests PASS. New HTTP/PostgreSQL cases NOT_RUN.
+- `npm run check:ua-real` PASS: 17 discovered, including 4 real CFE journeys and
+  a separate Unknown MockHttp case. Browser execution NOT_RUN (jar absent;
+  Maven path ACL and Docker daemon access blocked). No live provider credentials.
+- No commit/CI/review/clean-upgrade/acceptance closure/publication claimed.
