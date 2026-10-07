@@ -30,7 +30,7 @@ class OfficialOrderApiAdapter(
         if (!configured() || providerOrderId.isBlank()) return null
         return runCatching {
             val node = client().get()
-                .uri("{base}/v1/orders/{id}", properties.apiBaseUrl.trimEnd('/'), providerOrderId)
+                .uri("/v1/orders/{id}", providerOrderId)
                 .retrieve().body(JsonNode::class.java) ?: return null
             toResource(node)
         }.getOrNull()
@@ -40,7 +40,7 @@ class OfficialOrderApiAdapter(
         if (!configured()) return CreationObservation.Timeout
         return try {
             val node = client().post()
-                .uri("{base}/v1/orders", properties.apiBaseUrl.trimEnd('/'))
+                .uri("/v1/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Idempotency-Key", request.idempotencyKey.toString())
                 .body(
@@ -77,8 +77,7 @@ class OfficialOrderApiAdapter(
             while (page <= 10) {
                 val node = client().get()
                     .uri(
-                        "{base}/v1/orders/search?external_reference={ref}&begin_date={begin}&end_date={end}&limit=20&page={page}",
-                        properties.apiBaseUrl.trimEnd('/'),
+                        "/v1/orders/search?external_reference={ref}&begin_date={begin}&end_date={end}&limit=20&page={page}",
                         query.externalReference,
                         formatter.format(query.beginDate.atOffset(ZoneOffset.UTC)),
                         formatter.format(query.endDate.atOffset(ZoneOffset.UTC)),
@@ -100,6 +99,7 @@ class OfficialOrderApiAdapter(
     private fun client(): RestClient {
         val token = properties.resolveAccessToken() ?: error("UNCONFIGURED")
         return RestClient.builder()
+            .baseUrl(properties.apiBaseUrl.trimEnd('/'))
             .defaultHeader("Authorization", "Bearer $token")
             .build()
     }
