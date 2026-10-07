@@ -345,7 +345,14 @@ class MpOrdersCheckoutIntegrationTest(
         notify(provider, "late-bind", "late-bind")
         assertEquals(1, worker.process())
         val attemptId = jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE order_id=? AND state='ACCREDITED'", Long::class.java, orderId)!!
-        val bound = attempts.postAndBind(attemptId)
+        Fakes.createResult.set(
+            CreationObservation.VerifiedSuccess(provider, "https://www.mercadopago.com.ar/checkout/$provider"),
+        )
+        val bound = try {
+            attempts.postAndBind(attemptId)
+        } finally {
+            Fakes.createResult.set(null)
+        }
         assertEquals("ACCREDITED", bound["state"])
         attempts.recover(attemptId)
         assertEquals("ACCREDITED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))

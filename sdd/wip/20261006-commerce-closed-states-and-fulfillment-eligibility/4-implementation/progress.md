@@ -227,3 +227,15 @@ por lo que no se declara una validación local nueva. El gate efectivo será el
 CI hospedado completo sobre el próximo head. Fingerprint actualizado de 37
 archivos: `229A7DBF47089E1B892C8DCC00CE9723E6F1D4992BB226371D33CD2782F9BE70`;
 supersede al anterior y requiere reviews duales exact-head más CI verde.
+
+La review Security/Architecture exact-head detectó un P2 adicional antes del
+push: el escenario de bind tardío sobre un attempt ya `ACCREDITED` invocaba
+`postAndBind` después de que `bindRemote` hubiera limpiado correctamente el
+fake. El timeout default devolvía `RECOVERY_REQUIRED` antes de probar la defensa
+contra regresión. El test ahora configura explícitamente un
+`VerifiedSuccess` sólo alrededor de ese `postAndBind` y lo limpia en `finally`;
+conserva el assert `ACCREDITED`, la recuperación posterior y el gate de
+fulfillment. No cambia código productivo ni captura errores. Fingerprint nuevo:
+`459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
+Las aprobaciones del head anterior quedan invalidadas; se repetirán ambas
+reviews y CI sobre el próximo head.
