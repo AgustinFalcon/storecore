@@ -1,7 +1,10 @@
 # Plan incremental con gates
 
 GO documental registrado en `sdd/reviews/20261006-commerce-fulfillment-plan-sol.md`.
-Implementación incremental local en progreso; ninguna tarea cerrada todavía.
+Implementación integrada por PR #171; ninguna tarea cerrada todavía por los
+gates residuales de aceptación. Verify exact-head `37630043935` y dual GPT-6.1
+Sol APPROVED están registrados en progress.md; browser CFE específico y
+clean/upgrade siguen pendientes. No hubo CI push de master ni homologación.
 GO documental no es review de implementación ni aprobación de publicación.
 El estado actual y los bloqueos de ejecución están en tasks.json/progress.md.
 
@@ -102,7 +105,7 @@ propios antes de crear; teardown sólo de sus IDs y rutas verificadas. No matar
 por nombre/puerto. Tests bloqueados/flaky/skipped no pasan gates. Hosted CI
 que no arrancó no es verde. No iniciar recursos para este plan documental.
 
-Gates iniciales: Implementation NOT_RUN; Integration NOT_RUN; Review NOT_RUN;
+Gates iniciales históricos: Implementation NOT_RUN; Integration NOT_RUN; Review NOT_RUN;
 Homologation BLOCKED externa; Publication BLOCKED. Archive sólo tras todas las
 tareas/verificaciones y autorización Sol; el residual de disposición se registra
 como slice separado, nunca como restock implementado.

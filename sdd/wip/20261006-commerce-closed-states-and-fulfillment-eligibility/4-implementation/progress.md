@@ -239,3 +239,42 @@ fulfillment. No cambia código productivo ni captura errores. Fingerprint nuevo:
 `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
 Las aprobaciones del head anterior quedan invalidadas; se repetirán ambas
 reviews y CI sobre el próximo head.
+
+## 2026-10-07 — PR #171 integrado y evidencia exact-head
+
+PR [#171](https://github.com/AgustinFalcon/storecore/pull/171) MERGED.
+Head revisado y validado: `b3e4b3baa47f3abdabd4140b3bbcee975e4c3474`;
+merge: `84f1b02531609b93376cc61f15374b5f0f682363`. Fingerprint de los 37 archivos del source manifest:
+`459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
+Este registro supersede los estados actuales de ausencia de commit/PR/CI y
+review pendiente anteriores; conserva los fallos históricos y sus reparaciones.
+
+Verify exact-head `37630043935` terminó con frontend, backend y
+`unified-access-real-e2e` **success**. El backend hospedado supera el bloqueo
+local de ejecución para la suite que ejecutó; los runs fallidos previos no se
+reescriben como verdes. Dos reviews independientes GPT-6.1 Sol sobre ese head
+y fingerprint devolvieron **APPROVED**, sin P0–P3. Las aprobaciones de fingerprints
+anteriores no son la evidencia del head mergeado.
+
+- Bugbot: `/root/storecore_exacthead_bug_review`, GPT-6.1 Sol, esfuerzo medium,
+  **APPROVED**, sin P0–P3.
+- Security/Architecture: `/root/storecore_fulfillment_sdd_review`, GPT-6.1 Sol,
+  esfuerzo medium, **APPROVED**, sin P0–P3.
+
+Ambos revisores cubrieron el head y fingerprint exactos indicados arriba.
+
+### Gates residuales y límites
+
+- La suite `unified-access-real-e2e` acredita su flujo de acceso con wiring real;
+  no constituye ejecución del browser CFE específico de fulfillment/RMA.
+- Flyway clean/upgrade baseline y lectura de históricos requieren evidencia
+  explícita del escenario; backend success no prueba por sí solo ambos gates.
+- La matriz completa E01–E09, especialmente las variantes browser de E07/E08/E09,
+  no se declara cerrada por el nombre o resultado general de un job. Los casos
+  cubiertos se atribuyen a sus pruebas; cualquier variante sin evidencia sigue
+  pendiente. No se declara rojo inicial reproducido retroactivamente.
+- No existió CI push de master sobre el merge `84f1b025`; la evidencia citada
+  corresponde al head del PR. No se afirma validación post-merge.
+- WIP y tareas siguen abiertos para close-out completo; sin archive, tag,
+  release, deploy, homologación fiscal/carrier/MP ni activación live.
+- TODO-045 conserva disposición/reposición por ítem diferida. No RESTOCK.

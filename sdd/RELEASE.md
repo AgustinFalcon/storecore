@@ -19,9 +19,13 @@
 
 No se crea tag, release, importación ni publicación hasta completar estos checks y tener aprobación explícita.
 
-El corte local CFE de 2026-10-06 tiene GO documental y diff sin commit. No
-autoriza release: faltan PostgreSQL/E2E/carreras/rollback/clean/upgrade, bundle
-final y review dual/CI del head. Ante un eventual fallo, el rollback no puede
+El corte CFE fue integrado por PR #171 (head `b3e4b3b`, merge `84f1b025`).
+Verify `37630043935` sobre el head exacto confirmó frontend, backend y
+`unified-access-real-e2e` success, con dos reviews GPT-6.1 Sol APPROVED sin
+P0–P3 y fingerprint `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
+No hubo CI push de master. Browser CFE específico, clean/upgrade y gates no
+acreditados permanecen pendientes; el WIP no se archiva ni autoriza release o
+homologación. Ante un eventual fallo, el rollback no puede
 reabrir despacho sin pago: detener escrituras mediante la capability existente,
 con autorización operativa separada. Disposición/restock sigue diferido; no hay
 migración nueva ni homologación externa en este corte.

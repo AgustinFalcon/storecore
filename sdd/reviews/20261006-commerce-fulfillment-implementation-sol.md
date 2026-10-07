@@ -27,4 +27,29 @@ se corrigieron con tests y se regeneró el fingerprint.
 
 Ambos revisores verificaron el fingerprint final. Estas revisiones no sustituyen
 PostgreSQL/concurrencia, HTTPS E2E, clean/upgrade, bundle final ni CI del head
-Git, que permanecen pendientes y deben ejecutarse después del push.
+Git, que permanecían pendientes en ese ciclo histórico.
+
+## 2026-10-07 — Reviews finales exact-head del PR #171
+
+PR #171 MERGED. Head:
+`b3e4b3baa47f3abdabd4140b3bbcee975e4c3474`; merge:
+`84f1b02531609b93376cc61f15374b5f0f682363`.
+Fingerprint final:
+`459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
+
+- Bugbot `/root/storecore_exacthead_bug_review`: GPT-6.1 Sol, esfuerzo medium,
+  **APPROVED**, sin P0–P3.
+- Security/Architecture `/root/storecore_fulfillment_sdd_review`: GPT-6.1 Sol,
+  esfuerzo medium, **APPROVED**, sin P0–P3.
+
+Reportes independientes persistidos:
+
+- `sdd/reviews/20261007-sol-pr171-bugbot.md`.
+- `sdd/reviews/20261007-sol-pr171-security.md`.
+
+Ambas revisiones independientes corresponden al head y fingerprint finales;
+superseden las aprobaciones de source anteriores para este PR. Verify exact-head
+`37630043935` confirmó frontend/backend/unified-access-real-e2e success.
+No hubo CI push de master. Browser CFE específico, clean/upgrade y variantes
+de aceptación no acreditadas continúan pendientes en el WIP; sin archive,
+release, homologación ni activación live.

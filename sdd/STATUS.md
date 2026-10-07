@@ -61,16 +61,21 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
-## Fulfillment comercial — WIP local 2026-10-06
+## Fulfillment comercial — PR #171 integrado, WIP abierto
 
 `sdd/wip/20261006-commerce-closed-states-and-fulfillment-eligibility/` tiene
-Sol GO documental registrado y código sin commit en
-`fix/commerce-fulfillment-eligibility` sobre `de6a0d7`. Implementa tipos cerrados,
+Sol GO documental registrado y PR #171 MERGED: head
+`b3e4b3baa47f3abdabd4140b3bbcee975e4c3474`, merge `84f1b025`.
+Implementa tipos cerrados,
 prueba durable de acreditación/SALE WEB, locks order-first y recepción completa
-sin inspección ni reposición. Unit/compilación local parcial verificada; gates
-PostgreSQL, carreras/rollback real, HTTPS Angular→Spring→DB, clean/upgrade,
-bundle final y review dual siguen abiertos/bloqueados. No cierre, archive,
-CI verde ni cambio publicado. Progreso/evidencia y límites están en el WIP.
+sin inspección ni reposición. Verify exact-head `37630043935` terminó success
+en frontend, backend y `unified-access-real-e2e`; dos reviews independientes
+GPT-6.1 Sol APPROVED sin P0–P3 verificaron ese head y el fingerprint
+`459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
+No hubo CI push de master. Browser CFE específico, clean/upgrade y cualquier
+variante de aceptación sin evidencia explícita siguen pendientes; acceso
+unificado real no equivale a aceptación browser de fulfillment. Sin archive,
+homologación, release ni activación. Progreso/evidencia y límites están en el WIP.
 Disposición/reposición por ítem se difiere al backlog `TODO-045`.
 
 ## Fiscal externo

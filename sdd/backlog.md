@@ -9,7 +9,7 @@
 
 ## Features diferidos (no ejecutables en core 1.0.0)
 
-- TODO-044 [high] [in_progress] `commerce-closed-states-and-fulfillment-eligibility`: Sol GO documental; implementación local sin commit. Unit/compilación parcial PASS; PostgreSQL real, E01–E09, clean/upgrade, bundle final, dual review y CI pendientes. Ver WIP 20261006; no publicación/activación.
+- TODO-044 [high] [in_progress] `commerce-closed-states-and-fulfillment-eligibility`: PR #171 MERGED (head `b3e4b3b`, merge `84f1b025`); Verify exact-head `37630043935` frontend/backend/unified-access-real-e2e success; dual GPT-6.1 Sol APPROVED sin P0–P3 sobre fingerprint `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`. Browser CFE específico, clean/upgrade y aceptación no acreditada pendientes. No CI push master, archive, homologación ni activación; ver WIP 20261006.
 - TODO-045 [high] [deferred] `commerce-rma-item-disposition-and-restock`: outcomes/cantidades por ítem, inspección auditada, separación dañado/rechazado, idempotencia de ledger y carreras/reversión. Requiere feature y Sol GO propios; no tarea ejecutable aquí. Recepción CFE no habilita INSPECTED/ADJUSTED ni RESTOCK.
 
 - TODO-020 [high] [blocked] `external-fiscal-adapter`: biblioteca/repositorio externo conforme y auditable; D-01..D-07, titular/contador y Sol GO. Sin DDL/tarea fiscal StoreCore y nunca ventas ocultas/evasión.
