@@ -195,11 +195,14 @@ test('CFE E06/E08: committed response loss recovers by authoritative GET and ses
 test('CFE E02/E07 MockHttp only: malformed future states render Unknown safely without commands', async ({ page }) => {
   await uiLogin(page, cfeAdminEmail);
   const raw = 'UNRECOGNIZED_FUTURE_STATE';
-  await page.route('**/api/v1/user/orders', (route) => route.fulfill({ json: { status: 200, data: [{
+  await page.route((url) => url.pathname === '/api/v1/user/orders', (route) => route.fulfill({ json: { status: 200, data: [{
     id: 'unknown-fixture', orderStatus: raw, paymentStatus: raw, shipmentStatus: raw, rmaStatus: raw,
     fulfillmentEligibility: raw, shipmentAction: raw, rmaAction: raw, items: [],
   }] } }));
+  const mockedRead = page.waitForResponse((candidate) =>
+    candidate.request().method() === 'GET' && new URL(candidate.url()).pathname === '/api/v1/user/orders');
   await page.goto('/user/orders');
+  expect((await mockedRead).status()).toBe(200);
   const row = page.getByRole('row').filter({ hasText: 'unknown-fixture' });
   await expect(row).toContainText(ShipmentStatus.Unknown.label);
   await expect(row).not.toContainText(raw);
