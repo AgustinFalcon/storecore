@@ -8,7 +8,7 @@ Readmodel module/state cerrados con Unknown fijo; companion y module Unknown ocu
 
 FE conserva el snapshot/version recibido y genera un UUID por intento. Envía estado tipado, correlationId, expectedConfigVersion y motivo explícito. UI consulta roles tipados de readMe: sólo ADMIN muestra comandos; OPERATOR consulta. Backend mantiene auth.admin, SameOrigin, verificación/rotación CSRF y ownership de correlación existentes. Interceptor de sesión mantiene su cola y recuperación sin replay.
 
-Comandos superpuestos se ignoran con exhaustMap, controles deshabilitados durante el intento. Error/conflicto o timeout (15s) consulta GET commands/{correlationId}, luego GET capabilities; muestra resultado cerrado y snapshot autoritativo sin reenviar el POST. Resultado no confirmado permanece Unknown y no se presenta como éxito. Si el GET autoritativo falla, muestra error y conserva snapshot previo: requiere recarga, sin PASS de persistencia.
+Comandos superpuestos se ignoran con exhaustMap, controles deshabilitados durante el intento. Error/conflicto o timeout (15s) consulta GET commands/{correlationId}, luego GET capabilities; muestra resultado cerrado y snapshot autoritativo sin reenviar el POST. Resultado no confirmado permanece Unknown y no se presenta como éxito. Si el GET autoritativo falla, muestra error y conserva datos de lectura previos con todas las configVersion invalidadas (null): guard del store bloquea nuevos POST hasta GET autoritativo exitoso, sin PASS de persistencia.
 
 ## Evidencia y límites
 
@@ -24,3 +24,9 @@ Frontend final: npm run verify por S: ejecutó architecture (6 tests + scan PASS
 MockHttp browser: npm run test:a11y por S: imprimió 37 tests OK, incluyendo las 24 rutas, manifest exacto, fixtures/contraste/readiness. El proceso quedó sin completar durante teardown/reporter y se interrumpió con Ctrl-C tras varios minutos; exit 1, no se registra PASS global. No se cuenta como evidencia de comandos Spring/DB ni cookies reales. HTML/.last-run no fue publicado. No se modificó playwright.config.ts para esconder el bloqueo.
 
 SDD JSON parse PASS; diff de commit contra baseline: git diff HEAD^ HEAD --check PASS. Worktree limpio tras commit; no push/PR ni cambios a migraciones.
+
+## Corrección P2 de revisión
+
+Sobre be0b8f1, installation.store invalida las versiones ante fallo de mutación sin snapshot recuperado. El guard vive en store y omite la llamada al usecase si la versión es null; los controles existentes también se deshabilitan por esa versión. Un GET exitoso restaura snapshots/versión y habilita el nuevo comando. Prueba con usecase real y HTTP repository mock: POST falla → GET de resultado Unknown → GET capabilities falla → segundo intento no envía POST → refresh GET exitoso devuelve v8 → nuevo comando usa v8.
+
+Validación de la corrección por drive U: temporal (desmontado en finally): architecture 6 tests+scan PASS, lint PASS, 59 suites/221 tests PASS. Build production nuevamente ERROR/BLOCKED en descarga de Google Fonts; build development PASS (2.21 MB). Sin cambio de configuración para ocultar ese bloqueo. Backend/E2E RealLocal no se reejecutaron para este delta de store/test; sus límites anteriores siguen vigentes.

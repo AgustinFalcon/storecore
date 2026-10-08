@@ -75,7 +75,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       exhaustMap((cmd) =>
         defer(() => {
           const current = this.snapshot.capabilities.find((item) => item.module === cmd.module);
-          if (!current) {
+          if (!current || current.configVersion === null) {
             this.patchState({ errorMessage: 'Recargá la configuración antes de cambiar el estado.' });
             return EMPTY;
           }
@@ -88,7 +88,12 @@ export class InstallationStore extends ComponentStore<InstallationState> {
               this.loadCapabilities();
             },
             error: (err: unknown) => {
-              if (err instanceof CapabilityReconciliationError) this.patchState({ capabilities: err.snapshot });
+              if (err instanceof CapabilityReconciliationError) {
+                this.patchState({ capabilities: err.snapshot });
+              } else {
+                // A failed readback cannot authorize another write from the old version.
+                this.patchState({ capabilities: this.snapshot.capabilities.map(item => ({ ...item, configVersion: null })) });
+              }
               this.patchState({ errorMessage: getApiErrorMessage(err) });
             },
           }),
