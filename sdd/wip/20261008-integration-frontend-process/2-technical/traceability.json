@@ -92,6 +92,12 @@
     {
       "requirement": "INT-R04",
       "cut": "INT-FE-04",
+      "contract": "../4-implementation/int-fe04-commerce-fulfillment.md",
+      "document_baseline": "41dcfb3ff099a4ca162c4c11fe75e4609826b1a8",
+      "acceptance": ["E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09"],
+      "acceptance_status": "NOT_RUN",
+      "document_status": "documented_for_review",
+      "pr_order": ["FE04-D", "FE04-B", "FE04-T", "FE04-U", "FE04-E"],
       "endpoints": [
         "GET /api/v1/user/orders/{id}",
         "POST /api/v1/user/orders/{id}/shipments",
@@ -110,7 +116,10 @@
       "tests": [
         "CFE E01-E09",
         "response AND DB readback",
-        "paid via real worker with external loopback"
+        "paid via real worker with external loopback",
+        "existing closed types and wire mappers; Unknown fail-closed",
+        "CustomerCart/CustomerCheckout and cold result CustomerOrders fallback",
+        "actor/route generations and realm queue/CSRF interlock"
       ],
       "target_evidence_mode": "RealLocal",
       "status": "pending_execution"

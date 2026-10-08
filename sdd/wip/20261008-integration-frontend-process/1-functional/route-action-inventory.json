@@ -1,9 +1,10 @@
 {
   "baseline": "dfaeba0883a1073b185abaf336b63d5d6bdc5d54",
+  "runtime_inventory_baseline": "41dcfb3ff099a4ca162c4c11fe75e4609826b1a8",
   "api_prefix": "/api/v1",
   "route_count": 24,
   "int_fe03_document_baseline": "b8bd49018413a503f5af8d04aa64b1dc36263f04",
-  "planned_routes": [
+  "historical_int_fe03_planned_routes": [
     {
       "pattern": "/login",
       "realm": "Public",
@@ -36,7 +37,7 @@
     "MockHttp",
     "FixtureOnly"
   ],
-  "note": "MockHttp identifies the existing a11y fixture design, not a newly executed PASS. Favorite toggles in catalog/product share FixtureOnly storage. Proposed /login and USER dashboard routes are not baseline routes.",
+  "note": "Routes reconciled to runtime_inventory_baseline: /login and /user/home replace legacy session leaves, now redirects. Historical planned entries describe the FE03 documentary baseline only. MockHttp is fixture design, not a new PASS. Favorite toggles remain FixtureOnly. CFE adds no route and E01-E09 are NOT_RUN.",
   "routes": [
     {
       "pattern": "/",
@@ -168,7 +169,7 @@
       "real_local_status": "NOT_RUN_IN_INT_FE_00"
     },
     {
-      "pattern": "/customer/session",
+      "pattern": "/login",
       "realm": "Public",
       "actions": [
         "login",
@@ -176,7 +177,8 @@
         "logout"
       ],
       "endpoints": [
-        "POST /api/v1/customer/auth/login",
+        "POST /api/v1/auth/login",
+        "POST /api/v1/auth/context-selection",
         "GET /api/v1/customer/me",
         "GET /api/v1/customer/auth/csrf",
         "POST /api/v1/customer/auth/logout"
@@ -308,15 +310,14 @@
       "real_local_status": "NOT_RUN_IN_INT_FE_00"
     },
     {
-      "pattern": "/user/session",
-      "realm": "Public",
+      "pattern": "/user/home",
+      "realm": "User",
       "actions": [
-        "login",
+        "role-aware operations home",
         "probe",
         "logout"
       ],
       "endpoints": [
-        "POST /api/v1/internal/auth/login",
         "GET /api/v1/internal/me",
         "GET /api/v1/internal/auth/csrf",
         "POST /api/v1/internal/auth/logout"
