@@ -1,4 +1,6 @@
 import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
+import { ACCESS_REPOSITORY } from './core/tokens/access.tokens';
+import { AccessHttpRepository } from './data/access/access-http.repository';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { ApplicationConfig } from '@angular/core';
@@ -23,6 +25,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideHttpClient(withInterceptors([authInterceptor])),
     provideRouter(routes),
+    { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpRepository },
     { provide: CATALOG_REPOSITORY, useClass: CatalogHttpRepository },
     { provide: CUSTOMER_REPOSITORY, useClass: CustomerHttpRepository },

@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { defer, filter, finalize, mergeMap, switchMap, tap } from 'rxjs';
+import { defer, filter, finalize, mergeMap, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { AdvanceFulfillmentUseCase } from '../../domain/order/use-cases/advance-fulfillment.usecase';
@@ -22,8 +23,15 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
   constructor(
     private readonly getAdmin: GetAdminOrderUseCase,
     private readonly advance: AdvanceFulfillmentUseCase,
+    private readonly session: UserSession = new UserSession(),
   ) {
     super({ loading: false, errorMessage: '', order: null, mutatingOrderIds: [] });
+    const initial = this.get();
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      ++this.routeGeneration;
+      this.currentOrderId = '';
+      this.setState(initial);
+    })))(session.actorChanges$);
   }
 
   readonly loading$ = this.select((s) => s.loading || (s.order !== null && s.mutatingOrderIds.includes(s.order.id)));
@@ -39,6 +47,7 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
       }),
       switchMap((orderId) =>
         this.getAdmin.execute(orderId).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (order) => this.patchState({ order, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -55,6 +64,7 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
       mergeMap((cmd) => {
         const generation = this.routeGeneration;
         return defer(() => this.advance.ship(cmd.orderId, cmd.status, cmd.tracking)).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (order) => {
               if (generation === this.routeGeneration) this.patchState({ order });
@@ -76,6 +86,7 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
       mergeMap((cmd) => {
         const generation = this.routeGeneration;
         return defer(() => this.advance.rma(cmd.orderId, cmd.status)).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (order) => {
               if (generation === this.routeGeneration) this.patchState({ order });

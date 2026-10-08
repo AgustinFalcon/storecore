@@ -1,4 +1,4 @@
-export enum ScreenRealm { Public, Customer, User }
+export enum ScreenRealm { Public, Customer, User, Dual }
 
 export interface Screen {
   readonly pattern: string;
@@ -19,12 +19,12 @@ const screen = (pattern: string, realm: ScreenRealm, heading: string, ready: str
 
 export const screens: readonly Screen[] = [
   screen('/', ScreenRealm.Public, 'Inicio', '.sc-carousel__slide'),
+  screen('/login', ScreenRealm.Public, 'Ingresar', 'input[name="email"]'),
   screen('/catalog', ScreenRealm.Public, 'Catálogo', 'sc-product-tile'),
   screen('/catalog/:sku', ScreenRealm.Public, 'Producto de prueba', '.sc-pdp'),
   screen('/cart', ScreenRealm.Customer, 'Carrito', 'tbody tr'),
   screen('/checkout', ScreenRealm.Customer, 'Checkout', 'select[name="addressId"] option[value="test-address"]'),
   screen('/checkout/result/:orderId', ScreenRealm.Customer, 'Pedido iniciado', '.sc-result__card'),
-  screen('/customer/session', ScreenRealm.Public, 'Sesión customer', 'input[name="email"]'),
   screen('/customer/register', ScreenRealm.Public, 'Crear cuenta customer', 'input[name="email"]'),
   screen('/customer/profile', ScreenRealm.Customer, 'Perfil customer', 'input[name="firstName"]', {
     loadedValues: [
@@ -42,7 +42,7 @@ export const screens: readonly Screen[] = [
     ],
   }),
   screen('/customer/orders/:id', ScreenRealm.Customer, 'Orden test-order', 'tbody tr'),
-  screen('/user/session', ScreenRealm.Public, 'Sesión user', 'input[name="userEmail"]'),
+  screen('/user/home', ScreenRealm.User, 'Inicio de operaciones', 'a[href="/user/offers"]'),
   screen('/user/content', ScreenRealm.User, 'Contenido del home', 'input[name="homeTitle"]', {
     loadedValues: [
       { selector: 'input[name="homeTitle"]', value: 'Home de prueba' },

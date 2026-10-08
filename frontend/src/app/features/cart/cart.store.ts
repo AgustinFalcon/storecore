@@ -2,8 +2,11 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
+import { CustomerSession } from '../../core/auth/customer-session';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { environment } from '../../../environments/environment';
 import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
@@ -42,8 +45,11 @@ export class CartStore extends ComponentStore<CartState> {
     private readonly checkout: CheckoutCartUseCase,
     private readonly listAddresses: ListCustomerAddressesUseCase,
     private readonly router: Router,
+    private readonly session: CustomerSession,
+    private readonly access: AccessCoordinator,
   ) {
     super(INITIAL);
+    this.effect<void>(changes => changes.pipe(tap(() => this.setState({ ...INITIAL, idempotencyKey: crypto.randomUUID() }))))(session.actorChanges$);
   }
 
   get snapshot(): CartState {
@@ -63,9 +69,11 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => this.permitCart()),
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.getCart.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (cart) =>
               this.patchState({
@@ -82,8 +90,10 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly loadAddresses = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => this.permitCart()),
       switchMap(() =>
         this.listAddresses.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (addresses) =>
               this.patchState({
@@ -99,9 +109,11 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly add = this.effect<{ sku: string; quantity: number }>((line$) =>
     line$.pipe(
+      filter(() => this.permitCart()),
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap((line) =>
         this.addLine.execute(line.sku, line.quantity).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (cart) => this.patchState({ cart, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -113,6 +125,7 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly submitCheckout = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => this.permitCart()),
       tap(() => {
         if (!this.snapshot.addressId || !this.snapshot.currency) {
           this.patchState({ errorMessage: 'Elegí entrega y moneda antes de pagar.' });
@@ -129,7 +142,8 @@ export class CartStore extends ComponentStore<CartState> {
             currency: this.snapshot.currency,
           })
           .pipe(
-            tapResponse({
+            takeUntil(this.session.actorChanges$),
+          tapResponse({
               next: (receipt) => {
                 this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS' });
                 const checkoutUrl = receipt.checkoutUrl ?? null;
@@ -156,5 +170,11 @@ export class CartStore extends ComponentStore<CartState> {
     } catch {
       return false;
     }
+  }
+
+  private permitCart(): boolean {
+    const policy = CustomerCartAccess.resolve(this.access.state(), this.session.authenticated() ? this.session.actorId() : null);
+    if (!policy.canMutate) this.patchState({ loading: false, errorMessage: policy.label });
+    return policy.canMutate;
   }
 }

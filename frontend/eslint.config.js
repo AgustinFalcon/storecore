@@ -5,7 +5,7 @@ const angular = require('angular-eslint');
 
 module.exports = tseslint.config(
   {
-    files: ['e2e/**/*.ts'],
+    files: ['e2e/**/*.ts', 'ua-real-local/**/*.ts', 'playwright.ua-real-local.config.ts'],
     extends: [eslint.configs.recommended, ...tseslint.configs.recommended],
   },
   {

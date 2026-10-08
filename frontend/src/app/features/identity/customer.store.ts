@@ -2,9 +2,10 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { EMPTY, filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
 import { DeleteCustomerAddressUseCase } from '../../domain/customer/use-cases/delete-customer-address.usecase';
 import { GetCustomerProfileUseCase } from '../../domain/customer/use-cases/get-customer-profile.usecase';
@@ -56,6 +57,7 @@ const INITIAL: CustomerState = {
 
 @Injectable()
 export class CustomerStore extends ComponentStore<CustomerState> {
+  private registrationTransition = false;
   constructor(
     private readonly register: RegisterCustomerUseCase,
     private readonly signIn: SignInCustomerUseCase,
@@ -67,8 +69,18 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly deleteAddress: DeleteCustomerAddressUseCase,
     private readonly session: CustomerSession,
     private readonly router: Router,
+    private readonly access: AccessCoordinator,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      const draft = this.snapshot;
+      // Only the synchronous transition initiated by this registration keeps its
+      // public form draft. Private caches always clear; external actor events
+      // and successful authentication clear the draft and password as before.
+      this.setState(this.registrationTransition ? { ...INITIAL, loading: draft.loading,
+        email: draft.email, password: draft.password, firstName: draft.firstName, lastName: draft.lastName }
+        : { ...INITIAL });
+    })))(session.actorChanges$);
   }
 
   get snapshot(): CustomerState {
@@ -99,24 +111,39 @@ export class CustomerStore extends ComponentStore<CustomerState> {
         this.patchState({ loading: true, errorMessage: '' });
       }),
       filter(() => Boolean(this.snapshot.email && this.snapshot.password && this.snapshot.firstName && this.snapshot.lastName)),
-      switchMap(() =>
-        this.register
-          .execute({
-            email: this.snapshot.email,
-            password: this.snapshot.password,
-            firstName: this.snapshot.firstName,
-            lastName: this.snapshot.lastName,
-          })
+      switchMap(() => {
+        const registration = {
+          email: this.snapshot.email,
+          password: this.snapshot.password,
+          firstName: this.snapshot.firstName,
+          lastName: this.snapshot.lastName,
+        };
+        this.registrationTransition = true;
+        let started: boolean;
+        try { started = this.access.beginCustomerRegistration(); }
+        finally { this.registrationTransition = false; }
+        if (!started) {
+          this.patchState({ loading: false, errorMessage: 'Esperá a que termine el cierre de sesión.' });
+          return EMPTY;
+        }
+        const generation = this.session.generation();
+        return this.register
+          .execute(registration)
           .pipe(
+            // The use case fences old generations; its own markAuthenticated
+            // emits actorChanges synchronously before delivering registration.
             tapResponse({
               next: () => {
+                if (this.session.generation() !== generation + 1 || !this.session.authenticated()) return;
                 this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
                 void this.router.navigateByUrl('/customer/profile');
               },
-              error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+              error: (err: unknown) => {
+                if (this.session.generation() === generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
+              },
             }),
-          ),
-      ),
+          );
+      }),
     ),
   );
 
@@ -132,6 +159,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       filter(() => Boolean(this.snapshot.email && this.snapshot.password)),
       switchMap(() =>
         this.signIn.execute({ email: this.snapshot.email, password: this.snapshot.password }).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
@@ -149,6 +177,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.getProfile.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (profile) => this.patchState({ profile, loading: false, saved: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -172,6 +201,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       ),
       switchMap(() =>
         this.saveProfile.execute(this.snapshot.profile).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (profile) => this.patchState({ profile, loading: false, saved: true, errorMessage: '' }),
             error: (err: unknown) => this.patchState({ loading: false, saved: false, errorMessage: getApiErrorMessage(err) }),
@@ -186,6 +216,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.listAddresses.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (addresses) => this.patchState({ addresses, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -211,6 +242,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       }),
       switchMap(() =>
         this.saveAddress.execute(this.snapshot.addressDraft).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ addressDraft: emptyAddress });
@@ -229,6 +261,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap((id) =>
         this.deleteAddress.execute(id).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ addressDraft: emptyAddress });
@@ -245,6 +278,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     trigger$.pipe(
       switchMap(() =>
         this.signOutCustomer.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.setState({ ...INITIAL });

@@ -1,4 +1,5 @@
-import { map, Observable, switchMap, tap } from 'rxjs';
+import { defer, map, Observable, switchMap, tap } from 'rxjs';
+import { SessionMutationCancelledError } from '../../session-mutation-cancelled.error';
 import { UserSessionPort } from '../user-session.port';
 import { UserSessionResult } from '../user.entity';
 import { IUserRepository } from '../user.repository';
@@ -11,7 +12,12 @@ export class ProbeUserSessionUseCase {
   ) {}
 
   execute(): Observable<UserSessionResult> {
-    return this.repo.readMe().pipe(
+    const generation = this.session.generation();
+    const assertCurrent = () => { if (this.session.generation() !== generation) throw new SessionMutationCancelledError(); };
+    return defer(() => {
+      assertCurrent();
+      return this.repo.readMe().pipe(
+      tap(() => assertCurrent()),
       tap((profile) => {
         if (!UserRole.hasKnownRole(profile.roles)) {
           this.session.clear();
@@ -19,7 +25,8 @@ export class ProbeUserSessionUseCase {
         }
       }),
       switchMap((profile) => this.repo.readCsrf().pipe(map(() => profile))),
-      tap(() => this.session.markAuthenticated()),
+      tap(() => { assertCurrent(); this.session.markAuthenticated(); }),
     );
+    });
   }
 }

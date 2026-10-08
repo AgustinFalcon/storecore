@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
@@ -39,6 +40,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   constructor(
     private readonly catalog: ManageAdminCatalogUseCase,
     private readonly facets: ListCatalogFacetsUseCase,
+    private readonly session: UserSession = new UserSession(),
   ) {
     super({
       loading: false,
@@ -50,6 +52,10 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       brandDraft: emptyFacet,
       categoryDraft: emptyFacet,
     });
+    const initial = this.get();
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      this.setState(initial);
+    })))(session.actorChanges$);
   }
 
   get snapshot(): AdminCatalogState {
@@ -72,6 +78,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.catalog.list().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (products) => this.patchState({ products, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -85,6 +92,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     trigger$.pipe(
       switchMap(() =>
         this.facets.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (items) => this.patchState({ brands: items.brands, categories: items.categories }),
             error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
@@ -106,6 +114,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.draft.sku.trim() && this.snapshot.draft.name.trim())),
       switchMap(() =>
         this.catalog.save(this.snapshot.draft).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ draft: emptyProductDraft });
@@ -130,6 +139,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.brandDraft.id.trim() && this.snapshot.brandDraft.name.trim())),
       switchMap(() =>
         this.catalog.saveBrand(this.snapshot.brandDraft).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ brandDraft: emptyFacet });
@@ -154,6 +164,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.categoryDraft.id.trim() && this.snapshot.categoryDraft.name.trim())),
       switchMap(() =>
         this.catalog.saveCategory(this.snapshot.categoryDraft).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ categoryDraft: emptyFacet });

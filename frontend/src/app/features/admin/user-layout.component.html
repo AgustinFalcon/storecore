@@ -1,16 +1,12 @@
 <nav class="sc-console-nav" aria-label="Consola operador">
-  <a routerLink="/user/session" routerLinkActive="is-active">Sesión</a>
-  <a routerLink="/user/content" routerLinkActive="is-active">Contenido</a>
-  <a routerLink="/user/catalog" routerLinkActive="is-active">Catálogo</a>
-  <a routerLink="/user/offers" routerLinkActive="is-active">Ofertas</a>
-  <a routerLink="/user/promos" routerLinkActive="is-active">Promos</a>
-  <a routerLink="/user/orders" routerLinkActive="is-active">Fulfillment</a>
-  <a routerLink="/user/inventory" routerLinkActive="is-active">Inventario</a>
-  <a routerLink="/user/mercadolibre" routerLinkActive="is-active">Mercado Libre</a>
-  <a routerLink="/user/capabilities" routerLinkActive="is-active">Capabilities</a>
-  <a routerLink="/user/profile-import" routerLinkActive="is-active">Perfil</a>
-  @if (session.authenticated()) {
+  <a routerLink="/user/home" routerLinkActive="is-active">Inicio</a>
+  @for (action of actions(); track action) {
+    <a [routerLink]="action.path" routerLinkActive="is-active">{{ action.label }}</a>
+  }
+  <a routerLink="/login">Cambiar acceso</a>
+  @if (session.actorId()) {
     <button type="button" class="sc-console-nav__out" (click)="signOut()">Salir</button>
   }
 </nav>
+@if (errorMessage) { <p role="alert">{{ errorMessage }}</p> }
 <router-outlet />

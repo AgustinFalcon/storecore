@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { defer, EMPTY, exhaustMap, filter, finalize, forkJoin, switchMap, tap } from 'rxjs';
+import { defer, EMPTY, exhaustMap, filter, finalize, forkJoin, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import {
   CapabilityModule,
@@ -27,7 +28,7 @@ const emptyListing: MercadoLibreListing = { listingId: '', variationId: '', sku:
 
 @Injectable()
 export class InstallationStore extends ComponentStore<InstallationState> {
-  constructor(private readonly ops: ManageInstallationUseCase) {
+  constructor(private readonly ops: ManageInstallationUseCase, private readonly session: UserSession = new UserSession()) {
     super({
       changingCapability: false,
       loading: false,
@@ -38,6 +39,10 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       listings: [],
       listingDraft: emptyListing,
     });
+    const initial = this.get();
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      this.setState(initial);
+    })))(session.actorChanges$);
   }
 
   get snapshot(): InstallationState {
@@ -61,6 +66,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.ops.listCapabilities().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (capabilities) => this.patchState({ capabilities, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -108,6 +114,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.ops.listInventory().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (inventory) => this.patchState({ inventory, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -122,8 +129,8 @@ export class InstallationStore extends ComponentStore<InstallationState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         forkJoin({
-          mlAccount: this.ops.readMercadoLibreAccount(),
-          listings: this.ops.listMercadoLibreListings(),
+          mlAccount: this.ops.readMercadoLibreAccount().pipe(takeUntil(this.session.actorChanges$)),
+          listings: this.ops.listMercadoLibreListings().pipe(takeUntil(this.session.actorChanges$)),
         }).pipe(
           tapResponse({
             next: (data) => this.patchState({ ...data, loading: false }),

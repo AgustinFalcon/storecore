@@ -3,10 +3,10 @@
 <div class="shell" [attr.aria-busy]="store.loading$ | async">
   @if (consoleMode$ | async) {
     <header class="chrome chrome--console">
-      <a class="chrome__brand" routerLink="/user/content">StoreCore <span>Consola</span></a>
+      <a class="chrome__brand" routerLink="/user/home">StoreCore <span>Consola</span></a>
       <p class="chrome__hint">Operador · no es la cuenta que compra</p>
       <a class="chrome__text" routerLink="/">Ver tienda</a>
-      <a class="chrome__text" routerLink="/user/session">{{ user.authenticated() ? 'Sesión user' : 'Entrar user' }}</a>
+      <a class="chrome__text" routerLink="/login">{{ user.authenticated() ? 'Cambiar acceso' : 'Ingresar' }}</a>
     </header>
   } @else {
     <header class="chrome">
@@ -37,7 +37,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h2l1.2 9h11.3L20 8H7" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
           </a>
         }
-        <a class="chrome__account" routerLink="/customer/session">
+        <a class="chrome__account" [routerLink]="customer.authenticated() ? '/customer/profile' : '/login'">
           {{ customer.authenticated() ? 'Mi cuenta' : 'Ingresá' }}
         </a>
       </div>
@@ -48,7 +48,7 @@
       @for (category of store.categories$ | async; track category.id) {
         <a routerLink="/catalog" [queryParams]="{ category: category.id }">{{ category.name }}</a>
       }
-      <a class="chrome__cats-quiet" routerLink="/user/session">Operar</a>
+      <a class="chrome__cats-quiet" routerLink="/login">Operar</a>
     </nav>
   }
 
