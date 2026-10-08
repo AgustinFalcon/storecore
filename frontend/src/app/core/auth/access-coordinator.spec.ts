@@ -11,6 +11,8 @@ import { AccessHome } from '../../domain/access/access-home';
 import { ReturnDestination } from '../../domain/access/return-destination';
 import { CustomerHttpRepository } from '../../data/customer/customer-http.repository';
 import { RegisterCustomerUseCase } from '../../domain/customer/use-cases/register-customer.usecase';
+import { CustomerStore } from '../../features/identity/customer.store';
+import { Router } from '@angular/router';
 import { AccessCoordinator, ActiveContextHint } from './access-coordinator';
 import { AccessSessionStaging } from './access-session-staging';
 import { AccessHttpRepository } from '../../data/access/access-http.repository';
@@ -114,6 +116,7 @@ describe('AccessCoordinator queue and realm ownership', () => {
       const revocationGeneration = session.generation();
       // LoginStore.submit invokes this before the rejected credential command.
       access.supersedeProbes(); access.supersedeProbes(realm);
+      if (realm === AccessContext.Customer) expect(access.beginCustomerRegistration()).toBe(false);
       expect(session.generation()).toBe(revocationGeneration);
       const login = await firstValueFrom(TestBed.inject(AccessHttpRepository).signIn({ email: buyer.email, password: 'valid-password' }));
       expect(login.resolution).toBe(LoginResolution.Unavailable);
@@ -150,6 +153,37 @@ describe('AccessCoordinator queue and realm ownership', () => {
       expect(state.kind).toBe(AccessStateKind.Indeterminate);
     });
   }
+  it('fences hydration A before registration B dispatch when USER finishes before the registration response', async () => {
+    const initial = firstValueFrom(access.rehydrate()); probeCustomer(); anonymous('internal/me'); await initial;
+    const reload = firstValueFrom(access.rehydrate());
+    probeCustomer(); const delayedUser = http.expectOne(url('internal/me'));
+    const registration = new RegisterCustomerUseCase(new CustomerHttpRepository(client), customer);
+    const navigateByUrl = vi.fn();
+    const store = new CustomerStore(registration, {} as never, {} as never, {} as never,
+      {} as never, {} as never, {} as never, {} as never, customer, { navigateByUrl } as unknown as Router, access);
+    store.setEmail('b@example.test'); store.setPassword('valid-password'); store.setFirstName('B'); store.setLastName('Buyer');
+    store.submitRegister();
+    const dispatched = http.expectOne(url('customer/auth/register'));
+    expect(dispatched.request.body).toEqual({ email: 'b@example.test', password: 'valid-password', firstName: 'B', lastName: 'Buyer' });
+    expect(customer.authenticated()).toBe(false);
+    delayedUser.flush({}, { status: 401, statusText: 'Unauthorized' }); await reload;
+    expect(customer.actorId()).not.toBe(buyer.id);
+    expect(customer.authenticated()).toBe(false);
+    expect(access.state().activeContext).toBe(AccessContext.Unknown);
+    expect(navigateByUrl).not.toHaveBeenCalled();
+    dispatched.flush({ id: 'buyer-b', email: 'b@example.test', firstName: 'B', lastName: 'Buyer' },
+      { headers: { [CSRF_HEADER]: 'registration-b-token' } });
+    expect(customer.authenticated()).toBe(true); expect(customer.actorId()).toBeNull();
+    expect(customer.csrf()).toBe('registration-b-token');
+    expect(store.snapshot.authenticated).toBe(true); expect(store.snapshot.loading).toBe(false);
+    expect(navigateByUrl).toHaveBeenCalledWith('/customer/profile');
+    const verifiedB = firstValueFrom(access.rehydrate());
+    http.expectOne(url('customer/me')).flush({ ...buyer, id: 'buyer-b' });
+    http.expectOne(url('customer/auth/csrf')).flush({}, { headers: { [CSRF_HEADER]: 'registration-b-token' } });
+    anonymous('internal/me'); await verifiedB;
+    expect(customer.actorId()).toBe('buyer-b'); expect(customer.csrf()).toBe('registration-b-token');
+    store.ngOnDestroy();
+  });
   it('cancels queued old writes while a dispatched write settles before reload', async () => {
     customer.commit(buyer, 'initial');
     const active = firstValueFrom(client.put(url('customer/me'), {}), { defaultValue: undefined });

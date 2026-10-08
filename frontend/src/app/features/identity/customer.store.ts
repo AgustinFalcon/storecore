@@ -2,9 +2,10 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, takeUntil, tap } from 'rxjs';
+import { EMPTY, filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
 import { DeleteCustomerAddressUseCase } from '../../domain/customer/use-cases/delete-customer-address.usecase';
 import { GetCustomerProfileUseCase } from '../../domain/customer/use-cases/get-customer-profile.usecase';
@@ -67,6 +68,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly deleteAddress: DeleteCustomerAddressUseCase,
     private readonly session: CustomerSession,
     private readonly router: Router,
+    private readonly access: AccessCoordinator,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
     this.effect<void>(changes => changes.pipe(tap(() => this.setState({ ...INITIAL }))))(session.actorChanges$);
@@ -101,14 +103,19 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       }),
       filter(() => Boolean(this.snapshot.email && this.snapshot.password && this.snapshot.firstName && this.snapshot.lastName)),
       switchMap(() => {
+        const registration = {
+          email: this.snapshot.email,
+          password: this.snapshot.password,
+          firstName: this.snapshot.firstName,
+          lastName: this.snapshot.lastName,
+        };
+        if (!this.access.beginCustomerRegistration()) {
+          this.patchState({ loading: false, errorMessage: 'Esperá a que termine el cierre de sesión.' });
+          return EMPTY;
+        }
         const generation = this.session.generation();
         return this.register
-          .execute({
-            email: this.snapshot.email,
-            password: this.snapshot.password,
-            firstName: this.snapshot.firstName,
-            lastName: this.snapshot.lastName,
-          })
+          .execute(registration)
           .pipe(
             // The use case fences old generations; its own markAuthenticated
             // emits actorChanges synchronously before delivering registration.

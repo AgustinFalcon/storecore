@@ -51,6 +51,11 @@ export class CustomerSession implements CustomerSessionPort {
     this.transition.set(false);
   }
 
+  /** Drop display identity during replacement, retaining sent transport ownership. */
+  discardSuspendedPrincipal(): void {
+    if (this.transitionPending()) this.principal.set(null);
+  }
+
   setCsrf(value: string): void {
     this.csrfToken.set(value.trim());
   }

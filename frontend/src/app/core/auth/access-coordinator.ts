@@ -114,6 +114,16 @@ export class AccessCoordinator {
     this.flight = null;
   }
 
+  /** Registration replaces CUSTOMER identity; revoke owners keep their generation. */
+  beginCustomerRegistration(): boolean {
+    if (!this.mutationFence.permitsAuthentication(AccessContext.Customer)) return false;
+    this.supersedeProbes(AccessContext.Customer);
+    this.customer.discardSuspendedPrincipal();
+    this.customerProbe = SessionProbe.Unknown;
+    this.publish();
+    return true;
+  }
+
   /** Unified login has no principal: complete it with a fresh atomic realm probe. */
   acceptAuthenticated(context: AccessContext): Observable<AccessState> {
     if (!context.isKnown) return of(AccessState.Indeterminate);

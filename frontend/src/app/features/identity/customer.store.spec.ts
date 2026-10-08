@@ -7,6 +7,7 @@ import { CustomerStore } from './customer.store';
 import { RegisterCustomerUseCase } from '../../domain/customer/use-cases/register-customer.usecase';
 import { ICustomerRepository } from '../../domain/customer/customer.repository';
 import { CustomerSessionResult } from '../../domain/customer/customer.entity';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
 
 describe('CustomerStore actor fence', () => {
   for (const superseded of [false, true]) {
@@ -16,7 +17,8 @@ describe('CustomerStore actor fence', () => {
       const registration = new RegisterCustomerUseCase({ register: () => response } as unknown as ICustomerRepository, session);
       const navigateByUrl = vi.fn();
       const store = new CustomerStore(registration, {} as never, {} as never, {} as never,
-        {} as never, {} as never, {} as never, {} as never, session, { navigateByUrl } as unknown as Router);
+        {} as never, {} as never, {} as never, {} as never, session, { navigateByUrl } as unknown as Router,
+        { beginCustomerRegistration: () => true } as AccessCoordinator);
       store.setEmail('registration@test'); store.setPassword('password'); store.setFirstName('First'); store.setLastName('Last');
       store.submitRegister();
       if (superseded) session.commit({ id: 'other', email: 'other@test', firstName: 'Other', lastName: '', phone: '' }, 'other-csrf');
@@ -37,7 +39,7 @@ describe('CustomerStore actor fence', () => {
     const response = new Subject<CustomerProfile>();
     const store = new CustomerStore({} as never, {} as never, {} as never,
       { execute: () => response } as unknown as GetCustomerProfileUseCase, {} as never, {} as never,
-      {} as never, {} as never, session, {} as Router);
+      {} as never, {} as never, session, {} as Router, {} as AccessCoordinator);
     store.setProfile(buyer); store.loadProfile();
     session.commit({ ...buyer, id: 'b', email: 'b@test' }, 'b-csrf');
     response.next(buyer); response.complete();
