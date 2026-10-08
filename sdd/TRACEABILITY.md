@@ -1,5 +1,9 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
+## Delta de integración frontend — 2026-10-08
+
+[INT-FE](wip/20261008-integration-frontend-process/meta.md) conserva el baseline archivado y agrega inventario de 24 rutas, [requisito → endpoint → persistencia → prueba](wip/20261008-integration-frontend-process/2-technical/traceability.json) y DAG INT-FE-00..07. La evidencia se clasifica RealLocal/MockHttp/FixtureOnly; no sustituye gates externos. Favoritos productivos requieren mini-SDD específico antes de HTTP/DDL. UA/#176 y CFE E01–E09 son ports manuales pendientes sobre el linaje que ya contiene V20.
+
 **Estado:** archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. PR #14. TODO-041 in-repo: official refetch port + CI fake. Live vendor HTTP is installation-configured, never in CI.
 
 | Capacidad | Core/tarea o feature | Gate |
