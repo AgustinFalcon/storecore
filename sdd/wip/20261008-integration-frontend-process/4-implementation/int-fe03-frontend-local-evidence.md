@@ -47,6 +47,13 @@ reason/correlation/recovery y todos los contratos CFE existentes. No port CFE.
 - Frontend completo: PASS, 70 archivos / 272 pruebas, `npm run test`.
 - Build development: PASS, `npm run build -- --configuration development
   --preserve-symlinks`.
+- Build production: PASS sobre HEAD de evidencia `959d16c60c20ef49c6b3fa499a01d2b7b5cb791f`,
+  ejecutado por el agente raíz con red autorizada desde `T:\frontend`,
+  `npm run build -- --preserve-symlinks`: initial 550.66 kB / estimado transfer
+  125.65 kB. No cambio de fuente ni configuración; mapping desmontado.
+- Audit runtime: PASS, `npm audit --omit=dev --audit-level=high`, 0 vulnerabilidades,
+  misma revisión, ejecutado por el agente raíz con red autorizada. No acredita
+  audit de dependencias de desarrollo.
 - Playwright MockHttp: PASS, 39/39. Manifest exacto: 24 hojas; redirects se
   excluyen como antes. 24 route smoke+axe, controles de fixtures/readiness/
   contraste/parser, y selector UA con teclado+axe/responsive 1280/375 px.
@@ -61,7 +68,8 @@ Build requiere `--preserve-symlinks` por la junction de dependencias.
 Artifacts MockHttp: `frontend/playwright-report/`, `frontend/test-results/`
 (ignorados por Git). Servidor SPA local sobre dist development, loopback4300,
 fixtures sólo en Playwright. Esto no acredita cookies ni persistencia real.
-Revalidación después del commit de código: 39/39 PASS, 18.2 segundos. Servidor
+Revalidación final sobre HEAD `959d16c`, sin cambios de fuente: 39/39 PASS,
+21.2 segundos, después de restaurar dist development. Servidor
 SPA detenido y `subst` sin mappings al finalizar. Worktree tracked limpio.
 
 ## Fallos encontrados y corregidos
@@ -79,11 +87,18 @@ ahora reutiliza ese estado verificado; nuevo test de regresión y corrida comple
 
 ## Gates pendientes, sin sustituirlos por MockHttp
 
-Build production: BLOCKED por font inlining de fonts.googleapis.com con red
-restringida. Con preserve-symlinks el código se compiló hasta ese fetch; no se
-eliminó la fuente ni se cambió configuración para declarar production PASS.
-`npm audit --audit-level=high`: NOT_RUN, endpoint advisories de registry.npmjs.org
-inaccesible; también se intentó caché en workspace. No resultado de advisories.
+Build production y audit runtime desbloqueados con red autorizada en el agente
+raíz (resultados arriba). Los intentos del agente de implementación seguían
+rechazados por sandbox: audit devolvió EACCES, log
+`work/npm-cache/_logs/2026-10-08T18_50_53_228Z-debug-0.log`.
+Audit completo con dependencias de desarrollo sigue sin resultado.
+
+Al compartir dist, el intento final MockHttp vio el build productivo recién
+generado y rechazó 26 tests por un request font gstatic Inter v20 fuera del
+allowlist exacto del fixture (13 PASS). No fue una falla funcional UA. Se restauró
+dist development con el comando ya verificado para repetir el contrato MockHttp
+original; no se amplió allowlist ni se cambió fuente. No se reclama prueba browser
+del bundle productivo.
 
 A01: PASS parcial Unit/MockHttp (tipos, mapper, rechazo, CSRF ausente, login flow);
 happy paths RealLocal NOT_RUN.
