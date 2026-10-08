@@ -93,34 +93,20 @@ class AttemptBudgetsTest {
         repeat(10) { budget.checkAllowed("ip", hash); budget.recordFailure("ip", hash) }
         assertEquals(900L, assertFailsWith<LoginRateLimited> { budget.checkAllowed("ip", hash) }.retryAfterSeconds)
         budget.checkAllowed("other-ip", hash)
-        assertFailsWith<LoginRateLimited> { budget.checkAllowed("ip", "b".repeat(64)) }
+        budget.checkAllowed("ip", "b".repeat(64))
         clock.advance(900_000)
         budget.checkAllowed("ip", hash)
     }
 
-    @Test fun `invented challenges from one source share a budget and cannot exhaust global keys`() {
-        val budget = ChallengeAttemptBudget(BudgetClock(), maxKeys = 2)
-        repeat(10) { attempt ->
-            val hash = attempt.toString(16).padStart(64, '0')
-            budget.checkAllowed("attacker-ip", hash)
-            budget.recordFailure("attacker-ip", hash)
-        }
-        assertFailsWith<LoginRateLimited> {
-            budget.checkAllowed("attacker-ip", "f".repeat(64))
-        }
-        budget.checkAllowed("legitimate-ip", "e".repeat(64))
-    }
-
-    @Test fun `challenge source capacity fails closed and never accepts a raw challenge`() {
+    @Test fun `challenge capacity fails closed and never accepts a raw challenge`() {
         val clock = BudgetClock()
         val budget = ChallengeAttemptBudget(clock, maxKeys = 1)
         budget.recordFailure("ip", "a".repeat(64))
-        budget.checkAllowed("ip", "b".repeat(64))
-        assertFailsWith<LoginRateLimited> { budget.checkAllowed("other-ip", "b".repeat(64)) }
-        assertFailsWith<LoginRateLimited> { budget.recordFailure("other-ip", "b".repeat(64)) }
+        assertFailsWith<LoginRateLimited> { budget.checkAllowed("ip", "b".repeat(64)) }
+        assertFailsWith<LoginRateLimited> { budget.recordFailure("ip", "b".repeat(64)) }
         assertFailsWith<IllegalArgumentException> { budget.recordFailure("ip", "raw-secret-challenge") }
         clock.advance(900_000)
-        budget.recordFailure("other-ip", "b".repeat(64))
+        budget.recordFailure("ip", "b".repeat(64))
     }
 
     @Test fun `late in-flight rejections remain counted after older failures expire`() {

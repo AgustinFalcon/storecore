@@ -54,7 +54,7 @@ Reproducible local unit command from V:\backend:
 & C:\maven\bin\mvn.cmd '-Dmaven.repo.local=C:/Users/agustin/.m2/repository' -q '-Dtest=AttemptBudgetsTest,ClientAddressResolverTest,IdentityExceptionAdviceTest,InternalRoleTest,LoginRateLimiterTest,ReturnDestinationTest,UnifiedAccessResolutionTest,UnifiedLoginRequestValidationTest,UnifiedAccessControllerTest' test
 ```
 
-Final unit/controller run: **PASS, 50 tests in 9 suites, zero failures/errors**
+Final unit/controller run: **PASS, 49 tests in 9 suites, zero failures/errors**
 and exit code 0. All backend production and test sources compiled in the same
 Maven run, including HTTP/JDBC/schema tests. Controller tests use an
 application stub and real origin/cookie/address boundary, not browser or DB evidence.
@@ -64,6 +64,10 @@ An intermediate new controller assertion failed because getValuesAsList splits
 the Expires comma in Set-Cookie. It was corrected to the raw Set-Cookie header
 list, then all three controller assertions passed in the final run. Production
 cookie behavior did not need a change. The clock-rewind budget regression passed.
+Final source reconciliation restored reviewed #166 selection abuse keys to
+source IP + challenge hash (rather than the historical per-IP-only variant),
+with its independent-challenge and capacity tests. The final test count reflects
+removal of the obsolete per-IP-only expectation.
 `git diff --check`: PASS. Static historical migration diff against destination:
 empty; clean/upgrade execution remains blocked below.
 
