@@ -44,7 +44,12 @@
       "depends_on": [
         "INT-FE-02"
       ],
-      "status": "pending",
+      "status": "documented_for_review",
+      "implementation_status": "not_started",
+      "document_baseline": "b8bd49018413a503f5af8d04aa64b1dc36263f04",
+      "contract": "../4-implementation/int-fe03-unified-access-frontend.md",
+      "acceptance": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09"],
+      "acceptance_status": "NOT_RUN",
       "requirements": [
         "INT-R01",
         "INT-R03"

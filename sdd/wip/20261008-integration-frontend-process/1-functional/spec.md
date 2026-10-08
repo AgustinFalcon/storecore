@@ -19,6 +19,17 @@ Single-tenant por instalación; perfiles configurables; sin credenciales, precio
 
 Todos los conjuntos finitos del nuevo trabajo son enum/sealed Kotlin o clase TypeScript con constructor privado, casos estáticos, regla/etiqueta y un único fromWire. JSON/DB se traducen en el borde; Unknown seguro. Pasos de login objetos con responsabilidad única y recorrido extensible.
 
-## Exclusiones
+## INT-FE-03: contrato de aceptación frontend
+
+El [contrato UA frontend](../4-implementation/int-fe03-unified-access-frontend.md)
+define A01–A09: login/selección, reload de sesiones independientes, revocación,
+cambio de actor, interlock de writes/CSRF, destinos seguros, regresiones y browser
+real. Es especificación `documented_for_review`; ninguna aceptación ejecutada.
+`/login` y `/user/home` son rutas propuestas, no hojas runtime de esta base.
+Entradas legacy se redirigen durante el futuro port sin eliminar endpoints backend.
+Una preferencia local de contexto nunca equivale a sesión autenticada. El contexto
+USER no habilita writes CUSTOMER aunque ambas cookies existan en el navegador.
+
+## Exclusiones del corte
 
 No pago real MP-LIVE-05, fiscal/ARCA, carrier/Correo live, activación ML/POS companion, dispatcher ML, SaaS, tenancy ni loyalty. La simulación del puerto externo de pago sólo valida wiring local. El dossier externo permanece NO-GO.

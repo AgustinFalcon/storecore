@@ -28,7 +28,18 @@ Port manual de dominio/application, challenge store/controller, wiring/login/gua
 
 Preservar home blocks, ofertas, favoritos de pestaña hasta reemplazo productivo, inventory sealed, Unknown fail-closed, cancellation/detail identity y session mutation reconciliation. #176 agrega fences de revoke/login, logout frío coalescido, limpieza actor A→B y CustomerCartAccess cerrado. Cookie Set-Cookie race requiere browser real; mocks no la acreditan. UA no fusiona identidades.
 
-## INT-FE-04 CFE
+### INT-FE-03: contrato frontend sobre backend portado
+
+Addendum INT-FE-03 sobre `b8bd49018413a503f5af8d04aa64b1dc36263f04`:
+INT-FE-02 ya agrega endpoints UA y `V21__unified_access_challenges.sql`;
+las menciones anteriores a migración futura describen el baseline original.
+El frontend UA aún no está portado. [Contrato del corte](../4-implementation/int-fe03-unified-access-frontend.md)
+fija allowlist, never-copy master, API/cookies verificadas, closed types,
+interlock coordinator/SessionMutationQueue/CSRF y A01–A09. No nueva migración.
+El runner futuro será UA-only y aislado de CFE; conservar rate budget backend y
+un solo host loopback por escenario. No declarar aceptación desde mocks.
+
+## INT-FE-04 CFE: alcance posterior
 
 Procedencia #171/#173: `a653f45af977ad989b62a48ec01a363646207aaf` y WIP `20261006-commerce-closed-states-and-fulfillment-eligibility`. Port manual de tipos, política/evidencia/records, callers, consumers y acceptance. Mantener hooks BlackStore/DSP/lock order e inbox/SALE existentes. No transportar migraciones master ni reemplazar todo JdbcCartService/JdbcOrderService.
 

@@ -14,3 +14,7 @@ La antigüedad del encabezado de [STATUS](../../STATUS.md) no reemplaza el inven
 Leer [contrato funcional](1-functional/spec.md), [inventario de rutas](1-functional/route-action-inventory.json), [contrato técnico](2-technical/spec.md), [matriz de trazabilidad](2-technical/traceability.json), [DAG](3-tasks/tasks.json) y [evidencia](4-implementation/progress.md).
 
 INT-FE-01: [port manual y validación local](4-implementation/int-fe01-capability.md). No acredita homologación ni cierre.
+
+Addendum sobre `b8bd490`: INT-FE-02 tiene [implementación backend local y gates pendientes](4-implementation/int-fe02-unified-access-backend.md).
+INT-FE-03 tiene [contrato documental frontend A01–A09](4-implementation/int-fe03-unified-access-frontend.md)
+para review; implementación y aceptación NOT_RUN. INT-FE-04..07 siguen pendientes.
