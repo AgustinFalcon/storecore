@@ -11,3 +11,10 @@ Hallazgos reproducibles: 24 rutas; favoritos son sessionStorage en una pestaña;
 Fuentes UA #176 9a305b940b24d68c6bb80108060996b6210546a5 (features archivado) y CFE #173 a653f45af977ad989b62a48ec01a363646207aaf se inspeccionaron desde objetos Git locales. Esto verifica procedencia documental, no PASS de ejecución en integración.
 
 Validación ejecutada de este corte: Node leyó los tres JSON, recorrió por DFS las ocho tareas y sus dependencias, comparó los 24 patrones únicos con frontend/e2e/route-manifest.ts, comprobó cobertura INT-R01..08 y resolvió los 13 enlaces relativos del WIP. Resultado: PASS (json=3, links=13, tasks=8, routes=24, requirements=8). git diff --check: PASS. El SHA de commit se reporta al principal sin auto-referencia en este documento. Backend/frontend/E2E del producto: NOT_RUN (diff documental). CI/reviews exact-head y homologación externa: no acreditados.
+# Addendum INT-FE-03 — 2026-10-08
+
+[Contrato frontend A01–A09](int-fe03-unified-access-frontend.md) documentado para
+review sobre `b8bd49018413a503f5af8d04aa64b1dc36263f04`, en worktree nuevo.
+Sólo SDD: implementación y aceptación NOT_RUN. JSON/DAG/rutas/links y diff-check
+validados; scripts de arquitectura sin ejecución efectiva por typescript ausente.
+Sin cambios de frontend/backend, push, PR, merge o cierre.

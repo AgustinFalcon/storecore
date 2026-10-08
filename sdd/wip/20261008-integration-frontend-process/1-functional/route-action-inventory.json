@@ -2,6 +2,35 @@
   "baseline": "dfaeba0883a1073b185abaf336b63d5d6bdc5d54",
   "api_prefix": "/api/v1",
   "route_count": 24,
+  "int_fe03_document_baseline": "b8bd49018413a503f5af8d04aa64b1dc36263f04",
+  "planned_routes": [
+    {
+      "pattern": "/login",
+      "realm": "Public",
+      "actions": ["unified login", "verified context selection"],
+      "endpoints": ["POST /api/v1/auth/login", "POST /api/v1/auth/context-selection"],
+      "backend_status": "present_in_int_fe02_document_baseline",
+      "implementation": "planned_not_runtime",
+      "acceptance": ["A01", "A02", "A07", "A08", "A09"],
+      "real_local_status": "NOT_RUN"
+    },
+    {
+      "pattern": "/user/home",
+      "realm": "User",
+      "actions": ["role-aware operations home", "select verified existing context"],
+      "endpoints": ["GET /api/v1/internal/me", "GET /api/v1/internal/auth/csrf"],
+      "implementation": "planned_not_runtime",
+      "acceptance": ["A03", "A07", "A08", "A09"],
+      "real_local_status": "NOT_RUN"
+    }
+  ],
+  "int_fe03_existing_route_changes": {
+    "legacy_entries": ["/customer/session", "/user/session"],
+    "planned_behavior": "redirect to unified entry; backend legacy endpoints retained",
+    "cross_cutting_actions": ["realm logout/reload", "actor private-state cleanup", "serialized writes/CSRF", "safe return destinations"],
+    "acceptance": ["A03", "A04", "A05", "A06", "A07", "A09"],
+    "status": "documented_not_implemented"
+  },
   "evidence_modes": [
     "RealLocal",
     "MockHttp",

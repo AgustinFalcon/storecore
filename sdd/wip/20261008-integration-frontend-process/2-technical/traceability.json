@@ -64,9 +64,14 @@
     {
       "requirement": "INT-R03",
       "cut": "INT-FE-03",
+      "contract": "../4-implementation/int-fe03-unified-access-frontend.md",
+      "acceptance": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09"],
+      "acceptance_status": "NOT_RUN",
+      "document_baseline": "b8bd49018413a503f5af8d04aa64b1dc36263f04",
       "endpoints": [
         "legacy auth endpoints",
-        "unified auth endpoints after INT-FE-02"
+        "POST /api/v1/auth/login (present in document baseline)",
+        "POST /api/v1/auth/context-selection (present in document baseline)"
       ],
       "persistence": [
         "realm sessions",
@@ -76,7 +81,10 @@
         "#176 revoke/login cookie race",
         "actor A→B late responses",
         "safe return destinations",
-        "cart reset"
+        "cart reset",
+        "queue/CSRF interlock and capability correlation",
+        "UA-only runner: stable loopback and isolated backend budgets",
+        "manifest equality and axe (MockHttp, separate from RealLocal)"
       ],
       "target_evidence_mode": "RealLocal",
       "status": "pending_execution"
