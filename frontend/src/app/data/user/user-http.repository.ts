@@ -1,13 +1,14 @@
 import { HttpClient } from '@angular/common/http';
+import { CapabilityCommandStatus } from '../../domain/user/capability-command-status';
 import { Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { map, Observable, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import {
   CapabilityModule,
-  CapabilityState,
+  CapabilityStateCommand,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -126,10 +127,36 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
   }
 
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
+  setCapability(command: CapabilityStateCommand): Observable<CapabilityModule> {
+    if (!command.module.homologationVisible || !command.state.isCurrent || !Number.isSafeInteger(command.expectedConfigVersion) || command.expectedConfigVersion <= 0 || !command.reason.trim()) {
+      return throwError(() => new Error('Comando de configuración no válido.'));
+    }
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${module}/state`, { state })
+      .post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${command.module.wire}/state`, {
+        state: command.state.wire,
+        reason: command.reason,
+        correlationId: command.correlationId,
+        expectedConfigVersion: command.expectedConfigVersion,
+      })
       .pipe(map((body) => mapCapability(readApiBody<unknown>(body))));
+  }
+
+  capabilityCommandStatus(correlationId: string): Observable<CapabilityCommandStatus> {
+    return this.http.get<unknown>(`${environment.apiBaseUrl}/user/capabilities/commands/${correlationId}`).pipe(
+      map(body => {
+        const response = readApiBody<{ result?: unknown }>(body);
+        try {
+          const result = typeof response.result === 'string' ? JSON.parse(response.result) : response.result;
+          const snapshot = mapCapability(result);
+          if (snapshot.module.homologationVisible && snapshot.state.isCurrent && snapshot.configVersion !== null) {
+            return CapabilityCommandStatus.Completed;
+          }
+          return CapabilityCommandStatus.fromWire(result?.status);
+        } catch {
+          return CapabilityCommandStatus.Unknown;
+        }
+      }),
+    );
   }
 
   listInventory(): Observable<readonly InventoryRow[]> {

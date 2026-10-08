@@ -40,7 +40,7 @@
         "readback"
       ],
       "target_evidence_mode": "RealLocal",
-      "status": "pending_execution"
+      "status": "local_unit_verified_real_local_pending"
     },
     {
       "requirement": "INT-R03",

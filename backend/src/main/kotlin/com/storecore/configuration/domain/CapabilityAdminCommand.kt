@@ -25,6 +25,7 @@ sealed class CapabilityAdminCommand {
         override val reason: String,
     ) : CapabilityAdminCommand() {
         override val operation = CapabilityAdminOperation.ChangeState
+        init { require(nextState != CapabilityState.Unknown) { "Unrecognized capability state" } }
         override fun requestHash() = digest(listOf(operation.wire, module, expectedConfigVersion.toString(), nextState.name, reason))
     }
 

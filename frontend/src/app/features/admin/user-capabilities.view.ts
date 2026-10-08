@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
-import { CapabilityModuleId } from '../../domain/user/capability-module-id';
+import { FormsModule } from '@angular/forms';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
-import { CapabilityModule, CapabilityState } from '../../domain/user/user.entity';
+import { CapabilityChange, CapabilityModule } from '../../domain/user/user.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
 @Component({
   selector: 'sc-user-capabilities-view',
-  imports: [FeatureStatusComponent],
+  imports: [FeatureStatusComponent, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-capabilities.view.html',
 })
@@ -14,6 +14,9 @@ export class UserCapabilitiesViewComponent {
   @Input() items: readonly CapabilityModule[] = [];
   @Input() loading = false;
   @Input() error = '';
+  @Input() canWrite = false;
+  @Input() busy = false;
+  reason = '';
   readonly states = [
     CapabilityModuleState.Disabled,
     CapabilityModuleState.ReadOnly,
@@ -22,21 +25,13 @@ export class UserCapabilitiesViewComponent {
     CapabilityModuleState.Error,
   ];
 
-  @Output() readonly changeState = new EventEmitter<{ module: string; state: CapabilityState }>();
+  @Output() readonly changeState = new EventEmitter<CapabilityChange>();
   @Output() readonly retry = new EventEmitter<void>();
 
-  moduleOf(module: string): CapabilityModuleId {
-    return CapabilityModuleId.fromWire(module);
-  }
-
-  stateOf(state: string): CapabilityModuleState {
-    return CapabilityModuleState.fromWire(state);
-  }
-
-  emitChange(module: string, state: CapabilityModuleState): void {
-    if (state === CapabilityModuleState.Unknown) {
+  emitChange(item: CapabilityModule, state: CapabilityModuleState): void {
+    if (this.busy || !this.canWrite || !this.reason.trim() || !item.module.homologationVisible || !item.state.isCurrent || !state.isCurrent || item.configVersion === null) {
       return;
     }
-    this.changeState.emit({ module, state: state.wire as CapabilityState });
+    this.changeState.emit({ module: item.module, state, reason: this.reason.trim() });
   }
 }

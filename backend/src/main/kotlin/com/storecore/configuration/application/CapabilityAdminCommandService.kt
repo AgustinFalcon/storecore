@@ -20,15 +20,11 @@ class CapabilityAdminCommandService(
     private val transactions: TransactionTemplate,
 ) {
     fun changeState(actor: InternalUserPrincipal, csrf: String, command: CapabilityAdminCommand.ChangeState): CapabilityAdminMutation<CapabilityModuleView> {
-        val expected = if (command.expectedConfigVersion > 0) {
-            command.expectedConfigVersion
-        } else {
-            capabilities.list().first { it.module == command.module }.configVersion
-        }
-        val resolved = command.copy(expectedConfigVersion = expected)
+        if (command.expectedConfigVersion <= 0) throw CapabilityConfigInvalid()
+        val resolved = command
         val nextCsrf = admit(actor, csrf, resolved)
         commands.commit(actor, resolved)
-        val view = capabilities.list().first { it.module == resolved.module }
+        val view = capabilities.list().first { it.module.wire == resolved.module }
         return CapabilityAdminMutation(view, nextCsrf)
     }
 

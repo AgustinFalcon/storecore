@@ -1,9 +1,10 @@
 import { Observable } from 'rxjs';
+import { CapabilityCommandStatus } from './capability-command-status';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
 import {
   CapabilityModule,
-  CapabilityState,
+  CapabilityStateCommand,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -30,7 +31,8 @@ export interface IUserRepository {
   previewProfile(manifest: string): Observable<ProfilePreview>;
   mergeProfile(manifest: string): Observable<ProfilePreview>;
   listCapabilities(): Observable<readonly CapabilityModule[]>;
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule>;
+  setCapability(command: CapabilityStateCommand): Observable<CapabilityModule>;
+  capabilityCommandStatus(correlationId: string): Observable<CapabilityCommandStatus>;
   listInventory(): Observable<readonly InventoryRow[]>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
   listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]>;
