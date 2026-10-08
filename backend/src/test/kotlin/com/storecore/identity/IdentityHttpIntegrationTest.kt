@@ -1,5 +1,9 @@
 ﻿package com.storecore.identity
 
+import org.apache.hc.client5.http.impl.classic.HttpClients
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.AfterEach
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -32,6 +36,18 @@ class IdentityHttpIntegrationTest(
     @Autowired private val loginRateLimiter: LoginRateLimiter,
     @LocalServerPort private val port: Int,
 ) {
+    private val noRetryClient = HttpClients.custom().disableAutomaticRetries().build()
+
+    @BeforeEach
+    fun disableHttpStatusRetries() {
+        // Default HttpClient retries 429 after Retry-After (900s here), hiding
+        // the original response after the server budget has expired.
+        http.restTemplate.requestFactory = HttpComponentsClientHttpRequestFactory(noRetryClient)
+    }
+
+    @AfterEach
+    fun closeHttpTransport() = noRetryClient.close()
+
     @Test
     fun `customer identity uses http-only opaque cookie csrf rotation and owned addresses`() {
         val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"person@example.com","password":"a-very-long-password","firstName":"Person","lastName":"One"}""")
@@ -240,7 +256,9 @@ class IdentityHttpIntegrationTest(
         val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Origin","lastName":"Test"}""")
         val cookie = registered.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(59.toChar())
         val csrf = registered.headers.getFirst("X-CSRF-Token")!!
-        val forged = exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"changed@example.com","firstName":"Changed","lastName":"Test","phone":null}""", cookie, csrf, "http://localhost:$port")
+        // Match the actual HTTP Host, so CORS sees a same-origin request. The
+        // application's configured Origin policy must still reject Host fallback.
+        val forged = exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"changed@example.com","firstName":"Changed","lastName":"Test","phone":null}""", cookie, csrf, "http://127.0.0.1:$port")
         assertEquals(403, forged.statusCode.value())
         assertEquals(true, forged.body!!.contains("CSRF_INVALID"))
     }

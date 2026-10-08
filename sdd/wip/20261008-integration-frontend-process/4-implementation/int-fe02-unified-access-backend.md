@@ -176,3 +176,43 @@ therefore remain NOT_RUN locally, not passing. All ten focused suites, including
 the two new real-wiring unit assertions, also passed within the full attempt.
 The full attempt compiled all source/tests on JDK17. `git diff --check`: PASS.
 No production budget/resolver or historical SQL was changed by this follow-up.
+
+## Hosted #179 rerun: confirmed HTTP transport root cause
+
+The subsequent hosted run reported 344 tests with the two mixed credential
+assertions still receiving 401 instead of 429, and the Host-fallback assertion
+receiving a non-application 403 body. The earlier IPv4/IPv6 explanation is
+superseded: an isolated embedded HTTP reproduction confirmed a single credential
+bucket containing exactly five attempts and a sixth server response of 429.
+Apache HttpClient5, selected by TestRestTemplate, then logged an automatic retry
+of that response after **900 seconds**, honoring Retry-After. After that delay the
+server window expired and the retried invalid credentials returned 401. Diagnostic
+log: `backend/target/int-fe02-http-transport.log`. The diagnostic JVM (PID82460)
+was stopped and verified absent; no diagnostic process or drive mapping remains.
+
+The real-DB HTTP fixture now explicitly disables automatic transport retries
+before each test and closes its owned client afterwards. This exposes the first
+server response without changing production budgets, trusted source resolution,
+Retry-After, anti-enumeration, selection admission or auth policy.
+
+The Host-fallback fixture now sends Origin matching its actual request Host
+(`127.0.0.1:port`). The previous localhost Origin became cross-origin after the
+fixture address change, so CORS rejected it before application CSRF validation.
+The corrected assertion still requires 403 with CSRF_INVALID: same request Host
+must not replace the explicitly configured installation Origin.
+
+CredentialHttpTransportTest reproduces the exact five mixed unified/customer/
+internal submissions followed by the sixth rejection through embedded Tomcat,
+real MVC/controllers/AOP/use cases and the shared budget. A second case repeats
+that sequence after ten Unknown context selections; a third checks the actual
+Host Origin application's CSRF denial. JDBC/password work and transactions are
+substituted, so these tests are **not** claimed as database acceptance. Its
+configuration is isolated behind a test-only profile to avoid contaminating the
+real database application context.
+
+Final local JDK17 focal result: **PASS, 58 tests across eleven complete suites,
+zero failures/errors, exit0**, including all three embedded HTTP regressions.
+Log: `backend/target/int-fe02-http-transport-fixed.log`. All production and test
+sources compiled; `git diff --check` passed. Real database HTTP/Flyway execution
+remains NOT_RUN locally due to the previously recorded Docker pipe denial;
+hosted rerun remains the definitive real-DB gate. No production or SQL changes.
