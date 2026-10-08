@@ -70,6 +70,8 @@ export class AccessCoordinator {
       if (generation !== this.generation) return of(AccessState.Indeterminate);
       const customerRevision = this.revision(AccessContext.Customer);
       const userRevision = this.revision(AccessContext.User);
+      const customerGeneration = this.customer.generation();
+      const userGeneration = this.user.generation();
       const customerPending = this.pendingRevocations.has(AccessContext.Customer);
       const userPending = this.pendingRevocations.has(AccessContext.User);
       return forkJoin({
@@ -77,13 +79,19 @@ export class AccessCoordinator {
         user: userPending ? of(SessionProbe.Unknown) : this.probe(AccessContext.User),
       }).pipe(map((results) => {
         if (generation !== this.generation) return AccessState.Indeterminate;
-        if (!customerPending && customerRevision === this.revision(AccessContext.Customer)) {
+        if (!customerPending && customerRevision === this.revision(AccessContext.Customer)
+          && customerGeneration === this.customer.generation()) {
           this.apply(AccessContext.Customer, results.customer);
           this.customerProbe = results.customer;
+        } else {
+          this.customerProbe = SessionProbe.Unknown;
         }
-        if (!userPending && userRevision === this.revision(AccessContext.User)) {
+        if (!userPending && userRevision === this.revision(AccessContext.User)
+          && userGeneration === this.user.generation()) {
           this.apply(AccessContext.User, results.user);
           this.userProbe = results.user;
+        } else {
+          this.userProbe = SessionProbe.Unknown;
         }
         return this.publish();
       }));
@@ -98,7 +106,11 @@ export class AccessCoordinator {
   /** Call when a login starts, before its response may supersede a reload flight. */
   supersedeProbes(context: AccessContext = AccessContext.Unknown): void {
     ++this.generation;
-    this.mutationFence.advance(context);
+    for (const realm of [AccessContext.Customer, AccessContext.User]) {
+      if ((context === AccessContext.Unknown || context === realm) && !this.pendingRevocations.has(realm)) {
+        this.mutationFence.advance(realm);
+      }
+    }
     this.flight = null;
   }
 
@@ -149,6 +161,9 @@ export class AccessCoordinator {
       this.pendingRevocations.add(context);
       this.mutationFence.beginRevocation(context);
       this.staging.clear(context);
+      // The revoke establishes its fence exactly once. Later login/probe commands
+      // must not advance it and cancel the queued revocation transport owner.
+      this.mutationFence.advance(context);
       this.supersedeProbes(context);
       const revision = this.revision(context) + 1;
       this.realmRevisions.set(context, revision);

@@ -9,6 +9,8 @@ import { UserRole } from '../../domain/user/user-role';
 import { LoginResolution, LoginResult } from '../../domain/access/login-resolution';
 import { AccessHome } from '../../domain/access/access-home';
 import { ReturnDestination } from '../../domain/access/return-destination';
+import { CustomerHttpRepository } from '../../data/customer/customer-http.repository';
+import { RegisterCustomerUseCase } from '../../domain/customer/use-cases/register-customer.usecase';
 import { AccessCoordinator, ActiveContextHint } from './access-coordinator';
 import { AccessSessionStaging } from './access-session-staging';
 import { AccessHttpRepository } from '../../data/access/access-http.repository';
@@ -101,6 +103,53 @@ describe('AccessCoordinator queue and realm ownership', () => {
     const revoke = http.expectOne(url('customer/auth/logout'));
     expect(revoke.request.headers.get(CSRF_HEADER)).toBe('after-write'); revoke.flush({}); await logout;
   });
+  for (const realm of [AccessContext.Customer, AccessContext.User]) {
+    it(`preserves queued ${realm.wire} logout when a login supersedes probes behind a sent write`, async () => {
+      customer.commit(buyer, 'customer-old'); user.commit(operator, 'user-old');
+      const path = realm === AccessContext.Customer ? 'customer/me' : 'user/content/home';
+      const session = realm === AccessContext.Customer ? customer : user;
+      const write = firstValueFrom(client.put(url(path), {}), { defaultValue: undefined });
+      const sent = http.expectOne(url(path));
+      const logout = firstValueFrom(access.logout(realm));
+      const revocationGeneration = session.generation();
+      // LoginStore.submit invokes this before the rejected credential command.
+      access.supersedeProbes(); access.supersedeProbes(realm);
+      expect(session.generation()).toBe(revocationGeneration);
+      const login = await firstValueFrom(TestBed.inject(AccessHttpRepository).signIn({ email: buyer.email, password: 'valid-password' }));
+      expect(login.resolution).toBe(LoginResolution.Unavailable);
+      http.expectNone(url('auth/login'));
+      const logoutPath = `${realm === AccessContext.Customer ? 'customer' : 'internal'}/auth/logout`;
+      http.expectNone(url(logoutPath));
+      sent.flush({}, { headers: { [CSRF_HEADER]: 'write-rotated-current' } });
+      const revoke = http.expectOne(url(logoutPath));
+      expect(revoke.request.headers.get(CSRF_HEADER)).toBe('write-rotated-current');
+      revoke.flush({}); await logout; await write;
+      expect(session.authenticated()).toBe(false); expect(session.actorId()).toBeNull(); expect(session.csrf()).toBe('');
+    });
+  }
+  for (const anonymousResult of [false, true]) {
+    it(`cannot apply old CUSTOMER ${anonymousResult ? '401' : 'principal A'} after registration B while USER probe is delayed`, async () => {
+      customer.commit(buyer, 'a-token');
+      const initial = firstValueFrom(access.rehydrate()); probeCustomer(); anonymous('internal/me'); await initial;
+      const reload = firstValueFrom(access.rehydrate());
+      const delayedUser = http.expectOne(url('internal/me'));
+      if (anonymousResult) anonymous('customer/me'); else probeCustomer();
+      const registration = new RegisterCustomerUseCase(new CustomerHttpRepository(client), customer);
+      const registered = firstValueFrom(registration.execute({ email: 'b@example.test', password: 'valid-password', firstName: 'B', lastName: 'Buyer' }));
+      http.expectOne(url('customer/auth/register')).flush({ id: 'buyer-b', email: 'b@example.test', firstName: 'B', lastName: 'Buyer' },
+        { headers: { [CSRF_HEADER]: 'registration-b-token' } });
+      expect((await registered).id).toBe('buyer-b');
+      const generationB = customer.generation();
+      expect(customer.authenticated()).toBe(true); expect(customer.csrf()).toBe('registration-b-token');
+      delayedUser.flush({}, { status: 401, statusText: 'Unauthorized' });
+      const state = await reload;
+      expect(customer.generation()).toBe(generationB);
+      expect(customer.authenticated()).toBe(true); expect(customer.actorId()).toBeNull();
+      expect(customer.csrf()).toBe('registration-b-token');
+      expect(state.activeContext).toBe(AccessContext.Unknown);
+      expect(state.kind).toBe(AccessStateKind.Indeterminate);
+    });
+  }
   it('cancels queued old writes while a dispatched write settles before reload', async () => {
     customer.commit(buyer, 'initial');
     const active = firstValueFrom(client.put(url('customer/me'), {}), { defaultValue: undefined });
