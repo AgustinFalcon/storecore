@@ -8,6 +8,7 @@ import { CSRF_HEADER } from '../../core/auth/csrf';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { UserSession } from '../../core/auth/user-session';
 import { AccessMutationFence } from '../../core/auth/access-mutation-fence';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { AccessSessionStaging } from '../../core/auth/access-session-staging';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessHome } from '../../domain/access/access-home';
@@ -32,6 +33,24 @@ describe('unified access HTTP repository', () => {
     customer.setCsrf('previous-customer'); user.setCsrf('previous-user');
   });
   afterEach(() => ctrl.verify());
+  it('blocks credential and same-realm challenge HTTP before issuing cookies during revoke, including cold commands', async () => {
+    const coordinator = TestBed.inject(AccessCoordinator);
+    const credentials = { email: 'test@example.test', password: 'sample-password' };
+    const cold = repository.signIn(credentials);
+    const logout = firstValueFrom(coordinator.logout(AccessContext.Customer));
+    const revoke = ctrl.expectOne(`${environment.apiBaseUrl}/customer/auth/logout`);
+    coordinator.supersedeProbes();
+    expect((await firstValueFrom(cold)).resolution).toBe(LoginResolution.Unavailable);
+    expect((await firstValueFrom(repository.selectContext('c'.repeat(40), AccessContext.Customer))).resolution).toBe(LoginResolution.Unavailable);
+    ctrl.expectNone(`${environment.apiBaseUrl}/auth/login`);
+    ctrl.expectNone(`${environment.apiBaseUrl}/auth/context-selection`);
+    expect(staging.take(AccessContext.Customer)).toBeNull();
+    revoke.flush({}); await logout;
+    const login = firstValueFrom(repository.signIn(credentials));
+    ctrl.expectOne(`${environment.apiBaseUrl}/auth/login`).flush(authenticated(AccessContext.Customer), { headers: { [CSRF_HEADER]: 'new-customer' } });
+    expect((await login).resolution).toBe(LoginResolution.Authenticated);
+    expect(staging.take(AccessContext.Customer)).toBe('new-customer');
+  });
   it('uses the exact login body and cookies without attaching a realm token', async () => {
     const credentials = { email: 'test@example.test', password: 'sample-password', returnPath: '/catalog' };
     const pending = firstValueFrom(repository.signIn(credentials));

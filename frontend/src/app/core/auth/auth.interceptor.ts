@@ -59,6 +59,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const context = path.includes('/customer/') ? AccessContext.Customer
     : path.includes('/internal/') || path.includes('/user/') ? AccessContext.User : AccessContext.Unknown;
   const generation = context.isKnown ? fence.snapshot(context) : -1;
+  // Legacy credential endpoints share the same revoke barrier as unified auth.
+  if (isMutation(req.method) && (isCustomerPublicAuth(path) || isInternalPublicAuth(path))
+    && !fence.permitsAuthentication(context)) {
+    return throwError(() => new HttpErrorResponse({ status: 409, statusText: 'Session revocation pending' }));
+  }
 
   let outgoing = req.clone({ withCredentials: true });
   if (isMutation(outgoing.method) && !isCustomerPublicAuth(path) && !isInternalPublicAuth(path)) {

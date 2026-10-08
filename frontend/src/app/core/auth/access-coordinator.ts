@@ -1,6 +1,6 @@
 import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
-import { catchError, defer, finalize, forkJoin, map, Observable, of, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
+import { BehaviorSubject, catchError, defer, finalize, forkJoin, map, Observable, of, ReplaySubject, share, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessState, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
@@ -35,10 +35,15 @@ export class AccessCoordinator {
   private readonly cancelProbes = new Subject<void>();
   private generation = 0;
   private flight: Observable<AccessState> | null = null;
+  private readonly revocations = new Map<AccessContext, Observable<void>>();
+  private readonly pendingRevocations = new Set<AccessContext>();
+  private readonly realmRevisions = new Map<AccessContext, number>();
   private customerProbe = SessionProbe.Unknown;
   private userProbe = SessionProbe.Unknown;
   private readonly accepted = signal(AccessState.Indeterminate);
   readonly state = this.accepted.asReadonly();
+  private readonly stateChanges = new BehaviorSubject(AccessState.Indeterminate);
+  readonly stateChanges$ = this.stateChanges.asObservable();
 
   constructor(
     backend: HttpBackend,
@@ -55,16 +60,31 @@ export class AccessCoordinator {
   rehydrate(): Observable<AccessState> {
     if (this.flight) return this.flight;
     const generation = ++this.generation;
-    this.mutationFence.advance();
-    const flight = defer(() => forkJoin({ customer: this.probe(AccessContext.Customer), user: this.probe(AccessContext.User) })).pipe(
-      map((results) => {
+    for (const realm of [AccessContext.Customer, AccessContext.User]) {
+      if (!this.pendingRevocations.has(realm)) this.mutationFence.advance(realm);
+    }
+    const flight: Observable<AccessState> = defer(() => {
+      if (generation !== this.generation) return of(AccessState.Indeterminate);
+      const customerRevision = this.revision(AccessContext.Customer);
+      const userRevision = this.revision(AccessContext.User);
+      const customerPending = this.pendingRevocations.has(AccessContext.Customer);
+      const userPending = this.pendingRevocations.has(AccessContext.User);
+      return forkJoin({
+        customer: customerPending ? of(SessionProbe.Unknown) : this.probe(AccessContext.Customer),
+        user: userPending ? of(SessionProbe.Unknown) : this.probe(AccessContext.User),
+      }).pipe(map((results) => {
         if (generation !== this.generation) return AccessState.Indeterminate;
-        this.apply(AccessContext.Customer, results.customer);
-        this.apply(AccessContext.User, results.user);
-        this.customerProbe = results.customer;
-        this.userProbe = results.user;
+        if (!customerPending && customerRevision === this.revision(AccessContext.Customer)) {
+          this.apply(AccessContext.Customer, results.customer);
+          this.customerProbe = results.customer;
+        }
+        if (!userPending && userRevision === this.revision(AccessContext.User)) {
+          this.apply(AccessContext.User, results.user);
+          this.userProbe = results.user;
+        }
         return this.publish();
-      }),
+      }));
+    }).pipe(
       finalize(() => { if (this.flight === flight) this.flight = null; }),
       shareReplay({ bufferSize: 1, refCount: false }),
     );
@@ -83,6 +103,10 @@ export class AccessCoordinator {
   /** Unified login has no principal: complete it with a fresh atomic realm probe. */
   acceptAuthenticated(context: AccessContext): Observable<AccessState> {
     if (!context.isKnown) return of(AccessState.Indeterminate);
+    if (!this.mutationFence.permitsAuthentication(context)) {
+      this.staging.clear(context);
+      return of(AccessState.Indeterminate);
+    }
     const stagedCsrf = this.staging.take(context);
     this.supersedeProbes(context);
     this.apply(context, SessionProbe.Anonymous);
@@ -91,7 +115,7 @@ export class AccessCoordinator {
     this.publish();
     if (!stagedCsrf) return of(AccessState.Indeterminate);
     const generation = this.generation;
-    return this.probeWithStagedCsrf(context, stagedCsrf).pipe(map((result) => {
+    return defer(() => generation === this.generation ? this.probeWithStagedCsrf(context, stagedCsrf) : of(SessionProbe.Unknown)).pipe(map((result) => {
       if (generation !== this.generation) return AccessState.Indeterminate;
       this.apply(context, result);
       if (context === AccessContext.Customer) this.customerProbe = result;
@@ -106,35 +130,66 @@ export class AccessCoordinator {
     const next = this.state().select(context);
     if (next.activeContext === context) this.hint.write(context);
     this.accepted.set(next);
+    this.stateChanges.next(next);
     return next;
   }
 
   logout(context: AccessContext = this.state().activeContext): Observable<void> {
     if (!context.isKnown) return of(undefined);
-    this.staging.clear(context);
-    this.supersedeProbes(context);
-    const generation = this.generation;
-    const csrf = context === AccessContext.Customer ? this.customer.csrf() : this.user.csrf();
-    return this.http.post(`${environment.apiBaseUrl}/${this.realmPath(context)}/auth/logout`, {},
-      { withCredentials: true, headers: { [CSRF_HEADER]: csrf } }).pipe(
-      catchError((error: unknown) => {
-        if (error instanceof HttpErrorResponse && error.status === 401) return of(null);
-        throw error;
+    const existing = this.revocations.get(context);
+    if (existing) return existing;
+    const flight: Observable<void> = defer(() => {
+      const current = this.revocations.get(context);
+      if (current && current !== flight) return current;
+      this.revocations.set(context, flight);
+      this.pendingRevocations.add(context);
+      this.mutationFence.beginRevocation(context);
+      this.staging.clear(context);
+      this.supersedeProbes(context);
+      const revision = this.revision(context) + 1;
+      this.realmRevisions.set(context, revision);
+      const csrf = context === AccessContext.Customer ? this.customer.csrf() : this.user.csrf();
+      // Pending revoke removes authority, but retains CSRF until the server confirms it.
+      if (context === AccessContext.Customer) this.customerProbe = SessionProbe.Unknown;
+      else this.userProbe = SessionProbe.Unknown;
+      this.publish();
+      return this.http.post(`${environment.apiBaseUrl}/${this.realmPath(context)}/auth/logout`, {},
+        { withCredentials: true, headers: { [CSRF_HEADER]: csrf } }).pipe(
+        catchError((error: unknown) => {
+          if (error instanceof HttpErrorResponse && error.status === 401) return of(null);
+          throw error;
+        }),
+        tap(() => {
+          if (revision !== this.revision(context)) return;
+          this.realmRevisions.set(context, revision + 1);
+          this.apply(context, SessionProbe.Anonymous);
+          if (context === AccessContext.Customer) this.customerProbe = SessionProbe.Anonymous;
+          else this.userProbe = SessionProbe.Anonymous;
+          if (this.hint.read() === context) this.hint.write(AccessContext.Unknown);
+          this.publish();
+        }), map(() => undefined),
+      );
+    }).pipe(
+      finalize(() => {
+        if (this.revocations.get(context) === flight) {
+          this.pendingRevocations.delete(context);
+          this.mutationFence.endRevocation(context);
+          this.revocations.delete(context);
+        }
       }),
-      tap(() => {
-        if (generation !== this.generation) return;
-        this.apply(context, SessionProbe.Anonymous);
-        if (context === AccessContext.Customer) this.customerProbe = SessionProbe.Anonymous;
-        else this.userProbe = SessionProbe.Anonymous;
-        if (this.hint.read() === context) this.hint.write(AccessContext.Unknown);
-        this.publish();
-      }), map(() => undefined),
+      // An old command replays its terminal result; retry requires a fresh logout command.
+      share({ connector: () => new ReplaySubject<void>(1), resetOnError: false, resetOnComplete: false, resetOnRefCountZero: false }),
     );
+    this.revocations.set(context, flight);
+    return flight;
   }
+
+  private revision(context: AccessContext): number { return this.realmRevisions.get(context) ?? 0; }
 
   private publish(): AccessState {
     const next = AccessState.resolve(this.customerProbe, this.userProbe, this.hint.read());
     this.accepted.set(next);
+    this.stateChanges.next(next);
     return next;
   }
 

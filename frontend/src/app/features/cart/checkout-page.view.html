@@ -4,12 +4,20 @@
     <h1 id="checkout-title">Checkout</h1>
     <p class="sc-page__lede">El pago se inicia en el servidor. Reintentar reusa la misma clave. El browser no habla con Mercado Pago.</p>
   </header>
+  @if (!access.canMutate) {
+    <p>{{ access.label }}</p>
+    @if (access.requiresSelection) {
+      <button type="button" class="sc-btn sc-btn--primary" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>
+    } @else {
+      <a routerLink="/login">Entrar como cliente</a>
+    }
+  }
   <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
   <div class="sc-checkout__layout">
-    <form class="sc-panel" (submit)="$event.preventDefault(); pay.emit()">
+    <form class="sc-panel" (submit)="$event.preventDefault(); canPay && pay.emit()">
       <h2>Entrega</h2>
       <label>Dirección
-        <select required name="addressId" [ngModel]="state.addressId" (ngModelChange)="addressChange.emit($event)">
+        <select required name="addressId" [disabled]="!access.canMutate" [ngModel]="state.addressId" (ngModelChange)="addressChange.emit($event)">
           <option value="">Elegí una dirección</option>
           @for (address of state.addresses; track address.id) {
             <option [value]="address.id">{{ address.street }} {{ address.number }} · {{ address.city }}</option>
@@ -18,12 +26,12 @@
       </label>
       <h2>Cobro</h2>
       <label>Moneda
-        <input required name="currency" [ngModel]="state.currency" (ngModelChange)="currencyChange.emit($event)" />
+        <input required name="currency" [disabled]="!access.canMutate" [ngModel]="state.currency" (ngModelChange)="currencyChange.emit($event)" />
       </label>
       <p class="sc-callout sc-callout--info">Clave de idempotencia <span class="sc-mono">{{ state.idempotencyKey }}</span>. No se edita. Un reintento usa la misma clave.</p>
       <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay" [attr.title]="canPay ? null : 'Falta dirección, moneda o el carrito está vacío'">Pagar</button>
       @if (state.errorMessage) {
-        <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" (click)="pay.emit()">Reintentar</button>
+        <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" [disabled]="!canPay" (click)="canPay && pay.emit()">Reintentar</button>
       }
     </form>
     <aside class="sc-summary">

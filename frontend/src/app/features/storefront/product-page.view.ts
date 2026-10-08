@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Cart } from '../../domain/cart/cart.entity';
+import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -16,12 +17,13 @@ export class ProductPageViewComponent {
   @Input() cart: Cart | null = null;
   @Input() loading = false;
   @Input() error = '';
-  @Input() signedIn = false;
+  @Input() access = CustomerCartAccess.Unknown;
   quantity = 1;
   activeImage = '';
 
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
+  @Output() readonly selectCustomer = new EventEmitter<void>();
 
   get hasDiscount(): boolean {
     return !!this.product && this.product.price.base > this.product.price.effective;
@@ -32,6 +34,7 @@ export class ProductPageViewComponent {
   }
 
   submit(sku: string): void {
+    if (!this.access.canMutate || !this.product?.active) return;
     this.add.emit({ sku, quantity: Math.max(1, Number(this.quantity) || 1) });
   }
 }
