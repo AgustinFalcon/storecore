@@ -41,6 +41,15 @@ un solo host loopback por escenario. No declarar aceptación desde mocks.
 
 ## INT-FE-04 CFE: alcance posterior
 
+Addendum documental sobre FE03 `41dcfb3ff099a4ca162c4c11fe75e4609826b1a8`:
+[contrato backend-first CFE](../4-implementation/int-fe04-commerce-fulfillment.md)
+fija DTO administrativo eligibility/actions, reutilización de tipos cerrados,
+retorno frío seguro, allowlist/no-touch, interlock actor/CSRF y PR D/B/T/U/E.
+OrderView sigue con strings y nextShipAction/nextRmaAction; AdminOrder frontend
+aún no consume acciones ni elegibilidad. El mapper futuro conserva esos nombres
+wire y no deriva autoridad de shipmentStatus. Sólo se documenta el port;
+E01–E09 NOT_RUN. V21 UA existe y no se propone nueva migración CFE.
+
 Procedencia #171/#173: `a653f45af977ad989b62a48ec01a363646207aaf` y WIP `20261006-commerce-closed-states-and-fulfillment-eligibility`. Port manual de tipos, política/evidencia/records, callers, consumers y acceptance. Mantener hooks BlackStore/DSP/lock order e inbox/SALE existentes. No transportar migraciones master ni reemplazar todo JdbcCartService/JdbcOrderService.
 
 - E01: checkout pendiente; ship/RMA/CUSTOMER rechazados sin efectos.

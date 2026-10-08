@@ -61,7 +61,19 @@
       "depends_on": [
         "INT-FE-03"
       ],
-      "status": "pending",
+      "status": "documented_for_review",
+      "implementation_status": "not_started",
+      "document_baseline": "41dcfb3ff099a4ca162c4c11fe75e4609826b1a8",
+      "contract": "../4-implementation/int-fe04-commerce-fulfillment.md",
+      "acceptance": ["E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09"],
+      "acceptance_status": "NOT_RUN",
+      "subtasks": [
+        {"id": "FE04-D", "depends_on": [], "status": "documented_for_review"},
+        {"id": "FE04-B", "depends_on": ["FE04-D"], "status": "pending"},
+        {"id": "FE04-T", "depends_on": ["FE04-B"], "status": "pending"},
+        {"id": "FE04-U", "depends_on": ["FE04-T"], "status": "pending"},
+        {"id": "FE04-E", "depends_on": ["FE04-U"], "status": "pending"}
+      ],
       "requirements": [
         "INT-R04",
         "INT-R08"

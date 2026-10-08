@@ -26,3 +26,19 @@ INT-FE-02 no equivale a integrado/aceptado. Revalidar sus gates antes del port.
 
 Todos los subpasos de implementación están pendientes; D documentado para review.
 INT-FE-04/05/06 no empiezan por completar D: dependen del corte FE03 aceptado.
+
+## Sub-DAG INT-FE-04
+
+Base exacta FE03 `41dcfb3ff099a4ca162c4c11fe75e4609826b1a8`; D documental
+puede prepararse sin declarar aceptación FE03. Ver [contrato CFE](../4-implementation/int-fe04-commerce-fulfillment.md).
+
+1. FE04-D: contrato, allowlist, decisiones de retorno y E01–E09 para review.
+2. FE04-B depende de D/review y gates FE03: backend, elegibilidad/evidencia,
+   transacciones, wire DTO y tests. Sin frontend que adelante autoridad.
+3. FE04-T depende de B: extender tipos existentes, traductores y destinos cerrados.
+4. FE04-U depende de T: consumers UI, interlock de actor/CSRF/ruta y pruebas UX.
+5. FE04-E depende de U: aceptación E01–E09, regresiones, manifest/axe,
+   RealLocal HTTPS/DB y evidencia/reviews por SHA.
+
+Orden de PR D → B → T → U → E. B/T/U/E pendientes; ninguna prueba de producto
+se ejecuta en D. Sin promoción master, live ni cierre por completar documentos.
