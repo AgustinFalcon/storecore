@@ -11,9 +11,16 @@ describe('CapabilityModuleId', () => {
 
   it('hides an unknown wire from the homologation console', () => {
     const module = CapabilityModuleId.fromWire('NOT_A_MODULE');
-    expect(module.wire).toBe('NOT_A_MODULE');
+    expect(module).toBe(CapabilityModuleId.Unknown);
+    expect(module.wire).toBe('');
     expect(module.homologationVisible).toBe(false);
     expect(module.isUnknown).toBe(true);
+  });
+
+  it('maps companion, whitespace, case variants and arbitrary wires to the same fixed Unknown', () => {
+    for (const raw of ['BLACKSTORE_INTEGRATION', ' CATALOG ', 'catalog', 'OTHER', '', null, undefined]) {
+      expect(CapabilityModuleId.fromWire(raw)).toBe(CapabilityModuleId.Unknown);
+    }
   });
 
   it('does not print a blank wire as a visible module', () => {

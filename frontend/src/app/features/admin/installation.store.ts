@@ -1,18 +1,19 @@
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, forkJoin, switchMap, tap } from 'rxjs';
+import { defer, EMPTY, exhaustMap, filter, finalize, forkJoin, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import {
   CapabilityModule,
-  CapabilityState,
+  CapabilityChange,
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
 } from '../../domain/user/user.entity';
-import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
+import { CapabilityReconciliationError, ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
 
 export interface InstallationState {
+  readonly changingCapability: boolean;
   readonly loading: boolean;
   readonly errorMessage: string;
   readonly capabilities: readonly CapabilityModule[];
@@ -28,6 +29,7 @@ const emptyListing: MercadoLibreListing = { listingId: '', variationId: '', sku:
 export class InstallationStore extends ComponentStore<InstallationState> {
   constructor(private readonly ops: ManageInstallationUseCase) {
     super({
+      changingCapability: false,
       loading: false,
       errorMessage: '',
       capabilities: [],
@@ -43,6 +45,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
   }
 
   readonly loading$ = this.select((s) => s.loading);
+  readonly changingCapability$ = this.select((s) => s.changingCapability);
   readonly errorMessage$ = this.select((s) => s.errorMessage);
   readonly capabilities$ = this.select((s) => s.capabilities);
   readonly inventory$ = this.select((s) => s.inventory);
@@ -67,14 +70,29 @@ export class InstallationStore extends ComponentStore<InstallationState> {
     ),
   );
 
-  readonly changeCapability = this.effect<{ module: string; state: CapabilityState }>((cmd$) =>
+  readonly changeCapability = this.effect<CapabilityChange>((cmd$) =>
     cmd$.pipe(
-      switchMap((cmd) =>
-        this.ops.setCapability(cmd.module, cmd.state).pipe(
+      exhaustMap((cmd) =>
+        defer(() => {
+          const current = this.snapshot.capabilities.find((item) => item.module === cmd.module);
+          if (!current) {
+            this.patchState({ errorMessage: 'Recargá la configuración antes de cambiar el estado.' });
+            return EMPTY;
+          }
+          this.patchState({ errorMessage: '', changingCapability: true });
+          return this.ops.setCapability(current, cmd.state, cmd.reason);
+        }).pipe(
           tapResponse({
-            next: () => this.loadCapabilities(),
-            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
+            next: (updated) => {
+              this.patchState({ capabilities: this.snapshot.capabilities.map((item) => item.module === updated.module ? updated : item) });
+              this.loadCapabilities();
+            },
+            error: (err: unknown) => {
+              if (err instanceof CapabilityReconciliationError) this.patchState({ capabilities: err.snapshot });
+              this.patchState({ errorMessage: getApiErrorMessage(err) });
+            },
           }),
+          finalize(() => this.patchState({ changingCapability: false })),
         ),
       ),
     ),

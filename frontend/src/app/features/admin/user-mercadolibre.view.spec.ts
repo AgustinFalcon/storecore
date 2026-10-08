@@ -14,6 +14,7 @@ describe('MercadoLibre account wire to render', () => {
 
   function render(raw: unknown): HTMLElement {
     const state: InstallationState = {
+      changingCapability: false,
       loading: false, errorMessage: '', capabilities: [], inventory: [], listings: [],
       listingDraft: { listingId: '', variationId: '', sku: '', accountId: null },
       mlAccount: mapMercadoLibreAccount(raw),
@@ -48,6 +49,7 @@ describe('MercadoLibre account wire to render', () => {
 
   it('shows an honest empty state when the disabled account has no account reference', () => {
     const state: InstallationState = {
+      changingCapability: false,
       loading: false, errorMessage: '', capabilities: [], inventory: [], listings: [],
       listingDraft: { listingId: '', variationId: '', sku: '', accountId: null },
       mlAccount: mapMercadoLibreAccount({ authorized: false, accountRef: '', status: 'DISABLED' }),

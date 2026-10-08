@@ -21,7 +21,7 @@
       "depends_on": [
         "INT-FE-00"
       ],
-      "status": "pending",
+      "status": "implemented_local_pending_real_local",
       "requirements": [
         "INT-R02"
       ]

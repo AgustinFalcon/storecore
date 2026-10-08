@@ -28,6 +28,7 @@ import com.storecore.configuration.domain.CapabilityAdminCommand
 import com.storecore.configuration.domain.CapabilityAdminOperation
 import com.storecore.configuration.domain.CapabilityModuleView
 import com.storecore.configuration.domain.CapabilityState
+import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import org.springframework.beans.factory.annotation.Autowired
@@ -80,14 +81,14 @@ open class JdbcCapabilityService(
         } else if (schema != 1 || configJson != "{}") {
             throw CapabilityConfigInvalid()
         }
-        val state = CapabilityState.valueOf(config["state"].toString())
+        val state = CapabilityState.fromWire(config["state"]?.toString())
         val actionRow = jdbc.queryForList(
             "SELECT action_kind, allows_write, allowed_when_paused FROM capability_actions WHERE module_code=? AND action_code=? FOR SHARE",
             module, action,
         ).singleOrNull() ?: throw CapabilityActionNotAllowed()
         val kind = CapabilityActionKind.valueOf(actionRow["action_kind"].toString())
         when (state) {
-            CapabilityState.DISABLED -> throw CapabilityDisabled()
+            CapabilityState.DISABLED, CapabilityState.Unknown -> throw CapabilityDisabled()
             CapabilityState.READ_ONLY -> if (kind !in setOf(CapabilityActionKind.READ, CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityReadOnly()
             CapabilityState.PAUSED -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityPaused()
             CapabilityState.ERROR -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityErrorState()
@@ -131,10 +132,10 @@ open class JdbcCapabilityService(
         }
         if (live.size > 1) throw CapabilityKillSwitchInvalid()
         if (live.isNotEmpty()) throw CapabilityKillSwitchActive()
-        val state = CapabilityState.valueOf(photo.path("state").asText())
+        val state = CapabilityState.fromWire(photo.path("state").asText())
         val kind = CapabilityActionKind.valueOf(photo.path("actionKind").asText())
         when (state) {
-            CapabilityState.DISABLED -> throw CapabilityDisabled()
+            CapabilityState.DISABLED, CapabilityState.Unknown -> throw CapabilityDisabled()
             CapabilityState.READ_ONLY -> if (kind !in setOf(CapabilityActionKind.READ, CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityReadOnly()
             CapabilityState.PAUSED -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityPaused()
             CapabilityState.ERROR -> if (kind !in setOf(CapabilityActionKind.STATUS, CapabilityActionKind.HEALTH)) throw CapabilityErrorState()
@@ -159,7 +160,7 @@ open class JdbcCapabilityService(
 
     override fun list(): List<CapabilityModuleView> = jdbc.query(
         "SELECT module_code, state, config_version FROM module_configurations ORDER BY module_code",
-    ) { rs, _ -> CapabilityModuleView(rs.getString("module_code"), CapabilityState.valueOf(rs.getString("state")), rs.getInt("config_version")) }
+    ) { rs, _ -> capabilityModuleView(rs.getString("module_code"), rs.getString("state"), rs.getInt("config_version")) }
 
     override fun changeState(actor: InternalUserPrincipal, module: String, state: CapabilityState, expectedVersion: Int?, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles || reason.isBlank()) throw CapabilityActorNotAuthorized()
@@ -370,3 +371,10 @@ open class JdbcCapabilityService(
         )
     }
 }
+
+internal fun capabilityModuleView(moduleCode: String?, state: String, configVersion: Int): CapabilityModuleView =
+    CapabilityModuleView(
+        module = InstallationCapabilityModule.fromWire(moduleCode),
+        state = CapabilityState.fromWire(state),
+        configVersion = configVersion,
+    )

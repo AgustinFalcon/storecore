@@ -18,6 +18,8 @@ El inventario describe implementación observada y clase de evidencia existente,
 
 El backend actual exige correlationId, expectedConfigVersion, reason y rota CSRF. UserHttpRepository envía sólo state y la UI no cubre el flujo de comandos; portear readmodel y command por allowlist, conservando module visibility de integración. Estados/module/resultado/acciones cerrados; payload desde tipo, conflicto stale → GET autoritativo; timeout → consultar comando y no duplicar efectos. No activar companion por actualizar la consola.
 
+INT-FE-01 local corrige este gap observado en el baseline: payload con UUID/versión/motivo, dominio cerrado y Unknown, ADMIN en UI y backend, consulta de correlación + snapshot autoritativo ante error/timeout. Versión esperada positiva y motivo no vacío obligatorios en HTTP; no resolver versión implícita del cliente. [Evidencia del port](../4-implementation/int-fe01-capability.md), con gate RealLocal pendiente.
+
 ## INT-FE-02/03 Unified Access
 
 Fuente revisable #176: `9a305b940b24d68c6bb80108060996b6210546a5`, rama `fix/unified-access-context-hardening`. El contrato fuente está archivado en `sdd/features/20261003-unified-access-entry/` (no en wip en ese SHA). Fuente histórica backend #166, frontend #167 y E2E #169; revalidar SHA/diff antes de portear.

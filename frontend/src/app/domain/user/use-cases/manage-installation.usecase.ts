@@ -1,8 +1,9 @@
-import { map, Observable } from 'rxjs';
-import { CapabilityModuleId } from '../capability-module-id';
+import { catchError, map, Observable, of, switchMap, throwError, timeout } from 'rxjs';
+import { CapabilityCommandStatus } from '../capability-command-status';
+import { UserRole } from '../user-role';
+import { CapabilityModuleState } from '../capability-module-state';
 import {
   CapabilityModule,
-  CapabilityState,
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
@@ -12,17 +13,46 @@ import { IUserRepository } from '../user.repository';
 export class ManageInstallationUseCase {
   constructor(private readonly repo: IUserRepository) {}
 
+  canChangeCapabilities(): Observable<boolean> {
+    return this.repo.readMe().pipe(map(actor => actor.roles.includes(UserRole.Admin)), catchError(() => of(false)));
+  }
+
   listCapabilities(): Observable<readonly CapabilityModule[]> {
     return this.repo.listCapabilities().pipe(
-      map((items) => items.filter((item) => CapabilityModuleId.fromWire(item.module).homologationVisible)),
+      map((items) => items.filter((item) => item.module.homologationVisible)),
     );
   }
 
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
-    if (!CapabilityModuleId.fromWire(module).homologationVisible) {
+  setCapability(current: CapabilityModule, state: CapabilityModuleState, reason: string): Observable<CapabilityModule> {
+    if (!current.module.homologationVisible) {
       throw new Error('Este módulo no forma parte de la consola de homologación.');
     }
-    return this.repo.setCapability(module, state);
+    if (!current.state.isCurrent || !state.isCurrent) {
+      throw new Error('El estado de capability no es reconocido.');
+    }
+    if (current.configVersion === null || !Number.isSafeInteger(current.configVersion) || current.configVersion <= 0) {
+      throw new Error('Recargá la configuración antes de cambiar el estado.');
+    }
+    if (!reason.trim()) throw new Error('Ingresá el motivo del cambio.');
+    // Created once per user attempt, before any HTTP subscription or retry.
+    const command = {
+      module: current.module,
+      state,
+      reason,
+      expectedConfigVersion: current.configVersion,
+      correlationId: crypto.randomUUID(),
+    };
+    return this.repo.setCapability(command).pipe(
+      timeout(15000),
+      catchError(() => this.repo.capabilityCommandStatus(command.correlationId).pipe(
+        timeout(15000),
+        catchError(() => of(CapabilityCommandStatus.Unknown)),
+        switchMap(status => this.listCapabilities().pipe(
+          timeout(15000),
+          switchMap(items => throwError(() => new CapabilityReconciliationError(items, status))),
+        )),
+      )),
+    );
   }
 
   listInventory(): Observable<readonly InventoryRow[]> {
@@ -39,5 +69,11 @@ export class ManageInstallationUseCase {
 
   saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing> {
     return this.repo.saveMercadoLibreListing(listing);
+  }
+}
+
+export class CapabilityReconciliationError extends Error {
+  constructor(readonly snapshot: readonly CapabilityModule[], status: CapabilityCommandStatus) {
+    super(`Resultado del comando: ${status.label}. Configuración actualizada desde el servidor; revisá antes de intentar otro cambio.`);
   }
 }

@@ -11,10 +11,10 @@ import { PaymentStatus } from '../../domain/order/payment-status';
 import { RmaStatus } from '../../domain/order/rma-status';
 import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
+import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { UserRole } from '../../domain/user/user-role';
 import {
   CapabilityModule,
-  CapabilityState,
   HomeBannerBlock,
   HomeContentDraft,
   InventoryRow,
@@ -300,10 +300,11 @@ export function mapPreview(value: unknown): ProfilePreview {
 
 export function mapCapability(value: unknown): CapabilityModule {
   const row = asRecord(value);
-  const state = CapabilityModuleState.fromWire(text(row['state']));
+  const version = row['configVersion'];
   return {
-    module: text(row['module']),
-    state: (state === CapabilityModuleState.Unknown ? CapabilityModuleState.Disabled.wire : state.wire) as CapabilityState,
+    module: CapabilityModuleId.fromWire(typeof row['module'] === 'string' ? row['module'] : null),
+    state: CapabilityModuleState.fromWire(typeof row['state'] === 'string' ? row['state'] : null),
+    configVersion: typeof version === 'number' && Number.isSafeInteger(version) && version > 0 ? version : null,
   };
 }
 

@@ -16,8 +16,7 @@ export class CapabilityModuleState {
   static readonly Unknown = new CapabilityModuleState('', 'Estado no reconocido', '');
 
   static fromWire(raw: string | null | undefined): CapabilityModuleState {
-    const wire = raw?.trim() ?? '';
-    return BY_WIRE.get(wire) ?? CapabilityModuleState.Unknown;
+    return BY_WIRE.get(raw ?? '') ?? CapabilityModuleState.Unknown;
   }
 
   get isCurrent(): boolean {
