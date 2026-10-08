@@ -184,6 +184,38 @@ describe('AccessCoordinator queue and realm ownership', () => {
     expect(customer.actorId()).toBe('buyer-b'); expect(customer.csrf()).toBe('registration-b-token');
     store.ngOnDestroy();
   });
+  for (const status of [409, 503]) {
+    it(`keeps registration draft through its own transition and ${status}, retries the same payload, but clears on external actor change`, () => {
+      customer.commit(buyer, 'a-token');
+      const registration = new RegisterCustomerUseCase(new CustomerHttpRepository(client), customer);
+      const navigateByUrl = vi.fn();
+      const store = new CustomerStore(registration, {} as never, {} as never, {} as never,
+        {} as never, {} as never, {} as never, {} as never, customer, { navigateByUrl } as unknown as Router, access);
+      const payload = { email: 'b@example.test', password: 'valid-password', firstName: 'B', lastName: 'Buyer' };
+      store.setEmail(payload.email); store.setPassword(payload.password); store.setFirstName(payload.firstName); store.setLastName(payload.lastName);
+      store.setProfile(buyer);
+      store.submitRegister();
+      const first = http.expectOne(url('customer/auth/register'));
+      expect(first.request.body).toEqual(payload);
+      expect(store.snapshot.loading).toBe(true);
+      expect(store.snapshot.email).toBe(payload.email); expect(store.snapshot.password).toBe(payload.password);
+      expect(store.snapshot.profile.email).toBe(''); expect(customer.authenticated()).toBe(false);
+      first.flush({ message: 'Registration rejected' }, { status, statusText: 'Rejected' });
+      expect(store.snapshot.loading).toBe(false); expect(store.snapshot.errorMessage).not.toBe('');
+      expect(store.snapshot.email).toBe(payload.email); expect(store.snapshot.password).toBe(payload.password);
+      expect(store.snapshot.firstName).toBe(payload.firstName); expect(store.snapshot.lastName).toBe(payload.lastName);
+      store.submitRegister();
+      const retry = http.expectOne(url('customer/auth/register'));
+      expect(retry.request.body).toEqual(payload); expect(store.snapshot.loading).toBe(true);
+      retry.flush({ message: 'Registration rejected' }, { status, statusText: 'Rejected' });
+      customer.commit({ ...buyer, id: 'external-b' }, 'external-b-token');
+      expect(store.snapshot.email).toBe(''); expect(store.snapshot.password).toBe('');
+      expect(store.snapshot.firstName).toBe(''); expect(store.snapshot.lastName).toBe('');
+      expect(store.snapshot.loading).toBe(false); expect(store.snapshot.errorMessage).toBe('');
+      expect(store.snapshot.profile.email).toBe(''); expect(store.snapshot.addresses).toEqual([]);
+      expect(navigateByUrl).not.toHaveBeenCalled(); store.ngOnDestroy();
+    });
+  }
   it('cancels queued old writes while a dispatched write settles before reload', async () => {
     customer.commit(buyer, 'initial');
     const active = firstValueFrom(client.put(url('customer/me'), {}), { defaultValue: undefined });

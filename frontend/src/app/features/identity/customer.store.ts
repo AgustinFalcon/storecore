@@ -57,6 +57,7 @@ const INITIAL: CustomerState = {
 
 @Injectable()
 export class CustomerStore extends ComponentStore<CustomerState> {
+  private registrationTransition = false;
   constructor(
     private readonly register: RegisterCustomerUseCase,
     private readonly signIn: SignInCustomerUseCase,
@@ -71,7 +72,15 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly access: AccessCoordinator,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
-    this.effect<void>(changes => changes.pipe(tap(() => this.setState({ ...INITIAL }))))(session.actorChanges$);
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      const draft = this.snapshot;
+      // Only the synchronous transition initiated by this registration keeps its
+      // public form draft. Private caches always clear; external actor events
+      // and successful authentication clear the draft and password as before.
+      this.setState(this.registrationTransition ? { ...INITIAL, loading: draft.loading,
+        email: draft.email, password: draft.password, firstName: draft.firstName, lastName: draft.lastName }
+        : { ...INITIAL });
+    })))(session.actorChanges$);
   }
 
   get snapshot(): CustomerState {
@@ -109,7 +118,11 @@ export class CustomerStore extends ComponentStore<CustomerState> {
           firstName: this.snapshot.firstName,
           lastName: this.snapshot.lastName,
         };
-        if (!this.access.beginCustomerRegistration()) {
+        this.registrationTransition = true;
+        let started: boolean;
+        try { started = this.access.beginCustomerRegistration(); }
+        finally { this.registrationTransition = false; }
+        if (!started) {
           this.patchState({ loading: false, errorMessage: 'Esperá a que termine el cierre de sesión.' });
           return EMPTY;
         }
