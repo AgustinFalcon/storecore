@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { AccessComponent } from './features/access/access.component';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
 import { FulfillmentComponent } from './features/admin/fulfillment.component';
@@ -32,6 +33,7 @@ export const routes: Routes = [
     path: '',
     component: ShellComponent,
     children: [
+      { path: 'login', component: AccessComponent, title: 'Ingresar' },
       { path: '', component: StorefrontHomeComponent, title: 'StoreCore' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
