@@ -70,10 +70,10 @@ class UnifiedAccessCoordinator(
         acceptedOrigin: String,
     ): LoginResolution.Authenticated {
         val challengeHash = tokens.sha256(challenge)
-        challengeBudget.checkAllowed(sourceIp, challengeHash)
+        val admission = challengeBudget.checkAllowed(sourceIp, challengeHash)
         val selected = AccessContext.fromWire(context)
         if (selected == AccessContext.Unknown) {
-            challengeBudget.recordFailure(sourceIp, challengeHash)
+            admission.reject()
             throw AccessChallengeRejected()
         }
         return try {
@@ -82,10 +82,10 @@ class UnifiedAccessCoordinator(
                 LoginResolution.Authenticated(issuer.issue(consumed.candidate), consumed.destination)
             } ?: error("UNIFIED_SELECTION_TRANSACTION_FAILED")
         } catch (rejected: AccessChallengeRejected) {
-            challengeBudget.recordFailure(sourceIp, challengeHash)
+            admission.reject()
             throw rejected
         } catch (rejected: AuthenticationFailed) {
-            challengeBudget.recordFailure(sourceIp, challengeHash)
+            admission.reject()
             throw AccessChallengeRejected()
         }
     }

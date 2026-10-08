@@ -54,7 +54,7 @@ Reproducible local unit command from V:\backend:
 & C:\maven\bin\mvn.cmd '-Dmaven.repo.local=C:/Users/agustin/.m2/repository' -q '-Dtest=AttemptBudgetsTest,ClientAddressResolverTest,IdentityExceptionAdviceTest,InternalRoleTest,LoginRateLimiterTest,ReturnDestinationTest,UnifiedAccessResolutionTest,UnifiedLoginRequestValidationTest,UnifiedAccessControllerTest' test
 ```
 
-Final unit/controller run: **PASS, 49 tests in 9 suites, zero failures/errors**
+Backend-port unit/controller run before P2: **PASS, 49 tests in 9 suites, zero failures/errors**
 and exit code 0. All backend production and test sources compiled in the same
 Maven run, including HTTP/JDBC/schema tests. Controller tests use an
 application stub and real origin/cookie/address boundary, not browser or DB evidence.
@@ -84,3 +84,39 @@ challenge and USER-role removal rollback. They compile but still require executi
 RealLocal Angular→Spring→PostgreSQL, browser cookie races, full backend regression,
 hosted CI JDK17, dual reviews and INT-FE-02 acceptance remain pending. No external
 activation, frontend completion, merge, publication, release or homologation claim.
+
+## P2 selection budget capacity hardening
+
+The reviewed IP+challenge rejection key alone allowed arbitrary anonymous hashes
+to fill 10,000 entries and turn subsequent legitimate requests into global 429.
+The capacity policy is now closed: `AttemptCapacityPolicy.FailClosed` remains the
+default for credential/source windows; only the selection rejection window uses
+`EvictOldest`. Selection first atomically acquires one of ten **submission** slots
+per trusted-resolved IP in fifteen minutes, before constructing a hash key,
+Unknown handling, challenge lookup or DB access. This is intentionally stricter
+than the per-challenge rejected-selection limit. Success does not refund a slot.
+
+Each admitted request owns a `SelectionAdmission`; rejection is idempotent even
+under duplicate concurrent callbacks. The separate IP+hash rejection window keeps
+the ten-rejection limit and can evict its oldest entry when full. Eviction cannot
+reopen a real challenge beyond ten submissions: source admission evidence remains
+independent, unmodified, and non-evicting. Random hashes therefore never cause a
+capacity 429 for an unrelated source. There is no challenge-existence lookup in
+admission, DB oracle, secret logging, session authority or retry/replay exception.
+
+Both maps remain bounded (10,000 source IPs, 10,000 challenge keys by default).
+The source cap counts validated network sources, not JSON hashes; a distributed
+flood from 10,000 distinct real IPs can still exhaust this process-local source
+capacity, which deliberately fails closed rather than resetting live source
+throttling. That infrastructure limit is not claimed as distributed DoS protection.
+HTTP selection fixtures invalidate their Spring context after each test so test
+cases sharing loopback do not consume each other's new aggregate source slots.
+
+P2 tests exercise 10,000 random Unknown selections with challenge capacity two,
+one-key overflow followed by a legitimate different source, a real challenge
+after eviction by twenty other IPs, 24-way final-slot contention and idempotent
+rejection callbacks. Final P2 result: **PASS, 53 tests in the complete nine suites,
+zero failures/errors, exit 0**. All production/test sources compiled, including
+the HTTP test isolation changes. `git diff --check` also passed. Same local JDK21
+runtime and target17 as above; no new hosted CI JDK17 claim.
+Database/browser gates remain NOT_RUN for the previously recorded Docker block.

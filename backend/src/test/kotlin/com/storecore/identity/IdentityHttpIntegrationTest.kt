@@ -317,6 +317,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun unifiedLoginRequiresOneUseContextSelectionForDualRealmCredentials() {
         val email = "unified-dual-${System.nanoTime()}@example.com"
         exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Dual","lastName":"Customer"}""")
@@ -359,6 +360,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun concurrentContextSelectionsIssueAtMostOneSession() {
         val email = "unified-race-${System.nanoTime()}@example.com"
         exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Race","lastName":"Customer"}""")
@@ -394,6 +396,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun failedUserRevalidationRollsBackChallengeConsumption() {
         val email = "unified-role-rollback-${System.nanoTime()}@example.com"
         exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Rollback","lastName":"Customer"}""")
@@ -416,6 +419,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun unknownContextAndWrongNonceNeverConsumeTheChallenge() {
         val email = "unified-binding-${System.nanoTime()}@example.com"
         exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Binding","lastName":"Customer"}""")
@@ -435,6 +439,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun expiredChallengeCannotBeConsumedRetroactively() {
         val customerEmail = "expired-customer-${System.nanoTime()}@example.com"
         val userEmail = "expired-user-${System.nanoTime()}@example.com"
@@ -461,6 +466,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
     fun challengeExpiryIsRecheckedAfterWaitingForTheRowLock() {
         val customerEmail = "waiting-customer-${System.nanoTime()}@example.com"
         val userEmail = "waiting-user-${System.nanoTime()}@example.com"

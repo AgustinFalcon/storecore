@@ -8,7 +8,14 @@ import java.time.Duration
 import java.util.ArrayDeque
 
 /** One monitor protects access and eviction; callers never retain detached buckets. */
-internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private val limit: Int, private val maxKeys: Int) {
+internal enum class AttemptCapacityPolicy { FailClosed, EvictOldest }
+
+internal class BoundedAttemptWindow<K : Any>(
+    private val clock: Clock,
+    private val limit: Int,
+    private val maxKeys: Int,
+    private val capacityPolicy: AttemptCapacityPolicy = AttemptCapacityPolicy.FailClosed,
+) {
     private val buckets = mutableMapOf<K, ArrayDeque<Long>>()
     private val windowMillis = Duration.ofMinutes(15).toMillis()
     private var nextSweepAt = Long.MIN_VALUE
@@ -28,7 +35,7 @@ internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private v
         sweep(now)
         val bucket = buckets[key] ?: run {
             if (buckets.size >= maxKeys) sweep(now, force = true)
-            if (buckets.size >= maxKeys) throw LoginRateLimited(900)
+            if (buckets.size >= maxKeys && capacityPolicy == AttemptCapacityPolicy.FailClosed) throw LoginRateLimited(900)
             return
         }
         prune(bucket, now)
@@ -47,9 +54,12 @@ internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private v
     }
 
     private fun bucket(key: K, now: Long): ArrayDeque<Long> {
-        buckets[key]?.let { prune(it, now); return it }
+        buckets.remove(key)?.let { prune(it, now); buckets[key] = it; return it }
         if (buckets.size >= maxKeys) sweep(now, force = true)
-        if (buckets.size >= maxKeys) throw LoginRateLimited(900)
+        if (buckets.size >= maxKeys) when (capacityPolicy) {
+            AttemptCapacityPolicy.FailClosed -> throw LoginRateLimited(900)
+            AttemptCapacityPolicy.EvictOldest -> buckets.remove(buckets.keys.first())
+        }
         return ArrayDeque<Long>().also { buckets[key] = it }
     }
 
