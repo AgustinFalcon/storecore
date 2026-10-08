@@ -32,7 +32,7 @@
       "depends_on": [
         "INT-FE-01"
       ],
-      "status": "pending",
+      "status": "implemented_local_pending_database_and_reviews",
       "requirements": [
         "INT-R01",
         "INT-R03"
