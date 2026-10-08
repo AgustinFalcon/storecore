@@ -1,0 +1,522 @@
+{
+  "baseline": "dfaeba0883a1073b185abaf336b63d5d6bdc5d54",
+  "api_prefix": "/api/v1",
+  "route_count": 24,
+  "evidence_modes": [
+    "RealLocal",
+    "MockHttp",
+    "FixtureOnly"
+  ],
+  "note": "MockHttp identifies the existing a11y fixture design, not a newly executed PASS. Favorite toggles in catalog/product share FixtureOnly storage. Proposed /login and USER dashboard routes are not baseline routes.",
+  "routes": [
+    {
+      "pattern": "/",
+      "realm": "Public",
+      "actions": [
+        "load home",
+        "browse blocks"
+      ],
+      "endpoints": [
+        "GET /api/v1/content/home"
+      ],
+      "persistence": [
+        "home_content_sections"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/catalog",
+      "realm": "Public",
+      "actions": [
+        "search",
+        "brand/category filter",
+        "offers filter",
+        "favorite toggle"
+      ],
+      "endpoints": [
+        "GET /api/v1/catalog",
+        "GET /api/v1/catalog/brands",
+        "GET /api/v1/catalog/categories"
+      ],
+      "persistence": [
+        "products",
+        "product_variants",
+        "offers",
+        "offer_products"
+      ],
+      "next_cut": "INT-FE-05",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/catalog/:sku",
+      "realm": "Public",
+      "actions": [
+        "load product",
+        "variant/quantity",
+        "add cart",
+        "favorite toggle"
+      ],
+      "endpoints": [
+        "GET /api/v1/catalog/products/{sku}",
+        "PUT /api/v1/customer/cart/items"
+      ],
+      "persistence": [
+        "products",
+        "product_variants",
+        "cart_items"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/cart",
+      "realm": "Customer",
+      "actions": [
+        "load",
+        "update quantity",
+        "remove item"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/cart",
+        "PUT /api/v1/customer/cart/items"
+      ],
+      "persistence": [
+        "carts",
+        "cart_items"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/checkout",
+      "realm": "Customer",
+      "actions": [
+        "select address",
+        "checkout"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/me/addresses",
+        "POST /api/v1/customer/checkout"
+      ],
+      "persistence": [
+        "orders",
+        "order_items",
+        "inventory_reservations",
+        "mp_checkout_attempts"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/checkout/result/:orderId",
+      "realm": "Customer",
+      "actions": [
+        "load result",
+        "safe provider redirect"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/orders/{id}"
+      ],
+      "persistence": [
+        "orders",
+        "payments",
+        "mp_checkout_attempts"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/session",
+      "realm": "Public",
+      "actions": [
+        "login",
+        "probe",
+        "logout"
+      ],
+      "endpoints": [
+        "POST /api/v1/customer/auth/login",
+        "GET /api/v1/customer/me",
+        "GET /api/v1/customer/auth/csrf",
+        "POST /api/v1/customer/auth/logout"
+      ],
+      "persistence": [
+        "identity_sessions"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/register",
+      "realm": "Public",
+      "actions": [
+        "register"
+      ],
+      "endpoints": [
+        "POST /api/v1/customer/auth/register"
+      ],
+      "persistence": [
+        "customers",
+        "identity_sessions"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/profile",
+      "realm": "Customer",
+      "actions": [
+        "load",
+        "save",
+        "logout"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/me",
+        "PUT /api/v1/customer/me",
+        "POST /api/v1/customer/auth/logout"
+      ],
+      "persistence": [
+        "customers",
+        "identity_sessions"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/addresses",
+      "realm": "Customer",
+      "actions": [
+        "load",
+        "create",
+        "update",
+        "delete"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/me/addresses",
+        "POST /api/v1/customer/me/addresses",
+        "PUT /api/v1/customer/me/addresses/{addressId}",
+        "DELETE /api/v1/customer/me/addresses/{addressId}"
+      ],
+      "persistence": [
+        "customer_addresses"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/favorites",
+      "realm": "Customer",
+      "actions": [
+        "load local list",
+        "toggle",
+        "open product"
+      ],
+      "endpoints": [],
+      "persistence": [
+        "sessionStorage only; no account DB"
+      ],
+      "next_cut": "INT-FE-06",
+      "implementation": "browser_local_only",
+      "baseline_evidence_mode": "FixtureOnly",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/orders",
+      "realm": "Customer",
+      "actions": [
+        "list own orders",
+        "open detail"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/orders"
+      ],
+      "persistence": [
+        "orders",
+        "order_items"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/customer/orders/:id",
+      "realm": "Customer",
+      "actions": [
+        "load own order"
+      ],
+      "endpoints": [
+        "GET /api/v1/customer/orders/{id}"
+      ],
+      "persistence": [
+        "orders",
+        "order_items",
+        "shipments"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/session",
+      "realm": "Public",
+      "actions": [
+        "login",
+        "probe",
+        "logout"
+      ],
+      "endpoints": [
+        "POST /api/v1/internal/auth/login",
+        "GET /api/v1/internal/me",
+        "GET /api/v1/internal/auth/csrf",
+        "POST /api/v1/internal/auth/logout"
+      ],
+      "persistence": [
+        "identity_sessions",
+        "user_roles"
+      ],
+      "next_cut": "INT-FE-03",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/content",
+      "realm": "User",
+      "actions": [
+        "load draft",
+        "edit blocks",
+        "save"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/content/home",
+        "PUT /api/v1/user/content/home"
+      ],
+      "persistence": [
+        "home_content_sections",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/catalog",
+      "realm": "User",
+      "actions": [
+        "list",
+        "save product",
+        "save brand/category"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/catalog",
+        "PUT /api/v1/user/catalog/products/{sku}",
+        "PUT /api/v1/user/catalog/brands/{id}",
+        "PUT /api/v1/user/catalog/categories/{id}"
+      ],
+      "persistence": [
+        "products",
+        "product_variants",
+        "brands",
+        "categories",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/offers",
+      "realm": "User",
+      "actions": [
+        "list",
+        "save offer"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/offers",
+        "POST /api/v1/user/offers"
+      ],
+      "persistence": [
+        "offers",
+        "offer_products",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-05",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/promos",
+      "realm": "User",
+      "actions": [
+        "list",
+        "save manual channel promo"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/promos",
+        "POST /api/v1/user/promos"
+      ],
+      "persistence": [
+        "channel_price_policies",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/orders",
+      "realm": "User",
+      "actions": [
+        "list fulfillment",
+        "ship",
+        "receive RMA"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/orders",
+        "POST /api/v1/user/orders/{id}/shipments",
+        "POST /api/v1/user/orders/{id}/rma"
+      ],
+      "persistence": [
+        "orders",
+        "shipments",
+        "fulfillment_events",
+        "returns",
+        "return_items"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/orders/:id",
+      "realm": "User",
+      "actions": [
+        "load fulfillment",
+        "next shipment/RMA action"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/orders/{id}",
+        "POST /api/v1/user/orders/{id}/shipments",
+        "POST /api/v1/user/orders/{id}/rma"
+      ],
+      "persistence": [
+        "orders",
+        "shipments",
+        "fulfillment_events",
+        "returns",
+        "return_items"
+      ],
+      "next_cut": "INT-FE-04",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/inventory",
+      "realm": "User",
+      "actions": [
+        "read WEB inventory"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/inventory"
+      ],
+      "persistence": [
+        "inventory_balances",
+        "inventory_ledger"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/mercadolibre",
+      "realm": "User",
+      "actions": [
+        "read account",
+        "list/save mapping"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/mercadolibre/account",
+        "GET /api/v1/user/mercadolibre/listings",
+        "PUT /api/v1/user/mercadolibre/listings/{listingId}"
+      ],
+      "persistence": [
+        "channel_accounts",
+        "channel_listings"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/capabilities",
+      "realm": "User",
+      "actions": [
+        "list",
+        "change state (contract gap)"
+      ],
+      "endpoints": [
+        "GET /api/v1/user/capabilities",
+        "POST /api/v1/user/capabilities/{module}/state"
+      ],
+      "persistence": [
+        "module_configurations",
+        "capability_admin_commands",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-01",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    },
+    {
+      "pattern": "/user/profile-import",
+      "realm": "User",
+      "actions": [
+        "preview",
+        "merge versioned profile"
+      ],
+      "endpoints": [
+        "POST /api/v1/user/profiles/preview",
+        "POST /api/v1/user/profiles/merge"
+      ],
+      "persistence": [
+        "universal_profile_imports",
+        "audit_events"
+      ],
+      "next_cut": "INT-FE-07",
+      "implementation": "http_repository_present_not_newly_executed",
+      "baseline_evidence_mode": "MockHttp",
+      "real_local_status": "NOT_RUN_IN_INT_FE_00"
+    }
+  ]
+}

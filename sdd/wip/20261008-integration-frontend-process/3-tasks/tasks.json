@@ -1,0 +1,102 @@
+{
+  "feature": "20261008-integration-frontend-process",
+  "baseline": "dfaeba0883a1073b185abaf336b63d5d6bdc5d54",
+  "status": "baseline_documented_for_review",
+  "execution_strategy": "incremental_gated_manual_ports",
+  "tasks": [
+    {
+      "id": "INT-FE-00",
+      "title": "SDD/baseline documental",
+      "depends_on": [],
+      "status": "documented_for_review",
+      "requirements": [
+        "INT-R01",
+        "INT-R07",
+        "INT-R08"
+      ]
+    },
+    {
+      "id": "INT-FE-01",
+      "title": "Capability readmodel y comandos",
+      "depends_on": [
+        "INT-FE-00"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R02"
+      ]
+    },
+    {
+      "id": "INT-FE-02",
+      "title": "UA backend y migración compatible con V20",
+      "depends_on": [
+        "INT-FE-01"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R01",
+        "INT-R03"
+      ]
+    },
+    {
+      "id": "INT-FE-03",
+      "title": "UA frontend y hardening #176 preservando integración",
+      "depends_on": [
+        "INT-FE-02"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R01",
+        "INT-R03"
+      ]
+    },
+    {
+      "id": "INT-FE-04",
+      "title": "CFE backend/UI y aceptación E01-E09",
+      "depends_on": [
+        "INT-FE-03"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R04",
+        "INT-R08"
+      ]
+    },
+    {
+      "id": "INT-FE-05",
+      "title": "Ofertas de vitrina completas",
+      "depends_on": [
+        "INT-FE-03"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R05"
+      ]
+    },
+    {
+      "id": "INT-FE-06",
+      "title": "Favoritos productivos: mini-SDD y HTTP",
+      "depends_on": [
+        "INT-FE-03"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R06"
+      ]
+    },
+    {
+      "id": "INT-FE-07",
+      "title": "Manifest runtime, a11y y E2E RealLocal",
+      "depends_on": [
+        "INT-FE-04",
+        "INT-FE-05",
+        "INT-FE-06"
+      ],
+      "status": "pending",
+      "requirements": [
+        "INT-R07",
+        "INT-R08"
+      ]
+    }
+  ]
+}

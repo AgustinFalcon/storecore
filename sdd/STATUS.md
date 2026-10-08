@@ -1,5 +1,9 @@
 # Estado canónico del SDD — StoreCore
 
+## Addendum de baseline INT-FE — 2026-10-08
+
+Inventario documental desde `dfaeba0883a1073b185abaf336b63d5d6bdc5d54` de integración: [INT-FE-00..07](wip/20261008-integration-frontend-process/meta.md). En este SHA existen 24 rutas hoja y `V20__capability_legacy_overloads_retirement.sql`; las referencias históricas “22 rutas” y “V20 libre” debajo no describen este head. UA y CFE se portan manualmente por cortes; el frontend de favoritos es de pestaña, capability command y ofertas tienen residuales HTTP. INT-FE-00 documenta baseline/DAG, sin código ni PASS nuevo de producto. INT-FE-01..07 siguen pendientes. Homologación externa, master, live y cierre permanecen sin autorización.
+
 **Estado actualizado:** 2026-10-01; `origin/integration/storecore-int` en `a8874ad` (después de #124; stamp #122 `969b6ec`; Verify #122 run `36892772073` SUCCESS on `2ffc52a`; Verify #124 run `36893274679` SUCCESS on `4023071`). Carril A implementable: dual Grok GO para quedarse en integración (`sdd/reviews/20261001-grok-int-carrila-sdd.md`, `sdd/reviews/20261001-grok-int-carrila-scope.md`). Revalidar head antes de migrar. SHA stamp: issue [#125](https://github.com/AgustinFalcon/storecore/issues/125).
 **Madurez:** `storecore-core-v1.0.0` archivado en `sdd/features/20260921-single-tenant-installation-baseline/`. Integración: PR #14. No existe TASK-011.  
 **Sol GO:** `sdd/reviews/20260922-sol-go-core.md`.  

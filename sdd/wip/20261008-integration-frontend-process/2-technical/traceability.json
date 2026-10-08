@@ -1,0 +1,187 @@
+{
+  "feature": "20261008-integration-frontend-process",
+  "note": "Endpoints marked source/future do not exist in baseline. Physical table names must be revalidated by each implementation cut.",
+  "rows": [
+    {
+      "requirement": "INT-R01",
+      "cut": "INT-FE-00",
+      "endpoints": [
+        "all existing endpoints"
+      ],
+      "persistence": [
+        "Flyway V1-V20",
+        "POSC/DSP/inventory/inbox"
+      ],
+      "tests": [
+        "upgrade/checksums",
+        "integration regression suites"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R02",
+      "cut": "INT-FE-01",
+      "endpoints": [
+        "GET /api/v1/user/capabilities",
+        "POST /api/v1/user/capabilities/{module}/state",
+        "GET /api/v1/user/capabilities/commands/{correlationId}",
+        "POST /api/v1/user/capabilities/commands/{correlationId}/abort"
+      ],
+      "persistence": [
+        "module_configurations",
+        "capability_admin_commands",
+        "audit_events"
+      ],
+      "tests": [
+        "ADMIN/OPERATOR",
+        "stale version/replay/timeout",
+        "CSRF rotation",
+        "readback"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R03",
+      "cut": "INT-FE-02",
+      "endpoints": [
+        "POST /api/v1/auth/login (source; absent baseline)",
+        "POST /api/v1/auth/context-selection (source; absent baseline)"
+      ],
+      "persistence": [
+        "identity_sessions",
+        "new challenge table in future migration"
+      ],
+      "tests": [
+        "clean/upgrade V20",
+        "opaque challenge expiry/reuse/binding",
+        "realm login/logout"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R03",
+      "cut": "INT-FE-03",
+      "endpoints": [
+        "legacy auth endpoints",
+        "unified auth endpoints after INT-FE-02"
+      ],
+      "persistence": [
+        "realm sessions",
+        "customer carts"
+      ],
+      "tests": [
+        "#176 revoke/login cookie race",
+        "actor A→B late responses",
+        "safe return destinations",
+        "cart reset"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R04",
+      "cut": "INT-FE-04",
+      "endpoints": [
+        "GET /api/v1/user/orders/{id}",
+        "POST /api/v1/user/orders/{id}/shipments",
+        "POST /api/v1/user/orders/{id}/rma",
+        "POST /api/v1/customer/checkout"
+      ],
+      "persistence": [
+        "orders",
+        "payments",
+        "mp_order_commercial_applications",
+        "inventory_ledger",
+        "shipments",
+        "returns",
+        "return_items"
+      ],
+      "tests": [
+        "CFE E01-E09",
+        "response AND DB readback",
+        "paid via real worker with external loopback"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R05",
+      "cut": "INT-FE-05",
+      "endpoints": [
+        "GET/POST /api/v1/user/offers",
+        "POST /api/v1/user/offers/{id}/status (BE exists; FE missing)",
+        "GET /api/v1/catalog",
+        "PUT /api/v1/customer/cart/items"
+      ],
+      "persistence": [
+        "offers",
+        "offer_products",
+        "order_items",
+        "audit_events"
+      ],
+      "tests": [
+        "approval/status sequence",
+        "schedule boundaries/margin/priority",
+        "catalog/cart effective price",
+        "immutable order snapshot"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R06",
+      "cut": "INT-FE-06",
+      "endpoints": [
+        "NONE baseline; mini-SDD defines HTTP before implementation"
+      ],
+      "persistence": [
+        "NONE baseline; CUSTOMER favorites persistence future delta"
+      ],
+      "tests": [
+        "ownership",
+        "unique account+SKU",
+        "toggle/reload/login new browser",
+        "inactive/deleted product"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R07",
+      "cut": "INT-FE-07",
+      "endpoints": [
+        "all route/action inventory"
+      ],
+      "persistence": [
+        "all relevant read/write models"
+      ],
+      "tests": [
+        "runtime manifest exact equality",
+        "axe keyboard/responsive",
+        "loading/empty/error/retry/Unknown"
+      ],
+      "target_evidence_mode": "MockHttp",
+      "status": "pending_execution"
+    },
+    {
+      "requirement": "INT-R08",
+      "cut": "INT-FE-07",
+      "endpoints": [
+        "all newly implemented actions plus integration regressions"
+      ],
+      "persistence": [
+        "HTTP response/readback/durable effects must agree"
+      ],
+      "tests": [
+        "E2E RealLocal no API intercept",
+        "exact SHA CI/reviews",
+        "failures/NOT_RUN retained"
+      ],
+      "target_evidence_mode": "RealLocal",
+      "status": "pending_execution"
+    }
+  ]
+}
