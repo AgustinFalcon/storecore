@@ -100,8 +100,9 @@ export class CustomerStore extends ComponentStore<CustomerState> {
         this.patchState({ loading: true, errorMessage: '' });
       }),
       filter(() => Boolean(this.snapshot.email && this.snapshot.password && this.snapshot.firstName && this.snapshot.lastName)),
-      switchMap(() =>
-        this.register
+      switchMap(() => {
+        const generation = this.session.generation();
+        return this.register
           .execute({
             email: this.snapshot.email,
             password: this.snapshot.password,
@@ -109,16 +110,20 @@ export class CustomerStore extends ComponentStore<CustomerState> {
             lastName: this.snapshot.lastName,
           })
           .pipe(
-            takeUntil(this.session.actorChanges$),
-          tapResponse({
+            // The use case fences old generations; its own markAuthenticated
+            // emits actorChanges synchronously before delivering registration.
+            tapResponse({
               next: () => {
+                if (this.session.generation() !== generation + 1 || !this.session.authenticated()) return;
                 this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
                 void this.router.navigateByUrl('/customer/profile');
               },
-              error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+              error: (err: unknown) => {
+                if (this.session.generation() === generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
+              },
             }),
-          ),
-      ),
+          );
+      }),
     ),
   );
 

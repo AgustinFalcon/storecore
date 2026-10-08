@@ -6,6 +6,9 @@ import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessStateKind } from '../../domain/access/session-probe';
 import { UserRole } from '../../domain/user/user-role';
+import { LoginResolution, LoginResult } from '../../domain/access/login-resolution';
+import { AccessHome } from '../../domain/access/access-home';
+import { ReturnDestination } from '../../domain/access/return-destination';
 import { AccessCoordinator, ActiveContextHint } from './access-coordinator';
 import { AccessSessionStaging } from './access-session-staging';
 import { AccessHttpRepository } from '../../data/access/access-http.repository';
@@ -118,9 +121,35 @@ describe('AccessCoordinator queue and realm ownership', () => {
     expect(pending.cancelled).toBe(false); http.expectNone(url('internal/auth/logout'));
     pending.flush({ id: operator.id, roles: [UserRole.Operator.wire] });
     http.expectOne(url('internal/auth/csrf')).flush({}, { headers: { [CSRF_HEADER]: 'stale-probe-token' } });
-    http.expectOne(url('internal/auth/logout')).flush({}); await logout; await reload;
+    const revoke = http.expectOne(url('internal/auth/logout'));
+    // Backend-like rotation: the new cookie accepts only its corresponding token.
+    expect(revoke.request.headers.get(CSRF_HEADER)).toBe('stale-probe-token');
+    expect(user.authenticated()).toBe(false);
+    revoke.flush({}); await logout; await reload;
     expect(user.authenticated()).toBe(false); expect(user.csrf()).toBe('');
   });
+  for (const realm of [AccessContext.Customer, AccessContext.User]) {
+    it(`revokes a stale dispatched unified login in ${realm.wire} with its rotated token without accepting identity`, async () => {
+      customer.commit(buyer, 'old-customer'); user.commit(operator, 'old-user');
+      const login = firstValueFrom(TestBed.inject(AccessHttpRepository).signIn({ email: buyer.email, password: 'valid-password' }));
+      const dispatched = http.expectOne(url('auth/login'));
+      const logout = firstValueFrom(access.logout(realm));
+      const path = realm === AccessContext.Customer ? 'customer' : 'internal';
+      http.expectNone(url(`${path}/auth/logout`));
+      dispatched.flush({ code: 200, data: { kind: LoginResolution.Authenticated.wire, context: realm.wire,
+        home: AccessHome.forContext(realm).wire, destination: { kind: ReturnDestination.Home.wire } } },
+      { headers: { [CSRF_HEADER]: 'rotated-login-cookie-token' } });
+      expect(await login).toBe(LoginResult.Unknown);
+      expect((realm === AccessContext.Customer ? customer : user).authenticated()).toBe(false);
+      expect(TestBed.inject(AccessSessionStaging).take(realm)).toBeNull();
+      const revoke = http.expectOne(url(`${path}/auth/logout`));
+      expect(revoke.request.headers.get(CSRF_HEADER)).toBe('rotated-login-cookie-token');
+      revoke.flush({}); await logout;
+      const session = realm === AccessContext.Customer ? customer : user;
+      expect(session.csrf()).toBe(''); expect(session.actorId()).toBeNull(); expect(session.authenticated()).toBe(false);
+      expect(access.state().activeContext).not.toBe(realm);
+    });
+  }
   it('retries failed logout only with a fresh explicit command', async () => {
     user.commit(operator, 'token');
     const command = access.logout(AccessContext.User);

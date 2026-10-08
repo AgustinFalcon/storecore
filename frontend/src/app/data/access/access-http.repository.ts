@@ -1,5 +1,6 @@
 import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { AccessInterlock } from '../../core/auth/access-interlock';
+import { AccessTransportCsrf } from '../../core/auth/access-transport-csrf';
 import { Injectable } from '@angular/core';
 import { catchError, defer, map, Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
@@ -19,6 +20,7 @@ export class AccessHttpRepository implements IAccessRepository {
     private readonly interlock: AccessInterlock,
     private readonly mutationFence: AccessMutationFence,
     private readonly staging: AccessSessionStaging,
+    private readonly transportCsrf: AccessTransportCsrf,
   ) { this.http = new HttpClient(backend); }
   signIn(credentials: AccessCredentials): Observable<LoginResult> {
     return this.submit('/auth/login', { email: credentials.email, password: credentials.password, ...(credentials.returnPath === undefined ? {} : { returnPath: credentials.returnPath }) });
@@ -36,10 +38,15 @@ export class AccessHttpRepository implements IAccessRepository {
       ]);
       return this.interlock.run(AccessContext.Unknown, () => this.http.post<unknown>(`${environment.apiBaseUrl}${path}`, body, { observe: 'response', withCredentials: true }).pipe(
         map((response) => {
+          const result = mapAccessResponse(response.body);
+          // A sent login can rotate cookies after its identity generation expires.
+          // Reconcile that transport effect while owning both realm queues.
+          if (result.resolution === LoginResolution.Authenticated) {
+            this.transportCsrf.reconcile(result.context, response.headers.get(CSRF_HEADER));
+          }
           const current = this.mutationFence.accepts(AccessContext.Customer, generations.get(AccessContext.Customer) ?? -1)
             && this.mutationFence.accepts(AccessContext.User, generations.get(AccessContext.User) ?? -1);
           if (!current) return LoginResult.Unknown;
-          const result = mapAccessResponse(response.body);
           if (selectedContext && (result.resolution !== LoginResolution.Authenticated || result.context !== selectedContext)) return LoginResult.Unknown;
           if (result.resolution === LoginResolution.Authenticated) {
             if (!this.mutationFence.permitsAuthentication(result.context)) return LoginResult.Unavailable;

@@ -61,7 +61,7 @@ describe('unified access HTTP repository', () => {
     expect(request.request.headers.has(CSRF_HEADER)).toBe(false);
     request.flush(authenticated(AccessContext.Customer), { headers: { [CSRF_HEADER]: 'new-customer' } });
     expect((await pending).resolution).toBe(LoginResolution.Authenticated);
-    expect(customer.csrf()).toBe('previous-customer'); expect(user.csrf()).toBe('previous-user');
+    expect(customer.csrf()).toBe('new-customer'); expect(user.csrf()).toBe('previous-user');
     expect(staging.take(AccessContext.Customer)).toBe('new-customer');
     expect(customer.authenticated()).toBe(false);
   });
@@ -74,7 +74,7 @@ describe('unified access HTTP repository', () => {
     expect(request.request.withCredentials).toBe(true);
     request.flush(authenticated(AccessContext.User), { headers: { [CSRF_HEADER]: 'new-user' } });
     expect((await pending).context).toBe(AccessContext.User);
-    expect(user.csrf()).toBe('previous-user'); expect(customer.csrf()).toBe('previous-customer');
+    expect(user.csrf()).toBe('new-user'); expect(customer.csrf()).toBe('previous-customer');
     expect(staging.take(AccessContext.User)).toBe('new-user');
   });
   it('preserves both accepted realms for challenge and unknown responses even with a CSRF header', async () => {
@@ -104,7 +104,7 @@ describe('unified access HTTP repository', () => {
     const pending = firstValueFrom(repository.selectContext('a'.repeat(40), AccessContext.User));
     ctrl.expectOne(`${environment.apiBaseUrl}/auth/context-selection`).flush(authenticated(AccessContext.Customer), { headers: { [CSRF_HEADER]: 'must-not-install' } });
     expect(await pending).toBe(LoginResult.Unknown);
-    expect(customer.csrf()).toBe('previous-customer'); expect(user.csrf()).toBe('previous-user');
+    expect(customer.csrf()).toBe('must-not-install'); expect(user.csrf()).toBe('previous-user');
     expect(staging.take(AccessContext.Customer)).toBeNull(); expect(staging.take(AccessContext.User)).toBeNull();
   });
   it('discards a response invalidated by a newer login, logout or probe generation', async () => {
@@ -114,7 +114,7 @@ describe('unified access HTTP repository', () => {
     fence.advance();
     request.flush(authenticated(AccessContext.Customer), { headers: { [CSRF_HEADER]: 'must-not-install' } });
     expect(await pending).toBe(LoginResult.Unknown);
-    expect(customer.csrf()).toBe('previous-customer');
+    expect(customer.csrf()).toBe('must-not-install');
     expect(user.csrf()).toBe('previous-user');
     expect(staging.take(AccessContext.Customer)).toBeNull();
   });

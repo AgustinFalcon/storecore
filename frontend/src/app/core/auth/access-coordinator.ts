@@ -13,6 +13,7 @@ import { UserSession } from './user-session';
 import { AccessMutationFence } from './access-mutation-fence';
 import { AccessSessionStaging } from './access-session-staging';
 import { AccessInterlock } from './access-interlock';
+import { AccessTransportCsrf } from './access-transport-csrf';
 import { mapAccessPrincipal } from '../../data/mappers/access-session.mapper';
 
 /** A browser hint is navigation preference only. No identity or secrets are persisted. */
@@ -53,6 +54,7 @@ export class AccessCoordinator {
     private readonly mutationFence: AccessMutationFence,
     private readonly staging: AccessSessionStaging,
     private readonly interlock: AccessInterlock,
+    private readonly transportCsrf: AccessTransportCsrf,
   ) {
     // Staging must bypass the legacy interceptor's eager CSRF/401 session effects.
     this.http = new HttpClient(backend);
@@ -212,8 +214,9 @@ export class AccessCoordinator {
       switchMap((principal) => principal === null ? of(SessionProbe.Unknown)
         : this.http.get(`${base}/auth/csrf`, { withCredentials: true, observe: 'response' }).pipe(map((response) => {
           const body = readApiBody<unknown>(response.body);
-          if (!body || typeof body !== 'object' || Array.isArray(body)) return SessionProbe.Unknown;
           const csrf = response.headers.get(CSRF_HEADER)?.trim();
+          this.transportCsrf.reconcile(context, csrf ?? null);
+          if (!body || typeof body !== 'object' || Array.isArray(body)) return SessionProbe.Unknown;
           return csrf ? SessionProbe.authenticated(principal, csrf) : SessionProbe.Unknown;
         }))),
       timeout(10_000),
