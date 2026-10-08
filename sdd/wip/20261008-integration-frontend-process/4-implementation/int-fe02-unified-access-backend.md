@@ -120,3 +120,59 @@ zero failures/errors, exit 0**. All production/test sources compiled, including
 the HTTP test isolation changes. `git diff --check` also passed. Same local JDK21
 runtime and target17 as above; no new hosted CI JDK17 claim.
 Database/browser gates remain NOT_RUN for the previously recorded Docker block.
+
+## Hosted #179 regression follow-up
+
+Hosted backend for PR [#179](https://github.com/AgustinFalcon/storecore/pull/179)
+at `48fe9e93339b3bc0a70b6a421724a35df2856e9c` actually executed 341 tests and
+reported four failures, as relayed by the coordinating task: three historical
+ceiling expectations stopped at V20 although V21 was now applied, and the mixed
+unified/legacy HTTP budget test expected 429 but received 401 on request six.
+That run is a genuine failed execution, not an empty-step or quota failure.
+
+Posc002fAcceptanceMatrixTest now expects contiguous V1..V21 after its V7 upgrade
+while retaining the seeded-data, disabled companion and historical-gate assertions.
+Dsp003StockDesiredChangedTest expects ceiling21 while retaining the unchanged
+V18 hash and durable outbox assertions. Dsp008UpgradeCoexistenceTest requires the
+exact additive UA V21 filename/history and reserves V22 as next-free; its V20
+effective legacy-privilege retirement tests remain intact. No migration changed.
+
+Credential investigation verified that legacy JDBC login and the unified
+coordinator both acquire the same injected LoginAttemptBudget before password
+work, use CanonicalEmail.fromWire and resolve client addresses through the same
+trusted-proxy boundary. No production reset, realm partition or selection-budget
+sharing was found. New CredentialEndpointBudgetTest invokes both real controllers
+and real use cases (JDBC/password work substituted) with alternate direct/proxy
+peers resolving to the **same** IP, while varying NFKC/case/whitespace email wire.
+Exactly five mixed submissions fail generically, the sixth is rate-limited before
+any additional password work; exhausting selection admission does not consume or
+reset credential slots. Those two wiring assertions passed locally.
+
+The old real-HTTP fixture used localhost for general requests but 127.0.0.1 for
+its no-retry client. localhost can resolve to distinct IPv4/IPv6 peer addresses,
+which are intentionally distinct budget keys. The fixture now explicitly fixes
+all calls to 127.0.0.1 and varies canonical-email wire across the three endpoints.
+An additional real-HTTP test exhausts selection first, then checks the independent
+five-request credential budget. The address-split explanation remains a transport
+hypothesis until the actual HTTP/DB test reruns; no production rule merges IPs or
+trusts spoofed forwarding headers to make the assertion pass.
+
+Local JDK17 is available at `C:\Users\agustin\.jdks\jbr-17.0.8.1` (JBR
+17.0.8.1+7-1063.1-nomod). Ten focused suites including the complete earlier nine
+plus CredentialEndpointBudgetTest passed: **55 tests, zero failures/errors, exit0**.
+All backend/test sources compiled on JDK17. New-test Mockito matcher nullability
+was corrected before that final pass; it did not require a production change.
+The full `mvn -q test` JDK17 attempt is logged at
+`backend/target/int-fe02-full-maven-jdk17.log`; final outcome is recorded below.
+Hosted rerun/reviews and actual HTTP/DB acceptance remain required.
+
+Full JDK17 Maven result: **exit1, 234 reported tests, zero assertion failures,
+105 infrastructure errors, 129 completed tests**. Docker initialization failed
+with `AccessDeniedException \\.\pipe\docker_engine`; subsequent DB suites and
+Spring contexts failed/short-circuited initialization. The count is not comparable
+to hosted 341 because container-class setup errors prevent their test methods
+from running. The three ceiling suites and real HTTP credential/selection tests
+therefore remain NOT_RUN locally, not passing. All ten focused suites, including
+the two new real-wiring unit assertions, also passed within the full attempt.
+The full attempt compiled all source/tests on JDK17. `git diff --check`: PASS.
+No production budget/resolver or historical SQL was changed by this follow-up.

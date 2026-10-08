@@ -532,10 +532,26 @@ class IdentityHttpIntegrationTest(
             "/api/v1/auth/login",
             "/api/v1/customer/auth/login",
         )
-        paths.forEach { path -> assertEquals(401, exchange(path, HttpMethod.POST, payload).statusCode.value(), path) }
+        paths.forEachIndexed { index, path ->
+            val wire = if (index % 2 == 0) payload.replace(email, " ${email.uppercase(java.util.Locale.ROOT)} ") else payload
+            assertEquals(401, exchange(path, HttpMethod.POST, wire).statusCode.value(), path)
+        }
         val sixth = exchange("/api/v1/internal/auth/login", HttpMethod.POST, payload)
         assertEquals(429, sixth.statusCode.value(), sixth.body)
         assertNotNull(sixth.headers.getFirst("Retry-After"))
+    }
+
+    @Test
+    @org.springframework.test.annotation.DirtiesContext(methodMode = org.springframework.test.annotation.DirtiesContext.MethodMode.AFTER_METHOD)
+    fun exhaustedSelectionBudgetDoesNotConsumeCredentialBudget() {
+        repeat(10) {
+            val challenge = java.util.UUID.randomUUID().toString() + java.util.UUID.randomUUID().toString()
+            assertEquals(401, exchange("/api/v1/auth/context-selection", HttpMethod.POST,
+                """{"challenge":"$challenge","context":"UNKNOWN"}""").statusCode.value())
+        }
+        // Same real client address, different budget purpose; credentials still
+        // admit exactly five requests across unified and both legacy endpoints.
+        unifiedAndLegacyCredentialEndpointsShareOneAttemptBudget()
     }
 
     @Test
@@ -558,7 +574,9 @@ class IdentityHttpIntegrationTest(
     }
 
     private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null, origin: String = "http://localhost:4200") = http.exchange(
-        URI("http://localhost:$port$path"), method,
+        // All credential callers must reach the same canonical client address;
+        // localhost may resolve to either ::1 or 127.0.0.1 on separate connections.
+        URI("http://127.0.0.1:$port$path"), method,
         HttpEntity(body, HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
             set(HttpHeaders.ORIGIN, origin)

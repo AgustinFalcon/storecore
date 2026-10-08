@@ -75,7 +75,7 @@ class Dsp003StockDesiredChangedTest {
         val path = Path.of("src/main/resources/db/migration/V18__dsp003_stock_desired_changed_outbox.sql")
         assertEquals(V18_SHA, lfSha(Files.readAllBytes(path)))
         assertEquals(
-            "20",
+            "21",
             jdbc.queryForObject("SELECT MAX(version::int)::text FROM flyway_schema_history WHERE success", String::class.java),
         )
         val variantId = seedVariant("SKU-DSP003-A", 10, 4, 2)
