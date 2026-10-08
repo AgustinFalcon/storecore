@@ -4,6 +4,14 @@
     <h1 id="cart-title">Carrito</h1>
     <p class="sc-page__lede">El número grande de cada línea es el efectivo. Original, descuento, oferta y campaña quedan al lado.</p>
   </header>
+  @if (!access.canMutate) {
+    <p>{{ access.label }}</p>
+    @if (access.requiresSelection) {
+      <button type="button" class="sc-btn sc-btn--primary" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>
+    } @else {
+      <a routerLink="/login">Entrar como cliente</a>
+    }
+  }
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
@@ -11,7 +19,7 @@
     emptyText="El carrito está vacío."
     (retry)="retry.emit()"
   />
-  @if (state.cart.lines.length > 0) {
+  @if (access.canMutate && state.cart.lines.length > 0) {
     <div class="sc-bag__layout">
       <div class="sc-table-wrap">
         <table class="sc-table">
