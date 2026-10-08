@@ -2,7 +2,7 @@
 
 Fecha: 2026-10-08. Rama local `integration/storecore-unified-access-frontend`.
 Base exacta: PR #180 head `5c27e26` (INT-FE-02 + corrección CI + contrato FE03).
-SHA frontend del código validado: `4ce98d51f9e4d326c8cc0cd3f195cbeec5a7ea9f`.
+SHA frontend del código validado: `0452b2e71a6094ee0c296187effc8e69afb7c543`.
 Backend heredado: `b8bd49018413a503f5af8d04aa64b1dc36263f04`, con corrección de
 test HTTP `6d45f065160ff440fc110fac93b23e98f0d70d9b`, incluido en base completa
 `5c27e26503c17acec9297c7826bdaaacf96552c5`. No backend ejecutado en RealLocal.
@@ -44,13 +44,13 @@ reason/correlation/recovery y todos los contratos CFE existentes. No port CFE.
   --module nodenext --moduleResolution nodenext --skipLibCheck`, sin instalar deps.
 - Arquitectura: PASS, 6/6 domain-boundary tests y scan.
 - Lint: PASS, `npm run lint` incluye el runner/config UA separados.
-- Frontend completo: PASS, 70 archivos / 272 pruebas, `npm run test`.
+- Frontend completo tras review: PASS, 71 archivos / 278 pruebas, `npm run test`.
 - Build development: PASS, `npm run build -- --configuration development
   --preserve-symlinks`.
-- Build production: PASS sobre HEAD de evidencia `959d16c60c20ef49c6b3fa499a01d2b7b5cb791f`,
+- Build production tras review: PASS sobre código `0452b2e71a6094ee0c296187effc8e69afb7c543`,
   ejecutado por el agente raíz con red autorizada desde `T:\frontend`,
-  `npm run build -- --preserve-symlinks`: initial 550.66 kB / estimado transfer
-  125.65 kB. No cambio de fuente ni configuración; mapping desmontado.
+  `npm run build -- --preserve-symlinks`: initial 551.30 kB / estimado transfer
+  125.84 kB. No cambio de fuente ni configuración; mapping desmontado.
 - Audit runtime: PASS, `npm audit --omit=dev --audit-level=high`, 0 vulnerabilidades,
   misma revisión, ejecutado por el agente raíz con red autorizada. No acredita
   audit de dependencias de desarrollo.
@@ -68,11 +68,30 @@ Build requiere `--preserve-symlinks` por la junction de dependencias.
 Artifacts MockHttp: `frontend/playwright-report/`, `frontend/test-results/`
 (ignorados por Git). Servidor SPA local sobre dist development, loopback4300,
 fixtures sólo en Playwright. Esto no acredita cookies ni persistencia real.
-Revalidación final sobre HEAD `959d16c`, sin cambios de fuente: 39/39 PASS,
-21.2 segundos, después de restaurar dist development. Servidor
+Revalidación final sobre código `0452b2e`, sin cambios de fuente: 39/39 PASS,
+18.3 segundos, dist development. Servidor
 SPA detenido y `subst` sin mappings al finalizar. Worktree tracked limpio.
 
 ## Fallos encontrados y corregidos
+
+Review de `95f2976`: corregido registro que se auto-cancelaba cuando
+RegisterCustomerUseCase.markAuthenticated emitía actorChanges antes del next.
+El comando de registro ya fencea su generación en el use case; el store no
+lo cancela con el evento que produce su propio éxito. Los callbacks aceptan
+únicamente la generación esperada; errores de comandos superseded no parchean
+el estado de otro actor. Regresiones usan el use case real y prueban navegación
+success y ausencia de navegación/patch después de cambio a otro actor.
+
+Separado AccessTransportCsrf con resultado cerrado TransportCsrfOutcome. El
+owner despachado de probe/unified login reconcilia el token del realm rotado
+antes de soltar la cola, incluso si su resultado de identidad está obsoleto.
+Nunca instala principal, autenticación ni levanta el fence. La respuesta de
+identidad continúa protegida por generación; staging no acepta resultados
+stale. Logout encolado toma el token reconciliado al despachar. Tests exactos
+comprueban su header tras probe stale y login unified stale en ambos realms,
+logout exitoso, staging vacío y ausencia de autoridad resucitada. Se mantienen
+tests de write enviado/destroy/rotación y cancelación de writes pendientes.
+Los tokens transport-owned ya no se confunden con aceptación de identidad.
 
 Primera suite frontend: 6 fallos de tests de guards antiguos y de expectativas
 sobre respuesta privada obsoleta; actualizados al contrato unified.
