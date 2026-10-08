@@ -2,7 +2,7 @@
 
 Fecha: 2026-10-08. Rama local `integration/storecore-unified-access-frontend`.
 Base exacta: PR #180 head `5c27e26` (INT-FE-02 + corrección CI + contrato FE03).
-SHA frontend del código validado: `f4ec0a73faf5fcc3dd25e4e52ec3265760f6b37f`.
+SHA frontend del código validado: `e4c42f458fc0b813e67591ab3a1de77f6a071ea8`.
 Backend heredado: `b8bd49018413a503f5af8d04aa64b1dc36263f04`, con corrección de
 test HTTP `6d45f065160ff440fc110fac93b23e98f0d70d9b`, incluido en base completa
 `5c27e26503c17acec9297c7826bdaaacf96552c5`. No backend ejecutado en RealLocal.
@@ -44,13 +44,13 @@ reason/correlation/recovery y todos los contratos CFE existentes. No port CFE.
   --module nodenext --moduleResolution nodenext --skipLibCheck`, sin instalar deps.
 - Arquitectura: PASS, 6/6 domain-boundary tests y scan.
 - Lint: PASS, `npm run lint` incluye el runner/config UA separados.
-- Frontend completo tras segunda review: PASS, 71 archivos / 282 pruebas, `npm run test`.
+- Frontend completo tras review final: PASS, 71 archivos / 283 pruebas, `npm run test`.
 - Build development: PASS, `npm run build -- --configuration development
   --preserve-symlinks`.
-- Build production tras segunda review: PASS sobre código `f4ec0a73faf5fcc3dd25e4e52ec3265760f6b37f`,
+- Build production tras review final: PASS sobre código `e4c42f458fc0b813e67591ab3a1de77f6a071ea8`,
   ejecutado por el agente raíz con red autorizada desde `T:\frontend`,
-  `npm run build -- --preserve-symlinks`: initial 551.59 kB / estimado transfer
-  125.94 kB. No cambio de fuente ni configuración; mapping desmontado.
+  `npm run build -- --preserve-symlinks`: initial 552.07 kB / estimado transfer
+  125.86 kB. No cambio de fuente ni configuración; mapping desmontado.
 - Audit runtime: PASS, `npm audit --omit=dev --audit-level=high`, 0 vulnerabilidades,
   misma revisión, ejecutado por el agente raíz con red autorizada. No acredita
   audit de dependencias de desarrollo.
@@ -68,11 +68,23 @@ Build requiere `--preserve-symlinks` por la junction de dependencias.
 Artifacts MockHttp: `frontend/playwright-report/`, `frontend/test-results/`
 (ignorados por Git). Servidor SPA local sobre dist development, loopback4300,
 fixtures sólo en Playwright. Esto no acredita cookies ni persistencia real.
-Revalidación final sobre código `f4ec0a7`, sin cambios de fuente: 39/39 PASS,
-19.1 segundos, dist development. Servidor
+Revalidación final sobre código `e4c42f4`, sin cambios de fuente: 39/39 PASS,
+18.2 segundos, dist development. Servidor
 SPA detenido y `subst` sin mappings al finalizar. Worktree tracked limpio.
 
 ## Fallos encontrados y corregidos
+
+Review final de `24cf1f8`: el store captura el payload validado y comienza la
+transición CUSTOMER antes de ejecutar registro. beginCustomerRegistration
+supersede la hidratación anterior y retira su probe/principal suspendido sin
+tocar epoch/CSRF del write ya despachado. No avanza USER ni revocaciones: si
+CUSTOMER tiene revoke pendiente, no se inicia registro. El payload se captura
+antes de actorChanges para no vaciar credenciales al limpiar el store.
+Regresión inversa usa store, repository y use case reales: probe A completado,
+USER delayed, POST B despachado, USER finaliza antes de B; A no se instala ni se
+publica, luego B acepta su token y navega. Probe posterior verifica principal B
+con ese token. El test exige además cuerpo POST exacto. Regresiones previas y
+queues enviadas/pendientes permanecen PASS.
 
 Segunda review de `b4b289f`: supersedeProbes excluye los realms con revocación
 pendiente; logout establece su fence exactamente una vez antes de encolarse.
