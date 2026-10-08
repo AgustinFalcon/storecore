@@ -110,7 +110,7 @@ class LoginRateLimiterTest {
         limiter.clear(IdentityRealm.USER, IP, EMAIL)
         reference.clear(IdentityRealm.USER, IP, EMAIL)
         assertSuffixAndBound(limiter, reference)
-        // clear removes only a bucket and must not reset the monotonic clock watermark.
+        // Compatibility clear is a no-op and must not reset the monotonic clock watermark.
         clock.set(START.minus(Duration.ofDays(1)))
         assertEquivalentRecord(limiter, reference, IdentityRealm.USER, IP, EMAIL)
         assertEquivalentCheck(limiter, reference, IdentityRealm.USER, IP, EMAIL)
@@ -192,7 +192,7 @@ class LoginRateLimiterTest {
     }
 
     @Test
-    fun `realms have separate capacity and clear only frees matching realm`() {
+    fun `realms have separate capacity and success does not free failure evidence`() {
         val clock = MutableClock(START)
         val limiter = LoginRateLimiter(clock, maxBucketsPerRealm = 1)
         limiter.recordFailure(IdentityRealm.USER, IP, "user@example.com")
@@ -202,7 +202,7 @@ class LoginRateLimiterTest {
         assertEquals(900L, rejectedAfter { limiter.checkAllowed(IdentityRealm.CUSTOMER, IP, "new-customer@example.com") })
         limiter.clear(IdentityRealm.USER, IP, "user@example.com")
 
-        limiter.checkAllowed(IdentityRealm.USER, IP, "new-user@example.com")
+        assertEquals(900L, rejectedAfter { limiter.checkAllowed(IdentityRealm.USER, IP, "new-user@example.com") })
         assertEquals(900L, rejectedAfter { limiter.checkAllowed(IdentityRealm.CUSTOMER, IP, "new-customer@example.com") })
     }
 
@@ -321,7 +321,8 @@ class LoginRateLimiterTest {
         }
 
         fun clear(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
-            bucketsByRealm.getValue(realm).remove(key(realm, sourceIp, canonicalEmail))
+            // Success never resets failures in the reference model either.
+            Unit
         }
 
         fun snapshot(): Map<IdentityRealm, Map<String, List<Long>>> = IdentityRealm.entries.associateWith { realm ->

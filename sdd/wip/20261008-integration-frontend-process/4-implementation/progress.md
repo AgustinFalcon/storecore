@@ -2,6 +2,8 @@
 
 Actualización INT-FE-01: [port manual capability y evidencia local](int-fe01-capability.md). Implementación local con gates externos/RealLocal pendientes; el registro INT-FE-00 debajo conserva su alcance documental original.
 
+Actualización INT-FE-02: [port manual Unified Access backend](int-fe02-unified-access-backend.md) sobre 999d5c8. V21 nuevo con V1..V20 intactos, tests unit/controller locales y tests HTTP/JDBC/upgrade compilados. Docker local inaccesible: PostgreSQL/ACL/Flyway real NOT_RUN; gates de DB, reviews, CI JDK17 y frontend permanecen pendientes.
+
 Worktree nuevo desde dfaeba0883a1073b185abaf336b63d5d6bdc5d54; rama integration/storecore-frontend-process. Inventario por lectura de app.routes.ts, route-manifest.ts, a11y.spec.ts, repositories, controllers, migraciones y Verify. Sin código productivo, DDL, push, PR, deploy o activación.
 
 Hallazgos reproducibles: 24 rutas; favoritos son sessionStorage en una pestaña; ofertas HTTP list/save carecen del comando status que expone backend; capability state FE envía sólo state frente al contrato BE correlación/versión/motivo; V20 existe y los textos históricos V20-libre no aplican al head.

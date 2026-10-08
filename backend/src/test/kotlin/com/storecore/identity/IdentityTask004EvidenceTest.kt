@@ -201,7 +201,7 @@ class IdentityTask004EvidenceTest {
             jdbc = JdbcTemplate(dataSource)
             passwords = Argon2PasswordHasher()
             transactionManager = DataSourceTransactionManager(dataSource)
-            identity = JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter())
+            identity = JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter(), com.storecore.identity.infrastructure.security.LoginAttemptBudget())
         }
 
         @JvmStatic

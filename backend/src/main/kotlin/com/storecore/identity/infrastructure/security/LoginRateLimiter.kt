@@ -75,7 +75,8 @@ class LoginRateLimiter(
 
     @Synchronized
     fun clear(realm: IdentityRealm, sourceIp: String, canonicalEmail: String) {
-        bucketsByRealm.getValue(realm).remove(key(realm, sourceIp, canonicalEmail))
+        // Successful authentication never erases failure evidence; expiry owns eviction.
+        Unit
     }
 
     private fun pruneExpiredBuckets(realmBuckets: LinkedHashMap<String, Bucket>, now: Long) {

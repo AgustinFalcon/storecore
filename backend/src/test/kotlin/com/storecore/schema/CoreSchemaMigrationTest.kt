@@ -170,6 +170,73 @@ class CoreSchemaMigrationTest {
             }
         }
     }
+
+    @Test
+    fun `identity V21 protects one use unified access challenge evidence`() {
+        connection().use { connection ->
+            connection.createStatement().use { statement ->
+                assertEquals(1, scalar(connection, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='unified_access_challenges'"))
+                assertTrue(statement.executeQuery("SELECT has_table_privilege('storecore_runtime','unified_access_challenges','SELECT,INSERT,UPDATE')").use { it.next(); it.getBoolean(1) })
+                assertEquals(false, statement.executeQuery("SELECT has_table_privilege('storecore_runtime','unified_access_challenges','DELETE')").use { it.next(); it.getBoolean(1) })
+                statement.executeUpdate("INSERT INTO customers(email,password_hash,first_name,last_name) VALUES ('v21-customer@example.com','\$argon2id\$fixture','V21','Customer') ON CONFLICT(email) DO NOTHING")
+                statement.executeUpdate("INSERT INTO users(email,password_hash,first_name,last_name) VALUES ('v21-user@example.com','\$argon2id\$fixture','V21','User') ON CONFLICT(email) DO NOTHING")
+                statement.executeUpdate(
+                    """WITH issued AS (SELECT clock_timestamp() value)
+                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+                       SELECT '00000000-0000-0000-0000-000000000111',repeat('a',64),repeat('b',64),'http://localhost:4200',
+                              (SELECT id FROM customers WHERE email='v21-customer@example.com'),
+                              (SELECT id FROM users WHERE email='v21-user@example.com'),'HOME',value,value+interval '120 seconds' FROM issued""",
+                )
+                assertThrows(PSQLException::class.java) { statement.executeUpdate("UPDATE unified_access_challenges SET challenge_hash=repeat('c',64) WHERE id='00000000-0000-0000-0000-000000000111'") }
+                assertEquals(1, statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=clock_timestamp() WHERE id='00000000-0000-0000-0000-000000000111'"))
+                assertThrows(PSQLException::class.java) { statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=clock_timestamp() WHERE id='00000000-0000-0000-0000-000000000111'") }
+                assertThrows(PSQLException::class.java) { statement.executeUpdate("DELETE FROM unified_access_challenges WHERE id='00000000-0000-0000-0000-000000000111'") }
+                statement.executeUpdate(
+                    """WITH issued AS (SELECT clock_timestamp()-interval '180 seconds' value)
+                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+                       SELECT '00000000-0000-0000-0000-000000000112',repeat('c',64),repeat('d',64),'http://localhost:4200',
+                              (SELECT id FROM customers WHERE email='v21-customer@example.com'),
+                              (SELECT id FROM users WHERE email='v21-user@example.com'),'HOME',value,value+interval '120 seconds' FROM issued""",
+                )
+                statement.execute("SET ROLE storecore_runtime")
+                try {
+                    assertThrows(PSQLException::class.java) {
+                        statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=issued_at+interval '1 second' WHERE id='00000000-0000-0000-0000-000000000112'")
+                    }
+                } finally {
+                    statement.execute("RESET ROLE")
+                }
+            }
+        }
+    }
     private fun connection() = DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password)
+    @Test
+    fun `V20 to V21 upgrade preserves historical checksums companion objects and retired capability ACLs`() {
+        val database = "ua_upgrade_${System.nanoTime()}"
+        connection().use { it.createStatement().use { statement -> statement.execute("CREATE DATABASE $database") } }
+        val url = postgres.jdbcUrl.substringBeforeLast('/') + "/$database"
+        val baseline = Flyway.configure().dataSource(url, postgres.username, postgres.password)
+            .locations("classpath:db/migration").target("20").load()
+        baseline.migrate()
+        val before = baseline.info().applied().associate { it.version.version to it.checksum }
+        assertEquals(20, before.size)
+        val upgraded = Flyway.configure().dataSource(url, postgres.username, postgres.password)
+            .locations("classpath:db/migration").load()
+        assertEquals(1, upgraded.migrate().migrationsExecuted)
+        upgraded.validate()
+        assertEquals(before, upgraded.info().applied().filter { it.version.version != "21" }.associate { it.version.version to it.checksum })
+        DriverManager.getConnection(url, postgres.username, postgres.password).use { db ->
+            assertEquals(1, scalar(db, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='unified_access_challenges'"))
+            assertTrue(scalar(db, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name LIKE 'blackstore_integration_%'") > 0)
+            assertEquals(1, scalar(db, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='channel_outbox' AND column_name='projection_version'"))
+            assertEquals(0, scalar(db, """SELECT COUNT(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                WHERE n.nspname='public' AND p.proname LIKE 'capability_admin_%'
+                  AND oidvectortypes(p.proargtypes) LIKE 'bigint,%'
+                  AND has_function_privilege('storecore_runtime',p.oid,'EXECUTE')"""))
+            db.createStatement().use { statement ->
+                assertEquals(false, statement.executeQuery("SELECT has_table_privilege('storecore_runtime','unified_access_challenges','DELETE')").use { it.next(); it.getBoolean(1) })
+            }
+        }
+    }
     private fun scalar(connection: java.sql.Connection, sql: String): Int = connection.createStatement().use { statement -> statement.executeQuery(sql).use { resultSet -> check(resultSet.next()); resultSet.getInt(1) } }
 }

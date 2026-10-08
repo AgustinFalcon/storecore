@@ -10,7 +10,6 @@ import jakarta.validation.constraints.NotBlank
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
-import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.time.Duration
 import java.util.UUID
 
 @RestController
@@ -31,6 +29,8 @@ class IdentityController(
     private val identity: IdentityUseCases,
     private val mutations: IdentityMutationCoordinator,
     private val auth: RequestAuth,
+    private val cookies: IdentityCookieWriter,
+    private val clientAddresses: ClientAddressResolver,
 ) {
     @PostMapping("/customer/auth/register")
     fun registerCustomer(@Valid @RequestBody request: RegisterRequest): ResponseEntity<BaseResponse<PrincipalView>> {
@@ -40,11 +40,11 @@ class IdentityController(
 
     @PostMapping("/customer/auth/login")
     fun loginCustomer(http: HttpServletRequest, @Valid @RequestBody request: LoginRequest): ResponseEntity<BaseResponse<PrincipalView>> =
-        issuedResponse(identity.login(IdentityRealm.CUSTOMER, request.email, request.password, http.remoteAddr ?: "unknown"), HttpStatus.OK)
+        issuedResponse(identity.login(IdentityRealm.CUSTOMER, request.email, request.password, clientAddresses.resolve(http)), HttpStatus.OK)
 
     @PostMapping("/internal/auth/login")
     fun loginInternal(http: HttpServletRequest, @Valid @RequestBody request: LoginRequest): ResponseEntity<BaseResponse<PrincipalView>> =
-        issuedResponse(identity.login(IdentityRealm.USER, request.email, request.password, http.remoteAddr ?: "unknown"), HttpStatus.OK)
+        issuedResponse(identity.login(IdentityRealm.USER, request.email, request.password, clientAddresses.resolve(http)), HttpStatus.OK)
 
     @GetMapping("/customer/auth/csrf")
     fun customerCsrf(http: HttpServletRequest): ResponseEntity<BaseResponse<Unit>> = csrfResponse(auth.customer(http))
@@ -122,7 +122,7 @@ class IdentityController(
     private fun logout(http: HttpServletRequest, csrf: String, realm: IdentityRealm): ResponseEntity<Void> {
         auth.requireSameOrigin(http)
         auth.logoutCandidate(http, realm)?.let { mutations.logout(it, csrf) }
-        return ResponseEntity.noContent().cacheControl(org.springframework.http.CacheControl.noStore()).header(HttpHeaders.SET_COOKIE, expiredCookie(realm).toString()).build()
+        return ResponseEntity.noContent().cacheControl(org.springframework.http.CacheControl.noStore()).header(HttpHeaders.SET_COOKIE, cookies.expireSession(realm).toString()).build()
     }
 
     private fun issuedResponse(issued: com.storecore.identity.domain.IssuedCredentials, status: HttpStatus, explicitCustomer: CustomerView? = null): ResponseEntity<BaseResponse<PrincipalView>> {
@@ -131,7 +131,7 @@ class IdentityController(
             is InternalUserPrincipal -> internalView(principal)
         }
         return ResponseEntity.status(status).cacheControl(org.springframework.http.CacheControl.noStore())
-            .header(HttpHeaders.SET_COOKIE, sessionCookie(issued.principal.realm, issued.sessionToken).toString())
+            .header(HttpHeaders.SET_COOKIE, cookies.session(issued.principal.realm, issued.sessionToken).toString())
             .header(CSRF_HEADER, issued.csrfToken).body(BaseResponse.ok(view, status.value()))
     }
 
@@ -140,10 +140,6 @@ class IdentityController(
 
     private fun customerView(principal: CustomerPrincipal) = CustomerView(principal, null, null, null)
     private fun internalView(principal: InternalUserPrincipal) = InternalView(principal.userId, principal.roles.map { it.name }.sorted())
-    private fun sessionCookie(realm: IdentityRealm, token: String): ResponseCookie = ResponseCookie.from(cookieName(realm), token).secure(true).httpOnly(true).sameSite("Lax").path("/").maxAge(Duration.ofHours(12)).build()
-    private fun expiredCookie(realm: IdentityRealm): ResponseCookie = ResponseCookie.from(cookieName(realm), "").secure(true).httpOnly(true).sameSite("Lax").path("/").maxAge(Duration.ZERO).build()
-    private fun cookieName(realm: IdentityRealm) = if (realm == IdentityRealm.CUSTOMER) RequestAuth.CUSTOMER_COOKIE else RequestAuth.INTERNAL_COOKIE
-
     companion object {
         private const val CSRF_HEADER = RequestAuth.CSRF_HEADER
     }
