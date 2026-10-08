@@ -187,13 +187,10 @@ describe('authInterceptor', () => {
     session.setCsrf('csrf-a');
     const http = TestBed.inject(HttpClient);
     const ctrl = TestBed.inject(HttpTestingController);
-    const active = firstValueFrom(http.put('/api/v1/customer/me', { name: 'A' }));
+    const active = firstValueFrom(http.put('/api/v1/customer/me', { name: 'A' }), { defaultValue: undefined });
     const queued = firstValueFrom(http.post('/api/v1/customer/me/addresses', { street: 'A' }))
       .catch((error: unknown) => error);
-    const login = firstValueFrom(http.post('/api/v1/customer/auth/login', {}));
     const activeRequest = ctrl.expectOne('/api/v1/customer/me');
-    ctrl.expectOne('/api/v1/customer/auth/login').flush({ id: 'customer-b' });
-    await login;
     session.markAuthenticated();
     session.setCsrf('csrf-b');
 

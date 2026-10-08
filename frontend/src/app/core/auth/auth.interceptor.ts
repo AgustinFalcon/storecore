@@ -1,12 +1,13 @@
 import { HttpBackend, HttpClient, HttpErrorResponse, HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, defer, mergeMap, of, tap, throwError } from 'rxjs';
+import { catchError, defer, EMPTY, filter, mergeMap, of, tap, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { requestPath } from '../api/request-path';
 import { CSRF_HEADER } from './csrf';
 import { CustomerSession } from './customer-session';
 import { UserSession } from './user-session';
 import { CustomerMutationQueue, UserMutationQueue } from './session-mutation-queue';
+import { SessionMutationCancelledError } from '../../domain/session-mutation-cancelled.error';
 
 function isMutation(method: string): boolean {
   return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
@@ -51,11 +52,21 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const path = requestPath(req.url);
   const customerGeneration = customer.generation();
   const userGeneration = user.generation();
+  const realmRequest = path.includes('/customer/') || path.includes('/internal/') || path.includes('/user/');
+  const requestIsCurrent = () => !realmRequest || (path.includes('/customer/')
+    ? customer.generation() === customerGeneration : user.generation() === userGeneration);
+  const customerActor = customer.actorRevision();
+  const userActor = user.actorRevision();
   const generationIsCurrent = () => path.includes('/customer/')
-    ? customer.generation() === customerGeneration
-    : user.generation() === userGeneration;
+    ? customer.actorRevision() === customerActor
+    : user.actorRevision() === userActor;
 
   const dispatch = () => defer(() => {
+    if (isMutation(req.method) && !isCustomerPublicAuth(path) && !isInternalPublicAuth(path)) {
+      const suspended = path.includes('/customer/') ? customer.transitionPending()
+        : (path.includes('/internal/') || path.includes('/user/')) && user.transitionPending();
+      if (suspended) return throwError(() => new SessionMutationCancelledError());
+    }
     let outgoing = req.clone({ withCredentials: true });
     if (isMutation(outgoing.method) && !isCustomerPublicAuth(path) && !isInternalPublicAuth(path)) {
       if (path.includes('/customer/') && customer.csrf()) {
@@ -84,7 +95,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       catchError((err: unknown) => {
         if (err instanceof HttpErrorResponse) {
           if (!generationIsCurrent()) {
-            return throwError(() => err);
+            return EMPTY;
           }
           if (err.status === 401) {
             if (path.includes('/customer/')) {
@@ -111,16 +122,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             }
           }
         }
-        return throwError(() => err);
+        return requestIsCurrent() ? throwError(() => err) : EMPTY;
       }),
+      filter(() => requestIsCurrent()),
     );
   });
 
   const internal = path.includes('/internal/') || path.includes('/user/');
-  if (internal && ((isMutation(req.method) && !isInternalPublicAuth(path)) || isCsrfProbe(path))) {
+  if (internal && (isMutation(req.method) || isCsrfProbe(path))) {
     return internalMutations.enqueue(dispatch, user.generation(), () => user.generation());
   }
-  if (path.includes('/customer/') && ((isMutation(req.method) && !isCustomerPublicAuth(path)) || isCsrfProbe(path))) {
+  if (path.includes('/customer/') && (isMutation(req.method) || isCsrfProbe(path))) {
     return customerMutations.enqueue(dispatch, customer.generation(), () => customer.generation());
   }
   return dispatch();

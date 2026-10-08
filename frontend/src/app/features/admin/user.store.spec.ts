@@ -194,7 +194,7 @@ function createStore(
   publicHome: GetHomeUseCase = {} as GetHomeUseCase,
   promos: ManagePromosUseCase = {} as ManagePromosUseCase,
 ): UserStore {
-  const session = { authenticated: () => false } as UserSession;
+  const session = new UserSession();
   return new UserStore(
     {} as SignInUserUseCase,
     {} as SignOutUserUseCase,

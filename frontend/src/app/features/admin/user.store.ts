@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { catchError, EMPTY, exhaustMap, filter, forkJoin, map, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, exhaustMap, filter, forkJoin, map, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
 import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
@@ -68,6 +68,12 @@ export class UserStore extends ComponentStore<UserState> {
       preview: null,
       previewManifest: null,
     });
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      ++this.previewGeneration;
+      this.patchState({ loading: false, authenticated: false, email: '', password: '',
+        home: { title: '', body: '' }, homeBlocks: null, promos: [], promoDraft: emptyPromo,
+        manifest: '', preview: null, previewManifest: null, errorMessage: '' });
+    })))(session.actorChanges$);
   }
 
   get snapshot(): UserState {
@@ -107,7 +113,8 @@ export class UserStore extends ComponentStore<UserState> {
       filter(() => Boolean(this.snapshot.email && this.snapshot.password)),
       switchMap(() =>
         this.signIn.execute({ email: this.snapshot.email, password: this.snapshot.password }).pipe(
-            tapResponse({
+            takeUntil(this.session.actorChanges$),
+          tapResponse({
             next: () => {
               this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
               void this.router.navigateByUrl('/user/content');
@@ -123,6 +130,7 @@ export class UserStore extends ComponentStore<UserState> {
     trigger$.pipe(
       switchMap(() =>
         this.signOutUser.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({
@@ -158,6 +166,7 @@ export class UserStore extends ComponentStore<UserState> {
           draft: this.saveHome.load(),
           published: this.publicHome.execute(),
         }).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: ({ draft, published }) =>
               this.patchState({
@@ -203,6 +212,7 @@ export class UserStore extends ComponentStore<UserState> {
               }),
             ),
           ),
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: ({ home, published }) =>
               this.patchState({
@@ -227,6 +237,7 @@ export class UserStore extends ComponentStore<UserState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.promos.list().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (items) => this.patchState({ promos: items, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -249,6 +260,7 @@ export class UserStore extends ComponentStore<UserState> {
       filter(() => promoWindowError(this.snapshot.promoDraft) === ''),
       switchMap(() =>
         this.promos.save(promoForApi(this.snapshot.promoDraft)).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ promoDraft: emptyPromo });
@@ -275,6 +287,7 @@ export class UserStore extends ComponentStore<UserState> {
         const manifest = this.snapshot.manifest;
         const generation = this.previewGeneration;
         return this.importer.preview(manifest).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (preview) => {
               if (generation === this.previewGeneration && manifest === this.snapshot.manifest) {
@@ -307,6 +320,7 @@ export class UserStore extends ComponentStore<UserState> {
         const generation = this.previewGeneration;
         this.patchState({ loading: true, errorMessage: '' });
         return this.importer.merge(manifest).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (result) => {
               if (generation === this.previewGeneration && manifest === this.snapshot.manifest && this.snapshot.preview === preview) {

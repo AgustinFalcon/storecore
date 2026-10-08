@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { ReturnDestination } from './domain/access/return-destination';
+import { RedirectFunction } from '@angular/router';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
 import { FulfillmentComponent } from './features/admin/fulfillment.component';
@@ -12,7 +14,9 @@ import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.co
 import { UserOffersComponent } from './features/admin/user-offers.component';
 import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
 import { UserPromosComponent } from './features/admin/user-promos.component';
-import { UserSessionComponent } from './features/admin/user-session.component';
+import { UserHomeComponent } from './features/admin/user-home.component';
+import { LoginComponent } from './features/identity/login.component';
+import { UserAction } from './domain/user/user-action';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
 import { CheckoutResultComponent } from './features/cart/checkout-result.component';
@@ -21,7 +25,6 @@ import { CustomerFavoritesComponent } from './features/identity/customer-favorit
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
 import { CustomerProfileComponent } from './features/identity/customer-profile.component';
 import { CustomerRegisterComponent } from './features/identity/customer-register.component';
-import { CustomerSessionComponent } from './features/identity/customer-session.component';
 import { CustomerOrderDetailComponent } from './features/orders/customer-order-detail.component';
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
 import { ShellComponent } from './features/shell/shell.component';
@@ -29,12 +32,18 @@ import { CatalogPageComponent } from './features/storefront/catalog-page.compone
 import { ProductPageComponent } from './features/storefront/product-page.component';
 import { StorefrontHomeComponent } from './features/storefront/storefront-home.component';
 
+export const legacyLoginRedirect: RedirectFunction = ({ queryParams }) => {
+  const destination = ReturnDestination.fromWire(queryParams['returnTo']);
+  return destination === ReturnDestination.Unknown ? '/login' : `/login?returnTo=${destination.wire}`;
+};
+
 export const routes: Routes = [
   {
     path: '',
     component: ShellComponent,
     children: [
       { path: '', component: StorefrontHomeComponent, title: 'StoreCore' },
+      { path: 'login', component: LoginComponent, title: 'Ingresar' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },
@@ -44,8 +53,8 @@ export const routes: Routes = [
         path: 'customer',
         component: CustomerLayoutComponent,
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'session' },
-          { path: 'session', component: CustomerSessionComponent, title: 'Customer' },
+          { path: '', pathMatch: 'full', redirectTo: '/login' },
+          { path: 'session', pathMatch: 'full', redirectTo: legacyLoginRedirect },
           { path: 'register', component: CustomerRegisterComponent, title: 'Registro' },
           { path: 'profile', component: CustomerProfileComponent, title: 'Perfil', canActivate: [customerGuard] },
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
@@ -58,18 +67,19 @@ export const routes: Routes = [
         path: 'user',
         component: UserLayoutComponent,
         children: [
-          { path: '', pathMatch: 'full', redirectTo: 'session' },
-          { path: 'session', component: UserSessionComponent, title: 'User' },
-          { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard] },
-          { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
-          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard] },
-          { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
-          { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
-          { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard] },
-          { path: 'inventory', component: UserInventoryComponent, title: 'Inventario', canActivate: [userGuard] },
-          { path: 'mercadolibre', component: UserMercadoLibreComponent, title: 'Mercado Libre', canActivate: [userGuard] },
-          { path: 'capabilities', component: UserCapabilitiesComponent, title: 'Capabilities', canActivate: [userGuard] },
-          { path: 'profile-import', component: ProfileImportComponent, title: 'Perfil', canActivate: [userGuard] },
+          { path: '', pathMatch: 'full', redirectTo: 'home' },
+          { path: 'session', pathMatch: 'full', redirectTo: legacyLoginRedirect },
+          { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
+          { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard], data: { action: UserAction.Content } },
+          { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard], data: { action: UserAction.Catalog } },
+          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard], data: { action: UserAction.Offers } },
+          { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard], data: { action: UserAction.Promos } },
+          { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard], data: { action: UserAction.Orders } },
+          { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard], data: { action: UserAction.Orders } },
+          { path: 'inventory', component: UserInventoryComponent, title: 'Inventario', canActivate: [userGuard], data: { action: UserAction.Inventory } },
+          { path: 'mercadolibre', component: UserMercadoLibreComponent, title: 'Mercado Libre', canActivate: [userGuard], data: { action: UserAction.MercadoLibre } },
+          { path: 'capabilities', component: UserCapabilitiesComponent, title: 'Capabilities', canActivate: [userGuard], data: { action: UserAction.Capabilities } },
+          { path: 'profile-import', component: ProfileImportComponent, title: 'Perfil', canActivate: [userGuard], data: { action: UserAction.ProfileImport } },
         ],
       },
     ],

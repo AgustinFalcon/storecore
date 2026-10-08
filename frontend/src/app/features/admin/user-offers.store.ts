@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { isValidOfferWindow, toInstallationInstant } from '../../domain/catalog/offer-window';
 import { DiscountType } from '../../domain/offer/discount-type';
@@ -30,13 +31,17 @@ const emptyDraft: StorefrontOfferDraft = {
 
 @Injectable()
 export class UserOffersStore extends ComponentStore<UserOffersState> {
-  constructor(private readonly offers: ManageStorefrontOffersUseCase) {
+  constructor(private readonly offers: ManageStorefrontOffersUseCase, private readonly session: UserSession = new UserSession()) {
     super({
       loading: false,
       errorMessage: '',
       offers: [],
       draft: emptyDraft,
     });
+    const initial = this.get();
+    this.effect<void>(changes => changes.pipe(tap(() => {
+      this.setState(initial);
+    })))(session.actorChanges$);
   }
 
   get snapshot(): UserOffersState {
@@ -50,6 +55,7 @@ export class UserOffersStore extends ComponentStore<UserOffersState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.offers.list().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (offers) => this.patchState({ offers, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -72,6 +78,7 @@ export class UserOffersStore extends ComponentStore<UserOffersState> {
       filter(() => offerDraftError(this.snapshot.draft) === ''),
       switchMap(() =>
         this.offers.save(offerForApi(this.snapshot.draft)).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ draft: emptyDraft });

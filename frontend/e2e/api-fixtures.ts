@@ -22,7 +22,7 @@ const product = { sku: line.sku, name: line.name, description: 'Descripción de 
   price: { base: 100, desired: null, observed: null, effective: 100, priceVersion: '1' }, active: true };
 const order = { id: 'test-order', orderStatus: 'PAID', paymentStatus: 'APPROVED', shipmentStatus: 'PREPARING',
   rmaStatus: null, tracking: null, total: 100, lines: [line] };
-const profile = { email: 'customer@example.invalid', firstName: 'Cliente', lastName: 'Prueba', phone: '' };
+const profile = { id: 'test-customer', email: 'customer@example.invalid', firstName: 'Cliente', lastName: 'Prueba', phone: '' };
 const address = { id: 'test-address', street: 'Calle de prueba', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
 const home = { title: 'Home de prueba', body: 'Contenido de prueba', blocks: [{ id: 'test-block', title: 'Bloque de prueba', body: 'Texto de prueba' }] };
 const publicReads: Readonly<Record<string, unknown>> = {
@@ -57,8 +57,8 @@ const userReads: Readonly<Record<string, unknown>> = {
 export async function installApiFixtures(page: Page, realm: ScreenRealm): Promise<{ unexpected: string[]; seen: Set<string> }> {
   const unexpected: string[] = [];
   const seen = new Set<string>();
-  const reads = { ...publicReads, ...(realm === ScreenRealm.Customer ? customerReads : {}),
-    ...(realm === ScreenRealm.User ? userReads : {}) };
+  const reads = { ...publicReads, ...(realm === ScreenRealm.Customer || realm === ScreenRealm.Dual ? customerReads : {}),
+    ...(realm === ScreenRealm.User || realm === ScreenRealm.Dual ? userReads : {}) };
   await page.addInitScript(({ key, item }) => sessionStorage.setItem(key, JSON.stringify([item])),
     { key: FAVORITES_STORAGE_KEY, item: { sku: line.sku, name: line.name } });
   await page.route('**/*', async (route) => {

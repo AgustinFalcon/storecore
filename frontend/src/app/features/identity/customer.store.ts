@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { filter, switchMap, takeUntil, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
@@ -69,6 +69,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly router: Router,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
+    this.effect<void>(changes => changes.pipe(tap(() => this.setState({ ...INITIAL }))))(session.actorChanges$);
   }
 
   get snapshot(): CustomerState {
@@ -108,7 +109,8 @@ export class CustomerStore extends ComponentStore<CustomerState> {
             lastName: this.snapshot.lastName,
           })
           .pipe(
-            tapResponse({
+            takeUntil(this.session.actorChanges$),
+          tapResponse({
               next: () => {
                 this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
                 void this.router.navigateByUrl('/customer/profile');
@@ -132,6 +134,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       filter(() => Boolean(this.snapshot.email && this.snapshot.password)),
       switchMap(() =>
         this.signIn.execute({ email: this.snapshot.email, password: this.snapshot.password }).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
@@ -149,6 +152,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.getProfile.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (profile) => this.patchState({ profile, loading: false, saved: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -172,6 +176,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       ),
       switchMap(() =>
         this.saveProfile.execute(this.snapshot.profile).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (profile) => this.patchState({ profile, loading: false, saved: true, errorMessage: '' }),
             error: (err: unknown) => this.patchState({ loading: false, saved: false, errorMessage: getApiErrorMessage(err) }),
@@ -186,6 +191,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
         this.listAddresses.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: (addresses) => this.patchState({ addresses, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
@@ -211,6 +217,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       }),
       switchMap(() =>
         this.saveAddress.execute(this.snapshot.addressDraft).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ addressDraft: emptyAddress });
@@ -229,6 +236,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap((id) =>
         this.deleteAddress.execute(id).pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.patchState({ addressDraft: emptyAddress });
@@ -245,6 +253,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     trigger$.pipe(
       switchMap(() =>
         this.signOutCustomer.execute().pipe(
+          takeUntil(this.session.actorChanges$),
           tapResponse({
             next: () => {
               this.setState({ ...INITIAL });

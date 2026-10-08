@@ -1,12 +1,15 @@
 <nav class="sc-account-nav" aria-label="Cuenta customer">
   @if (!session.authenticated()) {
-    <a routerLink="/customer/session" routerLinkActive="is-active">Ingresá</a>
+    <a routerLink="/login" routerLinkActive="is-active">Ingresá</a>
     <a routerLink="/customer/register" routerLinkActive="is-active">Crear cuenta</a>
   } @else {
     <a routerLink="/customer/profile" routerLinkActive="is-active">Perfil</a>
     <a routerLink="/customer/addresses" routerLinkActive="is-active">Direcciones</a>
     <a routerLink="/customer/orders" routerLinkActive="is-active">Órdenes</a>
+  }
+  @if (session.actorId()) {
     <button type="button" class="sc-account-nav__out" (click)="signOut()">Salir</button>
   }
 </nav>
+@if (errorMessage) { <p role="alert">{{ errorMessage }}</p> }
 <router-outlet />
