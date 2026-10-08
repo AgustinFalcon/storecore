@@ -2,6 +2,10 @@
 
 Fecha: 2026-10-08. Rama local `integration/storecore-unified-access-frontend`.
 Base exacta: PR #180 head `5c27e26` (INT-FE-02 + corrección CI + contrato FE03).
+SHA frontend del código validado: `4ce98d51f9e4d326c8cc0cd3f195cbeec5a7ea9f`.
+Backend heredado: `b8bd49018413a503f5af8d04aa64b1dc36263f04`, con corrección de
+test HTTP `6d45f065160ff440fc110fac93b23e98f0d70d9b`, incluido en base completa
+`5c27e26503c17acec9297c7826bdaaacf96552c5`. No backend ejecutado en RealLocal.
 Consulta UA: #176 `9a305b940b24d68c6bb80108060996b6210546a5`.
 Estado: implementación local revisable; no aceptación completa A01–A09, cierre,
 push, PR, merge, master, deploy ni cambio backend de producción.
@@ -57,6 +61,8 @@ Build requiere `--preserve-symlinks` por la junction de dependencias.
 Artifacts MockHttp: `frontend/playwright-report/`, `frontend/test-results/`
 (ignorados por Git). Servidor SPA local sobre dist development, loopback4300,
 fixtures sólo en Playwright. Esto no acredita cookies ni persistencia real.
+Revalidación después del commit de código: 39/39 PASS, 18.2 segundos. Servidor
+SPA detenido y `subst` sin mappings al finalizar. Worktree tracked limpio.
 
 ## Fallos encontrados y corregidos
 
