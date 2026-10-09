@@ -152,3 +152,5 @@ ambos se ejecutarán en la etapa de PR que el usuario pidió tratar después. No
 declara merge-ready ni homologación real. El validador distribuido de SDD-kit
 sigue `BLOCKED_TOOLING` por ausencia de `tools/shared/validator-utils.sh`; no se
 falsea ese resultado.
+
+2026-10-20: FE-COMP-04 se porta sobre catálogo/checkout/postventa modulares de #187/#188. El documento fe-comp04-evidence.md conserva evidencia histórica del corte original; sus resultados no acreditan este rebase. Revalidación del nuevo SHA pendiente; no declara revisión independiente, CI ni merge.
