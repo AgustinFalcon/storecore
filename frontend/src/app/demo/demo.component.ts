@@ -1,10 +1,13 @@
-import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
+import { Component, computed, inject, signal, DestroyRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
 import { DemoProductEditorComponent } from './demo-product-editor';
 import { DemoPostSaleComponent } from './demo-postsale.component';
+import { DemoFulfillmentComponent } from './demo-fulfillment.component';
+import { DemoInboxComponent } from './demo-inbox.component';
+import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
 import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings, DemoSellableVariant, DemoMedia, initializeProductVariants } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus } from '../domain/order/payment-status';
@@ -62,8 +65,9 @@ export class DemoRootComponent {
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoProductEditorComponent, DemoPostSaleComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoProductEditorComponent, DemoPostSaleComponent, DemoFulfillmentComponent, DemoInboxComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
+  @ViewChild(DemoFulfillmentComponent) private fulfillment?: DemoFulfillmentComponent;
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -98,6 +102,7 @@ export class DemoPageComponent {
   get selectedImage(): DemoMedia | undefined { return this.galleryImages.find(image => image.id === this.imageId()) ?? this.galleryImages[0]; }
   chooseImage(image: DemoMedia): void { this.imageId.set(image.id); }
   readonly Module = DemoModuleId;
+  readonly pickupPoint = DEMO_PICKUP_POINT;
   readonly Math = Math;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
   readonly sampleManifest = JSON.stringify({ version: 1, title: 'Tu taller, mejor equipado' }, null, 2);
@@ -200,7 +205,7 @@ export class DemoPageComponent {
   cancelProcessing(): void { clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Cancelled); }
   cancelPayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
   saveIncident(): void { const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
-  resolveIncident(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolveIncident(order.id), 'Incidencia resuelta.'); }
+  resolveIncident(): void { this.fulfillment?.requestResolution(); }
   receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? DemoPaymentMethod.Card.label}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, ...(order.returns ?? []).filter(request => !!request.refundId).map(request => `REINTEGRO ${request.refundId}: ${this.money(request.lines.reduce((sum, line) => sum + line.refund, 0))}`), 'Sin cobro real ni validez fiscal.'].join('\n'); }
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
@@ -230,6 +235,10 @@ export class DemoPageComponent {
   adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentVariantId = this.state.commerce.variants(product.sku)[0].id; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
   saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason, this.adjustmentVariantId), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
+  get canAdvance(): boolean { return !!this.order && new DemoFulfillmentPolicy().actions(this.order).length > 0 && ensureFulfillment(this.order).incident === DemoIncidentKind.None; }
+  get advanceLabel(): string { return this.order ? new DemoFulfillmentPolicy().actions(this.order)[0]?.label ?? 'Entrega finalizada' : 'Entrega no disponible'; }
+  get canResolveIncident(): boolean { return !!this.order && ensureFulfillment(this.order).incident === DemoIncidentKind.Report; }
+  shipmentLabel(order: import('./demo-model').DemoOrder): string { return ensureFulfillment(order).phase.label; }
   connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
   linkML(sku: string): void { this.state.run(() => { const listing = this.state.data.listings.find(value => value.sku === sku); if (listing) { listing.linked = !listing.linked; if (listing.linked) listing.desired = undefined; } else this.state.data.listings.push({ sku, linked: true, observed: 0, error: false }); this.state.commerce.touch(); }, 'Vínculo simulado actualizado.'); }
   syncML(sku: string): void { this.state.run(() => { if (!this.state.data.mlConnected) throw new Error('Conectá la cuenta simulada primero.'); const listing = this.state.data.listings.find(value => value.sku === sku); if (!listing?.linked) throw new Error('Vinculá el producto primero.'); listing.error = this.state.scenario() === DemoScenario.Error; if (!listing.error) listing.observed = this.state.commerce.available(sku); this.state.commerce.touch(); }, 'Sincronización simulada registrada.'); }
