@@ -1,0 +1,13 @@
+{
+  "feature": "20261008-commercial-frontend-demo",
+  "baseline": "ef21e612d13a2b104dd7c96fb1f97ae4e7ca8ce2",
+  "status": "documented_for_review",
+  "tasks": [
+    {"id":"DEMO-D","depends_on":[],"status":"documented_for_review","requirements":["DEMO-R01","DEMO-R02","DEMO-R03","DEMO-R04","DEMO-R05","DEMO-R06","DEMO-R07","DEMO-R08","DEMO-R09","DEMO-R10"]},
+    {"id":"DEMO-B","depends_on":["DEMO-D"],"status":"pending","requirements":["DEMO-R01","DEMO-R07","DEMO-R10"]},
+    {"id":"DEMO-T","depends_on":["DEMO-D"],"status":"pending","requirements":["DEMO-R04","DEMO-R05","DEMO-R07","DEMO-R08"]},
+    {"id":"DEMO-U1","depends_on":["DEMO-B","DEMO-T"],"status":"pending","requirements":["DEMO-R02","DEMO-R03","DEMO-R04","DEMO-R05","DEMO-R09"]},
+    {"id":"DEMO-U2","depends_on":["DEMO-B","DEMO-T"],"status":"pending","requirements":["DEMO-R06","DEMO-R07","DEMO-R08","DEMO-R09"]},
+    {"id":"DEMO-E","depends_on":["DEMO-U1","DEMO-U2"],"status":"pending","acceptance":["E01","E02","E03","E04","E05","E06","E07","E08","E09","E10"],"acceptance_status":"NOT_RUN","requirements":["DEMO-R01","DEMO-R02","DEMO-R03","DEMO-R04","DEMO-R05","DEMO-R06","DEMO-R07","DEMO-R08","DEMO-R09","DEMO-R10"]}
+  ]
+}
