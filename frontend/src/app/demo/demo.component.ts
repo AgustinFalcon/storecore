@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
 import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
@@ -37,7 +37,7 @@ export class CatalogSort {
   static fromWire(raw: unknown): CatalogSort { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
-@Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
   readonly state = inject(DemoApplicationState);
   readonly router = inject(Router);
