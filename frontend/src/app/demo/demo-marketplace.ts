@@ -65,6 +65,7 @@ export interface DemoCompetitorDetails { source: string; variantId: string; obse
 const date = (raw: unknown): raw is string => typeof raw === 'string' && Number.isFinite(Date.parse(raw));
 const quantity = (raw: unknown): raw is number => Number.isSafeInteger(raw) && Number(raw) >= 0;
 const stamp = '2026-10-09T10:00:00.000Z';
+const mappingIdentity = (sku: string, variantId: string): string => `mapping-${encodeURIComponent(sku)}:${encodeURIComponent(variantId)}`;
 export function ensureMarketplace(state: DemoMarketplaceSnapshot, now = stamp): DemoMarketState {
   if (!state.marketplace) {
     state.marketplace = { account: state.mlConnected ? DemoMLAccountStatus.Authorized : DemoMLAccountStatus.Disconnected, accountAt: now, mappings: [], queue: [] };
@@ -73,7 +74,7 @@ export function ensureMarketplace(state: DemoMarketplaceSnapshot, now = stamp): 
       const variant = marketplaceVariants(state, listing.sku)[0];
       if (!variant) continue;
       const local = variant.local;
-      state.marketplace.mappings.push({ id: `mapping-${product!.sku}-${variant.id}`, sku: product!.sku, variantId: variant.id, listingId: `SIM-${product!.sku}`, variationId: `SIM-${variant.id}`, status: listing.linked ? DemoMappingStatus.Linked : DemoMappingStatus.Unlinked, local, desired: local, desiredAt: now, generation: 0 });
+      state.marketplace.mappings.push({ id: mappingIdentity(product!.sku, variant.id), sku: product!.sku, variantId: variant.id, listingId: `SIM-${product!.sku}`, variationId: `SIM-${variant.id}`, status: listing.linked ? DemoMappingStatus.Linked : DemoMappingStatus.Unlinked, local, desired: local, desiredAt: now, generation: 0 });
     }
     new DemoMarketplaceProjection().refresh(state, now);
   }
@@ -112,7 +113,7 @@ export class DemoMarketplaceMapping {
     if (market.mappings.some(value => (value.sku !== sku || value.variantId !== variantId) && value.status !== DemoMappingStatus.Unlinked && value.listingId === listingId && value.variationId === variationId)) throw new Error('Conflicto: esta publicación/variación ya identifica otra variante. Elegí una identidad distinta.');
     let mapping = market.mappings.find(value => value.sku === sku && value.variantId === variantId);
     if (mapping?.status === DemoMappingStatus.Unknown) throw new Error('Restablecé el vínculo desconocido.');
-    if (!mapping) { mapping = { id: `mapping-${sku}-${variantId}`, sku, variantId, listingId, variationId, status: DemoMappingStatus.Linked, local: 0, desired: 0, desiredAt: now, generation: 0 }; market.mappings.push(mapping); }
+    if (!mapping) { mapping = { id: mappingIdentity(sku, variantId), sku, variantId, listingId, variationId, status: DemoMappingStatus.Linked, local: 0, desired: 0, desiredAt: now, generation: 0 }; market.mappings.push(mapping); }
     else { mapping.listingId = listingId; mapping.variationId = variationId; mapping.status = DemoMappingStatus.Linked; mapping.confirmed = undefined; mapping.confirmedAt = undefined; mapping.observed = undefined; mapping.observedAt = undefined; mapping.generation++; }
     new DemoMarketplaceProjection().refresh(state, now);
   }
@@ -134,6 +135,31 @@ export class DemoMarketplaceProcessor {
       if (!fail) { mapping.observed = entry.desired; mapping.confirmed = entry.desired; mapping.observedAt = now; mapping.confirmedAt = now; }
     }
     new DemoMarketplaceProjection().refresh(state, now);
+  }
+}
+export interface DemoMarketplaceSalePort {
+  snapshot: DemoMarketplaceSnapshot;
+  movements: { id: string; sku: string; variantId?: string; delta: number; reason: string }[];
+  consume(sku: string, variantId: string): void;
+}
+/** Inventory ownership stays with the catalog; this step validates channel replay first. */
+export class DemoMarketplaceSale {
+  apply(port: DemoMarketplaceSalePort, sku: string, operation: string, now: string, variantId?: string): boolean {
+    if (!operation.trim() || (variantId !== undefined && !variantId.trim())) throw new Error('Indicá operación e identidad de variante válidas.');
+    const market = ensureMarketplace(port.snapshot, now);
+    const mapping = market.mappings.find(value => value.sku === sku && (variantId === undefined || value.variantId === variantId) && value.status.eligible);
+    if (!market.account.canProcess || !mapping) throw new Error('Conectá la cuenta simulada y vinculá la variante.');
+    const existing = port.movements.find(value => value.id === operation);
+    if (existing) {
+      if (existing.sku !== sku || existing.variantId !== mapping.variantId || existing.reason !== 'Venta Mercado Libre simulada') throw new Error('La operación ya pertenece a otra variante u operación.');
+      return false;
+    }
+    const variant = marketplaceVariants(port.snapshot, sku).find(value => value.id === mapping.variantId);
+    if (!variant || variant.local < 1) throw new Error('Producto sin stock.');
+    port.consume(sku, mapping.variantId);
+    port.movements.push({ id: operation, sku, variantId: mapping.variantId, delta: -1, reason: 'Venta Mercado Libre simulada' });
+    new DemoMarketplaceProjection().refresh(port.snapshot, now);
+    return true;
   }
 }
 export function ensureCompetitorDetails(value: DemoCompetitor, state: DemoMarketplaceCatalog): DemoCompetitorDetails {
@@ -163,15 +189,15 @@ export class DemoCompetitorObservationStep {
   }
 }
 
-/** The snapshot boundary owns validation/rehydration; legacy v1-v4 get explicit sample IDs. */
+/** The snapshot boundary owns validation/rehydration; legacy v1/v4 get explicit sample IDs. */
 export function decodeMarketplace(state: DemoMarketplaceSnapshot): void {
   const market = ensureMarketplace(state);
   if (!date(market.accountAt) || !Array.isArray(market.mappings) || !Array.isArray(market.queue)) throw new Error('Canal de muestra guardado inválido.');
   market.account = DemoMLAccountStatus.fromWire(market.account?.wire);
   const ids = new Set<string>(); const variants = new Set<string>();
   for (const mapping of market.mappings) {
-    if (!mapping.id || ids.has(mapping.id) || variants.has(`${mapping.sku}:${mapping.variantId}`) || !marketplaceVariants(state, mapping.sku).some(value => value.id === mapping.variantId) || !/^SIM-[\w:-]{1,80}$/.test(mapping.listingId) || !/^SIM-[\w:-]{1,80}$/.test(mapping.variationId) || !quantity(mapping.local) || !quantity(mapping.desired) || !quantity(mapping.generation) || !date(mapping.desiredAt) || (mapping.observed !== undefined && (!quantity(mapping.observed) || !date(mapping.observedAt))) || (mapping.confirmed !== undefined && (!quantity(mapping.confirmed) || !date(mapping.confirmedAt)))) throw new Error('Mapping de muestra guardado inválido.');
-    ids.add(mapping.id); variants.add(`${mapping.sku}:${mapping.variantId}`); mapping.status = DemoMappingStatus.fromWire(mapping.status?.wire);
+    if (!mapping.id || ids.has(mapping.id) || variants.has(JSON.stringify([mapping.sku, mapping.variantId])) || !marketplaceVariants(state, mapping.sku).some(value => value.id === mapping.variantId) || !/^SIM-[\w:-]{1,80}$/.test(mapping.listingId) || !/^SIM-[\w:-]{1,80}$/.test(mapping.variationId) || !quantity(mapping.local) || !quantity(mapping.desired) || !quantity(mapping.generation) || !date(mapping.desiredAt) || (mapping.observed !== undefined && (!quantity(mapping.observed) || !date(mapping.observedAt))) || (mapping.confirmed !== undefined && (!quantity(mapping.confirmed) || !date(mapping.confirmedAt)))) throw new Error('Mapping de muestra guardado inválido.');
+    ids.add(mapping.id); variants.add(JSON.stringify([mapping.sku, mapping.variantId])); mapping.status = DemoMappingStatus.fromWire(mapping.status?.wire);
   }
   for (const mapping of market.mappings) if (mapping.status === DemoMappingStatus.Linked && market.mappings.some(value => value.id !== mapping.id && value.status !== DemoMappingStatus.Unlinked && value.listingId === mapping.listingId && value.variationId === mapping.variationId)) mapping.status = DemoMappingStatus.Conflict;
   const jobs = new Set<string>();
