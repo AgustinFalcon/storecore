@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-09",
+  "reviewBaseline": "458c4504c786c0460c2131f2a35a4f2cb03dd365",
+  "command": "node demo-e2e/run.mjs",
+  "test": "cart editor invalid inputs preserve line and persistence until explicit removal",
+  "result": "PASS",
+  "quantity": [
+    {
+      "input": "",
+      "expected": "visible error; no success; line retained; persistence unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "0",
+      "expected": "visible error; no success; line retained; persistence unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "-1",
+      "expected": "visible error; no success; line retained; persistence unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "0.5",
+      "expected": "visible error; no success; line retained; persistence unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "1.5",
+      "expected": "visible error; no success; line retained; persistence unchanged",
+      "cartUnchanged": true
+    }
+  ],
+  "validEdit": "1 ->2",
+  "explicitRemove": "Quitar removes line",
+  "restore": "restores previous quantity 2"
+}

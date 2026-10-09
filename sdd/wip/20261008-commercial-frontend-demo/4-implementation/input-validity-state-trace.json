@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-09",
+  "reviewBaseline": "8a070712ea00ac80887dfe7cbb5a389ab828d392",
+  "command": "node demo-e2e/run.mjs",
+  "test": "PDP invalid quantities preserve cart and navigation resets stale presentation",
+  "result": "PASS",
+  "quantity": [
+    {
+      "input": "0",
+      "expected": "visible integer >=1 error; no success; cart unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "-1",
+      "expected": "visible integer >=1 error; no success; cart unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "0.5",
+      "expected": "visible integer >=1 error; no success; cart unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "1.5",
+      "expected": "visible integer >=1 error; no success; cart unchanged",
+      "cartUnchanged": true
+    },
+    {
+      "input": "",
+      "expected": "visible integer >=1 error; no success; cart unchanged",
+      "cartUnchanged": true
+    }
+  ],
+  "validAddition": "2 increments existing 1 to 3",
+  "sameRouteSkuNavigation": "Case -> Standard, quantity ->1",
+  "incompatibleSku": "Only Standard and no Case in persisted cart"
+}
