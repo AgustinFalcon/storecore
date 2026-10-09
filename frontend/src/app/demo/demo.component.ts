@@ -3,7 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { DemoProductEditorComponent } from './demo-product-editor';
+import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings, DemoSellableVariant, DemoMedia, initializeProductVariants } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
@@ -23,8 +24,9 @@ export class DemoDialog {
   static readonly Tracking = new DemoDialog('Seguimiento de entrega');
   static readonly Receipt = new DemoDialog('Comprobante de demostración');
   static readonly Incident = new DemoDialog('Registrar incidencia');
+  static readonly Zoom = new DemoDialog('Ampliar imagen');
   static readonly Unknown = new DemoDialog('Acción desconocida');
-  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident, this.Zoom].find(value => value.label === raw) ?? this.Unknown; }
 }
 export class CatalogSort {
   private constructor(readonly wire: string, readonly label: string, readonly compare: (left: DemoProduct, right: DemoProduct) => number) {}
@@ -59,7 +61,7 @@ export class DemoRootComponent {
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoProductEditorComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
@@ -85,10 +87,15 @@ export class DemoPageComponent {
   competitorSku = 'DEMO-001';
   competitorThreshold = 1;
   readonly sorts = CatalogSort.all;
-  readonly Gallery = DemoGalleryView;
-  readonly gallery = signal(DemoGalleryView.Front);
-  get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
-  readonly variant = signal(DemoProductVariant.Standard);
+  get variants(): readonly DemoSellableVariant[] { return this.product ? this.state.commerce.variants(this.product.sku) : []; }
+  readonly variantId = signal('');
+  readonly imageId = signal('');
+  get selectedVariant(): DemoSellableVariant | undefined { return this.variants.find(value => value.id === (this.variantId() || this.variants[0]?.id)); }
+  get selectedStock(): number { return this.product && this.selectedVariant ? this.state.commerce.variantAvailable(this.product.sku, this.selectedVariant.id) : 0; }
+  get selectedPrice(): number { return this.product && this.selectedVariant ? this.state.commerce.variantPrice(this.product.sku, this.selectedVariant.id) : 0; }
+  get galleryImages(): DemoMedia[] { return this.selectedVariant?.images.length ? this.selectedVariant.images : this.product?.images ?? []; }
+  get selectedImage(): DemoMedia | undefined { return this.galleryImages.find(image => image.id === this.imageId()) ?? this.galleryImages[0]; }
+  chooseImage(image: DemoMedia): void { this.imageId.set(image.id); }
   readonly Module = DemoModuleId;
   readonly Math = Math;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
@@ -126,6 +133,8 @@ export class DemoPageComponent {
   draftModule = DemoModuleId.Unknown;
   info = '';
   adjustmentSku = '';
+  adjustmentVariantId = '';
+  get adjustmentVariants(): DemoSellableVariant[] { return this.adjustmentSku ? this.state.commerce.variants(this.adjustmentSku) : []; }
   adjustmentDelta = 1;
   adjustmentReason = '';
   selectedOrderStatus: PaymentStatus | null = null;
@@ -134,10 +143,10 @@ export class DemoPageComponent {
   draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, active: true, from: '2026-10-08', until: '2027-12-31' };
   configName = 'Mi comercio';
   manifest = '';
-  removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
+  removed: { sku: string; quantity: number; variant: DemoProductVariant; variantId?: string } | null = null;
+  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variantId.set(''); this.imageId.set(''); this.quantity = 1; }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
-  productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
+  productImage(product: DemoProduct): string { return product.images?.[0]?.src ?? '/assets/demo/product-placeholder.svg'; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
   selectPayment(raw: string): void { this.paymentMethod.set(DemoPaymentMethod.fromWire(raw)); }
   selectDelivery(raw: string): void { this.deliveryMethod.set(DemoDeliveryMethod.fromWire(raw)); this.delivery = this.deliveryMethod() !== DemoDeliveryMethod.Unknown; }
@@ -148,10 +157,13 @@ export class DemoPageComponent {
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
   get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
-  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku) + line.variant.extraUnit })); }
+  get cartLines() { return this.state.actor.cart.map(line => { const selected = this.state.commerce.sellable(line.sku, line.variantId); return { ...line, variantId: selected.id, variantName: selected.name, attributes: selected.attributes, image: selected.images.at(0), available: this.state.commerce.variantAvailable(line.sku, selected.id), product: this.state.commerce.product(line.sku), unit: this.state.commerce.variantPrice(line.sku, selected.id) }; }); }
+  get cartChanged(): boolean { return this.cartLines.some(line => line.quotedUnit !== undefined && line.quotedUnit !== line.unit); }
+  refreshCart(): void { this.state.run(() => this.state.commerce.refreshCart(this.state.actorId()), 'Resumen actualizado. Revisá los importes antes de confirmar.'); }
   get total(): number { return this.cartLines.reduce((sum, line) => sum + line.unit * line.quantity, 0); }
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
   get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < this.state.data.settings.lowStockThreshold); }
+  get lowVariantStock() { return this.state.data.products.flatMap(product => this.state.commerce.variants(product.sku).filter(variant => variant.active && variant.onHand-variant.reserved < this.state.data.settings.lowStockThreshold).map(variant => ({ product, variant }))); }
   get pendingOrders() { return this.orders.filter(order => order.payment === PaymentStatus.Pending); }
   get incidentOrders() { return this.orders.filter(order => !!order.incident); }
   get competitorAlerts(): number { return this.state.data.competitors.filter(value => value.unread).length; }
@@ -166,15 +178,13 @@ export class DemoPageComponent {
   money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value / 100); }
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
-  get draftPrice(): number { return this.draftProduct.price / 100; }
-  set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
   clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(0); this.onlyAvailable.set(false); this.page.set(0); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
-  selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
-  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
-  setQuantity(sku: string, raw: number | null): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN), 'Carrito actualizado.'); }
-  remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
-  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
+  selectVariant(raw: string): void { this.variantId.set(raw); this.imageId.set(''); this.quantity = 1; }
+  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } const selected = this.selectedVariant; if (!selected) { this.state.error.set('Seleccioná una variante disponible.'); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, selected.id), `${product.name} · ${selected.name} agregado a tu carrito.`); }
+  setQuantity(sku: string, raw: number | null, variantId?: string): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN, variantId), 'Carrito actualizado.'); }
+  remove(sku: string, variantId?: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku && (!variantId || line.variantId === variantId)) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku, variantId), 'Producto quitado del carrito.')) this.removed = removed; }
+  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variantId ?? removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
   context(context: DemoContext): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; this.state.login(context, actor); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
   register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => { this.state.data.actors.push({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }); this.state.commerce.touch(); }, 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
@@ -201,8 +211,8 @@ export class DemoPageComponent {
   confirm(text: string, action: () => void): void { this.info = text; this.confirmation = action; this.open(DemoDialog.Confirm); }
   performConfirmation(): void { const action = this.confirmation; this.confirmation = null; this.close(); action?.(); }
   editingSku: string | undefined;
-  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? { ...product } : { ...this.draftProduct, sku: `DEMO-${this.state.data.products.length + 1}`, name: '', reserved: 0 }; this.open(DemoDialog.Product); }
-  saveProduct(): void { if (this.state.run(() => this.state.commerce.saveProduct({ ...this.draftProduct }, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
+  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? structuredClone(product) : { sku: `DEMO-${this.state.data.products.length + 1}`, name: '', description: '', brand: '', category: 'Herramientas', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar', images: [] }; initializeProductVariants(this.draftProduct); this.open(DemoDialog.Product); }
+  saveProduct(): void { const variants = this.draftProduct.variants ?? []; const product = { ...this.draftProduct, price: variants[0]?.price ?? 0, onHand: variants.reduce((sum, value) => sum + value.onHand, 0), reserved: variants.reduce((sum, value) => sum + value.reserved, 0) }; if (this.state.run(() => this.state.commerce.saveProduct(product, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
   archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...product, active: !product.active }, product.sku), product.active ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
   editAddress(address?: DemoAddress): void { this.draftAddress = address ? { ...address } : { id: crypto.randomUUID(), label: 'Casa', street: '', city: '', postal: '', primary: false }; this.open(DemoDialog.Address); }
   saveAddress(): void { if (!this.draftAddress.street.trim() || !this.draftAddress.city.trim() || !this.draftAddress.postal.trim()) { this.state.error.set('Completá calle, ciudad y código postal.'); return; } if (this.state.run(() => { const actor = this.state.actor; const index = actor.addresses.findIndex(value => value.id === this.draftAddress.id); if (this.draftAddress.primary) actor.addresses.forEach(value => value.primary = false); if (index < 0) actor.addresses.push({ ...this.draftAddress, primary: actor.addresses.length === 0 || this.draftAddress.primary }); else actor.addresses[index] = { ...this.draftAddress }; this.state.commerce.touch(); }, 'Dirección guardada.')) this.close(); }
@@ -216,8 +226,8 @@ export class DemoPageComponent {
   editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
   saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); }
   toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }
-  adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
-  saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
+  adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentVariantId = this.state.commerce.variants(product.sku)[0].id; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
+  saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason, this.adjustmentVariantId), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
   receiveReturn(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
