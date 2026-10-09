@@ -1,3 +1,6 @@
+import { DemoFulfillmentComponent } from './demo-fulfillment.component';
+import { DemoInboxComponent } from './demo-inbox.component';
+import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
 import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
@@ -59,7 +62,7 @@ export class DemoRootComponent {
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoFulfillmentComponent, DemoInboxComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
@@ -90,6 +93,7 @@ export class DemoPageComponent {
   get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
   readonly variant = signal(DemoProductVariant.Standard);
   readonly Module = DemoModuleId;
+  readonly pickupPoint = DEMO_PICKUP_POINT;
   readonly Math = Math;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
   readonly sampleManifest = JSON.stringify({ version: 1, title: 'Tu taller, mejor equipado' }, null, 2);
@@ -219,6 +223,10 @@ export class DemoPageComponent {
   adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
   saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
+  get canAdvance(): boolean { return !!this.order && new DemoFulfillmentPolicy().actions(this.order).length > 0 && ensureFulfillment(this.order).incident === DemoIncidentKind.None; }
+  get advanceLabel(): string { return this.order ? new DemoFulfillmentPolicy().actions(this.order)[0]?.label ?? 'Entrega finalizada' : 'Entrega no disponible'; }
+  get canResolveIncident(): boolean { return !!this.order && ensureFulfillment(this.order).incident === DemoIncidentKind.Report; }
+  shipmentLabel(order: import('./demo-model').DemoOrder): string { return ensureFulfillment(order).phase.label; }
   receiveReturn(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
   linkML(sku: string): void { this.state.run(() => { const listing = this.state.data.listings.find(value => value.sku === sku); if (listing) { listing.linked = !listing.linked; if (listing.linked) listing.desired = undefined; } else this.state.data.listings.push({ sku, linked: true, observed: 0, error: false }); this.state.commerce.touch(); }, 'Vínculo simulado actualizado.'); }
