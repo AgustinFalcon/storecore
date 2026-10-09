@@ -1,6 +1,6 @@
 # FE-COMP-05 — acceso demo y administración
 
-Fecha: 2026-10-09. Rama `integration/storecore-comp05-access-admin`, base C04 `78289ce`. Estado: `implemented_local_pending_full_browser_independent_review_and_ci`.
+Fecha: 2026-10-09. Rama `integration/storecore-comp05-access-admin`, integrada sobre C06 y snapshot V5. Estado: `implemented_local_pending_independent_review_and_ci`.
 
 E05.1: la entrada única lista perfiles compradores explícitos y el administrador de muestra. El código público `demo` se valida exactamente; no se almacenan passwords, ni se representa una contraseña arbitraria como autenticación real. Alta comprador normaliza email, rechaza duplicados y valida nombre/apellido; perfiles, carritos, direcciones y pedidos conservan actor. La intención de navegación permite exclusivamente rutas locales del recorrido, verifica ownership de pedidos y vuelve al home del contexto cuando no corresponde. Nunca acepta una URL externa.
 
@@ -10,4 +10,6 @@ E05.3: productos, inventario, ventas, promociones y contenido tienen búsqueda, 
 
 Validación local ejecutada durante implementación: 347/347 unitarias; lint y arquitectura PASS; build demo PASS usando subst V: y preserve-symlinks (V: desmontado). Seis browser C05 PASS, incluidos identidad/ownership, recovery, duplicado/errores/foco/cancelación/persistencia y Axe con cero violaciones a 390/768/1440. Tras esos pases se agregaron fixture de 37 productos y ledger de nuevos controles. Dos regresiones antiguas se adaptaron al contrato nuevo: selector de perfil en lugar de input email y teléfono de seis dígitos. Primera regresión completa fue interrumpida al identificar esas fixtures; segunda fue detenida para liberar puerto 4390 a C06. No se declara PASS del browser completo.
 
-Pendientes antes de aceptación: ejecutar suite completa final de 52 browser, revisar ledger/paginación, build producción, reviews independientes sobre SHA y CI/PR. Ningún servidor queda activo por este corte; runners interrumpidos con SIGINT y servidores detenidos por finally. No push, merge, backend o integración externa.
+La validación combinada final sobre C04+C06+C05 acreditó 359/359 unitarias, lint, build de producción y 56/56 browser (cero skipped, unexpected o flaky), incluidos accesibilidad de acceso/admin, variantes/galería y Marketplace a 390/768/1440. El selector de campaña de la matriz usa identidad de la campaña creada y no orden visual. Runner detenido, puerto 4390 sin listener y unidad temporal desmontada.
+
+Pendientes antes de aceptación: revisiones independientes finales, CI/PR y la secuencia de merge. No hay backend o integración externa: acceso, recuperación y Marketplace permanecen simulaciones locales explícitas.
