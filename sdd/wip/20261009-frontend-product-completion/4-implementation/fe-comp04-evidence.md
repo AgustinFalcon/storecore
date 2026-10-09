@@ -30,3 +30,7 @@ La matriz CTA previa acredita sus controles anteriores; el observador excluye ex
 Hallazgos de ejecución corregidos: etiquetas generales de envío incompatibles con expectativas existentes (se preservaron las etiquetas de domicilio y sólo se diferenciaron fases de retiro), un selector de prueba que capturaba marcar-todas en lugar de una fila, ruta admin de prueba incompleta, y contraste insuficiente heredado en cabecera de tabla/métricas (ajustado a `#435b6d`). Corrida intermedia: 43/44 browser PASS, único fallo pendiente era contraste de métricas; no se representa como ejecución final aprobada.
 
 Artefactos locales: `frontend/demo-playwright-report/results.json` contiene la corrida focal final; `comp04-full-0c9f5bd.json` preserva la completa. `frontend/test-results/fulfillment-*/` contiene capturas y adjuntos CTA/datos finales. El runner cerró Chromium y servidor 4390; check posterior: **0 listeners en 4390**, y `subst` sin unidades temporales activas. Estos artefactos no prueban integración real de pagos/envíos/ML ni homologación.
+
+## Correcciones P2 de revisión independiente
+
+El acceso heredado `order-incident-resolve` sólo enfoca el formulario de respuesta; resolver exige texto explícito en UI y dominio. Las incidencias vigentes generan alertas activas por contexto. Una nueva consulta vuelve a no leída y conserva el historial. Las alertas de stock actualizan cantidad y texto, y un cambio o nuevo episodio se reabre como no leído. La suite unitaria posterior acredita estos casos; la navegación de regresión queda pendiente de correr sobre este delta.

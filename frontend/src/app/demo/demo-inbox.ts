@@ -1,6 +1,7 @@
 import type { DemoSnapshot } from './demo-model';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { DemoSyncStatus } from './demo-process-types';
+import { DemoIncidentKind, ensureFulfillment } from './demo-fulfillment';
 
 export class DemoAlertCategory {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -53,16 +54,31 @@ export class DemoInboxPolicy {
     };
     for (const order of state.orders) {
       for (const audience of ['admin', this.audience(false, order.actor)]) {
+        const fulfillment = ensureFulfillment(order);
+        const incidentId = `${audience}:incident:${order.id}`;
+        const existingIncident = state.inbox.alerts.find(value => value.id === incidentId);
+        const pendingIncident = fulfillment.incident !== DemoIncidentKind.None && fulfillment.incident !== DemoIncidentKind.Unknown;
+        if (pendingIncident) {
+          const text = `${order.id} · ${fulfillment.incident.label}: ${fulfillment.incidentText}`;
+          if (existingIncident && (existingIncident.resolution === DemoAlertResolution.Resolved || existingIncident.text !== text)) { existingIncident.read = DemoAlertRead.Unread; existingIncident.created = now; }
+          add(`incident:${order.id}`, audience, DemoAlertCategory.Orders, text, false, order.id);
+          if (existingIncident) existingIncident.text = text;
+        } else if (existingIncident) existingIncident.resolution = DemoAlertResolution.Resolved;
         add(`payment:${order.id}`, audience, DemoAlertCategory.Orders, `${order.id} · Revisá el resultado del pago`, order.payment !== PaymentStatus.Pending, order.id);
         order.history.forEach((text, index) => add(`event:${order.id}:${index}`, audience, DemoAlertCategory.Orders, `${order.id} · ${text}`, true, order.id));
       }
     }
     for (const event of state.postSaleAlerts ?? []) for (const audience of ['admin', this.audience(false, event.actor)]) add(`return:${event.id}`, audience, DemoAlertCategory.PostSale, `${event.orderId} · ${event.text}`, true, event.orderId);
     for (const product of state.products) for (const variant of product.variants ?? []) {
-      const available = variant.onHand - variant.reserved; const low = available < state.settings.lowStockThreshold;
+      const available = variant.onHand - variant.reserved; const low = product.active && variant.active && available < state.settings.lowStockThreshold;
       const existing = state.inbox.alerts.find(value => value.id === `admin:stock:${variant.id}`);
-      if (existing) existing.resolution = low ? DemoAlertResolution.Active : DemoAlertResolution.Resolved;
-      if (low && product.active && variant.active) add(`stock:${variant.id}`, 'admin', DemoAlertCategory.Stock, `${product.name} · ${variant.name}: ${available} disponibles`, false, undefined, product.sku);
+      const text = `${product.name} · ${variant.name}: ${available} disponibles`;
+      if (existing) {
+        if (low && (existing.resolution === DemoAlertResolution.Resolved || existing.text !== text)) { existing.read = DemoAlertRead.Unread; existing.created = now; }
+        existing.text = text;
+        existing.resolution = low ? DemoAlertResolution.Active : DemoAlertResolution.Resolved;
+      }
+      if (low) add(`stock:${variant.id}`, 'admin', DemoAlertCategory.Stock, text, false, undefined, product.sku);
     }
     for (const job of state.syncJobs ?? []) if (job.status === DemoSyncStatus.Failed || state.inbox.alerts.some(value => value.id === `admin:sync:${job.id}`)) add(`sync:${job.id}`, 'admin', DemoAlertCategory.Marketplace, `${job.sku} · Revisá la sincronización simulada`, job.status !== DemoSyncStatus.Failed, undefined, job.sku);
     for (const competitor of state.competitors) if (competitor.unread) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, true, undefined, competitor.sku);
