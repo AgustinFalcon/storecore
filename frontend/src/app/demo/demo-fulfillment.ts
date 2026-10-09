@@ -73,7 +73,7 @@ export class DemoFulfillmentPolicy {
     const fields = order.delivery?.method === DemoDeliveryMethod.Pickup ? [draft.store, draft.location, draft.hours, draft.pickupDeadline] : [draft.recipient, draft.phone, draft.carrier, draft.service];
     if (fields.some(field => typeof field !== 'string' || !field.trim()) || (order.delivery?.method === DemoDeliveryMethod.Pickup && !validPickupDate(draft.pickupDeadline))) throw new Error('Completá los datos de la modalidad de entrega.');
     for (const key of ['recipient', 'phone', 'carrier', 'service', 'store', 'location', 'hours', 'pickupDeadline'] as const) value[key] = draft[key].trim();
-    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `${value.store} · ${value.location} · ${value.hours}`; order.delivery.destination = order.address; }
+    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `Retiro en ${value.store} · ${value.location} · ${value.hours}`; order.delivery.destination = order.address; }
   }
   apply(order: DemoOrder, action: DemoFulfillmentAction, note: string, pickupDeadline?: string): string | undefined {
     const value = ensureFulfillment(order);

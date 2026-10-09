@@ -136,7 +136,7 @@ export class DemoCommerce {
     order.method = method;
     if (deliveryMethod) { order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? this.snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? 'Comercio de muestra · Retiro con DNI y número de pedido' : `${address!.street} · ${address!.city} · CP ${address!.postal}` }; order.address = order.delivery.destination; order.total += order.delivery.cost; }
     const fulfillment = ensureFulfillment(order); fulfillment.recipient = `${actor.firstName} ${actor.lastName}`; fulfillment.phone = actor.phone;
-    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `${fulfillment.store} · ${fulfillment.location} · ${fulfillment.hours}`; order.delivery.destination = order.address; }
+    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `Retiro en ${fulfillment.store} · ${fulfillment.location} · ${fulfillment.hours}`; order.delivery.destination = order.address; }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
     this.snapshot.orders.push(order); actor.cart = []; this.commit(approved); return order;
   }
