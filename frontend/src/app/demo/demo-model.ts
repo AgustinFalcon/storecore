@@ -97,9 +97,10 @@ export class DemoCommerce {
   available(sku: string): number { const product = this.product(sku); return product.onHand - product.reserved; }
   price(sku: string): number { const product = this.product(sku); const offer = this.snapshot.campaigns.find(value => value.sku === sku && value.active && value.from <= this.now().slice(0, 10) && value.until >= this.now().slice(0, 10)); return offer ? Math.round(product.price * (100 - offer.percent) / 100) : product.price; }
   setQuantity(actorId: string, sku: string, quantity: number): void {
-    if (!Number.isInteger(quantity) || quantity < 0 || quantity > this.available(sku)) throw new Error('La cantidad supera el stock disponible.');
+    if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad. Para quitar el producto usá Quitar.');
+    if (quantity > this.available(sku)) throw new Error('La cantidad supera el stock disponible.');
     const actor = this.actor(actorId); const existing = actor.cart.find(line => line.sku === sku);
-    if (quantity === 0) actor.cart = actor.cart.filter(line => line.sku !== sku); else if (existing) existing.quantity = quantity; else actor.cart.push({ sku, quantity, variant: DemoProductVariant.Standard });
+    if (existing) existing.quantity = quantity; else actor.cart.push({ sku, quantity, variant: DemoProductVariant.Standard });
     this.commit();
   }
   add(actorId: string, sku: string, quantity: number, variant = DemoProductVariant.Standard): void {
@@ -160,6 +161,7 @@ export class DemoCommerce {
     for (const job of this.snapshot.syncJobs ?? []) { if (job.status === DemoSyncStatus.Confirmed || job.status === DemoSyncStatus.Unknown || job.status === DemoSyncStatus.Superseded) continue; const listing = this.snapshot.listings.find(value => value.sku === job.sku); if (!listing?.linked) continue; if (job.desired !== listing.desired) { job.status = DemoSyncStatus.Superseded; continue; } job.status = fail ? DemoSyncStatus.Failed : DemoSyncStatus.Confirmed; listing.error = fail; if (!fail) { listing.observed = job.desired; listing.confirmed = job.desired; } }
     this.commit();
   }
+  remove(actorId: string, sku: string): void { const actor = this.actor(actorId); const remaining = actor.cart.filter(line => line.sku !== sku); if (remaining.length === actor.cart.length) return; actor.cart = remaining; this.commit(); }
   watchCompetitor(name: string, sku: string, threshold: number): void { this.product(sku); if (!name.trim() || !Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new Error('Indicá nombre, producto y umbral entre 1 y 100%.'); this.snapshot.competitors.push({ id: this.id(), name: name.trim(), sku, threshold, enabled: true, price: this.price(sku), history: [this.price(sku)], unread: false }); this.commit(); }
   competitorPrice(id: string, price: number): void { const competitor = this.snapshot.competitors.find(value => value.id === id); if (!competitor || !Number.isSafeInteger(price) || price < 100) throw new Error('Indicá un precio de muestra válido.'); const percent = Math.abs(price - competitor.price) * 100 / competitor.price; competitor.price = price; competitor.history.push(price); if (competitor.enabled !== false && percent >= (competitor.threshold ?? 1)) competitor.unread = true; this.commit(); }
   saveSettings(settings: DemoSettings): void { if (![settings.homepageItems, settings.lowStockThreshold, settings.deliveryDays, settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(settings.trackingPrefix)) throw new Error('Indicá valores enteros de 1 a 30 y un prefijo de seguimiento de 2–12 letras/números.'); this.snapshot.settings = { ...settings }; this.commit(); }
