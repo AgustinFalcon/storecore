@@ -20,7 +20,8 @@
           },
           "configurations": {
             "production": { "outputHashing": "all" },
-            "development": { "optimization": false, "sourceMap": true }
+            "development": { "optimization": false, "sourceMap": true },
+            "demo": { "browser": "src/main.demo.ts", "index": { "input": "src/index.demo.html", "output": "index.html" }, "tsConfig": "tsconfig.demo.json", "optimization": false, "sourceMap": true, "preserveSymlinks": true, "outputPath": "dist/storecore-demo" }
           },
           "defaultConfiguration": "production"
         },
@@ -31,7 +32,8 @@
           },
           "configurations": {
             "production": { "buildTarget": "storecore-frontend:build:production" },
-            "development": { "buildTarget": "storecore-frontend:build:development" }
+            "development": { "buildTarget": "storecore-frontend:build:development" },
+            "demo": { "buildTarget": "storecore-frontend:build:demo", "proxyConfig": "proxy.demo.json" }
           },
           "defaultConfiguration": "development"
         },

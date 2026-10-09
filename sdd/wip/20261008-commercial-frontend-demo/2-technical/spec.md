@@ -2,6 +2,10 @@
 
 ## Composición y aislamiento
 
+### Adaptación aprobada de composición — 2026-10-08
+
+La composición demo usa `src/main.demo.ts`, `index.demo.html` y rutas bajo `/demo` con shell comercial dedicado. La composición HTTP permanece íntegra en `src/main.ts`/`app.config.ts`; no se agrega fallback. Se reutilizan los tipos canónicos OrderStatus, PaymentStatus y ShipmentStatus. Las operaciones nuevas de demostración usan `DemoCommerce` y `DemoApplicationState`, porque los puertos heredados no expresan quitar/editar carrito, ajustar inventario o simular ventas ML. Esto reemplaza la obligación de forzar adaptadores a cada puerto existente y de reutilizar cada componente de presentación. No hay HttpClient en el grafo demo ni dependencias a auth/cookies/CSRF productivos. El inventario de rutas original se conserva con prefijo `/demo`.
+
 Mantener `app.config.ts` HTTP por defecto. Crear entrada/configuración Angular demo explícita (comando dedicado y composición de providers) que vincula todos los tokens de repositorio actuales a adaptadores demo: ACCESS, HEALTH, CATALOG, CUSTOMER, CART, ORDER, USER y OFFER. Revisar además cualquier HttpClient directo: la demo no puede escapar a red mediante un servicio no sustituido. Un único `DemoApplicationState` y coordinador de transacciones sirven a todos los repositorios; no una copia independiente por pantalla.
 
 Las rutas existentes, guards, casos de uso y componentes se reutilizan. Si una capacidad aún carece de puerto, definir contrato frontend pequeño y adaptador demo; producción la presenta según su soporte real, sin endpoint inventado ni éxito falso. Configuración demo no puede activarse por query string, error HTTP, usuario o localStorage del build productivo. Banner y selector/reset de escenarios solo en composición demo. Assets locales; tests bloquean cualquier request API/proveedor externo en demo. Build producción verifica que no selecciona providers demo.
