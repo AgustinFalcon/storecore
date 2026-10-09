@@ -15,7 +15,7 @@
     "test:a11y": "playwright test",
     "test:ua-real": "node scripts/run-ua-real-e2e.mjs",
     "check:ua-real": "node --check scripts/run-ua-real-e2e.mjs && node --check scripts/ua-real-database.mjs && node --check scripts/cfe-official-provider.mjs && tsc -p tsconfig.ua-real.json && playwright test --config playwright.ua-real.config.ts --list",
-    "lint": "eslint src",
+    "lint": "eslint src e2e demo-e2e playwright.demo.config.ts",
     "check:architecture": "node --test scripts/domain-boundary.test.mjs && node scripts/check-architecture.mjs",
     "verify": "npm run check:architecture && npm run lint && npm run test && npm run build"
   },
