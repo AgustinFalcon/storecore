@@ -242,6 +242,7 @@ export class DemoCommerce {
     const { order, request } = this.returnRequest(orderId, returnId);
     if (new DemoReturnDecision().apply(request, approve, note)) this.postSaleEvent(order, request, `${request.status.label}: ${request.note}`);
   }
+  cancelReturn(actorId: string, orderId: string, returnId: string): void { const { order, request } = this.returnRequest(orderId, returnId); if (order.actor !== actorId) throw new Error('Sólo el comprador del pedido puede cancelar su solicitud.'); if (request.status === DemoReturnStatus.Cancelled) return; if (request.status !== DemoReturnStatus.Requested) throw new Error('La solicitud ya fue procesada; no se puede cancelar.'); request.status = DemoReturnStatus.Cancelled; this.postSaleEvent(order, request, request.status.label); }
   inspectReturn(orderId: string, returnId: string, outcomes: { variantId: string; disposition: DemoReturnDisposition }[]): void {
     const { order, request } = this.returnRequest(orderId, returnId);
     // Validate all variants before any mutation so a missing/invalid catalog cannot partially restock.

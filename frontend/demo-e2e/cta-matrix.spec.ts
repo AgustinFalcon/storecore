@@ -10,6 +10,7 @@ const executed = new Set<string>();
 
 test('commercial payment shipping channel tabs and watchlist actions', async ({page}) => {
  test.setTimeout(120000); await login(page);
+ await path(page,'customer/orders'); await action(page,'return-queue-filter').selectOption('requested'); await expect(page.getByRole('region',{name:'Cola de postventa'})).toContainText('0 solicitudes'); await action(page,'return-queue-filter').selectOption('all');
  for(const id of ['account-profile','account-addresses','account-favorites','account-orders']) { await path(page,'customer/profile'); await action(page,id).click(); await expect(page.locator('main h1')).toBeVisible(); }
  await path(page,'catalog/DEMO-002'); await action(page,'related-DEMO-001').click();
  await action(page,'product-add-cart').click(); await path(page,'checkout'); await action(page,'checkout-destination').selectOption('home'); await page.getByRole('radio').check(); await action(page,'checkout-step-next').click(); await action(page,'checkout-delivery-method').selectOption('pickup'); await action(page,'checkout-step-next').click();

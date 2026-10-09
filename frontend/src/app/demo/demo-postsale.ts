@@ -15,12 +15,24 @@ export class DemoReturnStatus {
   static readonly Requested = new DemoReturnStatus('requested', 'Solicitud enviada');
   static readonly Approved = new DemoReturnStatus('approved', 'Aprobada · esperamos los productos');
   static readonly Rejected = new DemoReturnStatus('rejected', 'Solicitud rechazada');
+  static readonly Cancelled = new DemoReturnStatus('cancelled', 'Solicitud cancelada por el comprador');
   static readonly Inspected = new DemoReturnStatus('inspected', 'Inspeccionada · reintegro pendiente');
   static readonly Refunded = new DemoReturnStatus('refunded', 'Reembolso simulado completado');
   static readonly Legacy = new DemoReturnStatus('legacy', 'Devolución histórica · requiere conciliación');
   static readonly Unknown = new DemoReturnStatus('', 'Estado desconocido · requiere recuperación');
-  static fromWire(raw: unknown): DemoReturnStatus { return [this.Requested, this.Approved, this.Rejected, this.Inspected, this.Refunded, this.Legacy].find(value => value.wire === raw) ?? this.Unknown; }
-  get reservesQuantity(): boolean { return this !== DemoReturnStatus.Rejected; }
+  static fromWire(raw: unknown): DemoReturnStatus { return [this.Requested, this.Approved, this.Rejected, this.Cancelled, this.Inspected, this.Refunded, this.Legacy].find(value => value.wire === raw) ?? this.Unknown; }
+  get reservesQuantity(): boolean { return this !== DemoReturnStatus.Rejected && this !== DemoReturnStatus.Cancelled; }
+}
+export class DemoReturnQueueFilter {
+  private constructor(readonly wire: string, readonly label: string, readonly matches: (status: DemoReturnStatus) => boolean) {}
+  static readonly All = new DemoReturnQueueFilter('all', 'Todas las solicitudes', () => true);
+  static readonly Requested = new DemoReturnQueueFilter('requested', 'Pendientes de decisión', status => status === DemoReturnStatus.Requested);
+  static readonly Approved = new DemoReturnQueueFilter('approved', 'Esperando recepción', status => status === DemoReturnStatus.Approved);
+  static readonly Inspected = new DemoReturnQueueFilter('inspected', 'Reintegro pendiente', status => status === DemoReturnStatus.Inspected);
+  static readonly Closed = new DemoReturnQueueFilter('closed', 'Finalizadas', status => status === DemoReturnStatus.Refunded || status === DemoReturnStatus.Rejected || status === DemoReturnStatus.Cancelled);
+  static readonly Unknown = new DemoReturnQueueFilter('', 'Filtro desconocido', () => false);
+  static readonly all = [this.All, this.Requested, this.Approved, this.Inspected, this.Closed];
+  static fromWire(raw: unknown): DemoReturnQueueFilter { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 export class DemoReturnDisposition {
   private constructor(readonly wire: string, readonly label: string, readonly restock: boolean) {}
