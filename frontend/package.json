@@ -14,7 +14,7 @@
     "test": "ng test --watch=false",
     "test:a11y": "playwright test",
     "test:ua-real-local": "playwright test --config playwright.ua-real-local.config.ts",
-    "lint": "eslint src e2e ua-real-local playwright.ua-real-local.config.ts",
+    "lint": "eslint src e2e ua-real-local demo-e2e playwright.ua-real-local.config.ts playwright.demo.config.ts",
     "check:architecture": "node --test scripts/domain-boundary.test.mjs && node scripts/check-architecture.mjs",
     "verify": "npm run check:architecture && npm run lint && npm run test && npm run build"
   },

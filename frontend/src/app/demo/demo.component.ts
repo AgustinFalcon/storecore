@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario } from './demo-model';
+import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
@@ -18,8 +18,9 @@ export class DemoDialog {
   static readonly Adjustment = new DemoDialog('Ajustar inventario');
   static readonly Information = new DemoDialog('Información');
   static readonly Confirm = new DemoDialog('Confirmar operación');
+  static readonly Module = new DemoDialog('Configurar módulo');
   static readonly Unknown = new DemoDialog('Acción desconocida');
-  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm].find(value => value.label === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module].find(value => value.label === raw) ?? this.Unknown; }
 }
 export class CatalogSort {
   private constructor(readonly wire: string, readonly label: string, readonly compare: (left: DemoProduct, right: DemoProduct) => number) {}
@@ -66,6 +67,11 @@ export class DemoPageComponent {
   readonly Payment = PaymentStatus;
   readonly Shipment = ShipmentStatus;
   readonly sorts = CatalogSort.all;
+  readonly Gallery = DemoGalleryView;
+  readonly gallery = signal(DemoGalleryView.Front);
+  readonly variants = DemoProductVariant.all;
+  readonly variant = signal(DemoProductVariant.Standard);
+  readonly Module = DemoModuleId;
   readonly Math = Math;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
   readonly sampleManifest = JSON.stringify({ version: 1, title: 'Tu taller, mejor equipado' }, null, 2);
@@ -97,6 +103,9 @@ export class DemoPageComponent {
   profilePhone = this.state.actor.phone;
   contentTitle = this.state.data.title;
   contentSubtitle = this.state.data.subtitle;
+  contentBlocks: DemoContentBlock[] = this.state.data.blocks.map(block => ({ ...block }));
+  draftSettings: DemoSettings = { ...this.state.data.settings };
+  draftModule = DemoModuleId.Unknown;
   info = '';
   adjustmentSku = '';
   adjustmentDelta = 1;
@@ -107,17 +116,17 @@ export class DemoPageComponent {
   draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, active: true, from: '2026-10-08', until: '2027-12-31' };
   configName = 'Mi comercio';
   manifest = '';
-  removed: { sku: string; quantity: number } | null = null;
+  removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
   constructor() { this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); }
   get screen(): DemoScreen { return DemoScreen.fromWire(this.route.snapshot.data['screen']); }
   get allowed(): boolean { return this.screen.admin ? this.state.context() === DemoContext.Admin : !this.screen.privateCustomer || this.state.context() === DemoContext.Customer; }
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
   get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
-  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku) })); }
+  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku) + line.variant.extraUnit })); }
   get total(): number { return this.cartLines.reduce((sum, line) => sum + line.unit * line.quantity, 0); }
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
-  get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < 5); }
+  get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < this.state.data.settings.lowStockThreshold); }
   get favoriteProducts(): DemoProduct[] { return this.state.data.products.filter(product => this.favorite(product.sku)); }
   get adminProducts(): DemoProduct[] { return this.state.data.products.filter(product => !this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())); }
   listing(sku: string) { return this.state.data.listings.find(value => value.sku === sku); }
@@ -125,23 +134,25 @@ export class DemoPageComponent {
   changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.page.set(0); }
   movements(product: DemoProduct): void { const rows = this.state.data.movements.filter(value => value.sku === product.sku); this.information(rows.length ? rows.map(value => `${value.delta > 0 ? '+' : ''}${value.delta} unidades · ${value.reason}`).join('\n') : 'Sin movimientos posteriores al stock inicial de demostración.'); }
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
-  money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(value / 100); }
+  money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value / 100); }
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
   get draftPrice(): number { return this.draftProduct.price / 100; }
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
   clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(0); this.onlyAvailable.set(false); this.page.set(0); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
-  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity), `${product.name} agregado a tu carrito.`); }
+  selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
+  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
   setQuantity(sku: string, raw: number): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, Number(raw)), 'Carrito actualizado.'); }
   remove(sku: string): void { this.removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; this.setQuantity(sku, 0); }
-  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity), 'Producto restaurado.')) this.removed = null; }
+  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
-  context(context: DemoContext): void { this.state.login(context, this.email.includes('cliente2') ? 'cliente2' : 'cliente'); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
+  context(context: DemoContext): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; this.state.login(context, actor); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
   register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => { this.state.data.actors.push({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }); this.state.commerce.touch(); }, 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
   nextStep(): void { if (this.step() === CheckoutStep.Address && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección.'); return; } if (this.step() === CheckoutStep.Delivery && !this.delivery) { this.state.error.set('Seleccioná la entrega simulada.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
   checkout(): void { let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(this.state.actorId(), this.request, this.addressId, this.state.scenario()).id; }, 'Pedido registrado.')) { void this.router.navigate(['/demo/checkout/result', id]); } }
   resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
+  retryOrder(): void { const order = this.order; if (!order || order.payment !== PaymentStatus.Rejected) return; if (this.state.run(() => { for (const line of order.lines) this.state.commerce.add(this.state.actorId(), line.sku, line.quantity, line.variant); }, 'Productos recuperados en tu carrito.')) void this.router.navigate(['/demo/cart']); }
   open(dialog: DemoDialog): void { this.focusBeforeDialog = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.dialog.set(dialog); setTimeout(() => document.querySelector<HTMLDialogElement>('dialog')?.showModal()); }
   close(): void { document.querySelector<HTMLDialogElement>('dialog')?.close(); this.dialog.set(DemoDialog.None); this.focusBeforeDialog?.focus(); }
   information(text: string): void { this.info = text; this.open(DemoDialog.Information); }
@@ -156,7 +167,9 @@ export class DemoPageComponent {
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
-  saveContent(): void { if (!this.contentTitle.trim()) { this.state.error.set('Ingresá un título.'); return; } this.state.run(() => { this.state.data.title = this.contentTitle; this.state.data.subtitle = this.contentSubtitle; this.state.commerce.touch(); }, 'Contenido publicado en la tienda.'); }
+  saveContent(): void { if (!this.contentTitle.trim() || this.contentBlocks.some(block => !block.title.trim() || !block.body.trim())) { this.state.error.set('Completá el título de portada y el contenido de cada bloque.'); return; } this.state.run(() => { this.state.data.title = this.contentTitle; this.state.data.subtitle = this.contentSubtitle; this.state.data.blocks = this.contentBlocks.map(block => ({ ...block })); this.state.commerce.touch(); }, 'Contenido publicado en la tienda.'); }
+  cancelContent(): void { this.contentTitle = this.state.data.title; this.contentSubtitle = this.state.data.subtitle; this.contentBlocks = this.state.data.blocks.map(block => ({ ...block })); }
+  reorderContent(index: number, direction: number): void { const target = index + direction; if (target < 0 || target >= this.contentBlocks.length) return; const blocks = [...this.contentBlocks]; [blocks[index], blocks[target]] = [blocks[target], blocks[index]]; this.contentBlocks = blocks; }
   editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
   saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); }
   toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }
@@ -170,7 +183,9 @@ export class DemoPageComponent {
   saleML(sku: string): void { this.state.run(() => this.state.commerce.mlSale(sku, `ml-sale-${sku}`), 'Venta simulada registrada (repetir la misma operación no duplica stock).'); }
   simulateCompetitor(): void { this.state.run(() => { const competitor = this.state.data.competitors[0]; competitor.price = Math.max(100, competitor.price - 10000); competitor.history.push(competitor.price); competitor.unread = true; this.state.commerce.touch(); }, 'Nueva alerta de precio simulada.'); }
   acknowledge(): void { this.state.run(() => { this.state.data.competitors.forEach(value => value.unread = false); this.state.commerce.touch(); }, 'Alertas marcadas como leídas.'); }
-  moduleToggle(id: string): void { this.state.run(() => { const module = this.state.data.modules.find(value => value.id === id); if (module) module.enabled = !module.enabled; this.state.commerce.touch(); }, 'Preferencia demo guardada.'); }
+  moduleToggle(id: DemoModuleId): void { this.confirm(`Cambiar el estado de ${id.label} afecta sus operaciones simuladas.`, () => this.state.run(() => { const module = this.state.data.modules.find(value => value.id === id); if (!module || id === DemoModuleId.Unknown) throw new Error('Módulo desconocido.'); module.enabled = !module.enabled; this.state.commerce.touch(); }, 'Estado del módulo demo guardado.')); }
+  configureModule(id: DemoModuleId): void { this.draftModule = id; this.draftSettings = { ...this.state.data.settings }; this.open(DemoDialog.Module); }
+  saveModule(): void { if (this.draftModule === DemoModuleId.Unknown) { this.state.error.set('Módulo no reconocido.'); return; } if (this.state.run(() => this.state.commerce.saveSettings(this.draftSettings), `${this.draftModule.label}: configuración guardada.`)) this.close(); }
   validateManifest(): void { try { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string') throw new Error('El perfil requiere un título de comercio.'); this.information(`Perfil válido. Nuevo título: ${parsed.title}. La importación actualiza solamente el contenido de esta demo.`); } catch { this.state.error.set('El perfil no es JSON válido o le falta title.'); } }
   importManifest(): void { this.state.run(() => { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string' || !parsed.title.trim()) throw new Error('Perfil inválido.'); this.state.data.title = parsed.title; this.state.commerce.touch(); }, 'Perfil importado en la demo.'); }
   exportProfile(): void { const blob = new Blob([JSON.stringify({ version: 1, title: this.state.data.title, subtitle: this.state.data.subtitle }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'comercio-demo.json'; anchor.click(); URL.revokeObjectURL(url); }

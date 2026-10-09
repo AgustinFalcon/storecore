@@ -24,6 +24,20 @@ Se implementaron las 24 superficies: home/catálogo/PDP/carrito/checkout/resulta
 
 ### Límites y pendientes de cierre
 
-Este corte NO declara 100% de CTA accionados ni E01–E10 cerrados. E10 (reviews independientes) pendiente. La galería de PDP usa ilustración local única; variantes son una configuración por producto. Quedan refinamientos de galerías/variantes múltiples, composición/reordenamiento de bloques y configuración avanzada de módulos del inventario original. Se conservan como pendientes explícitos para iteración, sin botones vacíos que aparenten ejecutarlos.
+El primer corte no declaraba 100% de CTA accionados ni E01–E10 cerrados. Sus residuales de galería/variantes, bloques y configuración avanzada fueron implementados en el segundo corte descrito debajo. E10 (reviews independientes) continúa pendiente.
 
 HTTP Mock/UA E09 específico: NOT_RUN en este corte; sí full unit y build productivo. Backend FE04, proveedores reales, scraping/ML live, cobros, correo y fiscal: NOT_RUN/fuera de demo. No push, PR, merge ni deploy. No se declara homologación.
+
+## Segundo corte: funcionalidad y matriz exhaustiva de CTA
+
+Sobre `ba80ce0e2b0da865a7cbb068c9b28bca7a6403dd` se amplió la cobertura a cada CTA estático y cada CTA renderizado durante los escenarios. `cta-matrix.spec.ts` observa controles, registra click/change, reconcilia el código y falla si encuentra CTA sin escenario ejecutado; no se excluyen los controles nuevos para conseguir PASS.
+
+Galería frontal/detalle conserva selección y cambia la ilustración. Las presentaciones Estándar/Con estuche cambian precio, persisten en carrito y pedido y comparten explícitamente el stock del SKU físico; no afirman balances independientes de accesorios. La selección desconocida impide comprar. Los bloques de portada se editan y reordenan en borrador; guardar aplica el orden al storefront y cancelar descarta. Los módulos tienen identificador cerrado y editor propio: destacados/umbral stock, días entrega, prefijo tracking y filas ML. Guardar configura vistas/comportamiento; pausar requiere confirmación y bloquea las nuevas operaciones de su dominio. No activa servicios reales.
+
+Hallazgos corregidos durante la matriz: nombres accesibles de selects, reingreso del customer recién registrado, recuperar carrito de pago rechazado, import/archivo/direcciones/fulfillment con confirmación, variant/presentación persistida, precios con centavos visibles, productos archivados fuera de home/no comprables, snapshot con relaciones/configuración inválidas recuperable por reset, y runner de Playwright que finaliza y detiene su servidor Windows.
+
+Evidencia actual: full unit 300/300 (73 archivos); pruebas dirigidas demo 15/15; lint incluyendo demo-e2e/config PASS; arquitectura PASS; build demo 1.90 MB PASS. Playwright 14 escenarios cubren storefront, 24 rutas, todos los controles CRUD/cancel/confirm, filtros/paginación/favoritos, cinco resultados de checkout, fulfillment/RMA, actor isolation, ML sync/error/retry/venta/idempotencia, alertas, export, galerías/variantes, bloques/configuración y 390/768/1440 con axe 0. La matriz registra 285 CTA observados y 285 ejecutados, 100 CTA estáticos reconciliados y cero faltantes. Ver `executed-cta-matrix.json` y `frontend/demo-playwright-report/results.json` (artefacto local regenerable).
+
+Los controles deshabilitados de paginación y reordenamiento tienen límites/razones visibles; sus acciones se ejecutan al pasar a una posición válida. Los SKU agotados conservan recuperación por catálogo/alternativas y se prueban sin comprar stock inexistente. Las variantes opcionales toman el mismo balance del producto y precio adicional de presentación: configuración demo, no inventario productivo de accesorios.
+
+No se afirma homologación ni implementación backend. E10 review funcional/diseño/código/seguridad independiente sobre SHA final: pendiente del coordinador. HTTP/UA Mock específico permanece NOT_RUN en este corte, con suite unitaria productiva y build productivo preservados.
