@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 const cta = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
-async function login(page: Page, admin = false, email = 'cliente@demo.invalid') { await page.goto('/demo/login'); await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Contraseña', { exact: true }).fill('demo'); await cta(page, 'login-submit').click(); await cta(page, admin ? 'login-admin' : 'login-customer').click(); }
+async function login(page: Page, admin = false, email = 'cliente@demo.invalid') { await page.goto('/demo/login'); await page.getByLabel('Perfil comprador de muestra').selectOption(email); await page.getByLabel('Contraseña', { exact: true }).fill('demo'); await cta(page, 'login-submit').click(); await cta(page, admin ? 'login-admin' : 'login-customer').click(); }
 async function audit(page: Page) { expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true); expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]); }
 const families = ['fulfillment-details', 'fulfillment-save', 'fulfillment-note', 'fulfillment-dispatch', 'fulfillment-failed-attempt', 'fulfillment-retry', 'fulfillment-deliver', 'fulfillment-ready', 'fulfillment-no-show', 'fulfillment-extend', 'fulfillment-new-deadline', 'fulfillment-collect', 'fulfillment-resolution', 'fulfillment-resolve', 'inbox-filter', 'inbox-read-all', 'inbox-preferences', 'inbox-preference-orders', 'inbox-preference-post-sale', 'inbox-preference-stock', 'inbox-preference-marketplace', 'inbox-read', 'inbox-open'];
 const executed = new Set<string>();
