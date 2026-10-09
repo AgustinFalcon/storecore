@@ -10,6 +10,6 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   if (!ready) throw new Error('Demo server did not start.');
-  const tests = spawn(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.demo.config.ts'], { stdio: 'inherit', env: { ...process.env, STORECORE_DEMO_EXTERNAL_SERVER: '1' } });
+  const tests = spawn(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.demo.config.ts', ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, STORECORE_DEMO_EXTERNAL_SERVER: '1' } });
   process.exitCode = await new Promise(resolve => tests.on('exit', code => resolve(code ?? 1)));
 } finally { stop(); }

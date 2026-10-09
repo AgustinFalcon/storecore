@@ -9,3 +9,5 @@ Por cada escenario guardar: corte/criterio, SHA, fixture/reset, rol, ruta/tab/CT
 El trabajo backend previo no se retoma en este WIP. Su handoff y gates permanecen en el worktree `storecore-int-fe04-commerce-backend`; el frontend simulado no los cierra. Revisar estado/commit allí antes de continuar backend.
 
 FE-COMP-02: implementado localmente con evidencia de producto/variantes/carrito/snapshots en [fe-comp02-evidence.md](fe-comp02-evidence.md). Estado `implemented_local_pending_review`; no cierra la feature ni las revisiones independientes/CI/merge. FE-COMP-03..06 continúan pendientes.
+
+FE-COMP-03: implementado localmente sobre C02 con solicitudes/cancelación de comprador, cola filtrada, decisión, inspección por línea, reposición apta y reembolso parcial idempotente. Evidencia y límites en [fe-comp03-evidence.md](fe-comp03-evidence.md). Estado `implemented_local_pending_independent_review_and_ci`. No cierra G-U/CI ni homologación real. FE-COMP-04..06 continúan pendientes.
