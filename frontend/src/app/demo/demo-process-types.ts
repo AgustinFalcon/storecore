@@ -45,4 +45,4 @@ export class DemoSyncStatus {
 }
 export interface DemoDeliverySnapshot { method: DemoDeliveryMethod; cost: number; days: number; destination: string; }
 export interface DemoSyncJob { id: string; sku: string; desired: number; status: DemoSyncStatus; created: string; }
-export interface DemoCompetitor { id: string; name: string; price: number; history: number[]; unread: boolean; sku?: string; threshold?: number; enabled?: boolean; }
+export interface DemoCompetitor { id: string; name: string; price: number; history: number[]; unread: boolean; sku?: string; threshold?: number; enabled?: boolean; details?: import('./demo-marketplace').DemoCompetitorDetails; }

@@ -2,6 +2,7 @@ import type { DemoSnapshot } from './demo-model';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { DemoSyncStatus } from './demo-process-types';
 import { DemoIncidentKind, ensureFulfillment } from './demo-fulfillment';
+import { ensureCompetitorDetails } from './demo-marketplace';
 
 export class DemoAlertCategory {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -81,8 +82,8 @@ export class DemoInboxPolicy {
       if (low) add(`stock:${variant.id}`, 'admin', DemoAlertCategory.Stock, text, false, undefined, product.sku);
     }
     for (const job of state.syncJobs ?? []) if (job.status === DemoSyncStatus.Failed || state.inbox.alerts.some(value => value.id === `admin:sync:${job.id}`)) add(`sync:${job.id}`, 'admin', DemoAlertCategory.Marketplace, `${job.sku} · Revisá la sincronización simulada`, job.status !== DemoSyncStatus.Failed, undefined, job.sku);
-    for (const competitor of state.competitors) if (competitor.unread) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, true, undefined, competitor.sku);
-    state.version = 4;
+    for (const competitor of state.competitors) { const details = ensureCompetitorDetails(competitor, state); for (const signal of details.signals) add(`competitor:${competitor.id}:${signal.operation}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra ${signal.percent.toFixed(1)}%`, false, undefined, competitor.sku); if (competitor.unread && !details.signals.length) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, false, undefined, competitor.sku); }
+    if (state.marketplace) state.version = 5;
   }
 }
 export function decodeInbox(state: DemoSnapshot): void {

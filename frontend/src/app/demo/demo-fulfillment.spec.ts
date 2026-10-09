@@ -59,7 +59,7 @@ describe('fulfillment by modality and persistent notification ownership', () => 
   });
   it('unknown values close commands and legacy snapshot migrates without losing completed post-sale eligibility', () => {
     expect(Phase.fromWire('invented')).toBe(Phase.Unknown); expect(Action.fromWire('invented')).toBe(Action.Unknown); expect(Incident.fromWire('invented')).toBe(Incident.Unknown);
-    const snapshot = demoSeed(); const restored = decodeSnapshot(JSON.stringify(snapshot)); expect(restored.version).toBe(4); expect(ensureFulfillment(restored.orders[2]).phase).toBe(Phase.Delivered);
+    const snapshot = demoSeed(); const restored = decodeSnapshot(JSON.stringify(snapshot)); expect(restored.version).toBe(5); expect(ensureFulfillment(restored.orders[2]).phase).toBe(Phase.Delivered);
     restored.orders[0].fulfillment!.phase = Phase.Unknown; expect(new DemoFulfillmentPolicy().actions(restored.orders[0])).toEqual([]);
     restored.orders[0].fulfillment!.phase = Phase.Collected; expect(() => decodeSnapshot(JSON.stringify(restored))).toThrow('modalidad');
   });
