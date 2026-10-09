@@ -1,5 +1,35 @@
 # FE-COMP-04 — modalidades de entrega e inbox persistido
 
+## Rebase modular — 2026-10-20
+
+Este corte se rebasa sobre `4c4f6ac` (#187/#188). Los SHA, totales y artefactos del
+2026-10-09 debajo son evidencia histórica del árbol anterior, no de este rebase.
+No se reintroducen `demo-catalog.ts`, `demo-postsale.ts` ni sus suites monolíticas.
+La fachada demo que conserva la base recibe sólo cambios de entrega/alertas; la
+composición general de los módulos y la UI de postventa pertenecen al corte de
+integración posterior. El snapshot de esa fachada admite v1/v4; no se afirma
+migración del viejo esquema monolítico v2/v3 sobre los contratos modulares.
+
+Fulfillment depende de un contrato mínimo compatible con checkout modular. Inbox
+acepta el catálogo actual, calcula disponibilidad mediante `DemoCatalogQuery`
+(incluye `notSellable`), respeta `ProductPublication`/`VariantSaleState`, identifica
+stock por SKU más variante y consume postventa mediante `actorId`. Los tipos,
+decoders y correcciones de inventario/postventa de la base no se modifican.
+La suite focal cubre el refresh de stock con el catálogo actual y la elegibilidad
+de devolución/aislamiento de alertas con el fixture de postventa modular.
+
+Validación local de este rebase: `tsc` app/spec PASS; lint PASS; arquitectura 6/6 y
+scan PASS; suite Angular completa 372/372 en 85 archivos PASS; fulfillment focal
+9/9 PASS; builds producción/demo PASS. Browser focal: 7/7 PASS en
+390/768/1440, incluye 23 familias CTA sin faltantes y Axe sin violaciones.
+Regresión browser completa: 31/31 PASS, 0 skipped/flaky/unexpected, 2.5 minutos;
+reporte local en `frontend/demo-playwright-report/results.json`. Las herramientas
+Angular/Chromium se ejecutaron fuera del sandbox por errores de acceso del
+compilador; dependencias compartidas mediante junction local temporal, sin
+instalación ni cambio de lockfile. No se hizo push, deploy, merge ni CI remoto.
+
+## Evidencia histórica del corte original
+
 Fecha: 2026-10-09. Base C03: `66930542814791973ba16b1b023c4f607fd362d7`. Código final de producto: `c4c01e270a974e7e6bc40da179a28a5ea37f7c05`, rama `integration/storecore-comp04-fulfillment-alerts`. Dominio/comportamiento probado en `0c9f5bd4aaa9cf24ff452393de54defdeec2df11`; el commit `c4c01e2` sólo reordena las tarjetas debajo del título y quita un timeline duplicado, sin cambiar selectores ni dominio. Estado: `implemented_local_pending_independent_review_and_ci`. El commit documental posterior no cambia producto.
 
 ## Comportamiento
@@ -30,3 +60,7 @@ La matriz CTA previa acredita sus controles anteriores; el observador excluye ex
 Hallazgos de ejecución corregidos: etiquetas generales de envío incompatibles con expectativas existentes (se preservaron las etiquetas de domicilio y sólo se diferenciaron fases de retiro), un selector de prueba que capturaba marcar-todas en lugar de una fila, ruta admin de prueba incompleta, y contraste insuficiente heredado en cabecera de tabla/métricas (ajustado a `#435b6d`). Corrida intermedia: 43/44 browser PASS, único fallo pendiente era contraste de métricas; no se representa como ejecución final aprobada.
 
 Artefactos locales: `frontend/demo-playwright-report/results.json` contiene la corrida focal final; `comp04-full-0c9f5bd.json` preserva la completa. `frontend/test-results/fulfillment-*/` contiene capturas y adjuntos CTA/datos finales. El runner cerró Chromium y servidor 4390; check posterior: **0 listeners en 4390**, y `subst` sin unidades temporales activas. Estos artefactos no prueban integración real de pagos/envíos/ML ni homologación.
+
+## Correcciones P2 de revisión independiente
+
+El acceso heredado `order-incident-resolve` sólo enfoca el formulario de respuesta; resolver exige texto explícito en UI y dominio. Las incidencias vigentes generan alertas activas por contexto. Una nueva consulta vuelve a no leída y conserva el historial. Las alertas de stock actualizan cantidad y texto, y un cambio o nuevo episodio se reabre como no leído. La suite unitaria posterior acredita estos casos; la navegación de regresión queda pendiente de correr sobre este delta.

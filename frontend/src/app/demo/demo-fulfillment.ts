@@ -2,7 +2,13 @@ import { ShipmentStatus } from '../domain/order/shipment-status';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { OrderStatus } from '../domain/order/order-status';
 import { DemoDeliveryMethod } from './demo-process-types';
-import type { DemoOrder } from './demo-model';
+import type { DemoDeliverySnapshot } from './demo-process-types';
+/** Shared delivery contract implemented by both the legacy facade and modular checkout. */
+export interface DemoFulfillmentOrder {
+  id: string; actor: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus;
+  address: string; tracking: string; history: string[]; delivery?: DemoDeliverySnapshot;
+  incident?: string; fulfillment?: DemoFulfillment;
+}
 export const DEMO_PICKUP_POINT = Object.freeze({ store: 'StoreCore · sucursal Centro', location: 'Av. de muestra 123, Buenos Aires', hours: 'Lunes a viernes de 9 a 18 h' });
 
 export class DemoFulfillmentPhase {
@@ -18,7 +24,7 @@ export class DemoFulfillmentPhase {
   get complete(): boolean { return this === DemoFulfillmentPhase.Delivered || this === DemoFulfillmentPhase.Collected; }
 }
 export class DemoFulfillmentAction {
-  private constructor(readonly wire: string, readonly label: string, readonly needsNote: boolean, readonly execute: (order: DemoOrder, value: DemoFulfillment, note: string, deadline?: string) => void) {}
+  private constructor(readonly wire: string, readonly label: string, readonly needsNote: boolean, readonly execute: (order: DemoFulfillmentOrder, value: DemoFulfillment, note: string, deadline?: string) => void) {}
   static readonly Dispatch = new DemoFulfillmentAction('dispatch', 'Despachar envío', false, (order, value) => { value.phase = DemoFulfillmentPhase.Transit; order.shipment = ShipmentStatus.Shipped; });
   static readonly Deliver = new DemoFulfillmentAction('deliver', 'Confirmar entrega en domicilio', false, (order, value) => { value.phase = DemoFulfillmentPhase.Delivered; value.attempts++; order.shipment = ShipmentStatus.Delivered; });
   static readonly FailedAttempt = new DemoFulfillmentAction('failed-attempt', 'Registrar intento fallido', true, (_, value, note) => { value.attempts++; value.incident = DemoIncidentKind.Delivery; value.incidentText = note; });
@@ -47,7 +53,7 @@ export interface DemoFulfillment {
   lastAction?: DemoFulfillmentAction; lastNote?: string; lastDeadline?: string;
 }
 function validPickupDate(value: string): boolean { const date = new Date(`${value}T12:00:00.000Z`); return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value; }
-export function ensureFulfillment(order: DemoOrder): DemoFulfillment {
+export function ensureFulfillment(order: DemoFulfillmentOrder): DemoFulfillment {
   if (order.fulfillment) return order.fulfillment;
   const pickup = order.delivery?.method === DemoDeliveryMethod.Pickup;
   const phase = order.shipment === ShipmentStatus.Preparing ? DemoFulfillmentPhase.Preparing : order.shipment === ShipmentStatus.Shipped ? (pickup ? DemoFulfillmentPhase.Ready : DemoFulfillmentPhase.Transit) : order.shipment === ShipmentStatus.Delivered ? (pickup ? DemoFulfillmentPhase.Collected : DemoFulfillmentPhase.Delivered) : DemoFulfillmentPhase.Unknown;
@@ -55,7 +61,7 @@ export function ensureFulfillment(order: DemoOrder): DemoFulfillment {
 }
 /** One policy is shared by admin commands and buyer presentation. Incidents never replace delivery phase. */
 export class DemoFulfillmentPolicy {
-  actions(order: DemoOrder): DemoFulfillmentAction[] {
+  actions(order: DemoFulfillmentOrder): DemoFulfillmentAction[] {
     const value = ensureFulfillment(order); const method = order.delivery?.method ?? DemoDeliveryMethod.Home;
     if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase === DemoFulfillmentPhase.Unknown || value.incident === DemoIncidentKind.Unknown || value.lastAction === DemoFulfillmentAction.Unknown || method === DemoDeliveryMethod.Unknown || value.phase.complete) return [];
     if (method === DemoDeliveryMethod.Home) {
@@ -67,7 +73,7 @@ export class DemoFulfillmentPolicy {
     }
     return [];
   }
-  configure(order: DemoOrder, draft: DemoFulfillment): void {
+  configure(order: DemoFulfillmentOrder, draft: DemoFulfillment): void {
     const value = ensureFulfillment(order);
     if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase !== DemoFulfillmentPhase.Preparing || value.incident === DemoIncidentKind.Unknown || order.delivery?.method === DemoDeliveryMethod.Unknown) throw new Error('Los datos de entrega sólo se editan antes de preparar el despacho o retiro.');
     const fields = order.delivery?.method === DemoDeliveryMethod.Pickup ? [draft.store, draft.location, draft.hours, draft.pickupDeadline] : [draft.recipient, draft.phone, draft.carrier, draft.service];
@@ -75,7 +81,7 @@ export class DemoFulfillmentPolicy {
     for (const key of ['recipient', 'phone', 'carrier', 'service', 'store', 'location', 'hours', 'pickupDeadline'] as const) value[key] = draft[key].trim();
     if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `Retiro en ${value.store} · ${value.location} · ${value.hours}`; order.delivery.destination = order.address; }
   }
-  apply(order: DemoOrder, action: DemoFulfillmentAction, note: string, pickupDeadline?: string): string | undefined {
+  apply(order: DemoFulfillmentOrder, action: DemoFulfillmentAction, note: string, pickupDeadline?: string): string | undefined {
     const value = ensureFulfillment(order);
     if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase === DemoFulfillmentPhase.Unknown || value.incident === DemoIncidentKind.Unknown || value.lastAction === DemoFulfillmentAction.Unknown || order.delivery?.method === DemoDeliveryMethod.Unknown) throw new Error('El seguimiento requiere conciliación antes de continuar.');
     if (action !== DemoFulfillmentAction.Unknown && value.lastAction === action && value.lastNote === note.trim() && value.lastDeadline === (pickupDeadline ?? '')) return;
@@ -87,7 +93,7 @@ export class DemoFulfillmentPolicy {
     return `${action.label} · ${value.phase.label}${note.trim() ? ` · ${note.trim()}` : ''}`;
   }
 }
-export function decodeFulfillment(order: DemoOrder): void {
+export function decodeFulfillment(order: DemoFulfillmentOrder): void {
   const value = ensureFulfillment(order);
   value.phase = DemoFulfillmentPhase.fromWire(value.phase?.wire); value.incident = DemoIncidentKind.fromWire(value.incident?.wire);
   if (value.lastAction) value.lastAction = DemoFulfillmentAction.fromWire(value.lastAction.wire);

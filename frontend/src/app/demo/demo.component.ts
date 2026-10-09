@@ -1,7 +1,8 @@
 import { DemoFulfillmentComponent } from './demo-fulfillment.component';
 import { DemoInboxComponent } from './demo-inbox.component';
 import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
-import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
+import { Component, computed, inject, signal, DestroyRef, ViewChild } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -64,6 +65,7 @@ export class DemoRootComponent {
 
 @Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoFulfillmentComponent, DemoInboxComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
+  @ViewChild(DemoFulfillmentComponent) private fulfillment?: DemoFulfillmentComponent;
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -193,8 +195,9 @@ export class DemoPageComponent {
   cancelProcessing(): void { clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Cancelled); }
   cancelPayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
   saveIncident(): void { const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
-  resolveIncident(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolveIncident(order.id), 'Incidencia resuelta.'); }
+  resolveIncident(): void { this.fulfillment?.requestResolution(); }
   receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? DemoPaymentMethod.Card.label}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
+
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
   resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
