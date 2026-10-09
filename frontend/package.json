@@ -7,6 +7,9 @@
   },
   "scripts": {
     "start": "ng serve",
+    "start:demo": "ng serve --configuration demo --host 127.0.0.1 --port 4200",
+    "build:demo": "ng build --configuration demo",
+    "test:demo": "npm run build:demo && node demo-e2e/run.mjs",
     "build": "ng build",
     "test": "ng test --watch=false",
     "test:a11y": "playwright test",
