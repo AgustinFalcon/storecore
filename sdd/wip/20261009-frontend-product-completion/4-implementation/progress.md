@@ -1,5 +1,7 @@
 # Evidencia inicial
 
+FE-COMP-05: acceso de muestra explícito, intención local validada con ownership, recuperación simulada en memoria, validación de formularios y administración con filtros/orden/paginación. Evidencia en [fe-comp05-evidence.md](fe-comp05-evidence.md): 347 unitarias y build demo finales PASS; lint/arquitectura PASS; seis browser C05 PASS durante desarrollo. Regresión final de 52 browser pendiente; runners detenidos al coordinar puerto con C06. No cambia esquema ni versión de snapshot V4. Estado `implemented_local_pending_full_browser_independent_review_and_ci`; no es aceptación global ni cierre de homologación.
+
 2026-10-09: inspección estática de `db377fa` y documentación de FE-COMP-01..06. No se ejecutó producto, no hay nuevos resultados browser/build/CI ni revisión aprobada. Implementación: pendiente. Gates G-D/T/B/U/R: `NOT_RUN` salvo validación estructural documental que se registre explícitamente tras ejecutarla.
 
 Validación documental local 2026-10-09: `tasks.json` parseado con PowerShell `ConvertFrom-Json`; seis IDs únicos, dependencias existentes ordenadas sin ciclos y los 16 criterios de aceptación referidos presentes en el spec funcional: PASS. Este check de estructura no aprueba G-D ni acredita comportamiento del producto.

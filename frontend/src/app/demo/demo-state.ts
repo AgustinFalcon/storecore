@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { DemoCommerce, DemoContext, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoInboxPolicy } from './demo-inbox';
+import { DemoAccessIntent } from './demo-access';
 
 const STORAGE_KEY = 'storecore.commercial-demo.v1';
 @Injectable({ providedIn: 'root' })
@@ -34,7 +35,9 @@ export class DemoApplicationState {
       this.revision.update(value => value + 1); this.message.set(result); return true;
     } catch (error) { this.commerce.snapshot = decodeSnapshot(before); this.revision.update(value => value + 1); this.error.set(error instanceof Error ? error.message : 'No se pudo completar la operación.'); return false; }
   }
-  login(context: DemoContext, actor = 'cliente'): void { this.actorId.set(actor); this.context.set(context); sessionStorage.setItem('storecore.demo.context', context.wire); sessionStorage.setItem('storecore.demo.actor', actor); this.error.set(''); }
+  rememberIntent(path: string): void { const intent=DemoAccessIntent.fromWire(path); if(intent!==DemoAccessIntent.Unknown) sessionStorage.setItem('storecore.demo.intent',intent.path); }
+  consumeIntent(): string { const intent=DemoAccessIntent.fromWire(sessionStorage.getItem('storecore.demo.intent')); sessionStorage.removeItem('storecore.demo.intent'); return intent.destination(this.data,this.actorId(),this.context()); }
+  login(context: DemoContext, actor = 'cliente'): void { if(context===DemoContext.Unknown||!this.data.actors.some(value=>value.id===actor)) throw new Error('Elegí un contexto y perfil de muestra válidos.'); this.actorId.set(actor); this.context.set(context); sessionStorage.setItem('storecore.demo.context', context.wire); sessionStorage.setItem('storecore.demo.actor', actor); this.error.set(''); }
   logout(): void { this.context.set(DemoContext.Unknown); sessionStorage.removeItem('storecore.demo.context'); sessionStorage.removeItem('storecore.demo.actor'); this.message.set('Sesión demo cerrada.'); }
   reset(): void {
     try {
