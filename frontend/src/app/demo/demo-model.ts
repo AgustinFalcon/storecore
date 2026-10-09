@@ -177,7 +177,7 @@ export class DemoCommerce {
     if (deliveryMethod) { order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? this.snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? 'Comercio de muestra · Retiro con DNI y número de pedido' : `${address!.street} · ${address!.city} · CP ${address!.postal}` }; order.address = order.delivery.destination; order.total += order.delivery.cost; }
     if (!Number.isSafeInteger(order.total)) throw new Error('El importe supera el límite de precisión permitido. Revisá precios y cantidades.');
     const fulfillment = ensureFulfillment(order); fulfillment.recipient = `${actor.firstName} ${actor.lastName}`; fulfillment.phone = actor.phone;
-    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `${fulfillment.store} · ${fulfillment.location} · ${fulfillment.hours}`; order.delivery.destination = order.address; }
+    if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `Retiro en ${fulfillment.store} · ${fulfillment.location} · ${fulfillment.hours}`; order.delivery.destination = order.address; }
     for (const line of lines) { if (approved) { this.stockLine(line, -line.quantity, 0); this.snapshot.movements.push({ id: `${order.id}-${line.variantId}`, sku: line.sku, variantId: line.variantId, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) this.stockLine(line, 0, line.quantity); }
     this.snapshot.orders.push(order); actor.cart = []; this.commit(approved); return order;
   }
