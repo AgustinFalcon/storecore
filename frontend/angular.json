@@ -21,7 +21,7 @@
           "configurations": {
             "production": { "outputHashing": "all" },
             "development": { "optimization": false, "sourceMap": true },
-            "demo": { "browser": "src/main.demo.ts", "index": { "input": "src/index.demo.html", "output": "index.html" }, "tsConfig": "tsconfig.demo.json", "optimization": false, "sourceMap": true, "preserveSymlinks": true, "outputPath": "dist/storecore-demo" }
+              "demo": { "browser": "src/main.demo.ts", "index": { "input": "src/index.demo.html", "output": "index.html" }, "tsConfig": "tsconfig.demo.json", "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }], "optimization": false, "sourceMap": true, "preserveSymlinks": true, "outputPath": "dist/storecore-demo" }
           },
           "defaultConfiguration": "production"
         },
