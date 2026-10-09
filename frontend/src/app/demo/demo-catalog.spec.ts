@@ -61,7 +61,7 @@ describe('variant commerce', () => {
   });
   it('migrates legacy standard identity and preserves historical money without guessing unknown variants', () => {
     const legacy=demoSeed(); legacy.version=1; legacy.products.forEach(product=>{delete product.variants;delete product.images;}); legacy.actors[0].cart=[{sku:'DEMO-001',quantity:1,variant: {wire:'standard'} as never}];
-    const restored=decodeSnapshot(JSON.stringify(legacy)); expect(restored.version).toBe(2); expect(restored.actors[0].cart[0].variantId).toBe('DEMO-001:standard');
+    const restored=decodeSnapshot(JSON.stringify(legacy)); expect(restored.version).toBe(3); expect(restored.actors[0].cart[0].variantId).toBe('DEMO-001:standard');
     legacy.actors[0].cart[0].variant={wire:'alien'} as never; expect(()=>decodeSnapshot(JSON.stringify(legacy))).toThrow('migrarse');
   });
   it('rejects remote media and empty alt and permits honest empty galleries', () => { expect(()=>validateMedia([{id:'x',src:'https://other/image.svg',alt:'x'}])).toThrow(); expect(()=>validateMedia([{id:'x',src:'/assets/demo/DEMO-001.svg',alt:''}])).toThrow(); expect(()=>validateMedia([])).not.toThrow(); });
