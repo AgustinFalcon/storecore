@@ -37,3 +37,5 @@ frontend/dist/
 frontend/.angular/
 frontend/playwright-report/
 frontend/test-results/
+frontend/demo-playwright-report/
+frontend/debug.log
