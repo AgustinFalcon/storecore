@@ -4,6 +4,7 @@ import { OrderStatus } from '../domain/order/order-status';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
+import { DemoMLAccountStatus, DemoMarketplaceProjection, DemoMarketplaceMapping, DemoMarketplaceProcessor, DemoCompetitorObservationStep, ensureMarketplace, decodeMarketplace } from './demo-marketplace';
 
 export class DemoScenario {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -67,13 +68,14 @@ export interface DemoAddress { id: string; label: string; street: string; city: 
 export interface DemoActor { id: string; email: string; firstName: string; lastName: string; phone: string; addresses: DemoAddress[]; favorites: string[]; cart: { sku: string; quantity: number; variant: DemoProductVariant }[]; }
 export interface DemoOrder { id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
-export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
-export interface DemoMovement { id: string; sku: string; delta: number; reason: string; }
+export interface DemoListing { sku: string; linked: boolean; observed?: number; error: boolean; desired?: number; confirmed?: number; }
+export interface DemoMovement { id: string; sku: string; variantId?: string; delta: number; reason: string; }
 export interface DemoSnapshot { version: number; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
 export interface DemoOrder { fulfillment?: DemoFulfillment; }
 export interface DemoSnapshot { inbox?: DemoInbox; }
+export interface DemoSnapshot { marketplace?: import('./demo-marketplace').DemoMarketState; }
 export function demoSeed(): DemoSnapshot {
   const products = NAMES.map((name, index): DemoProduct => ({ sku: `DEMO-${String(index + 1).padStart(3, '0')}`, name, category: ['Herramientas', 'Seguridad', 'Organización'][Math.floor(index / 6) === 0 ? 0 : index < 9 ? 1 : 2], brand: ['Norte', 'Avance', 'Taller'][index % 3], description: 'Diseñado para trabajar con precisión y comodidad. Calidad durable, garantía de 12 meses y asistencia personalizada. Incluye accesorios y manual de uso.', price: (12500 + index * 8500) * 100, original: (14500 + index * 8500) * 100, onHand: index === 5 ? 0 : index === 8 ? 2 : 18 + index, reserved: 0, active: true, tone: ['#e6a63f', '#667b94', '#a5b49b'][index % 3], variant: 'Estándar' }));
   const actor = (id: string, firstName: string): DemoActor => ({ id, email: `${id}@demo.invalid`, firstName, lastName: 'Demo', phone: '011 5555 0100', addresses: [{ id: `address-${id}`, label: 'Casa', street: 'Avenida de muestra 123', city: 'Buenos Aires', postal: '1406', primary: true }], favorites: [products[0].sku, products[2].sku], cart: [] });
@@ -85,15 +87,10 @@ export function demoSeed(): DemoSnapshot {
 /** All financial amounts are integer minor units; this coordinator is framework-free. */
 export class DemoCommerce {
   constructor(public snapshot: DemoSnapshot = demoSeed(), private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
-  private commit(projectStock = false): void { this.snapshot.revision++; if (projectStock) this.queueStock(); }
+  private commit(projectStock = false): void { this.snapshot.revision++; this.snapshot.version = 5; if (projectStock) ensureMarketplace(this.snapshot, this.now()); this.queueStock(); }
   private queueStock(): void {
-    this.snapshot.syncJobs ??= [];
-    for (const listing of this.snapshot.listings.filter(value => value.linked)) {
-      const desired = this.product(listing.sku).onHand;
-      if (listing.desired === desired) continue;
-      listing.desired = desired;
-      this.snapshot.syncJobs.push({ id: `stock-${this.snapshot.revision}-${listing.sku}`, sku: listing.sku, desired, status: DemoSyncStatus.Queued, created: this.now() });
-    }
+    ensureMarketplace(this.snapshot, this.now()); new DemoMarketplaceProjection().refresh(this.snapshot, this.now());
+    this.snapshot.syncJobs = this.snapshot.marketplace!.queue.map(job => ({ id: job.id, sku: this.snapshot.marketplace!.mappings.find(mapping => mapping.id === job.mappingId)!.sku, desired: job.desired, status: job.status, created: job.created }));
   }
   private requireModule(id: DemoModuleId): void { if (!this.snapshot.modules.some(module => module.id === id && module.enabled)) throw new Error(`${id.label} está pausado en la demostración. Habilitalo desde Módulos del comercio.`); }
   actor(id: string): DemoActor { const actor = this.snapshot.actors.find(value => value.id === id); if (!actor) throw new Error('Elegí una identidad de demostración.'); return actor; }
@@ -162,16 +159,18 @@ export class DemoCommerce {
   advance(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order) throw new Error('Pedido no disponible.'); const action = new DemoFulfillmentPolicy().actions(order)[0]; if (!action) throw new Error('La entrega no puede avanzar.'); this.fulfill(orderId, action); }
   receiveReturn(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order || order.shipment !== ShipmentStatus.Delivered || order.returned) throw new Error('La devolución no está disponible.'); order.returned = true; order.history.push('Devolución recibida; inspección pendiente. Sin reintegro automático de stock.'); this.commit(); }
   adjust(sku: string, delta: number, reason: string): void { const product = this.product(sku); if (!Number.isInteger(delta) || !reason.trim() || product.onHand + delta < product.reserved) throw new Error('Indicá unidades enteras y motivo; el stock no puede ser menor a las reservas.'); product.onHand += delta; this.snapshot.movements.push({ id: this.id(), sku, delta, reason }); this.commit(true); }
-  mlSale(sku: string, operation: string): void { this.requireModule(DemoModuleId.MercadoLibre); if (!this.snapshot.mlConnected || !this.snapshot.listings.some(value => value.sku === sku && value.linked)) throw new Error('Conectá la cuenta simulada y vinculá el producto.'); if (this.snapshot.movements.some(value => value.id === operation)) return; if (this.available(sku) < 1) throw new Error('Producto sin stock.'); this.product(sku).onHand--; this.snapshot.movements.push({ id: operation, sku, delta: -1, reason: 'Venta Mercado Libre simulada' }); this.commit(true); }
+  mlSale(sku: string, operation: string, variantId?: string): void { this.requireModule(DemoModuleId.MercadoLibre); const market = ensureMarketplace(this.snapshot, this.now()); const mapping = market.mappings.find(value => value.sku === sku && (!variantId || value.variantId === variantId) && value.status.eligible); if (!market.account.canProcess || !mapping) throw new Error('Conectá la cuenta simulada y vinculá la variante.'); const existing = this.snapshot.movements.find(value => value.id === operation); if (existing) { if (existing.sku !== sku || existing.variantId !== mapping.variantId) throw new Error('La operación ya pertenece a otra variante.'); return; } if (!this.product(sku).active || this.available(sku) < 1) throw new Error('Producto sin stock.'); this.product(sku).onHand--; this.snapshot.movements.push({ id: operation, sku, variantId: mapping.variantId, delta: -1, reason: 'Venta Mercado Libre simulada' }); this.commit(true); }
   processStock(fail = false): void {
-    this.requireModule(DemoModuleId.MercadoLibre); if (!this.snapshot.mlConnected) throw new Error('Conectá la cuenta simulada primero.');
-    this.queueStock();
-    for (const job of this.snapshot.syncJobs ?? []) { if (job.status === DemoSyncStatus.Confirmed || job.status === DemoSyncStatus.Unknown || job.status === DemoSyncStatus.Superseded) continue; const listing = this.snapshot.listings.find(value => value.sku === job.sku); if (!listing?.linked) continue; if (job.desired !== listing.desired) { job.status = DemoSyncStatus.Superseded; continue; } job.status = fail ? DemoSyncStatus.Failed : DemoSyncStatus.Confirmed; listing.error = fail; if (!fail) { listing.observed = job.desired; listing.confirmed = job.desired; } }
+    this.requireModule(DemoModuleId.MercadoLibre); new DemoMarketplaceProcessor().process(this.snapshot, this.now(), fail);
+    this.snapshot.syncJobs = ensureMarketplace(this.snapshot).queue.map(job => ({ id: job.id, sku: this.snapshot.marketplace!.mappings.find(mapping => mapping.id === job.mappingId)!.sku, desired: job.desired, status: job.status, created: job.created }));
     this.commit();
   }
+  setMLAccount(status: DemoMLAccountStatus): void { this.requireModule(DemoModuleId.MercadoLibre); const market = ensureMarketplace(this.snapshot, this.now()); if (status === DemoMLAccountStatus.Unknown || market.account === DemoMLAccountStatus.Unknown) throw new Error('Cuenta desconocida; restablecé la demostración.'); market.account = status; market.accountAt = this.now(); new DemoMarketplaceProjection().refresh(this.snapshot, this.now()); this.commit(); }
+  mapML(sku: string, variantId: string, listingId: string, variationId: string): void { this.requireModule(DemoModuleId.MercadoLibre); new DemoMarketplaceMapping().save(this.snapshot, sku, variantId, listingId, variationId, this.now()); if (!this.snapshot.listings.some(value => value.sku === sku)) this.snapshot.listings.push({ sku, linked: true, observed: 0, error: false }); new DemoMarketplaceProjection().refresh(this.snapshot, this.now()); this.commit(); }
+  unlinkML(id: string): void { this.requireModule(DemoModuleId.MercadoLibre); new DemoMarketplaceMapping().unlink(this.snapshot, id); new DemoMarketplaceProjection().refresh(this.snapshot, this.now()); this.commit(); }
   remove(actorId: string, sku: string): void { const actor = this.actor(actorId); const remaining = actor.cart.filter(line => line.sku !== sku); if (remaining.length === actor.cart.length) return; actor.cart = remaining; this.commit(); }
   watchCompetitor(name: string, sku: string, threshold: number): void { this.product(sku); if (!name.trim() || !Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new Error('Indicá nombre, producto y umbral entre 1 y 100%.'); this.snapshot.competitors.push({ id: this.id(), name: name.trim(), sku, threshold, enabled: true, price: this.price(sku), history: [this.price(sku)], unread: false }); this.commit(); }
-  competitorPrice(id: string, price: number): void { const competitor = this.snapshot.competitors.find(value => value.id === id); if (!competitor || !Number.isSafeInteger(price) || price < 100) throw new Error('Indicá un precio de muestra válido.'); const percent = Math.abs(price - competitor.price) * 100 / competitor.price; competitor.price = price; competitor.history.push(price); if (competitor.enabled !== false && percent >= (competitor.threshold ?? 1)) competitor.unread = true; this.commit(); }
+  competitorPrice(id: string, price: number, operation = this.id()): void { new DemoCompetitorObservationStep().apply(this.snapshot, id, price, operation, this.now()); this.commit(); }
   saveSettings(settings: DemoSettings): void { if (![settings.homepageItems, settings.lowStockThreshold, settings.deliveryDays, settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(settings.trackingPrefix)) throw new Error('Indicá valores enteros de 1 a 30 y un prefijo de seguimiento de 2–12 letras/números.'); this.snapshot.settings = { ...settings }; this.commit(); }
   saveProduct(product: DemoProduct, editingSku?: string): void {
     this.requireModule(DemoModuleId.Catalog);
@@ -192,7 +191,8 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('Snapshot inválido.');
   const state = parsed as DemoSnapshot;
-  if (![1, 4].includes(state.version) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
+  if (state.version === 5 && !state.marketplace) throw new Error('Falta el canal de muestra en la demo guardada. Restablecé sus datos.');
+  if (![1, 4, 5].includes(state.version) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
   if (state.products.some(value => !value.sku || !Number.isSafeInteger(value.price) || value.price <= 0 || !Number.isInteger(value.onHand) || !Number.isInteger(value.reserved) || value.reserved < 0 || value.onHand < value.reserved)) throw new Error('Stock o precios inválidos. Restablecé la demostración.');
   const skus = new Set(state.products.map(product => product.sku));
   if (skus.size !== state.products.length || !state.actors.some(actor => actor.id === 'cliente') || state.actors.some(actor => !actor.id || typeof actor.email !== 'string' || typeof actor.firstName !== 'string' || !Array.isArray(actor.addresses) || !Array.isArray(actor.cart) || !Array.isArray(actor.favorites) || actor.cart.some(line => !skus.has(line.sku) || !Number.isInteger(line.quantity) || line.quantity < 1) || actor.addresses.some(address => !address.id || typeof address.street !== 'string' || typeof address.city !== 'string' || typeof address.postal !== 'string'))) throw new Error('La identidad o el carrito demo guardado son inválidos. Restablecé la demostración.');
@@ -208,6 +208,7 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   if (!Array.isArray(state.blocks) || state.blocks.some(block => typeof block.id !== 'string' || typeof block.title !== 'string' || typeof block.body !== 'string') || ![state.settings.homepageItems, state.settings.lowStockThreshold, state.settings.deliveryDays, state.settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(state.settings.trackingPrefix)) throw new Error('La configuración demo guardada es inválida. Restablecé la demostración.');
   for (const order of state.orders) decodeFulfillment(order);
   decodeInbox(state);
-  state.version = 4;
+  decodeMarketplace(state);
+  state.version = 5;
   return state;
 }
