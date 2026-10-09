@@ -4,6 +4,29 @@ const cta=(page:Page,id:string)=>page.locator(`[data-cta="${id}"]`);
 async function login(page:Page,admin=false){ await page.goto('/demo/login'); await page.getByLabel('Contraseña',{exact:true}).fill('demo'); await cta(page,'login-submit').click(); await cta(page,admin?'login-admin':'login-customer').click(); }
 test.beforeEach(async({page})=>{ await page.route('**/*',route=>{ const url=new URL(route.request().url()); expect(url.hostname).toBe('127.0.0.1'); expect(url.pathname.startsWith('/api')).toBe(false); return route.continue(); }); });
 
+for (const cancelled of [false,true]) test(`retry preserves standard case and admin-created variant ${cancelled}`,async({page})=>{
+ test.setTimeout(60000); await login(page,true); await page.goto('/demo/user/catalog'); await cta(page,'admin-product-edit-DEMO-001').click();
+ await cta(page,'product-variant-add').click(); await page.locator('[name="variant-name-2"]').fill('Nueva presentación XL'); await page.locator('[name="variant-stock-2"]').fill('5'); await cta(page,'product-save').click(); await expect(page.getByRole('dialog')).not.toBeVisible();
+ await login(page); await page.goto('/demo/catalog/DEMO-001'); const identities=await cta(page,'product-variant').locator('option').evaluateAll(options=>options.map(option=>(option as HTMLOptionElement).value)); expect(identities).toHaveLength(3);
+ for (const id of identities) { await cta(page,'product-variant').selectOption(id); await cta(page,'product-add-cart').click(); }
+ await cta(page,'product-review-cart').click(); await cta(page,'cart-checkout').click(); await page.getByRole('radio').check(); await cta(page,'checkout-step-next').click(); await cta(page,'checkout-delivery-method').selectOption('pickup'); await cta(page,'checkout-step-next').click(); await cta(page,'shell-scenario').selectOption(cancelled?'pending':'rejected'); await cta(page,'checkout-confirm').click(); await expect(page).toHaveURL(/checkout\/result/);
+ if (cancelled) { await cta(page,'order-payment-cancel').click(); await cta(page,'operation-confirm').click(); }
+ await cta(page,'order-payment-retry').click(); await expect(page).toHaveURL(/\/cart$/); await expect(page.locator('.cart-line')).toHaveCount(3);
+ for (const id of identities) { await expect(cta(page,`cart-remove-${id}`)).toBeVisible(); }
+ await expect(page.locator('.cart-line')).toContainText(['Estándar','Con estuche','Nueva presentación XL']);
+});
+
+for (const width of [390,1440]) test(`duplicate variant validation at footer preserves draft and recovers ${width}`,async({page})=>{
+ await page.setViewportSize({width,height:900}); await login(page,true); await page.goto('/demo/user/catalog'); await cta(page,'admin-product-edit-DEMO-001').click();
+ const original=await page.locator('[name="variant-name-1"]').inputValue(); const duplicate=await page.locator('[name="variant-name-0"]').inputValue();
+ await page.locator('[name="variant-name-1"]').fill(duplicate); await cta(page,'product-save').scrollIntoViewIfNeeded(); await cta(page,'product-save').click();
+ const summary=page.locator('#product-save-error'); await expect(summary).toBeVisible(); await expect(summary).toBeFocused(); await expect(summary).toContainText(/nombre/i);
+ expect(await summary.evaluate(element=>{const r=element.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;})).toBe(true);
+ await expect(page.locator('[name="variant-name-1"]')).toHaveValue(duplicate); await expect(page.getByRole('dialog')).toBeVisible();
+ expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+ await page.locator('[name="variant-name-1"]').fill(original+' corregida'); await cta(page,'product-save').click(); await expect(page.getByRole('dialog')).not.toBeVisible(); await page.reload(); await expect(page.locator('table')).toContainText(original+' corregida');
+});
+
 test('admin creates open variants → buyer multi-variant cart → immutable order → inventory',async({page},info)=>{
  test.setTimeout(60000); await login(page,true); await page.goto('/demo/user/catalog'); await cta(page,'admin-product-create').click();
  await page.locator('[name="sku"]').fill('OPEN-CATALOG'); await page.locator('[name="name"]').fill('Producto con atributos abiertos'); await page.locator('[name="brand"]').fill('Marca nueva'); await page.locator('[name="category"]').fill('Categoría nueva'); await page.locator('[name="description"]').fill('Dos variantes con precios, stock e imágenes diferentes.');

@@ -204,7 +204,7 @@ export class DemoPageComponent {
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
   resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
-  retryOrder(): void { const order = this.order; if (!order || (order.payment !== PaymentStatus.Rejected && order.payment !== PaymentStatus.Cancelled)) return; if (this.state.run(() => { for (const line of order.lines) this.state.commerce.add(this.state.actorId(), line.sku, line.quantity, line.variant); }, 'Productos recuperados en tu carrito.')) void this.router.navigate(['/demo/cart']); }
+  retryOrder(): void { const order = this.order; if (!order) return; if (this.state.run(() => this.state.commerce.retryOrder(this.state.actorId(), order.id), 'Productos recuperados en tu carrito.')) void this.router.navigate(['/demo/cart']); }
   open(dialog: DemoDialog): void { this.focusBeforeDialog = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.dialog.set(dialog); setTimeout(() => document.querySelector<HTMLDialogElement>('dialog')?.showModal()); }
   close(): void { document.querySelector<HTMLDialogElement>('dialog')?.close(); this.dialog.set(DemoDialog.None); this.focusBeforeDialog?.focus(); }
   information(text: string): void { this.info = text; this.open(DemoDialog.Information); }

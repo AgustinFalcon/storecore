@@ -133,6 +133,25 @@ export class DemoCommerce {
     const saved = this.actor(actorId).cart.find(line => line.variantId === selected.id); if (saved) saved.variant = typeof variant === 'string' ? DemoProductVariant.Standard : variant;
   }
   favorite(actorId: string, sku: string): void { const actor = this.actor(actorId); actor.favorites = actor.favorites.includes(sku) ? actor.favorites.filter(value => value !== sku) : [...actor.favorites, sku]; this.commit(); }
+  /** Recover exact identities, validating the entire retry before changing the cart. */
+  retryOrder(actorId: string, orderId: string): void {
+    const order = this.snapshot.orders.find(value => value.id === orderId && value.actor === actorId);
+    if (!order || (order.payment !== PaymentStatus.Rejected && order.payment !== PaymentStatus.Cancelled)) throw new Error('Este pedido no permite recuperar el carrito.');
+    const actor = this.actor(actorId);
+    const recovered = actor.cart.map(line => ({ ...line }));
+    for (const line of order.lines) {
+      if (!line.variantId) throw new Error('El pedido no conserva la identidad de su variante.');
+      const variant = this.sellable(line.sku, line.variantId);
+      if (!variant.active || !this.product(line.sku).active) throw new Error('La variante del pedido está archivada. No se recuperó el carrito.');
+      const existing = recovered.find(value => value.variantId === variant.id);
+      const quantity = (existing?.quantity ?? 0) + line.quantity;
+      if (quantity > this.variantAvailable(line.sku, variant.id)) throw new Error('La variante del pedido no tiene stock disponible. No se recuperó el carrito.');
+      if (existing) existing.quantity = quantity;
+      else recovered.push({ sku: line.sku, variantId: variant.id, variant: DemoProductVariant.Standard, quantity, quotedUnit: this.variantPrice(line.sku, variant.id) });
+    }
+    actor.cart = recovered;
+    this.commit();
+  }
   checkout(actorId: string, request: string, addressId: string, scenario: DemoScenario, method = DemoPaymentMethod.Card, deliveryMethod?: DemoDeliveryMethod): DemoOrder {
     const existing = this.snapshot.orders.find(order => order.actor === actorId && order.request === request); if (existing) return existing;
     this.requireModule(DemoModuleId.Checkout);

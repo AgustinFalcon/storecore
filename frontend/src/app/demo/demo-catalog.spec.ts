@@ -2,6 +2,31 @@ import { DemoCommerce, demoSeed, DemoScenario, decodeSnapshot, DemoCurrency } fr
 import { validateMedia } from './demo-catalog';
 
 describe('variant commerce', () => {
+  for (const cancelled of [false, true]) it(`recovers rejected/cancelled exact standard, case and open identities: ${cancelled}`, () => {
+    const state = new DemoCommerce(demoSeed());
+    const product = structuredClone(state.product('DEMO-001'));
+    product.variants!.push({ ...structuredClone(product.variants![0]), id: 'admin-open', name: 'Abierta XL' });
+    state.saveProduct(product, product.sku);
+    const identities = state.variants(product.sku).map(value => value.id);
+    for (const id of identities) state.add('cliente', product.sku, 1, id);
+    const order = state.checkout('cliente', 'retry', 'address-cliente', cancelled ? DemoScenario.Pending : DemoScenario.Rejected);
+    if (cancelled) state.cancelPayment(order.id);
+    state.retryOrder('cliente', order.id);
+    expect(state.actor('cliente').cart.map(line => line.variantId)).toEqual(identities);
+    expect(state.actor('cliente').cart.map(line => line.quantity)).toEqual([1, 1, 1]);
+  });
+  it('rejects archived, insufficient and absent retry identities atomically', () => {
+    const state = new DemoCommerce(demoSeed()); const [a, b] = state.variants('DEMO-001');
+    state.add('cliente', 'DEMO-001', 1, a.id); state.add('cliente', 'DEMO-001', 1, b.id);
+    const order = state.checkout('cliente', 'retry', 'address-cliente', DemoScenario.Rejected);
+    b.active = false;
+    expect(() => state.retryOrder('cliente', order.id)).toThrow('archivada'); expect(state.actor('cliente').cart).toEqual([]);
+    b.active = true; b.onHand = 0;
+    expect(() => state.retryOrder('cliente', order.id)).toThrow('stock'); expect(state.actor('cliente').cart).toEqual([]);
+    b.onHand = 3; delete order.lines[1].variantId;
+    expect(() => state.retryOrder('cliente', order.id)).toThrow('identidad'); expect(state.actor('cliente').cart).toEqual([]);
+    expect(() => state.retryOrder('cliente2', order.id)).toThrow('pedido');
+  });
   const commerce = () => new DemoCommerce(demoSeed(), () => '2026-10-09T00:00:00Z', () => 'variants-order');
   it('allows the same product twice and only merges the same variant', () => {
     const state=commerce(); const [a,b]=state.variants('DEMO-001');
