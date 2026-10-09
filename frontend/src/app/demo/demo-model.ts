@@ -101,6 +101,7 @@ export class DemoCommerce {
     const actor = this.actor(actorId); const address = actor.addresses.find(value => value.id === addressId);
     if (!address || !actor.cart.length) throw new Error('Agregá productos y seleccioná una dirección.');
     if (scenario === DemoScenario.NoStock || actor.cart.some(line => this.available(line.sku) < line.quantity)) throw new Error('El stock cambió. Revisá las cantidades de tu carrito.');
+    if (actor.cart.some(line => !this.product(line.sku).active)) throw new Error('Un producto del carrito está archivado. Revisá el carrito y quitalo antes de confirmar.');
     if (actor.cart.some(line => line.variant === DemoProductVariant.Unknown)) throw new Error('El carrito contiene una variante no reconocida.');
     const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku) + line.variant.extraUnit }));
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
@@ -120,7 +121,16 @@ export class DemoCommerce {
   adjust(sku: string, delta: number, reason: string): void { const product = this.product(sku); if (!Number.isInteger(delta) || !reason.trim() || product.onHand + delta < product.reserved) throw new Error('Indicá unidades enteras y motivo; el stock no puede ser menor a las reservas.'); product.onHand += delta; this.snapshot.movements.push({ id: this.id(), sku, delta, reason }); this.commit(); }
   mlSale(sku: string, operation: string): void { this.requireModule(DemoModuleId.MercadoLibre); if (!this.snapshot.mlConnected || !this.snapshot.listings.some(value => value.sku === sku && value.linked)) throw new Error('Conectá la cuenta simulada y vinculá el producto.'); if (this.snapshot.movements.some(value => value.id === operation)) return; if (this.available(sku) < 1) throw new Error('Producto sin stock.'); this.product(sku).onHand--; this.snapshot.movements.push({ id: operation, sku, delta: -1, reason: 'Venta Mercado Libre simulada' }); this.commit(); }
   saveSettings(settings: DemoSettings): void { if (![settings.homepageItems, settings.lowStockThreshold, settings.deliveryDays, settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(settings.trackingPrefix)) throw new Error('Indicá valores enteros de 1 a 30 y un prefijo de seguimiento de 2–12 letras/números.'); this.snapshot.settings = { ...settings }; this.commit(); }
-  saveProduct(product: DemoProduct): void { this.requireModule(DemoModuleId.Catalog); if (!product.name.trim() || !product.sku.trim() || !Number.isSafeInteger(product.price) || product.price <= 0 || !Number.isInteger(product.onHand) || product.onHand < product.reserved) throw new Error('Revisá nombre, SKU, precio y stock.'); const index = this.snapshot.products.findIndex(value => value.sku === product.sku); if (index < 0) this.snapshot.products.push({ ...product }); else this.snapshot.products[index] = { ...product }; this.commit(); }
+  saveProduct(product: DemoProduct, editingSku?: string): void {
+    this.requireModule(DemoModuleId.Catalog);
+    const existing = this.snapshot.products.find(value => value.sku === (editingSku ?? product.sku));
+    if (!editingSku && existing) throw new Error('El SKU ya existe. Editá el producto existente.');
+    if (editingSku && (!existing || product.sku !== editingSku)) throw new Error('No se puede cambiar el SKU de un producto existente.');
+    const reserved = existing?.reserved ?? 0;
+    if (!product.name.trim() || !product.sku.trim() || !Number.isSafeInteger(product.price) || product.price <= 0 || !Number.isInteger(product.onHand) || product.onHand < reserved) throw new Error('Revisá nombre, SKU, precio y stock; respetá las reservas existentes.');
+    if (existing) Object.assign(existing, { ...product, reserved }); else this.snapshot.products.push({ ...product, reserved: 0 });
+    this.commit();
+  }
   saveCampaign(campaign: DemoCampaign): void { this.requireModule(DemoModuleId.Catalog); if (!campaign.title.trim() || !this.snapshot.products.some(value => value.sku === campaign.sku) || campaign.percent <= 0 || campaign.percent > 70 || campaign.from > campaign.until) throw new Error('Revisá el título, producto, descuento (1–70%) y vigencia.'); const index = this.snapshot.campaigns.findIndex(value => value.id === campaign.id); if (index < 0) this.snapshot.campaigns.push({ ...campaign }); else this.snapshot.campaigns[index] = { ...campaign }; this.commit(); }
   touch(): void { this.commit(); }
 }
