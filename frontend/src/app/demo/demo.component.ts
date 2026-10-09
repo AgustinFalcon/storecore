@@ -87,7 +87,7 @@ export class DemoPageComponent {
   readonly sorts = CatalogSort.all;
   readonly Gallery = DemoGalleryView;
   readonly gallery = signal(DemoGalleryView.Front);
-  get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === false ? [DemoProductVariant.Standard] : DemoProductVariant.all; }
+  get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
   readonly variant = signal(DemoProductVariant.Standard);
   readonly Module = DemoModuleId;
   readonly Math = Math;
@@ -135,7 +135,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); }
+  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }

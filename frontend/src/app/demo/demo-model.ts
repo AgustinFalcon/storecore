@@ -102,7 +102,17 @@ export class DemoCommerce {
     if (quantity === 0) actor.cart = actor.cart.filter(line => line.sku !== sku); else if (existing) existing.quantity = quantity; else actor.cart.push({ sku, quantity, variant: DemoProductVariant.Standard });
     this.commit();
   }
-  add(actorId: string, sku: string, quantity: number, variant = DemoProductVariant.Standard): void { if (!this.product(sku).active) throw new Error('Este producto está archivado y no se puede comprar.'); if (variant === DemoProductVariant.Unknown) throw new Error('Seleccioná una variante conocida.'); const existing = this.actor(actorId).cart.find(line => line.sku === sku); if (existing && existing.variant !== variant) throw new Error('Este producto ya está en tu carrito con otra presentación. Quitalo antes de cambiar la variante.'); this.setQuantity(actorId, sku, (existing?.quantity ?? 0) + quantity); const saved = this.actor(actorId).cart.find(line => line.sku === sku); if (saved) saved.variant = variant; }
+  add(actorId: string, sku: string, quantity: number, variant = DemoProductVariant.Standard): void {
+    if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad.');
+    const product = this.product(sku);
+    if (!product.active) throw new Error('Este producto está archivado y no se puede comprar.');
+    if (variant === DemoProductVariant.Unknown) throw new Error('Seleccioná una variante conocida.');
+    if (variant === DemoProductVariant.Case && product.supportsCase !== true) throw new Error('La presentación con estuche no está disponible para este producto.');
+    const existing = this.actor(actorId).cart.find(line => line.sku === sku);
+    if (existing && existing.variant !== variant) throw new Error('Este producto ya está en tu carrito con otra presentación. Quitalo antes de cambiar la variante.');
+    this.setQuantity(actorId, sku, (existing?.quantity ?? 0) + quantity);
+    const saved = this.actor(actorId).cart.find(line => line.sku === sku); if (saved) saved.variant = variant;
+  }
   favorite(actorId: string, sku: string): void { const actor = this.actor(actorId); actor.favorites = actor.favorites.includes(sku) ? actor.favorites.filter(value => value !== sku) : [...actor.favorites, sku]; this.commit(); }
   checkout(actorId: string, request: string, addressId: string, scenario: DemoScenario, method = DemoPaymentMethod.Card, deliveryMethod?: DemoDeliveryMethod): DemoOrder {
     const existing = this.snapshot.orders.find(order => order.actor === actorId && order.request === request); if (existing) return existing;
@@ -114,7 +124,7 @@ export class DemoCommerce {
     if (scenario === DemoScenario.NoStock || actor.cart.some(line => this.available(line.sku) < line.quantity)) throw new Error('El stock cambió. Revisá las cantidades de tu carrito.');
     if (actor.cart.some(line => !this.product(line.sku).active)) throw new Error('Un producto del carrito está archivado. Revisá el carrito y quitalo antes de confirmar.');
     if (actor.cart.some(line => line.variant === DemoProductVariant.Unknown)) throw new Error('El carrito contiene una variante no reconocida.');
-    if (actor.cart.some(line => line.variant === DemoProductVariant.Case && this.product(line.sku).supportsCase === false)) throw new Error('Una presentación dejó de estar disponible. Quitá el producto y seleccioná otra variante.');
+    if (actor.cart.some(line => line.variant === DemoProductVariant.Case && this.product(line.sku).supportsCase !== true)) throw new Error('Una presentación dejó de estar disponible. Quitá el producto y seleccioná otra variante.');
     const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku) + line.variant.extraUnit }));
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
     const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: ShipmentStatus.Preparing, lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
