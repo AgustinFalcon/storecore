@@ -11,6 +11,8 @@ import { CartStore } from './cart.store';
     @if (store.state$ | async; as state) {
       <sc-checkout-page-view
         [state]="state"
+        [access]="store.authority()"
+        (selectCustomer)="store.selectCustomer()"
         (addressChange)="store.setAddressId($event)"
         (currencyChange)="store.setCurrency($event)"
         (pay)="store.submitCheckout()"

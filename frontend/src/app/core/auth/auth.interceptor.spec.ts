@@ -15,6 +15,21 @@ describe('authInterceptor', () => {
       providers: [provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting()],
     });
   });
+  it('blocks legacy same-realm login and registration before sending a request during revoke', async () => {
+    const fence = TestBed.inject(AccessMutationFence);
+    fence.beginRevocation(AccessContext.Customer);
+    const http = TestBed.inject(HttpClient);
+    const ctrl = TestBed.inject(HttpTestingController);
+    for (const path of ['/api/v1/customer/auth/login', '/api/v1/customer/auth/register']) {
+      const error = await firstValueFrom(http.post(path, {})).catch((err: { status: number }) => err);
+      expect((error as { status: number }).status).toBe(409);
+      ctrl.expectNone(path);
+    }
+    const other = firstValueFrom(http.post('/api/v1/internal/auth/login', {}));
+    ctrl.expectOne('/api/v1/internal/auth/login').flush({});
+    await other;
+    ctrl.verify();
+  });
 
   it('sends credentials and CSRF on customer writes', async () => {
     TestBed.inject(CustomerSession).setCsrf('csrf-c');

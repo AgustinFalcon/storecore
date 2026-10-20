@@ -1,7 +1,6 @@
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { CustomerSession } from '../../core/auth/customer-session';
 import { CartStore } from '../cart/cart.store';
 import { CatalogStore } from './catalog.store';
 import { ProductPageViewComponent } from './product-page.view';
@@ -17,7 +16,8 @@ import { ProductPageViewComponent } from './product-page.view';
       [cart]="cart.cart$ | async"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || ''"
-      [signedIn]="session.authenticated()"
+      [access]="cart.authority()"
+      (selectCustomer)="cart.selectCustomer()"
       (add)="cart.add($event)"
       (retry)="reload()"
     />
@@ -27,7 +27,6 @@ export class ProductPageComponent implements OnInit {
   constructor(
     readonly store: CatalogStore,
     readonly cart: CartStore,
-    readonly session: CustomerSession,
     private readonly route: ActivatedRoute,
   ) {}
 
@@ -37,7 +36,7 @@ export class ProductPageComponent implements OnInit {
 
   reload(): void {
     this.store.loadProduct(this.route.snapshot.paramMap.get('sku') ?? '');
-    if (this.session.authenticated()) {
+    if (this.cart.authority().canMutate) {
       this.cart.load();
     }
   }

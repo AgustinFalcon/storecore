@@ -61,10 +61,13 @@
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" aria-label="Agregar una unidad">+</button>
             </span>
           </label>
-          @if (signedIn) {
+          @if (access.canMutate) {
             <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
+          } @else if (access.requiresSelection) {
+            <p>{{ access.label }}</p>
+            <button type="button" class="sc-btn sc-btn--primary sc-btn--block" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>
           } @else {
-            <p><a routerLink="/login">Entrar para agregar</a></p>
+            <p>{{ access.label }} <a routerLink="/login">Entrar para agregar</a></p>
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>

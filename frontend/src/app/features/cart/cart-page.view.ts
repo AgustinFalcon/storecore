@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { CartLine } from '../../domain/cart/cart.entity';
+import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { CartState } from './cart.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
@@ -12,6 +13,8 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
 })
 export class CartPageViewComponent {
   @Input({ required: true }) state!: CartState;
+  @Input() access = CustomerCartAccess.Unknown;
+  @Output() readonly selectCustomer = new EventEmitter<void>();
   @Output() readonly quantityChange = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
 

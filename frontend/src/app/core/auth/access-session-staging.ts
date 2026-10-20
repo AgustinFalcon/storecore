@@ -1,14 +1,16 @@
 import { Injectable } from '@angular/core';
 import { AccessContext } from '../../domain/access/access-context';
+import { AccessMutationFence } from './access-mutation-fence';
 
 /** Holds a verified unified-response CSRF token until its principal is probed. */
 @Injectable({ providedIn: 'root' })
 export class AccessSessionStaging {
   private readonly csrfByContext = new Map<AccessContext, string>();
+  constructor(private readonly fence: AccessMutationFence) {}
 
   stage(context: AccessContext, csrf: string): boolean {
     const token = csrf.trim();
-    if (!context.isKnown || !token) return false;
+    if (!context.isKnown || !token || !this.fence.permitsAuthentication(context)) return false;
     this.csrfByContext.set(context, token);
     return true;
   }

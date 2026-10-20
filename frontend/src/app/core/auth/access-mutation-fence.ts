@@ -9,6 +9,13 @@ export class AccessMutationFence {
   private userGeneration = 0;
   private readonly customerCancellation = new Subject<void>();
   private readonly userCancellation = new Subject<void>();
+  private readonly revoking = new Set<AccessContext>();
+
+  beginRevocation(context: AccessContext): void { if (context.isKnown) this.revoking.add(context); }
+  endRevocation(context: AccessContext): void { this.revoking.delete(context); }
+  permitsAuthentication(context: AccessContext = AccessContext.Unknown): boolean {
+    return context.isKnown ? !this.revoking.has(context) : this.revoking.size === 0;
+  }
 
   advance(context: AccessContext = AccessContext.Unknown): void {
     if (context === AccessContext.Customer || context === AccessContext.Unknown) {

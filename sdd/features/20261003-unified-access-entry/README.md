@@ -27,3 +27,7 @@ future removal decision.
 
 This archive does not federate BlackStore, deploy, release, activate live vendor
 credentials or claim fiscal/ARCA or Correo Argentino homologation.
+
+Post-archive maintenance of logout concurrency and customer cart authority is
+recorded in the [2026-10-07 master hardening addendum](2-technical/20261007-master-hardening.md),
+with separate local evidence and pending browser/CI/review gates.
