@@ -8,6 +8,7 @@ import { ProductPublication, ProductCondition, VariantSaleState } from './catalo
 import type { DemoProduct, DemoProductVariantRecord } from './catalog/catalog-model';
 import { DemoCatalogQuery } from './catalog/demo-catalog-query';
 import { DemoPostSaleWire } from './postsale/postsale-wire';
+import { DemoReturnIdentity } from './postsale/return-identity';
 import { DemoReservationState } from './checkout/demo-reservation-state';
 import { OrderStatus } from '../domain/order/order-status';
 import { PaymentStatus } from '../domain/order/payment-status';
@@ -116,6 +117,7 @@ export function decodeSnapshot(raw:string):DemoSnapshot {
   }
   for(const product of products)for(const variant of product.variants)if((held.get(JSON.stringify([product.sku,variant.id]))??0)>variant.reserved)throw new Error('La reserva supera el stock reservado de la variante.');
   const returns=legacy?[]:items(source['returns']).map(value=>DemoPostSaleWire.request(value));
+  DemoReturnIdentity.requireUnique(returns);
   if(returns.some(request=>!orders.some(order=>order.id===request.orderId)))throw new Error('Solicitud sin pedido.');
   for(const order of orders)DemoPostSaleWire.validateOrder(order,returns);
   const state={...source,version:6,products,actors,orders,returns,postSaleAlerts:legacy?[]:items(source['postSaleAlerts'])} as unknown as DemoSnapshot;

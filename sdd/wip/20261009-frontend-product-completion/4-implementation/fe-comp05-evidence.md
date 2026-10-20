@@ -133,7 +133,44 @@ Validación final de esta corrección (no sustituye evidencia de CI/revisión):
 - `git diff --check`: PASS. Runner y servidor finalizados; junction temporal
   retirada al cerrar los gates, conservando node_modules de #187.
 
-## Estado de entrega
+## Correcciones NO-GO de seguridad — 2026-10-20
+
+Sobre `bfd7a2113a07c834b1986a85f2154bcd8c93b153`, el decoder v6 exige
+unicidad global de RMA mediante `DemoReturnIdentity` inmediatamente después de
+traducir returns y antes de `validateOrder`. Dos pedidos del mismo comprador o
+de compradores distintos no pueden compartir ID. Las pruebas espían el orden de
+validación y verifican rechazo sin mutación de la fuente. Los comandos validan
+el agregado antes de buscar o repetir una solicitud, y verifican el nuevo ID
+antes de insertarlo: una identidad ambigua falla cerrada sin cambiar historial,
+estado, inventario ni revisión.
+
+El parser de intención usa la tabla cerrada `DemoScreen`, excluyendo login y
+registro para evitar ciclos. Cada segmento debe coincidir exactamente; los
+parámetros admiten sólo identidades ASCII acotadas a 128 caracteres. Se cubren
+explícitamente `/demo/catalog`, `/demo/user/orders/:id` y
+`/demo/user/mercadolibre`, sin patrones arbitrarios, queries, fragments,
+traversal ni redirects externos. La política exige actor/rol/contexto coherente,
+admin para USER y pedido existente para detalle administrativo. Un comprador
+no se reescribe a una ruta USER; vuelve al home. CUSTOMER conserva ownership
+exacto de su pedido, incluso después de login frío y recarga.
+
+Gates de esta corrección sobre fuente congelada:
+
+- Focal CORE + composición + comandos postventa: 3 archivos / 51 pruebas PASS.
+- Unit completo: 93 archivos / 471 pruebas PASS.
+- Lint completo, TypeScript app/demo/spec, `ngc --noEmit` y arquitectura
+  6/6 + scan: PASS.
+- Demo build: PASS, 2026-10-20 19:42:18.462 UTC; sólo el nuevo spec CORE se
+  completó después del build, sin cambios productivos posteriores.
+- Build productivo: PASS, 2026-10-20 19:43:30.048 UTC.
+- Browser focal de intención: 12/12 PASS. Browser completo: 68/68 PASS,
+  expected 68, skipped 0, unexpected 0, flaky 0 y errors vacíos. Inicio
+  2026-10-20 19:43:10.578 UTC, duración 230830.241 ms. Sin cambios productivos
+  ni helpers browser posteriores al build demo. `git diff --check`: PASS.
+- Runner y servidor cerrados; junction temporal retirada al finalizar,
+  conservando las dependencias originales de #187. No hay cambios de paquetes.
+
+## Estado de entrega actual
 
 Estado actual: implemented_local_pending_independent_review_and_ci.
 Faltan la re-revisión independiente y CI sobre el SHA final publicado.

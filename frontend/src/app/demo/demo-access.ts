@@ -1,20 +1,31 @@
 import { DemoContext, DemoSnapshot } from './demo-model';
+import { DemoScreen } from './demo-screen';
+import { DemoRole } from './demo-roles';
 
 /** Navigation intent is deliberately narrower than an arbitrary return URL. */
 export class DemoAccessIntent {
-  private constructor(readonly path: string) {}
-  static readonly Unknown = new DemoAccessIntent('');
+  private constructor(readonly path: string, readonly screen: DemoScreen, private readonly orderId?: string) {}
+  static readonly Unknown = new DemoAccessIntent('', DemoScreen.Unknown);
   static fromWire(raw: unknown): DemoAccessIntent {
-    if (typeof raw !== 'string' || !/^\/demo(?:\/catalog\/[A-Za-z0-9:_-]+|\/cart|\/checkout|\/customer\/(?:profile|addresses|favorites|orders(?:\/[A-Za-z0-9:_-]+)?)|\/checkout\/result\/[A-Za-z0-9:_-]+|\/user\/(?:home|customers|catalog|inventory|orders|offers|promos|content|capabilities|profile-import))?$/.test(raw)) return this.Unknown;
-    return new DemoAccessIntent(raw);
+    if (typeof raw !== 'string' || (raw !== '/demo' && !raw.startsWith('/demo/'))) return this.Unknown;
+    const segments = raw === '/demo' ? [] : raw.slice(6).split('/');
+    for (const screen of DemoScreen.all) {
+      if (screen === DemoScreen.Login || screen === DemoScreen.Register) continue;
+      const pattern = screen.path ? screen.path.split('/') : [];
+      if (segments.length !== pattern.length || !pattern.every((part, index) => part.startsWith(':') ? /^[A-Za-z0-9:_-]{1,128}$/.test(segments[index]) : part === segments[index])) continue;
+      const orderPosition = pattern.findIndex(part => part === ':id' || part === ':orderId');
+      return new DemoAccessIntent(raw, screen, orderPosition < 0 ? undefined : segments[orderPosition]);
+    }
+    return this.Unknown;
   }
   destination(snapshot: DemoSnapshot, actor: string, context: DemoContext): string {
     const home = context === DemoContext.Admin ? '/demo/user/home' : '/demo';
-    if (this === DemoAccessIntent.Unknown || context === DemoContext.Unknown) return home;
-    if (this.path.startsWith('/demo/user/')) return context === DemoContext.Admin ? this.path : home;
-    const id = this.path.match(/\/(?:orders|result)\/([^/]+)$/)?.[1];
-    if (id && !snapshot.orders.some(order => order.id === id && order.actor === actor)) return home;
-    if (context !== DemoContext.Customer && (this.path === '/demo/cart' || this.path === '/demo/checkout' || this.path.startsWith('/demo/customer/') || id)) return home;
+    const identity = snapshot.actors.find(value => value.id === actor);
+    const authorized = !!identity && ((context === DemoContext.Admin && identity.role === DemoRole.Admin) || (context === DemoContext.Customer && identity.role === DemoRole.Customer));
+    if (this === DemoAccessIntent.Unknown || !authorized) return home;
+    if (this.screen.admin && context !== DemoContext.Admin) return home;
+    if (this.screen.privateCustomer && context !== DemoContext.Customer) return home;
+    if (this.orderId && !snapshot.orders.some(order => order.id === this.orderId && (this.screen.admin || order.actor === actor))) return home;
     return this.path;
   }
 }

@@ -3,6 +3,7 @@ import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { DemoCatalogQuery } from '../catalog/demo-catalog-query';
 import type { DemoCheckoutSnapshot } from '../checkout/checkout-model';
 import { DemoRefundAllocation } from './refund-allocation';
+import { DemoReturnIdentity } from './return-identity';
 import { DemoReturnPolicy } from './return-policy';
 import { DemoReturnInventoryProjection } from './return-inventory-projection';
 import { DemoReturnDecision, DemoReturnDisposal, DemoReturnInspection, DemoReturnReception } from './return-transitions';
@@ -31,6 +32,7 @@ export class DemoPostSaleCommands {
   request(actorId: string, command: string, orderId: string, selections: readonly DemoReturnSelection[]): DemoReturnRequest {
     this.port.requireCustomerAccess(actorId);
     const snapshot = this.port.snapshot();
+    DemoReturnIdentity.requireUnique(snapshot.returns);
     const order = snapshot.orders.find(value => value.id === orderId && value.actor === actorId);
     if (!order || order.payment !== PaymentStatus.Approved || order.shipment !== ShipmentStatus.Delivered) throw new Error('La devolución requiere un pedido propio, pagado y entregado.');
     const normalizedCommand = command.trim();
@@ -60,6 +62,7 @@ export class DemoPostSaleCommands {
         return { sku: bought.sku, variantId: bought.variantId, name: bought.name, quantity: selection.quantity, refund: new DemoRefundAllocation().amount(bought.unit * bought.quantity, bought.quantity, prior, selection.quantity), reason: selection.reason, disposition: DemoReturnDisposition.Pending, accounting: DemoReturnAccounting.NotRecorded };
       }),
     };
+    DemoReturnIdentity.requireUnique([...snapshot.returns, request]);
     snapshot.returns.push(request);
     this.record(order, request, DemoPostSaleEventKind.Requested, request.status.label);
     return request;
@@ -127,6 +130,7 @@ export class DemoPostSaleCommands {
 
   private find(requestId: string): { order: DemoPostSaleOrder; request: DemoReturnRequest } {
     const snapshot = this.port.snapshot();
+    DemoReturnIdentity.requireUnique(snapshot.returns);
     const request = snapshot.returns.find(value => value.id === requestId);
     const order = request ? snapshot.orders.find(value => value.id === request.orderId) : undefined;
     if (!request || !order || request.status === DemoReturnStatus.Unknown || request.lines.some(line => line.reason === DemoReturnReason.Unknown)) throw new Error('Devolución no disponible.');

@@ -179,3 +179,12 @@ líneas congeladas, no el catálogo actual. Focal CORE 23/23, suite 92 archivos 
 El cierre browser y sus métricas se registran en fe-comp05-evidence.md. Se
 mantiene implemented_local_pending_independent_review_and_ci: re-revisión del
 diff y CI todavía pendientes; no push ni declaración merge-ready.
+
+2026-10-20: corrección NO-GO security FE-COMP-05 sobre bfd7a21. RMA exige
+unicidad global antes de validar pedidos; decoder y comandos rechazan identidad
+ambigua atómicamente. Intenciones usan los patrones cerrados de DemoScreen y
+validación de segmentos, cubriendo catálogo, detalle USER y Mercado Libre sin
+abrir redirects ni relajar roles/ownership. Focal CORE 51/51, full unit 93
+archivos / 471 pruebas, lint/tsc/ngc/arq y ambos builds PASS. Browser focal de
+intención 12/12 PASS; métricas del pase completo en fe-comp05-evidence.md.
+Siguen pendientes re-revisión independiente y CI; sin push.
