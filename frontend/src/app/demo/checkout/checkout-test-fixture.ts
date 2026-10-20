@@ -1,11 +1,11 @@
 import { DemoProductDraftEditor } from '../catalog/product-draft-editor';
 import { DemoCatalogQuery } from '../catalog/demo-catalog-query';
 import { DemoCatalogCommands } from '../catalog/demo-catalog-commands';
-import { DemoCartCommands } from './demo-cart-commands';
+import { DemoCartCommands, type DemoCartCommandPort } from './demo-cart-commands';
 import type { DemoCheckoutSnapshot } from './checkout-model';
 
 /** Isolated test composition; application composition belongs to the integration slice. */
-export function checkoutFixture() {
+export function checkoutFixture(overrides: Partial<DemoCartCommandPort> = {}) {
   const editor = new DemoProductDraftEditor(() => 'second-variant');
   const product = editor.addVariant(editor.create('TEST-1'));
   product.name = 'Producto de prueba';
@@ -22,6 +22,6 @@ export function checkoutFixture() {
   };
   const commit = () => { snapshot.revision++; };
   const commands = new DemoCatalogCommands({ catalog, snapshot: () => snapshot, requireCatalogAccess: id => { if (id !== 'admin') throw new Error('Sin permiso.'); }, requireModule: () => {}, commit });
-  const cart = new DemoCartCommands({ catalog, snapshot: () => snapshot, actor, requireCustomerAccess: actor, requireModule: () => {}, commit, id: () => String(++sequence), now: () => '2026-10-20T12:00:00Z', paymentPending: () => {}, paymentResolved: () => {} });
+  const cart = new DemoCartCommands({ catalog, snapshot: () => snapshot, actor, requireCustomerAccess: actor, requirePaymentAccess: (actorId, order) => { actor(actorId); if (actorId !== order.actor) throw new Error('Sin permiso para operar este pago.'); }, requireModule: () => {}, commit, id: () => String(++sequence), now: () => '2026-10-20T12:00:00Z', paymentPending: () => {}, paymentResolved: () => {}, ...overrides });
   return { snapshot, product, actor: snapshot.actors[0], catalog, commands, cart, editor };
 }
