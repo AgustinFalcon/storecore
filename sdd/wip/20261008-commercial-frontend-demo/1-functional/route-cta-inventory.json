@@ -1,6 +1,6 @@
 {
   "status":"initial_required_action_groups_not_final_dom_inventory",
-  "baseline":"ef21e612d13a2b104dd7c96fb1f97ae4e7ca8ce2",
+  "baseline":"9a305b940b24d68c6bb80108060996b6210546a5",
   "sharedActions":["brand-home","search-submit","desktop-navigation","mobile-navigation-open","mobile-navigation-close","account-navigation","cart-navigation","logout","demo-scenario-select","demo-reset-open","demo-reset-confirm","demo-reset-cancel","dialog-close","error-retry","pagination-next","pagination-previous","filter-clear"],
   "requiredStates":["loading","empty","error-retry","success","invalid-input","forbidden","unknown"],
   "finalInventoryRule":"Expand groups into unique routeId/ctaId per actual interactive action, map each to scenario/test assertion and evidence; non-applicable states require reason. Compare final DOM and route config; no untracked CTA.",
