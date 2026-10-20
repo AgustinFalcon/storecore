@@ -152,3 +152,5 @@ ambos se ejecutarán en la etapa de PR que el usuario pidió tratar después. No
 declara merge-ready ni homologación real. El validador distribuido de SDD-kit
 sigue `BLOCKED_TOOLING` por ausencia de `tools/shared/validator-utils.sh`; no se
 falsea ese resultado.
+
+2026-10-20: promoción documental limpia sobre `master` `95e0c88383e57dd80747b8de50fc00629bd90494`. Se preservan specs funcionales/técnicos, tareas, manifiestos, briefs y evidencia textual; las capturas PNG regenerables se excluyen para evitar rutas Windows no portables y peso binario innecesario. El backup local recuperable queda fuera del PR. Esta promoción no atribuye los gates históricos al SHA nuevo: requiere review exact-head y CI del PR antes de mergear.

@@ -73,8 +73,9 @@ Evidencia final:
 - matriz de CTA y recorridos: 8/8 PASS;
 - regresión comercial: 11/11 PASS;
 - regresión visual/estado: 6/6 PASS;
-- set responsive definitivo: 3/3 PASS y 60 PNG preservados en
-  `4-implementation/evidence/final-visual/` (20 superficies por 390/768/1440);
+- set responsive definitivo: 3/3 PASS y 60 PNG generados en la corrida original
+  (20 superficies por 390/768/1440). La promoción limpia conserva manifiestos
+  y evidencia textual; los binarios regenerables no se versionan en este corte;
 - UI visual APPROVE, UX competitivo APPROVE y Product Owner APPROVE, sin P1/P2
   reproducibles pendientes.
 
