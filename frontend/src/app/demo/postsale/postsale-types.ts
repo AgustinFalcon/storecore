@@ -57,6 +57,25 @@ export class DemoReturnAccounting {
   static fromWire(raw: unknown): DemoReturnAccounting { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
+/** Closed discriminator for durable post-sale events; status alone is not an event identity. */
+export class DemoPostSaleEventKind {
+  private constructor(readonly wire: string) {}
+  static readonly Requested = new DemoPostSaleEventKind('requested');
+  static readonly Cancelled = new DemoPostSaleEventKind('cancelled');
+  static readonly Decided = new DemoPostSaleEventKind('decided');
+  static readonly Received = new DemoPostSaleEventKind('received');
+  static readonly Inspected = new DemoPostSaleEventKind('inspected');
+  static readonly Disposed = new DemoPostSaleEventKind('disposed');
+  static readonly Refunded = new DemoPostSaleEventKind('refunded');
+  static readonly Unknown = new DemoPostSaleEventKind('');
+  static readonly all = [this.Requested, this.Cancelled, this.Decided, this.Received, this.Inspected, this.Disposed, this.Refunded] as const;
+  static fromWire(raw: unknown): DemoPostSaleEventKind { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+  identity(requestId: string, effectiveRevision: number): string {
+    if (this === DemoPostSaleEventKind.Unknown || !requestId || !Number.isSafeInteger(effectiveRevision) || effectiveRevision < 1) throw new Error('El evento de postventa no tiene una identidad válida.');
+    return `${requestId}-${this.wire}-${effectiveRevision}`;
+  }
+}
+
 export class DemoRefundStatus {
   private constructor(readonly wire: string, readonly label: string) {}
   static readonly None = new DemoRefundStatus('none', 'Sin reembolso');

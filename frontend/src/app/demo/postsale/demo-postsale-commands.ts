@@ -5,7 +5,7 @@ import type { DemoCheckoutSnapshot } from '../checkout/checkout-model';
 import { DemoRefundAllocation } from './refund-allocation';
 import { DemoReturnPolicy } from './return-policy';
 import { DemoReturnDecision, DemoReturnDisposal, DemoReturnInspection, DemoReturnReception } from './return-transitions';
-import { DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus, demoReturnLineKey, type DemoPostSaleAlert, type DemoPostSaleOrder, type DemoReturnRequest, type DemoReturnSelection } from './postsale-types';
+import { DemoPostSaleEventKind, DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus, demoReturnLineKey, type DemoPostSaleAlert, type DemoPostSaleOrder, type DemoReturnRequest, type DemoReturnSelection } from './postsale-types';
 
 export interface DemoPostSaleSnapshot extends Omit<DemoCheckoutSnapshot, 'orders'> {
   orders: DemoPostSaleOrder[];
@@ -60,7 +60,7 @@ export class DemoPostSaleCommands {
       }),
     };
     snapshot.returns.push(request);
-    this.record(order, request, request.status.label);
+    this.record(order, request, DemoPostSaleEventKind.Requested, request.status.label);
     return request;
   }
 
@@ -71,25 +71,25 @@ export class DemoPostSaleCommands {
     if (request.status === DemoReturnStatus.Cancelled) return;
     if (request.status !== DemoReturnStatus.Requested) throw new Error('La solicitud ya fue procesada; no se puede cancelar.');
     request.status = DemoReturnStatus.Cancelled;
-    this.record(order, request, request.status.label);
+    this.record(order, request, DemoPostSaleEventKind.Cancelled, request.status.label);
   }
 
   decide(adminId: string, requestId: string, approve: boolean, reason: string): void {
     this.port.requireAdminAccess(adminId);
     const { order, request } = this.find(requestId);
-    if (new DemoReturnDecision().apply(request, approve, reason)) this.record(order, request, `${request.status.label}: ${request.decisionReason}`);
+    if (new DemoReturnDecision().apply(request, approve, reason)) this.record(order, request, DemoPostSaleEventKind.Decided, `${request.status.label}: ${request.decisionReason}`);
   }
 
   receive(adminId: string, requestId: string): void {
     this.port.requireAdminAccess(adminId);
     const { order, request } = this.find(requestId);
-    if (new DemoReturnReception().apply(request)) this.record(order, request, request.status.label);
+    if (new DemoReturnReception().apply(request)) this.record(order, request, DemoPostSaleEventKind.Received, request.status.label);
   }
 
   inspect(adminId: string, requestId: string, notes: string, result: DemoReturnInspectionResult): void {
     this.port.requireAdminAccess(adminId);
     const { order, request } = this.find(requestId);
-    if (new DemoReturnInspection().apply(request, notes, result)) this.record(order, request, `${result.label}: ${request.inspectionNotes}`);
+    if (new DemoReturnInspection().apply(request, notes, result)) this.record(order, request, DemoPostSaleEventKind.Inspected, `${result.label}: ${request.inspectionNotes}`);
   }
 
   dispose(adminId: string, requestId: string, outcomes: readonly { sku: string; variantId: string; disposition: DemoReturnDisposition }[]): void {
@@ -106,7 +106,7 @@ export class DemoPostSaleCommands {
       this.port.catalog.refreshTotals(product);
       snapshot.movements.push({ id: `${request.id}-${line.sku}-${line.variantId}`, sku: line.sku, variantId: line.variantId, delta: line.quantity, reason: `${line.disposition.label} · ${request.id}` });
     }
-    this.record(order, request, request.status.label, true);
+    this.record(order, request, DemoPostSaleEventKind.Disposed, request.status.label, true);
   }
 
   refund(adminId: string, requestId: string): void {
@@ -119,7 +119,7 @@ export class DemoPostSaleCommands {
     request.status = DemoReturnStatus.Refunded;
     request.refundedAmount = amount;
     request.refundId = `SIM-REFUND-${request.id}`;
-    this.record(order, request, `${request.status.label} · ${request.refundId}`);
+    this.record(order, request, DemoPostSaleEventKind.Refunded, `${request.status.label} · ${request.refundId}`);
   }
 
   private find(requestId: string): { order: DemoPostSaleOrder; request: DemoReturnRequest } {
@@ -130,11 +130,13 @@ export class DemoPostSaleCommands {
     return { order, request };
   }
 
-  private record(order: DemoPostSaleOrder, request: DemoReturnRequest, text: string, projectStock = false): void {
+  private record(order: DemoPostSaleOrder, request: DemoReturnRequest, event: DemoPostSaleEventKind, text: string, projectStock = false): void {
+    const snapshot = this.port.snapshot();
     const createdAt = this.port.now();
+    const eventRevision = snapshot.revision + 1;
     request.history.push(`${text} · ${createdAt}`);
     order.history.push(`${text} · ${createdAt}`);
-    this.port.snapshot().postSaleAlerts.push({ id: `${request.id}-${request.status.wire}`, orderId: order.id, actorId: order.actor, text, createdAt });
+    snapshot.postSaleAlerts.push({ id: event.identity(request.id, eventRevision), orderId: order.id, actorId: order.actor, text, createdAt });
     this.port.commit(projectStock);
   }
 }

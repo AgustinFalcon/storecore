@@ -98,6 +98,26 @@ describe('DemoPostSaleCommands', () => {
     expect(request.status).toBe(DemoReturnStatus.Inspected);
   });
 
+  it('identifies every effective inspection event and ignores an identical retry', () => {
+    const fixture = postSaleFixture();
+    const request = fixture.commands.request('customer', 'inspection-events', fixture.order.id, selection(fixture.order.lines[0]));
+    fixture.commands.decide('admin', request.id, true, 'Autorizada');
+    fixture.commands.receive('admin', request.id);
+    const receptionAlert = fixture.snapshot.postSaleAlerts.at(-1)!;
+    fixture.commands.inspect('admin', request.id, 'Falta validar serie', DemoReturnInspectionResult.NeedsReview);
+    const firstAlert = fixture.snapshot.postSaleAlerts.at(-1)!;
+    expect(firstAlert.id).not.toBe(receptionAlert.id);
+    const revision = fixture.snapshot.revision;
+    fixture.commands.inspect('admin', request.id, 'Falta validar serie', DemoReturnInspectionResult.NeedsReview);
+    expect(fixture.snapshot.revision).toBe(revision);
+    expect(fixture.snapshot.postSaleAlerts.at(-1)).toBe(firstAlert);
+    fixture.commands.inspect('admin', request.id, 'Serie validada; falta probar accesorios', DemoReturnInspectionResult.NeedsReview);
+    const secondAlert = fixture.snapshot.postSaleAlerts.at(-1)!;
+    expect(secondAlert.id).not.toBe(firstAlert.id);
+    expect(firstAlert.id).toContain('-inspected-');
+    expect(secondAlert.id).toContain('-inspected-');
+  });
+
   it('restocks sellable and records damaged physical units without increasing availability', () => {
     const fixture = postSaleFixture();
     const [sellable, damaged] = fixture.order.lines;
