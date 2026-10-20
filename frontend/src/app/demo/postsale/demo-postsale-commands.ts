@@ -1,6 +1,7 @@
 import { PaymentStatus } from '../../domain/order/payment-status';
 import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { DemoCatalogQuery } from '../catalog/demo-catalog-query';
+import { DemoProductPolicy } from '../catalog/product-policy';
 import type { DemoCheckoutSnapshot } from '../checkout/checkout-model';
 import { DemoRefundAllocation } from './refund-allocation';
 import { DemoReturnPolicy } from './return-policy';
@@ -97,8 +98,11 @@ export class DemoPostSaleCommands {
     const snapshot = this.port.snapshot();
     const { order, request } = this.find(requestId);
     const dispositions = new Map(outcomes.map(value => [demoReturnLineKey(value), value.disposition]));
+    const disposal = new DemoReturnDisposal();
+    if (!disposal.requiresMutation(request, dispositions)) return;
     const inventory = request.lines.map(line => ({ line, product: this.port.catalog.product(line.sku), variant: this.port.catalog.variant(line.sku, line.variantId) }));
-    if (!new DemoReturnDisposal().apply(request, dispositions)) return;
+    if (inventory.some(({ product, variant }) => !DemoProductPolicy.knownProduct(product) || !DemoProductPolicy.knownVariant(variant))) throw new Error('El producto o la variante necesitan conciliación antes de disponer inventario.');
+    disposal.apply(request, dispositions);
     for (const { line, product, variant } of inventory) {
       variant.onHand += line.quantity;
       if (line.disposition === DemoReturnDisposition.Damaged) variant.notSellable += line.quantity;

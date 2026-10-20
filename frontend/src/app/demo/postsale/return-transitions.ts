@@ -31,7 +31,7 @@ export class DemoReturnInspection {
 }
 
 export class DemoReturnDisposal {
-  apply(request: DemoReturnRequest, dispositions: ReadonlyMap<string, DemoReturnDisposition>): boolean {
+  requiresMutation(request: DemoReturnRequest, dispositions: ReadonlyMap<string, DemoReturnDisposition>): boolean {
     const valid = dispositions.size === request.lines.length && request.lines.every(line => DemoReturnDisposition.all.includes(dispositions.get(demoReturnLineKey(line)) ?? DemoReturnDisposition.Unknown));
     if (!valid) throw new Error('Elegí una disposición válida para cada producto inspeccionado.');
     if (request.status === DemoReturnStatus.Disposed || request.status === DemoReturnStatus.Refunded) {
@@ -40,6 +40,11 @@ export class DemoReturnDisposal {
     }
     if (request.status !== DemoReturnStatus.Inspected || request.inspectionResult !== DemoReturnInspectionResult.Complete) throw new Error('La devolución necesita una inspección completa antes de disponer inventario.');
     if (request.lines.some(line => line.accounting !== DemoReturnAccounting.NotRecorded || line.disposition !== DemoReturnDisposition.Pending)) throw new Error('La contabilidad de la devolución no permite volver a disponer inventario.');
+    return true;
+  }
+
+  apply(request: DemoReturnRequest, dispositions: ReadonlyMap<string, DemoReturnDisposition>): boolean {
+    if (!this.requiresMutation(request, dispositions)) return false;
     request.lines.forEach(line => line.disposition = dispositions.get(demoReturnLineKey(line))!);
     request.status = DemoReturnStatus.Disposed;
     return true;

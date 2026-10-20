@@ -1,4 +1,5 @@
 import { ShipmentStatus } from '../../domain/order/shipment-status';
+import { OutletScope, ProductCondition, ProductPublication, VariantSaleState } from '../catalog/catalog-types';
 import { DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus } from './postsale-types';
 import { DemoReturnPolicy } from './return-policy';
 import { postSaleFixture } from './postsale-test-fixture';
@@ -178,6 +179,58 @@ describe('DemoPostSaleCommands', () => {
     expect(() => fixture.commands.dispose('customer', request.id, [])).toThrow('administrativo');
     expect(() => fixture.commands.dispose('admin', request.id, [{ sku: first.sku, variantId: first.variantId, disposition: DemoReturnDisposition.Restock }])).toThrow('cada producto');
     expect(JSON.stringify(fixture.snapshot)).toBe(before);
+  });
+
+  it('blocks disposal atomically when the product or returned variant has an Unknown catalog type', () => {
+    const corruptions = [
+      (fixture: ReturnType<typeof postSaleFixture>) => { fixture.product.publication = ProductPublication.Unknown; },
+      (fixture: ReturnType<typeof postSaleFixture>) => { fixture.product.variants[0].saleState = VariantSaleState.Unknown; },
+      (fixture: ReturnType<typeof postSaleFixture>) => { fixture.product.variants[0].condition = ProductCondition.Unknown; },
+      (fixture: ReturnType<typeof postSaleFixture>) => {
+        fixture.product.variants[0].condition = ProductCondition.Outlet;
+        fixture.product.variants[0].outlet = {
+          scope: OutletScope.Unknown,
+          reference: 'unknown-scope',
+          notes: 'Pendiente',
+          defects: 'Pendiente',
+          warrantyTerms: 'Pendiente',
+          media: fixture.product.media.map(value => ({ ...value })),
+        };
+      },
+    ];
+    for (const [index, corrupt] of corruptions.entries()) {
+      const fixture = postSaleFixture();
+      const line = fixture.order.lines[0];
+      const request = fixture.commands.request('customer', `unknown-catalog-${index}`, fixture.order.id, selection(line));
+      fixture.commands.decide('admin', request.id, true, 'Autorizada');
+      fixture.commands.receive('admin', request.id);
+      fixture.commands.inspect('admin', request.id, 'Completa', DemoReturnInspectionResult.Complete);
+      corrupt(fixture);
+      const before = JSON.stringify(fixture.snapshot);
+      expect(() => fixture.commands.dispose('admin', request.id, [{ sku: line.sku, variantId: line.variantId, disposition: DemoReturnDisposition.Restock }])).toThrow('conciliación');
+      expect(JSON.stringify(fixture.snapshot)).toBe(before);
+      expect(request.status).toBe(DemoReturnStatus.Inspected);
+      expect(request.lines[0].accounting).toBe(DemoReturnAccounting.NotRecorded);
+    }
+  });
+
+  it('accepts an identical disposal replay before consulting a catalog entry deleted after success', () => {
+    const fixture = postSaleFixture();
+    const line = fixture.order.lines[0];
+    const request = fixture.commands.request('customer', 'replay-without-catalog', fixture.order.id, selection(line));
+    fixture.commands.decide('admin', request.id, true, 'Autorizada');
+    fixture.commands.receive('admin', request.id);
+    fixture.commands.inspect('admin', request.id, 'Completa', DemoReturnInspectionResult.Complete);
+    const outcome = [{ sku: line.sku, variantId: line.variantId, disposition: DemoReturnDisposition.Restock }];
+    fixture.commands.dispose('admin', request.id, outcome);
+    const revision = fixture.snapshot.revision;
+    const movements = fixture.snapshot.movements.length;
+    const alerts = fixture.snapshot.postSaleAlerts.length;
+    fixture.product.variants = fixture.product.variants.filter(value => value.id !== line.variantId);
+    expect(() => fixture.commands.dispose('admin', request.id, outcome)).not.toThrow();
+    expect(fixture.snapshot.revision).toBe(revision);
+    expect(fixture.snapshot.movements).toHaveLength(movements);
+    expect(fixture.snapshot.postSaleAlerts).toHaveLength(alerts);
   });
 
   it('fails closed for Unknown states instead of treating raw strings as valid', () => {
