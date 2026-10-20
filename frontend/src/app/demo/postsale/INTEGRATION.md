@@ -15,6 +15,9 @@ composed in the later buyer/operator runtime slices.
 - Persist closed values only through `DemoPostSaleWire.request`; validate the
   full order aggregate with `DemoPostSaleWire.validateOrder` before exposing a
   restored snapshot.
+- Treat an order line as the composite `sku + variantId` in selection,
+  availability, deduplication, disposition and wire validation. A variant ID is
+  not assumed globally unique.
 - Render `DemoReturnStatus`, `DemoReturnReason`,
   `DemoReturnInspectionResult`, `DemoReturnDisposition`,
   `DemoReturnAccounting` and `DemoRefundStatus` directly. A view must not
@@ -28,6 +31,9 @@ an independent object and repeated identical commands are no-ops. Disposition
 is the only inventory effect: sellable units increase availability, while
 damaged units increase physical and non-sellable quantities together. Refund is
 separate, excludes delivery cost and never changes the original order total.
+`NeedsReview` remains in `Received` and requires a later `Complete` inspection;
+`Unknown` never authorizes a write. Persisted status, inspection, disposition
+and accounting combinations are validated as one matrix before composition.
 
 Provider refunds, bank settlement, ARCA documents, shipment transitions,
 general inventory screens, alerts UI and HTTP endpoints are outside this slice.

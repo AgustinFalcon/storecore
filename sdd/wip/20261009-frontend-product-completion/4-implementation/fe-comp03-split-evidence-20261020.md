@@ -20,11 +20,12 @@ Mercado Libre and productive provider calls are not part of this commit.
 - `npx tsc -p tsconfig.app.json --noEmit`: PASS.
 - `npx tsc -p tsconfig.spec.json --noEmit`: PASS.
 - `npx vitest run --globals src/app/demo/postsale --environment jsdom`: PASS,
-  3 files / 13 tests.
+  3 files / 17 tests. The re-review regressions cover composite line identity,
+  incomplete/Unknown inspection and the persisted status/accounting matrix.
 - `npm run lint`: PASS.
 - `npm run check:architecture`: PASS, 6 policy tests and architecture scan.
 - `npm test -- --watch=false`: PASS outside the Windows filesystem sandbox,
-  84 files / 354 tests. The first sandboxed Angular invocation returned the
+  84 files / 358 tests. The first sandboxed Angular invocation returned the
   previously documented false `Acceso denegado`/unresolved-file failure; it is
   not counted as product failure or PASS.
 - `npm run build`: PASS, product artifact `dist/storecore-frontend`.

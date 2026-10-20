@@ -82,7 +82,7 @@ export class DemoReturnQueueFilter {
   static fromWire(raw: unknown): DemoReturnQueueFilter { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
-export interface DemoReturnSelection { variantId: string; quantity: number; reason: DemoReturnReason; }
+export interface DemoReturnSelection { sku: string; variantId: string; quantity: number; reason: DemoReturnReason; }
 export interface DemoReturnLine { sku: string; variantId: string; name: string; quantity: number; refund: number; reason: DemoReturnReason; disposition: DemoReturnDisposition; accounting: DemoReturnAccounting; }
 export interface DemoReturnRequest {
   id: string;
@@ -101,3 +101,8 @@ export interface DemoReturnRequest {
 }
 export interface DemoPostSaleAlert { id: string; orderId: string; actorId: string; text: string; createdAt: string; }
 export interface DemoPostSaleOrder extends DemoOrder { returns?: DemoReturnRequest[]; }
+
+/** Product and variant are jointly authoritative; neither value is globally unique on its own. */
+export function demoReturnLineKey(value: { sku: string; variantId: string }): string {
+  return `${value.sku}\u0000${value.variantId}`;
+}

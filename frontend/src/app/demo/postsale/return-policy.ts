@@ -1,11 +1,12 @@
-import { DemoRefundStatus, DemoReturnStatus, type DemoPostSaleOrder, type DemoReturnRequest } from './postsale-types';
+import { DemoRefundStatus, DemoReturnStatus, demoReturnLineKey, type DemoPostSaleOrder, type DemoReturnRequest } from './postsale-types';
 
 export class DemoReturnPolicy {
-  available(order: DemoPostSaleOrder, returns: readonly DemoReturnRequest[], variantId: string): number {
-    const bought = order.lines.find(line => line.variantId === variantId)?.quantity ?? 0;
+  available(order: DemoPostSaleOrder, returns: readonly DemoReturnRequest[], sku: string, variantId: string): number {
+    const identity = demoReturnLineKey({ sku, variantId });
+    const bought = order.lines.find(line => demoReturnLineKey(line) === identity)?.quantity ?? 0;
     const reserved = returns.filter(request => request.orderId === order.id && request.status.reservesQuantity)
       .flatMap(request => request.lines)
-      .filter(line => line.variantId === variantId)
+      .filter(line => demoReturnLineKey(line) === identity)
       .reduce((sum, line) => sum + line.quantity, 0);
     return bought - reserved;
   }

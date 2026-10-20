@@ -5,7 +5,7 @@ import type { DemoCheckoutSnapshot } from '../checkout/checkout-model';
 import { DemoRefundAllocation } from './refund-allocation';
 import { DemoReturnPolicy } from './return-policy';
 import { DemoReturnDecision, DemoReturnDisposal, DemoReturnInspection, DemoReturnReception } from './return-transitions';
-import { DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus, type DemoPostSaleAlert, type DemoPostSaleOrder, type DemoReturnRequest, type DemoReturnSelection } from './postsale-types';
+import { DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus, demoReturnLineKey, type DemoPostSaleAlert, type DemoPostSaleOrder, type DemoReturnRequest, type DemoReturnSelection } from './postsale-types';
 
 export interface DemoPostSaleSnapshot extends Omit<DemoCheckoutSnapshot, 'orders'> {
   orders: DemoPostSaleOrder[];
@@ -35,12 +35,12 @@ export class DemoPostSaleCommands {
     const normalizedCommand = command.trim();
     const repeated = snapshot.returns.find(value => value.orderId === orderId && value.command === normalizedCommand);
     if (repeated) {
-      const same = repeated.lines.length === selections.length && repeated.lines.every(line => selections.some(selection => selection.variantId === line.variantId && selection.quantity === line.quantity && selection.reason === line.reason));
+      const same = repeated.lines.length === selections.length && repeated.lines.every(line => selections.some(selection => demoReturnLineKey(selection) === demoReturnLineKey(line) && selection.quantity === line.quantity && selection.reason === line.reason));
       if (!same) throw new Error('Esta operación ya existe con otros datos.');
       return repeated;
     }
     if (snapshot.returns.some(value => value.orderId === orderId && (value.status === DemoReturnStatus.Unknown || value.lines.some(line => line.reason === DemoReturnReason.Unknown)))) throw new Error('La postventa guardada necesita conciliación antes de continuar.');
-    if (!normalizedCommand || !selections.length || new Set(selections.map(value => value.variantId)).size !== selections.length || selections.some(value => !Number.isInteger(value.quantity) || value.quantity < 1 || value.quantity > this.policy.available(order, snapshot.returns, value.variantId) || !DemoReturnReason.all.includes(value.reason))) throw new Error('Seleccioná productos, cantidades disponibles y un motivo por producto.');
+    if (!normalizedCommand || !selections.length || new Set(selections.map(demoReturnLineKey)).size !== selections.length || selections.some(value => !Number.isInteger(value.quantity) || value.quantity < 1 || value.quantity > this.policy.available(order, snapshot.returns, value.sku, value.variantId) || !DemoReturnReason.all.includes(value.reason))) throw new Error('Seleccioná productos, cantidades disponibles y un motivo por producto.');
     const request: DemoReturnRequest = {
       id: `RMA-${this.port.id()}`,
       command: normalizedCommand,
@@ -54,8 +54,8 @@ export class DemoPostSaleCommands {
       refundedAmount: 0,
       history: [`Solicitud creada · ${this.port.now()}`],
       lines: selections.map(selection => {
-        const bought = order.lines.find(line => line.variantId === selection.variantId)!;
-        const prior = bought.quantity - this.policy.available(order, snapshot.returns, selection.variantId);
+        const bought = order.lines.find(line => demoReturnLineKey(line) === demoReturnLineKey(selection))!;
+        const prior = bought.quantity - this.policy.available(order, snapshot.returns, selection.sku, selection.variantId);
         return { sku: bought.sku, variantId: bought.variantId, name: bought.name, quantity: selection.quantity, refund: new DemoRefundAllocation().amount(bought.unit * bought.quantity, bought.quantity, prior, selection.quantity), reason: selection.reason, disposition: DemoReturnDisposition.Pending, accounting: DemoReturnAccounting.NotRecorded };
       }),
     };
@@ -92,11 +92,11 @@ export class DemoPostSaleCommands {
     if (new DemoReturnInspection().apply(request, notes, result)) this.record(order, request, `${result.label}: ${request.inspectionNotes}`);
   }
 
-  dispose(adminId: string, requestId: string, outcomes: readonly { variantId: string; disposition: DemoReturnDisposition }[]): void {
+  dispose(adminId: string, requestId: string, outcomes: readonly { sku: string; variantId: string; disposition: DemoReturnDisposition }[]): void {
     this.port.requireAdminAccess(adminId);
     const snapshot = this.port.snapshot();
     const { order, request } = this.find(requestId);
-    const dispositions = new Map(outcomes.map(value => [value.variantId, value.disposition]));
+    const dispositions = new Map(outcomes.map(value => [demoReturnLineKey(value), value.disposition]));
     const inventory = request.lines.map(line => ({ line, product: this.port.catalog.product(line.sku), variant: this.port.catalog.variant(line.sku, line.variantId) }));
     if (!new DemoReturnDisposal().apply(request, dispositions)) return;
     for (const { line, product, variant } of inventory) {
