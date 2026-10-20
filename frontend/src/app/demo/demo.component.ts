@@ -1,16 +1,28 @@
-import { DemoFulfillmentComponent } from './demo-fulfillment.component';
-import { DemoInboxComponent } from './demo-inbox.component';
-import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
 import { Component, computed, inject, signal, DestroyRef, ViewChild } from '@angular/core';
-
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { DemoProductEditorComponent } from './demo-product-editor';
+import { DemoPostSaleComponent } from './demo-postsale.component';
+import { DemoFulfillmentComponent } from './demo-fulfillment.component';
+import { DemoInboxComponent } from './demo-inbox.component';
 import { DemoAlertRead, DemoInboxPolicy } from './demo-inbox';
 import { DemoMarketplaceComponent } from './demo-marketplace.component';
-import { DemoMLAccountStatus, DemoMarketSignalRead, ensureMarketplace, ensureCompetitorDetails, marketplaceVariants } from './demo-marketplace';
+import { DemoMLAccountStatus, DemoMarketSignalRead, ensureMarketplace, ensureCompetitorDetails } from './demo-marketplace';
+import { DemoAccessComponent } from './demo-access.component';
+import { DemoAdminFilter, DemoAdminSort, DEMO_ADMIN_LIMIT } from './demo-admin-selection';
+import { DemoCustomerOrderFilter } from './demo-customer-order-filter';
+import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
+import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { DemoProductVariantRecord, DemoProductMedia } from './catalog/catalog-model';
+import { DemoCampaignState } from './demo-config-types';
+import { DemoRole } from './demo-roles';
+import { DemoCheckoutFlow } from './checkout/demo-checkout-flow';
+import { DemoDeliveryPolicy } from './checkout/demo-delivery-policy';
+import { ProductCondition, ProductPublication } from './catalog/catalog-types';
+import { DemoProductDraftEditor } from './catalog/product-draft-editor';
+import { DemoProductPolicy } from './catalog/product-policy';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
@@ -30,8 +42,9 @@ export class DemoDialog {
   static readonly Tracking = new DemoDialog('Seguimiento de entrega');
   static readonly Receipt = new DemoDialog('Comprobante de demostración');
   static readonly Incident = new DemoDialog('Registrar incidencia');
+  static readonly Zoom = new DemoDialog('Ampliar imagen');
   static readonly Unknown = new DemoDialog('Acción desconocida');
-  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident, this.Zoom].find(value => value.label === raw) ?? this.Unknown; }
 }
 export class CatalogSort {
   private constructor(readonly wire: string, readonly label: string, readonly compare: (left: DemoProduct, right: DemoProduct) => number) {}
@@ -66,7 +79,7 @@ export class DemoRootComponent {
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoFulfillmentComponent, DemoInboxComponent, DemoMarketplaceComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoProductEditorComponent, DemoPostSaleComponent, DemoFulfillmentComponent, DemoInboxComponent, DemoMarketplaceComponent, DemoAccessComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
   @ViewChild(DemoFulfillmentComponent) private fulfillment?: DemoFulfillmentComponent;
   readonly state = inject(DemoApplicationState);
@@ -93,14 +106,34 @@ export class DemoPageComponent {
   competitorSku = 'DEMO-001';
   competitorThreshold = 1;
   readonly sorts = CatalogSort.all;
-  readonly Gallery = DemoGalleryView;
-  readonly gallery = signal(DemoGalleryView.Front);
-  get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
-  readonly variant = signal(DemoProductVariant.Standard);
+  readonly AdminFilter=DemoAdminFilter;
+  readonly adminFilters=DemoAdminFilter.all;
+  readonly adminSorts=DemoAdminSort.all;
+  readonly adminFilter=signal(DemoAdminFilter.fromWire(this.route.snapshot.queryParamMap.get('filter')??'all'));
+  readonly adminSort=signal(DemoAdminSort.Recent);
+  readonly adminPage=signal(0);
+  readonly adminLimit=DEMO_ADMIN_LIMIT;
+  adminFilterChanged(raw:string):void {this.adminFilter.set(DemoAdminFilter.fromWire(raw));this.adminPage.set(0);}
+  adminSortChanged(raw:string):void {this.adminSort.set(DemoAdminSort.fromWire(raw));this.adminPage.set(0);}
+  get adminCount():number{return this.screen===DemoScreen.Customers?this.selectedCustomers.length:this.screen===DemoScreen.AdminCatalog||this.screen===DemoScreen.Inventory?this.selectedAdminProducts.length:this.screen===DemoScreen.AdminOrders?this.selectedOrders.length:this.screen===DemoScreen.Content?this.contentBlocks.filter(value=>!this.search()||`${value.title} ${value.body}`.toLowerCase().includes(this.search().toLowerCase())).length:this.selectedCampaigns.length;}
+  get adminPageIndex():number{return Math.min(this.adminPage(),Math.max(0,Math.ceil(this.adminCount/this.adminLimit)-1));}
+  adminSlice<T>(values:T[]):T[]{return values.slice(this.adminPageIndex*this.adminLimit,(this.adminPageIndex+1)*this.adminLimit);}
+  get variants(): readonly DemoProductVariantRecord[] { return this.product ? this.state.commerce.variants(this.product.sku) : []; }
+  readonly variantId = signal('');
+  readonly imageId = signal('');
+  get selectedVariant(): DemoProductVariantRecord | undefined { return this.variants.find(value => value.id === (this.variantId() || this.variants[0]?.id)); }
+  get selectedStock(): number { return this.product && this.selectedVariant ? this.state.commerce.available(this.product.sku, this.selectedVariant.id) : 0; }
+  get selectedPrice(): number { return this.product && this.selectedVariant ? this.state.commerce.price(this.product.sku, this.selectedVariant.id) : 0; }
+  get galleryImages(): readonly DemoProductMedia[] { return this.selectedVariant?.outlet?.media ?? this.product?.media ?? []; }
+  get selectedImage(): DemoProductMedia | undefined { return this.galleryImages.find(image => image.id === this.imageId()) ?? this.galleryImages[0]; }
+  chooseImage(image: DemoProductMedia): void { this.imageId.set(image.id); }
   readonly Module = DemoModuleId;
   readonly pickupPoint = DEMO_PICKUP_POINT;
+  private readonly checkoutFlow = new DemoCheckoutFlow();
+  get deliveryMethods() { return DemoDeliveryPolicy.forCart(this.state.actor.cart, (sku, id) => this.state.commerce.catalog.variant(sku, id)); }
+  get cartPickupLocation(): string | null { return DemoDeliveryPolicy.pickupLocation(this.state.actor.cart, (sku, id) => this.state.commerce.catalog.variant(sku, id)); }
   readonly Math = Math;
-  readonly activeProduct = (product: DemoProduct): boolean => product.active;
+  readonly activeProduct = (product: DemoProduct): boolean => product.publication.published;
   readonly sampleManifest = JSON.stringify({ version: 1, title: 'Tu taller, mejor equipado' }, null, 2);
   readonly dialog = signal(DemoDialog.None);
   readonly step = signal(CheckoutStep.Address);
@@ -113,15 +146,11 @@ export class DemoPageComponent {
   readonly sort = signal(CatalogSort.Featured);
   readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
   readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
-  readonly filtered = computed(() => this.state.data.products.filter(product => product.active && (!this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())) && (!this.category() || product.category === this.category()) && (!this.brand() || product.brand === this.brand()) && (!this.onlyAvailable() || this.state.commerce.available(product.sku) > 0) && (!this.maxPrice() || this.state.commerce.price(product.sku) <= this.maxPrice() * 100)).sort(this.sort().compare));
+  readonly filtered = computed(() => this.state.data.products.filter(product => product.publication.published && (!this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())) && (!this.category() || product.category === this.category()) && (!this.brand() || product.brand === this.brand()) && (!this.onlyAvailable() || this.state.commerce.available(product.sku) > 0) && (!this.maxPrice() || this.state.commerce.price(product.sku) <= this.maxPrice() * 100)).sort(this.sort().compare));
   readonly products = computed(() => this.filtered().slice(this.page() * 6, this.page() * 6 + 6));
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
   private confirmation: (() => void) | null = null;
-  email = 'cliente@demo.invalid';
-  password = '';
-  showPassword = false;
-  chooseContext = false;
   quantity = 1;
   addressId = '';
   delivery = false;
@@ -135,18 +164,22 @@ export class DemoPageComponent {
   draftModule = DemoModuleId.Unknown;
   info = '';
   adjustmentSku = '';
+  adjustmentVariantId = '';
+  get adjustmentVariants(): DemoProductVariantRecord[] { return this.adjustmentSku ? this.state.commerce.variants(this.adjustmentSku) : []; }
   adjustmentDelta = 1;
   adjustmentReason = '';
-  selectedOrderStatus: PaymentStatus | null = null;
-  draftProduct: DemoProduct = { sku: '', name: '', category: 'Herramientas', brand: 'Norte', description: '', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar' };
+  selectedOrderStatus: PaymentStatus | null = this.route.snapshot.queryParamMap.get('payment') ? PaymentStatus.fromWire(this.route.snapshot.queryParamMap.get('payment')) : null;
+  private readonly draftEditor = new DemoProductDraftEditor(undefined, Array.from({length: 12}, (_, index) => `/assets/demo/DEMO-${String(index + 1).padStart(3, '0')}.svg`));
+  private editingRevision = 0;
+  draftProduct: DemoProduct = this.draftEditor.create();
   draftAddress: DemoAddress = { id: '', label: 'Casa', street: '', city: '', postal: '', primary: false };
-  draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, active: true, from: '2026-10-08', until: '2027-12-31' };
+  draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, state: DemoCampaignState.Active, from: '2026-10-08', until: '2027-12-31' };
   configName = 'Mi comercio';
   manifest = '';
-  removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
-  get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
-  productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
+  removed: { sku: string; quantity: number; variantId: string } | null = null;
+  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); this.adminPage.set(0); this.adminFilter.set(DemoAdminFilter.fromWire(params.get('filter')??'all')); this.selectedOrderStatus=params.get('payment')?PaymentStatus.fromWire(params.get('payment')):null; }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variantId.set(''); this.imageId.set(''); this.quantity = 1; }); }
+  get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.publication.published && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
+  productImage(product: DemoProduct): string { return product.media?.[0]?.src ?? '/assets/demo/product-placeholder.svg'; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
   selectPayment(raw: string): void { this.paymentMethod.set(DemoPaymentMethod.fromWire(raw)); }
   selectDelivery(raw: string): void { this.deliveryMethod.set(DemoDeliveryMethod.fromWire(raw)); this.delivery = this.deliveryMethod() !== DemoDeliveryMethod.Unknown; }
@@ -156,17 +189,30 @@ export class DemoPageComponent {
   get allowed(): boolean { return this.screen.admin ? this.state.context() === DemoContext.Admin : !this.screen.privateCustomer || this.state.context() === DemoContext.Customer; }
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
-  get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
-  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku) + line.variant.extraUnit })); }
+  get customerFilter() { return DemoCustomerOrderFilter.fromWire(this.route.snapshot.queryParamMap.get('customerId'), this.state.data.actors); }
+  get selectedOrders() { const values=this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && this.customerFilter.matches(order) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || `${order.id} ${order.actor} ${order.lines.map(line=>line.name).join(' ')}`.toLowerCase().includes(this.search().toLowerCase()))); return this.adminSort().apply(values); }
+  get orders() {return this.screen.admin?this.adminSlice(this.selectedOrders):this.selectedOrders;}
+  get cartLines() { return this.state.actor.cart.map(line => { const selected = this.state.commerce.catalog.variant(line.sku, line.variantId); return { ...line, variantId: selected.id, variantName: selected.label, attributes: selected.attributes, image: selected.outlet?.media.at(0) ?? this.state.commerce.product(line.sku).media.at(0), available: this.state.commerce.available(line.sku, selected.id), product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku, selected.id) }; }); }
+  get cartChanged(): boolean { return this.state.commerce.needsReconfirmation(this.state.actorId()); }
+  refreshCart(): void { this.state.run(() => this.state.commerce.refreshCart(this.state.actorId()), 'Resumen actualizado. Revisá los importes antes de confirmar.'); }
   get total(): number { return this.cartLines.reduce((sum, line) => sum + line.unit * line.quantity, 0); }
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
   get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < this.state.data.settings.lowStockThreshold); }
-  get pendingOrders() { return this.orders.filter(order => order.payment === PaymentStatus.Pending); }
-  get incidentOrders() { return this.orders.filter(order => !!order.incident); }
+  get lowVariantStock() { return this.state.data.products.filter(product=>product.publication.published).flatMap(product => this.state.commerce.variants(product.sku).filter(variant => variant.saleState.active && (variant.condition === ProductCondition.Standard || (variant.condition === ProductCondition.Outlet && variant.onHand > variant.notSellable)) && this.state.commerce.catalog.available(product.sku, variant.id) < this.state.data.settings.lowStockThreshold).map(variant => ({ product, variant }))); }
+  get pendingOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && this.customerFilter.matches(order) && order.payment === PaymentStatus.Pending); }
+  get incidentOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && this.customerFilter.matches(order) && !!order.incident); }
   get competitorAlerts(): number { return this.state.data.competitors.filter(value => value.unread).length; }
   get syncErrors(): number { return (this.state.data.syncJobs ?? []).filter(value => value.status === DemoSyncStatus.Failed).length; }
   get favoriteProducts(): DemoProduct[] { return this.state.data.products.filter(product => this.favorite(product.sku)); }
-  get adminProducts(): DemoProduct[] { return this.state.data.products.filter(product => !this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())); }
+  get selectedAdminProducts(): DemoProduct[] { const values=this.state.data.products.filter(product => (!this.search() || `${product.name} ${product.sku} ${product.brand} ${product.category}`.toLowerCase().includes(this.search().toLowerCase()))&&(!this.category()||product.category===this.category())&&this.adminFilter().product(product,Math.min(...this.state.commerce.variants(product.sku).filter(variant=>variant.saleState.active).map(variant=>this.state.commerce.catalog.available(product.sku,variant.id))),this.state.data.settings.lowStockThreshold)); return this.adminSort().apply(values); }
+  get selectedCustomers() { return this.state.data.actors.filter(actor => actor.role === DemoRole.Customer && (!this.search() || `${actor.firstName} ${actor.lastName} ${actor.email}`.toLowerCase().includes(this.search().toLowerCase()))).sort((left, right) => left.firstName.localeCompare(right.firstName)); }
+  get customers() { return this.adminSlice(this.selectedCustomers); }
+  customerOrders(id: string) { return this.state.data.orders.filter(order => order.actor === id); }
+  get adminProducts(): DemoProduct[] {return this.adminSlice(this.selectedAdminProducts);}
+  get selectedCampaigns():DemoCampaign[]{const values=this.state.data.campaigns.filter(value=>(!this.search()||`${value.title} ${value.sku}`.toLowerCase().includes(this.search().toLowerCase()))&&this.adminFilter().campaign(value));return this.adminSort().apply(values);}
+  get adminCampaigns():DemoCampaign[]{return this.adminSlice(this.selectedCampaigns);}
+  get visibleContentBlocks():DemoContentBlock[]{return this.adminSlice(this.contentBlocks.filter(value=>!this.search()||`${value.title} ${value.body}`.toLowerCase().includes(this.search().toLowerCase())));}
+  contentIndex(block:DemoContentBlock):number{return this.contentBlocks.findIndex(value=>value.id===block.id);}
   listing(sku: string) { return this.state.data.listings.find(value => value.sku === sku); }
   get mlAccount() { return ensureMarketplace(this.state.data).account; }
   get mlLinkedCount(): number { return ensureMarketplace(this.state.data).mappings.filter(mapping => mapping.status.eligible).length; }
@@ -176,23 +222,20 @@ export class DemoPageComponent {
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
   money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value / 100); }
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
+  adjustable(product: DemoProduct): boolean { return product.variants.some(variant => variant.condition === ProductCondition.Standard); }
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
-  get draftPrice(): number { return this.draftProduct.price / 100; }
-  set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
   clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(0); this.onlyAvailable.set(false); this.page.set(0); }
-  toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
-  selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
-  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
-  setQuantity(sku: string, raw: number | null): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN), 'Carrito actualizado.'); }
-  remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
-  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
-  signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
-  context(context: DemoContext): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; this.state.login(context, actor); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
-  register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => { this.state.data.actors.push({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }); this.state.commerce.touch(); }, 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
-  nextStep(): void { if (this.step() === CheckoutStep.Address && this.deliveryMethod() !== DemoDeliveryMethod.Pickup && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección o retiro en el comercio.'); return; } if (this.step() === CheckoutStep.Delivery && (!this.delivery || this.deliveryMethod() === DemoDeliveryMethod.Unknown || (this.deliveryMethod() === DemoDeliveryMethod.Home && !this.state.actor.addresses.some(address => address.id === this.addressId)))) { this.state.error.set('Confirmá la entrega; domicilio requiere una dirección válida.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
+  access(): void { this.state.rememberIntent(this.router.url.split('?')[0]); void this.router.navigate(['/demo/login']); }
+  toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { this.access(); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
+  selectVariant(raw: string): void { this.variantId.set(raw); this.imageId.set(''); this.quantity = 1; }
+  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { this.access(); return; } const selected = this.selectedVariant; if (!selected) { this.state.error.set('Seleccioná una variante disponible.'); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, selected.id), `${product.name} · ${selected.label} agregado a tu carrito.`); }
+  setQuantity(sku: string, raw: number | null, variantId: string): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN, variantId), 'Carrito actualizado.'); }
+  remove(sku: string, variantId: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku && line.variantId === variantId) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku, variantId), 'Producto quitado del carrito.')) this.removed = removed; }
+  restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variantId), 'Producto restaurado.')) this.removed = null; }
+  nextStep(): void { const result = this.checkoutFlow.advance(this.step(), this.deliveryMethod(), this.delivery, this.state.actor.addresses, this.addressId); this.state.error.set(result.issue.message); this.step.set(result.step); }
   checkout(): void {
     if (this.paymentPhase() === DemoPaymentPhase.Processing) return;
-    if (this.paymentMethod() === DemoPaymentMethod.Unknown || this.deliveryMethod() === DemoDeliveryMethod.Unknown) { this.state.error.set('Seleccioná pago y entrega.'); return; }
+    const issue = this.checkoutFlow.validateSubmission(this.paymentMethod(), this.deliveryMethod()); if (issue.message) { this.state.error.set(issue.message); return; }
     const actorId = this.state.actorId(), addressId = this.addressId, scenario = this.state.scenario(), method = this.paymentMethod(), delivery = this.deliveryMethod();
     this.paymentPhase.set(DemoPaymentPhase.Processing);
     this.paymentTimer = setTimeout(() => { let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(actorId, this.request, addressId, scenario, method, delivery).id; }, 'Pedido registrado.')) void this.router.navigate(['/demo/checkout/result', id]); this.paymentPhase.set(DemoPaymentPhase.Ready); }, 750);
@@ -201,54 +244,53 @@ export class DemoPageComponent {
   cancelPayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
   saveIncident(): void { const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
   resolveIncident(): void { this.fulfillment?.requestResolution(); }
-  receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? DemoPaymentMethod.Card.label}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
-
+  receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? DemoPaymentMethod.Card.label}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, ...this.state.data.returns.filter(request => request.orderId === order.id).filter(request => !!request.refundId).map(request => `REINTEGRO ${request.refundId}: ${this.money(request.lines.reduce((sum, line) => sum + line.refund, 0))}`), 'Sin cobro real ni validez fiscal.'].join('\n'); }
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
   resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
-  retryOrder(): void { const order = this.order; if (!order || (order.payment !== PaymentStatus.Rejected && order.payment !== PaymentStatus.Cancelled)) return; if (this.state.run(() => { for (const line of order.lines) this.state.commerce.add(this.state.actorId(), line.sku, line.quantity, line.variant); }, 'Productos recuperados en tu carrito.')) void this.router.navigate(['/demo/cart']); }
-  open(dialog: DemoDialog): void { this.focusBeforeDialog = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.dialog.set(dialog); setTimeout(() => document.querySelector<HTMLDialogElement>('dialog')?.showModal()); }
-  close(): void { document.querySelector<HTMLDialogElement>('dialog')?.close(); this.dialog.set(DemoDialog.None); this.focusBeforeDialog?.focus(); }
+  retryOrder(): void { const order = this.order; if (!order) return; if (this.state.run(() => this.state.commerce.retryOrder(this.state.actorId(), order.id), 'Productos recuperados en tu carrito. Revisá y aceptá cualquier cambio de precio.')) void this.router.navigate(['/demo/cart']); }
+  open(dialog: DemoDialog): void { this.focusBeforeDialog = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.dialog.set(dialog); setTimeout(() => document.querySelector<HTMLDialogElement>('#demo-page-dialog')?.showModal()); }
+  close(): void { document.querySelector<HTMLDialogElement>('#demo-page-dialog')?.close(); this.dialog.set(DemoDialog.None); this.focusBeforeDialog?.focus(); }
   information(text: string): void { this.info = text; this.open(DemoDialog.Information); }
   confirm(text: string, action: () => void): void { this.info = text; this.confirmation = action; this.open(DemoDialog.Confirm); }
   performConfirmation(): void { const action = this.confirmation; this.confirmation = null; this.close(); action?.(); }
   editingSku: string | undefined;
-  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? { ...product } : { ...this.draftProduct, sku: `DEMO-${this.state.data.products.length + 1}`, name: '', reserved: 0 }; this.open(DemoDialog.Product); }
-  saveProduct(): void { if (this.state.run(() => this.state.commerce.saveProduct({ ...this.draftProduct }, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
-  archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...product, active: !product.active }, product.sku), product.active ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
+  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.editingRevision = this.state.data.revision; this.draftProduct = product ? DemoProductPolicy.clone(product) : this.draftEditor.create(`DEMO-${String(this.state.data.products.length + 1).padStart(3, '0')}`); this.draftProduct.media = this.draftProduct.media.map(media => ({...media, src: media.src.replace(/\.jpg$/, '.svg')})); this.open(DemoDialog.Product); }
+  saveProduct(): void { const product = DemoProductPolicy.clone(this.draftProduct); this.state.commerce.catalog.refreshTotals(product); if (this.state.run(() => this.state.commerce.saveProduct(product, this.editingSku, this.editingRevision), `Producto ${product.sku} guardado.`)) this.close(); }
+  archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...DemoProductPolicy.clone(product), publication: product.publication.next }, product.sku, this.state.data.revision), product.publication === ProductPublication.Published ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
   editAddress(address?: DemoAddress): void { this.draftAddress = address ? { ...address } : { id: crypto.randomUUID(), label: 'Casa', street: '', city: '', postal: '', primary: false }; this.open(DemoDialog.Address); }
-  saveAddress(): void { if (!this.draftAddress.street.trim() || !this.draftAddress.city.trim() || !this.draftAddress.postal.trim()) { this.state.error.set('Completá calle, ciudad y código postal.'); return; } if (this.state.run(() => { const actor = this.state.actor; const index = actor.addresses.findIndex(value => value.id === this.draftAddress.id); if (this.draftAddress.primary) actor.addresses.forEach(value => value.primary = false); if (index < 0) actor.addresses.push({ ...this.draftAddress, primary: actor.addresses.length === 0 || this.draftAddress.primary }); else actor.addresses[index] = { ...this.draftAddress }; this.state.commerce.touch(); }, 'Dirección guardada.')) this.close(); }
-  deleteAddress(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses = this.state.actor.addresses.filter(value => value.id !== address.id); if (address.primary && this.state.actor.addresses[0]) this.state.actor.addresses[0].primary = true; this.state.commerce.touch(); }, 'Dirección eliminada.'); }
-  primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
-  saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
+  saveAddress(): void { if (this.state.run(() => this.state.commerce.saveAddress(this.state.actorId(), this.draftAddress), 'Dirección guardada.')) this.close(); else this.formError(this.state.error()); }
+  deleteAddress(address: DemoAddress): void { this.state.run(() => this.state.commerce.deleteAddress(this.state.actorId(), address.id), 'Dirección eliminada.'); }
+  primary(address: DemoAddress): void { this.state.run(() => this.state.commerce.primaryAddress(this.state.actorId(), address.id), 'Dirección principal actualizada.'); }
+  saveProfile(): void { if (!this.state.run(() => this.state.commerce.saveProfile(this.state.actorId(), { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }), 'Perfil actualizado.')) this.formError(this.state.error()); }
+  formError(message: string): void { this.state.error.set(message); setTimeout(()=>{ const summary=document.querySelector<HTMLElement>('dialog[open] [role="alert"]') ?? document.querySelector<HTMLElement>('[role="alert"]');summary?.setAttribute('tabindex','-1');summary?.focus(); }); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
-  saveContent(): void { if (!this.contentTitle.trim() || this.contentBlocks.some(block => !block.title.trim() || !block.body.trim())) { this.state.error.set('Completá el título de portada y el contenido de cada bloque.'); return; } this.state.run(() => { this.state.data.title = this.contentTitle; this.state.data.subtitle = this.contentSubtitle; this.state.data.blocks = this.contentBlocks.map(block => ({ ...block })); this.state.commerce.touch(); }, 'Contenido publicado en la tienda.'); }
+  saveContent(): void { if (!this.state.run(() => this.state.commerce.saveContent(this.contentTitle, this.contentSubtitle, this.contentBlocks), 'Contenido publicado en la tienda.')) this.formError(this.state.error()); }
   cancelContent(): void { this.contentTitle = this.state.data.title; this.contentSubtitle = this.state.data.subtitle; this.contentBlocks = this.state.data.blocks.map(block => ({ ...block })); }
   reorderContent(index: number, direction: number): void { const target = index + direction; if (target < 0 || target >= this.contentBlocks.length) return; const blocks = [...this.contentBlocks]; [blocks[index], blocks[target]] = [blocks[target], blocks[index]]; this.contentBlocks = blocks; }
   editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
-  saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); }
-  toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }
-  adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
-  saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
+  saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); else this.formError(this.state.error()); }
+  toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, state: campaign.state.next }), 'Vigencia de la oferta actualizada.'); }
+  adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentVariantId = this.state.commerce.variants(product.sku)[0].id; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
+  saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason, this.adjustmentVariantId), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
   get canAdvance(): boolean { return !!this.order && new DemoFulfillmentPolicy().actions(this.order).length > 0 && ensureFulfillment(this.order).incident === DemoIncidentKind.None; }
   get advanceLabel(): string { return this.order ? new DemoFulfillmentPolicy().actions(this.order)[0]?.label ?? 'Entrega finalizada' : 'Entrega no disponible'; }
   get canResolveIncident(): boolean { return !!this.order && ensureFulfillment(this.order).incident === DemoIncidentKind.Report; }
   shipmentLabel(order: import('./demo-model').DemoOrder): string { return ensureFulfillment(order).phase.label; }
-  receiveReturn(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   connectML(): void { this.state.run(() => this.state.commerce.setMLAccount(ensureMarketplace(this.state.data).account === DemoMLAccountStatus.Authorized ? DemoMLAccountStatus.Disconnected : DemoMLAccountStatus.Authorized), this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
-  linkML(sku: string): void { this.state.run(() => { const mapping = ensureMarketplace(this.state.data).mappings.find(value => value.sku === sku); if (mapping?.status.eligible) this.state.commerce.unlinkML(mapping.id); else { const variant = marketplaceVariants(this.state.data, sku)[0]; this.state.commerce.mapML(sku, variant.id, `SIM-${sku}`, `SIM-${variant.id}`); } }, 'Vínculo simulado actualizado.'); }
+  linkML(sku: string): void { this.state.run(() => { const mapping = ensureMarketplace(this.state.data).mappings.find(value => value.sku === sku); if (mapping?.status.eligible) this.state.commerce.unlinkML(mapping.id); else { const variant = this.state.commerce.variants(sku)[0]; this.state.commerce.mapML(sku, variant.id, `SIM-${sku}`, `SIM-${variant.id}`); } }, 'Vínculo simulado actualizado.'); }
   saleML(sku: string): void { this.state.run(() => this.state.commerce.mlSale(sku, `ml-sale-${sku}`), 'Venta simulada registrada (repetir la misma operación no duplica stock).'); }
   simulateCompetitor(competitor = this.state.data.competitors[0]): void { if (competitor) this.state.run(() => this.state.commerce.competitorPrice(competitor.id, Math.max(100, competitor.price - Math.max(10000, Math.round(competitor.price * .1)))), 'Precio de muestra actualizado; revisá el historial y las alertas.'); }
   watchCompetitor(): void { if (this.state.run(() => this.state.commerce.watchCompetitor(this.competitorName, this.competitorSku, Number(this.competitorThreshold)), 'Competidor agregado a seguimiento simulado.')) this.competitorName = ''; }
-  toggleCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { competitor.enabled = competitor.enabled === false; this.state.commerce.touch(); }, 'Preferencia de alertas actualizada.'); }
-  removeCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { this.state.data.competitors = this.state.data.competitors.filter(value => value.id !== competitor.id); this.state.commerce.touch(); }, 'Competidor eliminado del seguimiento.'); }
+  toggleCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { this.state.commerce.requireAdminAccess(this.state.actorId()); competitor.enabled = competitor.enabled === false; this.state.commerce.touch(); }, 'Preferencia de alertas actualizada.'); }
+  removeCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { this.state.commerce.requireAdminAccess(this.state.actorId()); this.state.data.competitors = this.state.data.competitors.filter(value => value.id !== competitor.id); this.state.commerce.touch(); }, 'Competidor eliminado del seguimiento.'); }
   processStock(): void { this.state.run(() => this.state.commerce.processStock(this.state.scenario() === DemoScenario.Error), 'Cola de sincronización simulada procesada.'); }
-  acknowledge(): void { this.state.run(() => { this.state.data.competitors.forEach(value => { value.unread = false; ensureCompetitorDetails(value, this.state.data).signals.forEach(signal => signal.read = DemoMarketSignalRead.Read); }); const inbox = new DemoInboxPolicy(); for (const alert of this.state.data.inbox?.alerts ?? []) if (alert.audience === 'admin' && alert.id.startsWith('admin:competitor:')) inbox.mark(this.state.data, 'admin', alert.id, DemoAlertRead.Read); this.state.commerce.touch(); }, 'Alertas marcadas como leídas.'); }
-  moduleToggle(id: DemoModuleId): void { this.confirm(`Cambiar el estado de ${id.label} afecta sus operaciones simuladas.`, () => this.state.run(() => { const module = this.state.data.modules.find(value => value.id === id); if (!module || id === DemoModuleId.Unknown) throw new Error('Módulo desconocido.'); module.enabled = !module.enabled; this.state.commerce.touch(); }, 'Estado del módulo demo guardado.')); }
+  acknowledge(): void { this.state.run(() => { this.state.commerce.requireAdminAccess(this.state.actorId()); this.state.data.competitors.forEach(value => { value.unread = false; ensureCompetitorDetails(value, this.state.data).signals.forEach(signal => signal.read = DemoMarketSignalRead.Read); }); const inbox = new DemoInboxPolicy(); for (const alert of this.state.data.inbox?.alerts ?? []) if (alert.audience === 'admin' && alert.id.startsWith('admin:competitor:')) inbox.mark(this.state.data, 'admin', alert.id, DemoAlertRead.Read); this.state.commerce.touch(); }, 'Alertas marcadas como leídas.'); }
+  moduleToggle(id: DemoModuleId): void { this.confirm(`Cambiar el estado de ${id.label} afecta sus operaciones simuladas.`, () => this.state.run(() => this.state.commerce.setModule(id), 'Estado del módulo demo guardado.')); }
   configureModule(id: DemoModuleId): void { this.draftModule = id; this.draftSettings = { ...this.state.data.settings }; this.open(DemoDialog.Module); }
   saveModule(): void { if (this.draftModule === DemoModuleId.Unknown) { this.state.error.set('Módulo no reconocido.'); return; } if (this.state.run(() => this.state.commerce.saveSettings(this.draftSettings), `${this.draftModule.label}: configuración guardada.`)) this.close(); }
   validateManifest(): void { try { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string') throw new Error('El perfil requiere un título de comercio.'); this.information(`Perfil válido. Nuevo título: ${parsed.title}. La importación actualiza solamente el contenido de esta demo.`); } catch { this.state.error.set('El perfil no es JSON válido o le falta title.'); } }
-  importManifest(): void { this.state.run(() => { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string' || !parsed.title.trim()) throw new Error('Perfil inválido.'); this.state.data.title = parsed.title; this.state.commerce.touch(); }, 'Perfil importado en la demo.'); }
+  importManifest(): void { this.state.run(() => { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string' || !parsed.title.trim()) throw new Error('Perfil inválido.'); this.state.commerce.importProfile(parsed.title); }, 'Perfil importado en la demo.'); }
   exportProfile(): void { const blob = new Blob([JSON.stringify({ version: 1, title: this.state.data.title, subtitle: this.state.data.subtitle }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'comercio-demo.json'; anchor.click(); URL.revokeObjectURL(url); }
 }

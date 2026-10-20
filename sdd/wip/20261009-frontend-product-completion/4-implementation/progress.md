@@ -1,5 +1,20 @@
 # Evidencia inicial
 
+2026-10-20: #191 se prepara en rama dedicada desde `e57ded241cfc76d8922605d3f526483d1ffbabae`.
+La composición conecta los módulos canónicos #187–#190, perfiles con roles cerrados,
+schema v6 y administración C05. Fuente histórica `ffc54ba` conservada.
+Evidencia incremental y límites en [fe-comp05-evidence.md](fe-comp05-evidence.md).
+Suite local 425/425 y builds PASS durante desarrollo; browser final, review y CI pendientes.
+Las cifras de 2026-10-14 y las de las ramas originales son históricas.
+
+2026-10-20, cierre de validación local de #191: 90 archivos / 430 unitarias,
+TypeScript app/demo/spec, lint, arquitectura, ngc y builds demo/productivo PASS.
+Browser final: 51 esperadas PASS, cero omitidas/inesperadas/inestables y errors
+vacíos; incluye Customers y Outlet retenido además de los recorridos cruzados.
+El reporte final comienza a las 19:13:08 UTC y dura 229348.84 ms. Estado
+`implemented_local_pending_independent_review_and_ci`; no reutiliza CI/reviews
+de #190, no autoriza merge/release y no declara integraciones reales.
+
 2026-10-09: inspección estática de `db377fa` y documentación de FE-COMP-01..06. No se ejecutó producto, no hay nuevos resultados browser/build/CI ni revisión aprobada. Implementación: pendiente. Gates G-D/T/B/U/R: `NOT_RUN` salvo validación estructural documental que se registre explícitamente tras ejecutarla.
 
 Validación documental local 2026-10-09: `tasks.json` parseado con PowerShell `ConvertFrom-Json`; seis IDs únicos, dependencias existentes ordenadas sin ciclos y los 16 criterios de aceptación referidos presentes en el spec funcional: PASS. Este check de estructura no aprueba G-D ni acredita comportamiento del producto.
@@ -154,3 +169,22 @@ sigue `BLOCKED_TOOLING` por ausencia de `tools/shared/validator-utils.sh`; no se
 falsea ese resultado.
 
 2026-10-20: FE-COMP-04 se porta sobre catálogo/checkout/postventa modulares de #187/#188. El documento fe-comp04-evidence.md distingue la evidencia histórica del corte original y la nueva validación local: 372/372 unitarias, 9/9 focales, 31/31 browser completos, tsc app/spec, lint, arquitectura y ambos builds PASS. Sin reintroducir monolitos ni composición de #191. No declara revisión independiente, CI ni merge.
+
+2026-10-20: corrección local de revisión FE-COMP-05 sobre d1216b0: índice puro
+SKU+variante impide borrar identidades referenciadas antes de mutar y rechaza
+huérfanos en decode; customerId validado filtra por identidad exacta, separado
+de q; PDP muestra garantía configurada y postventa usa detalles e importe de
+líneas congeladas, no el catálogo actual. Focal CORE 23/23, suite 92 archivos /
+455 pruebas, lint, ngc, tsc app/demo/spec, arquitectura y ambos builds PASS.
+El cierre browser y sus métricas se registran en fe-comp05-evidence.md. Se
+mantiene implemented_local_pending_independent_review_and_ci: re-revisión del
+diff y CI todavía pendientes; no push ni declaración merge-ready.
+
+2026-10-20: corrección NO-GO security FE-COMP-05 sobre bfd7a21. RMA exige
+unicidad global antes de validar pedidos; decoder y comandos rechazan identidad
+ambigua atómicamente. Intenciones usan los patrones cerrados de DemoScreen y
+validación de segmentos, cubriendo catálogo, detalle USER y Mercado Libre sin
+abrir redirects ni relajar roles/ownership. Focal CORE 51/51, full unit 93
+archivos / 471 pruebas, lint/tsc/ngc/arq y ambos builds PASS. Browser focal de
+intención 12/12 PASS; métricas del pase completo en fe-comp05-evidence.md.
+Siguen pendientes re-revisión independiente y CI; sin push.

@@ -3,6 +3,7 @@ import { DemoModuleId } from '../demo-model';
 import { DemoSnapshotConflict } from './catalog-types';
 import { DemoCatalogQuery } from './demo-catalog-query';
 import { DemoProductPolicy } from './product-policy';
+import { DemoVariantReferenceIndex } from './variant-reference-index';
 
 export interface DemoCatalogCommandPort {
   readonly catalog: DemoCatalogQuery;
@@ -27,6 +28,7 @@ export class DemoCatalogCommands {
     const proposed = DemoProductPolicy.clone(product);
     if (existing) {
       if (!DemoProductPolicy.known(existing)) throw new Error('El producto guardado contiene estados desconocidos.');
+      DemoVariantReferenceIndex.from(snapshot).requirePreserved(existing, proposed);
       DemoProductPolicy.preserveReservations(existing, proposed);
       for (const variant of proposed.variants) variant.reserved = existing.variants.find(value => value.id === variant.id)?.reserved ?? 0;
     } else proposed.variants.forEach(variant => variant.reserved = 0);

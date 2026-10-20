@@ -2,13 +2,14 @@ import type { DemoSnapshot } from './demo-model';
 import type { DemoProduct } from './catalog/catalog-model';
 import type { DemoPostSaleAlert } from './postsale/postsale-types';
 import { DemoCatalogQuery } from './catalog/demo-catalog-query';
+import { ProductCondition } from './catalog/catalog-types';
 import type { DemoFulfillmentOrder } from './demo-fulfillment';
 
 /** Composition boundary: legacy inventory is projected by SKU; current catalog by SKU and variant. */
 export interface DemoInboxSnapshot {
   marketplace?: import('./demo-marketplace').DemoMarketState;
   version: number; inbox?: DemoInbox; actors: readonly { id: string }[]; orders: DemoFulfillmentOrder[];
-  products: (DemoProduct | DemoSnapshot['products'][number])[];
+  products: (DemoProduct | { sku: string; name: string; variant: string; price: number; active: boolean; onHand: number; reserved: number })[];
   settings: { lowStockThreshold: number }; syncJobs?: DemoSnapshot['syncJobs']; competitors: DemoSnapshot['competitors'];
   postSaleAlerts?: readonly DemoPostSaleAlert[];
 }
@@ -96,7 +97,7 @@ export class DemoInboxPolicy {
         const catalog = new DemoCatalogQuery(() => ({ revision: 0, products: [product] }));
         for (const variant of product.variants) {
           const available = catalog.available(product.sku, variant.id);
-          const low = product.publication.published && variant.saleState.active && available < state.settings.lowStockThreshold;
+          const low = product.publication.published && variant.condition === ProductCondition.Standard && variant.saleState.active && available < state.settings.lowStockThreshold;
           this.stockAlert(state, add, `${product.sku}:${variant.id}`, product.sku, `${product.name} · ${variant.label}: ${available} disponibles`, low, now);
         }
         continue;
@@ -106,7 +107,6 @@ export class DemoInboxPolicy {
     }
     for (const job of state.syncJobs ?? []) if (job.status === DemoSyncStatus.Failed || state.inbox.alerts.some(value => value.id === `admin:sync:${job.id}`)) add(`sync:${job.id}`, 'admin', DemoAlertCategory.Marketplace, `${job.sku} · Revisá la sincronización simulada`, job.status !== DemoSyncStatus.Failed, undefined, job.sku);
     for (const competitor of state.competitors) { const details = ensureCompetitorDetails(competitor, state); for (const signal of details.signals) add(`competitor:${competitor.id}:${signal.operation}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra ${signal.percent.toFixed(1)}%`, false, undefined, competitor.sku, DemoAlertRead.fromWire(signal.read.wire)); if (competitor.unread && !details.signals.length) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, false, undefined, competitor.sku); }
-    if (state.marketplace) state.version = 5;
   }
 }
 export function decodeInbox(state: DemoInboxSnapshot): void {

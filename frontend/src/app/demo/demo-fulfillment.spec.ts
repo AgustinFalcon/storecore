@@ -1,17 +1,18 @@
+import { demoTestRuntime } from './demo-test-runtime';
 import { checkoutFixture } from './checkout/checkout-test-fixture';
 import { DemoCatalogWire } from './catalog/catalog-wire';
 import { VariantSaleState } from './catalog/catalog-types';
 import { postSaleFixture } from './postsale/postsale-test-fixture';
 import { DemoReturnReason } from './postsale/postsale-types';
 import { decodeInbox, type DemoInboxSnapshot } from './demo-inbox';
-import { DemoCommerce, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
+import { DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoDeliveryMethod, DemoPaymentMethod } from './demo-process-types';
 import { DEMO_PICKUP_POINT, DemoFulfillmentAction as Action, DemoFulfillmentPhase as Phase, DemoFulfillmentPolicy, DemoIncidentKind as Incident, ensureFulfillment, decodeFulfillment, type DemoFulfillmentOrder } from './demo-fulfillment';
 import { ShipmentStatus } from '../domain/order/shipment-status';
 import { DemoAlertCategory as Category, DemoAlertRead as Read, DemoAlertResolution as Resolution, DemoAlertFilter, DemoInboxPolicy } from './demo-inbox';
 
 describe('fulfillment by modality and persistent notification ownership', () => {
-  const create = (method: DemoDeliveryMethod) => { const commerce = new DemoCommerce(demoSeed()); commerce.add('cliente', 'DEMO-001', 1); return { commerce, order: commerce.checkout('cliente', 'fulfillment', 'address-cliente', DemoScenario.Approved, DemoPaymentMethod.Card, method) }; };
+  const create = (method: DemoDeliveryMethod) => { const commerce = demoTestRuntime(demoSeed()); commerce.sessionAsCustomer(); commerce.add('cliente', 'DEMO-001', 1, 'DEMO-001:standard'); const order=commerce.checkout('cliente', 'fulfillment', 'address-cliente', DemoScenario.Approved, DemoPaymentMethod.Card, method); commerce.sessionAsAdmin(); return {commerce,order}; };
   it('freezes the complete pickup point promised by legacy checkout and preserves it after reload', () => {
     const { commerce, order } = create(DemoDeliveryMethod.Pickup);
     const destination = `Retiro en ${DEMO_PICKUP_POINT.store} · ${DEMO_PICKUP_POINT.location} · ${DEMO_PICKUP_POINT.hours}`;
@@ -77,7 +78,7 @@ describe('fulfillment by modality and persistent notification ownership', () => 
       if (!reporting) commerce.reportIncident(order.id, 'Consulta abierta');
       const wire = JSON.parse(JSON.stringify(commerce.snapshot));
       wire.orders.find((value: { id: string }) => value.id === order.id).fulfillment[field] = { wire: 'future-state' };
-      const restored = decodeSnapshot(JSON.stringify(wire)); const commands = new DemoCommerce(restored);
+      const restored = decodeSnapshot(JSON.stringify(wire)); const commands = demoTestRuntime(restored);
       const current = restored.orders.find(value => value.id === order.id)!; const policy = new DemoFulfillmentPolicy(); const before = JSON.stringify(restored);
       expect(policy.actions(current)).toEqual([]); expect(policy.canConfigure(current)).toBe(false);
       expect(() => commands.configureFulfillment(current.id, { ...ensureFulfillment(current), carrier: 'Changed' })).toThrow('conciliación');
@@ -152,7 +153,7 @@ describe('fulfillment by modality and persistent notification ownership', () => 
   });
   it('unknown values close commands and legacy snapshot migrates without losing completed post-sale eligibility', () => {
     expect(Phase.fromWire('invented')).toBe(Phase.Unknown); expect(Action.fromWire('invented')).toBe(Action.Unknown); expect(Incident.fromWire('invented')).toBe(Incident.Unknown);
-    const snapshot = demoSeed(); const restored = decodeSnapshot(JSON.stringify(snapshot)); expect(restored.version).toBe(5); expect(ensureFulfillment(restored.orders[2]).phase).toBe(Phase.Delivered);
+    const snapshot = demoSeed(); const restored = decodeSnapshot(JSON.stringify(snapshot)); expect(restored.version).toBe(6); expect(ensureFulfillment(restored.orders[2]).phase).toBe(Phase.Delivered);
     restored.orders[0].fulfillment!.phase = Phase.Unknown; expect(new DemoFulfillmentPolicy().actions(restored.orders[0])).toEqual([]);
     restored.orders[0].fulfillment!.phase = Phase.Collected; expect(() => decodeSnapshot(JSON.stringify(restored))).toThrow('modalidad');
   });

@@ -1,0 +1,30 @@
+import { expect, Page, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+const cta=(page:Page,id:string)=>page.locator(`[data-cta="${id}"]`);
+async function login(page:Page,email:string){await page.goto('/demo/login');await page.getByRole('combobox',{name:/Perfil de muestra/}).selectOption(email);await page.getByLabel('Contraseña',{exact:true}).fill('demo');await cta(page,'login-submit').click();await cta(page,email==='admin@demo.invalid'?'login-admin':'login-customer').click();}
+
+test('retained Outlet unit exposes its condition but cannot enter commercial stock or checkout',async({page},info)=>{
+ await login(page,'cliente@demo.invalid');await page.goto('/demo/catalog/VLD-043');await expect(page.locator('.outlet-details')).toContainText('Unidad retenida');await expect(page.locator('.outlet-details')).toContainText('Defectos');await expect(page.locator('.outlet-details')).toContainText('Garantía');await expect(cta(page,'product-add-cart')).toBeDisabled();await expect(cta(page,'shell-cart')).toContainText('0');await expect.poll(()=>page.locator('.product-image').first().evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);await page.screenshot({path:info.outputPath('outlet-held.png'),fullPage:true});
+ await login(page,'admin@demo.invalid');await page.goto('/demo/user/inventory');const row=page.getByRole('row').filter({hasText:'VLD-043'});await expect(row).toContainText('1 no vendibles');await expect(cta(page,'inventory-adjust-VLD-043')).toBeDisabled();await page.goto('/demo/user/home');await expect(page.locator('[data-cta^="dashboard-variant-stock-"]').filter({hasText:'VLD-043'})).toHaveCount(0);
+});
+
+for(const width of [390,768,1440])test(`customer directory access and responsive layout ${width}`,async({page},info)=>{
+ await page.setViewportSize({width,height:900});await login(page,'cliente@demo.invalid');await page.goto('/demo/user/customers');await expect(page.getByRole('heading',{name:'Ingresá para continuar'})).toBeVisible();await expect(page.locator('table')).toHaveCount(0);
+ await login(page,'admin@demo.invalid');await page.goto('/demo/user/customers');await expect(page.getByRole('heading',{name:'Clientes del comercio'})).toBeVisible();await expect(page.locator('table')).toContainText('cliente2@demo.invalid');await expect(page.locator('table')).not.toContainText('admin@demo.invalid');expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);await page.screenshot({path:info.outputPath(`customers-${width}.png`),fullPage:true});
+ await page.getByLabel('Buscar cliente',{exact:true}).fill('nadie');await expect(page.locator('table')).toContainText('No encontramos clientes');
+});
+
+test('canonical product editor keeps cancelled changes detached and saves closed variant data',async({page},info)=>{
+ await page.setViewportSize({width:390,height:844});await login(page,'admin@demo.invalid');await page.goto('/demo/user/catalog');await cta(page,'admin-product-edit-DEMO-001').click();
+ const editor=page.locator('sc-demo-product-editor');await editor.getByLabel('Nombre',{exact:true}).fill('Cambio descartado');await cta(page,'product-cancel').click();await expect(page.locator('table')).not.toContainText('Cambio descartado');await expect(cta(page,'admin-product-edit-DEMO-001')).toBeFocused();
+ await cta(page,'admin-product-edit-DEMO-001').click();await editor.getByLabel('Nombre',{exact:true}).fill('Taladro con ficha actualizada');await editor.getByLabel('Precio base ($)',{exact:true}).first().fill('13000');
+ await expect.poll(()=>editor.locator('img').first().evaluate((image:HTMLImageElement)=>image.naturalWidth)).toBeGreaterThan(0);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:info.outputPath('editor-390.png'),fullPage:true});expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+ await cta(page,'product-save').click();await expect(page.getByRole('dialog')).not.toBeVisible();await page.reload();await expect(page.locator('table')).toContainText('Taladro con ficha actualizada');await page.goto('/demo/catalog/DEMO-001');await expect(page.getByRole('heading',{name:'Taladro con ficha actualizada'})).toBeVisible();
+});
+
+test('post-sale stages remain separate through receipt inspection disposition and refund',async({page},info)=>{
+ await page.setViewportSize({width:390,height:844});await login(page,'cliente2@demo.invalid');await page.goto('/demo/customer/orders/DEMO-102');const panel=page.locator('sc-demo-postsale');await panel.getByLabel('Cantidad a devolver').fill('1');await panel.getByLabel('Motivo',{exact:true}).selectOption('damaged');await cta(page,'return-request-submit').click();
+ const id=await page.evaluate(()=>JSON.parse(localStorage.getItem('storecore.commercial-demo.v1')!).returns[0].id as string);await expect(panel).toContainText('Solicitada');
+ await login(page,'admin@demo.invalid');await page.goto('/demo/user/orders/DEMO-102');await panel.getByLabel('Motivo de la decisión').fill('Producto recibido con daño informado');await cta(page,'return-approve-'+id).click();await cta(page,'return-receive-'+id).click();await panel.getByLabel('Notas de inspección').fill('Se verifica daño en la carcasa');await panel.getByLabel('Resultado',{exact:true}).selectOption('complete');await cta(page,'return-inspect-'+id).click();await panel.getByLabel(/Disposición:/).selectOption('damaged');await cta(page,'return-dispose-'+id).click();await cta(page,'return-refund-'+id).click();await expect(panel).toContainText('Reembolso simulado');await page.screenshot({path:info.outputPath('post-sale-390.png'),fullPage:true});expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+ await page.reload();await expect(panel).toContainText('SIM-REFUND-');await login(page,'cliente@demo.invalid');await page.goto('/demo/customer/orders');await expect(page.locator('sc-demo-postsale')).not.toContainText(id);
+});

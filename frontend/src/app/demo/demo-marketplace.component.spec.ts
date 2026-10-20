@@ -1,12 +1,13 @@
+import { demoTestRuntime } from './demo-test-runtime';
 import { TestBed } from '@angular/core/testing';
 import { DemoMarketplaceComponent } from './demo-marketplace.component';
 import { DemoApplicationState } from './demo-state';
-import { DemoCommerce, demoSeed } from './demo-model';
+import { demoSeed } from './demo-model';
 import { DemoMLAccountStatus, DemoObservationStatus, ensureCompetitorDetails } from './demo-marketplace';
 
 describe('marketplace component domain guards', () => {
   function fixture() {
-    const commerce = new DemoCommerce(demoSeed()); commerce.setMLAccount(DemoMLAccountStatus.Authorized);
+    const commerce = demoTestRuntime(demoSeed()); commerce.setMLAccount(DemoMLAccountStatus.Authorized);
     const run = vi.fn((operation: () => void) => { operation(); return true; });
     TestBed.configureTestingModule({ providers: [{ provide: DemoApplicationState, useValue: { data: commerce.snapshot, commerce, run } }] });
     const component = TestBed.runInInjectionContext(() => new DemoMarketplaceComponent());
