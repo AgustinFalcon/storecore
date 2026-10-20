@@ -55,3 +55,18 @@ El editor convertía `null` a 0 y usaba la misma operación para quitar, generan
 Regresión domain: 0/negativos/fracciones/NaN preservan snapshot; cantidad válida actualiza; remove explícito elimina una vez. Browser: vacío/0/-1/0.5/1.5 producen error visible, sin éxito y con línea/carrito/persistencia intactos; luego 1→2, Quitar y Restaurar recuperan las 2 unidades. [Traza de editor carrito](cart-input-validity-state-trace.json) complementa [traza PDP](input-validity-state-trace.json).
 
 Revalidación final completa: **24/24 Playwright PASS**, 0 skipped/flaky/unexpected, 156.03s; **332/332 CTAs** sin pendientes; **312/312 unitarias**, 74 archivos; lint PASS; architecture 6/6 + scan PASS; build demo PASS; build productivo PASS 552.34kB. `subst T:` retirado, runner y servidor demo terminados. Reviews finales se repiten sobre nuevo SHA; estas pruebas siguen siendo de composición demo y no homologan providers externos.
+
+## Promoción limpia sobre `master` — 2026-10-20
+
+Los cuatro commits de procesos se rebasaron sobre el merge limpio de #193 (`fa10ccfe898fd6fc07897fe1697417e80a96b6ef`). La resolución preserva el `CatalogSort` canónico con precio efectivo, registro único por email normalizado y prevalidación atómica de reservas; agrega los tipos cerrados de pago, entrega, fases, tabs y sincronización del proceso sin recuperar archivos de estado paralelos. El spec trasplantado también fue corregido para importar `PaymentStatus` desde `commerce-states.ts`, el borde canónico actual.
+
+Evidencia local sobre `promotion/storecore-master-demo-processes`:
+
+- `npm run lint`: PASS.
+- `npm run check:architecture`: PASS, 6/6 y escaneo de capas.
+- `npm test`: PASS, 42 archivos y 203 tests.
+- `npm run test:demo`: PASS, build demo y 26/26 Chromium en 2.0 min; incluye las 24 rutas, matriz CTA, compra, pagos, envío, fulfillment, ML/competencia simulados, entradas inválidas y responsive 390/768/1440.
+- `npm run build`: PASS, bundle productivo 515.62 kB.
+- `git diff --check`: PASS antes de publicar.
+
+El runner Playwright terminó su servidor local. Reviews exact-head y GitHub CI se mantienen pendientes hasta publicar el PR. Ninguna evidencia de esta promoción acredita proveedores reales, scraping, cobros, correo, ARCA, carriers ni homologación.

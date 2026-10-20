@@ -1,6 +1,6 @@
 import { DemoCommerce, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoDeliveryMethod, DemoPaymentMethod, DemoPaymentPhase, DemoMLTab, DemoSyncStatus } from './demo-process-types';
-import { PaymentStatus } from '../domain/order/payment-status';
+import { PaymentStatus } from '../domain/order/commerce-states';
 describe('commercial process snapshots and stock authority', () => {
   const create = () => new DemoCommerce(demoSeed(), () => '2026-10-09T12:00:00Z', () => 'purchase');
   it('all process borders close unknown values', () => { expect(DemoPaymentMethod.fromWire('other')).toBe(DemoPaymentMethod.Unknown); expect(DemoDeliveryMethod.fromWire('other')).toBe(DemoDeliveryMethod.Unknown); expect(DemoPaymentPhase.fromWire('other')).toBe(DemoPaymentPhase.Unknown); expect(DemoMLTab.fromWire('other')).toBe(DemoMLTab.Unknown); expect(DemoSyncStatus.fromWire('other')).toBe(DemoSyncStatus.Unknown); });
