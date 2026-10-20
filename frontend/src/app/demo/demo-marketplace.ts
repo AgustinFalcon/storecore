@@ -1,4 +1,5 @@
-import type { DemoProduct as LegacyProduct } from './demo-model';
+/** Compatibility input for the isolated previous slice; application snapshots use the canonical catalog. */
+interface LegacyProduct { sku: string; name: string; variant: string; active: boolean; onHand: number; reserved: number; price: number; }
 import type { DemoProduct } from './catalog/catalog-model';
 import { DemoCatalogQuery } from './catalog/demo-catalog-query';
 import { DemoSyncStatus, type DemoCompetitor } from './demo-process-types';

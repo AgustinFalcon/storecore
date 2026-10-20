@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 const cta = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
 async function admin(page: Page) {
-  await page.goto('/demo/login'); await page.getByLabel('Contraseña', { exact: true }).fill('demo');
+  await page.goto('/demo/login'); await page.getByRole('combobox',{name:/Perfil de muestra/}).selectOption('admin@demo.invalid'); await page.getByLabel('Contraseña', { exact: true }).fill('demo');
   await cta(page, 'login-submit').click(); await cta(page, 'login-admin').click();
   await page.goto('/demo/user/mercadolibre'); await cta(page, 'marketplace-authorize').click();
 }

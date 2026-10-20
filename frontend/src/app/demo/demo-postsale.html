@@ -1,0 +1,25 @@
+<section class="card post-sale" aria-labelledby="postsale-heading">
+<h2 id="postsale-heading">{{queue?'Postventa y devoluciones':'Devoluciones de este pedido'}}</h2>
+<p class="demo-note">El importe corresponde a productos. Los reembolsos son simulados y no mueven dinero real.</p>
+@if(queue){<label>Mostrar solicitudes<select [ngModel]="filter.wire" (ngModelChange)="selectFilter($event)">@for(option of Filter.all; track option.wire){<option [value]="option.wire">{{option.label}}</option>}</select></label>}
+@if(alerts.length){<details><summary>Últimas novedades de postventa</summary>@for(alert of alerts; track alert.id){<p>{{alert.text}}</p>}</details>}
+@if(canRequest && order){<form (submit)="$event.preventDefault(); submit()"><h3>Solicitar una devolución</h3>
+@for(line of order.lines; track key(line); let index=$index){@if(available(line)>0){<fieldset><legend>{{line.name}}</legend><p>{{available(line)}} unidades disponibles para solicitar.</p><label>Cantidad a devolver<input type="number" min="0" [max]="available(line)" step="1" [name]="'return-quantity-'+index" [(ngModel)]="quantities[key(line)]"/></label><label>Motivo<select aria-label="Motivo" [name]="'return-reason-'+index" [ngModel]="reasons[key(line)]?.wire??''" (ngModelChange)="selectReason(key(line),$event)"><option value="">Seleccionar motivo</option>@for(reason of Reason.all; track reason.wire){<option [value]="reason.wire">{{reason.label}}</option>}</select></label></fieldset>}}
+<p>Reintegro estimado: <strong>{{money(proposedRefund)}}</strong></p><button class="primary" data-cta="return-request-submit" type="submit">Enviar solicitud</button></form>}
+@for(request of requests; track request.id){<article class="card"><div class="section-heading"><div><h3>{{request.id}}</h3><p>{{request.orderId}}</p></div><span class="badge">{{request.status.label}}</span></div>
+@for(line of request.lines; track key(line)){<p><strong>{{line.name}}</strong> × {{line.quantity}} · {{line.reason.label}} · {{money(line.refund)}}<br/><small>{{line.disposition.label}} · {{line.accounting.label}}</small></p>}
+@if(request.decisionReason){<p>Decisión: {{request.decisionReason}}</p>}
+@if(request.inspectionNotes){<p>Inspección: {{request.inspectionNotes}} · {{request.inspectionResult.label}}</p>}
+@if(request.refundId){<p>Reintegro: {{request.refundId}} · {{money(request.refundedAmount)}}</p>}
+@if(queue){<a [routerLink]="[admin?'/demo/user/orders':'/demo/customer/orders',request.orderId]">Abrir pedido</a>}
+@if(!admin && request.status===Status.Requested){<button [attr.data-cta]="'return-cancel-'+request.id" (click)="cancel(request)">Cancelar solicitud</button>}
+@if(admin){
+@if(request.status===Status.Requested){<label>Motivo de la decisión<textarea [ngModel]="notes[request.id]" (ngModelChange)="notes[request.id]=$event"></textarea></label><div class="actions"><button [attr.data-cta]="'return-approve-'+request.id" (click)="decide(request,true)">Aprobar devolución</button><button [attr.data-cta]="'return-reject-'+request.id" (click)="decide(request,false)">Rechazar devolución</button></div>}
+@if(request.status===Status.Approved){<button [attr.data-cta]="'return-receive-'+request.id" (click)="receive(request)">Registrar recepción</button>}
+@if(request.status===Status.Received){<label>Notas de inspección<textarea [ngModel]="notes[request.id]" (ngModelChange)="notes[request.id]=$event"></textarea></label><label>Resultado<select aria-label="Resultado" [ngModel]="results[request.id]?.wire??''" (ngModelChange)="selectResult(request.id,$event)"><option value="">Seleccionar resultado</option>@for(result of Inspection.all; track result.wire){<option [value]="result.wire">{{result.label}}</option>}</select></label><button [attr.data-cta]="'return-inspect-'+request.id" (click)="inspect(request)">Guardar inspección</button>}
+@if(request.status===Status.Inspected){@for(line of request.lines; track key(line)){<label>Disposición: {{line.name}}<select [ngModel]="outcomes[request.id+key(line)]?.wire??''" (ngModelChange)="selectOutcome(request,line,$event)"><option value="">Seleccionar disposición</option>@for(option of Disposition.all; track option.wire){<option [value]="option.wire">{{option.label}}</option>}</select></label>}<button [attr.data-cta]="'return-dispose-'+request.id" (click)="dispose(request)">Confirmar disposición de inventario</button>}
+@if(request.status===Status.Disposed){<button [attr.data-cta]="'return-refund-'+request.id" (click)="refund(request)">Confirmar reembolso simulado</button>}
+}
+<details><summary>Historial de la solicitud</summary><ol class="timeline">@for(event of request.history; track $index){<li>{{event}}</li>}</ol></details></article>
+}@empty{<p class="empty-state">No hay solicitudes de devolución para esta selección.</p>}
+</section>
