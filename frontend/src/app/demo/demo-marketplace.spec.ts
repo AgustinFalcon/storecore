@@ -1,15 +1,81 @@
 import { DemoCommerce, decodeSnapshot, demoSeed, DemoScenario } from './demo-model';
 import { DemoMLAccountStatus, DemoMappingStatus, DemoObservationStatus, DemoMarketplaceMapping, DemoMarketplaceProcessor, DemoMarketplaceProjection, competitorFreshness, ensureCompetitorDetails, ensureMarketplace } from './demo-marketplace';
 import { DemoSyncStatus } from './demo-process-types';
-import { DemoInboxPolicy, DemoAlertRead, DemoAlertResolution } from './demo-inbox';
+import { DemoInboxPolicy, DemoAlertRead, DemoAlertResolution, DemoAlertCategory } from './demo-inbox';
 import { checkoutFixture } from './checkout/checkout-test-fixture';
 import type { DemoMarketplaceSnapshot } from './demo-marketplace';
 import { ProductPublication, VariantSaleState } from './catalog/catalog-types';
-import { DemoMarketplaceSale, decodeMarketplace, type DemoMarketplaceSalePort } from './demo-marketplace';
+import { DemoMarketplaceSale, DemoCompetitorAvailabilityStep, DemoMarketSignalRead, decodeMarketplace, type DemoMarketplaceSalePort } from './demo-marketplace';
 
 const now = '2026-10-09T10:00:00.000Z';
 const setup = () => new DemoCommerce(demoSeed(), () => now, () => 'operation-fixed');
 describe('FE-COMP-06 marketplace simulator invariants', () => {
+  it('rejects omitted domain variant identity even with multiple valid mappings and leaves every stock untouched', () => {
+    const { product } = checkoutFixture();
+    const snapshot: DemoMarketplaceSnapshot = { products: [product], listings: [{ sku: product.sku, linked: true, error: false }], mlConnected: true, competitors: [] };
+    new DemoMarketplaceMapping().save(snapshot, product.sku, product.variants[1].id, 'SIM-second', 'SIM-second', now);
+    const port: DemoMarketplaceSalePort = { snapshot, movements: [], consume: (_sku, id) => { product.variants.find(value => value.id === id)!.onHand--; } };
+    const before = JSON.stringify(port);
+    expect(() => new DemoMarketplaceSale().apply(port, product.sku, 'omitted', now, undefined as unknown as string)).toThrow('identidad');
+    expect(JSON.stringify(port)).toBe(before);
+  });
+  it('legacy sale adapter refuses ambiguous eligible variants instead of choosing the first mapping', () => {
+    const commerce = setup(); commerce.setMLAccount(DemoMLAccountStatus.Authorized);
+    const market = commerce.snapshot.marketplace!;
+    market.mappings.push({ ...market.mappings[0], id: 'another', variantId: 'different', variationId: 'SIM-different' });
+    const before = JSON.stringify(commerce.snapshot);
+    expect(() => commerce.mlSale('DEMO-001', 'omitted')).toThrow('explícita');
+    expect(JSON.stringify(commerce.snapshot)).toBe(before);
+  });
+  it('Unknown account blocks unlink before changing the mapping, queue or persisted snapshot', () => {
+    const commerce = setup(); commerce.setMLAccount(DemoMLAccountStatus.Authorized);
+    const market = commerce.snapshot.marketplace!; market.account = DemoMLAccountStatus.Unknown;
+    const before = JSON.stringify(commerce.snapshot);
+    expect(() => commerce.unlinkML(market.mappings[0].id)).toThrow('desconocida');
+    expect(JSON.stringify(commerce.snapshot)).toBe(before);
+    expect(market.account.canManageMappings).toBe(false);
+  });
+  it('availability policy rejects current or target Unknown without changing persistence', () => {
+    const commerce = setup(); const competitor = commerce.snapshot.competitors[0]; const details = ensureCompetitorDetails(competitor, commerce.snapshot);
+    const step = new DemoCompetitorAvailabilityStep();
+    for (const current of [DemoObservationStatus.Recent, DemoObservationStatus.Unknown]) {
+      details.availability = current;
+      for (const target of [DemoObservationStatus.Stale, DemoObservationStatus.Unknown]) {
+        if (current !== DemoObservationStatus.Unknown && target !== DemoObservationStatus.Unknown) continue;
+        const before = JSON.stringify(commerce.snapshot);
+        expect(current.canTransitionTo(target)).toBe(false);
+        expect(() => step.apply(commerce.snapshot, competitor.id, target)).toThrow('desconocida');
+        expect(JSON.stringify(commerce.snapshot)).toBe(before);
+      }
+    }
+    details.availability = DemoObservationStatus.Recent;
+    commerce.competitorAvailability(competitor.id, DemoObservationStatus.Stale);
+    expect(details.availability).toBe(DemoObservationStatus.Stale);
+  });
+  for (const version of [1, 4]) it(`migrates v${version} historical ML replay without consuming again or accepting another SKU`, () => {
+    const seed = demoSeed(); seed.version = version; seed.mlConnected = true;
+    seed.products[0].onHand--; seed.movements.push({ id: 'historical-sale', sku: seed.products[0].sku, delta: -1, reason: 'Venta Mercado Libre simulada' });
+    seed.movements.push({ id: 'other-operation', sku: seed.products[0].sku, delta: -1, reason: 'Ajuste manual' });
+    const commerce = new DemoCommerce(decodeSnapshot(JSON.stringify(seed)));
+    const before = JSON.stringify(commerce.snapshot);
+    commerce.mlSale(seed.products[0].sku, 'historical-sale');
+    expect(JSON.stringify(commerce.snapshot)).toBe(before);
+    expect(commerce.snapshot.movements[1].variantId).toBeUndefined();
+    expect(() => commerce.mlSale(seed.products[1].sku, 'historical-sale')).toThrow('otra variante');
+    expect(JSON.stringify(commerce.snapshot)).toBe(before);
+  });
+  it('new inbox alerts inherit persisted signal reading after preferences were paused while resolution stays active', () => {
+    const commerce = setup(); const inbox = new DemoInboxPolicy(); const competitor = commerce.snapshot.competitors[0];
+    inbox.preference(commerce.snapshot, 'admin', DemoAlertCategory.Marketplace, false);
+    commerce.competitorPrice(competitor.id, competitor.price - 50000, 'paused-signal');
+    competitor.details!.signals[0].read = DemoMarketSignalRead.Read;
+    const restored = decodeSnapshot(JSON.stringify(commerce.snapshot));
+    inbox.preference(restored, 'admin', DemoAlertCategory.Marketplace, true); inbox.reconcile(restored, now);
+    const alert = restored.inbox!.alerts.find(value => value.id.includes('paused-signal'))!;
+    expect(alert.read).toBe(DemoAlertRead.Read); expect(alert.resolution).toBe(DemoAlertResolution.Active);
+    inbox.reconcile(restored, now);
+    expect(restored.inbox!.alerts.filter(value => value.id === alert.id)).toHaveLength(1);
+  });
   it('projects modular variant reservations and not-sellable stock without composing the runtime', () => {
     const { product } = checkoutFixture();
     const state: DemoMarketplaceSnapshot = { products: [product], listings: [{ sku: product.sku, linked: true, error: false }], mlConnected: true, competitors: [] };

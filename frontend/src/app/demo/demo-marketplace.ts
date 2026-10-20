@@ -30,6 +30,7 @@ export class DemoMLAccountStatus {
   static readonly Unknown = new DemoMLAccountStatus('', 'Cuenta desconocida', 'Restablecer demostración');
   static readonly all = [this.Disconnected, this.Authorized, this.Expired, this.Error, this.Paused];
   static fromWire(raw: unknown): DemoMLAccountStatus { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+  get canManageMappings(): boolean { return this !== DemoMLAccountStatus.Unknown; }
 }
 export class DemoMappingStatus {
   private constructor(readonly wire: string, readonly label: string, readonly eligible = false) {}
@@ -47,6 +48,7 @@ export class DemoObservationStatus {
   static readonly Unknown = new DemoObservationStatus('', 'Observación desconocida');
   static readonly all = [this.Recent, this.Stale, this.Unavailable];
   static fromWire(raw: unknown): DemoObservationStatus { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+  canTransitionTo(target: DemoObservationStatus): boolean { return this !== DemoObservationStatus.Unknown && target !== DemoObservationStatus.Unknown; }
 }
 export interface DemoVariantMapping { id: string; sku: string; variantId: string; listingId: string; variationId: string; status: DemoMappingStatus; local: number; desired: number; desiredAt: string; observed?: number; observedAt?: string; confirmed?: number; confirmedAt?: string; generation: number; }
 export interface DemoMLQueueEntry { id: string; mappingId: string; generation: number; desired: number; status: DemoSyncStatus; created: string; attempts: number; lastAttempt?: string; error: string; }
@@ -117,7 +119,7 @@ export class DemoMarketplaceMapping {
     else { mapping.listingId = listingId; mapping.variationId = variationId; mapping.status = DemoMappingStatus.Linked; mapping.confirmed = undefined; mapping.confirmedAt = undefined; mapping.observed = undefined; mapping.observedAt = undefined; mapping.generation++; }
     new DemoMarketplaceProjection().refresh(state, now);
   }
-  unlink(state: DemoMarketplaceSnapshot, id: string): void { const market = ensureMarketplace(state); const mapping = market.mappings.find(value => value.id === id); if (!mapping || mapping.status === DemoMappingStatus.Unknown) throw new Error('Vínculo no disponible.'); mapping.status = DemoMappingStatus.Unlinked; for (const entry of market.queue.filter(value => value.mappingId === id && (value.status === DemoSyncStatus.Queued || value.status === DemoSyncStatus.Failed))) entry.status = DemoSyncStatus.Superseded; }
+  unlink(state: DemoMarketplaceSnapshot, id: string): void { const market = ensureMarketplace(state); if (!market.account.canManageMappings) throw new Error('Restablecé la cuenta de muestra desconocida.'); const mapping = market.mappings.find(value => value.id === id); if (!mapping || mapping.status === DemoMappingStatus.Unknown) throw new Error('Vínculo no disponible.'); mapping.status = DemoMappingStatus.Unlinked; for (const entry of market.queue.filter(value => value.mappingId === id && (value.status === DemoSyncStatus.Queued || value.status === DemoSyncStatus.Failed))) entry.status = DemoSyncStatus.Superseded; }
 }
 /** Only a successful simulator response advances observed and confirmed. */
 export class DemoMarketplaceProcessor {
@@ -144,10 +146,10 @@ export interface DemoMarketplaceSalePort {
 }
 /** Inventory ownership stays with the catalog; this step validates channel replay first. */
 export class DemoMarketplaceSale {
-  apply(port: DemoMarketplaceSalePort, sku: string, operation: string, now: string, variantId?: string): boolean {
-    if (!operation.trim() || (variantId !== undefined && !variantId.trim())) throw new Error('Indicá operación e identidad de variante válidas.');
+  apply(port: DemoMarketplaceSalePort, sku: string, operation: string, now: string, variantId: string): boolean {
+    if (!operation.trim() || typeof variantId !== 'string' || !variantId.trim()) throw new Error('Indicá operación e identidad de variante válidas.');
     const market = ensureMarketplace(port.snapshot, now);
-    const mapping = market.mappings.find(value => value.sku === sku && (variantId === undefined || value.variantId === variantId) && value.status.eligible);
+    const mapping = market.mappings.find(value => value.sku === sku && value.variantId === variantId && value.status.eligible);
     if (!market.account.canProcess || !mapping) throw new Error('Conectá la cuenta simulada y vinculá la variante.');
     const existing = port.movements.find(value => value.id === operation);
     if (existing) {
@@ -173,6 +175,16 @@ export function competitorFreshness(value: DemoCompetitor, state: DemoMarketplac
   const details = ensureCompetitorDetails(value, state);
   if (details.availability !== DemoObservationStatus.Recent) return details.availability;
   return Date.parse(now) - Date.parse(details.observedAt) > 86400000 ? DemoObservationStatus.Stale : DemoObservationStatus.Recent;
+}
+export class DemoCompetitorAvailabilityStep {
+  apply(state: DemoMarketplaceSnapshot, id: string, target: DemoObservationStatus): void {
+    const value = state.competitors.find(candidate => candidate.id === id);
+    if (!value) throw new Error('Competidor no disponible.');
+    if (target === DemoObservationStatus.Unknown) throw new Error('Restablecé la observación desconocida.');
+    const details = ensureCompetitorDetails(value, state);
+    if (!details.availability.canTransitionTo(target)) throw new Error('Restablecé la observación desconocida.');
+    details.availability = target;
+  }
 }
 export class DemoCompetitorObservationStep {
   apply(state: DemoMarketplaceSnapshot, id: string, price: number, operation: string, now: string): void {

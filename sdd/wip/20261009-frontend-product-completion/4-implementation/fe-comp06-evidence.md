@@ -1,5 +1,44 @@
 # FE-COMP-06 — marketplace y competencia de muestra
 
+## Addendum de correcciones tras revisión — 2026-10-20
+
+Las revisiones de producto y seguridad sobre `8018ce3` emitieron NO-GO con seis
+P2. Se corrigieron antes de solicitar una nueva revisión; aquel SHA y sus gates
+anteriores no representan aprobación del árbol corregido.
+
+1. Venta de dominio exige variante explícita, aun con un solo mapping. El
+   adaptador legacy solo traduce ID omitido con exactamente un candidato
+   elegible. Dos mappings ya no permiten elegir silenciosamente el primero.
+2. Disponibilidad de observaciones cambia mediante comando y regla en el tipo
+   cerrado. Origen/destino Unknown bloquean sin sobrescribirlos; la UI deriva
+   habilitación de esa regla, incluso para renovar/repetir muestras.
+3. Unlink valida cuenta Unknown antes de cambiar vínculo o superseder cola; el
+   formulario y los controles derivados también quedan deshabilitados.
+4. Repetir venta exige un evento real previo. Sin historial no ejecuta comandos
+   ni inventa una operación initial; el control está deshabilitado. Con evento,
+   el replay conserva el snapshot completo, incluida revisión.
+5. Traductor legacy v1/v4 agrega variante SKU:standard únicamente a movimientos
+   históricos ML con razón conocida y delta -1. Replay posterior no consume otra
+   unidad ni acepta reutilizar la operación para otro SKU. Los ajustes manuales
+   no reciben identidad ML.
+6. Al crear una alerta de competencia, inbox toma la lectura persistida de la
+   señal, sin resolverla. Se prueba la secuencia preferencias pausadas → señal
+   leída → reload → preferencias activas → alerta Read/Active única.
+
+Verificación del árbol corregido: focal **5 suites / 66 pruebas PASS**;
+full **87 suites / 406 pruebas PASS**; TypeScript app/spec, lint, arquitectura
+(6 pruebas + scan), demo (2.21 MB) y producción (552.34 kB) PASS. Browser afectado:
+**6/6 PASS en 20.8 segundos** (cuatro C06 y dos regresiones nuevas), con ledger
+de 17 familias completo, axe sin violaciones y sin overflow en 15 combinaciones.
+Reporte local ignorado `frontend/demo-playwright-report/pr190-review-fixes-6-20261020.json`.
+El full browser 35/35 documentado debajo es anterior a estas seis correcciones;
+no se atribuye una nueva ejecución full browser al árbol corregido. Las nuevas
+regresiones unitarias son siete de dominio y dos de componente. Junction temporal
+#188 retirada al terminar, sin borrar su destino. Nueva review y CI pendientes;
+no se declara APPROVED, merge ni push.
+
+## Evidencia previa del rebase
+
 Evidencia local actualizada el 2026-10-20 para el rebase de #190. Origen
 `76aea78126e181540c2fdf7b0b3d0b66b48f4f72`, base anterior `78289cee`,
 base nueva exacta #189 `00a48385ee76cf01f710d2ae8eb6bbfda88cc664`.

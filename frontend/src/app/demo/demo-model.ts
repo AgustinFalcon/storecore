@@ -4,7 +4,7 @@ import { OrderStatus } from '../domain/order/order-status';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
-import { DemoMLAccountStatus, DemoMarketplaceProjection, DemoMarketplaceMapping, DemoMarketplaceProcessor, DemoMarketplaceSale, DemoCompetitorObservationStep, ensureMarketplace, decodeMarketplace } from './demo-marketplace';
+import { DemoMLAccountStatus, DemoMarketplaceProjection, DemoMarketplaceMapping, DemoMarketplaceProcessor, DemoMarketplaceSale, DemoCompetitorObservationStep, DemoCompetitorAvailabilityStep, ensureMarketplace, decodeMarketplace } from './demo-marketplace';
 
 export class DemoScenario {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -159,7 +159,7 @@ export class DemoCommerce {
   advance(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order) throw new Error('Pedido no disponible.'); const action = new DemoFulfillmentPolicy().actions(order)[0]; if (!action) throw new Error('La entrega no puede avanzar.'); this.fulfill(orderId, action); }
   receiveReturn(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order || order.shipment !== ShipmentStatus.Delivered || order.returned) throw new Error('La devolución no está disponible.'); order.returned = true; order.history.push('Devolución recibida; inspección pendiente. Sin reintegro automático de stock.'); this.commit(); }
   adjust(sku: string, delta: number, reason: string): void { const product = this.product(sku); if (!Number.isInteger(delta) || !reason.trim() || product.onHand + delta < product.reserved) throw new Error('Indicá unidades enteras y motivo; el stock no puede ser menor a las reservas.'); product.onHand += delta; this.snapshot.movements.push({ id: this.id(), sku, delta, reason }); this.commit(true); }
-  mlSale(sku: string, operation: string, variantId?: string): void { this.requireModule(DemoModuleId.MercadoLibre); const changed = new DemoMarketplaceSale().apply({ snapshot: this.snapshot, movements: this.snapshot.movements, consume: selectedSku => { this.product(selectedSku).onHand--; } }, sku, operation, this.now(), variantId); if (changed) this.commit(true); }
+  mlSale(sku: string, operation: string, variantId?: string): void { this.requireModule(DemoModuleId.MercadoLibre); const candidates = ensureMarketplace(this.snapshot).mappings.filter(value => value.sku === sku && value.status.eligible); if (variantId === undefined) { if (candidates.length !== 1) throw new Error('Seleccioná una identidad de variante explícita.'); variantId = candidates[0].variantId; } const changed = new DemoMarketplaceSale().apply({ snapshot: this.snapshot, movements: this.snapshot.movements, consume: selectedSku => { this.product(selectedSku).onHand--; } }, sku, operation, this.now(), variantId); if (changed) this.commit(true); }
   processStock(fail = false): void {
     this.requireModule(DemoModuleId.MercadoLibre); new DemoMarketplaceProcessor().process(this.snapshot, this.now(), fail);
     this.snapshot.syncJobs = ensureMarketplace(this.snapshot).queue.map(job => ({ id: job.id, sku: this.snapshot.marketplace!.mappings.find(mapping => mapping.id === job.mappingId)!.sku, desired: job.desired, status: job.status, created: job.created }));
@@ -170,6 +170,7 @@ export class DemoCommerce {
   unlinkML(id: string): void { this.requireModule(DemoModuleId.MercadoLibre); new DemoMarketplaceMapping().unlink(this.snapshot, id); new DemoMarketplaceProjection().refresh(this.snapshot, this.now()); this.commit(); }
   remove(actorId: string, sku: string): void { const actor = this.actor(actorId); const remaining = actor.cart.filter(line => line.sku !== sku); if (remaining.length === actor.cart.length) return; actor.cart = remaining; this.commit(); }
   watchCompetitor(name: string, sku: string, threshold: number): void { this.product(sku); if (!name.trim() || !Number.isInteger(threshold) || threshold < 1 || threshold > 100) throw new Error('Indicá nombre, producto y umbral entre 1 y 100%.'); this.snapshot.competitors.push({ id: this.id(), name: name.trim(), sku, threshold, enabled: true, price: this.price(sku), history: [this.price(sku)], unread: false }); this.commit(); }
+  competitorAvailability(id: string, target: import('./demo-marketplace').DemoObservationStatus): void { new DemoCompetitorAvailabilityStep().apply(this.snapshot, id, target); this.commit(); }
   competitorPrice(id: string, price: number, operation = this.id()): void { new DemoCompetitorObservationStep().apply(this.snapshot, id, price, operation, this.now()); this.commit(); }
   saveSettings(settings: DemoSettings): void { if (![settings.homepageItems, settings.lowStockThreshold, settings.deliveryDays, settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(settings.trackingPrefix)) throw new Error('Indicá valores enteros de 1 a 30 y un prefijo de seguimiento de 2–12 letras/números.'); this.snapshot.settings = { ...settings }; this.commit(); }
   saveProduct(product: DemoProduct, editingSku?: string): void {
@@ -207,6 +208,9 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.settings ??= demoSeed().settings;
   if (!Array.isArray(state.blocks) || state.blocks.some(block => typeof block.id !== 'string' || typeof block.title !== 'string' || typeof block.body !== 'string') || ![state.settings.homepageItems, state.settings.lowStockThreshold, state.settings.deliveryDays, state.settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(state.settings.trackingPrefix)) throw new Error('La configuración demo guardada es inválida. Restablecé la demostración.');
   for (const order of state.orders) decodeFulfillment(order);
+  if (state.version === 1 || state.version === 4) for (const movement of state.movements) {
+    if (movement.variantId === undefined && movement.reason === 'Venta Mercado Libre simulada' && movement.delta === -1 && skus.has(movement.sku)) movement.variantId = `${movement.sku}:standard`;
+  }
   decodeInbox(state);
   decodeMarketplace(state);
   state.version = 5;
