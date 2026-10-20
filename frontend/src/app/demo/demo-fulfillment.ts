@@ -13,14 +13,27 @@ export const DEMO_PICKUP_POINT = Object.freeze({ store: 'StoreCore · sucursal C
 
 export class DemoFulfillmentPhase {
   private constructor(readonly wire: string, readonly label: string) {}
+  static readonly Pending = new DemoFulfillmentPhase('pending', 'Entrega pendiente de pago');
   static readonly Preparing = new DemoFulfillmentPhase('preparing', 'Preparando');
   static readonly Transit = new DemoFulfillmentPhase('transit', 'Enviado');
   static readonly Delivered = new DemoFulfillmentPhase('delivered', 'Entregado');
   static readonly Ready = new DemoFulfillmentPhase('ready', 'Listo para retirar');
   static readonly Collected = new DemoFulfillmentPhase('collected', 'Retirado por el comprador');
   static readonly Unknown = new DemoFulfillmentPhase('', 'Entrega pendiente de conciliación');
-  static readonly all = [this.Preparing, this.Transit, this.Delivered, this.Ready, this.Collected];
+  static readonly all = [this.Pending, this.Preparing, this.Transit, this.Delivered, this.Ready, this.Collected];
   static fromWire(raw: unknown): DemoFulfillmentPhase { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+  static forShipment(shipment: ShipmentStatus, method: DemoDeliveryMethod): DemoFulfillmentPhase {
+    if (method === DemoDeliveryMethod.Unknown) return this.Unknown;
+    if (shipment === ShipmentStatus.Pending) return this.Pending;
+    if (shipment === ShipmentStatus.Preparing) return this.Preparing;
+    if (shipment === ShipmentStatus.Shipped) return method === DemoDeliveryMethod.Pickup ? this.Ready : this.Transit;
+    if (shipment === ShipmentStatus.Delivered) return method === DemoDeliveryMethod.Pickup ? this.Collected : this.Delivered;
+    return this.Unknown;
+  }
+  refresh(order: DemoFulfillmentOrder): DemoFulfillmentPhase {
+    return this === DemoFulfillmentPhase.Pending && order.status === OrderStatus.Paid && order.payment === PaymentStatus.Approved && order.shipment === ShipmentStatus.Preparing && order.delivery?.method !== DemoDeliveryMethod.Unknown && order.fulfillment?.incident !== DemoIncidentKind.Unknown && order.fulfillment?.lastAction !== DemoFulfillmentAction.Unknown
+      ? DemoFulfillmentPhase.Preparing : this;
+  }
   get complete(): boolean { return this === DemoFulfillmentPhase.Delivered || this === DemoFulfillmentPhase.Collected; }
 }
 export class DemoFulfillmentAction {
@@ -54,16 +67,31 @@ export interface DemoFulfillment {
 }
 function validPickupDate(value: string): boolean { const date = new Date(`${value}T12:00:00.000Z`); return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value; }
 export function ensureFulfillment(order: DemoFulfillmentOrder): DemoFulfillment {
-  if (order.fulfillment) return order.fulfillment;
+  if (order.fulfillment) { order.fulfillment.phase = order.fulfillment.phase.refresh(order); return order.fulfillment; }
   const pickup = order.delivery?.method === DemoDeliveryMethod.Pickup;
-  const phase = order.shipment === ShipmentStatus.Preparing ? DemoFulfillmentPhase.Preparing : order.shipment === ShipmentStatus.Shipped ? (pickup ? DemoFulfillmentPhase.Ready : DemoFulfillmentPhase.Transit) : order.shipment === ShipmentStatus.Delivered ? (pickup ? DemoFulfillmentPhase.Collected : DemoFulfillmentPhase.Delivered) : DemoFulfillmentPhase.Unknown;
-  return order.fulfillment = { phase, recipient: 'Comprador de muestra', phone: '011 5555 0100', carrier: 'Correo de muestra', service: 'Estándar', ...DEMO_PICKUP_POINT, pickupDeadline: '2026-12-31', attempts: phase === DemoFulfillmentPhase.Delivered ? 1 : 0, incident: order.incident ? DemoIncidentKind.Report : DemoIncidentKind.None, incidentText: order.incident ?? '', resolution: '' };
+  const phase = DemoFulfillmentPhase.forShipment(order.shipment, order.delivery?.method ?? DemoDeliveryMethod.Home);
+  const destination = pickup ? order.delivery!.destination.trim() : '';
+  // Checkout freezes one pickup description, not separate address/opening-hour fields.
+  const point = destination ? { store: destination, location: destination, hours: '' } : DEMO_PICKUP_POINT;
+  return order.fulfillment = { phase, recipient: 'Comprador de muestra', phone: '011 5555 0100', carrier: 'Correo de muestra', service: 'Estándar', ...point, pickupDeadline: '2026-12-31', attempts: phase === DemoFulfillmentPhase.Delivered ? 1 : 0, incident: order.incident ? DemoIncidentKind.Report : DemoIncidentKind.None, incidentText: order.incident ?? '', resolution: '' };
 }
 /** One policy is shared by admin commands and buyer presentation. Incidents never replace delivery phase. */
 export class DemoFulfillmentPolicy {
+  writable(order: DemoFulfillmentOrder): boolean {
+    const value = ensureFulfillment(order);
+    return order.status !== OrderStatus.Unknown && order.payment === PaymentStatus.Approved
+      && order.shipment !== ShipmentStatus.Unknown && order.shipment !== ShipmentStatus.Cancelled && order.shipment !== ShipmentStatus.Pending
+      && value.phase !== DemoFulfillmentPhase.Unknown && value.phase !== DemoFulfillmentPhase.Pending
+      && value.incident !== DemoIncidentKind.Unknown && value.lastAction !== DemoFulfillmentAction.Unknown && order.delivery?.method !== DemoDeliveryMethod.Unknown;
+  }
+  requireWritable(order: DemoFulfillmentOrder): DemoFulfillment {
+    if (!this.writable(order)) throw new Error('El seguimiento requiere conciliación antes de continuar.');
+    return ensureFulfillment(order);
+  }
+  canConfigure(order: DemoFulfillmentOrder): boolean { return this.writable(order) && ensureFulfillment(order).phase === DemoFulfillmentPhase.Preparing; }
   actions(order: DemoFulfillmentOrder): DemoFulfillmentAction[] {
     const value = ensureFulfillment(order); const method = order.delivery?.method ?? DemoDeliveryMethod.Home;
-    if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase === DemoFulfillmentPhase.Unknown || value.incident === DemoIncidentKind.Unknown || value.lastAction === DemoFulfillmentAction.Unknown || method === DemoDeliveryMethod.Unknown || value.phase.complete) return [];
+    if (!this.writable(order) || value.phase.complete) return [];
     if (method === DemoDeliveryMethod.Home) {
       if (value.phase === DemoFulfillmentPhase.Preparing) return value.incident === DemoIncidentKind.None && [value.recipient, value.phone, value.carrier, value.service, order.address].every(field => !!field.trim()) ? [DemoFulfillmentAction.Dispatch] : [];
       if (value.phase === DemoFulfillmentPhase.Transit) return value.incident === DemoIncidentKind.Delivery ? [DemoFulfillmentAction.Retry] : value.incident === DemoIncidentKind.None ? [DemoFulfillmentAction.Deliver, DemoFulfillmentAction.FailedAttempt] : [];
@@ -74,16 +102,15 @@ export class DemoFulfillmentPolicy {
     return [];
   }
   configure(order: DemoFulfillmentOrder, draft: DemoFulfillment): void {
-    const value = ensureFulfillment(order);
-    if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase !== DemoFulfillmentPhase.Preparing || value.incident === DemoIncidentKind.Unknown || order.delivery?.method === DemoDeliveryMethod.Unknown) throw new Error('Los datos de entrega sólo se editan antes de preparar el despacho o retiro.');
+    const value = this.requireWritable(order);
+    if (!this.canConfigure(order)) throw new Error('Los datos de entrega sólo se editan antes de preparar el despacho o retiro.');
     const fields = order.delivery?.method === DemoDeliveryMethod.Pickup ? [draft.store, draft.location, draft.hours, draft.pickupDeadline] : [draft.recipient, draft.phone, draft.carrier, draft.service];
     if (fields.some(field => typeof field !== 'string' || !field.trim()) || (order.delivery?.method === DemoDeliveryMethod.Pickup && !validPickupDate(draft.pickupDeadline))) throw new Error('Completá los datos de la modalidad de entrega.');
     for (const key of ['recipient', 'phone', 'carrier', 'service', 'store', 'location', 'hours', 'pickupDeadline'] as const) value[key] = draft[key].trim();
     if (order.delivery?.method === DemoDeliveryMethod.Pickup) { order.address = `Retiro en ${value.store} · ${value.location} · ${value.hours}`; order.delivery.destination = order.address; }
   }
   apply(order: DemoFulfillmentOrder, action: DemoFulfillmentAction, note: string, pickupDeadline?: string): string | undefined {
-    const value = ensureFulfillment(order);
-    if (order.status === OrderStatus.Unknown || order.payment !== PaymentStatus.Approved || value.phase === DemoFulfillmentPhase.Unknown || value.incident === DemoIncidentKind.Unknown || value.lastAction === DemoFulfillmentAction.Unknown || order.delivery?.method === DemoDeliveryMethod.Unknown) throw new Error('El seguimiento requiere conciliación antes de continuar.');
+    const value = this.requireWritable(order);
     if (action !== DemoFulfillmentAction.Unknown && value.lastAction === action && value.lastNote === note.trim() && value.lastDeadline === (pickupDeadline ?? '')) return;
     if (!this.actions(order).includes(action)) throw new Error('Esta acción no está disponible para la modalidad y estado actuales.');
     if (action.needsNote && !note.trim()) throw new Error('Indicá el motivo o la coordinación del próximo intento.');
@@ -94,11 +121,13 @@ export class DemoFulfillmentPolicy {
   }
 }
 export function decodeFulfillment(order: DemoFulfillmentOrder): void {
-  const value = ensureFulfillment(order);
+  const value = order.fulfillment ?? ensureFulfillment(order);
   value.phase = DemoFulfillmentPhase.fromWire(value.phase?.wire); value.incident = DemoIncidentKind.fromWire(value.incident?.wire);
   if (value.lastAction) value.lastAction = DemoFulfillmentAction.fromWire(value.lastAction.wire);
+  value.phase = value.phase.refresh(order);
   if (!Number.isInteger(value.attempts) || value.attempts < 0 || ['recipient', 'phone', 'carrier', 'service', 'store', 'location', 'hours', 'pickupDeadline', 'incidentText', 'resolution'].some(key => typeof value[key as keyof DemoFulfillment] !== 'string')) throw new Error('El seguimiento guardado es inválido.');
   const pickup = order.delivery?.method === DemoDeliveryMethod.Pickup;
+  if (value.phase === DemoFulfillmentPhase.Pending && ![ShipmentStatus.Pending, ShipmentStatus.Cancelled].includes(order.shipment)) throw new Error('El estado de entrega no coincide con su historial.');
   if ((pickup && [DemoFulfillmentPhase.Transit, DemoFulfillmentPhase.Delivered].includes(value.phase)) || (!pickup && [DemoFulfillmentPhase.Ready, DemoFulfillmentPhase.Collected].includes(value.phase))) throw new Error('La modalidad no coincide con el seguimiento guardado.');
   if (value.phase !== DemoFulfillmentPhase.Unknown && ((value.phase.complete && order.shipment !== ShipmentStatus.Delivered) || (value.phase === DemoFulfillmentPhase.Preparing && order.shipment !== ShipmentStatus.Preparing) || ([DemoFulfillmentPhase.Transit, DemoFulfillmentPhase.Ready].includes(value.phase) && order.shipment !== ShipmentStatus.Shipped))) throw new Error('El estado de entrega no coincide con su historial.');
 }

@@ -1,6 +1,5 @@
 import { Component, ElementRef, Input, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { PaymentStatus } from '../domain/order/payment-status';
 import { DemoApplicationState } from './demo-state';
 import { DemoContext, DemoOrder } from './demo-model';
 import { DemoDeliveryMethod } from './demo-process-types';
@@ -46,7 +45,7 @@ export class DemoFulfillmentComponent {
   get pickup(): boolean { return this.order?.delivery?.method === DemoDeliveryMethod.Pickup; }
   get value(): DemoFulfillment { return ensureFulfillment(this.order!); }
   get actions(): DemoFulfillmentAction[] { return this.visible && this.admin && this.order ? this.policy.actions(this.order) : []; }
-  get canConfigure(): boolean { return !!this.order && this.order.payment === PaymentStatus.Approved && this.value.phase === DemoFulfillmentPhase.Preparing && this.value.incident !== DemoIncidentKind.Unknown && this.order.delivery?.method !== DemoDeliveryMethod.Unknown; }
+  get canConfigure(): boolean { return !!this.order && this.policy.canConfigure(this.order); }
   save(): void { if (!this.visible || !this.admin || !this.order) return; this.state.run(() => this.state.commerce.configureFulfillment(this.order!.id, this.draft), 'Datos de entrega guardados.'); }
   perform(action: DemoFulfillmentAction): void { if (!this.visible || !this.admin || !this.order) return; if (this.state.run(() => this.state.commerce.fulfill(this.order!.id, action, this.note, this.newDeadline), action.label + ' · simulación guardada')) { this.note = ''; this.newDeadline = ''; } }
   resolve(): void { if (!this.visible || !this.admin || !this.order) return; if (this.state.run(() => this.state.commerce.resolveIncident(this.order!.id, this.resolution), 'Consulta resuelta y visible para el comprador.')) this.resolution = ''; }
