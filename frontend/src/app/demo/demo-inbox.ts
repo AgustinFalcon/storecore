@@ -6,6 +6,7 @@ import type { DemoFulfillmentOrder } from './demo-fulfillment';
 
 /** Composition boundary: legacy inventory is projected by SKU; current catalog by SKU and variant. */
 export interface DemoInboxSnapshot {
+  marketplace?: import('./demo-marketplace').DemoMarketState;
   version: number; inbox?: DemoInbox; actors: readonly { id: string }[]; orders: DemoFulfillmentOrder[];
   products: (DemoProduct | DemoSnapshot['products'][number])[];
   settings: { lowStockThreshold: number }; syncJobs?: DemoSnapshot['syncJobs']; competitors: DemoSnapshot['competitors'];
@@ -14,6 +15,7 @@ export interface DemoInboxSnapshot {
 import { PaymentStatus } from '../domain/order/payment-status';
 import { DemoSyncStatus } from './demo-process-types';
 import { DemoIncidentKind, ensureFulfillment } from './demo-fulfillment';
+import { ensureCompetitorDetails } from './demo-marketplace';
 
 export class DemoAlertCategory {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -67,10 +69,10 @@ export class DemoInboxPolicy {
   /** Stable event IDs preserve read state across reloads and repeated reconciliation. */
   reconcile(state: DemoInboxSnapshot, now: string): void {
     state.inbox ??= { alerts: [], preferences: [] };
-    const add = (id: string, audience: string, category: DemoAlertCategory, text: string, resolved = false, orderId?: string, sku?: string) => {
+    const add = (id: string, audience: string, category: DemoAlertCategory, text: string, resolved = false, orderId?: string, sku?: string, initialRead = DemoAlertRead.Unread) => {
       const existing = state.inbox!.alerts.find(value => value.id === `${audience}:${id}`);
       if (existing) { existing.resolution = resolved ? DemoAlertResolution.Resolved : DemoAlertResolution.Active; return; }
-      if (this.enabled(state, audience, category)) state.inbox!.alerts.push({ id: `${audience}:${id}`, audience, category, read: DemoAlertRead.Unread, created: now, text, orderId, sku, resolution: resolved ? DemoAlertResolution.Resolved : DemoAlertResolution.Active });
+      if (this.enabled(state, audience, category)) state.inbox!.alerts.push({ id: `${audience}:${id}`, audience, category, read: initialRead, created: now, text, orderId, sku, resolution: resolved ? DemoAlertResolution.Resolved : DemoAlertResolution.Active });
     };
     for (const order of state.orders) {
       for (const audience of ['admin', this.audience(false, order.actor)]) {
@@ -103,8 +105,8 @@ export class DemoInboxPolicy {
       this.stockAlert(state, add, product.sku, product.sku, `${product.name}: ${available} disponibles`, low, now);
     }
     for (const job of state.syncJobs ?? []) if (job.status === DemoSyncStatus.Failed || state.inbox.alerts.some(value => value.id === `admin:sync:${job.id}`)) add(`sync:${job.id}`, 'admin', DemoAlertCategory.Marketplace, `${job.sku} · Revisá la sincronización simulada`, job.status !== DemoSyncStatus.Failed, undefined, job.sku);
-    for (const competitor of state.competitors) if (competitor.unread) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, true, undefined, competitor.sku);
-    state.version = 4;
+    for (const competitor of state.competitors) { const details = ensureCompetitorDetails(competitor, state); for (const signal of details.signals) add(`competitor:${competitor.id}:${signal.operation}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra ${signal.percent.toFixed(1)}%`, false, undefined, competitor.sku, DemoAlertRead.fromWire(signal.read.wire)); if (competitor.unread && !details.signals.length) add(`competitor:${competitor.id}:${competitor.history.length}`, 'admin', DemoAlertCategory.Marketplace, `${competitor.name} · Cambio de precio de muestra`, false, undefined, competitor.sku); }
+    if (state.marketplace) state.version = 5;
   }
 }
 export function decodeInbox(state: DemoInboxSnapshot): void {

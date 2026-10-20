@@ -8,6 +8,9 @@ import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } fr
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
 import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { DemoAlertRead, DemoInboxPolicy } from './demo-inbox';
+import { DemoMarketplaceComponent } from './demo-marketplace.component';
+import { DemoMLAccountStatus, DemoMarketSignalRead, ensureMarketplace, ensureCompetitorDetails, marketplaceVariants } from './demo-marketplace';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus } from '../domain/order/payment-status';
 import { ShipmentStatus } from '../domain/order/shipment-status';
@@ -63,7 +66,7 @@ export class DemoRootComponent {
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoFulfillmentComponent, DemoInboxComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink, DemoFulfillmentComponent, DemoInboxComponent, DemoMarketplaceComponent], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
   @ViewChild(DemoFulfillmentComponent) private fulfillment?: DemoFulfillmentComponent;
   readonly state = inject(DemoApplicationState);
@@ -165,6 +168,8 @@ export class DemoPageComponent {
   get favoriteProducts(): DemoProduct[] { return this.state.data.products.filter(product => this.favorite(product.sku)); }
   get adminProducts(): DemoProduct[] { return this.state.data.products.filter(product => !this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())); }
   listing(sku: string) { return this.state.data.listings.find(value => value.sku === sku); }
+  get mlAccount() { return ensureMarketplace(this.state.data).account; }
+  get mlLinkedCount(): number { return ensureMarketplace(this.state.data).mappings.filter(mapping => mapping.status.eligible).length; }
   filterOrders(raw: string): void { this.selectedOrderStatus = raw ? PaymentStatus.fromWire(raw) : null; }
   changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.page.set(0); }
   movements(product: DemoProduct): void { const rows = this.state.data.movements.filter(value => value.sku === product.sku); this.information(rows.length ? rows.map(value => `${value.delta > 0 ? '+' : ''}${value.delta} unidades · ${value.reason}`).join('\n') : 'Sin movimientos posteriores al stock inicial de demostración.'); }
@@ -231,16 +236,15 @@ export class DemoPageComponent {
   get canResolveIncident(): boolean { return !!this.order && ensureFulfillment(this.order).incident === DemoIncidentKind.Report; }
   shipmentLabel(order: import('./demo-model').DemoOrder): string { return ensureFulfillment(order).phase.label; }
   receiveReturn(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
-  connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
-  linkML(sku: string): void { this.state.run(() => { const listing = this.state.data.listings.find(value => value.sku === sku); if (listing) { listing.linked = !listing.linked; if (listing.linked) listing.desired = undefined; } else this.state.data.listings.push({ sku, linked: true, observed: 0, error: false }); this.state.commerce.touch(); }, 'Vínculo simulado actualizado.'); }
-  syncML(sku: string): void { this.state.run(() => { if (!this.state.data.mlConnected) throw new Error('Conectá la cuenta simulada primero.'); const listing = this.state.data.listings.find(value => value.sku === sku); if (!listing?.linked) throw new Error('Vinculá el producto primero.'); listing.error = this.state.scenario() === DemoScenario.Error; if (!listing.error) listing.observed = this.state.commerce.available(sku); this.state.commerce.touch(); }, 'Sincronización simulada registrada.'); }
+  connectML(): void { this.state.run(() => this.state.commerce.setMLAccount(ensureMarketplace(this.state.data).account === DemoMLAccountStatus.Authorized ? DemoMLAccountStatus.Disconnected : DemoMLAccountStatus.Authorized), this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
+  linkML(sku: string): void { this.state.run(() => { const mapping = ensureMarketplace(this.state.data).mappings.find(value => value.sku === sku); if (mapping?.status.eligible) this.state.commerce.unlinkML(mapping.id); else { const variant = marketplaceVariants(this.state.data, sku)[0]; this.state.commerce.mapML(sku, variant.id, `SIM-${sku}`, `SIM-${variant.id}`); } }, 'Vínculo simulado actualizado.'); }
   saleML(sku: string): void { this.state.run(() => this.state.commerce.mlSale(sku, `ml-sale-${sku}`), 'Venta simulada registrada (repetir la misma operación no duplica stock).'); }
   simulateCompetitor(competitor = this.state.data.competitors[0]): void { if (competitor) this.state.run(() => this.state.commerce.competitorPrice(competitor.id, Math.max(100, competitor.price - Math.max(10000, Math.round(competitor.price * .1)))), 'Precio de muestra actualizado; revisá el historial y las alertas.'); }
   watchCompetitor(): void { if (this.state.run(() => this.state.commerce.watchCompetitor(this.competitorName, this.competitorSku, Number(this.competitorThreshold)), 'Competidor agregado a seguimiento simulado.')) this.competitorName = ''; }
   toggleCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { competitor.enabled = competitor.enabled === false; this.state.commerce.touch(); }, 'Preferencia de alertas actualizada.'); }
   removeCompetitor(competitor: DemoCompetitor): void { this.state.run(() => { this.state.data.competitors = this.state.data.competitors.filter(value => value.id !== competitor.id); this.state.commerce.touch(); }, 'Competidor eliminado del seguimiento.'); }
   processStock(): void { this.state.run(() => this.state.commerce.processStock(this.state.scenario() === DemoScenario.Error), 'Cola de sincronización simulada procesada.'); }
-  acknowledge(): void { this.state.run(() => { this.state.data.competitors.forEach(value => value.unread = false); this.state.commerce.touch(); }, 'Alertas marcadas como leídas.'); }
+  acknowledge(): void { this.state.run(() => { this.state.data.competitors.forEach(value => { value.unread = false; ensureCompetitorDetails(value, this.state.data).signals.forEach(signal => signal.read = DemoMarketSignalRead.Read); }); const inbox = new DemoInboxPolicy(); for (const alert of this.state.data.inbox?.alerts ?? []) if (alert.audience === 'admin' && alert.id.startsWith('admin:competitor:')) inbox.mark(this.state.data, 'admin', alert.id, DemoAlertRead.Read); this.state.commerce.touch(); }, 'Alertas marcadas como leídas.'); }
   moduleToggle(id: DemoModuleId): void { this.confirm(`Cambiar el estado de ${id.label} afecta sus operaciones simuladas.`, () => this.state.run(() => { const module = this.state.data.modules.find(value => value.id === id); if (!module || id === DemoModuleId.Unknown) throw new Error('Módulo desconocido.'); module.enabled = !module.enabled; this.state.commerce.touch(); }, 'Estado del módulo demo guardado.')); }
   configureModule(id: DemoModuleId): void { this.draftModule = id; this.draftSettings = { ...this.state.data.settings }; this.open(DemoDialog.Module); }
   saveModule(): void { if (this.draftModule === DemoModuleId.Unknown) { this.state.error.set('Módulo no reconocido.'); return; } if (this.state.run(() => this.state.commerce.saveSettings(this.draftSettings), `${this.draftModule.label}: configuración guardada.`)) this.close(); }
