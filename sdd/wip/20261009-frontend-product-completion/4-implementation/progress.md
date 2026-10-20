@@ -1,5 +1,20 @@
 # Evidencia inicial
 
+2026-10-20: #191 se prepara en rama dedicada desde `e57ded241cfc76d8922605d3f526483d1ffbabae`.
+La composición conecta los módulos canónicos #187–#190, perfiles con roles cerrados,
+schema v6 y administración C05. Fuente histórica `ffc54ba` conservada.
+Evidencia incremental y límites en [fe-comp05-evidence.md](fe-comp05-evidence.md).
+Suite local 425/425 y builds PASS durante desarrollo; browser final, review y CI pendientes.
+Las cifras de 2026-10-14 y las de las ramas originales son históricas.
+
+2026-10-20, cierre de validación local de #191: 90 archivos / 430 unitarias,
+TypeScript app/demo/spec, lint, arquitectura, ngc y builds demo/productivo PASS.
+Browser final: 51 esperadas PASS, cero omitidas/inesperadas/inestables y errors
+vacíos; incluye Customers y Outlet retenido además de los recorridos cruzados.
+El reporte final comienza a las 19:13:08 UTC y dura 229348.84 ms. Estado
+`implemented_local_pending_independent_review_and_ci`; no reutiliza CI/reviews
+de #190, no autoriza merge/release y no declara integraciones reales.
+
 2026-10-09: inspección estática de `db377fa` y documentación de FE-COMP-01..06. No se ejecutó producto, no hay nuevos resultados browser/build/CI ni revisión aprobada. Implementación: pendiente. Gates G-D/T/B/U/R: `NOT_RUN` salvo validación estructural documental que se registre explícitamente tras ejecutarla.
 
 Validación documental local 2026-10-09: `tasks.json` parseado con PowerShell `ConvertFrom-Json`; seis IDs únicos, dependencias existentes ordenadas sin ciclos y los 16 criterios de aceptación referidos presentes en el spec funcional: PASS. Este check de estructura no aprueba G-D ni acredita comportamiento del producto.
