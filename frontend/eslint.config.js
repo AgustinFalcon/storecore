@@ -5,6 +5,10 @@ const angular = require('angular-eslint');
 
 module.exports = tseslint.config(
   {
+    files: ['e2e/**/*.ts', 'demo-e2e/**/*.ts', 'playwright.demo.config.ts'],
+    extends: [eslint.configs.recommended, ...tseslint.configs.recommended],
+  },
+  {
     files: ['src/**/*.ts'],
     extends: [
       eslint.configs.recommended,

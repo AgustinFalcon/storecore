@@ -41,3 +41,5 @@ frontend/test-results/
 frontend/ua-real-results/
 !/docs/testing/
 !/docs/testing/**
+frontend/demo-playwright-report/
+frontend/debug.log
