@@ -6,12 +6,21 @@ import { DemoReturnReason } from './postsale/postsale-types';
 import { decodeInbox, type DemoInboxSnapshot } from './demo-inbox';
 import { DemoCommerce, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoDeliveryMethod, DemoPaymentMethod } from './demo-process-types';
-import { DemoFulfillmentAction as Action, DemoFulfillmentPhase as Phase, DemoFulfillmentPolicy, DemoIncidentKind as Incident, ensureFulfillment, decodeFulfillment, type DemoFulfillmentOrder } from './demo-fulfillment';
+import { DEMO_PICKUP_POINT, DemoFulfillmentAction as Action, DemoFulfillmentPhase as Phase, DemoFulfillmentPolicy, DemoIncidentKind as Incident, ensureFulfillment, decodeFulfillment, type DemoFulfillmentOrder } from './demo-fulfillment';
 import { ShipmentStatus } from '../domain/order/shipment-status';
 import { DemoAlertCategory as Category, DemoAlertRead as Read, DemoAlertResolution as Resolution, DemoAlertFilter, DemoInboxPolicy } from './demo-inbox';
 
 describe('fulfillment by modality and persistent notification ownership', () => {
   const create = (method: DemoDeliveryMethod) => { const commerce = new DemoCommerce(demoSeed()); commerce.add('cliente', 'DEMO-001', 1); return { commerce, order: commerce.checkout('cliente', 'fulfillment', 'address-cliente', DemoScenario.Approved, DemoPaymentMethod.Card, method) }; };
+  it('freezes the complete pickup point promised by legacy checkout and preserves it after reload', () => {
+    const { commerce, order } = create(DemoDeliveryMethod.Pickup);
+    const destination = `Retiro en ${DEMO_PICKUP_POINT.store} · ${DEMO_PICKUP_POINT.location} · ${DEMO_PICKUP_POINT.hours}`;
+    expect(ensureFulfillment(order)).toMatchObject(DEMO_PICKUP_POINT);
+    expect(order.address).toBe(destination); expect(order.delivery!.destination).toBe(destination);
+    const restored = decodeSnapshot(JSON.stringify(commerce.snapshot)); const frozen = restored.orders.find(value => value.id === order.id)!;
+    expect(ensureFulfillment(frozen)).toMatchObject(DEMO_PICKUP_POINT);
+    expect(frozen.delivery!.destination).toBe(destination); expect(frozen.address).toBe(destination);
+  });
   it.each(DemoDeliveryMethod.all)('promotes a reconciled modular pending payment only after approval for %s', method => {
     const { snapshot, product, cart } = checkoutFixture();
     product.variants[0].pickupLocation = 'Sucursal Norte · Calle 456';
