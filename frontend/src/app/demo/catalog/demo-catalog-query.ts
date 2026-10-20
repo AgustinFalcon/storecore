@@ -16,6 +16,7 @@ export class DemoCatalogQuery {
   }
 
   variant(sku: string, variantId: string): DemoProductVariantRecord {
+    if (typeof variantId !== 'string' || !variantId.trim()) throw new Error('Seleccioná una variante válida.');
     const variant = this.product(sku).variants.find(value => value.id === variantId);
     if (!variant) throw new Error('La variante seleccionada ya no está disponible. Actualizá la página y elegí otra opción.');
     return variant;
@@ -31,21 +32,23 @@ export class DemoCatalogQuery {
 
   available(sku: string, variantId?: string): number {
     const product = this.product(sku);
+    const selected = variantId === undefined ? undefined : this.variant(sku, variantId);
     if (!product.publication.published || !DemoProductPolicy.known(product)) return 0;
     const available = (variant: DemoProductVariantRecord): number =>
       variant.saleState.active && variant.condition !== ProductCondition.Unknown
         ? variant.onHand - variant.reserved - variant.notSellable
         : 0;
-    return variantId
-      ? available(this.variant(sku, variantId))
+    return selected
+      ? available(selected)
       : product.variants.reduce((sum, variant) => sum + available(variant), 0);
   }
 
   priceQuote(sku: string, variantId?: string) {
     const product = this.product(sku);
-    const variant = variantId
+    const variant = variantId !== undefined
       ? this.variant(sku, variantId)
-      : product.variants.find(value => value.saleState.active) ?? product.variants[0];
+      : product.variants.filter(value => value.saleState.active).reduce<DemoProductVariantRecord | undefined>((minimum, value) => !minimum || value.price < minimum.price ? value : minimum, undefined);
+    if (!variant) return { amount: 0 };
     return this.quote(product, variant, this.available(sku, variant.id) > 0);
   }
 

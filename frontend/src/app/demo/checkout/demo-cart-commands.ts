@@ -14,6 +14,8 @@ export interface DemoCartCommandPort {
   snapshot(): DemoCheckoutSnapshot;
   actor(actorId: string): DemoActor;
   requireCustomerAccess(actorId: string): void;
+  /** Validate the current session and its customer ownership or explicit administrative permission. */
+  requirePaymentAccess(actorId: string, order: DemoOrder): void;
   requireModule(module: DemoModuleId): void;
   commit(projectStock?: boolean): void;
   now(): string;
@@ -28,6 +30,7 @@ export class DemoCartCommands {
 
   setQuantity(actorId: string, sku: string, variantId: string, quantity: number): void {
     this.port.requireCustomerAccess(actorId);
+    this.port.catalog.variant(sku, variantId);
     if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad. Para quitar el producto usá Quitar.');
     if (quantity > this.port.catalog.available(sku, variantId)) throw new Error('La cantidad supera el stock disponible para esta variante.');
     const actor = this.port.actor(actorId);
@@ -50,6 +53,7 @@ export class DemoCartCommands {
 
   remove(actorId: string, sku: string, variantId: string): void {
     this.port.requireCustomerAccess(actorId);
+    if (typeof variantId !== 'string' || !variantId.trim()) throw new Error('Seleccioná una variante válida.');
     const actor = this.port.actor(actorId);
     const remaining = actor.cart.filter(line => line.sku !== sku || line.variantId !== variantId);
     if (remaining.length === actor.cart.length) return;
@@ -75,8 +79,9 @@ export class DemoCartCommands {
     this.port.commit();
   }
 
-  checkout(actorId: string, request: string, addressId: string, scenario: DemoScenario, method = DemoPaymentMethod.Card, deliveryMethod?: DemoDeliveryMethod): DemoOrder {
+  checkout(actorId: string, request: string, addressId: string, scenario: DemoScenario, method = DemoPaymentMethod.Card, deliveryMethod: DemoDeliveryMethod): DemoOrder {
     this.port.requireCustomerAccess(actorId);
+    if (!DemoDeliveryMethod.all.includes(deliveryMethod)) throw new Error('Elegí una entrega válida antes de confirmar.');
     const snapshot = this.port.snapshot();
     const existing = snapshot.orders.find(order => order.actor === actorId && order.request === request);
     if (existing) return existing;
@@ -103,11 +108,9 @@ export class DemoCartCommands {
     const order: DemoOrder = { id: `DEMO-${this.port.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: approved ? ShipmentStatus.Preparing : rejected ? ShipmentStatus.Cancelled : ShipmentStatus.Pending, lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.port.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`] };
     order.method = method;
     order.reservation = { state: approved ? DemoReservationState.Consumed : rejected ? DemoReservationState.None : DemoReservationState.Held, lines: rejected ? [] : lines.map(line => ({ sku: line.sku, variantId: line.variantId, quantity: line.quantity })) };
-    if (deliveryMethod) {
-      order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? pickupLocation! : `${address!.street} · ${address!.city} · CP ${address!.postal}` };
-      order.address = order.delivery.destination;
-      order.total += order.delivery.cost;
-    }
+    order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? pickupLocation! : `${address!.street} · ${address!.city} · CP ${address!.postal}` };
+    order.address = order.delivery.destination;
+    order.total += order.delivery.cost;
     for (const line of lines) {
       const product = this.port.catalog.product(line.sku);
       const variant = this.port.catalog.variant(line.sku, line.variantId);
@@ -124,10 +127,11 @@ export class DemoCartCommands {
     return order;
   }
 
-  resolvePayment(orderId: string, scenario: DemoScenario): void {
+  resolvePayment(actorId: string, orderId: string, scenario: DemoScenario): void {
     const snapshot = this.port.snapshot();
     const order = snapshot.orders.find(value => value.id === orderId);
     if (!order) throw new Error('Pedido no encontrado.');
+    this.port.requirePaymentAccess(actorId, order);
     if (order.payment !== PaymentStatus.Pending) throw new Error('Este pago ya tiene un resultado definitivo.');
     if (order.method === DemoPaymentMethod.Unknown || order.delivery?.method === DemoDeliveryMethod.Unknown) throw new Error('El pedido contiene un método no reconocido.');
     if (scenario !== DemoScenario.Approved && scenario !== DemoScenario.Rejected) throw new Error('Elegí aprobado o rechazado.');
@@ -149,10 +153,11 @@ export class DemoCartCommands {
     this.port.commit(scenario === DemoScenario.Approved);
   }
 
-  cancelPayment(orderId: string): void {
+  cancelPayment(actorId: string, orderId: string): void {
     const snapshot = this.port.snapshot();
     const order = snapshot.orders.find(value => value.id === orderId);
     if (!order) throw new Error('Pedido no encontrado.');
+    this.port.requirePaymentAccess(actorId, order);
     if (order.payment === PaymentStatus.Cancelled) return;
     if (order.payment !== PaymentStatus.Pending) throw new Error('Solo un pago pendiente puede cancelarse.');
     const reservation = order.reservation?.state ?? DemoReservationState.Unknown;

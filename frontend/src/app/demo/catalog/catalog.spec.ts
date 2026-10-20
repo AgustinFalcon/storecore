@@ -1,3 +1,4 @@
+import { DemoDeliveryMethod } from '../demo-process-types';
 import { checkoutFixture } from '../checkout/checkout-test-fixture';
 import { DemoScenario } from '../demo-model';
 import { CatalogValidationError, DemoSnapshotConflict, OutletScope, ProductCondition, ProductPublication, VariantSaleState } from './catalog-types';
@@ -36,7 +37,7 @@ describe('closed catalog contracts', () => {
   it('archives without altering variants or historical order snapshots', () => {
     const { product, cart, commands, snapshot } = checkoutFixture();
     cart.add('customer', product.sku, 1, product.variants[0].id);
-    cart.checkout('customer', 'historic', 'home', DemoScenario.Approved);
+    cart.checkout('customer', 'historic', 'home', DemoScenario.Approved, undefined, DemoDeliveryMethod.Home);
     const historic = JSON.stringify(snapshot.orders);
     const variants = JSON.stringify(product.variants);
     new ChangeDemoProductPublicationCommand('admin', product, snapshot.revision).execute(commands);
