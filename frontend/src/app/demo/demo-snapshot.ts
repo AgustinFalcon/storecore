@@ -3,6 +3,7 @@ import { DemoContext, DemoModuleId, DEMO_PICKUP_DESTINATION, demoSeed, type Demo
 import { DemoRole } from './demo-roles';
 import { DemoCatalogWire } from './catalog/catalog-wire';
 import { DemoProductPolicy } from './catalog/product-policy';
+import { DemoVariantReferenceIndex } from './catalog/variant-reference-index';
 import { ProductPublication, ProductCondition, VariantSaleState } from './catalog/catalog-types';
 import type { DemoProduct, DemoProductVariantRecord } from './catalog/catalog-model';
 import { DemoCatalogQuery } from './catalog/demo-catalog-query';
@@ -132,6 +133,7 @@ export function decodeSnapshot(raw:string):DemoSnapshot {
   if((version===5||version===6)&&!source['marketplace'])throw new Error('Falta el canal de muestra en la demo guardada.');
   decodeMarketplace(state);
   ensureMarketplace(state);
+  DemoVariantReferenceIndex.from(state).validateCatalog(state.products);
   return state;
 }
 

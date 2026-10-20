@@ -12,6 +12,7 @@ import { DemoMarketplaceComponent } from './demo-marketplace.component';
 import { DemoMLAccountStatus, DemoMarketSignalRead, ensureMarketplace, ensureCompetitorDetails } from './demo-marketplace';
 import { DemoAccessComponent } from './demo-access.component';
 import { DemoAdminFilter, DemoAdminSort, DEMO_ADMIN_LIMIT } from './demo-admin-selection';
+import { DemoCustomerOrderFilter } from './demo-customer-order-filter';
 import { DemoFulfillmentPolicy, DemoIncidentKind, ensureFulfillment, DEMO_PICKUP_POINT } from './demo-fulfillment';
 import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
 import { DemoProductVariantRecord, DemoProductMedia } from './catalog/catalog-model';
@@ -188,7 +189,8 @@ export class DemoPageComponent {
   get allowed(): boolean { return this.screen.admin ? this.state.context() === DemoContext.Admin : !this.screen.privateCustomer || this.state.context() === DemoContext.Customer; }
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
-  get selectedOrders() { const values=this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || `${order.id} ${order.actor} ${order.lines.map(line=>line.name).join(' ')}`.toLowerCase().includes(this.search().toLowerCase()))); return this.adminSort().apply(values); }
+  get customerFilter() { return DemoCustomerOrderFilter.fromWire(this.route.snapshot.queryParamMap.get('customerId'), this.state.data.actors); }
+  get selectedOrders() { const values=this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && this.customerFilter.matches(order) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || `${order.id} ${order.actor} ${order.lines.map(line=>line.name).join(' ')}`.toLowerCase().includes(this.search().toLowerCase()))); return this.adminSort().apply(values); }
   get orders() {return this.screen.admin?this.adminSlice(this.selectedOrders):this.selectedOrders;}
   get cartLines() { return this.state.actor.cart.map(line => { const selected = this.state.commerce.catalog.variant(line.sku, line.variantId); return { ...line, variantId: selected.id, variantName: selected.label, attributes: selected.attributes, image: selected.outlet?.media.at(0) ?? this.state.commerce.product(line.sku).media.at(0), available: this.state.commerce.available(line.sku, selected.id), product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku, selected.id) }; }); }
   get cartChanged(): boolean { return this.state.commerce.needsReconfirmation(this.state.actorId()); }
@@ -197,8 +199,8 @@ export class DemoPageComponent {
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
   get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < this.state.data.settings.lowStockThreshold); }
   get lowVariantStock() { return this.state.data.products.filter(product=>product.publication.published).flatMap(product => this.state.commerce.variants(product.sku).filter(variant => variant.saleState.active && (variant.condition === ProductCondition.Standard || (variant.condition === ProductCondition.Outlet && variant.onHand > variant.notSellable)) && this.state.commerce.catalog.available(product.sku, variant.id) < this.state.data.settings.lowStockThreshold).map(variant => ({ product, variant }))); }
-  get pendingOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && order.payment === PaymentStatus.Pending); }
-  get incidentOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && !!order.incident); }
+  get pendingOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && this.customerFilter.matches(order) && order.payment === PaymentStatus.Pending); }
+  get incidentOrders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor===this.state.actorId()) && this.customerFilter.matches(order) && !!order.incident); }
   get competitorAlerts(): number { return this.state.data.competitors.filter(value => value.unread).length; }
   get syncErrors(): number { return (this.state.data.syncJobs ?? []).filter(value => value.status === DemoSyncStatus.Failed).length; }
   get favoriteProducts(): DemoProduct[] { return this.state.data.products.filter(product => this.favorite(product.sku)); }

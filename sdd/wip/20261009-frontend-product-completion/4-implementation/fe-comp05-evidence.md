@@ -92,7 +92,48 @@ Dependencias temporales: junction node_modules hacia el checkout #187; se retira
 antes de la entrega y quedó retirado tras los gates, preservando el directorio
 de dependencias original. No hay cambios de paquetes/lockfiles.
 
-## Gates y límites
+## Correcciones de revisión local — 2026-10-20
+
+Sobre el corte local `d1216b088f18310019c4eec4cb6d71f26cbee23b`,
+`DemoVariantReferenceIndex` indexa identidades compuestas SKU+variante sin
+depender de estados ni de UI. El comando `saveProduct` impide eliminar o
+reemplazar variantes referenciadas antes de mutar catálogo/reservas. Conserva
+referencias de carritos, líneas de pedido, reservas, movimientos, devoluciones,
+mapping y cola de marketplace, y detalles de competencia, incluso históricos.
+No introduce tombstones. El mismo índice valida el catálogo al decodificar y
+rechaza snapshots con referencias huérfanas. Las pruebas ejercen directamente
+saveProduct, atomicidad del rechazo, recarga y wire corrupto por cada referencia;
+permiten eliminar una variante realmente libre y editar datos sin cambiar una
+línea histórica pagada.
+
+`DemoCustomerOrderFilter` separa el parámetro `customerId` validado de la
+búsqueda textual `q`. Sólo acepta una identidad exacta de un actor Customer;
+Unknown no coincide con pedidos. La selección compara `order.actor === id`,
+incluyendo colas y alertas en contexto de cliente. El directorio no usa el ID
+como texto de búsqueda: cliente y cliente2 se mantienen aislados.
+
+PDP muestra atributos y garantía configurada del producto. Postventa obtiene
+etiqueta, atributos e importe desde la línea congelada del pedido original por
+SKU+variantId, nunca del catálogo editado ni de la primera variante. El contrato
+canónico llama `unit` a ese importe comprado (`quotedUnit` pertenece al carrito).
+El browser reproduce dos variantes tras editar catálogo, a 390/768/1440 con Axe,
+además de garantía configurada y separación exacta de clientes.
+
+Validación final de esta corrección (no sustituye evidencia de CI/revisión):
+
+- Focal CORE: 2 archivos / 23 pruebas PASS.
+- Suite completa: 92 archivos / 455 pruebas PASS; lint completo y ngc PASS.
+- TypeScript app/demo/spec y arquitectura 6/6 + scan PASS.
+- Demo build: PASS, 2026-10-20 19:32:30.877 UTC.
+- Build productivo: PASS, 2026-10-20 19:34:32.797 UTC.
+- Browser focal de regresión: 5/5 PASS. Browser completo final: 56/56 PASS,
+  expected 56, skipped 0, unexpected 0, flaky 0, errors vacíos. Inicio
+  2026-10-20 19:32:31.516 UTC, duración 223997.118 ms. Fuente congelada sin
+  cambios posteriores al build demo; sólo se actualizó documentación después.
+- `git diff --check`: PASS. Runner y servidor finalizados; junction temporal
+  retirada al cerrar los gates, conservando node_modules de #187.
+
+## Estado de entrega
 
 Estado actual: implemented_local_pending_independent_review_and_ci.
 Faltan la re-revisión independiente y CI sobre el SHA final publicado.

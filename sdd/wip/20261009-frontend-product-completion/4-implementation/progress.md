@@ -169,3 +169,13 @@ sigue `BLOCKED_TOOLING` por ausencia de `tools/shared/validator-utils.sh`; no se
 falsea ese resultado.
 
 2026-10-20: FE-COMP-04 se porta sobre catálogo/checkout/postventa modulares de #187/#188. El documento fe-comp04-evidence.md distingue la evidencia histórica del corte original y la nueva validación local: 372/372 unitarias, 9/9 focales, 31/31 browser completos, tsc app/spec, lint, arquitectura y ambos builds PASS. Sin reintroducir monolitos ni composición de #191. No declara revisión independiente, CI ni merge.
+
+2026-10-20: corrección local de revisión FE-COMP-05 sobre d1216b0: índice puro
+SKU+variante impide borrar identidades referenciadas antes de mutar y rechaza
+huérfanos en decode; customerId validado filtra por identidad exacta, separado
+de q; PDP muestra garantía configurada y postventa usa detalles e importe de
+líneas congeladas, no el catálogo actual. Focal CORE 23/23, suite 92 archivos /
+455 pruebas, lint, ngc, tsc app/demo/spec, arquitectura y ambos builds PASS.
+El cierre browser y sus métricas se registran en fe-comp05-evidence.md. Se
+mantiene implemented_local_pending_independent_review_and_ci: re-revisión del
+diff y CI todavía pendientes; no push ni declaración merge-ready.
