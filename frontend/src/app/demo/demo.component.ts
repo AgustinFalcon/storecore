@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { CatalogSort, CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 
@@ -21,17 +21,6 @@ export class DemoDialog {
   static readonly Unknown = new DemoDialog('Acción desconocida');
   static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module].find(value => value.label === raw) ?? this.Unknown; }
 }
-export class CatalogSort {
-  private constructor(readonly wire: string, readonly label: string, readonly compare: (left: DemoProduct, right: DemoProduct) => number) {}
-  static readonly Featured = new CatalogSort('featured', 'Destacados', () => 0);
-  static readonly PriceUp = new CatalogSort('price-up', 'Menor precio', (a, b) => a.price - b.price);
-  static readonly PriceDown = new CatalogSort('price-down', 'Mayor precio', (a, b) => b.price - a.price);
-  static readonly Name = new CatalogSort('name', 'Nombre A–Z', (a, b) => a.name.localeCompare(b.name));
-  static readonly Unknown = new CatalogSort('', 'Orden desconocido', () => 0);
-  static readonly all = [this.Featured, this.PriceUp, this.PriceDown, this.Name];
-  static fromWire(raw: unknown): CatalogSort { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
-}
-
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
   readonly state = inject(DemoApplicationState);
@@ -85,7 +74,7 @@ export class DemoPageComponent {
   readonly sort = signal(CatalogSort.Featured);
   readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
   readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
-  readonly filtered = computed(() => this.state.data.products.filter(product => product.active && (!this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())) && (!this.category() || product.category === this.category()) && (!this.brand() || product.brand === this.brand()) && (!this.onlyAvailable() || this.state.commerce.available(product.sku) > 0) && (!this.maxPrice() || this.state.commerce.price(product.sku) <= this.maxPrice() * 100)).sort(this.sort().compare));
+  readonly filtered = computed(() => this.state.data.products.filter(product => product.active && (!this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())) && (!this.category() || product.category === this.category()) && (!this.brand() || product.brand === this.brand()) && (!this.onlyAvailable() || this.state.commerce.available(product.sku) > 0) && (!this.maxPrice() || this.state.commerce.price(product.sku) <= this.maxPrice() * 100)).sort((left, right) => this.sort().compare(left, right, product => this.state.commerce.price(product.sku))));
   readonly products = computed(() => this.filtered().slice(this.page() * 6, this.page() * 6 + 6));
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
@@ -147,7 +136,7 @@ export class DemoPageComponent {
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
   context(context: DemoContext): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; this.state.login(context, actor); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
-  register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => { this.state.data.actors.push({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }); this.state.commerce.touch(); }, 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
+  register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => this.state.commerce.registerActor({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }), 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
   nextStep(): void { if (this.step() === CheckoutStep.Address && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección.'); return; } if (this.step() === CheckoutStep.Delivery && !this.delivery) { this.state.error.set('Seleccioná la entrega simulada.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
   checkout(): void { let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(this.state.actorId(), this.request, this.addressId, this.state.scenario()).id; }, 'Pedido registrado.')) { void this.router.navigate(['/demo/checkout/result', id]); } }
   resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }

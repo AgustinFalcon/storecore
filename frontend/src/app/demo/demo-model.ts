@@ -45,6 +45,21 @@ export class DemoGalleryView {
   static readonly all = [this.Front, this.Detail];
   static fromWire(raw: unknown): DemoGalleryView { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
+export class CatalogSort {
+  private constructor(
+    readonly wire: string,
+    readonly label: string,
+    private readonly ordering: (left: DemoProduct, right: DemoProduct, effectivePrice: (product: DemoProduct) => number) => number,
+  ) {}
+  static readonly Featured = new CatalogSort('featured', 'Destacados', () => 0);
+  static readonly PriceUp = new CatalogSort('price-up', 'Menor precio', (left, right, price) => price(left) - price(right));
+  static readonly PriceDown = new CatalogSort('price-down', 'Mayor precio', (left, right, price) => price(right) - price(left));
+  static readonly Name = new CatalogSort('name', 'Nombre A–Z', (left, right) => left.name.localeCompare(right.name));
+  static readonly Unknown = new CatalogSort('', 'Orden desconocido', () => 0);
+  static readonly all = [this.Featured, this.PriceUp, this.PriceDown, this.Name];
+  static fromWire(raw: unknown): CatalogSort { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+  compare(left: DemoProduct, right: DemoProduct, effectivePrice: (product: DemoProduct) => number): number { return this.ordering(left, right, effectivePrice); }
+}
 export class DemoModuleId {
   private constructor(readonly wire: string, readonly label: string) {}
   static readonly Catalog = new DemoModuleId('catalog', 'Catálogo');
@@ -80,6 +95,13 @@ export class DemoCommerce {
   private commit(): void { this.snapshot.revision++; }
   private requireModule(id: DemoModuleId): void { if (!this.snapshot.modules.some(module => module.id === id && module.enabled)) throw new Error(`${id.label} está pausado en la demostración. Habilitalo desde Módulos del comercio.`); }
   actor(id: string): DemoActor { const actor = this.snapshot.actors.find(value => value.id === id); if (!actor) throw new Error('Elegí una identidad de demostración.'); return actor; }
+  registerActor(actor: DemoActor): void {
+    const email = actor.email.trim().toLowerCase();
+    if (!email || this.snapshot.actors.some(value => value.email.trim().toLowerCase() === email)) throw new Error('Ya existe una cuenta con ese email. Iniciá sesión o usá otro.');
+    if (!actor.id || this.snapshot.actors.some(value => value.id === actor.id)) throw new Error('La identidad de la cuenta no es válida.');
+    this.snapshot.actors.push({ ...actor, email });
+    this.commit();
+  }
   product(sku: string): DemoProduct { const product = this.snapshot.products.find(value => value.sku === sku); if (!product) throw new Error('Producto no encontrado.'); return product; }
   available(sku: string): number { const product = this.product(sku); return product.onHand - product.reserved; }
   price(sku: string): number { const product = this.product(sku); const offer = this.snapshot.campaigns.find(value => value.sku === sku && value.active && value.from <= this.now().slice(0, 10) && value.until >= this.now().slice(0, 10)); return offer ? Math.round(product.price * (100 - offer.percent) / 100) : product.price; }
@@ -111,7 +133,9 @@ export class DemoCommerce {
     const order = this.snapshot.orders.find(value => value.id === orderId); if (!order) throw new Error('Pedido no encontrado.');
     if (order.payment !== PaymentStatus.Pending) throw new Error('Este pago ya tiene un resultado definitivo.');
     if (scenario !== DemoScenario.Approved && scenario !== DemoScenario.Rejected) throw new Error('Elegí aprobado o rechazado.');
-    for (const line of order.lines) { const product = this.product(line.sku); product.reserved -= line.quantity; if (scenario === DemoScenario.Approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Pago ${order.id}` }); } }
+    const products = order.lines.map(line => ({ line, product: this.product(line.sku) }));
+    if (products.some(({ line, product }) => product.reserved < line.quantity || product.onHand < line.quantity)) throw new Error('Las reservas del pedido son inconsistentes. Restablecé la demostración.');
+    for (const { line, product } of products) { product.reserved -= line.quantity; if (scenario === DemoScenario.Approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Pago ${order.id}` }); } }
     order.payment = scenario === DemoScenario.Approved ? PaymentStatus.Approved : PaymentStatus.Rejected; order.status = scenario === DemoScenario.Approved ? OrderStatus.Paid : OrderStatus.Cancelled; order.history.push(order.payment.label); this.commit();
   }
   advance(orderId: string): void { this.requireModule(DemoModuleId.Shipping); const order = this.snapshot.orders.find(value => value.id === orderId); if (!order || order.payment !== PaymentStatus.Approved) throw new Error('El pedido necesita pago aprobado.'); if (order.shipment === ShipmentStatus.Preparing) { order.shipment = ShipmentStatus.Shipped; order.tracking = `${this.snapshot.settings.trackingPrefix}-${order.id}`; } else if (order.shipment === ShipmentStatus.Shipped) order.shipment = ShipmentStatus.Delivered; else throw new Error('La entrega ya está finalizada.'); order.history.push(`${order.shipment.label} · ${this.now()}`); this.commit(); }
@@ -146,6 +170,11 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.orders = state.orders.map(order => ({ ...order, status: OrderStatus.fromWire(order.status?.wire), payment: PaymentStatus.fromWire(order.payment?.wire), shipment: ShipmentStatus.fromWire(order.shipment?.wire) }));
   state.orders = state.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
   state.actors = state.actors.map(actor => ({ ...actor, cart: actor.cart.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
+  const normalizedEmails = state.actors.map(actor => actor.email.trim().toLowerCase());
+  if (new Set(normalizedEmails).size !== normalizedEmails.length) throw new Error('La identidad demo guardada contiene emails duplicados. Restablecé la demostración.');
+  const requiredReservations = new Map<string, number>();
+  for (const order of state.orders.filter(order => order.payment === PaymentStatus.Pending)) for (const line of order.lines) requiredReservations.set(line.sku, (requiredReservations.get(line.sku) ?? 0) + line.quantity);
+  if (state.products.some(product => product.reserved !== (requiredReservations.get(product.sku) ?? 0))) throw new Error('Las reservas guardadas no coinciden con los pedidos pendientes. Restablecé la demostración.');
   state.modules = state.modules.map(module => ({ ...module, id: DemoModuleId.fromWire(typeof module.id === 'string' ? module.id : module.id?.wire) }));
   state.blocks ??= demoSeed().blocks;
   state.settings ??= demoSeed().settings;

@@ -20,3 +20,10 @@ test('archived cart item blocks checkout and can be removed',async({page})=>{
  await login(page);await page.goto('/demo/catalog/DEMO-001');await cta(page,'product-add-cart').click();await login(page,true);await page.goto('/demo/user/catalog');await cta(page,'admin-product-archive-DEMO-001').click();await cta(page,'operation-confirm').click();
  await login(page);await page.goto('/demo/checkout');await page.getByRole('radio').check();await cta(page,'checkout-step-next').click();await page.getByRole('checkbox').check();await cta(page,'checkout-step-next').click();await cta(page,'checkout-confirm').click();await expect(page.getByRole('alert')).toContainText('archivado');await cta(page,'checkout-edit-cart').click();await cta(page,'cart-remove-DEMO-001').click();await expect(cta(page,'cart-empty-catalog')).toBeVisible();
 });
+test('catalog ordering follows the effective discounted price',async({page})=>{
+ await login(page,true);await page.goto('/demo/user/offers');await cta(page,'campaign-create').click();await page.getByLabel('Título',{exact:true}).fill('Descuento profundo');await page.getByLabel('Producto',{exact:true}).selectOption('DEMO-002');await page.getByLabel('Descuento %',{exact:true}).fill('70');await cta(page,'campaign-save').click();
+ await login(page);await page.goto('/demo/catalog');await page.getByLabel('Ordenar',{exact:true}).selectOption('price-up');await expect(page.locator('.product-card').first()).toContainText('Amoladora angular 115 mm');await expect(page.locator('.product-card').first()).toContainText('$ 6.300');
+});
+test('registration rejects an existing normalized email',async({page})=>{
+ await page.goto('/demo/customer/register');await page.getByLabel('Nombre',{exact:true}).fill('Cuenta duplicada');await page.getByLabel('Email',{exact:true}).fill(' CLIENTE@DEMO.INVALID ');await page.getByLabel('Contraseña',{exact:true}).fill('demo');await cta(page,'login-submit').click();await expect(page.getByRole('alert')).toContainText('Ya existe una cuenta');await expect(page).toHaveURL(/demo\/customer\/register/);
+});

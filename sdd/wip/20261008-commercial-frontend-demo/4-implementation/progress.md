@@ -56,9 +56,11 @@ Evidencia ejecutada en `promotion/storecore-master-demo-ui`:
 
 - `npm run lint`: PASS.
 - `npm run check:architecture`: PASS, 6/6 y escaneo de capas.
-- `npm run test`: PASS, 41 archivos y 190 tests.
-- `npm run test:demo`: PASS, build demo y 18/18 Chromium; matriz CTA completa y responsive 390/768/1440.
+- `npm run test`: PASS, 41 archivos y 194 tests.
+- `npm run test:demo`: PASS, build demo y 20/20 Chromium; matriz CTA completa y responsive 390/768/1440.
 - `npm run build`: PASS, bundle productivo 515.62 kB.
 - `git diff --check`: PASS antes de publicación.
 
-Los assertions de browser usan la etiqueta canónica `Acreditado` de `PaymentStatus.Approved`; no duplican la etiqueta antigua `Aprobado` en la vista o el test. E01–E09 cuentan con evidencia local de este corte según los límites anteriores. E10, GitHub CI y reviews exact-head se mantienen pendientes hasta publicar el PR. No se acredita backend externo, Mercado Libre live, pagos, correo, ARCA ni homologación.
+Los assertions de browser usan la etiqueta canónica `Acreditado` de `PaymentStatus.Approved`; no duplican la etiqueta antigua `Aprobado` en la vista o el test. La primera review exact-head de #193 detectó tres P2: ordenamiento por precio base en vez de precio efectivo, registro duplicado por email normalizado y restauración de reservas inconsistente con pedidos pendientes. Se corrigieron en el dominio: `CatalogSort` ordena mediante el resolvedor de precio efectivo; `DemoCommerce.registerActor` concentra y rechaza identidades duplicadas; y el decoder reconstruye reservas exactamente desde pedidos pendientes mientras `resolvePayment` prevalida invariantes antes de mutar. Las regresiones unitarias y browser específicas están incluidas en los totales 194 y 20/20 anteriores.
+
+E01–E09 cuentan con evidencia local de este corte según los límites anteriores. E10, GitHub CI y la segunda review exact-head se mantienen pendientes hasta publicar el SHA corregido. No se acredita backend externo, Mercado Libre live, pagos, correo, ARCA ni homologación.
