@@ -1,0 +1,240 @@
+{
+  "revision": "operator-batch-01-astra-approved",
+  "scope": "Static visual specifications approved through SC-SURF-19; operator SC-SURF-20..26, full 26-surface G2 and Angular behavior remain open",
+  "stitchProjectId": "6473866243657965808",
+  "screens": {
+    "SC-SURF-01": "fc50b7624d004c25a85f22ce700ef5a6",
+    "SC-SURF-15": "acc9135b2944492ca927153b049cfb9d"
+  },
+  "reviews": [
+    { "reviewer": "UI visual and product UX", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+    { "reviewer": "Frontend delivery and product integrity", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+    { "reviewer": "Angular architecture and domain contracts", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 }
+  ],
+  "constraints": [
+    "Approval is limited to the two anchor patterns.",
+    "TASK-002, TASK-003 and full G2 remain open until all 26 surfaces and responsive evidence are approved.",
+    "No Angular source change is authorized before TASK-004 closes."
+  ],
+  "batches": [
+    {
+      "batchId": "storefront-01",
+      "revision": "generated-v1",
+      "surfaces": ["SC-SURF-02", "SC-SURF-03", "SC-SURF-04", "SC-SURF-05"],
+      "verdict": "CHANGES_REQUESTED",
+      "reviews": [
+        { "reviewer": "UI visual and product UX", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 7 },
+        { "reviewer": "Frontend delivery and product integrity", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "CHANGES_REQUESTED", "openP1": 1, "openP2": 6 },
+        { "reviewer": "Angular architecture and domain contracts", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "CHANGES_REQUESTED", "openP1": 1, "openP2": 5 }
+      ],
+      "blockingThemes": [
+        "fabricated merchant, fiscal, certification, stock, warranty, coverage and fulfillment claims",
+        "non-canonical routes and identity inference from email text",
+        "technical state matrices embedded in commercial baselines",
+        "missing accessible modal and drawer focus contract",
+        "outlet condition conflated with promotional discount",
+        "broken PDP media placeholders and incomplete recovery-password flow",
+        "missing 390, 768 and 1440 evidence"
+      ]
+    },
+    {
+      "batchId": "storefront-01",
+      "revision": "hardening-final-approved",
+      "surfaces": ["SC-SURF-02", "SC-SURF-03", "SC-SURF-04", "SC-SURF-05"],
+      "screens": {
+        "SC-SURF-02": "4db5656e39854e55a0e0ea0fa636ff05",
+        "SC-SURF-03": "45d86d536cd441ea8857334c08af48f0",
+        "SC-SURF-04": "fff1fda8df934acb8815c0f82e59c026",
+        "SC-SURF-05": "696c60073fc449ec85a155e8b23bf1cc"
+      },
+      "verdict": "APPROVE",
+      "reviews": [
+        { "reviewer": "UI visual and product UX", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Frontend delivery and product integrity", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Angular architecture and domain contracts", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 }
+      ],
+      "scope": "Approved design/prototype patterns and declared states for SC-SURF-02..05; responsive Angular evidence remains a later gate."
+    },
+    {
+      "batchId": "storefront-02",
+      "revision": "static-visual-approved",
+      "surfaces": ["SC-SURF-02", "SC-SURF-06", "SC-SURF-07", "SC-SURF-08", "SC-SURF-09"],
+      "screens": {
+        "SC-SURF-02": "5deea948b6614926ab6be4a03f240ed5",
+        "SC-SURF-06": "3455a89f904d4e49a3d824c4d63e5d7f",
+        "SC-SURF-07": "4b212a62f7784102a6fbc9baacd83fa6",
+        "SC-SURF-08": "868e34545849423d98c4c52799959f1a",
+        "SC-SURF-09": "711b198acd164a79b7b4300df8322d39"
+      },
+      "verdict": "APPROVE",
+      "reviews": [
+        { "reviewer": "UI visual and product UX", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Frontend delivery and product integrity", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Angular architecture and domain contracts", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 }
+      ],
+      "scope": "Approved static visual state boards. Stitch contains no application controllers; session, closed types, persistence, navigation execution, keyboard and responsive behavior remain Angular implementation gates."
+    },
+    {
+      "batchId": "storefront-03",
+      "revision": "static-visual-approved",
+      "surfaces": ["SC-SURF-10", "SC-SURF-11", "SC-SURF-12", "SC-SURF-13", "SC-SURF-14"],
+      "screens": {
+        "SC-SURF-10": "d57d2daf2f544b0f9a100eeb5bd2ab35",
+        "SC-SURF-11": "3f0c7aaa45bc435f9be7a417259842ab",
+        "SC-SURF-12": "36f07d74b7f94cfa99164ddac2e7bd2d",
+        "SC-SURF-13": "25d1235464f94331b486a29ff463ff71",
+        "SC-SURF-14": "c04300ff8002416dbc2da34a4bf832a6"
+      },
+      "verdict": "APPROVE",
+      "reviews": [
+        { "reviewer": "UI visual and product UX", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Frontend delivery and product integrity", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 },
+        { "reviewer": "Angular architecture and domain contracts", "model": "gpt-6.1-sol", "effort": "medium", "verdict": "APPROVE", "openP1": 0, "openP2": 0 }
+      ],
+      "scope": "Approved static commerce/customer visual state boards. Payment, inventory, fiscal, return and persistence semantics remain executable Angular gates; no Stitch application logic is accepted."
+    },
+    {
+      "batchId": "operator-01",
+      "revision": "astra-r6-static-approved",
+      "surfaces": ["SC-SURF-16", "SC-SURF-17", "SC-SURF-18", "SC-SURF-19"],
+      "screens": {
+        "SC-SURF-16": "9d7d0fa78b774cf4a54e0b7edfd248a0",
+        "SC-SURF-17": "c957a37d58514cddb472cd1e5242fa0c",
+        "SC-SURF-18": "2a3d46e0a1b748a7a91758a66d469019",
+        "SC-SURF-19": "230f5a35c7a04ed4895834f010c0fee3"
+      },
+      "verdict": "APPROVE",
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE", "openP1": 0, "openP2": 0, "coordination": "cross-reviewed-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE", "openP1": 0, "openP2": 0, "coordination": "cross-reviewed-with-modern-ui" }
+      ],
+      "scope": "Approved static operator specifications for content, product/variant/Outlet administration, offers and manual campaigns. Rendering was reviewed at 390, 768 and 1440. Executable Angular behavior, persistence and accessibility remain later gates."
+    },
+    {
+      "batchId": "operator-02-preflight",
+      "revision": "astra-contract-approved-for-design",
+      "surfaces": ["SC-SURF-20", "SC-SURF-21", "SC-SURF-22", "SC-SURF-23"],
+      "verdict": "APPROVE_TO_DESIGN",
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE_TO_DESIGN", "openP1": 0, "openP2": 0, "coordination": "cross-reviewed-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE_TO_DESIGN", "openP1": 0, "openP2": 0, "coordination": "cross-reviewed-with-modern-ui" }
+      ],
+      "scope": "Approved SC20-SC23 SDD design brief after freezing the 12-order ledger, exact Demo/Real capability matrix, target applicability and deterministic before/after/idempotency specimens. Stitch screens and visual responsive review remain open."
+    },
+    {
+      "batchId": "operator-03",
+      "revision": "astra-round-1",
+      "surfaces": ["SC-SURF-24", "SC-SURF-25", "SC-SURF-26"],
+      "screens": {
+        "SC-SURF-24": "98eb086892764070892a42f27fc81a2d",
+        "SC-SURF-25": "44fb1818ec1b49cbba134824b9e7a726",
+        "SC-SURF-26": "5ccb74a8223947f7a1e0660f25a379de"
+      },
+      "verdict": "CHANGES_REQUESTED",
+      "openP1": 0,
+      "openP2": 10,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 10, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 10, "coordination": "consensus-with-modern-ui" }
+      ],
+      "blockingThemes": [
+        "role authority and future capability honesty",
+        "correlationId-based uncertain command reconciliation",
+        "complete closed-state compositions",
+        "valid real profile homeSections array and complete reset preview",
+        "identified customer restriction and actionable reactivation",
+        "canonical SC15 navigation and business-facing copy",
+        "measured responsive failures at 390 and 768",
+        "accessible labels and AA contrast"
+      ],
+      "scope": "Static visual review only. HTML was rendered with Tailwind at 390, 768 and 1440. Angular behavior, keyboard and productive integrations remain later gates."
+    },
+    {
+      "batchId": "operator-r6-split",
+      "revision": "astra-r6-consolidated",
+      "surfaces": ["SC-SURF-20", "SC-SURF-21", "SC-SURF-22", "SC-SURF-23", "SC-SURF-24", "SC-SURF-25", "SC-SURF-26"],
+      "screens": {
+        "SC-SURF-20": ["8349d37833af47279d1484034731ff05", "a10089b53a57418db1a68baf5794f273"],
+        "SC-SURF-21": ["61d38c9c3df54635b9fca70e0ff2ae5e", "556fc60ee8114861a049d37339db8251"],
+        "SC-SURF-22": ["b422ab395e29410abb8887f58937138f", "74bd05094acf43378fb3be2ee0c6fc40"],
+        "SC-SURF-23": ["cc39e990d65c4d5b9dc1f0536f72dcbf", "edb17f5aa72e4c7ea21ed14d416c47e2"],
+        "SC-SURF-24": ["492742fe6e894dec83df02e340f8085f", "8814f02097cb4fe0966e2af3f1c37dcb"],
+        "SC-SURF-25": ["f3d16923599e47eaaae67ee1fa933e42", "996f01ea5fe34677a76228f639d91220"],
+        "SC-SURF-26": ["c16ce77f0c0a4c6f88aadfb9dbab8252", "c61b7e6b1b95455b8d9a142cf0434756"]
+      },
+      "verdict": "CHANGES_REQUESTED",
+      "openP1": 0,
+      "openP2": 53,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 53, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 53, "coordination": "consensus-with-modern-ui" }
+      ],
+      "blockingThemes": [
+        "literal fixture and productive-contract fidelity without invented claims",
+        "complete operable commands, confirmation, recovery and idempotency specimens",
+        "strict Demo/Real and baseline/state-companion separation",
+        "canonical routes, target-aware navigation and role authority",
+        "full state compositions instead of prose or JSON-only panels",
+        "responsive reflow and mobile fact parity at 390, 768 and 1440",
+        "keyboard-safe drawers, modal semantics, labels, contrast and interactive semantics"
+      ],
+      "scope": "Consolidated strict static design audit. Counts are the sum of surface-level P2 findings (SC20 7, SC21 8, SC22 6, SC23 9, SC24 8, SC25 8, SC26 7), not independent duplicate defects. No Angular change is authorized until every surface receives coordinated APPROVE with zero P1/P2."
+    },
+    {
+      "batchId": "operator-02-sc20b",
+      "revision": "astra-r6.2",
+      "surfaces": ["SC-SURF-20"],
+      "screens": { "SC-SURF-20B": "06edab55d7ce4be69511fe3158303f6d" },
+      "verdict": "CHANGES_REQUESTED",
+      "openP1": 0,
+      "openP2": 5,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 5, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 5, "coordination": "consensus-with-modern-ui" }
+      ],
+      "scope": "Companion B only. Accepted CSV, target separation, authority, dialogs, focus and global reflow; baseline A is missing and SC20 remains unapproved."
+    },
+    {
+      "batchId": "operator-02-sc21a",
+      "revision": "astra-r6.1",
+      "surfaces": ["SC-SURF-21"],
+      "screens": { "SC-SURF-21A": "5d6880c39b49404692f588e22e12bb91" },
+      "verdict": "CHANGES_REQUESTED",
+      "openP1": 0,
+      "openP2": 5,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 5, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 5, "coordination": "consensus-with-modern-ui" }
+      ],
+      "scope": "Baseline A only. Ledger and responsive content accepted; event timing/accounting copy, shell routes, drawer isolation, banner offsets and header accessibility remain open. SC21 remains unapproved."
+    },
+    {
+      "batchId": "operator-02-sc21b",
+      "revision": "astra-r6.1",
+      "surfaces": ["SC-SURF-21"],
+      "screens": { "SC-SURF-21B": "2ec69b996b38456bad6aba1ff5249a28" },
+      "verdict": "CHANGES_REQUESTED",
+      "openP1": 0,
+      "openP2": 6,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 6, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "CHANGES_REQUESTED", "openP1": 0, "openP2": 6, "coordination": "consensus-with-modern-ui" }
+      ],
+      "scope": "Companion B only. Step controls, dialogs, exact baseline, isolated damaged specimen, refund and RMA chain accepted; invented operational facts, guards, recovery, Real lifecycle, state coverage and radio/contrast accessibility remain open."
+    },
+    {
+      "batchId": "operator-02-sc21a",
+      "revision": "astra-r6.4-approved",
+      "surfaces": ["SC-SURF-21"],
+      "screens": { "SC-SURF-21A": "682808d52c284544a2e744313e4a7955" },
+      "verdict": "APPROVE",
+      "openP1": 0,
+      "openP2": 0,
+      "reviews": [
+        { "reviewer": "Modern UI and responsive design", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE", "openP1": 0, "openP2": 0, "coordination": "consensus-with-product-ux" },
+        { "reviewer": "E-commerce product and UX", "model": "gpt-6.1-astra", "effort": "high", "verdict": "APPROVE", "openP1": 0, "openP2": 0, "coordination": "consensus-with-modern-ui" }
+      ],
+      "scope": "Approved clean SC21 baseline only: exact ledger, role-aware routes, responsive shell, keyboard drawer and accessible labels/contrast. SC21B and the full surface remain open."
+    }
+  ]
+}
