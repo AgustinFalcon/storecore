@@ -1,10 +1,10 @@
 import { PaymentStatus } from '../../domain/order/payment-status';
 import { ShipmentStatus } from '../../domain/order/shipment-status';
 import { DemoCatalogQuery } from '../catalog/demo-catalog-query';
-import { DemoProductPolicy } from '../catalog/product-policy';
 import type { DemoCheckoutSnapshot } from '../checkout/checkout-model';
 import { DemoRefundAllocation } from './refund-allocation';
 import { DemoReturnPolicy } from './return-policy';
+import { DemoReturnInventoryProjection } from './return-inventory-projection';
 import { DemoReturnDecision, DemoReturnDisposal, DemoReturnInspection, DemoReturnReception } from './return-transitions';
 import { DemoPostSaleEventKind, DemoReturnAccounting, DemoReturnDisposition, DemoReturnInspectionResult, DemoReturnReason, DemoReturnStatus, demoReturnLineKey, type DemoPostSaleAlert, type DemoPostSaleOrder, type DemoReturnRequest, type DemoReturnSelection } from './postsale-types';
 
@@ -100,8 +100,7 @@ export class DemoPostSaleCommands {
     const dispositions = new Map(outcomes.map(value => [demoReturnLineKey(value), value.disposition]));
     const disposal = new DemoReturnDisposal();
     if (!disposal.requiresMutation(request, dispositions)) return;
-    const inventory = request.lines.map(line => ({ line, product: this.port.catalog.product(line.sku), variant: this.port.catalog.variant(line.sku, line.variantId) }));
-    if (inventory.some(({ product, variant }) => !DemoProductPolicy.knownProduct(product) || !DemoProductPolicy.knownVariant(variant))) throw new Error('El producto o la variante necesitan conciliación antes de disponer inventario.');
+    const inventory = new DemoReturnInventoryProjection(this.port.catalog).prepare(request.lines, dispositions);
     disposal.apply(request, dispositions);
     for (const { line, product, variant } of inventory) {
       variant.onHand += line.quantity;

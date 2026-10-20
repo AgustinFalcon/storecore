@@ -233,6 +233,67 @@ describe('DemoPostSaleCommands', () => {
     expect(fixture.snapshot.postSaleAlerts).toHaveLength(alerts);
   });
 
+  it('rejects an Outlet unit restock whose projected stock would exceed its closed scope', () => {
+    const fixture = postSaleFixture();
+    const line = fixture.order.lines[0];
+    const variant = fixture.catalog.variant(line.sku, line.variantId);
+    variant.onHand = 1;
+    variant.reserved = 0;
+    variant.notSellable = 0;
+    variant.condition = ProductCondition.Outlet;
+    variant.outlet = {
+      scope: OutletScope.Unit,
+      reference: 'outlet-unit-1',
+      notes: 'Unidad identificada',
+      defects: 'Caja marcada',
+      warrantyTerms: 'Garantía reducida',
+      media: fixture.product.media.map(value => ({ ...value })),
+    };
+    fixture.catalog.refreshTotals(fixture.product);
+    const request = fixture.commands.request('customer', 'outlet-overflow', fixture.order.id, selection(line));
+    fixture.commands.decide('admin', request.id, true, 'Autorizada');
+    fixture.commands.receive('admin', request.id);
+    fixture.commands.inspect('admin', request.id, 'Completa', DemoReturnInspectionResult.Complete);
+    const before = JSON.stringify(fixture.snapshot);
+    expect(() => fixture.commands.dispose('admin', request.id, [{ sku: line.sku, variantId: line.variantId, disposition: DemoReturnDisposition.Restock }])).toThrow('Outlet requiere');
+    expect(JSON.stringify(fixture.snapshot)).toBe(before);
+    expect(request.status).toBe(DemoReturnStatus.Inspected);
+  });
+
+  it('prevalidates every projected product in a multi-line disposal without partial stock effects', () => {
+    const fixture = postSaleFixture();
+    const [first, second] = fixture.order.lines;
+    const invalid = fixture.catalog.variant(second.sku, second.variantId);
+    invalid.onHand = 1;
+    invalid.reserved = 0;
+    invalid.notSellable = 0;
+    invalid.condition = ProductCondition.Outlet;
+    invalid.outlet = {
+      scope: OutletScope.Unit,
+      reference: 'outlet-unit-2',
+      notes: 'Unidad identificada',
+      defects: 'Carcasa marcada',
+      warrantyTerms: 'Garantía reducida',
+      media: fixture.product.media.map(value => ({ ...value })),
+    };
+    fixture.catalog.refreshTotals(fixture.product);
+    const request = fixture.commands.request('customer', 'atomic-projection', fixture.order.id, [
+      { sku: first.sku, variantId: first.variantId, quantity: 1, reason: DemoReturnReason.ChangedMind },
+      { sku: second.sku, variantId: second.variantId, quantity: 1, reason: DemoReturnReason.Defective },
+    ]);
+    fixture.commands.decide('admin', request.id, true, 'Autorizada');
+    fixture.commands.receive('admin', request.id);
+    fixture.commands.inspect('admin', request.id, 'Completa', DemoReturnInspectionResult.Complete);
+    const before = JSON.stringify(fixture.snapshot);
+    expect(() => fixture.commands.dispose('admin', request.id, [
+      { sku: first.sku, variantId: first.variantId, disposition: DemoReturnDisposition.Restock },
+      { sku: second.sku, variantId: second.variantId, disposition: DemoReturnDisposition.Restock },
+    ])).toThrow('Outlet requiere');
+    expect(JSON.stringify(fixture.snapshot)).toBe(before);
+    expect(request.status).toBe(DemoReturnStatus.Inspected);
+    expect(request.lines.every(value => value.accounting === DemoReturnAccounting.NotRecorded)).toBe(true);
+  });
+
   it('fails closed for Unknown states instead of treating raw strings as valid', () => {
     const fixture = postSaleFixture();
     const request = fixture.commands.request('customer', 'unknown', fixture.order.id, selection(fixture.order.lines[0]));
