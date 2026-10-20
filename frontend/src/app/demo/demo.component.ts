@@ -5,8 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
 import { CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
 import { DemoScreen } from './demo-screen';
-import { PaymentStatus } from '../domain/order/payment-status';
-import { ShipmentStatus } from '../domain/order/shipment-status';
+import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}

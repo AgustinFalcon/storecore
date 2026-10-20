@@ -1,6 +1,5 @@
 import { CheckoutStep, DemoCommerce, DemoContext, DemoScenario, DemoProductVariant, DemoGalleryView, DemoModuleId, decodeSnapshot, demoSeed } from './demo-model';
-import { PaymentStatus } from '../domain/order/payment-status';
-import { ShipmentStatus } from '../domain/order/shipment-status';
+import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 
 describe('commercial demo transactions', () => {
   const commerce = () => new DemoCommerce(demoSeed(), () => '2026-10-08T10:00:00.000Z', () => 'fixed-request');

@@ -1,8 +1,8 @@
 # Evidencia y pendientes
 
-Documento de planificación original, 2026-10-08, promovido el 2026-10-20 sobre la base limpia `9a305b940b24d68c6bb80108060996b6210546a5` del linaje de `master`. Este corte no contiene implementación, resultado de tests de producto, review aprobada ni capturas; las métricas antiguas de rutas y repositorios deben reconciliarse contra esta base antes de implementar.
+Documento de planificación original, 2026-10-08, promovido el 2026-10-20 sobre la base limpia del linaje de `master`. La base documental efectiva es el PR #192, head `769eb64d4feac0cdea4b5689dbec3920f74e7747`, que contiene el hardening #176 ya fusionado. Las secciones históricas conservan la evidencia del linaje de integración; la sección final distingue la nueva ejecución sobre `master`.
 
-Inventario inicial define grupos de acciones exigidos por ruta; falta reconciliación de CTA concretos con implementación final y DOM. Todos E01–E10: NOT_RUN. DEMO-B/T/U1/U2/E: pendientes. No cierre de SDD, release, integración real ni homologación. La promoción no arrastra la ancestry ni las migraciones incompatibles de `integration/storecore-int`.
+La promoción no arrastra la ancestry ni las migraciones incompatibles de `integration/storecore-int`. Integración real, homologación, release y deploy continúan fuera de alcance. E10 permanece pendiente hasta completar reviews independientes del nuevo SHA y CI hosted.
 
 Por cada entrega agregar SHA/base, rutas/CTA cubiertos/total, comandos/resultados, screenshots desktop/mobile, hallazgos y correcciones, review funcional/diseño, review código/seguridad y residuales reales. No convertir acciones simuladas en evidencia backend.
 
@@ -47,3 +47,18 @@ No se afirma homologación ni implementación backend. E10 review funcional/dise
 Se separaron creación/edición de producto: alta duplicada y renombre de SKU se rechazan; edición conserva la reserva vigente del dominio y rechaza stock inferior. Checkout rechaza productos archivados ya presentes en carrito, sin modificar stock/pedidos, y permite revisar/quitar desde el enlace existente. Reset persiste una revisión nueva; los comandos comparan el snapshot persistido completo y rechazan desaparición/reemplazo incluso con revisión coincidente. Instrucciones demo quedaron junto al formulario de login y el párrafo sidebar recibió color explícito de contraste alto.
 
 Regresiones: full unit 303/303, 73 archivos; lint PASS; arquitectura PASS; build demo 1.90 MB PASS; Playwright 18/18, incluida matriz 285/285 y cero faltantes. Corrida 2026-10-08 23:54–23:57 ART. Los tres tests responsive adicionales generaron 60 capturas (20 superficies por tamaño) de login, catálogo, PDP, carrito, checkout, perfil, direcciones, registro, pedidos y todas las secciones administrativas en 390/768/1440; todas sin overflow global. Inspección visual propia del set representativo: login/catalog/PDP/cart/perfil 390, checkout/content 768, inventory 1440, con instrucciones visibles, tablas contenidas y formularios legibles. Capturas regenerables en frontend/test-results/review-regressions-responsive-complete-surface-set-{width}/. La review independiente debe revalidar este nuevo SHA; no se declara aprobación por implementar las correcciones.
+
+## Promoción limpia sobre `master` — 2026-10-20
+
+Se transplantaron los tres cortes funcionales originales sobre #192 y se resolvieron únicamente conflictos de composición. El demo reutiliza `OrderStatus`, `PaymentStatus` y `ShipmentStatus` desde `commerce-states.ts`, el tipo cerrado canónico de `master`; no reintroduce archivos paralelos ni strings mágicos. Se preservaron los scripts UA reales de #176 y se amplió lint a `demo-e2e` y su configuración Playwright.
+
+Evidencia ejecutada en `promotion/storecore-master-demo-ui`:
+
+- `npm run lint`: PASS.
+- `npm run check:architecture`: PASS, 6/6 y escaneo de capas.
+- `npm run test`: PASS, 41 archivos y 190 tests.
+- `npm run test:demo`: PASS, build demo y 18/18 Chromium; matriz CTA completa y responsive 390/768/1440.
+- `npm run build`: PASS, bundle productivo 515.62 kB.
+- `git diff --check`: PASS antes de publicación.
+
+Los assertions de browser usan la etiqueta canónica `Acreditado` de `PaymentStatus.Approved`; no duplican la etiqueta antigua `Aprobado` en la vista o el test. E01–E09 cuentan con evidencia local de este corte según los límites anteriores. E10, GitHub CI y reviews exact-head se mantienen pendientes hasta publicar el PR. No se acredita backend externo, Mercado Libre live, pagos, correo, ARCA ni homologación.
