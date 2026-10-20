@@ -194,7 +194,7 @@ export class DemoCommerce {
     if (editingSku && (!existing || product.sku !== editingSku)) throw new Error('No se puede cambiar el SKU de un producto existente.');
     const reserved = existing?.reserved ?? 0;
     if (!product.name.trim() || !product.sku.trim() || !Number.isSafeInteger(product.price) || product.price <= 0 || !Number.isInteger(product.onHand) || product.onHand < reserved) throw new Error('Revisá nombre, SKU, precio y stock; respetá las reservas existentes.');
-    if (existing) Object.assign(existing, { ...product, reserved }); else this.snapshot.products.push({ ...product, reserved: 0 });
+    if (existing) Object.assign(existing, { ...product, supportsCase: product.supportsCase === true, reserved }); else this.snapshot.products.push({ ...product, supportsCase: product.supportsCase === true, reserved: 0 });
     this.commit(true);
   }
   saveCampaign(campaign: DemoCampaign): void { this.requireModule(DemoModuleId.Catalog); if (!campaign.title.trim() || !this.snapshot.products.some(value => value.sku === campaign.sku) || campaign.percent <= 0 || campaign.percent > 70 || campaign.from > campaign.until) throw new Error('Revisá el título, producto, descuento (1–70%) y vigencia.'); const index = this.snapshot.campaigns.findIndex(value => value.id === campaign.id); if (index < 0) this.snapshot.campaigns.push({ ...campaign }); else this.snapshot.campaigns[index] = { ...campaign }; this.commit(); }

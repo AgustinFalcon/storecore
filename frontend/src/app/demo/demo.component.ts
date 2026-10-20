@@ -117,7 +117,7 @@ export class DemoPageComponent {
   adjustmentDelta = 1;
   adjustmentReason = '';
   selectedOrderStatus: PaymentStatus | null = null;
-  draftProduct: DemoProduct = { sku: '', name: '', category: 'Herramientas', brand: 'Norte', description: '', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar' };
+  draftProduct: DemoProduct = { sku: '', name: '', category: 'Herramientas', brand: 'Norte', description: '', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar', supportsCase: false };
   draftAddress: DemoAddress = { id: '', label: 'Casa', street: '', city: '', postal: '', primary: false };
   draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, active: true, from: '2026-10-08', until: '2027-12-31' };
   configName = 'Mi comercio';
@@ -189,7 +189,7 @@ export class DemoPageComponent {
   confirm(text: string, action: () => void): void { this.info = text; this.confirmation = action; this.open(DemoDialog.Confirm); }
   performConfirmation(): void { const action = this.confirmation; this.confirmation = null; this.close(); action?.(); }
   editingSku: string | undefined;
-  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? { ...product } : { ...this.draftProduct, sku: `DEMO-${this.state.data.products.length + 1}`, name: '', reserved: 0 }; this.open(DemoDialog.Product); }
+  editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? { ...product } : { ...this.draftProduct, sku: `DEMO-${this.state.data.products.length + 1}`, name: '', reserved: 0, supportsCase: false }; this.open(DemoDialog.Product); }
   saveProduct(): void { if (this.state.run(() => this.state.commerce.saveProduct({ ...this.draftProduct }, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
   archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...product, active: !product.active }, product.sku), product.active ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
   editAddress(address?: DemoAddress): void { this.draftAddress = address ? { ...address } : { id: crypto.randomUUID(), label: 'Casa', street: '', city: '', postal: '', primary: false }; this.open(DemoDialog.Address); }
