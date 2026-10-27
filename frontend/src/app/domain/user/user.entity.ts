@@ -1,5 +1,6 @@
 import { UserRole } from './user-role';
 import { InventoryAvailability } from './inventory-availability';
+import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
 
 export interface UserSessionResult {
   readonly id: string;
@@ -53,7 +54,7 @@ export interface InventoryRow {
 export interface MercadoLibreAccount {
   readonly authorized: boolean;
   readonly accountRef: string;
-  readonly status: string;
+  readonly status: MercadoLibreAccountStatus;
 }
 
 export interface MercadoLibreListing {
