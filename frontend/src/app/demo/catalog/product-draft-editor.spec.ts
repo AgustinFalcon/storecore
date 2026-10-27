@@ -40,6 +40,13 @@ describe('DemoProductDraftEditor', () => {
     expect(moved.media[0].id).toBe('media-id');
     expect(draft.media[0].id).toBe('new-front');
   });
+  it('returns a closed issue instead of deleting a persisted variant', () => {
+    const draft = editor.addVariant(editor.create('DEMO-X'));
+    const persisted = draft.variants[1];
+    expect(editor.removeVariant(draft, 1, new Set([persisted.id])).issue).toBe(ProductDraftIssue.PersistedVariant);
+    expect(ProductDraftIssue.fromWire('PERSISTED_VARIANT')).toBe(ProductDraftIssue.PersistedVariant);
+    expect(draft.variants).toContain(persisted);
+  });
 
   it('creates and clears outlet details through the closed condition translator', () => {
     const draft = editor.create('DEMO-OUTLET');

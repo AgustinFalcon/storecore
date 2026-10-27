@@ -27,11 +27,12 @@ export class DemoCatalogCommands {
     const proposed = DemoProductPolicy.clone(product);
     if (existing) {
       if (!DemoProductPolicy.known(existing)) throw new Error('El producto guardado contiene estados desconocidos.');
+      DemoProductPolicy.preservePersistedVariants(existing, proposed);
       DemoProductPolicy.preserveReservations(existing, proposed);
       for (const variant of proposed.variants) variant.reserved = existing.variants.find(value => value.id === variant.id)?.reserved ?? 0;
     } else proposed.variants.forEach(variant => variant.reserved = 0);
     DemoProductPolicy.validate(proposed);
-    this.port.catalog.refreshTotals(proposed);
+    DemoProductPolicy.refreshTotals(proposed);
     if (existing) Object.assign(existing, proposed);
     else snapshot.products.push(proposed);
     this.port.commit(true);

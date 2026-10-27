@@ -1,6 +1,6 @@
 import { DemoModuleId, DemoScenario } from '../demo-model';
 import { DemoDeliveryMethod } from '../demo-process-types';
-import { ProductPublication } from '../catalog/catalog-types';
+import { OutletScope, ProductCondition, ProductPublication } from '../catalog/catalog-types';
 import { DemoProductPolicy } from '../catalog/product-policy';
 import { DemoReservationState } from './demo-reservation-state';
 import { checkoutFixture } from './checkout-test-fixture';
@@ -93,5 +93,38 @@ describe('variant cart commands', () => {
     const order = cart.checkout(actor.id, 'rejected', 'home', DemoScenario.Rejected, undefined, DemoDeliveryMethod.Home);
     expect(order.reservation!.state).toBe(DemoReservationState.None);
     expect([product.variants[0].onHand, product.variants[0].reserved]).toEqual([10, 0]);
+  });
+  it('rejects unsafe integer totals before mutating checkout state', () => {
+    const { cart, product, actor, snapshot } = checkoutFixture();
+    product.variants[0].price = Number.MAX_SAFE_INTEGER;
+    product.variants[0].original = Number.MAX_SAFE_INTEGER;
+    product.variants[0].onHand = 2;
+    cart.add(actor.id, product.sku, 2, product.variants[0].id);
+    const before = JSON.stringify(snapshot);
+    expect(() => cart.checkout(actor.id, 'unsafe-money', 'home', DemoScenario.Approved, undefined, DemoDeliveryMethod.Home)).toThrow('rango monetario');
+    expect(JSON.stringify(snapshot)).toBe(before);
+  });
+  it('freezes the selected Outlet evidence instead of generic product media', () => {
+    const { cart, product, actor } = checkoutFixture();
+    const variant = product.variants[0];
+    variant.condition = ProductCondition.Outlet;
+    variant.onHand = 1;
+    variant.outlet = {
+      scope: OutletScope.Unit,
+      reference: 'OUTLET-UNIT-1',
+      notes: 'Caja abierta',
+      defects: 'Marca lateral',
+      warrantyTerms: 'Garantía reducida',
+      media: [{ id: 'outlet-real', src: '/assets/demo/DEMO-011.jpg', alt: 'Marca lateral real' }],
+    };
+    cart.add(actor.id, product.sku, 1, variant.id);
+    const order = cart.checkout(actor.id, 'outlet-order', 'home', DemoScenario.Approved, undefined, DemoDeliveryMethod.Home);
+    expect(order.lines[0]).toMatchObject({
+      condition: ProductCondition.Outlet,
+      image: { id: 'outlet-real' },
+      outlet: { reference: 'OUTLET-UNIT-1', defects: 'Marca lateral' },
+    });
+    variant.outlet.media[0].alt = 'Mutada después de comprar';
+    expect(order.lines[0].image.alt).toBe('Marca lateral real');
   });
 });

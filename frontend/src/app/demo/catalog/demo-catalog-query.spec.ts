@@ -51,4 +51,17 @@ describe('DemoCatalogQuery', () => {
     const query = new DemoCatalogQuery(() => snapshot, (_product, variant, available) => ({ amount: available ? variant.price - 100 : variant.price }));
     expect(query.price(product.sku)).toBe(product.price - 100);
   });
+  it('uses price and original from one deterministic active representative', () => {
+    const { product, catalog } = checkoutFixture();
+    const [first, second] = product.variants;
+    first.price = 200;
+    first.original = 250;
+    second.price = 100;
+    second.original = 900;
+    catalog.refreshTotals(product);
+    expect([product.price, product.original]).toEqual([100, 900]);
+    second.saleState = VariantSaleState.Disabled;
+    catalog.refreshTotals(product);
+    expect([product.price, product.original]).toEqual([200, 250]);
+  });
 });

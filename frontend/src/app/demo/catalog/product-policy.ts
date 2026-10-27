@@ -29,6 +29,30 @@ export class DemoProductPolicy {
     const references = product.variants.filter(variant => variant.outlet).map(variant => ({ id: variant.outlet!.reference }));
     if (!unique(references)) throw new CatalogValidationError('Cada unidad o lote Outlet necesita una referencia única dentro del producto.');
   }
+  static refreshTotals(product: DemoProduct, allowUnknown = false): void {
+    const active = product.variants
+      .filter(variant => variant.saleState.active || (allowUnknown && variant.saleState === VariantSaleState.Unknown))
+      .sort((left, right) => left.price - right.price || left.id.localeCompare(right.id));
+    const representative = active[0];
+    const add = (sum: number, value: number): number => {
+      const result = sum + value;
+      if (!Number.isSafeInteger(result)) throw new CatalogValidationError('El stock agregado excede el rango entero admitido.');
+      return result;
+    };
+    product.onHand = product.variants.reduce((sum, variant) => add(sum, variant.onHand), 0);
+    product.reserved = product.variants.reduce((sum, variant) => add(sum, variant.reserved), 0);
+    product.price = representative?.price ?? 0;
+    product.original = representative?.original ?? 0;
+  }
+  static preservePersistedVariants(existing: DemoProduct, proposed: DemoProduct): void {
+    for (const current of existing.variants) {
+      if (proposed.variants.some(variant => variant.id === current.id)) continue;
+      proposed.variants.push({
+        ...this.clone(existing).variants.find(variant => variant.id === current.id)!,
+        saleState: VariantSaleState.Disabled,
+      });
+    }
+  }
   static preserveReservations(existing: DemoProduct, proposed: DemoProduct): void {
     for (const current of existing.variants) {
       const next = proposed.variants.find(variant => variant.id === current.id);

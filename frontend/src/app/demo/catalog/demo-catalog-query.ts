@@ -23,11 +23,7 @@ export class DemoCatalogQuery {
   }
 
   refreshTotals(product: DemoProduct): void {
-    const active = product.variants.filter(value => value.saleState.active);
-    product.onHand = product.variants.reduce((sum, value) => sum + value.onHand, 0);
-    product.reserved = product.variants.reduce((sum, value) => sum + value.reserved, 0);
-    product.price = active.length ? Math.min(...active.map(value => value.price)) : 0;
-    product.original = active.length ? Math.min(...active.map(value => value.original)) : 0;
+    DemoProductPolicy.refreshTotals(product);
   }
 
   available(sku: string, variantId?: string): number {

@@ -8,9 +8,10 @@ export class ProductDraftIssue {
   static readonly NeedsMedia = new ProductDraftIssue('NEEDS_MEDIA', 'El producto necesita al menos una imagen de demostración.');
   static readonly NeedsVariant = new ProductDraftIssue('NEEDS_VARIANT', 'El producto necesita al menos una variante vendible.');
   static readonly ReservedVariant = new ProductDraftIssue('RESERVED_VARIANT', 'No se puede quitar una variante con reservas.');
+  static readonly PersistedVariant = new ProductDraftIssue('PERSISTED_VARIANT', 'Una variante guardada conserva su identidad. Deshabilitala en lugar de quitarla.');
   static readonly Unknown = new ProductDraftIssue('', 'No se pudo aplicar el cambio al borrador.');
 
-  static readonly all = [this.None, this.NeedsMedia, this.NeedsVariant, this.ReservedVariant] as const;
+  static readonly all = [this.None, this.NeedsMedia, this.NeedsVariant, this.ReservedVariant, this.PersistedVariant] as const;
 
   static fromWire(raw: unknown): ProductDraftIssue {
     return this.all.find(issue => issue.wire === raw) ?? this.Unknown;
@@ -117,11 +118,12 @@ export class DemoProductDraftEditor {
     };
   }
 
-  removeVariant(draft: DemoProduct, index: number): ProductDraftChange {
+  removeVariant(draft: DemoProduct, index: number, persistedVariantIds: ReadonlySet<string> = new Set()): ProductDraftChange {
     if (draft.variants.length <= 1) return { draft, issue: ProductDraftIssue.NeedsVariant };
     const variant = draft.variants[index];
     if (!variant) return { draft, issue: ProductDraftIssue.Unknown };
     if (variant.reserved > 0) return { draft, issue: ProductDraftIssue.ReservedVariant };
+    if (persistedVariantIds.has(variant.id)) return { draft, issue: ProductDraftIssue.PersistedVariant };
     return { draft: { ...draft, variants: draft.variants.filter((_, current) => current !== index) }, issue: ProductDraftIssue.None };
   }
 

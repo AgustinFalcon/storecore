@@ -6,6 +6,8 @@ import { DemoModuleId, DemoScenario } from '../demo-model';
 import { DemoDeliveryPolicy } from './demo-delivery-policy';
 import { DemoReservationState } from './demo-reservation-state';
 import { DemoOrderReservations } from './demo-order-reservations';
+import { ProductCondition } from '../catalog/catalog-types';
+import { DemoMoney } from './demo-money';
 
 export interface DemoCartCommandPort {
   readonly catalog: DemoCatalogQuery;
@@ -99,16 +101,31 @@ export class DemoCartCommands {
     const lines: DemoOrderLine[] = actor.cart.map(line => {
       const product = this.port.catalog.product(line.sku);
       const variant = this.port.catalog.variant(line.sku, line.variantId);
-      return { sku: line.sku, variantId: variant.id, name: product.name, variantLabel: variant.label, attributes: variant.attributes.map(attribute => ({ ...attribute })), image: { ...(product.media[0] ?? { id: `${product.sku}-fallback`, src: '', alt: 'Imagen no disponible' }) }, quantity: line.quantity, unit: this.port.catalog.price(line.sku, variant.id) };
+      const media = variant.condition === ProductCondition.Outlet
+        ? variant.outlet?.media[0]
+        : product.media[0];
+      return {
+        sku: line.sku,
+        variantId: variant.id,
+        name: product.name,
+        variantLabel: variant.label,
+        attributes: variant.attributes.map(attribute => ({ ...attribute })),
+        image: { ...(media ?? { id: `${product.sku}-fallback`, src: '', alt: 'Imagen no disponible' }) },
+        condition: variant.condition,
+        outlet: variant.outlet ? { ...variant.outlet, media: variant.outlet.media.map(value => ({ ...value })) } : null,
+        quantity: line.quantity,
+        unit: this.port.catalog.price(line.sku, variant.id),
+      };
     });
     const approved = scenario === DemoScenario.Approved;
     const rejected = scenario === DemoScenario.Rejected;
-    const order: DemoOrder = { id: `DEMO-${this.port.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: approved ? ShipmentStatus.Preparing : rejected ? ShipmentStatus.Cancelled : ShipmentStatus.Pending, lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.port.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`] };
+    const merchandiseTotal = lines.reduce((sum, line) => DemoMoney.add(sum, DemoMoney.multiply(line.unit, line.quantity)), 0);
+    const order: DemoOrder = { id: `DEMO-${this.port.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: approved ? ShipmentStatus.Preparing : rejected ? ShipmentStatus.Cancelled : ShipmentStatus.Pending, lines, total: merchandiseTotal, address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.port.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`] };
     order.method = method;
     order.reservation = { state: approved ? DemoReservationState.Consumed : rejected ? DemoReservationState.None : DemoReservationState.Held, lines: rejected ? [] : lines.map(line => ({ sku: line.sku, variantId: line.variantId, quantity: line.quantity })) };
     order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? pickupLocation! : `${address!.street} · ${address!.city} · CP ${address!.postal}` };
     order.address = order.delivery.destination;
-    order.total += order.delivery.cost;
+    order.total = DemoMoney.add(order.total, order.delivery.cost);
     for (const line of lines) {
       const product = this.port.catalog.product(line.sku);
       const variant = this.port.catalog.variant(line.sku, line.variantId);

@@ -70,4 +70,31 @@ describe('closed catalog contracts', () => {
     outlet.variants[0].outlet!.scope = OutletScope.Lot;
     expect(() => DemoProductPolicy.validate(outlet)).not.toThrow();
   });
+  it('preserves a removed persisted variant as disabled inventory', () => {
+    const { commands, product } = checkoutFixture();
+    const removed = product.variants[1];
+    const proposal = DemoProductPolicy.clone(product);
+    proposal.variants = proposal.variants.filter(variant => variant.id !== removed.id);
+    commands.saveProduct('admin', proposal, product.sku);
+    expect(product.variants.find(variant => variant.id === removed.id)).toMatchObject({
+      onHand: removed.onHand,
+      reserved: removed.reserved,
+      saleState: VariantSaleState.Disabled,
+    });
+    expect(product.onHand).toBe(15);
+  });
+  it('derives untrusted summary aggregates from variants at the JSON boundary', () => {
+    const { product } = checkoutFixture();
+    const raw = JSON.parse(JSON.stringify(product));
+    raw.price = 1;
+    raw.original = 2;
+    raw.onHand = 1_000_000;
+    raw.reserved = 999_999;
+    raw.variants[0].price = 30_000;
+    raw.variants[0].original = 50_000;
+    raw.variants[1].price = 10_000;
+    raw.variants[1].original = 40_000;
+    const decoded = DemoCatalogWire.product(raw);
+    expect(decoded).toMatchObject({ price: 10_000, original: 40_000, onHand: 15, reserved: 0 });
+  });
 });

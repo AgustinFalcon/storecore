@@ -20,6 +20,7 @@ export class DemoCatalogWire {
         outlet: variant.outlet ? { ...variant.outlet, scope: OutletScope.fromWire(wire(variant.outlet.scope)) } : null,
       })),
     };
+    DemoProductPolicy.refreshTotals(product, true);
     DemoProductPolicy.validate(product, true);
     return DemoProductPolicy.clone(product);
   }
