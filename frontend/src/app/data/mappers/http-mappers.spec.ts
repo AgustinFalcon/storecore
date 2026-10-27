@@ -1,4 +1,4 @@
-import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapListings, mapMercadoLibreAccount, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapListings, mapMercadoLibreAccount, mapPreview, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
 import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
@@ -6,6 +6,13 @@ import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-accoun
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 
 describe('http-mappers', () => {
+  it('retains the profile diff wire text and rejects invalid compatibility instead of coercing it', () => {
+    const result = { compatible: true, version: '1.0.0', diff: '[ ]' };
+    expect(mapPreview(result)).toEqual(result);
+    expect(mapPreview({ ...result, compatible: false }).compatible).toBe(false);
+    for (const compatible of [undefined, null, 'true', 'false', 1, 0, {}, []]) expect(() => mapPreview({ ...result, compatible })).toThrow(/no reconocida/);
+    for (const row of [null, [], {}, { ...result, version: null }, { ...result, diff: [] }]) expect(() => mapPreview(row)).toThrow();
+  });
   it('decodes capability identifiers, states and versions without inventing a disabled state', () => {
     expect(mapCapabilities([
       { module: 'CATALOG', state: 'ACTIVE', configVersion: 8 },

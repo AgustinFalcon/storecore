@@ -1,0 +1,32 @@
+:host { display: block; min-width: 0; }
+.profile-import { min-width: 0; gap: 1.25rem; }
+.import-status { display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: 1rem; border-left: 4px solid #12615c; background: #f3f6fa; margin-block: 1rem; }
+.import-status span, .import-help { color: #526071; }
+.import-scope { max-width: 85ch; }
+.import-workbench { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 1.5rem; margin-top: 1.5rem; }
+.import-workbench > * { min-width: 0; }
+.import-workbench > .sc-panel { width: 100%; box-sizing: border-box; gap: 1rem; }
+.import-workbench h2, .import-workbench p { margin: 0; }
+.import-editor label { font-weight: 650; }
+.import-help { font-size: .875rem; line-height: 1.6; }
+textarea { display: block; width: 100%; box-sizing: border-box; min-height: 28rem; resize: vertical; padding: 1rem; border: 1px solid #8492a6; border-radius: .5rem; line-height: 1.6; font-size: .875rem; }
+textarea:focus-visible, pre:focus-visible, summary:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+.import-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin-block: 1.5rem; }
+.import-summary div { padding: .75rem .5rem; background: #f1f5f9; border-radius: .5rem; text-align: center; }
+.import-summary strong, .import-summary span { display: block; }
+.import-summary strong { font-size: 1.5rem; }
+.import-summary span { font-size: .8rem; }
+.import-change { border: 1px solid #cbd5e1; border-radius: .75rem; padding: 1rem; margin-block: 1rem; }
+.import-change__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.import-change__head label { display: flex; min-width: 0; flex: 1 1 12rem; align-items: center; gap: .75rem; min-height: 44px; font-weight: 650; }
+.import-change__head label span { overflow-wrap: anywhere; }
+input[type=checkbox] { flex: 0 0 22px; height: 22px; accent-color: #144a52; }
+details { margin-top: .75rem; }
+summary { min-height: 44px; align-content: center; cursor: pointer; overflow-wrap: anywhere; }
+h3 { font-size: .875rem; margin-block: 1rem .5rem; }
+pre { max-width: 100%; max-height: 22rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; padding: .75rem; background: #f1f5f9; border-radius: .5rem; font-size: .8rem; }
+.import-dialog { width: min(32rem, calc(100vw - 3rem)); box-sizing: border-box; padding: 1.5rem; border: 1px solid #cbd5e1; border-radius: 1rem; color: #152c46; max-height: calc(100dvh - 3rem); overflow: auto; }
+.import-dialog::backdrop { background: rgb(15 23 42 / 60%); }
+.import-dialog__actions { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.5rem; }
+@media (max-width: 900px) { .import-workbench { grid-template-columns: minmax(0, 1fr); } textarea { min-height: 22rem; } }
+@media (max-width: 480px) { .import-workbench { gap: 1rem; } .import-dialog__actions > button { width: 100%; } }

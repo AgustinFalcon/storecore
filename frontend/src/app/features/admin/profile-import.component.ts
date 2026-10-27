@@ -1,12 +1,12 @@
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ProfileImportViewComponent } from './profile-import.view';
-import { UserStore } from './user.store';
+import { ProfileImportStore } from './profile-import.store';
 
 @Component({
   selector: 'sc-profile-import',
   imports: [AsyncPipe, ProfileImportViewComponent],
-  providers: [UserStore],
+  providers: [ProfileImportStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (store.state$ | async; as state) {
@@ -14,11 +14,15 @@ import { UserStore } from './user.store';
         [state]="state"
         (manifestChange)="store.setManifest($event)"
         (preview)="store.previewProfile()"
+        (reviewUncertain)="store.reviewUncertainResult()"
+        (selectionChange)="store.selectSection($event.key, $event.selected)"
+        (confirm)="store.requestConfirmation()"
+        (cancelConfirmation)="store.cancelConfirmation()"
         (merge)="store.mergeProfile()"
       />
     }
   `,
 })
 export class ProfileImportComponent {
-  constructor(readonly store: UserStore) {}
+  constructor(readonly store: ProfileImportStore) {}
 }

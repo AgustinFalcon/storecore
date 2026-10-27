@@ -260,10 +260,13 @@ export function mapPromos(value: unknown): readonly ManualPromo[] {
 
 export function mapPreview(value: unknown): ProfilePreview {
   const row = asRecord(value);
+  if (typeof row['compatible'] !== 'boolean' || typeof row['version'] !== 'string' || typeof row['diff'] !== 'string') {
+    throw new Error('Respuesta de importación no reconocida.');
+  }
   return {
-    compatible: row['compatible'] === true,
-    version: text(row['version']),
-    diff: text(row['diff']),
+    compatible: row['compatible'],
+    version: row['version'],
+    diff: row['diff'],
   };
 }
 

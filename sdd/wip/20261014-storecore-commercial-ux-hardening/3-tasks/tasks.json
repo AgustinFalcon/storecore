@@ -143,6 +143,7 @@
     },
     {
       "id": "TASK-016",
+      "real_sc25_cut_20261027": { "status": "implemented_provisional", "scope": "/user/profile-import only; dedicated ProfileImportStore; exact-text selection/repreview/confirmation; closed phases/validity/compatibility/operations", "owner_e2e": "frontend/e2e/admin-profile-import.spec.ts", "evidence": "4-implementation/evidence/real-sc25-profile-import-cut-20261027.md", "remaining_gates": ["Stitch visual gate", "dual exact-head review", "backend live integration NOT_RUN", "CI exact-head NOT_RUN"] },
       "title": "Completar Mercado Libre, módulos y configuración",
       "description": "Implementar cinco tabs de operaciones ML, capabilities y configuración con estados deseado/observado, conflictos y simulación declarada. Competencia real, ARCA y carrier siguen diferidos.",
       "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006", "TASK-007", "TASK-008"],

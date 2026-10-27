@@ -2,11 +2,10 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { EMPTY, exhaustMap, filter, switchMap, tap } from 'rxjs';
+import { filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
-import { HomeContentDraft, ManualPromo, ProfilePreview } from '../../domain/user/user.entity';
-import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
+import { HomeContentDraft, ManualPromo } from '../../domain/user/user.entity';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
@@ -21,9 +20,6 @@ export interface UserState {
   readonly home: HomeContentDraft;
   readonly promos: readonly ManualPromo[];
   readonly promoDraft: ManualPromo;
-  readonly manifest: string;
-  readonly preview: ProfilePreview | null;
-  readonly previewManifest: string | null;
 }
 
 const emptyPromo: ManualPromo = {
@@ -46,7 +42,6 @@ export class UserStore extends ComponentStore<UserState> {
     private readonly signOutUser: SignOutUserUseCase,
     private readonly saveHome: SaveHomeContentUseCase,
     private readonly promos: ManagePromosUseCase,
-    private readonly importer: ImportProfileUseCase,
     private readonly session: UserSession,
     private readonly router: Router,
   ) {
@@ -59,9 +54,6 @@ export class UserStore extends ComponentStore<UserState> {
       home: { title: '', body: '' },
       promos: [],
       promoDraft: emptyPromo,
-      manifest: '',
-      preview: null,
-      previewManifest: null,
     });
   }
 
@@ -74,18 +66,11 @@ export class UserStore extends ComponentStore<UserState> {
   readonly authenticated$ = this.select((s) => s.authenticated);
   readonly home$ = this.select((s) => s.home);
   readonly promos$ = this.select((s) => s.promos);
-  readonly preview$ = this.select((s) => s.preview);
 
   readonly setEmail = this.updater((s, email: string) => ({ ...s, email }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
   readonly setHome = this.updater((s, home: HomeContentDraft) => ({ ...s, home }));
   readonly setPromoDraft = this.updater((s, promoDraft: ManualPromo) => ({ ...s, promoDraft }));
-  private previewGeneration = 0;
-
-  readonly setManifest = (manifest: string): void => {
-    this.previewGeneration += 1;
-    this.patchState({ manifest, preview: null, previewManifest: null, loading: false });
-  };
 
   readonly submitSignIn = this.effect<void>((trigger$) =>
     trigger$.pipe(
@@ -122,7 +107,6 @@ export class UserStore extends ComponentStore<UserState> {
                 email: '',
                 password: '',
                 errorMessage: '',
-                preview: null,
               });
               void this.router.navigateByUrl('/login');
             },
@@ -132,7 +116,6 @@ export class UserStore extends ComponentStore<UserState> {
                 email: '',
                 password: '',
                 errorMessage: '',
-                preview: null,
               });
               void this.router.navigateByUrl('/login');
             },
@@ -219,66 +202,4 @@ export class UserStore extends ComponentStore<UserState> {
     ),
   );
 
-  readonly previewProfile = this.effect<void>((trigger$) =>
-    trigger$.pipe(
-      tap(() => {
-        if (!this.snapshot.manifest.trim()) {
-          this.patchState({ loading: false, errorMessage: 'Pegá un manifiesto para previsualizar.' });
-          return;
-        }
-        this.patchState({ loading: true, errorMessage: '' });
-      }),
-      filter(() => Boolean(this.snapshot.manifest.trim())),
-      switchMap(() => {
-        const manifest = this.snapshot.manifest;
-        const generation = this.previewGeneration;
-        return this.importer.preview(manifest).pipe(
-          tapResponse({
-            next: (preview) => {
-              if (generation === this.previewGeneration && manifest === this.snapshot.manifest) {
-                this.patchState({ preview, previewManifest: manifest, loading: false });
-              }
-            },
-            error: (err: unknown) => {
-              if (generation === this.previewGeneration) {
-                this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
-              }
-            },
-          }),
-        );
-      }),
-    ),
-  );
-
-  readonly mergeProfile = this.effect<void>((trigger$) =>
-    trigger$.pipe(
-      exhaustMap(() => {
-        const { preview, previewManifest, manifest } = this.snapshot;
-        if (!preview || previewManifest !== manifest) {
-          this.patchState({ loading: false, errorMessage: 'Previsualizá el manifiesto actual antes del merge.' });
-          return EMPTY;
-        }
-        if (!preview.compatible) {
-          this.patchState({ loading: false, errorMessage: 'Perfil incompatible. Merge cerrado.' });
-          return EMPTY;
-        }
-        const generation = this.previewGeneration;
-        this.patchState({ loading: true, errorMessage: '' });
-        return this.importer.merge(manifest).pipe(
-          tapResponse({
-            next: (result) => {
-              if (generation === this.previewGeneration && manifest === this.snapshot.manifest && this.snapshot.preview === preview) {
-                this.patchState({ preview: result, loading: false });
-              }
-            },
-            error: (err: unknown) => {
-              if (generation === this.previewGeneration && manifest === this.snapshot.manifest) {
-                this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) });
-              }
-            },
-          }),
-        );
-      }),
-    ),
-  );
 }
