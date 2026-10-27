@@ -1,9 +1,23 @@
 import { DemoApplicationState } from './demo-state';
 import { DemoContext } from './demo-model';
+import { DemoSnapshotPersistence } from './demo-snapshot-persistence';
+import { DemoSnapshotWriter } from './demo-snapshot-writer';
 describe('isolated commercial demo state', () => {
-  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.spyOn(DemoSnapshotWriter.browser, 'assertWritable').mockImplementation(() => {}); });
+  afterEach(() => vi.restoreAllMocks());
   it('rolls back a failed command instead of exposing partial changes', () => { const state = new DemoApplicationState(); const before = state.data.products[0].onHand; expect(state.run(() => { state.data.products[0].onHand--; throw new Error('failure'); }, 'saved')).toBe(false); expect(state.data.products[0].onHand).toBe(before); expect(state.message()).toBe(''); expect(state.error()).toBe('failure'); });
   it('rejects a stale snapshot rather than overwriting another tab', () => { const first = new DemoApplicationState(); const second = new DemoApplicationState(); expect(first.run(() => first.commerce.adjust('DEMO-001', 1, 'Ingreso'), 'saved')).toBe(true); expect(second.run(() => second.commerce.adjust('DEMO-001', 2, 'Ingreso'), 'saved')).toBe(false); expect(second.error()).toContain('otra pestaña'); });
   it('isolates customers and resets only demo keys', () => { localStorage.setItem('production-key', 'untouched'); const state = new DemoApplicationState(); state.login(DemoContext.Customer); state.run(() => state.commerce.add('cliente','DEMO-001',1), 'saved'); state.login(DemoContext.Customer,'cliente2'); expect(state.actor.cart).toHaveLength(0); state.reset(); expect(state.context()).toBe(DemoContext.Unknown); expect(state.actor.cart).toHaveLength(0); expect(localStorage.getItem('production-key')).toBe('untouched'); });
   it('invalidates stale tabs on reset and when persisted data disappears or is replaced', () => { const first=new DemoApplicationState(); first.run(()=>first.commerce.add('cliente','DEMO-001',1),'saved'); const second=new DemoApplicationState(); const before=second.data.revision; first.reset(); expect(first.data.revision).toBeGreaterThan(before); expect(second.run(()=>second.commerce.touch(),'saved')).toBe(false); const third=new DemoApplicationState(); localStorage.removeItem('storecore.commercial-demo.v1'); expect(third.run(()=>third.commerce.touch(),'saved')).toBe(false); first.reset(); const fourth=new DemoApplicationState(); const replacement=JSON.parse(localStorage.getItem('storecore.commercial-demo.v1')!); replacement.title='Replaced at same revision'; localStorage.setItem('storecore.commercial-demo.v1',JSON.stringify(replacement)); expect(fourth.run(()=>fourth.commerce.touch(),'saved')).toBe(false); });
+  it('rejects an unreadable post-command candidate without publishing success', () => {
+    const state = new DemoApplicationState(); const before = JSON.stringify(state.data);
+    expect(state.run(() => { state.data.products[0].onHand = -1; state.commerce.touch(); }, 'saved')).toBe(false);
+    expect(JSON.stringify(state.data)).toBe(before); expect(state.message()).toBe(''); expect(localStorage.getItem(DemoSnapshotPersistence.key)).toBeNull();
+  });
+  it('rolls back memory and durable state when storage rejects the commit', () => {
+    const state = new DemoApplicationState(); const before = JSON.stringify(state.data);
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new Error('quota'); });
+    expect(state.run(() => state.commerce.adjust('DEMO-001', 1, 'Ingreso'), 'saved')).toBe(false);
+    expect(JSON.stringify(state.data)).toBe(before); expect(state.message()).toBe(''); expect(state.error()).toBe('quota');
+  });
 });
