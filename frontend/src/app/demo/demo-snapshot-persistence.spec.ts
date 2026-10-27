@@ -51,7 +51,7 @@ describe('DemoSnapshotPersistence', () => {
     localStorage.setItem(DemoSnapshotPersistence.key, '{corrupt');
     expect(() => repository().current(demoSeed())).toThrow();
     expect(() => repository().replace(demoSeed())).not.toThrow();
-    expect(repository().current(demoSeed()).version).toBe(1);
+    expect(repository().current(demoSeed()).version).toBe(2);
   });
 
   it('restores prior durable data when readback verification fails', () => {

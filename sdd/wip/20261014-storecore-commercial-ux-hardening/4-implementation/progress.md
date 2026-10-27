@@ -479,7 +479,7 @@ APPROVE sin P1/P2. Se habilitan TASK-002 y TASK-003 en Stitch.
 - Evidencia: arquitectura 6/6 PASS, lint PASS, **141 archivos / 622 tests PASS**, build productivo PASS, Chromium **7/7 PASS** en 390/768/1440 con Axe/sin overflow y PostgreSQL Testcontainers **6/6 PASS**.
 - Evidencia detallada: `evidence/real-sc25-profile-import-cut-20261019.md`. Stitch SC25 y PR/merge continúan como gates separados.
 
-## 2026-10-19 — SC26 Administración Demo de clientes
+## 2026-10-19 — SC26 Administración Demo de clientes (histórico / superseded)
 
 - Se completó la superficie Demo de clientes para Admin/Operator: búsqueda, filtros, vacíos, ficha mínima, pedido canónico, confirmación con motivo y lectura responsive.
 - La restricción/reactivación usa un journal atómico con epoch monotónico. No se pierden restricciones por escrituras concurrentes, sesiones corruptas, primera persistencia, comandos atrasados ni fallos posteriores al commit.
@@ -529,3 +529,11 @@ APPROVE sin P1/P2. Se habilitan TASK-002 y TASK-003 en Stitch.
 ## 2026-10-27 — SC-SURF-25 Real dedicated import workflow
 
 Implemented provisionally on base `a6ce9fa926650c9a1a109d9f02281d22046157b4`: dedicated store, closed domain states and compatibility/operations, exact-text selection → preview → native confirmation → HTTP merge, strict diff snapshots in both backend shapes, actor/denial cleanup, one write at a time and uncertain-result recovery via preview only. Owner browser acceptance: `frontend/e2e/admin-profile-import.spec.ts`. Current evidence: `evidence/real-sc25-profile-import-cut-20261027.md`. TASK-016 overall remains pending: this cut does not certify all ML/Demo tasks, Stitch, integration live, final reviews or CI.
+
+## 2026-10-27 — SC-SURF-26 Demo dedicated customer administration
+
+- Promoted only the executable Demo customer surface on base `c1af13d7968c9d39ca6c27d99ff47925b046c5ba`, preserving SC20–25 history outside this cut. Dedicated `/demo/user/customers` reads/searches/filters, customer summary, correlated `ORD-1015` link, reasoned confirmed restriction/reactivation and minimum correlated fixture.
+- Closed account state/filter/command policy uses existing `UserRole`: Admin reads/writes; Operator reads/opens orders without mutations; Customer/Unknown denied. Snapshot v2 migrates v1 once, preserves aggregates and stores account access generations. Session rehydrate/login/checkout revalidate durable access; deferred callbacks and confirmations are cancelled on actor/logout changes. Corrupt persistence never authorizes via seed.
+- Restriction is one synchronous transaction, reason required; repeats write nothing. Precommit failure preserves state and draft; conflict requires refresh; reactivation requires new login. Web Locks preserves one writer; other tabs are explicit read-only. Mobile administration uses an accessible drawer; dialogs restore stable focus and announce contextual success.
+- Final local checks: independent `npm run verify` PASS with **70 files / 421 tests**, lint, architecture **6/6 + scan** and Real build; independent final `npm run test:demo` **44/44 PASS** on the Demo build that includes the missing-persistence login guard. Final directed SC26 browser **11/11 PASS** at 19:42:33 UTC, 22.7 s, no skipped/flaky, 20 Axe scenes with zero total violations and 19 local PNG. See current evidence for exact build/run boundaries.
+- Current evidence: `evidence/demo-sc26-customer-administration-cut-20261027.md`. The 20261019 SC26 epoch/journal evidence is explicitly historical/superseded and is not reused as certification. TASK-013 overall remains pending; global Stitch/reviews/CI gates are separate. No commit, push, PR, merge, publish or backend changes.

@@ -14,6 +14,7 @@ resultados siguientes.
 | `real-sc23-mercadolibre-mapping-cut-20261016.md` | `UNKNOWN/UNVERIFIED` | Histórica, no aplicable | Orientar el corte propietario y repetir gates |
 | `real-sc24-capabilities-cut-20261016.md` | `UNKNOWN/UNVERIFIED` | Histórica, no aplicable | Orientar el corte propietario y repetir gates |
 | `real-sc25-profile-import-cut-20261019.md` | `UNKNOWN/UNVERIFIED` | Histórica, no aplicable | Orientar el corte propietario y repetir gates |
+| `demo-sc26-customer-administration-cut-20261019.md` | `UNKNOWN/UNVERIFIED` | Histórica, superseded | No certificar la promoción SC26; usar el corte ejecutado 20261027 |
 
 No se inventa un SHA para completar la trazabilidad. Cada PR de código debe
 publicar: SHA final, base, archivos, entorno, comandos, fixtures, resultados,

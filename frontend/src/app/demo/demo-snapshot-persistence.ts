@@ -57,6 +57,7 @@ export class DemoSnapshotPersistence {
   private commit(snapshot: DemoSnapshot, priorRaw: string | null): PersistedDemoSnapshot {
     const candidateRaw = JSON.stringify(snapshot);
     decodeSnapshot(candidateRaw);
+    if (candidateRaw === priorRaw) return { raw: priorRaw, snapshot: decodeSnapshot(candidateRaw) };
     try {
       this.storage.setItem(DemoSnapshotPersistence.key, candidateRaw);
       const storedRaw = this.storage.getItem(DemoSnapshotPersistence.key);

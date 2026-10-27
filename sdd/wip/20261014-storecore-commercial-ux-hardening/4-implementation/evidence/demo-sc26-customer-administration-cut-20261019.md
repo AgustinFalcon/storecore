@@ -1,5 +1,11 @@
 # SC26 — Administración Demo de clientes
 
+> HISTÓRICO / SUPERSEDED para la promoción SC26 del 2026-10-27. Este documento
+> describe otro corte y no certifica el runtime de la base `c1af13d7968c9d39ca6c27d99ff47925b046c5ba`.
+> La promoción actual usa snapshot comercial v2 y Web Locks, sin journal de eventos
+> paralelo. Ver `demo-sc26-customer-administration-cut-20261027.md` para evidencia
+> ejecutada y límites actuales; no reutilizar los conteos ni reviews de abajo.
+
 Fecha de cierre local: 2026-10-19 (America/Buenos_Aires).
 
 ## Alcance verificado

@@ -1,0 +1,2 @@
+:host { display:block; min-width:0; } .customer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:20px; } .card p, dialog p { overflow-wrap:anywhere; } dialog { box-sizing:border-box; max-width:min(620px,calc(100vw - 32px)); max-height:85vh; overflow:auto; } .actions { flex-wrap:wrap; } textarea { box-sizing:border-box; width:100%; } .section-heading { flex-wrap:wrap; gap:16px; } label { min-width:0; } input,select { max-width:100%; box-sizing:border-box; }
+.customers-page .empty-state p { color:#526577; }

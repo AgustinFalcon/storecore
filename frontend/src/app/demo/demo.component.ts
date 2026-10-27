@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, DestroyRef } from '@angular/core';
+import { Component, effect, computed, inject, signal, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -9,6 +9,9 @@ import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoPaymentPhase, DemoDeliveryMethod, DemoMLTab, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 import { CatalogStockScope, DemoCatalogLocation, type DemoCatalogCriteria } from './catalog/demo-catalog-location';
 import { DemoCatalogPresenter } from './catalog/demo-catalog-presenter';
+import { trapDemoDialogFocus } from './demo-dialog-focus';
+
+import { UserRole } from '../domain/user/user-role';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -29,12 +32,16 @@ export class DemoDialog {
 }
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
+  readonly trapFocus = trapDemoDialogFocus;
   readonly state = inject(DemoApplicationState);
   readonly router = inject(Router);
+  readonly Role = UserRole;
   readonly Context = DemoContext;
   readonly scenarios = DemoScenario.all;
   readonly navigation = DemoScreen.all.filter(screen => screen.admin && screen !== DemoScreen.AdminOrder);
   mobileOpen = false;
+  adminMenuOpen = false;
+  private adminMenuFocus: HTMLElement | null = null;
   resetOpen = false;
   private resetFocus: HTMLElement | null = null;
   query = '';
@@ -44,6 +51,8 @@ export class DemoRootComponent {
   changeScenario(raw: string): void { this.state.scenario.set(DemoScenario.fromWire(raw)); }
   logout(): void { this.state.logout(); void this.router.navigate(['/demo/login']); }
   reload(): void { window.location.reload(); }
+  openAdminMenu(): void { this.adminMenuFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.adminMenuOpen = true; document.querySelector<HTMLDialogElement>('#demo-admin-navigation')?.showModal(); }
+  closeAdminMenu(): void { document.querySelector<HTMLDialogElement>('#demo-admin-navigation')?.close(); this.adminMenuOpen = false; this.adminMenuFocus?.focus(); }
   openReset(): void { this.resetFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null; document.querySelector<HTMLDialogElement>('#demo-reset-dialog')?.showModal(); }
   closeReset(): void { document.querySelector<HTMLDialogElement>('#demo-reset-dialog')?.close(); this.resetFocus?.focus(); }
   confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
@@ -51,6 +60,7 @@ export class DemoRootComponent {
 
 @Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
+  readonly Role = UserRole;
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
@@ -105,6 +115,7 @@ export class DemoPageComponent {
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
   private confirmation: (() => void) | null = null;
+  private confirmationEpoch = -1;
   email = 'cliente@demo.invalid';
   password = '';
   showPassword = false;
@@ -131,7 +142,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { effect(() => { this.state.sessionEpoch(); this.cancelProcessing(); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
@@ -140,7 +151,7 @@ export class DemoPageComponent {
   selectMLTab(tab: DemoMLTab): void { this.mlTab.set(tab); }
   mlKeyboard(event: KeyboardEvent): void { const index = DemoMLTab.all.indexOf(this.mlTab()); const next = event.key === 'ArrowRight' ? (index + 1) % DemoMLTab.all.length : event.key === 'ArrowLeft' ? (index + DemoMLTab.all.length - 1) % DemoMLTab.all.length : event.key === 'Home' ? 0 : event.key === 'End' ? DemoMLTab.all.length - 1 : -1; if (next < 0) return; event.preventDefault(); const tab = DemoMLTab.all[next]; this.mlTab.set(tab); setTimeout(() => document.getElementById(`ml-tab-${tab.wire}`)?.focus()); }
   get screen(): DemoScreen { return DemoScreen.fromWire(this.route.snapshot.data['screen']); }
-  get allowed(): boolean { return this.screen.admin ? this.state.context() === DemoContext.Admin : !this.screen.privateCustomer || this.state.context() === DemoContext.Customer; }
+  get allowed(): boolean { return this.screen.admin ? this.state.context() === DemoContext.Admin && (this.state.role() === UserRole.Admin || (this.state.role() === UserRole.Operator && this.screen === DemoScreen.AdminOrder)) : !this.screen.privateCustomer || this.state.context() === DemoContext.Customer; }
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
   get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
@@ -178,30 +189,32 @@ export class DemoPageComponent {
   remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
-  context(context: DemoContext): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; this.state.login(context, actor); void this.router.navigate([context === DemoContext.Admin ? '/demo/user/home' : '/demo']); }
+  context(context: DemoContext, role = UserRole.Admin): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; if (this.state.login(context, actor, role)) void this.router.navigate([context === DemoContext.Admin ? role === UserRole.Operator ? '/demo/user/customers' : '/demo/user/home' : '/demo']); }
   register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => this.state.commerce.registerActor({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }), 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
   nextStep(): void { if (this.step() === CheckoutStep.Address && this.deliveryMethod() !== DemoDeliveryMethod.Pickup && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección o retiro en el comercio.'); return; } if (this.step() === CheckoutStep.Delivery && (!this.delivery || this.deliveryMethod() === DemoDeliveryMethod.Unknown || (this.deliveryMethod() === DemoDeliveryMethod.Home && !this.state.actor.addresses.some(address => address.id === this.addressId)))) { this.state.error.set('Confirmá la entrega; domicilio requiere una dirección válida.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
   checkout(): void {
     if (this.paymentPhase() === DemoPaymentPhase.Processing) return;
     if (this.paymentMethod() === DemoPaymentMethod.Unknown || this.deliveryMethod() === DemoDeliveryMethod.Unknown) { this.state.error.set('Seleccioná pago y entrega.'); return; }
+    try { this.state.validateCustomerSession(); } catch (error) { this.state.error.set(error instanceof Error ? error.message : 'Sesión no válida.'); return; }
+    const epoch = this.state.sessionEpoch();
     const actorId = this.state.actorId(), addressId = this.addressId, scenario = this.state.scenario(), method = this.paymentMethod(), delivery = this.deliveryMethod();
     this.paymentPhase.set(DemoPaymentPhase.Processing);
-    this.paymentTimer = setTimeout(() => { let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(actorId, this.request, addressId, scenario, method, delivery).id; }, 'Pedido registrado.')) void this.router.navigate(['/demo/checkout/result', id]); this.paymentPhase.set(DemoPaymentPhase.Ready); }, 750);
+    this.paymentTimer = setTimeout(() => { if (epoch !== this.state.sessionEpoch() || this.state.context() !== DemoContext.Customer) return; let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(actorId, this.request, addressId, scenario, method, delivery).id; }, 'Pedido registrado.')) void this.router.navigate(['/demo/checkout/result', id]); this.paymentPhase.set(DemoPaymentPhase.Ready); }, 750);
   }
   cancelProcessing(): void { clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Cancelled); }
-  cancelPayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
-  saveIncident(): void { const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
-  resolveIncident(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolveIncident(order.id), 'Incidencia resuelta.'); }
-  receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? DemoPaymentMethod.Card.label}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
+  cancelPayment(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
+  saveIncident(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
+  resolveIncident(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.resolveIncident(order.id), 'Incidencia resuelta.'); }
+  receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? 'Medio de pago no informado'}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
-  resolvePayment(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
+  resolvePayment(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }
   retryOrder(): void { const order = this.order; if (!order || (order.payment !== PaymentStatus.Rejected && order.payment !== PaymentStatus.Cancelled)) return; if (this.state.run(() => { for (const line of order.lines) this.state.commerce.add(this.state.actorId(), line.sku, line.quantity, line.variant); }, 'Productos recuperados en tu carrito.')) void this.router.navigate(['/demo/cart']); }
   open(dialog: DemoDialog): void { this.focusBeforeDialog = document.activeElement instanceof HTMLElement ? document.activeElement : null; this.dialog.set(dialog); setTimeout(() => document.querySelector<HTMLDialogElement>('dialog')?.showModal()); }
   close(): void { document.querySelector<HTMLDialogElement>('dialog')?.close(); this.dialog.set(DemoDialog.None); this.focusBeforeDialog?.focus(); }
   information(text: string): void { this.info = text; this.open(DemoDialog.Information); }
-  confirm(text: string, action: () => void): void { this.info = text; this.confirmation = action; this.open(DemoDialog.Confirm); }
-  performConfirmation(): void { const action = this.confirmation; this.confirmation = null; this.close(); action?.(); }
+  confirm(text: string, action: () => void): void { this.info = text; this.confirmationEpoch = this.state.sessionEpoch(); this.confirmation = action; this.open(DemoDialog.Confirm); }
+  performConfirmation(): void { const action = this.confirmationEpoch === this.state.sessionEpoch() ? this.confirmation : null; this.confirmation = null; this.close(); action?.(); }
   editingSku: string | undefined;
   editProduct(product?: DemoProduct): void { this.editingSku = product?.sku; this.draftProduct = product ? { ...product } : { ...this.draftProduct, sku: `DEMO-${this.state.data.products.length + 1}`, name: '', reserved: 0, supportsCase: false }; this.open(DemoDialog.Product); }
   saveProduct(): void { if (this.state.run(() => this.state.commerce.saveProduct({ ...this.draftProduct }, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
@@ -220,8 +233,8 @@ export class DemoPageComponent {
   toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }
   adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
   saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
-  advance(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
-  receiveReturn(): void { const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
+  advance(): void { if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
+  receiveReturn(): void { if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }
   linkML(sku: string): void { this.state.run(() => { const listing = this.state.data.listings.find(value => value.sku === sku); if (listing) { listing.linked = !listing.linked; if (listing.linked) listing.desired = undefined; } else this.state.data.listings.push({ sku, linked: true, observed: 0, error: false }); this.state.commerce.touch(); }, 'Vínculo simulado actualizado.'); }
   syncML(sku: string): void { this.state.run(() => { if (!this.state.data.mlConnected) throw new Error('Conectá la cuenta simulada primero.'); const listing = this.state.data.listings.find(value => value.sku === sku); if (!listing?.linked) throw new Error('Vinculá el producto primero.'); listing.error = this.state.scenario() === DemoScenario.Error; if (!listing.error) listing.observed = this.state.commerce.available(sku); this.state.commerce.touch(); }, 'Sincronización simulada registrada.'); }
