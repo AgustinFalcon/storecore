@@ -1,5 +1,12 @@
 # Evidencia inicial
 
+> **Estado de promoción:** este archivo conserva un diario histórico producido en
+> un árbol de integración anterior. Salvo que una entrada identifique un commit
+> recuperable, su procedencia es `UNKNOWN/UNVERIFIED` y no acredita código, gates
+> ni aceptación sobre el PR #195. El estado vigente de este SHA es `PLANNED` y
+> `NOT_RUN`, según `../3-tasks/tasks.json`; cada corte se promoverá y validará en
+> un PR de código independiente.
+
 2026-10-09: inspección estática de `db377fa` y documentación de FE-COMP-01..06. No se ejecutó producto, no hay nuevos resultados browser/build/CI ni revisión aprobada. Implementación: pendiente. Gates G-D/T/B/U/R: `NOT_RUN` salvo validación estructural documental que se registre explícitamente tras ejecutarla.
 
 Validación documental local 2026-10-09: `tasks.json` parseado con PowerShell `ConvertFrom-Json`; seis IDs únicos, dependencias existentes ordenadas sin ciclos y los 16 criterios de aceptación referidos presentes en el spec funcional: PASS. Este check de estructura no aprueba G-D ni acredita comportamiento del producto.

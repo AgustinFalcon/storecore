@@ -1,4 +1,8 @@
 # Evidencia Real SC17 — catálogo administrador
+> **Procedencia:** evidencia histórica de un árbol de integración previo al split. El
+> SHA exacto no es recuperable (`UNKNOWN/UNVERIFIED`); por tanto, estos resultados
+> no certifican el PR #195 ni `master`. Consultar `historical-provenance.md` y
+> repetir todos los gates sobre el SHA dueño antes de promover el corte.
 
 Fecha: 2026-10-16
 Alcance: paridad productiva limitada de `SC-SURF-17`; no acredita por sí sola TASK-014, TASK-018, TASK-021, TASK-022 ni TASK-024.

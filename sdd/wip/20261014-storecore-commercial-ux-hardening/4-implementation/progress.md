@@ -1,5 +1,13 @@
 # Progreso
 
+> **Estado de promoción:** este diario conserva resultados de un árbol de
+> integración anterior que fue dividido en cortes pequeños. No prueba que el
+> código descrito exista en el PR #195. La procedencia recuperable se registra en
+> `evidence/historical-provenance.md`; toda entrada sin SHA o snapshot verificable
+> es `UNKNOWN/UNVERIFIED`, histórica y no certificante. El estado ejecutable
+> vigente es el de `../3-tasks/tasks.json` y cada corte debe repetir tests, review
+> y CI sobre su SHA final.
+
 2026-10-14: WIP abierto desde `1d510e9`. Tres revisiones independientes no
 detectan P1 y coinciden en P2 de PDP, continuidad catálogo, navegación móvil,
 paginación y producto simple. Comparación browser confirma que Compra Gamer hace
