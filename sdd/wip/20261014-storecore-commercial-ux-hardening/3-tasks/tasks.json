@@ -1,0 +1,239 @@
+{
+  "feature": "20261014-storecore-commercial-ux-hardening",
+  "status": "approved",
+  "execution_strategy": "batched",
+  "local_config": { "mysql": null, "kvs": null, "bigqueue": null },
+  "stats": { "total": 24, "done": 2, "by_layer": { "1": 21, "2": 0, "3": 3 } },
+  "promotion_state": "Only documentation/design inventory tasks 001 and 002 are complete in this SHA. Historical implementation evidence is non-certifying until its owning code cut is promoted and revalidated.",
+  "tasks": [
+    {
+      "id": "TASK-001",
+      "title": "Congelar inventario de diseño y evidencia",
+      "description": "Convertir el manifiesto de 26 superficies en el inventario ejecutable de estados, diálogos, roles, acciones y evidencia. Registrar identidad visual, fixture, target, viewport y criterio de aceptación sin modificar Angular.",
+      "status": "done", "layer": 1, "complexity": "Medium", "depends_on": [],
+      "files": ["sdd/wip/20261014-storecore-commercial-ux-hardening/1-functional/delivery-manifest.json", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/design-manifest.json"],
+      "acceptance_criteria": ["AC-1: Las 26 superficies tienen estados, acciones, roles, targets y evidencia esperada sin huecos", "AC-2: Las 22 superficies Both enlazan bindings existentes; las cuatro Demo explican la ausencia de contrato real y registran su dependencia futura cuando corresponda", "GATE: El manifiesto valida JSON y ninguna ruta termina aprobada por redirect a Home"],
+      "references": ["SC-SURF-01..26", "E2E-01..12"], "design_decisions": ["DD-04", "DD-07", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-002",
+      "title": "Diseñar storefront y experiencia de cliente en Stitch",
+      "description": "Diseñar responsive las 14 superficies públicas/cliente con estados normales, vacíos, error y decisiones críticas. Aplicar el sistema StoreCore sin copiar marcas, claims o promociones de referencias externas.",
+      "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
+      "files": ["sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/design/storefront.md"],
+      "acceptance_criteria": ["AC-1: SC-SURF-01..14 tienen revisión visual a 390, 768 y 1440 con estados y diálogos inventariados", "AC-2: Búsqueda, PDP, identidad, carrito, checkout y posventa forman un recorrido continuo y comercialmente claro", "GATE: Los artefactos Stitch referencian una única revisión del sistema de diseño StoreCore"],
+      "references": ["SC-SURF-01..14", "E2E-01..08"], "design_decisions": ["DD-02", "DD-06", "DD-09"]
+    },
+    {
+      "id": "TASK-003",
+      "title": "Diseñar consola operativa completa en Stitch",
+      "description": "Diseñar responsive las 12 superficies de administración con densidad operativa, jerarquía de tareas y simulaciones honestas. Incluir clientes, catálogo, campañas, pedidos, inventario, Mercado Libre, módulos y configuración.",
+      "status": "in_progress", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
+      "files": ["sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/design/operator.md"],
+      "acceptance_criteria": ["AC-1: SC-SURF-15..26 tienen revisión visual a 390, 768 y 1440 con estados y diálogos inventariados", "AC-2: Estados de módulos futuros muestran simulación/delivery level sin prometer homologación", "GATE: Todas las acciones administrativas visibles tienen efecto demo definido o binding productivo identificado"],
+      "references": ["SC-SURF-15..26", "E2E-09..12"], "design_decisions": ["DD-02", "DD-06", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-004",
+      "title": "Cerrar triple gate de diseño",
+      "description": "Someter la misma revisión Stitch a UI visual, UX competitivo y Product Owner. Corregir iterativamente cada P1/P2 y preservar los tres veredictos sobre la misma revisión.",
+      "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-002", "TASK-003"],
+      "files": ["sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/design-reviews.json", "sdd/wip/20261014-storecore-commercial-ux-hardening/meta.md"],
+      "acceptance_criteria": ["AC-1: UI, UX y Product Owner emiten APPROVE sobre la misma revisión Stitch", "AC-2: No queda P1/P2 abierto y toda excepción responsive queda documentada", "GATE: DESIGN=APPROVED antes de TASK-019, entrega visual final o cierre del feature; implementación previa permanece PROVISIONAL"],
+      "references": ["G2"], "design_decisions": ["DD-02"]
+    },
+    {
+      "id": "TASK-005",
+      "title": "Preservar reproducciones de los bloqueos auditados",
+      "description": "Crear pruebas failing-before o evidencia preservada para persistencia, pago/fulfillment, cronología, alertas, dashboard, comprador, inventario y cobertura de media. Reemplazar la aserción heredada que acepta Cancelado con Preparando.",
+      "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002"],
+      "files": ["frontend/src/app/demo/**/*.spec.ts", "frontend/demo-e2e/**/*.spec.ts", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/reproductions/"],
+      "acceptance_criteria": ["AC-1: Los ocho bloqueos tienen prueba reproducible o evidencia failing-before", "AC-2: Ninguna prueba acepta combinaciones imposibles de pago y fulfillment", "GATE: G1 REPRODUCTION pasa sin borrar evidencia histórica"],
+      "references": ["G1", "E2E-01..12"], "design_decisions": ["DD-01", "DD-05"]
+    },
+    {
+      "id": "TASK-006",
+      "title": "Implementar tipos cerrados y políticas de dominio",
+      "description": "Extraer estados finitos a clases TypeScript cerradas con constructor privado, instancias estáticas y un único fromWire/Unknown. Implementar políticas puras de precio, inventario, cronología, alertas, capability y transiciones.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-005"],
+      "files": ["frontend/src/app/domain/**", "frontend/src/app/demo/domain/**"],
+      "acceptance_criteria": ["AC-1: Vista, store y tests no comparan strings mágicos para conjuntos finitos", "AC-2: Valores wire desconocidos producen Unknown y balances imposibles se rechazan sin clamp", "GATE: Tests unitarios cubren cada caso cerrado, traductor y política crítica"],
+      "references": ["SC-SURF-01..26"], "design_decisions": ["DD-05", "DD-08", "DD-11"]
+    },
+    {
+      "id": "TASK-007",
+      "title": "Extraer arquitectura SOLID y persistencia transaccional",
+      "description": "Dividir DemoPageComponent y DemoCommerce en presenters/controllers, casos de uso, comandos, políticas y step objects. Ejecutar dos checkpoints verdes: codec/persistencia transaccional primero y extracción por responsabilidad después.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006"],
+      "files": ["frontend/src/app/demo/**"],
+      "acceptance_criteria": ["AC-1: Las vistas sólo consumen view models tipados y emiten intent tipado", "AC-2: Fallo de decoder, quota/storage o conflicto cross-tab preserva estado válido y no muestra éxito", "GATE: Cada familia de comandos pasa round-trip y DemoCommerce sólo delega"],
+      "references": ["G3"], "design_decisions": ["DD-05", "DD-11"]
+    },
+    {
+      "id": "TASK-008",
+      "title": "Construir tokens, primitives, shells y colecciones responsive",
+      "description": "Implementar el sistema visual aprobado con primitives accesibles, shell público/operador, formularios, estados, tablas/cards y controlador modal único. Cubrir 390/768/1440, resize y reflow.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-006"],
+      "files": ["frontend/src/styles.css", "frontend/src/app/shared/**", "frontend/src/app/demo/**"],
+      "acceptance_criteria": ["AC-1: Primitives y composiciones coinciden con tokens y artefactos Stitch aprobados", "AC-2: Modal maneja nombre, foco inicial, trap, Escape, scroll y restauración", "GATE: WCAG 2.2 AA contractual pasa en componentes base"],
+      "references": ["SC-SURF-01..26", "G5"], "design_decisions": ["DD-02", "DD-03", "DD-05"]
+    },
+    {
+      "id": "TASK-009",
+      "title": "Completar home, catálogo y PDP",
+      "description": "Implementar descubrimiento, búsqueda, filtros, orden, paginación, media, variantes y decisión de compra. Diferenciar condición outlet simulada sin introducir un contrato productivo inexistente.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/storefront/**"],
+      "acceptance_criteria": ["AC-1: SC-SURF-01,04,05 cubren sus estados, CTA y persistencia declarados", "AC-2: Producto agotado activo conserva precio y comunica disponibilidad sin invalidarse", "GATE: E2E de descubrimiento y PDP pasan en los tres viewports"],
+      "references": ["SC-SURF-01", "SC-SURF-04", "SC-SURF-05", "E2E-01", "E2E-02"], "design_decisions": ["DD-04", "DD-08", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-010",
+      "title": "Completar acceso unificado y cuenta de cliente",
+      "description": "Implementar login, challenge de contexto, recuperación demo, registro, perfil, direcciones y favoritos con retorno seguro. Favoritos permanecen Demo/locales hasta que un corte propietario incorpore y pruebe ruta, tipos cerrados, port, repositorio HTTP y contrato backend; no se inventa sincronización productiva. Mantener realms, cookies, CSRF, permisos y sesiones separados.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/identity/**", "frontend/src/app/core/auth/**", "frontend/src/app/core/favorites/**"],
+      "acceptance_criteria": ["AC-1: SC-SURF-02,03,06..09 cubren happy/error/ambiguous/Unknown y retorno seguro", "AC-2: Favoritos autenticados persisten y reconcilian por cuenta; el fallback anónimo se presenta explícitamente como local de pestaña", "GATE: Guards y pruebas CSRF/realm no regresan"],
+      "references": ["SC-SURF-02", "SC-SURF-03", "SC-SURF-06..09", "E2E-02"], "design_decisions": ["DD-04", "DD-05", "DD-10"]
+    },
+    {
+      "id": "TASK-011",
+      "title": "Completar carrito, checkout y resultado",
+      "description": "Implementar conflictos de carrito, pasos de checkout como objetos y simulaciones honestas de envío/pago/QR/transferencia. La UI nunca infiere aprobación por redirect, QR o timer.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008", "TASK-009", "TASK-010"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/cart/**"],
+      "acceptance_criteria": ["AC-1: SC-SURF-10..12 ejecutan todas sus CTA y estados críticos", "AC-2: Simulaciones muestran disclosure persistente y autoridad del proveedor separada", "GATE: E2E de carrito/checkout/result pasa después de reload y segunda ejecución"],
+      "references": ["SC-SURF-10..12", "E2E-03", "E2E-04", "E2E-11"], "design_decisions": ["DD-04", "DD-06", "DD-09", "DD-10", "DD-11"]
+    },
+    {
+      "id": "TASK-012",
+      "title": "Completar pedidos y posventa de cliente",
+      "description": "Implementar lista, detalle, timeline, tracking e incidentes/devoluciones simuladas con estados coherentes. Mostrar estado fiscal no fiscal sin emitir documentos ni inventar integración.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008", "TASK-011"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/orders/**"],
+      "acceptance_criteria": ["AC-1: SC-SURF-13..14 cubren filtros, vacío, error, cronología y posventa", "AC-2: Pago rechazado/cancelado nunca coexiste con preparación o entrega", "GATE: E2E de pedido y posventa pasa con reload"],
+      "references": ["SC-SURF-13", "SC-SURF-14", "E2E-05", "E2E-06", "E2E-09", "E2E-10"], "design_decisions": ["DD-05", "DD-06", "DD-09"]
+    },
+    {
+      "id": "TASK-013",
+      "title": "Completar dashboard, contenido y administración de clientes",
+      "description": "Implementar dashboard demo derivado, edición/preview de contenido y nueva superficie de clientes. En producción, home operador conserva sólo navegación autorizada hasta existir un contrato de métricas/clientes.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/admin/user-home.component.ts", "frontend/src/app/features/admin/user-content.component.ts"],
+      "acceptance_criteria": ["AC-1: SC-SURF-15,16,26 cubren datos correlacionados, estados y CTA", "AC-2: Datos de clientes respetan mínimo necesario y rol", "GATE: No se agrega endpoint, mock repository ni ruta productiva de clientes"],
+      "references": ["SC-SURF-15", "SC-SURF-16", "SC-SURF-26", "E2E-09", "E2E-10"], "design_decisions": ["DD-04", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-014",
+      "title": "Completar catálogo admin, ofertas y campañas",
+      "description": "Implementar productos/media/variantes, precio, archivo, ofertas y campañas con políticas compartidas por comando y decoder. Ofertas y outlet permanecen Demo hasta contar con sus contratos productivos propietarios; campañas sólo usan el binding real ya existente.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006", "TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/admin/user-catalog.component.ts", "frontend/src/app/features/admin/user-offers.component.ts", "frontend/src/app/features/admin/user-promos.component.ts"],
+      "acceptance_criteria": ["AC-1: SC-SURF-17..19 cubren lista/editor/preview/error/conflict/success", "AC-2: Base 100 + oferta 20% + original 90 se rechaza sin mutación", "GATE: Producto con todas las variantes deshabilitadas se rechaza; archivar preserva stock e historial"],
+      "references": ["SC-SURF-17..19", "E2E-07"], "design_decisions": ["DD-05", "DD-08", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-015",
+      "title": "Completar fulfillment e inventario",
+      "description": "Implementar listas/detalles administrativos, transiciones válidas, alertas e inventario/reconciliación demo. Producción mantiene únicamente transiciones y consulta soportadas por sus ports actuales.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006", "TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/admin/fulfillment*", "frontend/src/app/features/admin/user-order-detail*", "frontend/src/app/features/admin/user-inventory.component.ts"],
+      "acceptance_criteria": ["AC-1: SC-SURF-20..22 cubren filtros, detalle, transiciones, alertas y balances", "AC-2: reserved + notSellable nunca supera physical y devolución dañada actualiza ambos en una transacción", "GATE: Ajuste/reconciliación no usa un contrato productivo inexistente"],
+      "references": ["SC-SURF-20..22", "E2E-04", "E2E-05", "E2E-08", "E2E-09"], "design_decisions": ["DD-04", "DD-05", "DD-10"]
+    },
+    {
+      "id": "TASK-016",
+      "title": "Completar Mercado Libre, módulos y configuración",
+      "description": "Implementar cinco tabs de operaciones ML, capabilities y configuración con estados deseado/observado, conflictos y simulación declarada. Competencia real, ARCA y carrier siguen diferidos.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006", "TASK-007", "TASK-008"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/features/admin/user-mercadolibre.component.ts", "frontend/src/app/features/admin/user-capabilities.component.ts", "frontend/src/app/features/admin/profile-import.component.ts"],
+      "acceptance_criteria": ["AC-1: SC-SURF-23..25 cubren tabs, Unknown, stale, conflict, error y retry", "AC-2: Capabilities enlaza superficies propietarias sin duplicarlas ni declarar homologación", "GATE: Demo bloquea llamadas externas y no muta proveedor real"],
+      "references": ["SC-SURF-23..25", "E2E-08", "E2E-11"], "design_decisions": ["DD-04", "DD-06", "DD-08", "DD-09", "DD-10"]
+    },
+    {
+      "id": "TASK-017",
+      "title": "Cerrar estados transversales, acceso, 404 y diálogos",
+      "description": "Completar empty/loading/error/Unknown/access denied/404 y todos los diálogos inventariados. Asegurar que cada salida preserva foco, datos recuperables y navegación segura.",
+      "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-009", "TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014", "TASK-015", "TASK-016"],
+      "files": ["frontend/src/app/demo/**", "frontend/src/app/shared/**", "frontend/src/app/app.routes.ts"],
+      "acceptance_criteria": ["AC-1: Cada estado transversal y diálogo tiene CTA recuperable o salida explícita", "AC-2: Acceso denegado y 404 no redirigen silenciosamente a Home", "GATE: Operación completa por teclado y restauración de foco pasan"],
+      "references": ["SC-SURF-01..26", "E2E-12", "G4", "G5"], "design_decisions": ["DD-03", "DD-05", "DD-07"]
+    },
+    {
+      "id": "TASK-018",
+      "title": "Aplicar paridad productiva limitada por bindings",
+      "description": "Llevar el diseño aprobado a las rutas reales sólo para acciones enumeradas en productiveBindings. Preservar Container→view→store→use case→port→HTTP y la excepción local declarada para navegación derivada de permisos.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-009", "TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014", "TASK-015", "TASK-016", "TASK-017"],
+      "files": ["frontend/src/app/features/**", "frontend/src/app/domain/**", "frontend/src/app/data/**"],
+      "acceptance_criteria": ["AC-1: Cada acción real implementada tiene component/use case/port/method/repository declarado", "AC-2: No aparece fixture o simulation adapter en el grafo productivo", "GATE: Tests de rutas reales pasan por separado de demo E2E"],
+      "references": ["SC-SURF-01..25", "G4"], "design_decisions": ["DD-04", "DD-10", "DD-11"]
+    },
+    {
+      "id": "TASK-019",
+      "title": "Ejecutar matriz CTA, E2E, visual y accesibilidad",
+      "description": "Ejecutar cada data-cta y E2E-01..12, generar baseline 26×3 y evidencia adicional de estados/diálogos/tabs. Validar axe más revisión manual WCAG 2.2 AA, resize, reflow y Target Size.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-004", "TASK-017", "TASK-018"],
+      "files": ["frontend/demo-e2e/**", "frontend/e2e/**", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/**"],
+      "acceptance_criteria": ["AC-1: Las 78 capturas baseline y toda evidencia extra quedan enlazadas a ruta/estado/acción/revisión/commit", "AC-2: Cada CTA prueba efecto y persistencia cuando corresponde, no sólo visibilidad", "GATE: G4 y G5 pasan; automatización A/AA sin violaciones aplicables y revisión manual completa"],
+      "references": ["E2E-01..12", "G4", "G5"], "design_decisions": ["DD-03", "DD-07"]
+    },
+    {
+      "id": "TASK-020",
+      "title": "Completar packaging reproducible del frontend",
+      "description": "Agregar packaging frontend multi-stage y runtime mínimo con health check /ping sin desplegar. Mantener producción y demo como builds separados y no introducir servicios backend.",
+      "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-018"],
+      "files": ["frontend/Dockerfile", "frontend/Dockerfile.runtime", "frontend/nginx.conf"],
+      "acceptance_criteria": ["AC-1: Build de imagen frontend es reproducible y no incorpora secretos ni fixtures productivos", "AC-2: Runtime sirve SPA y /ping local sin modificar APIs", "GATE: Imágenes de producción y demo compilan localmente; no hay tarea de deploy"],
+      "references": ["G7"], "design_decisions": ["DD-04", "DD-10"]
+    },
+    {
+      "id": "TASK-021",
+      "title": "Cerrar review ejecutable y CI equivalente",
+      "description": "Repetir revisión UI, UX y Product Owner sobre el mismo commit Angular ejecutable y corregir P1/P2 hasta triple APPROVE. Ejecutar lint, unit, build, E2E, aislamiento de red y packaging local.",
+      "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-019", "TASK-020"],
+      "files": ["sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/final-reviews.json", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/progress.md"],
+      "acceptance_criteria": ["AC-1: UI, UX y Product Owner emiten APPROVE sobre el mismo commit y no queda P1/P2", "AC-2: Lint, unitarias, builds, E2E y aislamiento externo pasan localmente", "GATE: G6 y G7 locales pasan; CI remoto se registra separadamente sin falsear ejecución"],
+      "references": ["G6", "G7"], "design_decisions": ["DD-03", "DD-07"]
+    },
+    {
+      "id": "TASK-022",
+      "title": "Code review final independiente",
+      "description": "Ejecutar revisión no mutante de Angular/TypeScript, arquitectura limpia, invariantes y cobertura sobre el SHA exacto certificado por TASK-021. Si aparece P1/P2, invalidar los tres reviews, reabrir la tarea productora y TASK-021; luego repetir los tres sobre el nuevo SHA.",
+      "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-021"],
+      "files": ["frontend/**"],
+      "acceptance_criteria": ["AC-1: Reviewer independiente no encuentra P1/P2 abierto", "AC-2: Se verifica cumplimiento de tipos cerrados, SOLID y productiveBindings", "GATE: CODE_REVIEW=APPROVED para el mismo SHA final de TASK-021; el review no modifica código"],
+      "references": ["G7"], "design_decisions": ["DD-05", "DD-10", "DD-11"]
+    },
+    {
+      "id": "TASK-023",
+      "title": "Performance review final",
+      "description": "Revisar sin modificar bundles, carga, render, imágenes y recorridos críticos sobre el SHA exacto certificado por TASK-021. Si aparece P1/P2, invalidar los tres reviews, reabrir la tarea productora y TASK-021; luego repetir los tres sobre el nuevo SHA.",
+      "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-021"],
+      "files": ["frontend/**", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/performance/**"],
+      "acceptance_criteria": ["AC-1: Presupuestos de bundle y métricas críticas quedan registrados y aprobados", "AC-2: No existe cuello P1/P2 en interacción, render o assets", "GATE: PERFORMANCE_REVIEW=APPROVED para el mismo SHA final de TASK-021; el review no modifica código"],
+      "references": ["G7"], "design_decisions": ["DD-03", "DD-07"]
+    },
+    {
+      "id": "TASK-024",
+      "title": "Security review final",
+      "description": "Revisar sin modificar autenticación, CSRF, roles, retorno seguro, XSS, datos de fixtures/evidencia y aislamiento de proveedores sobre el SHA exacto certificado por TASK-021. Si aparece P1/P2, invalidar los tres reviews, reabrir la tarea productora y TASK-021; luego repetir los tres sobre el nuevo SHA.",
+      "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-021"],
+      "files": ["frontend/**", "sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/security/**"],
+      "acceptance_criteria": ["AC-1: No hay credenciales, PII real, URLs arbitrarias ni autoridad inferida por frontend", "AC-2: Guards, CSRF, roles y sesiones separadas conservan cobertura", "GATE: SECURITY_REVIEW=APPROVED para el mismo SHA final de TASK-021; el review no modifica código"],
+      "references": ["G7"], "design_decisions": ["DD-04", "DD-05", "DD-06", "DD-10"]
+    }
+  ],
+  "dependency_graph": {
+    "by_layer": {
+      "1": {
+        "level_0": ["TASK-001"], "level_1": ["TASK-002", "TASK-003"], "level_2": ["TASK-004", "TASK-005"],
+        "level_3": ["TASK-006"], "level_4": ["TASK-007", "TASK-008"],
+        "level_5": ["TASK-009", "TASK-010", "TASK-013", "TASK-014", "TASK-015", "TASK-016"],
+        "level_6": ["TASK-011"], "level_7": ["TASK-012"], "level_8": ["TASK-017"],
+        "level_9": ["TASK-018"], "level_10": ["TASK-019", "TASK-020"], "level_11": ["TASK-021"]
+      },
+      "2": {},
+      "3": { "level_0": ["TASK-022", "TASK-023", "TASK-024"] }
+    }
+  }
+}
