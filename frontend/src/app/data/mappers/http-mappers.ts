@@ -4,9 +4,11 @@ import { HomeContent, HomeBlock } from '../../domain/catalog/home-content.entity
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
+import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
+import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import {
   CapabilityModule,
   CapabilityState,
@@ -304,20 +306,55 @@ function inventoryQuantity(value: unknown): number | null {
 }
 
 export function mapMercadoLibreAccount(value: unknown): MercadoLibreAccount {
-  const row = asRecord(value);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('La lectura de la cuenta de Mercado Libre no es válida.');
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row['authorized'] !== 'boolean' || typeof row['accountRef'] !== 'string') {
+    throw new Error('La lectura de la cuenta de Mercado Libre está incompleta.');
+  }
+  const accountRef = row['accountRef'].trim();
+  const status = MercadoLibreAccountStatus.fromWire(row['status']);
+  if (row['authorized'] && (!accountRef || status === MercadoLibreAccountStatus.Disabled)) {
+    throw new Error('La cuenta autorizada de Mercado Libre tiene una referencia o un estado inválido.');
+  }
+  if (!row['authorized'] && (accountRef || (status !== MercadoLibreAccountStatus.Disabled && status !== MercadoLibreAccountStatus.Unknown))) {
+    throw new Error('La cuenta no autorizada de Mercado Libre tiene un estado contradictorio.');
+  }
   return {
-    authorized: row['authorized'] === true,
-    accountRef: text(row['accountRef']),
-    status: text(row['status']),
+    authorized: row['authorized'],
+    accountRef,
+    status,
   };
 }
 
 export function mapListing(value: unknown): MercadoLibreListing {
-  const row = asRecord(value);
-  return { listingId: text(row['listingId']), variationId: text(row['variationId']), sku: text(row['sku']) };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('La lectura de publicaciones de Mercado Libre contiene una fila inválida.');
+  }
+  const row = value as Record<string, unknown>;
+  if (typeof row['listingId'] !== 'string' || !row['listingId'].trim()) {
+    throw new Error('La publicación de Mercado Libre no tiene un identificador válido.');
+  }
+  if (typeof row['variationId'] !== 'string') {
+    throw new Error('La publicación de Mercado Libre no tiene una variación válida.');
+  }
+  if (typeof row['sku'] !== 'string' || !row['sku'].trim()) {
+    throw new Error('La publicación de Mercado Libre no tiene un SKU válido.');
+  }
+  return { listingId: row['listingId'].trim(), variationId: row['variationId'].trim(), sku: row['sku'].trim() };
 }
 
 export function mapListings(value: unknown): readonly MercadoLibreListing[] {
-  return items(value).map(mapListing);
+  if (!Array.isArray(value)) throw new Error('La lectura de publicaciones de Mercado Libre no es válida.');
+  const listings = value.map(mapListing);
+  const identities = new Set<string>();
+  for (const listing of listings) {
+    const identity = JSON.stringify([listing.listingId, listing.variationId]);
+    if (identities.has(identity)) {
+      throw new Error('La lectura de publicaciones de Mercado Libre contiene una identidad duplicada.');
+    }
+    identities.add(identity);
+  }
+  return listings;
 }
-import { OrderStatus, PaymentStatus, ShipmentStatus, RmaStatus, FulfillmentEligibility, ShipmentTransition, RmaTransition } from '../../domain/order/commerce-states';
