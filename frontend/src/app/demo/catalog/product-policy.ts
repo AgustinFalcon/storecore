@@ -29,11 +29,16 @@ export class DemoProductPolicy {
     const references = product.variants.filter(variant => variant.outlet).map(variant => ({ id: variant.outlet!.reference }));
     if (!unique(references)) throw new CatalogValidationError('Cada unidad o lote Outlet necesita una referencia única dentro del producto.');
   }
-  static refreshTotals(product: DemoProduct, allowUnknown = false): void {
-    const active = product.variants
+  static representative(product: DemoProduct, allowUnknown = false): DemoProductVariantRecord | undefined {
+    return product.variants
       .filter(variant => variant.saleState.active || (allowUnknown && variant.saleState === VariantSaleState.Unknown))
-      .sort((left, right) => left.price - right.price || left.id.localeCompare(right.id));
-    const representative = active[0];
+      .reduce<DemoProductVariantRecord | undefined>((selected, variant) =>
+        !selected || variant.price < selected.price || (variant.price === selected.price && variant.id.localeCompare(selected.id) < 0)
+          ? variant
+          : selected, undefined);
+  }
+  static refreshTotals(product: DemoProduct, allowUnknown = false): void {
+    const representative = this.representative(product, allowUnknown);
     const add = (sum: number, value: number): number => {
       const result = sum + value;
       if (!Number.isSafeInteger(result)) throw new CatalogValidationError('El stock agregado excede el rango entero admitido.');

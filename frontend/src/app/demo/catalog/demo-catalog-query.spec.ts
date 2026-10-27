@@ -64,4 +64,19 @@ describe('DemoCatalogQuery', () => {
     catalog.refreshTotals(product);
     expect([product.price, product.original]).toEqual([200, 250]);
   });
+  it('keeps the same representative and quote across tied-price permutations', () => {
+    const { product, snapshot } = checkoutFixture();
+    const [first, second] = product.variants;
+    Object.assign(first, { id: 'z-variant', price: 100, original: 200 });
+    Object.assign(second, { id: 'a-variant', price: 100, original: 900 });
+    const query = new DemoCatalogQuery(
+      () => snapshot,
+      (_product, variant) => ({ amount: variant.id === 'a-variant' ? 90 : 80 }),
+    );
+    query.refreshTotals(product);
+    expect([product.price, product.original, query.price(product.sku)]).toEqual([100, 900, 90]);
+    product.variants.reverse();
+    query.refreshTotals(product);
+    expect([product.price, product.original, query.price(product.sku)]).toEqual([100, 900, 90]);
+  });
 });

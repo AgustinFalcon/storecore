@@ -43,7 +43,7 @@ export class DemoCatalogQuery {
     const product = this.product(sku);
     const variant = variantId !== undefined
       ? this.variant(sku, variantId)
-      : product.variants.filter(value => value.saleState.active).reduce<DemoProductVariantRecord | undefined>((minimum, value) => !minimum || value.price < minimum.price ? value : minimum, undefined);
+      : DemoProductPolicy.representative(product);
     if (!variant) return { amount: 0 };
     return this.quote(product, variant, this.available(sku, variant.id) > 0);
   }
