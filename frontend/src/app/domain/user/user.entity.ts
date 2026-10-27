@@ -1,4 +1,5 @@
 import { UserRole } from './user-role';
+import { InventoryAvailability } from './inventory-availability';
 
 export interface UserSessionResult {
   readonly id: string;
@@ -43,9 +44,10 @@ export interface CapabilityModule {
 
 export interface InventoryRow {
   readonly sku: string;
-  readonly availableQuantity: number;
-  readonly reservedQuantity: number;
-  readonly safetyStock: number;
+  readonly availableQuantity: number | null;
+  readonly reservedQuantity: number | null;
+  readonly safetyStock: number | null;
+  readonly availability: InventoryAvailability;
 }
 
 export interface MercadoLibreAccount {

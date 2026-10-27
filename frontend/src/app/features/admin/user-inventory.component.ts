@@ -1,26 +1,27 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
-import { InstallationStore } from './installation.store';
+import { ChangeDetectionStrategy, Component, effect } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
+import { UserInventoryStore } from './user-inventory.store';
 import { UserInventoryViewComponent } from './user-inventory.view';
 
 @Component({
   selector: 'sc-user-inventory',
   imports: [AsyncPipe, UserInventoryViewComponent],
-  providers: [InstallationStore],
+  providers: [UserInventoryStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <sc-user-inventory-view
-      [rows]="(store.inventory$ | async) ?? []"
-      [loading]="(store.loading$ | async) ?? false"
-      [error]="(store.errorMessage$ | async) ?? ''"
-      (retry)="store.loadInventory()"
-    />
+    @if (store.vm$ | async; as state) {
+      <sc-user-inventory-view [state]="state"
+        (retry)="store.loadInventory()" (queryChange)="store.setQuery($event)"
+        (filterChange)="store.setFilter($event)" (clearFilters)="store.clearFilters()" />
+    }
   `,
 })
-export class UserInventoryComponent implements OnInit {
-  constructor(readonly store: InstallationStore) {}
-
-  ngOnInit(): void {
-    this.store.loadInventory();
+export class UserInventoryComponent {
+  constructor(readonly store: UserInventoryStore, session: UserSession) {
+    effect(() => {
+      const actorChanged = store.setActor(session.authenticated() ? session.principal() : null);
+      if (actorChanged) store.loadInventory();
+    });
   }
 }
