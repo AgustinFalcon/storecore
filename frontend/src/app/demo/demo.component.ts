@@ -7,6 +7,8 @@ import { CatalogSort, CheckoutStep, DemoAddress, DemoCampaign, DemoContext, Demo
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoPaymentPhase, DemoDeliveryMethod, DemoMLTab, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
+import { CatalogStockScope, DemoCatalogLocation, type DemoCatalogCriteria } from './catalog/demo-catalog-location';
+import { DemoCatalogPresenter } from './catalog/demo-catalog-presenter';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -73,6 +75,7 @@ export class DemoPageComponent {
   competitorSku = 'DEMO-001';
   competitorThreshold = 1;
   readonly sorts = CatalogSort.all;
+  readonly CatalogStock = CatalogStockScope;
   readonly Gallery = DemoGalleryView;
   readonly gallery = signal(DemoGalleryView.Front);
   get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
@@ -87,13 +90,18 @@ export class DemoPageComponent {
   readonly search = signal(this.route.snapshot.queryParamMap.get('q') ?? '');
   readonly category = signal(this.route.snapshot.queryParamMap.get('category') ?? '');
   readonly brand = signal('');
-  readonly onlyAvailable = signal(false);
-  readonly maxPrice = signal(0);
+  readonly stockScope = signal(CatalogStockScope.All);
+  readonly maxPrice = signal<number | null>(null);
   readonly sort = signal(CatalogSort.Featured);
+  private readonly catalogPresenter = new DemoCatalogPresenter();
+  private readonly catalogLocation = new DemoCatalogLocation();
   readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
   readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
-  readonly filtered = computed(() => this.state.data.products.filter(product => product.active && (!this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())) && (!this.category() || product.category === this.category()) && (!this.brand() || product.brand === this.brand()) && (!this.onlyAvailable() || this.state.commerce.available(product.sku) > 0) && (!this.maxPrice() || this.state.commerce.price(product.sku) <= this.maxPrice() * 100)).sort((left, right) => this.sort().compare(left, right, product => this.state.commerce.price(product.sku))));
-  readonly products = computed(() => this.filtered().slice(this.page() * 6, this.page() * 6 + 6));
+  readonly filtered = computed(() => this.catalogPresenter.filter(this.state.data.products, this.catalogCriteria, product => this.state.commerce.available(product.sku), product => this.state.commerce.price(product.sku)));
+  readonly effectivePage = computed(() => this.catalogPresenter.pageIndex(this.filtered().length, this.page()));
+  readonly catalogPageCount = computed(() => this.catalogPresenter.pageCount(this.filtered().length));
+  readonly products = computed(() => this.catalogPresenter.page(this.filtered(), this.page()));
+  readonly catalogLocationIssue = computed(() => this.sort() === CatalogSort.Unknown || this.stockScope() === CatalogStockScope.Unknown);
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
   private confirmation: (() => void) | null = null;
@@ -123,7 +131,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.search.set(params.get('q') ?? ''); this.category.set(params.get('category') ?? ''); this.page.set(0); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
@@ -148,7 +156,13 @@ export class DemoPageComponent {
   get adminProducts(): DemoProduct[] { return this.state.data.products.filter(product => !this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())); }
   listing(sku: string) { return this.state.data.listings.find(value => value.sku === sku); }
   filterOrders(raw: string): void { this.selectedOrderStatus = raw ? PaymentStatus.fromWire(raw) : null; }
-  changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.page.set(0); }
+  private get catalogCriteria(): DemoCatalogCriteria { return { search: this.search(), category: this.category(), brand: this.brand(), stock: this.stockScope(), maxPrice: this.maxPrice(), sort: this.sort(), page: this.page() }; }
+  get catalogQueryParams(): Record<string, string | number | null> { return this.catalogLocation.toQuery({ ...this.catalogCriteria, page: this.effectivePage() }); }
+  updateCatalog(): void { this.page.set(0); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogLocation.toQuery({ ...this.catalogCriteria, page: 0 }), replaceUrl: true }); }
+  changeCatalogPage(next: number): void { this.page.set(this.catalogPresenter.pageIndex(this.filtered().length, next)); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogQueryParams }); }
+  changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.updateCatalog(); }
+  changeMaximum(raw: number | null): void { const value = Number(raw); this.maxPrice.set(raw !== null && Number.isFinite(value) && value >= 0 ? value : null); this.updateCatalog(); }
+  changeStock(available: boolean): void { this.stockScope.set(available ? CatalogStockScope.Available : CatalogStockScope.All); this.updateCatalog(); }
   movements(product: DemoProduct): void { const rows = this.state.data.movements.filter(value => value.sku === product.sku); this.information(rows.length ? rows.map(value => `${value.delta > 0 ? '+' : ''}${value.delta} unidades · ${value.reason}`).join('\n') : 'Sin movimientos posteriores al stock inicial de demostración.'); }
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
   money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value / 100); }
@@ -156,7 +170,7 @@ export class DemoPageComponent {
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
   get draftPrice(): number { return this.draftProduct.price / 100; }
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
-  clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(0); this.onlyAvailable.set(false); this.page.set(0); }
+  clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
   selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
   add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
