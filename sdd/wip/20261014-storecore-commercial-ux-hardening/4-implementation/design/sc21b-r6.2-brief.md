@@ -32,7 +32,7 @@ Include an isolated Real contract specimen for an applicable shipment: editable 
 
 Show the only productive whole-order RMA scene with current state, one next command, confirmation and result:
 
-`null —RECEIVED→ RETURN_RECEIVED`
+`NONE —RECEIVED→ RETURN_RECEIVED`
 
 `RETURN_RECEIVED` and every other existing RMA state expose no further Real command. `INSPECTED` and `ADJUSTED` belong only to the Demo return flow until a productive contract exists. Commands are not states. Partial quantity, inspection, adjustment, damage disposition, refund, incident and fiscal capabilities remain unavailable read-only explanations without fake disabled controls.
 

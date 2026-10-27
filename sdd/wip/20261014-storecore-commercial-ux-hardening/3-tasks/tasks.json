@@ -162,7 +162,7 @@
     {
       "id": "TASK-018",
       "title": "Aplicar paridad productiva limitada por bindings",
-      "description": "Llevar el diseño aprobado a las rutas reales sólo para acciones enumeradas en productiveBindings. Preservar Container→view→store→use case→port→HTTP y las dos excepciones locales declaradas.",
+      "description": "Llevar el diseño aprobado a las rutas reales sólo para acciones enumeradas en productiveBindings. Preservar Container→view→store→use case→port→HTTP y la excepción local declarada para navegación derivada de permisos.",
       "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-009", "TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014", "TASK-015", "TASK-016", "TASK-017"],
       "files": ["frontend/src/app/features/**", "frontend/src/app/domain/**", "frontend/src/app/data/**"],
       "acceptance_criteria": ["AC-1: Cada acción real implementada tiene component/use case/port/method/repository declarado", "AC-2: No aparece fixture o simulation adapter en el grafo productivo", "GATE: Tests de rutas reales pasan por separado de demo E2E"],

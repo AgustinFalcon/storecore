@@ -79,21 +79,22 @@
   },
   "closingSurfaceContracts": {
     "capabilities": {
-      "rolePolicy": { "ADMIN": ["read", "change-supported-capability"], "OPERATOR": ["read"], "Unknown": [] },
+      "rolePolicy": { "ADMIN": ["read", "change-demo-capability"], "OPERATOR": ["read"], "Unknown": [] },
+      "mutationTarget": "Demo",
       "productiveOperationalStates": ["DISABLED", "READ_ONLY", "ACTIVE", "PAUSED", "ERROR", "Unknown"],
       "availabilityStates": ["AVAILABLE", "DEPENDENCY_BLOCKED", "DEFERRED", "Unknown"],
       "deliveryLevels": ["DESIGN_APPROVED", "DEMO_APPROVED", "INTEGRATION_READY", "INTEGRATED", "HOMOLOGATED", "Unknown"],
       "changeCommand": { "required": ["productiveModuleId", "desiredOperationalState", "reason", "correlationId", "expectedConfigVersion"], "reasonMin": 1, "expectedConfigVersion": "positive-safe-integer", "retryPolicy": "never-blindly-repeat; reconcile-command-status-and-fresh-list-once" },
       "modules": [
-        { "module": "catalog", "productiveId": "CATALOG", "availability": "AVAILABLE", "deliveryLevel": "INTEGRATED", "owner": "SC-SURF-17", "changeable": true, "operationalStateProjection": { "applicable": true, "state": "ACTIVE", "configVersion": 7 } },
-        { "module": "inventory-control", "productiveId": null, "availability": "AVAILABLE", "deliveryLevel": "INTEGRATED", "owner": "SC-SURF-22", "changeable": false, "operationalStateProjection": { "applicable": false }, "disclosure": "No independent productive capability ID; navigation/information only." },
-        { "module": "mercadolibre", "productiveId": "MARKETPLACE_ML", "availability": "AVAILABLE", "deliveryLevel": "INTEGRATION_READY", "owner": "SC-SURF-23", "changeable": true, "operationalStateProjection": { "applicable": true, "state": "Unknown", "configVersion": null }, "disclosure": "Runtime state is not fixed by this fixture; Unknown blocks mutation until an authoritative positive configVersion is loaded." },
-        { "module": "outlet", "productiveId": null, "availability": "AVAILABLE", "deliveryLevel": "DESIGN_APPROVED", "owner": "SC-SURF-17", "changeable": false, "operationalStateProjection": { "applicable": false }, "disclosure": "No independent productive capability ID; informational link to product and variant administration." },
-        { "module": "arca", "productiveId": null, "availability": "DEFERRED", "deliveryLevel": "DESIGN_APPROVED", "owner": "future-arca-sdd", "changeable": false, "operationalStateProjection": { "applicable": false } },
-        { "module": "advanced-shipping", "productiveId": null, "availability": "DEPENDENCY_BLOCKED", "deliveryLevel": "DEMO_APPROVED", "owner": "future-shipping-sdd", "changeable": false, "operationalStateProjection": { "applicable": false } },
-        { "module": "wallet-connectors", "productiveId": null, "availability": "DEFERRED", "deliveryLevel": "DESIGN_APPROVED", "owner": "future-payments-sdd", "changeable": false, "operationalStateProjection": { "applicable": false } }
+        { "module": "catalog", "productiveId": "CATALOG", "availability": "AVAILABLE", "deliveryLevel": "INTEGRATED", "owner": "SC-SURF-17", "demoChangeable": true, "operationalStateProjection": { "applicable": true, "state": "ACTIVE", "configVersion": 7 } },
+        { "module": "inventory-control", "productiveId": null, "availability": "AVAILABLE", "deliveryLevel": "INTEGRATED", "owner": "SC-SURF-22", "demoChangeable": false, "operationalStateProjection": { "applicable": false }, "disclosure": "No independent productive capability ID; navigation/information only." },
+        { "module": "mercadolibre", "productiveId": "MARKETPLACE_ML", "availability": "AVAILABLE", "deliveryLevel": "INTEGRATION_READY", "owner": "SC-SURF-23", "demoChangeable": true, "operationalStateProjection": { "applicable": true, "state": "Unknown", "configVersion": null }, "disclosure": "Runtime state is not fixed by this fixture; Unknown blocks mutation. Productive mutation also remains deferred until the frontend versioned command contract is promoted." },
+        { "module": "outlet", "productiveId": null, "availability": "AVAILABLE", "deliveryLevel": "DESIGN_APPROVED", "owner": "SC-SURF-17", "demoChangeable": false, "operationalStateProjection": { "applicable": false }, "disclosure": "No independent productive capability ID; informational link to product and variant administration." },
+        { "module": "arca", "productiveId": null, "availability": "DEFERRED", "deliveryLevel": "DESIGN_APPROVED", "owner": "future-arca-sdd", "demoChangeable": false, "operationalStateProjection": { "applicable": false } },
+        { "module": "advanced-shipping", "productiveId": null, "availability": "DEPENDENCY_BLOCKED", "deliveryLevel": "DEMO_APPROVED", "owner": "future-shipping-sdd", "demoChangeable": false, "operationalStateProjection": { "applicable": false } },
+        { "module": "wallet-connectors", "productiveId": null, "availability": "DEFERRED", "deliveryLevel": "DESIGN_APPROVED", "owner": "future-payments-sdd", "demoChangeable": false, "operationalStateProjection": { "applicable": false } }
       ],
-      "deterministicChangeExample": { "module": "CATALOG", "before": { "state": "ACTIVE", "configVersion": 7 }, "command": { "state": "PAUSED", "reason": "Mantenimiento programado", "expectedConfigVersion": 7, "correlationId": "CAP-DEMO-001" }, "confirmedAfter": { "state": "PAUSED", "configVersion": 8 }, "conflictAfter": "fresh-server-snapshot-without-optimistic-success", "uncertainAfter": "command-status-plus-fresh-list-and-explicit-review-required" }
+      "deterministicChangeExample": { "target": "Demo", "module": "CATALOG", "before": { "state": "ACTIVE", "configVersion": 7 }, "command": { "state": "PAUSED", "reason": "Mantenimiento programado", "expectedConfigVersion": 7, "correlationId": "CAP-DEMO-001" }, "confirmedAfter": { "state": "PAUSED", "configVersion": 8 }, "conflictAfter": "fresh-server-snapshot-without-optimistic-success", "uncertainAfter": "demo-command-status-plus-fresh-list-and-explicit-review-required" }
     },
     "configuration": {
       "rolePolicy": { "ADMIN": ["demo-settings", "demo-export", "demo-reset", "preview-profile", "merge-profile"], "OPERATOR": [], "Unknown": [] },
@@ -191,7 +192,7 @@
     },
     "SC-SURF-21": {
       "Demo": { "states": ["payment-pending", "preparing", "shipped", "delivered", "pickup-ready", "incident", "return", "fiscal-status-demo", "loading", "error", "access-denied", "unknown"], "dialogs": ["transition-confirm", "tracking", "incident", "return", "receipt-status"], "actions": ["transition-order", "add-tracking", "resolve-demo-incident", "request-demo-return", "receive-demo-return", "inspect-demo-return", "classify-demo-return", "refund-demo-return"] },
-      "Real": { "states": ["payment-pending", "preparing", "shipped", "delivered", "pickup-ready", "return", "loading", "error", "access-denied", "unknown"], "dialogs": ["transition-confirm", "tracking", "return"], "actions": ["transition-order", "add-tracking", "advance-real-rma"], "unavailableAlternative": "Read-only explanation for payment, incident, fiscal, label, refund and partial/damaged-return capabilities not present in ports." }
+      "Real": { "states": ["payment-pending", "preparing", "shipped", "delivered", "return", "loading", "error", "access-denied", "unknown"], "wireFallbacks": { "READY_PICKUP": "unknown" }, "dialogs": ["transition-confirm", "tracking", "return"], "actions": ["transition-order", "add-tracking", "advance-real-rma"], "unavailableAlternative": "Read-only explanation for payment, incident, fiscal, label, pickup-ready, refund and partial/damaged-return capabilities not present in ports." }
     },
     "SC-SURF-22": {
       "Demo": { "states": ["normal", "low", "out", "adjustment", "history", "empty-filter", "concurrent-conflict", "impossible-rejected", "reservation-block", "reconciliation", "outlet-availability", "loading", "error", "access-denied", "unknown"], "dialogs": ["adjustment", "reconciliation", "confirm-disable", "concurrent-conflict-information"], "actions": ["filter-inventory", "open-demo-adjustment", "save-demo-adjustment", "reconcile-demo-inventory", "review-inventory-history"] },
@@ -203,7 +204,7 @@
     },
     "SC-SURF-24": {
       "Demo": { "states": ["populated", "filter-no-results", "disabled", "read-only", "active", "paused", "error", "unknown", "dependency-blocked", "deferred", "submitting", "confirmed", "version-conflict", "result-uncertain", "loading", "access-denied"], "dialogs": ["module-information", "confirm-capability", "uncertain-result-information"], "actions": ["filter-modules", "open-owned-surface", "change-supported-capability"] },
-      "Real": { "states": ["populated", "filter-no-results", "disabled", "read-only", "active", "paused", "error", "unknown", "submitting", "confirmed", "version-conflict", "result-uncertain", "loading", "access-denied"], "dialogs": ["module-information", "confirm-capability", "uncertain-result-information"], "actions": ["filter-modules", "open-owned-surface", "change-supported-capability"], "unavailableAlternative": "Operator reads only; future modules without productive IDs show availability and delivery information without a change control." }
+      "Real": { "states": ["populated", "filter-no-results", "disabled", "read-only", "active", "paused", "error", "unknown", "loading", "access-denied"], "dialogs": ["module-information"], "actions": ["filter-modules", "open-owned-surface"], "unavailableAlternative": "Read-only capability catalog. Productive mutation remains deferred until the versioned reasoned command and reconciliation port/repository are promoted." }
     },
     "SC-SURF-25": {
       "Demo": { "states": ["baseline", "validation-error", "export-ready", "reset-preview", "import-preview", "incompatible-version", "secret-rejected", "selection-empty", "merge-ready", "merging", "success", "failure", "loading", "access-denied", "unknown"], "dialogs": ["import-preview", "confirm-merge", "export-information", "reset"], "actions": ["edit-demo-settings", "export-demo-configuration", "reset-demo-configuration", "preview-import", "apply-supported-import"] },
@@ -222,7 +223,7 @@
     ],
     "shipmentBlocked": ["payment=PENDING", "payment=REJECTED", "payment=CANCELLED", "payment=CHARGED_BACK", "order=PAID_STOCK_REVIEW", "shipment=READY_PICKUP=>UNKNOWN", "shipment=CANCELLED", "shipment=DELIVERED", "shipment=UNKNOWN"],
     "rma": [
-      { "from": "null", "preconditions": ["shipment=DELIVERED", "fulfillmentEligibility=ELIGIBLE", "rmaAction=RECEIVED"], "command": "RECEIVED", "to": "RETURN_RECEIVED", "scope": "whole-order" }
+      { "from": "NONE", "preconditions": ["shipment=DELIVERED", "fulfillmentEligibility=ELIGIBLE", "rmaAction=RECEIVED"], "command": "RECEIVED", "to": "RETURN_RECEIVED", "scope": "whole-order" }
     ],
     "rmaBlocked": ["shipment!=DELIVERED", "fulfillmentEligibility!=ELIGIBLE", "rmaAction!=RECEIVED", "rma=RETURN_RECEIVED", "rma=REQUESTED", "rma=APPROVED", "rma=REJECTED", "rma=INSPECTED", "rma=ADJUSTED", "rma=CLOSED", "rma=UNKNOWN"]
   },

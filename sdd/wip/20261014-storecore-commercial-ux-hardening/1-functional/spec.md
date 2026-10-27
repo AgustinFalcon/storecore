@@ -168,7 +168,7 @@ Each surface must record role, target (`demo`, `real` or both), fixture, closed 
 
 - States: draft, scheduled, active, paused, expired and invalid.
 - Acceptance: projected and currently applied prices are distinct.
-- Admin and Operator may access the surface. Demo shows the complete lifecycle. Real writes only the states accepted by the current contract (`Draft` and `Active`); paused/ended are read-only and scheduled is derived from dates, not exposed as a new productive command. The current write body creates a value and does not promise update-by-ID semantics.
+- Admin and Operator may access the Demo surface, which shows the complete lifecycle. SC-SURF-18 has no productive route, port or HTTP repository in the reviewed SHA; every Real read/write capability remains deferred to its owning contract cut. Demo behavior never implies productive persistence.
 
 #### SC-SURF-19 — Campaigns
 
@@ -199,7 +199,7 @@ Each surface must record role, target (`demo`, `real` or both), fixture, closed 
 
 - The page title is `Pedido #…`; preparation is a contextual action, not a universal title. It shows historical lines/prices, independent payment/order/shipment/RMA facts and exactly one next valid action.
 - Demo may show payment, home-delivery/pickup, incident, partial-return, damaged-return, refund and non-fiscal receipt specimens only with explicit before/after effects. Receiving, inspecting, stock disposition and refund are distinct steps. A partial refund keeps the payment approved and shows a separate closed partial-refund state/amount; it never labels the whole payment as refunded.
-- Real permits only the existing shipment commands `PACKED`, `SHIPPED`, `DELIVERED` and the whole-order RMA command `RECEIVED`. Only `SHIPPED` requires tracking; `DELIVERED` preserves an existing code and also supports a delivery without tracking. Real can read `READY_PICKUP` but the productive backend does not currently expose a transition that produces or advances it. Real cannot inspect/adjust an RMA, mutate payment, issue labels/invoices/refunds, resolve incidents or promise partial/damaged-return controls through these ports.
+- Real permits only the existing shipment commands `PACKED`, `SHIPPED`, `DELIVERED` and the whole-order RMA command `RECEIVED`. Only `SHIPPED` requires tracking; `DELIVERED` preserves an existing code. `READY_PICKUP` is not part of the current closed frontend type: the single wire translator maps it to `Unknown`, it is not presented as a valid Real state and exposes no CTA. Real cannot inspect/adjust an RMA, mutate payment, issue labels/invoices/refunds, resolve incidents or promise partial/damaged-return controls through these ports.
 - Cancelled/rejected payment, stock review and Unknown block logistics. Pickup never requires postal tracking. Input survives recoverable command failure.
 - Acceptance: every transition is explainable and auditable after reload. Advanced shipping and fiscal panels are clearly Demo/non-homologated; a generated label is not carrier acceptance and a receipt specimen is not a fiscal document.
 
@@ -233,7 +233,7 @@ Each surface must record role, target (`demo`, `real` or both), fixture, closed 
 #### SC-SURF-24 — Capabilities and modules
 
 - Admin and Operator may read and filter modules; only Admin may change a capability in Demo or Real. Unknown/unsupported roles deny the surface. The card separates three closed facts: productive operational state (`DISABLED`, `READ_ONLY`, `ACTIVE`, `PAUSED`, `ERROR`, `Unknown`), availability (`AVAILABLE`, `DEPENDENCY_BLOCKED`, `DEFERRED`, `Unknown`) and delivery level (`DESIGN_APPROVED`, `DEMO_APPROVED`, `INTEGRATION_READY`, `INTEGRATED`, `HOMOLOGATED`, `Unknown`).
-- A change is available only for modules present in the productive capability catalog. It requires the current `configVersion`, a non-empty reason and explicit confirmation. The UI renders submitting, confirmed, version conflict and uncertain-result reconciliation; a timeout never becomes success and is not retried blindly.
+- Real currently reads the productive capability catalog only. The versioned mutation UX remains Demo/deferred until the frontend promotes a reasoned command type, port/repository methods and status reconciliation for the existing backend endpoints. Demo requires `configVersion`, a non-empty reason and explicit confirmation; submitting, confirmed, conflict and uncertain results never claim a productive write.
 - Acceptance: dependencies/value precede technical configuration; paused shipping blocks checkout before order creation. ARCA, advanced shipping, Outlet, inventory-control and wallet cards expose their honest availability/delivery level and link to their owning surface, but any card without a productive `CapabilityModuleId` is informational only and never receives an invented wire ID or command. Active never means integrated or homologated.
 
 #### SC-SURF-25 — Configuration and import/export

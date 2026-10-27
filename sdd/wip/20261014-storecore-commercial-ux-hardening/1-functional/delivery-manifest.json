@@ -9,7 +9,8 @@
   },
   "deferredProductiveCapabilities": {
     "SC-SURF-09": { "capability": "authenticated-account-favorites", "ownerCut": "future-favorites-contract", "requiredBeforeReal": ["route", "closed-domain-types", "application-port", "HTTP-repository", "backend-contract", "tests"] },
-    "SC-SURF-18": { "capability": "storefront-offers-administration", "ownerCut": "future-offers-contract", "requiredBeforeReal": ["route", "closed-domain-types", "application-port", "HTTP-repository", "backend-contract", "tests"] }
+    "SC-SURF-18": { "capability": "storefront-offers-administration", "ownerCut": "future-offers-contract", "requiredBeforeReal": ["route", "closed-domain-types", "application-port", "HTTP-repository", "backend-contract", "tests"] },
+    "SC-SURF-24-MUTATION": { "capability": "versioned-capability-command-and-reconciliation", "ownerCut": "future-capability-command-frontend-contract", "requiredBeforeReal": ["reasoned-versioned-command-type", "application-port-extension", "HTTP-repository-extension", "command-status-reconciliation", "tests"] }
   },
   "productiveBindings": {
     "SC-SURF-01": [{ "componentFile": "frontend/src/app/features/storefront/storefront-home.component.ts", "useCase": "GetHomeUseCase", "portFile": "frontend/src/app/domain/catalog/catalog.repository.ts", "portMethods": ["readHome"], "httpRepositoryFile": "frontend/src/app/data/catalog/catalog-http.repository.ts", "realActions": [{ "action": "load-home", "expectedEffect": "render-authoritative-home-content" }] }],
@@ -32,7 +33,7 @@
     "SC-SURF-21": [{ "componentFile": "frontend/src/app/features/admin/user-order-detail.component.ts", "useCase": "GetAdminOrderUseCase,AdvanceFulfillmentUseCase", "portFile": "frontend/src/app/domain/order/order.repository.ts", "portMethods": ["readAdmin", "advanceShipment", "advanceRma"], "httpRepositoryFile": "frontend/src/app/data/order/order-http.repository.ts", "realActions": [{ "action": "load-admin-order", "expectedEffect": "render-authoritative-admin-order" }, { "action": "advance-supported-transition", "expectedEffect": "persist-and-render-server-transition" }] }],
     "SC-SURF-22": [{ "componentFile": "frontend/src/app/features/admin/user-inventory.component.ts", "useCase": "ManageInstallationUseCase", "portFile": "frontend/src/app/domain/user/user.repository.ts", "portMethods": ["listInventory"], "httpRepositoryFile": "frontend/src/app/data/user/user-http.repository.ts", "realActions": [{ "action": "load-inventory", "expectedEffect": "render-authoritative-inventory-read-model" }] }],
     "SC-SURF-23": [{ "componentFile": "frontend/src/app/features/admin/user-mercadolibre.component.ts", "useCase": "ManageInstallationUseCase", "portFile": "frontend/src/app/domain/user/user.repository.ts", "portMethods": ["readMercadoLibreAccount", "listMercadoLibreListings", "saveMercadoLibreListing"], "httpRepositoryFile": "frontend/src/app/data/user/user-http.repository.ts", "realActions": [{ "action": "load-account-and-listings", "expectedEffect": "render-authoritative-marketplace-state" }, { "action": "save-supported-listing", "expectedEffect": "persist-server-listing" }] }],
-    "SC-SURF-24": [{ "componentFile": "frontend/src/app/features/admin/user-capabilities.component.ts", "useCase": "ManageInstallationUseCase", "portFile": "frontend/src/app/domain/user/user.repository.ts", "portMethods": ["listCapabilities", "setCapability", "capabilityCommandStatus"], "httpRepositoryFile": "frontend/src/app/data/user/user-http.repository.ts", "realActions": [{ "action": "load-capabilities", "expectedEffect": "render-authoritative-module-state" }, { "action": "set-supported-capability", "expectedEffect": "reconcile-server-command-result" }] }],
+    "SC-SURF-24": [{ "componentFile": "frontend/src/app/features/admin/user-capabilities.component.ts", "useCase": "ManageInstallationUseCase", "portFile": "frontend/src/app/domain/user/user.repository.ts", "portMethods": ["listCapabilities"], "httpRepositoryFile": "frontend/src/app/data/user/user-http.repository.ts", "realActions": [{ "action": "load-capabilities", "expectedEffect": "render-authoritative-module-state" }] }],
     "SC-SURF-25": [{ "componentFile": "frontend/src/app/features/admin/profile-import.component.ts", "useCase": "ImportProfileUseCase", "portFile": "frontend/src/app/domain/user/user.repository.ts", "portMethods": ["previewProfile", "mergeProfile"], "httpRepositoryFile": "frontend/src/app/data/user/user-http.repository.ts", "realActions": [{ "action": "preview-profile", "expectedEffect": "render-server-validated-preview" }, { "action": "merge-profile", "expectedEffect": "persist-supported-profile-merge" }] }]
   },
   "surfaces": [
@@ -306,7 +307,7 @@
       "demoRoute": "/demo/user/capabilities",
       "realRoute": "/user/capabilities",
       "demoScope": ["delivery-level", "availability", "operational-state", "deep-links", "simulation-disclosure", "admin-capability-change-simulation"],
-      "realScope": ["existing-capability-query-for-admin-and-operator", "existing-module-navigation", "admin-only-existing-set-capability-with-reconciliation"],
+      "realScope": ["existing-capability-query-for-admin-and-operator", "existing-module-navigation", "no-productive-mutation-until-versioned-frontend-contract"],
       "actions": ["filter-modules", "open-owned-surface", "change-supported-capability"]
     },
     {
