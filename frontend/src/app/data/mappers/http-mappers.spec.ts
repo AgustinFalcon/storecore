@@ -1,7 +1,32 @@
-import { mapAdminOrder, mapCart, mapCustomerSession, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { mapAdminOrder, mapCart, mapCustomerSession, mapInventory, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 
 describe('http-mappers', () => {
+  it('decodes authoritative inventory without quantity coercion or subtraction', () => {
+    expect(mapInventory([{ sku: ' SKU-1 ', availableQuantity: 8, reservedQuantity: 20, safetyStock: 3 }])).toEqual([
+      { sku: 'SKU-1', availableQuantity: 8, reservedQuantity: 20, safetyStock: 3, availability: InventoryAvailability.Normal },
+    ]);
+    expect(mapInventory([])).toEqual([]);
+  });
+
+  it('preserves unknown inventory quantities rather than manufacturing zero', () => {
+    for (const invalid of [undefined, null, '', '4', true, false, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+      for (const field of ['availableQuantity', 'reservedQuantity', 'safetyStock']) {
+        const row = mapInventory([{ sku: 'SKU-1', availableQuantity: 0, reservedQuantity: 0, safetyStock: 0, [field]: invalid }])[0];
+        expect(row[field as 'availableQuantity' | 'reservedQuantity' | 'safetyStock']).toBeNull();
+        expect(row.availability).toBe(InventoryAvailability.Unknown);
+      }
+    }
+  });
+
+  it('rejects malformed inventory collections and SKU identities as failed reads', () => {
+    for (const invalid of [undefined, null, {}, { items: [] }, true, 0, '[]']) expect(() => mapInventory(invalid)).toThrow();
+    for (const invalid of [null, [], {}, { sku: '' }, { sku: '  ' }, { sku: 12 }, { sku: false }]) {
+      expect(() => mapInventory([{ sku: 'valid' }, invalid])).toThrow();
+    }
+  });
+
   it('legacy or malformed state never becomes an allowed action', () => {
     const unknown = mapAdminOrder({ orderStatus: 'UNTRUSTED', paymentStatus: null, shipmentStatus: null, rmaStatus: null, shipmentAction: 'PACKED' });
     expect(unknown.orderStatus).toBe(OrderStatus.Unknown);

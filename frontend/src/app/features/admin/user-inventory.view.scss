@@ -1,0 +1,44 @@
+:host { display: block; min-width: 0; }
+.inventory { color: var(--sc-color-ink); }
+.inventory__head { display: flex; align-items: start; justify-content: space-between; gap: 1.5rem; }
+button, input, select { font: inherit; }
+button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-theme); cursor: pointer; }
+button:disabled { cursor: wait; opacity: .65; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--sc-color-focus); outline-offset: 3px; }
+.inventory__refresh { flex-shrink: 0; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-theme); }
+.inventory__notice { background: var(--sc-color-info-soft); border: 1px solid var(--sc-color-info); border-radius: var(--sc-radius-lg); padding: 1.25rem; margin-block: 1rem; }
+.inventory__notice h2 { margin: 0 0 .5rem; font-size: 1.125rem; }
+.inventory__notice--error { background: var(--sc-color-danger-soft); border-color: var(--sc-color-danger); }
+.inventory__metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; padding: 0; list-style: none; margin-block: 1.5rem; }
+.inventory__metrics li { display: grid; gap: .5rem; padding: 1.25rem; border: 1px solid var(--sc-color-line); border-radius: var(--sc-radius-lg); background: var(--sc-color-surface); }
+.inventory__metrics span { color: var(--sc-color-muted-ink); font-size: .875rem; }
+.inventory__metrics strong { font-size: 1.7rem; overflow-wrap: anywhere; }
+.inventory__explanation { color: var(--sc-color-muted-ink); font-size: .9rem; line-height: 1.6; }
+.inventory__filters { display: flex; align-items: end; flex-wrap: wrap; gap: 1rem; padding: 1.25rem; background: var(--sc-color-surface); border: 1px solid var(--sc-color-line); border-radius: var(--sc-radius-lg); margin-top: 1.5rem; }
+.inventory__filters label { display: grid; gap: .5rem; flex: 1 1 13rem; font-weight: 600; }
+.inventory__filters input, .inventory__filters select { min-height: 44px; width: 100%; min-width: 0; box-sizing: border-box; padding: .6rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius-sm); color: var(--sc-color-ink); background: var(--sc-color-surface); }
+.inventory__count { color: var(--sc-color-muted-ink); font-size: .875rem; }
+.inventory__table { width: 100%; border-collapse: collapse; background: var(--sc-color-surface); text-align: left; }
+.inventory__table caption { text-align: left; font-size: .8rem; color: var(--sc-color-muted-ink); padding-bottom: .75rem; }
+.inventory__table th, .inventory__table td { padding: 1rem; border-bottom: 1px solid var(--sc-color-line); overflow-wrap: anywhere; }
+.inventory__table thead { background: var(--sc-color-muted); font-size: .875rem; }
+.inventory__sku { font-family: ui-monospace, monospace; overflow-wrap: normal; word-break: normal; }
+.inventory__badge { display: inline-block; border-radius: 1rem; padding: .3rem .65rem; background: var(--sc-color-muted); color: var(--sc-color-muted-ink); font-size: .8rem; font-weight: 600; }
+.inventory__badge[data-tone=success] { background: var(--sc-color-success-soft); color: var(--sc-color-success); }
+.inventory__badge[data-tone=warning] { background: var(--sc-color-warning-soft); color: var(--sc-color-warning); }
+.inventory__badge[data-tone=danger] { background: var(--sc-color-danger-soft); color: var(--sc-color-danger); }
+@media (max-width: 900px) { .inventory__metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .inventory__head { flex-direction: column; } }
+@media (max-width: 840px) {
+  .inventory__metrics { gap: .65rem; } .inventory__metrics li { padding: 1rem; }
+  .inventory__metrics strong { font-size: 1.4rem; }
+  .inventory__filters { padding: 1rem; } .inventory__filters > * { width: 100%; }
+  .inventory__table, .inventory__table tbody, .inventory__table tr, .inventory__table td, .inventory__table tbody th { display: block; }
+  .inventory__table caption { display: block; width: 100%; box-sizing: border-box; }
+  .inventory__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .inventory__table tr { border: 1px solid var(--sc-color-line); border-radius: var(--sc-radius-lg); margin-bottom: 1rem; }
+  .inventory__table tbody th { background: var(--sc-color-muted); border-radius: .75rem .75rem 0 0; }
+  .inventory__table td { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+  .inventory__table td::before { content: attr(data-label); flex: 0 0 auto; color: var(--sc-color-muted-ink); font-size: .875rem; white-space: nowrap; }
+  .inventory__table td .inventory__badge { max-width: 62%; text-align: right; overflow-wrap: anywhere; }
+  .inventory__table td:last-child { border-bottom: 0; }
+}

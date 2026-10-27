@@ -6,6 +6,7 @@ import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
 import { UserRole } from '../../domain/user/user-role';
+import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import {
   CapabilityModule,
   CapabilityState,
@@ -279,15 +280,27 @@ export function mapCapabilities(value: unknown): readonly CapabilityModule[] {
 }
 
 export function mapInventory(value: unknown): readonly InventoryRow[] {
-  return items(value).map((item) => {
+  if (!Array.isArray(value)) throw new Error('La lectura de inventario no es válida.');
+  return value.map((item) => {
     const row = asRecord(item);
+    if (typeof row['sku'] !== 'string' || !row['sku'].trim()) {
+      throw new Error('La lectura de inventario contiene un SKU inválido.');
+    }
+    const availableQuantity = inventoryQuantity(row['availableQuantity']);
+    const reservedQuantity = inventoryQuantity(row['reservedQuantity']);
+    const safetyStock = inventoryQuantity(row['safetyStock']);
     return {
-      sku: text(row['sku']),
-      availableQuantity: num(row['availableQuantity']),
-      reservedQuantity: num(row['reservedQuantity']),
-      safetyStock: num(row['safetyStock']),
+      sku: row['sku'].trim(),
+      availableQuantity,
+      reservedQuantity,
+      safetyStock,
+      availability: InventoryAvailability.fromQuantities(availableQuantity, reservedQuantity, safetyStock),
     };
   });
+}
+
+function inventoryQuantity(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 export function mapMercadoLibreAccount(value: unknown): MercadoLibreAccount {
