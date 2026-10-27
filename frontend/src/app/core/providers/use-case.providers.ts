@@ -38,6 +38,7 @@ import { ListMyOrdersUseCase } from '../../domain/order/use-cases/list-my-orders
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
+import { ReadCapabilitiesUseCase } from '../../domain/user/use-cases/read-capabilities.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
 import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
@@ -71,6 +72,7 @@ export const USE_CASE_PROVIDERS: Provider[] = [
   { provide: ImportProfileUseCase, useFactory: (repo: IUserRepository) => new ImportProfileUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManageAdminCatalogUseCase, useFactory: (repo: IUserRepository) => new ManageAdminCatalogUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManageInstallationUseCase, useFactory: (repo: IUserRepository) => new ManageInstallationUseCase(repo), deps: [USER_REPOSITORY] },
+  { provide: ReadCapabilitiesUseCase, useFactory: (repo: IUserRepository) => new ReadCapabilitiesUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManagePromosUseCase, useFactory: (repo: IUserRepository) => new ManagePromosUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ProbeUserSessionUseCase, useFactory: (repo: IUserRepository, session: UserSession) => new ProbeUserSessionUseCase(repo, session), deps: [USER_REPOSITORY, UserSession] },
   { provide: SaveHomeContentUseCase, useFactory: (repo: IUserRepository) => new SaveHomeContentUseCase(repo), deps: [USER_REPOSITORY] },

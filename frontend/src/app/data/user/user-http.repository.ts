@@ -7,7 +7,6 @@ import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import {
   CapabilityModule,
-  CapabilityState,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -20,7 +19,6 @@ import {
 import { IUserRepository } from '../../domain/user/user.repository';
 import {
   mapCapabilities,
-  mapCapability,
   mapFacet,
   mapHomeDraft,
   mapInventory,
@@ -123,12 +121,6 @@ export class UserHttpRepository implements IUserRepository {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/capabilities`)
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
-  }
-
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
-    return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${module}/state`, { state })
-      .pipe(map((body) => mapCapability(readApiBody<unknown>(body))));
   }
 
   listInventory(): Observable<readonly InventoryRow[]> {

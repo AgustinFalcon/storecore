@@ -9,9 +9,10 @@ import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
+import { CapabilityModuleId } from '../../domain/user/capability-module-id';
+import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import {
   CapabilityModule,
-  CapabilityState,
   HomeContentDraft,
   InventoryRow,
   ManualPromo,
@@ -266,19 +267,32 @@ export function mapPreview(value: unknown): ProfilePreview {
   };
 }
 
-const CAPABILITY_STATES: readonly CapabilityState[] = ['DISABLED', 'READ_ONLY', 'ACTIVE', 'PAUSED', 'ERROR'];
-
 export function mapCapability(value: unknown): CapabilityModule {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('La lectura de módulos contiene una fila inválida.');
+  }
   const row = asRecord(value);
-  const state = text(row['state']) as CapabilityState;
+  if (typeof row['module'] !== 'string' || !row['module'].trim()) {
+    throw new Error('La lectura de módulos contiene un identificador inválido.');
+  }
+  const version = row['configVersion'];
   return {
-    module: text(row['module']),
-    state: CAPABILITY_STATES.includes(state) ? state : 'DISABLED',
+    id: CapabilityModuleId.fromWire(row['module']),
+    state: CapabilityModuleState.fromWire(row['state']),
+    configVersion: typeof version === 'number' && Number.isSafeInteger(version) && version >= 0 ? version : null,
   };
 }
 
 export function mapCapabilities(value: unknown): readonly CapabilityModule[] {
-  return items(value).map(mapCapability);
+  if (!Array.isArray(value)) throw new Error('La lectura de módulos no es válida.');
+  const wires = new Set<string>();
+  for (const valueRow of value) {
+    const row = asRecord(valueRow);
+    const wire = typeof row['module'] === 'string' ? row['module'].trim() : '';
+    if (wire && wires.has(wire)) throw new Error('La lectura de módulos contiene identificadores duplicados.');
+    if (wire) wires.add(wire);
+  }
+  return value.map(mapCapability);
 }
 
 export function mapInventory(value: unknown): readonly InventoryRow[] {

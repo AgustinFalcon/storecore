@@ -42,7 +42,11 @@ for (const role of [UserRole.Admin, UserRole.Operator]) {
     const permitted = UserAction.forRoles([role]);
     await expect(actions).toHaveCount(permitted.length);
     for (const action of permitted) await expect(actions.filter({ hasText: action.label })).toHaveAttribute('href', action.path);
-    if (role === UserRole.Operator) await expect(actions.filter({ hasText: UserAction.Capabilities.label })).toHaveCount(0);
+    if (role === UserRole.Operator) {
+      await actions.filter({ hasText: UserAction.Capabilities.label }).click();
+      await expect(page).toHaveURL(/\/user\/capabilities$/);
+      await expect(page.getByRole('heading', { name: 'Módulos del comercio' })).toBeVisible();
+    }
   });
 }
 

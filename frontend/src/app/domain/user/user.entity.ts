@@ -1,6 +1,8 @@
 import { UserRole } from './user-role';
 import { InventoryAvailability } from './inventory-availability';
 import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
+import { CapabilityModuleId } from './capability-module-id';
+import { CapabilityModuleState } from './capability-module-state';
 
 export interface UserSessionResult {
   readonly id: string;
@@ -36,11 +38,10 @@ export interface ProfilePreview {
   readonly diff: string;
 }
 
-export type CapabilityState = 'DISABLED' | 'READ_ONLY' | 'ACTIVE' | 'PAUSED' | 'ERROR';
-
 export interface CapabilityModule {
-  readonly module: string;
-  readonly state: CapabilityState;
+  readonly id: CapabilityModuleId;
+  readonly state: CapabilityModuleState;
+  readonly configVersion: number | null;
 }
 
 export interface InventoryRow {
