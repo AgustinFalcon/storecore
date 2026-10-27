@@ -1,6 +1,4 @@
-import { OrderStatus } from '../../domain/order/order-status';
-import { PaymentStatus } from '../../domain/order/payment-status';
-import { ShipmentStatus } from '../../domain/order/shipment-status';
+import { OrderStatus, PaymentStatus, ShipmentStatus } from '../../domain/order/commerce-states';
 import { DemoCatalogQuery } from '../catalog/demo-catalog-query';
 import type { DemoActor, DemoOrder, DemoOrderLine, DemoCheckoutSnapshot } from './checkout-model';
 import { DemoDeliveryMethod, DemoPaymentMethod } from '../demo-process-types';

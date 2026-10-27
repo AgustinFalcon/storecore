@@ -1,6 +1,4 @@
-import type { OrderStatus } from '../../domain/order/order-status';
-import type { PaymentStatus } from '../../domain/order/payment-status';
-import type { ShipmentStatus } from '../../domain/order/shipment-status';
+import type { OrderStatus, PaymentStatus, ShipmentStatus } from '../../domain/order/commerce-states';
 import type { DemoCatalogSnapshot, DemoProductMedia } from '../catalog/catalog-model';
 import type { DemoDeliverySnapshot, DemoPaymentMethod } from '../demo-process-types';
 import type { DemoReservationState } from './demo-reservation-state';
