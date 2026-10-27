@@ -1,9 +1,36 @@
-import { mapAdminOrder, mapCart, mapCustomerSession, mapInventory, mapListings, mapMercadoLibreAccount, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapListings, mapMercadoLibreAccount, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { CapabilityModuleId } from '../../domain/user/capability-module-id';
+import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 
 describe('http-mappers', () => {
+  it('decodes capability identifiers, states and versions without inventing a disabled state', () => {
+    expect(mapCapabilities([
+      { module: 'CATALOG', state: 'ACTIVE', configVersion: 8 },
+      { module: 'FUTURE_MODULE', state: 'FUTURE_STATE', configVersion: 'bad' },
+    ])).toEqual([
+      { id: CapabilityModuleId.Catalog, state: CapabilityModuleState.Active, configVersion: 8 },
+      { id: CapabilityModuleId.Unknown, state: CapabilityModuleState.Unknown, configVersion: null },
+    ]);
+  });
+
+  it('rejects malformed capability collections, rows, identities and duplicate typed ids', () => {
+    for (const invalid of [undefined, null, {}, { items: [] }, true, 0, '[]']) expect(() => mapCapabilities(invalid)).toThrow();
+    for (const invalid of [null, [], {}, { module: '' }, { module: '  ' }, { module: 12 }, { module: false }]) {
+      expect(() => mapCapabilities([invalid])).toThrow();
+    }
+    expect(() => mapCapabilities([
+      { module: 'CATALOG', state: 'ACTIVE', configVersion: 1 },
+      { module: 'CATALOG', state: 'READ_ONLY', configVersion: 2 },
+    ])).toThrow(/duplicados/i);
+    expect(mapCapabilities([
+      { module: 'FUTURE_A', state: 'ACTIVE', configVersion: 1 },
+      { module: 'FUTURE_B', state: 'ACTIVE', configVersion: 2 },
+    ])).toHaveLength(2);
+  });
+
   it('decodes the Mercado Libre account through its closed status translator', () => {
     expect(mapMercadoLibreAccount({ authorized: true, accountRef: ' seller-42 ', status: 'ACTIVE' })).toEqual({
       authorized: true,

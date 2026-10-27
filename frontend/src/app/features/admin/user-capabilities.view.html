@@ -1,63 +1,59 @@
-<section class="sc-page sc-console" aria-labelledby="cap-title">
-  <header class="sc-page-head">
-    <p class="sc-kicker">Consola</p>
-    <h1 id="cap-title">Capabilities</h1>
-    <p class="sc-page__lede">Estados tipados DISABLED, READ_ONLY, ACTIVE, PAUSED y ERROR. Sin feature flags genéricos.</p>
+<section class="sc-page sc-console capabilities" aria-labelledby="cap-title" [attr.aria-busy]="state.loading">
+  <header class="sc-page-head capabilities__head">
+    <div><p class="sc-kicker">Configuración · Sólo lectura</p><h1 id="cap-title">Módulos del comercio</h1><p class="sc-page__lede">Revisá qué está operativo hoy, qué depende de otra implementación y cuál es el nivel real de entrega.</p></div>
+    @if (!state.readState.isAccessDenied) { <button type="button" class="capabilities__refresh" [disabled]="state.loading" (click)="refresh.emit()">{{ state.loading && state.hasSnapshot ? 'Actualizando…' : 'Actualizar módulos' }}</button> }
   </header>
-  <sc-feature-status
-    [loading]="loading"
-    [error]="error"
-    [empty]="!loading && items.length === 0"
-    emptyText="No hay módulos configurados en esta instalación."
-    (retry)="retry.emit()"
-  />
-  <ul class="sc-legend" aria-label="Estados de capability">
-    @for (state of states; track state) {
-      <li><span class="sc-badge">{{ state }}</span></li>
+  <div class="capabilities__scope" role="note"><strong>Vista informativa.</strong><span>Esta pantalla no habilita servicios, no cambia estados y no certifica integraciones ni homologaciones.</span></div>
+  @if (state.readState.isAccessDenied) {
+    <div class="capabilities__notice capabilities__notice--error" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión interna autorizada para consultar los módulos del comercio.</p></div>
+  } @else if (unknownReadState) {
+    <div class="capabilities__notice capabilities__notice--error" role="alert"><h2>Estado de lectura no reconocido</h2><p>Actualizá la pantalla para volver a consultar el catálogo autoritativo.</p></div>
+  } @else {
+    @if (state.loading) { <p class="capabilities__notice" role="status">{{ state.hasSnapshot ? 'Actualizando módulos. Conservamos la última consulta mientras se carga.' : 'Cargando módulos…' }}</p> }
+    @if (state.errorMessage) {
+      <div class="capabilities__notice capabilities__notice--error" role="alert"><h2>{{ state.readState.isStale ? 'No pudimos actualizar los módulos' : 'No pudimos cargar los módulos' }}</h2><p>{{ state.errorMessage }}</p>
+        @if (state.readState.isStale) { <p>Mostramos la última consulta disponible; el estado operativo puede haber cambiado.</p> }
+        <button type="button" [disabled]="state.loading" (click)="refresh.emit()">Reintentar</button>
+      </div>
     }
-  </ul>
-  @if (items.length) {
-    <div class="sc-table-wrap">
-      <table class="sc-table">
-        <caption>Matriz de capabilities</caption>
-        <thead>
-          <tr>
-            <th>Módulo</th>
-            <th>Estado</th>
-            <th>Cambiar</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (item of items; track item.module) {
-            <tr>
-              <td>{{ item.module }}</td>
-              <td>
-                <span
-                  class="sc-badge"
-                  [class.sc-badge--info]="item.state === 'READ_ONLY'"
-                  [class.sc-badge--ok]="item.state === 'ACTIVE'"
-                  [class.sc-badge--warn]="item.state === 'PAUSED'"
-                  [class.sc-badge--err]="item.state === 'ERROR'"
-                >{{ item.state }}</span>
-              </td>
-              <td class="sc-table__actions">
-                @for (state of states; track state) {
-                  <button
-                    type="button"
-                    class="sc-btn sc-btn--ghost"
-                    [class.is-on]="state === item.state"
-                    [disabled]="state === item.state"
-                    [attr.title]="state === item.state ? 'Ya está en ' + state : 'Pasar a ' + state"
-                    (click)="changeState.emit({ module: item.module, state })"
-                  >
-                    {{ state }}
-                  </button>
-                }
-              </td>
-            </tr>
+    @if (state.hasSnapshot) {
+      <ul class="capabilities__metrics" aria-label="Resumen del catálogo comercial"><li><span>Módulos comerciales</span><strong>{{ cards.length }}</strong></li><li><span>Disponibles</span><strong>{{ availableCount }}</strong></li><li><span>Con dependencia o diferidos</span><strong>{{ pendingCount }}</strong></li><li><span>Módulos técnicos informados</span><strong>{{ state.modules.length }}</strong></li></ul>
+      <div class="capabilities__filters" role="search" aria-label="Filtrar módulos comerciales">
+        <label for="capability-query">Buscar módulo<input id="capability-query" type="search" placeholder="Ej.: inventario o ARCA" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label>
+        <label for="capability-filter">Estado operativo<select id="capability-filter" [ngModel]="state.filter" (ngModelChange)="filterChange.emit($event)">@for (filter of filters; track filter) { <option [ngValue]="filter">{{ filter.label }}</option> }</select></label>
+        <button type="button" (click)="clearFilters.emit()">Limpiar filtros</button>
+      </div>
+      <p class="capabilities__count" role="status">{{ visibleCards.length }} de {{ cards.length }} módulos comerciales</p>
+      @if (!visibleCards.length) {
+        <div class="capabilities__notice"><h2>Sin coincidencias</h2><p>Probá con otro término o volvé a mostrar todas las disponibilidades.</p><button type="button" (click)="clearFilters.emit()">Mostrar todos los módulos</button></div>
+      } @else {
+        <div class="capabilities__grid" aria-label="Catálogo de módulos comerciales">
+          @for (card of visibleCards; track card.id) {
+            <article class="capability-card">
+              <header class="capability-card__head"><div><p class="capability-card__eyebrow">{{ card.category }}</p><h2>{{ card.name }}</h2></div><span class="capability-card__availability" [attr.data-tone]="card.availability.tone">{{ card.availability.label }}</span></header>
+              <p class="capability-card__description">{{ card.summary }}</p>
+              <dl class="capability-card__facts"><div><dt>Estado operativo</dt><dd><span class="capability-card__badge" [attr.data-tone]="card.operationalTone">{{ card.operationalLabel }}</span></dd></div><div><dt>Disponibilidad</dt><dd>{{ card.availability.label }}</dd></div><div><dt>Nivel de entrega</dt><dd>{{ card.delivery.label }}</dd></div></dl>
+              @if (card.serverModule) { <p class="capability-card__authority">Lectura autoritativa · Versión {{ card.serverModule.configVersion ?? 'no informada' }}</p> } @else { <p class="capability-card__authority">Módulo informativo · Sin ID productivo</p> }
+              <div class="capability-card__actions"><button type="button" [attr.aria-label]="'Ver información de ' + card.name" (click)="openInformation(card, $event)">Ver información</button>@if (card.ownerPath) { <a [routerLink]="card.ownerPath">{{ card.ownerLabel }}</a> }</div>
+            </article>
           }
-        </tbody>
-      </table>
-    </div>
+        </div>
+      }
+      <section class="capabilities__technical" aria-labelledby="technical-title">
+        <div class="capabilities__section-head"><div><p class="sc-kicker">Fuente autoritativa</p><h2 id="technical-title">Módulos técnicos informados por el servidor</h2></div><p>Esta lista conserva cada fila recibida. La metadata comercial de las fichas no reemplaza el contrato técnico.</p></div>
+        @if (!state.modules.length) { <div class="capabilities__notice"><h3>Sin módulos técnicos configurados</h3><p>La consulta fue válida, pero el servidor no informó módulos para esta instalación.</p></div> } @else {
+          <table class="capabilities__table"><caption>Estado operativo y versión de configuración de todos los módulos devueltos por el servidor.</caption><thead><tr><th scope="col">Módulo técnico</th><th scope="col">Estado operativo</th><th scope="col">Versión</th></tr></thead><tbody>
+            @for (module of state.modules; track $index) { <tr><th scope="row" class="capabilities__mono">{{ module.id.label }}</th><td data-label="Estado operativo"><span class="capability-card__badge" [attr.data-tone]="module.state.tone">{{ module.state.label }}</span></td><td data-label="Versión">{{ module.configVersion ?? 'No informada' }}</td></tr> }
+          </tbody></table>
+        }
+      </section>
+    }
   }
 </section>
+<dialog #informationDialog class="capabilities__dialog" aria-labelledby="capability-dialog-title" (cancel)="$event.preventDefault(); closeInformation()" (close)="restoreDialogFocus()">
+  @if (activeCard(); as card) {
+    <header><div><p class="sc-kicker">Detalle informativo</p><h2 id="capability-dialog-title">{{ card.name }}</h2></div><button type="button" aria-label="Cerrar información" (click)="closeInformation()">×</button></header>
+    <p>{{ card.detail }}</p><dl class="capability-card__facts"><div><dt>Estado operativo</dt><dd>{{ card.operationalLabel }}</dd></div><div><dt>Disponibilidad</dt><dd>{{ card.availability.label }}</dd></div><div><dt>Nivel de entrega</dt><dd>{{ card.delivery.label }}</dd></div></dl>
+    <p class="capabilities__dialog-note">Información de lectura. No activa proveedores, no cambia configuración y no garantiza una homologación.</p><button type="button" class="capabilities__dialog-primary" (click)="closeInformation()">Entendido</button>
+  }
+</dialog>
