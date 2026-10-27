@@ -1,39 +1,61 @@
-<section class="sc-page sc-console" aria-labelledby="import-title">
+<section class="sc-page sc-console profile-import" aria-labelledby="import-title" [attr.aria-busy]="state.phase.busy">
   <header class="sc-page-head">
-    <p class="sc-kicker">Consola</p>
+    <p class="sc-kicker">Configuración · Administración</p>
     <h1 id="import-title">Importar perfil</h1>
-    <p class="sc-page__lede">Preview y merge explícito. El diff no muestra secretos.</p>
+    <p class="sc-page__lede">Revisá el contenido, elegí las secciones y confirmá su aplicación.</p>
   </header>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="preview.emit()" />
-  <div class="sc-workbench sc-workbench--even">
-    <form class="sc-panel" (submit)="$event.preventDefault(); preview.emit()">
-      <h2>Manifiesto</h2>
-      <label>JSON
-        <textarea required name="manifest" class="sc-mono sc-manifest" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
-      </label>
-      <div class="sc-table__actions">
-        <button type="submit" class="sc-btn sc-btn--primary">Previsualizar</button>
-        <button
-          type="button"
-          class="sc-btn sc-btn--ghost"
-          [disabled]="!canMerge"
-          [attr.title]="canMerge ? null : 'El merge queda cerrado si el manifiesto es incompatible'"
-          (click)="merge.emit()"
-        >Aplicar merge</button>
-      </div>
-    </form>
-    <aside class="sc-panel">
-      <h2>Resultado</h2>
-      @if (state.preview) {
-        @if (state.preview.compatible) {
-          <p><span class="sc-badge sc-badge--ok">Compatible</span> · {{ state.preview.version }}</p>
-          <pre>{{ state.preview.diff }}</pre>
-        } @else {
-          <p class="status status--error" role="alert">Incompatible {{ state.preview.version }}. Merge cerrado.</p>
-        }
-      } @else {
-        <p class="sc-callout">Todavía no hay diff. Previsualizá el manifiesto para ver compatibilidad.</p>
-      }
-    </aside>
+  <div class="import-status" role="status" aria-live="polite" aria-atomic="true">
+    <strong>{{ state.phase.label }}</strong>
+    @if (state.phase !== phase.AccessDenied) { <span>{{ state.validity.label }}</span> }
   </div>
+  @if (state.message) { <p class="sc-callout" [attr.role]="state.phase === phase.Failed || state.phase === phase.ResultUncertain || state.phase === phase.AccessDenied || state.phase === phase.Unknown ? 'alert' : 'status'">{{ state.message }}</p> }
+  @if (state.phase === phase.ResultUncertain) { <button type="button" class="sc-btn sc-btn--ghost" (click)="reviewUncertain.emit()">Volver a consultar vista previa</button> }
+  @if (state.phase !== phase.AccessDenied) {
+    <p class="import-scope">Sólo se importa <code>content.homeSections</code>. Hasta 100 secciones, con un máximo de 20.000 bytes por contenido. No incluye permisos, credenciales ni históricos.</p>
+    <div class="import-workbench">
+      <form class="sc-panel import-editor" (submit)="$event.preventDefault(); preview.emit()">
+        <p class="sc-kicker">1 · Preparar</p>
+        <h2>Manifiesto JSON</h2>
+        <label for="profile-manifest">Contenido del perfil</label>
+        <p id="manifest-help" class="import-help">Pegá el JSON del perfil versionado. Las posibles credenciales se rechazan de forma preventiva; revisá el archivo antes de compartirlo.</p>
+        <textarea id="profile-manifest" name="manifest" class="sc-mono" required spellcheck="false" aria-describedby="manifest-help" [disabled]="!state.phase.canEdit || state.phase === phase.Confirming" [ngModel]="state.manifest" (ngModelChange)="manifestChange.emit($event)"></textarea>
+        <p class="import-help">Al elegir secciones, este texto se actualiza con <code>mergeSelection</code>. Volvé a previsualizar para revisar el texto final que se enviará.</p>
+        <button type="submit" class="sc-btn sc-btn--primary" [disabled]="!state.phase.canEdit || state.phase === phase.Confirming || !state.manifest.trim()">Previsualizar manifiesto</button>
+      </form>
+      <section class="sc-panel import-review" aria-labelledby="review-title">
+        <p class="sc-kicker">2 · Revisar y aplicar</p>
+        <h2 id="review-title">Cambios por sección</h2>
+        @if (state.review; as review) {
+          <p><span class="sc-badge" [class.sc-badge--ok]="review.compatibility.allowsMerge">{{ review.compatibility.label }}</span> @if (review.known && review.version) { · Versión {{ review.version }} }</p>
+          <div class="import-summary" aria-label="Resumen de cambios">
+            @for (total of totals; track total.label) { <div><strong>{{ total.count }}</strong><span>{{ total.label }}</span></div> }
+          </div>
+          <p>{{ state.selection.length }} secciones seleccionadas. La vista previa no reserva ni bloquea el contenido del comercio.</p>
+          @for (change of review.changes; track change.sectionKey; let index = $index) {
+            <article class="import-change">
+              <div class="import-change__head">
+                <label [for]="'profile-section-' + index"><input [id]="'profile-section-' + index" type="checkbox" [attr.aria-label]="'Seleccionar sección ' + change.sectionKey" [checked]="state.selection.includes(change.sectionKey)" [disabled]="state.phase !== phase.Reviewing || !review.compatibility.allowsMerge || !review.known || !change.operation.selectable" (change)="selectionChange.emit({key: change.sectionKey, selected: $any($event.target).checked})" /><span>{{ change.sectionKey }}</span></label>
+                <span class="sc-badge">{{ change.operation.label }}</span>
+              </div>
+              <details><summary>Ver antes y después de {{ change.sectionKey }}</summary>
+                <h3>Antes</h3><pre tabindex="0" [attr.aria-label]="'Antes de ' + change.sectionKey">{{ change.before }}</pre>
+                <h3>Después</h3><pre tabindex="0" [attr.aria-label]="'Después de ' + change.sectionKey">{{ change.after }}</pre>
+              </details>
+            </article>
+          } @empty { <p>No hay secciones para importar.</p> }
+        } @else { <p class="sc-callout">Previsualizá un manifiesto para consultar la compatibilidad y el diff del servidor.</p> }
+        <p id="merge-help">Elegí al menos una sección y previsualizá el manifiesto final antes de confirmar.</p>
+        <button #confirmTrigger type="button" class="sc-btn sc-btn--primary" aria-describedby="merge-help" [disabled]="!canMerge" (click)="confirm.emit()">Revisar confirmación</button>
+      </section>
+    </div>
+  }
+  <dialog #confirmation class="import-dialog" aria-labelledby="merge-title" aria-describedby="merge-description" (cancel)="cancel($event)" (keydown)="containFocus($event)">
+    <h2 id="merge-title">¿Aplicar las secciones seleccionadas?</h2>
+    <p id="merge-description">Se enviará el mismo texto de la última vista previa, con {{ state.selection.length }} secciones seleccionadas. El contenido actual puede haber cambiado desde esa consulta.</p>
+    <p>Esta acción actualiza contenido del comercio.</p>
+    <div class="import-dialog__actions">
+      <button type="button" autofocus class="sc-btn sc-btn--ghost" (click)="cancel()">Cancelar</button>
+      <button type="button" class="sc-btn sc-btn--primary" (click)="merge.emit()">Confirmar importación</button>
+    </div>
+  </dialog>
 </section>

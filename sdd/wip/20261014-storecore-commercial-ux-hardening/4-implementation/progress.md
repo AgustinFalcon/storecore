@@ -525,3 +525,7 @@ APPROVE sin P1/P2. Se habilitan TASK-002 y TASK-003 en Stitch.
 - El estado cerrado de incidencia controla cola, detalle, dashboard y resolución: ORD-1018 permanece Resolved.
 - Restringir/reactivar cuentas exige writer antes del cambio y en el commit del evento; la denegación revierte cambios locales no comprometidos.
 - Validación de este re-review: **146 archivos / 664 unitarias PASS**, lint, arquitectura **6/6**, build Demo y Real PASS; browser dirigido **22/22 PASS**. No se reutiliza el 67/67 anterior como ejecución browser completa de este delta. Evidencia en el addendum de `evidence/p2-astra-remediation-20261020.md`.
+
+## 2026-10-27 — SC-SURF-25 Real dedicated import workflow
+
+Implemented provisionally on base `a6ce9fa926650c9a1a109d9f02281d22046157b4`: dedicated store, closed domain states and compatibility/operations, exact-text selection → preview → native confirmation → HTTP merge, strict diff snapshots in both backend shapes, actor/denial cleanup, one write at a time and uncertain-result recovery via preview only. Owner browser acceptance: `frontend/e2e/admin-profile-import.spec.ts`. Current evidence: `evidence/real-sc25-profile-import-cut-20261027.md`. TASK-016 overall remains pending: this cut does not certify all ML/Demo tasks, Stitch, integration live, final reviews or CI.

@@ -11,6 +11,21 @@ describe('UserHttpRepository capabilities', () => {
     providers: [provideHttpClient(), provideHttpClientTesting(), UserHttpRepository],
   }));
 
+  it('posts profile manifest text unchanged for preview and merge', async () => {
+    const repository = TestBed.inject(UserHttpRepository);
+    const http = TestBed.inject(HttpTestingController);
+    const manifest = '{\n  "content": {"homeSections": []}\n}';
+    for (const [url, execute] of [
+      ['/api/v1/user/profiles/preview', () => repository.previewProfile(manifest)],
+      ['/api/v1/user/profiles/merge', () => repository.mergeProfile(manifest)],
+    ] as const) {
+      const pending = firstValueFrom(execute()); const request = http.expectOne(url);
+      expect(request.request.method).toBe('POST'); expect(request.request.body).toEqual({ manifest });
+      request.flush({ compatible: true, version: '1.0.0', diff: '[]' }); await expect(pending).resolves.toMatchObject({ compatible: true });
+    }
+    http.verify();
+  });
+
   it('exposes capabilities through the GET contract only', async () => {
     const repository = TestBed.inject(UserHttpRepository);
     const http = TestBed.inject(HttpTestingController);
