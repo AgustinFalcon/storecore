@@ -4,6 +4,8 @@ import { DemoSnapshotPersistence } from './demo-snapshot-persistence';
 import { DemoSnapshotWriter } from './demo-snapshot-writer';
 import { UserRole } from '../domain/user/user-role';
 import { CustomerAccountCommand, CustomerAdministrationAuthority } from './customers/customer-account';
+import { ContentDraft, type ContentDraftData } from './content/content-draft';
+import { ContentAuthority } from './content/content-types';
 
 @Injectable({ providedIn: 'root' })
 export class DemoApplicationState {
@@ -35,6 +37,14 @@ export class DemoApplicationState {
   }
   get data() { this.revision(); return this.commerce.snapshot; }
   get authorizationAvailable(): boolean { return this.authorizationReadable; }
+  get canEditContent(): boolean { return this.authorizationReadable && ContentAuthority.permits(this.context(), this.role()); }
+  saveContentDraft(draft: ContentDraftData, epoch: number): boolean {
+    if (!this.canEditContent || epoch !== this.sessionEpoch()) return false;
+    return this.run(() => {
+      if (!this.canEditContent || epoch !== this.sessionEpoch()) throw new Error('El contexto cambió. Ingresá nuevamente.');
+      this.data.contentDraft = ContentDraft.fromWire(draft); this.commerce.touch();
+    }, 'Borrador guardado en esta Demo. La tienda actual no cambió.');
+  }
   get canResetDemo(): boolean { return !this.authorizationReadable || this.context() !== DemoContext.Admin || this.role() === UserRole.Admin; }
   get actor() { this.revision(); return this.commerce.actor(this.actorId()); }
   run(action: () => void, result: string): boolean {

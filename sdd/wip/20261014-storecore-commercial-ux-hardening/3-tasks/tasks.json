@@ -117,6 +117,7 @@
     },
     {
       "id": "TASK-013",
+      "demo_sc16_cut_20261028": { "status": "verified_local", "base": "45b231b", "scope": "Dedicated Demo editor; separate snapshot v3 contentDraft, preview without publishing, safe discard/navigation and Admin/Operator SC16 authority only", "evidence": "4-implementation/evidence/demo-sc16-content-drafts-cut-20261028.md", "remaining": ["Real content parity", "SC15", "rich banners/categories", "global visual/review/CI gates"] },
       "demo_sc26_cut_20261027": { "status": "implemented_provisional", "scope": "/demo/user/customers only; dedicated feature; closed account states/filter/commands; UserRole authority; snapshot v2 access-generation migration; rehydrate/login/deferred-checkout authorization; accessible customer/confirmation dialogs and mobile admin drawer", "owner_e2e": "frontend/demo-e2e/sc26-customer-administration.spec.ts", "evidence": "4-implementation/evidence/demo-sc26-customer-administration-cut-20261027.md", "remaining_gates": ["Stitch global visual gate", "dual final exact-head review", "CI exact-head NOT_RUN", "TASK-013 other surfaces remain separately scoped"] },
       "title": "Completar dashboard, contenido y administración de clientes",
       "description": "Implementar dashboard demo derivado, edición/preview de contenido y nueva superficie de clientes. En producción, home operador conserva sólo navegación autorizada hasta existir un contrato de métricas/clientes.",

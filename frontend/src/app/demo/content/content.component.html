@@ -1,0 +1,35 @@
+<section class="page content-page">
+@if (!authorized) {
+  <section class="empty-state" role="alert"><h1>Acceso denegado</h1><p>El contenido está disponible para administración y operadores autorizados.</p><a data-cta="content-login" routerLink="/demo/login">Cambiar de contexto</a></section>
+} @else {
+  <header class="page-heading"><div><p class="eyebrow">EDITOR DE PORTADA DEMO</p><h1 id="content-heading" tabindex="-1">Contenido de tu tienda</h1></div></header>
+  <p class="demo-note">Guardás un borrador local. Editar, previsualizar o guardar no publica cambios en la tienda actual.</p>
+  <div class="content-workspace">
+    <form class="card content-editor" novalidate (submit)="$event.preventDefault(); save()">
+      <div class="draft-status" role="status" aria-live="polite"><strong>{{ current.phase.label }}</strong><span>{{ status.label }}</span></div>
+      <p class="sr-only" role="status" aria-live="polite">{{ reorderAnnouncement() }}</p>
+      @if (!state.writerStatus().writable) { <p class="demo-note">{{ state.writerStatus().guidance }} Podés editar el borrador, pero esta pestaña no puede guardarlo.</p> }
+      @if (current.issue !== Issue.None) { <p class="content-error" role="alert">{{ current.issue.label }}</p> }
+      @if (current.error) { <p class="content-error" role="alert">{{ current.error }}</p> }
+      <fieldset [disabled]="!current.canEdit"><legend>Texto y secciones</legend>
+        <label for="content-title">Título principal<input [attr.aria-invalid]="invalid(current.draft.title)" [attr.aria-describedby]="invalid(current.draft.title) ? 'content-title-issue' : null" id="content-title" name="title" [(ngModel)]="current.draft.title" (ngModelChange)="flow.edit()" required/></label><small id="content-title-issue" class="field-error" [hidden]="!invalid(current.draft.title)">{{ Issue.Title.label }}</small>
+        <label for="content-subtitle">Descripción<textarea id="content-subtitle" name="subtitle" [(ngModel)]="current.draft.subtitle" (ngModelChange)="flow.edit()"></textarea></label>
+        <h2>Bloques de la portada</h2>
+        @for (block of current.draft.blocks; track block.id; let index = $index) {
+          <section class="content-block-editor" [attr.data-block-editor-id]="block.id"><label [for]="'content-block-title-'+index">Título del bloque<input [attr.aria-invalid]="invalid(block.title)" [attr.aria-describedby]="invalid(block.title) ? 'content-block-title-issue-'+index : null" [id]="'content-block-title-'+index" [name]="'block-title-'+block.id" [(ngModel)]="block.title" (ngModelChange)="flow.edit()" required/></label><small class="field-error" [id]="'content-block-title-issue-'+index" [hidden]="!invalid(block.title)">{{ Issue.BlockTitle.label }}</small><label [for]="'content-block-body-'+index">Texto del bloque<textarea [attr.aria-invalid]="invalid(block.body)" [attr.aria-describedby]="invalid(block.body) ? 'content-block-body-issue-'+index : null" [id]="'content-block-body-'+index" [name]="'block-body-'+block.id" [(ngModel)]="block.body" (ngModelChange)="flow.edit()" required></textarea></label><small class="field-error" [id]="'content-block-body-issue-'+index" [hidden]="!invalid(block.body)">{{ Issue.BlockBody.label }}</small><div class="actions"><button [attr.data-cta]="'content-up-'+block.id" type="button" [disabled]="index===0" [attr.aria-label]="'Subir bloque '+(index+1)" (click)="reorder(index,-1)">Subir</button><button [attr.data-cta]="'content-down-'+block.id" type="button" [disabled]="index===current.draft.blocks.length-1" [attr.aria-label]="'Bajar bloque '+(index+1)" (click)="reorder(index,1)">Bajar</button></div></section>
+        }
+      </fieldset>
+      <div class="actions"><button data-cta="content-save" class="primary" type="submit" [disabled]="!current.canEdit || !current.dirty || !state.writerStatus().writable">Guardar borrador</button><button data-cta="content-cancel" type="button" [disabled]="!current.canEdit || !current.dirty" (click)="requestDiscard()">Descartar cambios</button></div>
+    </form>
+    <aside class="card content-help"><h2>Prepará la portada</h2><p>La vista previa usa tus cambios sin guardarlos. La tienda actual mantiene su contenido.</p><button data-cta="content-preview" type="button" [disabled]="!current.canEdit" (click)="openPreview()">Vista previa del borrador</button><a data-cta="content-current-store" routerLink="/demo">Ver tienda actual →</a></aside>
+  </div>
+}
+</section>
+<dialog #modal [attr.aria-labelledby]="dialog()===Dialog.Preview ? 'content-preview-heading' : 'content-discard-heading'" (cancel)="$event.preventDefault(); close()" (keydown)="trapFocus($event)">
+  @if (dialog()===Dialog.Preview) {
+    <header><h2 id="content-preview-heading">{{ Dialog.Preview.label }}</h2><button data-cta="content-preview-close" type="button" autofocus (click)="close()">Volver al editor</button></header>
+    <p class="demo-note">Vista previa de tus cambios. No guarda ni publica contenido.</p>
+    <div class="draft-preview"><section class="hero"><div><p class="eyebrow">STORECORE DEMO</p><h2>{{ previewDraft.title }}</h2><p>{{ previewDraft.subtitle }}</p><p class="preview-action">Explorá herramientas, seguridad y organización.</p></div><div class="hero-art" aria-hidden="true"><div class="tool-body"></div><div class="tool-handle"></div></div></section><div class="editorial-blocks">@for (block of previewDraft.blocks; track block.id) { <article [attr.data-preview-block]="block.id"><h3>{{ block.title }}</h3><p>{{ block.body }}</p></article> }</div><div class="benefits"><div><strong>Elegí con confianza</strong><span>Productos con garantía</span></div><div><strong>Todo en un lugar</strong><span>Prepará tu próximo proyecto</span></div><div><strong>Comprá a tu manera</strong><span>Pago y entrega de demostración</span></div></div><h3>Categorías</h3><div class="category-grid">@for (category of categories; track category) { <article class="category-card"><strong>{{ category }}</strong></article> }</div><h3>Productos de la tienda actual</h3><div class="product-grid">@for (product of state.data.products.filter(activeProduct).slice(0,state.data.settings.homepageItems); track product.sku) { <article class="product-card"><div class="product-art"><img class="product-image" [src]="productImage(product)" [alt]="product.name"/></div><div class="product-info"><small>{{ product.brand }}</small><h3>{{ product.name }}</h3><strong class="price">{{ money(state.commerce.price(product.sku)) }}</strong><span class="stock">{{ state.commerce.available(product.sku) }} unidades disponibles</span></div></article> }</div></div>
+  }
+  @if (dialog()===Dialog.Discard) { <h2 id="content-discard-heading">{{ discardIntent.title }}</h2><p>Se restaurará el último borrador guardado. La tienda actual no cambiará.</p><div class="actions"><button data-cta="content-discard-cancel" type="button" autofocus (click)="close()">Seguir editando</button><button data-cta="content-discard-confirm" class="primary" type="button" (click)="confirmDiscard()">{{ discardIntent.actionLabel }}</button></div> }
+</dialog>

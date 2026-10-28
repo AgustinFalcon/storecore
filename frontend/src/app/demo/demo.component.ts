@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CatalogSort, CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoContentBlock, DemoSettings } from './demo-model';
+import { CatalogSort, CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoSettings } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoPaymentPhase, DemoDeliveryMethod, DemoMLTab, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
@@ -14,6 +14,8 @@ import { trapDemoDialogFocus } from './demo-dialog-focus';
 import { UserRole } from '../domain/user/user-role';
 import { DemoReturnDestination } from './identity/demo-return-destination';
 import { DemoProductSelection } from './catalog/demo-product-selection';
+import { demoProductImage } from './catalog/demo-product-image';
+import { demoMoney } from './demo-money';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -128,9 +130,6 @@ export class DemoPageComponent {
   profileName = this.state.actor.firstName;
   profileLastName = this.state.actor.lastName;
   profilePhone = this.state.actor.phone;
-  contentTitle = this.state.data.title;
-  contentSubtitle = this.state.data.subtitle;
-  contentBlocks: DemoContentBlock[] = this.state.data.blocks.map(block => ({ ...block }));
   draftSettings: DemoSettings = { ...this.state.data.settings };
   draftModule = DemoModuleId.Unknown;
   info = '';
@@ -146,7 +145,7 @@ export class DemoPageComponent {
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
   constructor() { effect(() => { this.state.sessionEpoch(); this.cancelProcessing(); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
-  productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
+  readonly productImage = demoProductImage;
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
   selectPayment(raw: string): void { this.paymentMethod.set(DemoPaymentMethod.fromWire(raw)); }
   selectDelivery(raw: string): void { this.deliveryMethod.set(DemoDeliveryMethod.fromWire(raw)); this.delivery = this.deliveryMethod() !== DemoDeliveryMethod.Unknown; }
@@ -178,7 +177,7 @@ export class DemoPageComponent {
   changeStock(available: boolean): void { this.stockScope.set(available ? CatalogStockScope.Available : CatalogStockScope.All); this.updateCatalog(); }
   movements(product: DemoProduct): void { const rows = this.state.data.movements.filter(value => value.sku === product.sku); this.information(rows.length ? rows.map(value => `${value.delta > 0 ? '+' : ''}${value.delta} unidades · ${value.reason}`).join('\n') : 'Sin movimientos posteriores al stock inicial de demostración.'); }
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
-  money(value: number): string { return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value / 100); }
+  readonly money = demoMoney;
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
   get draftPrice(): number { return this.draftProduct.price / 100; }
@@ -233,9 +232,6 @@ export class DemoPageComponent {
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
-  saveContent(): void { if (!this.contentTitle.trim() || this.contentBlocks.some(block => !block.title.trim() || !block.body.trim())) { this.state.error.set('Completá el título de portada y el contenido de cada bloque.'); return; } this.state.run(() => { this.state.data.title = this.contentTitle; this.state.data.subtitle = this.contentSubtitle; this.state.data.blocks = this.contentBlocks.map(block => ({ ...block })); this.state.commerce.touch(); }, 'Contenido publicado en la tienda.'); }
-  cancelContent(): void { this.contentTitle = this.state.data.title; this.contentSubtitle = this.state.data.subtitle; this.contentBlocks = this.state.data.blocks.map(block => ({ ...block })); }
-  reorderContent(index: number, direction: number): void { const target = index + direction; if (target < 0 || target >= this.contentBlocks.length) return; const blocks = [...this.contentBlocks]; [blocks[index], blocks[target]] = [blocks[target], blocks[index]]; this.contentBlocks = blocks; }
   editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
   saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); }
   toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }

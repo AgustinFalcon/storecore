@@ -574,3 +574,32 @@ plus architecture/lint/Real build PASS, Demo build PASS, SC03 Chromium **9/9**
 and final full Demo **54/54 PASS**, no skips/flaky/retries. Exact run boundaries
 are in the SC03 evidence; previous 53/53 and exact-SHA reviews do not certify
 this amendment. TASK-010/global design and promotion gates remain open.
+
+## 2026-10-28 — SC16 Demo saved drafts, separate from current Home
+
+Promoted locally from `45b231b`: a dedicated content editor, closed phases,
+issues/dialog/dirty/discard-intent types and independent validate/save/preview/
+discard steps. Snapshot v3 keeps `contentDraft` separate from Home and migrates
+v1/v2 additively without rewriting commerce/customer history. Malformed explicit
+drafts and missing v3 drafts fail closed. Admin and Operator may edit only SC16;
+existing reset/other-screen authority is unchanged.
+
+Preview uses unsaved copy, storefront sections, canonical SVG media, effective
+prices and the shared Home formatter. Save writes draft only through the
+existing writer/CAS/readback transaction. Failed writes retain edits. Navigation
+has one discard decision, contextual exit confirmation, native unload warning,
+Escape/focus handling, per-field errors and keyboard reorder announcements.
+Epoch/generation and destruction checks prevent late commits or exposure across
+logout/login, including the same actor.
+
+Final local checks: architecture 6/6 plus scan, lint, **79 files / 495 tests**,
+Real and Demo builds PASS; owner Chromium **12/12**, full Demo **67/67 PASS**,
+five-width editor/preview/discard Axe/reflow/captures and no skipped/flaky cases.
+The inherited hidden-error styling issue found by visual review was corrected
+and explicitly revalidated before the final run. Evidence:
+`evidence/demo-sc16-content-drafts-cut-20261028.md`.
+
+TASK-013 overall remains pending; SC15, Real content parity, rich banners and
+category controls, global visual/review/CI and homologation remain separate.
+Historical dirty-tree claims are not reused. No commit, push, PR or backend
+change is included in this local cut.
