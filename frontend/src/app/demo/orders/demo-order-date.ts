@@ -18,6 +18,13 @@ export class DemoOrderDate {
     return this.precision === OrderDatePrecision.Instant ? (other.time ?? 0)-(this.time ?? 0) : 0;
   }
   isNotAfter(other:DemoOrderDate):boolean|null {if(this.civilDay===null||other.civilDay===null)return null;if(this.precision===OrderDatePrecision.Instant&&other.precision===OrderDatePrecision.Instant)return (this.time??0)<=(other.time??0);return this.civilDay<=other.civilDay;}
+  /** Inclusive civil-day range, independent of browser zone and absent hour precision. */
+  withinDaysEndingAt(reference:DemoOrderDate,days:number):boolean|null {
+    if(this.civilDay===null||reference.civilDay===null||!Number.isSafeInteger(days)||days<1)return null;
+    const civilTime=(key:number)=>{const date=new Date(0);date.setUTCFullYear(Math.floor(key/10000),Math.floor(key/100)%100-1,key%100);date.setUTCHours(0,0,0,0);return date.getTime();};
+    const delta=(civilTime(reference.civilDay)-civilTime(this.civilDay))/86400000;return delta>=0&&delta<days;
+  }
+  windowStart(days:number):DemoOrderDate {if(this.civilDay===null||!Number.isSafeInteger(days)||days<1)return DemoOrderDate.fromWire(null);const date=new Date(0);date.setUTCFullYear(Math.floor(this.civilDay/10000),Math.floor(this.civilDay/100)%100-1,this.civilDay%100-(days-1));return DemoOrderDate.fromWire(date.toISOString().slice(0,10));}
   static fromWire(raw: unknown): DemoOrderDate {
     const unknown = () => new DemoOrderDate(OrderDatePrecision.Unknown, null, OrderDatePrecision.Unknown.label);
     if (typeof raw !== 'string') return unknown();
