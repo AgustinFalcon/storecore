@@ -19,6 +19,12 @@ import { demoMoney } from './demo-money';
 import { OrderHistoryCriteria } from './orders/demo-order-history';
 import { DemoCheckoutFlow, DemoCheckoutIssue, type CheckoutFacts } from './checkout/demo-checkout-flow';
 import { DeliveryConfirmation, DemoDeliveryAcceptance, DemoDeliveryQuote } from './checkout/demo-delivery-quote';
+import { CatalogDetailsRead } from './rich-catalog/catalog-details';
+import { CatalogGalleryComponent } from './rich-catalog/catalog-gallery.component';
+import { CatalogConditionComponent } from './rich-catalog/catalog-condition.component';
+import { VariantSaleState } from './catalog/catalog-types';
+import { CatalogBuyerPresenter } from './rich-catalog/catalog-buyer-presenter';
+import { CatalogCompareAt } from './rich-catalog/catalog-details-types';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -65,7 +71,7 @@ export class DemoRootComponent {
   confirmReset(): void { if (this.state.reset()) { this.closeReset(); void this.router.navigate(['/demo/login']); } }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
+@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink,CatalogGalleryComponent,CatalogConditionComponent], templateUrl: './demo-page.html', styleUrls: ['./demo.scss','./rich-catalog/catalog-buyer.scss'] })
 export class DemoPageComponent {
   get historyCriteria(): OrderHistoryCriteria { return OrderHistoryCriteria.fromWire({ q:this.route.snapshot.queryParamMap.get('q'),payment:this.route.snapshot.queryParamMap.get('payment'),page:this.route.snapshot.queryParamMap.get('page') }); }
   readonly Role = UserRole;
@@ -102,7 +108,20 @@ export class DemoPageComponent {
   readonly CatalogStock = CatalogStockScope;
   readonly Gallery = DemoGalleryView;
   readonly gallery = signal(DemoGalleryView.Front);
-  get variants(): readonly DemoProductVariant[] { return this.product?.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard]; }
+  get variants(): readonly DemoProductVariant[] { return this.productDetails?.variants.map(value=>value.variant)??(this.product?.supportsCase===true?DemoProductVariant.all:[DemoProductVariant.Standard]); }
+  get availableVariants():readonly DemoProductVariant[]{return this.productDetails?.variants.filter(value=>value.state===VariantSaleState.Active).map(value=>value.variant)??this.variants;}
+  get productDetails(){return this.product?CatalogDetailsRead.detail(this.state.data,this.product.sku):undefined;}
+  get selectedStock():number{return this.product?this.state.commerce.available(this.product.sku,this.variant()):0;}
+  get selectedOriginal():number{return this.productDetails?.variants.find(value=>value.variant===this.variant())?.original??Number.NaN;}
+  get selectedComparison(){return this.productDetails?.variants.find(value=>value.variant===this.variant())?.comparison??CatalogCompareAt.Unknown;}
+  readonly CompareAt=CatalogCompareAt;private readonly buyerPresenter=new CatalogBuyerPresenter();
+  variantEnabled(variant:DemoProductVariant):boolean{return this.availableVariants.includes(variant);}
+  variantState(variant:DemoProductVariant):string{return this.productDetails?.variants.find(value=>value.variant===variant)?.state.label??VariantSaleState.Unknown.label;}
+  variantPrice(variant:DemoProductVariant):number{return this.product?this.state.commerce.price(this.product.sku,variant):Number.NaN;}
+  catalogFacts(product:DemoProduct){return this.buyerPresenter.execute(this.state.data,product,variant=>this.state.commerce.price(product.sku,variant));}
+  catalogImage(product:DemoProduct):string{return this.catalogFacts(product).asset?.src??demoProductImage(product);}
+  catalogCondition(product:DemoProduct):string{return this.catalogFacts(product).condition;}
+  hasPriceRange(product:DemoProduct):boolean{return this.catalogFacts(product).range;}
   readonly variant = signal(DemoProductVariant.Standard);
   readonly Module = DemoModuleId;
   readonly Math = Math;
@@ -140,7 +159,7 @@ export class DemoPageComponent {
   get delivery(): boolean { return this.deliveryConfirmation === DeliveryConfirmation.Confirmed; }
   set delivery(confirmed: boolean) { if (confirmed) this.deliveryAcceptance.confirm(this.deliveryQuote, this.checkoutCartIdentity); else this.deliveryAcceptance.reset(); this.checkoutIssue.set(DemoCheckoutIssue.None); }
   get deliveryQuote(): DemoDeliveryQuote { return DemoDeliveryQuote.create(this.deliveryMethod(), this.state.actor.addresses.find(value => value.id === this.addressId), this.state.data.settings.deliveryDays); }
-  private get checkoutCartIdentity(): string { return JSON.stringify([this.state.actorId(), this.state.sessionEpoch(), this.cartLines.map(line => [line.sku, line.variant.wire, line.quantity, line.unit])]); }
+  private get checkoutCartIdentity(): string { return JSON.stringify([this.state.actorId(), this.state.sessionEpoch(), this.cartLines.map(line => [line.sku, line.variant.wire, line.quantity, line.unit,line.details])]); }
   get deliveryConfirmation(): DeliveryConfirmation { return this.deliveryAcceptance.state(this.deliveryQuote, this.checkoutCartIdentity); }
   private get checkoutFacts(): CheckoutFacts { return { quote: this.deliveryQuote, confirmation: this.deliveryConfirmation, hasItems: this.cartLines.length > 0 }; }
   profileName = this.state.actor.firstName;
@@ -177,7 +196,7 @@ export class DemoPageComponent {
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
   get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
-  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku) + line.variant.extraUnit })); }
+  get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku,line.variant),details:CatalogDetailsRead.detail(this.state.data,line.sku) })); }
   get total(): number { return this.cartLines.reduce((sum, line) => sum + line.unit * line.quantity, 0); }
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
   get lowStock(): DemoProduct[] { return this.state.data.products.filter(product => this.state.commerce.available(product.sku) < this.state.data.settings.lowStockThreshold); }
@@ -200,6 +219,7 @@ export class DemoPageComponent {
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
   readonly money = demoMoney;
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
+  stockBalance(product:DemoProduct):number|null{return CatalogDetailsRead.balance(this.state.data,product);}
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
   get draftPrice(): number { return this.draftProduct.price / 100; }
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
@@ -208,7 +228,7 @@ export class DemoPageComponent {
   selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
   private restoreProductSelection(): void {
     if (this.screen !== DemoScreen.Product) return;
-    const selected = DemoProductSelection.fromWire(this.route.snapshot.queryParamMap, this.variants, this.product ? this.stock(this.product) : 0);
+    const selected = DemoProductSelection.fromWire(this.route.snapshot.queryParamMap, this.availableVariants, this.product ? this.stock(this.product) : 0);
     this.variant.set(selected.variant); this.quantity = selected.quantity;
   }
   add(product: DemoProduct): void {
@@ -219,7 +239,7 @@ export class DemoPageComponent {
   }
   private requestProductAccess(product: DemoProduct, purpose = AccessSelectionPurpose.Purchase): void {
     const criteria = this.catalogQueryParams;
-    const captured = this.continuation.capture.execute(product, this.variant(), this.quantity, this.stock(product), { get: key => criteria[key] == null ? null : String(criteria[key]) }, purpose);
+    const captured = this.continuation.capture.execute(product, this.variant(), this.quantity, this.state.commerce.available(product.sku,this.variant()), { get: key => criteria[key] == null ? null : String(criteria[key]) }, purpose,this.availableVariants);
     if (captured.status !== PurchaseCaptureStatus.Ready) { this.state.error.set(captured.status.label); return; }
     this.state.error.set(''); void this.router.navigate(['/demo/login'], { queryParams: { returnUrl: captured.target.url } });
   }

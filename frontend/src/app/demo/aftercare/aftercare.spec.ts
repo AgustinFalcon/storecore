@@ -21,7 +21,7 @@ describe('SC14 closed aftercare aggregate',()=>{
   });
   it('translates every finite case and unsupported input exactly once',()=>{for(const type of [ReturnStage,ReturnOutcome,ReturnReason,RefundStatus,IncidentReason,IncidentStatus]){for(const value of type.all)expect(type.fromWire(value.wire)).toBe(value);for(const value of [undefined,null,'invented'])expect(type.fromWire(value)).toBe(type.Unknown);}});
   it('migrates v1–v3 absence only, rejects v4 missing/null/malformed, and never invents historical returns',()=>{
-    for(const version of [1,2,3]){const raw=JSON.parse(JSON.stringify(demoSeed()));raw.version=version;delete raw.aftercare;const restored=decodeSnapshot(JSON.stringify(raw));expect(restored.version).toBe(4);expect(restored.aftercare).toEqual({returns:[],incidents:[]});expect(raw.aftercare).toBeUndefined();}
+    for(const version of [1,2,3]){const raw=JSON.parse(JSON.stringify(demoSeed()));raw.version=version;delete raw.aftercare;const restored=decodeSnapshot(JSON.stringify(raw));expect(restored.version).toBe(demoSeed().version);expect(restored.aftercare).toEqual({returns:[],incidents:[]});expect(raw.aftercare).toBeUndefined();}
     for(const value of [undefined,null,{},[],{returns:null,incidents:[]}]){const raw={...demoSeed(),aftercare:value};expect(()=>decodeSnapshot(JSON.stringify(raw))).toThrow();}
     for(const version of [1,2,3])expect(()=>decodeSnapshot(JSON.stringify({...demoSeed(),version,aftercare:null}))).toThrow();
   });

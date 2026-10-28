@@ -27,14 +27,14 @@ export class AccessSelectionPurpose {
 
 export class CapturePurchaseStep {
   private readonly location = new DemoCatalogLocation();
-  execute(product: DemoProduct | undefined, variant: DemoProductVariant, quantity: number, available: number, catalog: CatalogQueryReader, purpose = AccessSelectionPurpose.Purchase): CapturedPurchase {
+  execute(product: DemoProduct | undefined, variant: DemoProductVariant, quantity: number, available: number, catalog: CatalogQueryReader, purpose = AccessSelectionPurpose.Purchase,variants:readonly DemoProductVariant[]=product?.supportsCase===true?DemoProductVariant.all:[DemoProductVariant.Standard]): CapturedPurchase {
     const invalid = (status: PurchaseCaptureStatus): CapturedPurchase => ({ status, target: DemoReturnDestination.fromWire(null) });
     if (purpose === AccessSelectionPurpose.Unknown) return invalid(PurchaseCaptureStatus.Unknown);
     if (!product?.active || (purpose.needsStock && available <= 0)) return invalid(PurchaseCaptureStatus.Unavailable);
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(this.location.toQuery(this.location.fromQuery(catalog)))) if (value !== null) query.set(key, String(value));
     query.set('variant', variant.wire); query.set('quantity', String(quantity));
-    const selected = DemoProductSelection.fromWire(query, product.supportsCase === true ? DemoProductVariant.all : [DemoProductVariant.Standard], available);
+    const selected = DemoProductSelection.fromWire(query, variants, available);
     if (selected.variant === DemoProductVariant.Unknown) return invalid(PurchaseCaptureStatus.Variant);
     if (!Number.isSafeInteger(selected.quantity)) {
       if (purpose !== AccessSelectionPurpose.Favorite) return invalid(PurchaseCaptureStatus.Quantity);

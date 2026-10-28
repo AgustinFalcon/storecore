@@ -87,14 +87,14 @@ test('SC03 rejects external, encoded and administrative return destinations', as
 test('SC03 invalid returned selection is not silently purchased as a different variant or amount', async ({ page }) => {
   await page.goto('/demo/login'); await chooseContext(page);
   for (const selection of [
-    { sku: 'DEMO-001', query: 'variant=unsupported&quantity=2' },
-    { sku: 'DEMO-007', query: `variant=${DemoProductVariant.Case.wire}&quantity=2` },
-    { sku: 'DEMO-001', query: `variant=${DemoProductVariant.Standard.wire}&quantity=999` },
-    { sku: 'DEMO-001', query: `variant=${DemoProductVariant.Standard.wire}&quantity=1.5` },
+    { sku: 'DEMO-001', query: 'variant=unsupported&quantity=2', variant:DemoProductVariant.Unknown },
+    { sku: 'DEMO-007', query: `variant=${DemoProductVariant.Case.wire}&quantity=2`, variant:DemoProductVariant.Unknown },
+    { sku: 'DEMO-001', query: `variant=${DemoProductVariant.Standard.wire}&quantity=999`, variant:DemoProductVariant.Standard },
+    { sku: 'DEMO-001', query: `variant=${DemoProductVariant.Standard.wire}&quantity=1.5`, variant:DemoProductVariant.Standard },
   ]) {
     await page.goto(`/demo/catalog/${selection.sku}?${selection.query}`);
     const before = await page.evaluate(() => ({ ...localStorage }));
-    await cta(page, 'product-add-cart').click(); await expect(page.getByRole('alert')).toBeVisible();
+    if(selection.variant===DemoProductVariant.Unknown){await expect(cta(page,'product-add-cart')).toBeDisabled();await expect(page.getByLabel('Variante',{exact:true})).toHaveValue(DemoProductVariant.Unknown.wire);}else{await cta(page, 'product-add-cart').click(); await expect(page.getByRole('alert')).toBeVisible();}
     await expect(cta(page, 'shell-cart')).toContainText('0');
     expect(await page.evaluate(() => ({ ...localStorage }))).toEqual(before);
   }

@@ -5,10 +5,11 @@ import { CustomerAccountState } from '../src/app/demo/customers/customer-account
 import { UserRole } from '../src/app/domain/user/user-role';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../src/app/domain/order/commerce-states';
 import { OrderPaymentFilter } from '../src/app/demo/orders/demo-order-history';
+import { MigrateCatalogV4ToV5Step } from '../src/app/demo/rich-catalog/catalog-details';
 
 const cta=(page:Page,id:string)=>page.locator(`[data-cta="${id}"]`);
 export function historyFixture():DemoSnapshot {
-  const snapshot=demoSeed(), source=snapshot.orders[0]; snapshot.products.push({...snapshot.products[1],sku:'OLD-SKU',active:false});
+  const snapshot=demoSeed(), source=snapshot.orders[0],retired={...snapshot.products[1],sku:'OLD-SKU',active:false};snapshot.products.push(retired);snapshot.catalogDetails.push(...new MigrateCatalogV4ToV5Step().execute([retired]));
   snapshot.orders=[...snapshot.orders.filter(order=>order.actor!=='cliente'),...[
     {id:'Z-old',createdDate:'2026-01-01'}, {id:'A-new',createdDate:'2026-10-28T12:00:00Z'},
     {id:'B-tie',createdDate:'2026-10-28T09:00:00-03:00'}, {id:'C-day',createdDate:'2026-10-01'},

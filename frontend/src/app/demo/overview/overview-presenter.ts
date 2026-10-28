@@ -8,6 +8,7 @@ import { DemoOrderDate } from '../orders/demo-order-date';
 import { ReturnStage,RefundStatus,IncidentStatus,IncidentReason,AftercareIssue } from '../aftercare/aftercare-types';
 import { RefundSummaryStep,AftercareEligibilityStep } from '../aftercare/aftercare-flow';
 import { OverviewAccess,OverviewAction,OverviewRange,OverviewTaskKind,overviewDateKnown } from './overview-types';
+import { CatalogDetailsRead } from '../rich-catalog/catalog-details';
 
 export interface OverviewOrder {readonly order:DemoOrder;readonly date:DemoOrderDate;readonly customer:string;readonly outcome:DemoResultOutcome;readonly task:OverviewTaskKind|null;}
 export interface OverviewAuthority {readonly context:DemoContext;readonly role:UserRole;readonly readable:boolean;}
@@ -34,7 +35,7 @@ export class ProjectOverviewMetricsStep {
 export class ProjectOverviewCurrentWorkStep {
   execute(snapshot:DemoSnapshot,rows:readonly OverviewOrder[]){
     const threshold=snapshot.settings.lowStockThreshold,validThreshold=Number.isSafeInteger(threshold)&&threshold>=0;
-    const stock=snapshot.products.filter(product=>product.active).map(product=>({product,available:Number.isSafeInteger(product.onHand)&&Number.isSafeInteger(product.reserved)&&product.onHand>=product.reserved&&product.reserved>=0?product.onHand-product.reserved:null}));
+    const stock=snapshot.products.filter(product=>product.active).map(product=>({product,available:CatalogDetailsRead.balance(snapshot,product)}));
     const returns=snapshot.aftercare.returns.filter(row=>![ReturnStage.Cancelled,ReturnStage.Closed,ReturnStage.Rejected,ReturnStage.Refunded].includes(row.stage));
     const incidents=snapshot.aftercare.incidents.filter(row=>row.status!==IncidentStatus.Closed);
     const summary=new RefundSummaryStep(),eligibility=new AftercareEligibilityStep();

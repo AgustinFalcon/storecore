@@ -7,8 +7,9 @@ import { DemoContext } from '../demo-model';
 import { DemoCheckoutResultPresenter, DemoResultOutcome } from './demo-checkout-result';
 import { demoMoney } from '../demo-money';
 import { DemoReturnDestination } from '../identity/demo-return-destination';
+import { CatalogLineFactsComponent } from '../rich-catalog/catalog-line-facts.component';
 
-@Component({ selector: 'sc-demo-checkout-result', imports: [RouterLink], templateUrl: './demo-checkout-result.component.html', styleUrls: ['../demo.scss', './demo-checkout-result.component.scss'] })
+@Component({ selector: 'sc-demo-checkout-result', imports: [RouterLink,CatalogLineFactsComponent], templateUrl: './demo-checkout-result.component.html', styleUrls: ['../demo.scss', './demo-checkout-result.component.scss'] })
 export class DemoCheckoutResultComponent {
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);

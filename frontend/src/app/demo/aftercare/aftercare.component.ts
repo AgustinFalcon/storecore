@@ -15,8 +15,9 @@ import { DemoAftercarePresenter,safeReceipt } from './aftercare-presenter';
 import { CancelSubmittedStep,SubmitIncidentStep,SubmitReturnStep,ValidateReturnProposalStep,type AftercareAuthority,type ReturnProposal } from './aftercare-flow';
 import { returnAmount } from './aftercare-ledger';
 import { AftercareDialog,AftercareFormStep,AftercareIssue,AftercareSuccessTarget,IncidentReason,ReturnReason,ReturnStage } from './aftercare-types';
+import { CatalogLineFactsComponent } from '../rich-catalog/catalog-line-facts.component';
 
-@Component({selector:'sc-demo-aftercare',imports:[FormsModule,RouterLink],templateUrl:'./aftercare.component.html',styleUrls:['../demo.scss','./aftercare.component.scss']})
+@Component({selector:'sc-demo-aftercare',imports:[FormsModule,RouterLink,CatalogLineFactsComponent],templateUrl:'./aftercare.component.html',styleUrls:['../demo.scss','./aftercare.component.scss']})
 export class DemoAftercareComponent {
   readonly state=inject(DemoApplicationState);private readonly route=inject(ActivatedRoute);private readonly router=inject(Router);private readonly injector=inject(Injector);private readonly destroy=inject(DestroyRef);
   private readonly presenter=new DemoAftercarePresenter();private readonly submit=new SubmitReturnStep();private readonly cancel=new CancelSubmittedStep();private readonly incident=new SubmitIncidentStep();private readonly validate=new ValidateReturnProposalStep();

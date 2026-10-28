@@ -6,6 +6,13 @@ import { DemoPaymentShipmentPolicy } from './checkout/demo-payment-shipment-poli
 import { AftercareCodec,type AftercareLedger } from './aftercare/aftercare-ledger';
 import { ReturnStage,ReturnOutcome,ReturnReason,RefundStatus } from './aftercare/aftercare-types';
 import { CatalogProductPolicy } from './admin-catalog/catalog-policy';
+import { DemoProductVariant } from './catalog/product-variant';
+export { DemoProductVariant } from './catalog/product-variant';
+import { CatalogDetailsCodec,CatalogDetailsRead,CatalogDetailsPolicy,MigrateCatalogV4ToV5Step,type CatalogDetails } from './rich-catalog/catalog-details';
+import { SyncCatalogDetailsAfterBasicSaveStep } from './rich-catalog/catalog-details-flow';
+import { QuoteCatalogPresentationStep } from './rich-catalog/catalog-price';
+import { EnrichCatalogDemoSeedStep } from './rich-catalog/catalog-rich-seed';
+import { CaptureCatalogOrderLineStep,CatalogOrderLineCodec,CalculateCatalogOrderTotalStep,type CatalogOrderLineFacts } from './rich-catalog/catalog-order-line';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 
@@ -37,14 +44,6 @@ export class CheckoutStep {
   static fromWire(raw: unknown): CheckoutStep { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
   next(): CheckoutStep { return CheckoutStep.all[this.index + 1] ?? this; }
   previous(): CheckoutStep { return CheckoutStep.all[this.index - 1] ?? this; }
-}
-export class DemoProductVariant {
-  private constructor(readonly wire: string, readonly label: string, readonly extraUnit: number) {}
-  static readonly Standard = new DemoProductVariant('standard', 'Estándar', 0);
-  static readonly Case = new DemoProductVariant('with-case', 'Con estuche de transporte', 250000);
-  static readonly Unknown = new DemoProductVariant('', 'Variante desconocida', 0);
-  static readonly all = [this.Standard, this.Case];
-  static fromWire(raw: unknown): DemoProductVariant { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 export class DemoGalleryView {
   private constructor(readonly wire: string, readonly label: string) {}
@@ -84,15 +83,15 @@ export interface DemoContentBlock { id: string; title: string; body: string; }
 export interface DemoProduct { sku: string; name: string; category: string; brand: string; description: string; price: number; original: number; onHand: number; reserved: number; active: boolean; tone: string; variant: string; supportsCase?: boolean; }
 export interface DemoAddress { id: string; label: string; street: string; city: string; postal: string; primary: boolean; }
 export interface DemoActor { access?: CustomerAccountAccess; id: string; email: string; firstName: string; lastName: string; phone: string; addresses: DemoAddress[]; favorites: string[]; cart: { sku: string; quantity: number; variant: DemoProductVariant }[]; }
-export interface DemoOrder { fulfillment?: DemoDeliveryMethod; createdDate?: string; id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
+export interface DemoOrder { fulfillment?: DemoDeliveryMethod; createdDate?: string; id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant;catalog?:CatalogOrderLineFacts }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
 export interface DemoMovement { id: string; sku: string; delta: number; reason: string; }
-export interface DemoSnapshot { version: number; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
+export interface DemoSnapshot { version: number; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
 export function demoSeed(): DemoSnapshot {
-  const products = NAMES.map((name, index): DemoProduct => ({ sku: `DEMO-${String(index + 1).padStart(3, '0')}`, name, category: ['Herramientas', 'Seguridad', 'Organización'][Math.floor(index / 6) === 0 ? 0 : index < 9 ? 1 : 2], brand: ['Norte', 'Avance', 'Taller'][index % 3], description: 'Diseñado para trabajar con precisión y comodidad. Calidad durable, garantía de 12 meses y asistencia personalizada. Incluye accesorios y manual de uso.', price: (12500 + index * 8500) * 100, original: (14500 + index * 8500) * 100, onHand: index === 5 ? 0 : index === 8 ? 2 : 18 + index, reserved: 0, active: true, tone: ['#e6a63f', '#667b94', '#a5b49b'][index % 3], variant: 'Estándar' }));
+  const products = NAMES.map((name, index): DemoProduct => ({ sku: `DEMO-${String(index + 1).padStart(3, '0')}`, name, category: ['Herramientas', 'Seguridad', 'Organización'][Math.floor(index / 6) === 0 ? 0 : index < 9 ? 1 : 2], brand: ['Norte', 'Avance', 'Taller'][index % 3], description: 'Producto de catálogo simulado. Las características y condiciones comerciales se informan en la ficha de cada artículo.', price: (12500 + index * 8500) * 100, original: (14500 + index * 8500) * 100, onHand: index === 5 ? 0 : index === 8 ? 2 : 18 + index, reserved: 0, active: true, tone: ['#e6a63f', '#667b94', '#a5b49b'][index % 3], variant: 'Estándar' }));
   const actor = (id: string, firstName: string): DemoActor => ({ id, email: `${id}@demo.invalid`, firstName, lastName: 'Demo', phone: '011 5555 0100', addresses: [{ id: `address-${id}`, label: 'Casa', street: 'Avenida de muestra 123', city: 'Buenos Aires', postal: '1406', primary: true }], favorites: [products[0].sku, products[2].sku], cart: [] });
   products.forEach((product, index) => product.supportsCase = index < 6);
   products.push({ sku: 'LUM-042', name: 'Luminaria de muestra', category: 'Herramientas', brand: 'Demo', description: 'Producto de muestra para el historial del cliente.', price: 8450000, original: 8450000, onHand: 12, reserved: 0, active: true, tone: '#667b94', variant: 'Estándar', supportsCase: false });
@@ -102,20 +101,20 @@ export function demoSeed(): DemoSnapshot {
   const actors = [actor('cliente', 'Alex'), actor('cliente2', 'Sam'), rocio]; actors.forEach(value => value.access = { state: CustomerAccountState.Active, generation: 0, reason: '' });
   const seed = { version: 3, revision: 0, products, actors, orders, campaigns: [{ id: 'offer-1', title: 'Equipá tu taller', sku: products[0].sku, percent: 10, active: true, from: '2026-01-01', until: '2027-12-31' }], listings: products.slice(0, 4).map(product => ({ sku: product.sku, linked: true, observed: product.onHand, error: false })), movements: [], title: 'Todo para tu próximo proyecto', subtitle: 'Herramientas, seguridad y organización. Elegí calidad, comprá con confianza.', blocks: [{ id: 'service', title: 'Te ayudamos a elegir', body: 'Encontrá herramientas y equipamiento para cada etapa de tu proyecto.' }, { id: 'quality', title: 'Calidad que te acompaña', body: 'Garantía y asistencia personalizada para trabajar con confianza.' }], settings: { homepageItems: 4, lowStockThreshold: 5, deliveryDays: 5, trackingPrefix: 'SIM', mlRows: 6 }, modules: DemoModuleId.all.map(id => ({ id, enabled: true })), competitors: [{ id: 'competitor-1', name: 'Comercio de muestra A', price: products[0].price + 50000, history: [products[0].price + 80000, products[0].price + 50000], unread: false }], mlConnected: false };
   const aftercare:AftercareLedger={returns:[{id:'RETURN-1015-1',orderId:'ORD-1015',actorId:rocio.id,reason:ReturnReason.ChangedMind,stage:ReturnStage.Refunded,outcome:ReturnOutcome.Accepted,lines:[{index:0,sku:'LUM-042',variant:DemoProductVariant.Standard,quantity:1,unit:8450000}],refund:{status:RefundStatus.Refunded,amount:8450000},events:[{id:'REFUND-1015-1',stage:ReturnStage.Refunded,date:'2026-10-16'}]}],incidents:[]};
-  return { ...seed, version:4, aftercare, contentDraft: ContentDraft.clone(seed) };
+  return new EnrichCatalogDemoSeedStep().execute({ ...seed, version:5, catalogDetails:new MigrateCatalogV4ToV5Step().execute(products),aftercare, contentDraft: ContentDraft.clone(seed) });
 }
 
 /** All financial amounts are integer minor units; this coordinator is framework-free. */
 export class DemoCommerce {
   constructor(public snapshot: DemoSnapshot = demoSeed(), private readonly now: () => string = () => new Date().toISOString(), private readonly id: () => string = () => crypto.randomUUID()) {}
-  private commit(projectStock = false): void { this.snapshot.revision++; if (projectStock) this.queueStock(); }
-  private queueStock(): void {
+  private commit(projectStock = false,reference?:string): void { this.snapshot.revision++; if (projectStock) this.queueStock(reference); }
+  private queueStock(reference?:string): void {
     this.snapshot.syncJobs ??= [];
     for (const listing of this.snapshot.listings.filter(value => value.linked)) {
       const desired = this.product(listing.sku).onHand;
       if (listing.desired === desired) continue;
       listing.desired = desired;
-      this.snapshot.syncJobs.push({ id: `stock-${this.snapshot.revision}-${listing.sku}`, sku: listing.sku, desired, status: DemoSyncStatus.Queued, created: this.now() });
+      this.snapshot.syncJobs.push({ id: `stock-${this.snapshot.revision}-${listing.sku}`, sku: listing.sku, desired, status: DemoSyncStatus.Queued, created: reference??this.now() });
     }
   }
   private requireModule(id: DemoModuleId): void { if (!this.snapshot.modules.some(module => module.id === id && module.enabled)) throw new Error(`${id.label} está pausado en la demostración. Habilitalo desde Módulos del comercio.`); }
@@ -130,12 +129,12 @@ export class DemoCommerce {
   assertCustomerAccess(actorId: string, generation?: number): void { const access = this.actor(actorId).access; if (!access?.state.permitsAccess || (generation !== undefined && generation !== access.generation)) throw new Error('La cuenta no tiene acceso. Iniciá una nueva sesión si fue reactivada.'); }
   changeCustomerAccount(role: UserRole, actorId: string, command: CustomerAccountCommand, reason: string): void { if (!CustomerAdministrationAuthority.canWrite(role)) throw new Error('Sólo un administrador puede cambiar la cuenta.'); const access = this.actor(actorId).access; if (!access) throw new Error('Estado de cuenta desconocido.'); if (command.apply(access, reason)) this.commit(); }
   product(sku: string): DemoProduct { const product = this.snapshot.products.find(value => value.sku === sku); if (!product) throw new Error('Producto no encontrado.'); return product; }
-  available(sku: string): number { const product = this.product(sku); return product.onHand - product.reserved; }
-  price(sku: string): number { const product = this.product(sku); const offer = this.snapshot.campaigns.find(value => value.sku === sku && value.active && value.from <= this.now().slice(0, 10) && value.until >= this.now().slice(0, 10)); return offer ? Math.max(1, Math.round(product.price * (100 - offer.percent) / 100)) : product.price; }
-  setQuantity(actorId: string, sku: string, quantity: number): void {
-    if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad. Para quitar el producto usá Quitar.');
-    if (quantity > this.available(sku)) throw new Error('La cantidad supera el stock disponible.');
+  available(sku: string,variant?:DemoProductVariant): number { return CatalogDetailsRead.available(this.snapshot,this.product(sku),variant); }
+  price(sku: string,variant?:DemoProductVariant,reference?:string): number { return new QuoteCatalogPresentationStep().execute(this.snapshot,this.product(sku),reference??(this.snapshot.campaigns.some(value=>value.sku===sku&&value.active)?this.now():''),variant)??Number.NaN; }
+  setQuantity(actorId: string, sku: string, quantity: number,variant?:DemoProductVariant): void {
+    if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad. Para quitar el producto usá Quitar.');
     const actor = this.actor(actorId); const existing = actor.cart.find(line => line.sku === sku);
+    if (quantity > this.available(sku,variant??existing?.variant??DemoProductVariant.Standard)) throw new Error('La cantidad supera el stock disponible o la presentación no está habilitada.');
     if (existing) existing.quantity = quantity; else actor.cart.push({ sku, quantity, variant: DemoProductVariant.Standard });
     this.commit();
   }
@@ -145,9 +144,10 @@ export class DemoCommerce {
     if (!product.active) throw new Error('Este producto está archivado y no se puede comprar.');
     if (variant === DemoProductVariant.Unknown) throw new Error('Seleccioná una variante conocida.');
     if (variant === DemoProductVariant.Case && product.supportsCase !== true) throw new Error('La presentación con estuche no está disponible para este producto.');
+    if(this.available(sku,variant)<quantity||!Number.isSafeInteger(this.price(sku,variant)))throw new Error('La presentación no está habilitada o no tiene disponibilidad para esa cantidad.');
     const existing = this.actor(actorId).cart.find(line => line.sku === sku);
     if (existing && existing.variant !== variant) throw new Error('Este producto ya está en tu carrito con otra presentación. Quitalo antes de cambiar la variante.');
-    this.setQuantity(actorId, sku, (existing?.quantity ?? 0) + quantity);
+    this.setQuantity(actorId, sku, (existing?.quantity ?? 0) + quantity,variant);
     const saved = this.actor(actorId).cart.find(line => line.sku === sku); if (saved) saved.variant = variant;
   }
   favorite(actorId: string, sku: string): void { const actor = this.actor(actorId); actor.favorites = actor.favorites.includes(sku) ? actor.favorites.filter(value => value !== sku) : [...actor.favorites, sku]; this.commit(); }
@@ -159,18 +159,18 @@ export class DemoCommerce {
     if (scenario === DemoScenario.Unknown || method === DemoPaymentMethod.Unknown || deliveryMethod === DemoDeliveryMethod.Unknown) throw new Error('Elegí un escenario, pago y entrega válidos.');
     const actor = this.actor(actorId); const address = actor.addresses.find(value => value.id === addressId);
     if ((!address && deliveryMethod !== DemoDeliveryMethod.Pickup) || !actor.cart.length) throw new Error('Agregá productos y seleccioná una dirección.');
-    if (scenario === DemoScenario.NoStock || actor.cart.some(line => this.available(line.sku) < line.quantity)) throw new Error('El stock cambió. Revisá las cantidades de tu carrito.');
+    const createdDate = this.now();
     if (actor.cart.some(line => !this.product(line.sku).active)) throw new Error('Un producto del carrito está archivado. Revisá el carrito y quitalo antes de confirmar.');
+    if (scenario === DemoScenario.NoStock || actor.cart.some(line => this.available(line.sku,line.variant) < line.quantity||!Number.isSafeInteger(this.price(line.sku,line.variant,createdDate)))) throw new Error('El stock o las presentaciones cambiaron. Revisá las cantidades de tu carrito.');
     if (actor.cart.some(line => line.variant === DemoProductVariant.Unknown)) throw new Error('El carrito contiene una variante no reconocida.');
     if (actor.cart.some(line => line.variant === DemoProductVariant.Case && this.product(line.sku).supportsCase !== true)) throw new Error('Una presentación dejó de estar disponible. Quitá el producto y seleccioná otra variante.');
-    const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku) + line.variant.extraUnit }));
+    const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku,line.variant,createdDate),catalog:new CaptureCatalogOrderLineStep().execute(this.snapshot,line.sku) }));
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
-    const createdDate = this.now();
-    const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, createdDate, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${createdDate}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
+    const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, createdDate, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: new CalculateCatalogOrderTotalStep().execute(lines), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${createdDate}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
     order.method = method;
-    if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total += order.delivery.cost; }
+    if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total = new CalculateCatalogOrderTotalStep().execute(lines,order.delivery.cost); }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
-    this.snapshot.orders.push(order); actor.cart = []; this.commit(approved); return order;
+    this.snapshot.orders.push(order); actor.cart = []; this.commit(approved,createdDate); return order;
   }
   resolvePayment(orderId: string, scenario: DemoScenario): void {
     const order = this.snapshot.orders.find(value => value.id === orderId); if (!order) throw new Error('Pedido no encontrado.');
@@ -193,7 +193,7 @@ export class DemoCommerce {
   resolveIncident(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order?.incident) throw new Error('No hay incidencia pendiente.'); order.incident = ''; order.history.push(`Incidencia resuelta · ${this.now()}`); this.commit(); }
   advance(orderId: string): void { this.requireModule(DemoModuleId.Shipping); const order = this.snapshot.orders.find(value => value.id === orderId); if (!order || order.payment !== PaymentStatus.Approved) throw new Error('El pedido necesita pago aprobado.'); if (order.shipment === ShipmentStatus.Preparing) { order.shipment = ShipmentStatus.Shipped; order.tracking = `${this.snapshot.settings.trackingPrefix}-${order.id}`; } else if (order.shipment === ShipmentStatus.Shipped) order.shipment = ShipmentStatus.Delivered; else throw new Error('La entrega ya está finalizada.'); order.history.push(`${order.shipment.label} · ${this.now()}`); this.commit(); }
   receiveReturn(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (this.snapshot.aftercare.returns.some(record=>record.orderId===orderId)) throw new Error('La posventa parcial registrada requiere su superficie administrativa específica.'); if (!order || order.shipment !== ShipmentStatus.Delivered || order.returned) throw new Error('La devolución no está disponible.'); order.returned = true; order.history.push('Devolución recibida; inspección pendiente. Sin reintegro automático de stock.'); this.commit(); }
-  adjust(sku: string, delta: number, reason: string): void { const product = this.product(sku); if (!Number.isInteger(delta) || !reason.trim() || product.onHand + delta < product.reserved) throw new Error('Indicá unidades enteras y motivo; el stock no puede ser menor a las reservas.'); product.onHand += delta; this.snapshot.movements.push({ id: this.id(), sku, delta, reason }); this.commit(true); }
+  adjust(sku: string, delta: number, reason: string): void { const product = this.product(sku); if (!Number.isSafeInteger(delta) || !reason.trim() || product.onHand + delta < product.reserved) throw new Error('Indicá unidades enteras y motivo; el stock no puede ser menor a las reservas.'); const detail=CatalogDetailsRead.detail(this.snapshot,sku);if(detail)CatalogDetailsPolicy.validate(detail,{...product,onHand:product.onHand+delta},true);product.onHand += delta; this.snapshot.movements.push({ id: this.id(), sku, delta, reason }); this.commit(true); }
   mlSale(sku: string, operation: string): void { this.requireModule(DemoModuleId.MercadoLibre); if (!this.snapshot.mlConnected || !this.snapshot.listings.some(value => value.sku === sku && value.linked)) throw new Error('Conectá la cuenta simulada y vinculá el producto.'); if (this.snapshot.movements.some(value => value.id === operation)) return; if (this.available(sku) < 1) throw new Error('Producto sin stock.'); this.product(sku).onHand--; this.snapshot.movements.push({ id: operation, sku, delta: -1, reason: 'Venta Mercado Libre simulada' }); this.commit(true); }
   processStock(fail = false): void {
     this.requireModule(DemoModuleId.MercadoLibre); if (!this.snapshot.mlConnected) throw new Error('Conectá la cuenta simulada primero.');
@@ -213,7 +213,9 @@ export class DemoCommerce {
     const reserved = existing?.reserved ?? 0;
     new CatalogProductPolicy().validate({...product,supportsCase:product.supportsCase===true,reserved},DemoProductVariant.Case.extraUnit);
     if (!product.name.trim() || !product.sku.trim() || !Number.isSafeInteger(product.price) || product.price <= 0 || !Number.isInteger(product.onHand) || product.onHand < reserved) throw new Error('Revisá nombre, SKU, precio y stock; respetá las reservas existentes.');
+    const previous=existing?{...existing}:undefined;
     if (existing) Object.assign(existing, { ...product, supportsCase: product.supportsCase === true, reserved }); else this.snapshot.products.push({ ...product, supportsCase: product.supportsCase === true, reserved: 0 });
+    new SyncCatalogDetailsAfterBasicSaveStep().execute(this.snapshot,this.product(product.sku),previous);
     this.commit();
   }
   saveCampaign(campaign: DemoCampaign): void { this.requireModule(DemoModuleId.Catalog); if (!campaign.title.trim() || !this.snapshot.products.some(value => value.sku === campaign.sku) || campaign.percent <= 0 || campaign.percent > 70 || campaign.from > campaign.until) throw new Error('Revisá el título, producto, descuento (1–70%) y vigencia.'); const index = this.snapshot.campaigns.findIndex(value => value.id === campaign.id); if (index < 0) this.snapshot.campaigns.push({ ...campaign }); else this.snapshot.campaigns[index] = { ...campaign }; this.commit(); }
@@ -225,8 +227,9 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('Snapshot inválido.');
   const state = parsed as DemoSnapshot;
-  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
-  const legacyAftercare=state.version!==4;
+  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
+  const legacyCatalog=state.version!==5;
+  const legacyAftercare=state.version===1||state.version===2||state.version===3;
   const legacyContent = state.version === 1 || state.version === 2;
   if (state.products.some(value => !value.sku || !Number.isSafeInteger(value.price) || value.price <= 0 || !Number.isInteger(value.onHand) || !Number.isInteger(value.reserved) || value.reserved < 0 || value.onHand < value.reserved)) throw new Error('Stock o precios inválidos. Restablecé la demostración.');
   state.products=state.products.map(product=>({...product,supportsCase:product.supportsCase===undefined?true:product.supportsCase}));
@@ -248,7 +251,7 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.orders = state.orders.map(order => ({ ...order, status: OrderStatus.fromWire(order.status?.wire), fulfillment: order.fulfillment ? DemoDeliveryMethod.fromWire(order.fulfillment.wire) : undefined, payment: PaymentStatus.fromWire(order.payment?.wire), shipment: ShipmentStatus.fromWire(order.shipment?.wire), method: order.method ? DemoPaymentMethod.fromWire(order.method.wire) : undefined, delivery: order.delivery ? { ...order.delivery, method: DemoDeliveryMethod.fromWire(order.delivery.method?.wire) } : undefined }));
   state.syncJobs = (state.syncJobs ?? []).map(job => ({ ...job, status: DemoSyncStatus.fromWire(job.status?.wire) }));
   if (state.syncJobs.some(job => !skus.has(job.sku) || !Number.isInteger(job.desired) || job.desired < 0) || state.orders.some(order => order.delivery && (!Number.isSafeInteger(order.delivery.cost) || order.delivery.cost < 0 || !Number.isInteger(order.delivery.days) || order.delivery.days < 1 || typeof order.delivery.destination !== 'string')) || state.competitors.some(value => !value.id || typeof value.name !== 'string' || !Number.isSafeInteger(value.price) || value.price < 1 || !Array.isArray(value.history) || value.history.some(price => !Number.isSafeInteger(price) || price < 1))) throw new Error('Los procesos demo guardados son inválidos. Restablecé la demostración.');
-  state.orders = state.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
+  state.orders = state.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard,...(Object.prototype.hasOwnProperty.call(line,'catalog')?{catalog:CatalogOrderLineCodec.fromWire(line.catalog)}:{}) })) }));
   state.actors = state.actors.map(actor => ({ ...actor, cart: actor.cart.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
   if (state.products.some(product => product.supportsCase !== undefined && typeof product.supportsCase !== 'boolean')) throw new Error('Las variantes demo guardadas son inválidas. Restablecé la demostración.');
   const normalizedEmails = state.actors.map(actor => actor.email.trim().toLowerCase());
@@ -262,5 +265,7 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   if (!Array.isArray(state.blocks) || state.blocks.some(block => typeof block.id !== 'string' || typeof block.title !== 'string' || typeof block.body !== 'string') || ![state.settings.homepageItems, state.settings.lowStockThreshold, state.settings.deliveryDays, state.settings.mlRows].every(value => Number.isInteger(value) && value >= 1 && value <= 30) || !/^[A-Z0-9-]{2,12}$/.test(state.settings.trackingPrefix)) throw new Error('La configuración demo guardada es inválida. Restablecé la demostración.');
   state.contentDraft = legacyContent && !Object.prototype.hasOwnProperty.call(state, 'contentDraft') ? ContentDraft.fromWire({ title: state.title, subtitle: state.subtitle, blocks: state.blocks }) : ContentDraft.fromWire(state.contentDraft);
   state.aftercare=legacyAftercare&&!Object.prototype.hasOwnProperty.call(state,'aftercare')?{returns:[],incidents:[]}:AftercareCodec.fromWire(state.aftercare,state.orders);
+  state.catalogDetails=CatalogDetailsCodec.fromWire(legacyCatalog&&!Object.prototype.hasOwnProperty.call(state,'catalogDetails')?new MigrateCatalogV4ToV5Step().execute(state.products):state.catalogDetails,state.products);
+  state.version=5;
   return state;
 }

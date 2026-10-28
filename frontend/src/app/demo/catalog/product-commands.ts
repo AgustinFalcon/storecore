@@ -12,7 +12,7 @@ export class ChangeDemoProductPublicationCommand {
   private readonly proposal: DemoProduct;
   constructor(private readonly actorId: string, product: DemoProduct, private readonly expectedRevision: number) {
     this.confirmation = product.publication.confirmation;
-    this.proposal = { ...DemoProductPolicy.clone(product), publication: product.publication.next };
+    this.proposal = { ...DemoProductPolicy.clone(product), publication: product.publication.next() };
   }
   execute(commerce: DemoProductWriter): void {
     if (this.proposal.publication === ProductPublication.Unknown) throw new Error('El estado desconocido no permite publicar ni archivar.');
