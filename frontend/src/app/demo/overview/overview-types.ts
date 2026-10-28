@@ -42,7 +42,7 @@ export class OverviewAction {
   static readonly Stock=new OverviewAction('dashboard-alert-stock','Revisar existencias','/demo/user/inventory',DemoModuleId.Catalog);
   static readonly LowStock=new OverviewAction('dashboard-low-stock','Ver inventario','/demo/user/inventory',DemoModuleId.Catalog);
   static readonly Inventory=new OverviewAction('dashboard-inventory','Gestionar inventario','/demo/user/inventory',DemoModuleId.Catalog);
-  static readonly Products=new OverviewAction('dashboard-products','Gestionar productos','/demo/user/catalog',DemoModuleId.Catalog);
+  static readonly Products=new OverviewAction('dashboard-products','Gestionar productos','/demo/user/catalog',DemoModuleId.Catalog,true);
   static readonly Content=new OverviewAction('dashboard-content','Editar borrador de portada','/demo/user/content',null,true);
   static readonly Offers=new OverviewAction('dashboard-offers','Revisar ofertas','/demo/user/offers',DemoModuleId.Catalog);
   static readonly Customers=new OverviewAction('dashboard-customers','Consultar clientes','/demo/user/customers',null,true);

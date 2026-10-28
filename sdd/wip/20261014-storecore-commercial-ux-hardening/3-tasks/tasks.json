@@ -134,6 +134,7 @@
     },
     {
       "id": "TASK-014",
+      "demo_sc17a_cut_20261028": { "status": "verified_local", "base": "c32ce1e", "scope": "Dedicated Demo basic catalog listing/editor/create/edit/set-publication for Admin+Operator; readonly stock and existing flat product model only", "evidence": "4-implementation/evidence/demo-sc17a-admin-catalog-cut-20261028.md", "remaining": ["SC17B media/gallery, per-variant lifecycle and Outlet unit/lot schema/mocks", "SC18 offers", "SC19 campaigns", "Real parity and global review/CI gates"] },
       "title": "Completar catálogo admin, ofertas y campañas",
       "description": "Implementar productos/media/variantes, precio, archivo, ofertas y campañas con políticas compartidas por comando y decoder. Ofertas y outlet permanecen Demo hasta contar con sus contratos productivos propietarios; campañas sólo usan el binding real ya existente.",
       "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006", "TASK-007", "TASK-008"],
