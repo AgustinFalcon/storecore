@@ -7,11 +7,12 @@ import { DemoSnapshotWriter } from './app/demo/demo-snapshot-writer';
 import { DemoRecoveryComponent } from './app/demo/identity/demo-recovery.component';
 import { DemoContentComponent } from './app/demo/content/content.component';
 import { contentCanDeactivate } from './app/demo/content/content.guard';
+import { DemoCheckoutResultComponent } from './app/demo/checkout/demo-checkout-result.component';
 
 // Dedicated compilation entry: no HttpClient, real auth, cookie or API provider is reachable.
 void DemoSnapshotWriter.browser.acquire().then(() => bootstrapApplication(DemoRootComponent, {
   providers: [provideRouter([{ path: 'demo', children: [
-    ...DemoScreen.all.map(screen => ({ path: screen.path, component: screen === DemoScreen.Content ? DemoContentComponent : screen === DemoScreen.Recover ? DemoRecoveryComponent : screen === DemoScreen.Customers ? DemoCustomersComponent : DemoPageComponent, canDeactivate: screen === DemoScreen.Content ? [contentCanDeactivate] : [], title: `${screen.title} · StoreCore Demo`, data: { screen: screen.path } })),
+    ...DemoScreen.all.map(screen => ({ path: screen.path, component: screen === DemoScreen.Result ? DemoCheckoutResultComponent : screen === DemoScreen.Content ? DemoContentComponent : screen === DemoScreen.Recover ? DemoRecoveryComponent : screen === DemoScreen.Customers ? DemoCustomersComponent : DemoPageComponent, canDeactivate: screen === DemoScreen.Content ? [contentCanDeactivate] : [], title: `${screen.title} · StoreCore Demo`, data: { screen: screen.path } })),
     { path: 'customer/session', redirectTo: 'login', pathMatch: 'full' },
     { path: 'user/session', redirectTo: 'login', pathMatch: 'full' },
     { path: 'customer', redirectTo: 'login', pathMatch: 'full' },

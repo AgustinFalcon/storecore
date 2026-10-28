@@ -8,13 +8,14 @@ export class DemoReturnDestination {
   static readonly Product = new DemoReturnDestination(/^\/demo\/catalog\/[^/]+$/);
   static readonly Cart = new DemoReturnDestination(/^\/demo\/cart$/);
   static readonly Checkout = new DemoReturnDestination(/^\/demo\/checkout$/);
+  static readonly Result = new DemoReturnDestination(/^\/demo\/checkout\/result\/[^/]+$/);
   static readonly Profile = new DemoReturnDestination(/^\/demo\/customer\/profile$/);
   static readonly Addresses = new DemoReturnDestination(/^\/demo\/customer\/addresses$/);
   static readonly Favorites = new DemoReturnDestination(/^\/demo\/customer\/favorites$/);
   static readonly Orders = new DemoReturnDestination(/^\/demo\/customer\/orders$/);
   static readonly Order = new DemoReturnDestination(/^\/demo\/customer\/orders\/[^/]+$/);
   static readonly Unknown = new DemoReturnDestination(/$a/);
-  static readonly all = [this.Home, this.Catalog, this.Product, this.Cart, this.Checkout, this.Profile, this.Addresses, this.Favorites, this.Orders, this.Order] as const;
+  static readonly all = [this.Home, this.Catalog, this.Product, this.Cart, this.Checkout, this.Result, this.Profile, this.Addresses, this.Favorites, this.Orders, this.Order] as const;
 
   static fromWire(raw: unknown): DemoReturnTarget {
     const invalid = { kind: this.Unknown, url: '/demo' };

@@ -1,6 +1,10 @@
 import { DemoReturnDestination as Destination } from './demo-return-destination';
 
 describe('SC03 return destination boundary', () => {
+  it('accepts the closed Demo result route but rejects encoded result paths', () => {
+    expect(Destination.fromWire('/demo/checkout/result/DEMO-100').kind).toBe(Destination.Result);
+    expect(Destination.fromWire('/demo/checkout/result/%2e%2e')).toEqual({ kind: Destination.Unknown, url: '/demo' });
+  });
   it.each(['/demo/catalog/%2E%2E/cart', '/demo/catalog/%2e%2e/cart', '/demo/catalog/%2e./cart', '/demo/catalog/.%2e/cart', '/demo/catalog/%252e%252e/cart'])('rejects encoded normalization before parsing %s', raw => {
     expect(Destination.fromWire(raw)).toEqual({ kind: Destination.Unknown, url: '/demo' });
   });
