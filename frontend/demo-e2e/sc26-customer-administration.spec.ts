@@ -101,6 +101,10 @@ test('SC26 Admin canonical search, exact ownership, nested dialog keyboard and o
   await expect(page.locator('main')).toContainText('Medio de pago no informado');
   await expect(page.locator('main')).toContainText(order.tracking);
   await expect(page.locator('main')).not.toContainText('Tarjeta de crédito');
+  await cta(page, 'order-receipt').click();
+  await expect(page.locator('.receipt-preview')).toContainText(`Entrega ${order.fulfillment?.label} · Costo no informado`);
+  await expect(page.locator('.receipt-preview')).not.toContainText(/Entrega\s+\$\s*0/);
+  await page.keyboard.press('Escape');
   await axe(page, info, 'canonical-order');
 });
 
@@ -226,6 +230,7 @@ test('SC26 Operator consults and opens order without mutation controls; Customer
   await summary(page).getByRole('link', { name: new RegExp(order.id) }).click();
   await expect(page).toHaveURL(`/demo/user/orders/${order.id}`);
   for (const id of ['order-incident-open', 'order-return-receive', 'order-shipment-advance', 'order-payment-resolve']) await expect(cta(page, id)).toHaveCount(0);
+  await expect(cta(page, 'shell-reset-open')).toBeDisabled();
   await cta(page, 'order-list-back').click();
   await expect(page).toHaveURL('/demo/user/customers');
   await login(page, DemoContext.Customer);

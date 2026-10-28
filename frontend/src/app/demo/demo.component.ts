@@ -55,7 +55,7 @@ export class DemoRootComponent {
   closeAdminMenu(): void { document.querySelector<HTMLDialogElement>('#demo-admin-navigation')?.close(); this.adminMenuOpen = false; this.adminMenuFocus?.focus(); }
   openReset(): void { this.resetFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null; document.querySelector<HTMLDialogElement>('#demo-reset-dialog')?.showModal(); }
   closeReset(): void { document.querySelector<HTMLDialogElement>('#demo-reset-dialog')?.close(); this.resetFocus?.focus(); }
-  confirmReset(): void { this.state.reset(); this.closeReset(); void this.router.navigate(['/demo/login']); }
+  confirmReset(): void { if (this.state.reset()) { this.closeReset(); void this.router.navigate(['/demo/login']); } }
 }
 
 @Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
@@ -205,7 +205,7 @@ export class DemoPageComponent {
   cancelPayment(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
   saveIncident(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order && this.state.run(() => this.state.commerce.reportIncident(order.id, this.incidentReason), 'Incidencia registrada y visible en seguimiento.')) this.close(); }
   resolveIncident(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.resolveIncident(order.id), 'Incidencia resuelta.'); }
-  receiptText(): string { const order = this.order; if (!order) return ''; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? 'Medio de pago no informado'}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), `Entrega ${this.money(order.delivery?.cost ?? 0)}`, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
+  receiptText(): string { const order = this.order; if (!order) return ''; const delivery = order.delivery ? `Entrega ${order.delivery.method.label} · ${this.money(order.delivery.cost)}` : `Entrega ${order.fulfillment?.label ?? 'Modalidad no informada'} · Costo no informado`; return ['COMPROBANTE DEMO — NO FISCAL', order.id, `Pago ${order.payment.label} · ${order.method?.label ?? 'Medio de pago no informado'}`, order.address, ...order.lines.map(line => `${line.name} × ${line.quantity} · ${this.money(line.unit * line.quantity)}`), delivery, `TOTAL ${this.money(order.total)}`, 'Sin cobro real ni validez fiscal.'].join('\n'); }
   downloadReceipt(): void { const url = URL.createObjectURL(new Blob([this.receiptText()], { type: 'text/plain;charset=utf-8' })); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `comprobante-demo-${this.order?.id}.txt`; anchor.click(); URL.revokeObjectURL(url); }
   printReceipt(): void { window.print(); }
   resolvePayment(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.resolvePayment(order.id, this.state.scenario()), 'Pago simulado actualizado.'); }

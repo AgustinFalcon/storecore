@@ -35,6 +35,7 @@ export class DemoApplicationState {
   }
   get data() { this.revision(); return this.commerce.snapshot; }
   get authorizationAvailable(): boolean { return this.authorizationReadable; }
+  get canResetDemo(): boolean { return !this.authorizationReadable || this.context() !== DemoContext.Admin || this.role() === UserRole.Admin; }
   get actor() { this.revision(); return this.commerce.actor(this.actorId()); }
   run(action: () => void, result: string): boolean {
     this.error.set(''); this.message.set('');
@@ -69,7 +70,8 @@ export class DemoApplicationState {
   private revokeAffectedSession(): void { if (this.context() === DemoContext.Customer) { try { this.validateCustomerSession(); } catch { this.logout(); } } }
   changeCustomerAccount(id: string, command: CustomerAccountCommand, reason: string): boolean { if (this.context() !== DemoContext.Admin || !CustomerAdministrationAuthority.canWrite(this.role())) { this.error.set('Acceso denegado.'); return false; } return this.run(() => this.commerce.changeCustomerAccount(this.role(), id, command, reason), 'Estado de la cuenta guardado en esta Demo.'); }
   logout(): void { this.sessionEpoch.update(value => value + 1); this.customerGeneration = null; this.role.set(UserRole.Unknown); this.context.set(DemoContext.Unknown); sessionStorage.removeItem('storecore.demo.context'); sessionStorage.removeItem('storecore.demo.actor'); sessionStorage.removeItem('storecore.demo.generation'); sessionStorage.removeItem('storecore.demo.role'); this.message.set('Sesión demo cerrada.'); }
-  reset(): void {
+  reset(): boolean {
+    if (!this.canResetDemo) { this.error.set('El rol Operador no puede restablecer los datos Demo.'); return false; }
     try {
       let storedRevision = this.persistedRevision;
       try { storedRevision = this.persistence.revisionOr(storedRevision); } catch { /* Reset repairs corrupt persistence. */ }
@@ -79,6 +81,7 @@ export class DemoApplicationState {
       this.commerce.snapshot = persisted.snapshot; this.persistedRevision = persisted.snapshot.revision; this.persistedRaw = persisted.raw;
       this.authorizationReadable = true;
       this.actorId.set('cliente'); this.logout(); this.scenario.set(DemoScenario.Approved); this.revision.update(value => value + 1); this.error.set(''); this.message.set('Demostración restablecida.');
-    } catch { this.error.set('No se pudo restablecer la demostración.'); }
+      return true;
+    } catch { this.error.set('No se pudo restablecer la demostración.'); return false; }
   }
 }

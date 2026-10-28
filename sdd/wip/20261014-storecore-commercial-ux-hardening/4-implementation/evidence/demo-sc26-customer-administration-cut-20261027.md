@@ -97,3 +97,22 @@ nuevo login, segunda pestaña, autorización en checkout pendiente y corrupción
 No se reutilizan los 631 tests ni el journal epoch de la evidencia histórica
 20261019. Stitch, triple gate visual global, revisión de SHA final y CI remoto
 siguen separados. El corte no declara backend, proveedores reales ni homologación.
+
+## Addendum de revisión exacta — 2026-10-28
+
+La revisión exacta del SHA provisional `02516d1` encontró y bloqueó tres P2:
+
+- el comprobante infería costo de entrega `$0` cuando `ORD-1015` no informa costo;
+- Operator podía usar el reset global para reescribir el acceso de cuentas;
+- un snapshot persistido como cadena vacía se confundía con ausencia y restauraba
+  el fallback Active en vez de fallar cerrado.
+
+La remediación muestra modalidad y `Costo no informado`, bloquea reset en contexto
+Operator tanto en vista como en estado, y distingue estrictamente `null` de cualquier
+wire persistido, incluida la cadena vacía. Se agregaron regresiones unitarias y browser.
+
+Reproducción final posterior a los P2: `npm run verify` PASS con arquitectura 6/6,
+lint, build Real y **70 archivos / 424 tests**; build Demo PASS 2026-10-28
+07:33:19 UTC; SC26 dirigido **11/11 PASS** (21.8 s); regresión Demo completa
+`npm run test:demo` **44/44 PASS** (2.3 min). La revisión debe repetirse sobre el
+nuevo SHA antes de publicar el PR.
