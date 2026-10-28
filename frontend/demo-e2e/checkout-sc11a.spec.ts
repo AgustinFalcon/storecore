@@ -32,7 +32,7 @@ for (const method of Method.all) {
     const total = await page.locator('.summary .total strong').innerText(); await expect(cta(page, 'checkout-confirm')).toContainText(total);
     await cta(page, 'checkout-confirm').click(); await expect(page).toHaveURL(/checkout\/result/); await expect(page.locator('.summary-row.total')).toContainText(total);
     await expect(page.locator('main')).toContainText(destinationText); await page.reload(); await expect(page.locator('main')).toContainText(destinationText);
-    await cta(page, 'order-receipt').click(); await expect(page.locator('.receipt-preview')).toContainText(total); await expect(page.locator('.receipt-preview')).toContainText(destinationText);
+    await cta(page, 'result-view-order').click(); await cta(page, 'order-receipt').click(); await expect(page.locator('.receipt-preview')).toContainText(total); await expect(page.locator('.receipt-preview')).toContainText(destinationText);
     const snapshot = JSON.parse((await stored(page))!); const order = snapshot.orders.at(-1); expect(order.lines[0].quantity).toBe(2); expect(order.delivery.method.wire).toBe(method.wire);
   });
 }

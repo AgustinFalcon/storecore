@@ -100,6 +100,7 @@
     },
     {
       "id": "TASK-011",
+      "demo_sc12a_cut_20261028": { "status": "verified_local", "base": "958769e", "scope": "Dedicated Demo buyer result and narrow shipment transitions; no schema/mass rewrite; overall TASK-011 pending", "evidence": "4-implementation/evidence/demo-sc12a-checkout-result-cut-20261028.md" },
       "demo_sc11a_cut_20261028": { "status": "verified_local", "base": "839ddd9", "scope": "Demo delivery confirmation and accessible review only; existing snapshot; overall TASK-011 remains pending", "evidence": "4-implementation/evidence/demo-sc11a-checkout-review-cut-20261028.md" },
       "title": "Completar carrito, checkout y resultado",
       "description": "Implementar conflictos de carrito, pasos de checkout como objetos y simulaciones honestas de envío/pago/QR/transferencia. La UI nunca infiere aprobación por redirect, QR o timer.",

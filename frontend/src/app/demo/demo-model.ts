@@ -2,6 +2,7 @@ import { CustomerAccountAccess, CustomerAccountState, CustomerAccountCommand, Cu
 import { UserRole } from '../domain/user/user-role';
 import { ContentDraft, type ContentDraftData } from './content/content-draft';
 import { DemoDeliveryQuote } from './checkout/demo-delivery-quote';
+import { DemoPaymentShipmentPolicy } from './checkout/demo-payment-shipment-policy';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 
@@ -160,7 +161,7 @@ export class DemoCommerce {
     if (actor.cart.some(line => line.variant === DemoProductVariant.Case && this.product(line.sku).supportsCase !== true)) throw new Error('Una presentación dejó de estar disponible. Quitá el producto y seleccioná otra variante.');
     const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku) + line.variant.extraUnit }));
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
-    const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: ShipmentStatus.Preparing, lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
+    const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
     order.method = method;
     if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total += order.delivery.cost; }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
@@ -174,14 +175,14 @@ export class DemoCommerce {
     const products = order.lines.map(line => ({ line, product: this.product(line.sku) }));
     if (products.some(({ line, product }) => product.reserved < line.quantity || product.onHand < line.quantity)) throw new Error('Las reservas del pedido son inconsistentes. Restablecé la demostración.');
     for (const { line, product } of products) { product.reserved -= line.quantity; if (scenario === DemoScenario.Approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Pago ${order.id}` }); } }
-    order.payment = scenario === DemoScenario.Approved ? PaymentStatus.Approved : PaymentStatus.Rejected; order.status = scenario === DemoScenario.Approved ? OrderStatus.Paid : OrderStatus.Cancelled; order.history.push(order.payment.label); this.commit(scenario === DemoScenario.Approved);
+    order.payment = scenario === DemoScenario.Approved ? PaymentStatus.Approved : PaymentStatus.Rejected; order.status = scenario === DemoScenario.Approved ? OrderStatus.Paid : OrderStatus.Cancelled; order.shipment = DemoPaymentShipmentPolicy.forPayment(order.payment); order.history.push(order.payment.label); this.commit(scenario === DemoScenario.Approved);
   }
   cancelPayment(orderId: string): void {
     const order = this.snapshot.orders.find(value => value.id === orderId); if (!order) throw new Error('Pedido no encontrado.');
     if (order.payment === PaymentStatus.Cancelled) return;
     if (order.payment !== PaymentStatus.Pending) throw new Error('Solo un pago pendiente puede cancelarse.');
     for (const line of order.lines) this.product(line.sku).reserved -= line.quantity;
-    order.payment = PaymentStatus.Cancelled; order.status = OrderStatus.Cancelled; order.history.push(`Pago cancelado · reserva liberada · ${this.now()}`); this.commit();
+    order.payment = PaymentStatus.Cancelled; order.status = OrderStatus.Cancelled; order.shipment = DemoPaymentShipmentPolicy.forPayment(order.payment); order.history.push(`Pago cancelado · reserva liberada · ${this.now()}`); this.commit();
   }
   reportIncident(orderId: string, reason: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order || order.payment !== PaymentStatus.Approved || !reason.trim()) throw new Error('Indicá una incidencia para un pedido aprobado.'); order.incident = reason.trim(); order.history.push(`Incidencia: ${order.incident} · ${this.now()}`); this.commit(); }
   resolveIncident(orderId: string): void { const order = this.snapshot.orders.find(value => value.id === orderId); if (!order?.incident) throw new Error('No hay incidencia pendiente.'); order.incident = ''; order.history.push(`Incidencia resuelta · ${this.now()}`); this.commit(); }
