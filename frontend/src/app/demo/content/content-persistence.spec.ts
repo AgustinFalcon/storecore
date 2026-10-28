@@ -11,7 +11,7 @@ describe('SC16 v3 draft persistence and existing transaction authority', () => {
   it.each([1, 2])('migrates legacy v%s without changing Home, identities or aggregate revision', version => {
     const legacy: Partial<DemoSnapshot> = { ...demoSeed(), version }; delete legacy.contentDraft;
     const restored = decodeSnapshot(JSON.stringify(legacy));
-    expect(restored.version).toBe(3); expect(restored.title).toBe(legacy.title); expect(restored.contentDraft.title).toBe(legacy.title);
+    expect(restored.version).toBe(demoSeed().version); expect(restored.title).toBe(legacy.title); expect(restored.contentDraft.title).toBe(legacy.title);
     expect(restored.revision).toBe(legacy.revision); expect(restored.orders).toHaveLength(legacy.orders!.length);
     restored.contentDraft.blocks[0].title = 'Draft only'; expect(restored.blocks[0].title).not.toBe('Draft only');
   });

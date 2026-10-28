@@ -111,6 +111,7 @@
     },
     {
       "id": "TASK-012",
+      "demo_sc14_cut_20261028": { "status": "verified_local", "base": "9bb6d07", "scope": "Dedicated CUSTOMER detail and safe timeline, incident/request/cancel commands, partial-line ledger and read-only advanced return/refund fixtures. Snapshot v4 explicit migration; no CUSTOMER approval/refund, no new Admin route/provider.", "evidence": "4-implementation/evidence/demo-sc14-order-aftercare-cut-20261028.md", "remaining": ["SC21 operational return/refund administration", "inventory intake/inspection/disposition/restock commands", "Real parity", "global final-review/visual/CI gates"] },
       "demo_sc13_cut_20261028": { "status": "verified_local", "base": "993074c", "scope": "Dedicated CUSTOMER history: strict recorded dates, stable chronology, closed payment filters, historical product search, pagination, safe empty/error/unknown and detail return. New orders capture injected clock once; no legacy rewrite or post-sale aggregate.", "evidence": "4-implementation/evidence/demo-sc13-order-history-cut-20261028.md", "remaining": ["SC14 rich post-sale", "Real parity", "global visual/CI/exact-head review gates"] },
       "title": "Completar pedidos y posventa de cliente",
       "description": "Implementar lista, detalle, timeline, tracking e incidentes/devoluciones simuladas con estados coherentes. Mostrar estado fiscal no fiscal sin emitir documentos ni inventar integración.",
