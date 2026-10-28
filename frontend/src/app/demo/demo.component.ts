@@ -16,6 +16,7 @@ import { AccessSelectionPurpose, DemoAccessContinuation, PurchaseCaptureStatus }
 import { DemoProductSelection } from './catalog/demo-product-selection';
 import { demoProductImage } from './catalog/demo-product-image';
 import { demoMoney } from './demo-money';
+import { OrderHistoryCriteria } from './orders/demo-order-history';
 import { DemoCheckoutFlow, DemoCheckoutIssue, type CheckoutFacts } from './checkout/demo-checkout-flow';
 import { DeliveryConfirmation, DemoDeliveryAcceptance, DemoDeliveryQuote } from './checkout/demo-delivery-quote';
 
@@ -66,6 +67,7 @@ export class DemoRootComponent {
 
 @Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink], templateUrl: './demo-page.html', styleUrl: './demo.scss' })
 export class DemoPageComponent {
+  get historyCriteria(): OrderHistoryCriteria { return OrderHistoryCriteria.fromWire({ q:this.route.snapshot.queryParamMap.get('q'),payment:this.route.snapshot.queryParamMap.get('payment'),page:this.route.snapshot.queryParamMap.get('page') }); }
   readonly Role = UserRole;
   readonly state = inject(DemoApplicationState);
   readonly route = inject(ActivatedRoute);
