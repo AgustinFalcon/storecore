@@ -1,6 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { demoSeed } from '../src/app/demo/demo-model';
+import { DemoRecoveryPhase } from '../src/app/demo/identity/demo-recovery-phase';
 
 const action = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
 const path = (page: Page, route: string) => page.goto(`/demo/${route}`);
@@ -8,6 +9,16 @@ async function login(page: Page, admin = false, email = 'cliente@demo.invalid') 
 async function confirm(page: Page) { await action(page,'operation-confirm').click(); }
 const observed = new Set<string>();
 const executed = new Set<string>();
+
+test('SC03 recovery CTAs have executed scenarios in the shared inventory', async ({ page }) => {
+ await path(page,'login'); await action(page,'login-recover-link').click();
+ await expect(page.getByRole('heading',{name:'Recuperar acceso',exact:true})).toBeVisible();
+ await page.getByLabel('Email',{exact:true}).fill('neutral@demo.invalid'); await action(page,'recovery-submit').click();
+ await expect(page.getByRole('status')).toContainText(DemoRecoveryPhase.Sent.label);
+ await page.getByText('Explorar resultados simulados',{exact:true}).click();
+ for(const phase of DemoRecoveryPhase.specimens) { await action(page,`recovery-scene-${phase.wire || 'unknown'}`).click(); await expect(page.getByRole('status')).toContainText(phase.label); }
+ await action(page,'recovery-login').click(); await expect(page).toHaveURL(/\/demo\/login\?/);
+});
 
 test('commercial payment shipping channel tabs and watchlist actions', async ({page}) => {
  test.setTimeout(120000); await login(page);

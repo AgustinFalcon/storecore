@@ -3,6 +3,7 @@ export class DemoScreen {
   private constructor(readonly path: string, readonly title: string, readonly admin = false, readonly privateCustomer = false) {}
   static readonly Home = new DemoScreen('', 'Inicio');
   static readonly Login = new DemoScreen('login', 'Ingresar');
+  static readonly Recover = new DemoScreen('recover', 'Recuperar acceso');
   static readonly Catalog = new DemoScreen('catalog', 'Catálogo');
   static readonly Product = new DemoScreen('catalog/:sku', 'Producto');
   static readonly Cart = new DemoScreen('cart', 'Tu carrito', false, true);
@@ -27,6 +28,6 @@ export class DemoScreen {
   static readonly Capabilities = new DemoScreen('user/capabilities', 'Módulos del comercio', true);
   static readonly Configuration = new DemoScreen('user/profile-import', 'Configuración del comercio', true);
   static readonly Unknown = new DemoScreen('unknown', 'Página no reconocida');
-  static readonly all = [this.Home, this.Login, this.Catalog, this.Product, this.Cart, this.Checkout, this.Result, this.Register, this.Profile, this.Addresses, this.Favorites, this.Orders, this.Order, this.AdminHome, this.Content, this.AdminCatalog, this.Offers, this.Promos, this.Customers, this.AdminOrders, this.AdminOrder, this.Inventory, this.ML, this.Capabilities, this.Configuration];
+  static readonly all = [this.Home, this.Login, this.Recover, this.Catalog, this.Product, this.Cart, this.Checkout, this.Result, this.Register, this.Profile, this.Addresses, this.Favorites, this.Orders, this.Order, this.AdminHome, this.Content, this.AdminCatalog, this.Offers, this.Promos, this.Customers, this.AdminOrders, this.AdminOrder, this.Inventory, this.ML, this.Capabilities, this.Configuration];
   static fromWire(raw: unknown): DemoScreen { return this.all.find(value => value.path === raw) ?? this.Unknown; }
 }
