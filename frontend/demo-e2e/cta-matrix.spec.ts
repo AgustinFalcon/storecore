@@ -10,6 +10,13 @@ async function confirm(page: Page) { await action(page,'operation-confirm').clic
 const observed = new Set<string>();
 const executed = new Set<string>();
 
+test('SC11A empty, delivery acceptance and editable review CTAs execute without a purchase', async ({ page }) => {
+ await login(page); await path(page,'checkout'); await action(page,'checkout-empty-catalog').click();
+ await path(page,'catalog/DEMO-001'); await action(page,'product-add-cart').click(); await path(page,'checkout'); await page.getByRole('radio').check(); await action(page,'checkout-step-next').click();
+ await action(page,'checkout-delivery-edit').click(); await action(page,'checkout-step-next').click(); await action(page,'checkout-delivery-confirm').check(); await action(page,'checkout-step-next').click();
+ await action(page,'checkout-review-edit-destination').click(); await expect(page.getByRole('heading',{name:'¿Dónde recibís tu pedido?',exact:true})).toBeVisible(); await expect(action(page,'shell-cart')).toContainText('1'); await action(page,'checkout-edit-cart').click(); await expect(page).toHaveURL(/cart/);
+});
+
 test('guest buyer CTAs keep a live selection through access links without an automatic purchase', async ({ page }) => {
  await path(page,'catalog/DEMO-001'); await page.getByLabel('Variante',{exact:true}).selectOption(DemoProductVariant.Case.wire); await page.getByLabel('Cantidad',{exact:true}).fill('2');
  await action(page,'product-add-cart').click(); expect(new URL(new URL(page.url()).searchParams.get('returnUrl')!,'https://demo.invalid').searchParams.get('quantity')).toBe('2');
@@ -41,7 +48,7 @@ test('commercial payment shipping channel tabs and watchlist actions', async ({p
  test.setTimeout(120000); await login(page);
  for(const id of ['account-profile','account-addresses','account-favorites','account-orders']) { await path(page,'customer/profile'); await action(page,id).click(); await expect(page.locator('main h1')).toBeVisible(); }
  await path(page,'catalog/DEMO-002'); await action(page,'related-DEMO-001').click();
- await action(page,'product-add-cart').click(); await path(page,'checkout'); await action(page,'checkout-destination').selectOption('home'); await page.getByRole('radio').check(); await action(page,'checkout-step-next').click(); await action(page,'checkout-delivery-method').selectOption('pickup'); await action(page,'checkout-step-next').click();
+ await action(page,'product-add-cart').click(); await path(page,'checkout'); await action(page,'checkout-destination').selectOption('pickup'); await action(page,'checkout-step-next').click(); await action(page,'checkout-delivery-confirm').check(); await action(page,'checkout-step-next').click();
  for(const method of ['qr','transfer','card']) { await action(page,'checkout-payment-method').selectOption(method); await expect(page.locator('.payment-preview')).toBeVisible(); }
  await action(page,'checkout-confirm').click(); await expect(page.getByRole('status')).toContainText('Procesando'); await action(page,'checkout-payment-cancel').click(); await expect(page.getByRole('status')).toContainText('cancelado'); await expect(action(page,'shell-cart')).toContainText('1');
  await action(page,'shell-scenario').selectOption('pending'); await action(page,'checkout-confirm').click(); await expect(page).toHaveURL(/checkout\/result/); const pendingId=page.url().split('/').at(-1)!; await path(page,'customer/orders'); await action(page,`order-open-${pendingId}`).click(); await path(page,'customer/orders'); await action(page,`order-alert-payment-${pendingId}`).click(); await action(page,'order-payment-cancel').click(); await confirm(page); await expect(page.getByRole('heading',{name:'Cancelado · Preparando'})).toBeVisible(); await action(page,'order-payment-retry').click(); await expect(page).toHaveURL(/cart/);
@@ -101,7 +108,7 @@ test('checkout all deterministic outcomes and order actions',async({page})=>{
   if(scenario==='rejected') { await action(page,'order-payment-retry').click(); await expect(page).toHaveURL(/cart/); await action(page,'cart-remove-DEMO-001').click(); } else { await action(page,'order-receipt').click(); await expect(page.getByRole('dialog')).toContainText('NO FISCAL'); await action(page,'dialog-close').click(); await action(page,'order-list-back').click(); }
  }
  await path(page,'customer/orders'); await page.getByLabel('Estado de pago',{exact:true}).selectOption('APPROVED'); await page.getByLabel('Buscar pedido',{exact:true}).fill('DEMO-100'); await action(page,'order-open-DEMO-100').click(); await action(page,'order-continue-shop').click(); await path(page,'customer/orders/DEMO-101'); await action(page,'order-tracking').click(); await action(page,'dialog-close').click();
- await path(page,'checkout'); await action(page,'checkout-edit-cart').click(); await path(page,'customer/orders'); for(const id of await page.locator('[data-cta^="order-open-"]').evaluateAll(elements=>elements.map(element=>element.getAttribute('data-cta')!))) { await action(page,id).click(); await expect(page.locator('main h1')).toBeVisible(); await action(page,'order-list-back').click(); }
+ await path(page,'checkout'); await action(page,'checkout-empty-catalog').click(); await path(page,'customer/orders'); for(const id of await page.locator('[data-cta^="order-open-"]').evaluateAll(elements=>elements.map(element=>element.getAttribute('data-cta')!))) { await action(page,id).click(); await expect(page.locator('main h1')).toBeVisible(); await action(page,'order-list-back').click(); }
 });
 
 test('admin editors, inventory, offers, fulfillment, ML and configuration CTAs',async({page})=>{

@@ -1,6 +1,7 @@
 import { CustomerAccountAccess, CustomerAccountState, CustomerAccountCommand, CustomerAdministrationAuthority, decodeCustomerAccess } from './customers/customer-account';
 import { UserRole } from '../domain/user/user-role';
 import { ContentDraft, type ContentDraftData } from './content/content-draft';
+import { DemoDeliveryQuote } from './checkout/demo-delivery-quote';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 
@@ -24,7 +25,7 @@ export class DemoContext {
 }
 export class CheckoutStep {
   private constructor(readonly wire: string, readonly label: string, readonly index: number) {}
-  static readonly Address = new CheckoutStep('address', 'Dirección', 0);
+  static readonly Address = new CheckoutStep('address', 'Destino', 0);
   static readonly Delivery = new CheckoutStep('delivery', 'Entrega', 1);
   static readonly Review = new CheckoutStep('review', 'Revisión y pago', 2);
   static readonly Unknown = new CheckoutStep('', 'Paso desconocido', -1);
@@ -161,7 +162,7 @@ export class DemoCommerce {
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
     const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: ShipmentStatus.Preparing, lines, total: lines.reduce((sum, line) => sum + line.unit * line.quantity, 0), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${this.now()}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
     order.method = method;
-    if (deliveryMethod) { order.delivery = { method: deliveryMethod, cost: deliveryMethod.cost, days: deliveryMethod === DemoDeliveryMethod.Home ? this.snapshot.settings.deliveryDays : deliveryMethod.days, destination: deliveryMethod === DemoDeliveryMethod.Pickup ? 'Comercio de muestra · Retiro con DNI y número de pedido' : `${address!.street} · ${address!.city} · CP ${address!.postal}` }; order.address = order.delivery.destination; order.total += order.delivery.cost; }
+    if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total += order.delivery.cost; }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
     this.snapshot.orders.push(order); actor.cart = []; this.commit(approved); return order;
   }
