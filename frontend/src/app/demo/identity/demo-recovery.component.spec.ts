@@ -13,6 +13,6 @@ describe('SC03 presentation boundary', () => {
     const component = fixture.componentInstance;
     component.email = 'person@demo.invalid'; component.simulate(Phase.Completed); expect(component.phase).toBe(Phase.Completed);
     epoch.update(value => value + 1); fixture.detectChanges(); expect(component.phase).toBe(Phase.Request); expect(component.email).toBe('');
-    expect(component.returnQuery.returnUrl).toBe('/demo'); fixture.destroy();
+    expect(component.returnQuery?.returnUrl).toBe('/demo'); fixture.destroy();
   });
 });

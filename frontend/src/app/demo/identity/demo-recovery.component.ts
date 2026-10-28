@@ -14,7 +14,7 @@ export class DemoRecoveryComponent {
   readonly specimens = DemoRecoveryPhase.specimens;
   readonly revision = signal(0);
   readonly flow = new DemoRecoveryFlow({ schedule: callback => { const timer = setTimeout(callback, 250); return () => clearTimeout(timer); } }, () => this.revision.update(value => value + 1));
-  readonly returnQuery = { returnUrl: DemoReturnDestination.fromWire(this.route.snapshot.queryParamMap.get('returnUrl')).url };
+  get returnQuery(): { returnUrl: string } | null { const raw = this.route.snapshot.queryParamMap.get('returnUrl'); return raw === null ? null : { returnUrl: DemoReturnDestination.fromWire(raw).url }; }
   email = '';
   get phase(): DemoRecoveryPhase { this.revision(); return this.flow.phase; }
   get error(): string { this.revision(); return this.flow.error; }

@@ -89,6 +89,7 @@
     },
     {
       "id": "TASK-010",
+      "demo_buyer_continuity_cut_20261028": { "status": "verified_local", "base": "d1e2513", "scope": "Natural Demo purchase/access intent across login/register/recovery only; no auto action or new persistence; overall TASK-010 remains pending", "evidence": "4-implementation/evidence/demo-buyer-continuity-cut-20261028.md" },
       "promotion_cut_sc03": { "status": "verified_local", "base": "a65115f", "review_amendment_base": "d706a9e", "evidence": "4-implementation/evidence/demo-sc03-access-recovery-cut-20261028.md", "scope": "Dedicated Demo recovery, safe customer return and actual PDP selection; overall TASK-010 remains pending" },
       "title": "Completar acceso unificado y cuenta de cliente",
       "description": "Implementar login, challenge de contexto, recuperación demo, registro, perfil, direcciones y favoritos con retorno seguro. Favoritos permanecen Demo/locales hasta que un corte propietario incorpore y pruebe ruta, tipos cerrados, port, repositorio HTTP y contrato backend; no se inventa sincronización productiva. Mantener realms, cookies, CSRF, permisos y sesiones separados.",

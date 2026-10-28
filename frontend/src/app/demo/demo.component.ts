@@ -12,7 +12,7 @@ import { DemoCatalogPresenter } from './catalog/demo-catalog-presenter';
 import { trapDemoDialogFocus } from './demo-dialog-focus';
 
 import { UserRole } from '../domain/user/user-role';
-import { DemoReturnDestination } from './identity/demo-return-destination';
+import { AccessSelectionPurpose, DemoAccessContinuation, PurchaseCaptureStatus } from './identity/demo-access-continuation';
 import { DemoProductSelection } from './catalog/demo-product-selection';
 import { demoProductImage } from './catalog/demo-product-image';
 import { demoMoney } from './demo-money';
@@ -109,6 +109,7 @@ export class DemoPageComponent {
   readonly sort = signal(CatalogSort.Featured);
   private readonly catalogPresenter = new DemoCatalogPresenter();
   private readonly catalogLocation = new DemoCatalogLocation();
+  private readonly continuation = new DemoAccessContinuation();
   readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
   readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
   readonly filtered = computed(() => this.catalogPresenter.filter(this.state.data.products, this.catalogCriteria, product => this.state.commerce.available(product.sku), product => this.state.commerce.price(product.sku)));
@@ -183,21 +184,45 @@ export class DemoPageComponent {
   get draftPrice(): number { return this.draftProduct.price / 100; }
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
   clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
-  toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
+  toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { if (this.screen === DemoScreen.Product && this.product?.sku === sku) this.requestProductAccess(this.product, AccessSelectionPurpose.Favorite); else void this.router.navigate(['/demo/login'], { queryParams: this.continuation.route(this.router.url) }); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
   selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
   private restoreProductSelection(): void {
     if (this.screen !== DemoScreen.Product) return;
     const selected = DemoProductSelection.fromWire(this.route.snapshot.queryParamMap, this.variants, this.product ? this.stock(this.product) : 0);
     this.variant.set(selected.variant); this.quantity = selected.quantity;
   }
-  add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
+  add(product: DemoProduct): void {
+    if (this.state.context() !== DemoContext.Customer) {
+      this.requestProductAccess(product); return;
+    }
+    this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`);
+  }
+  private requestProductAccess(product: DemoProduct, purpose = AccessSelectionPurpose.Purchase): void {
+    const criteria = this.catalogQueryParams;
+    const captured = this.continuation.capture.execute(product, this.variant(), this.quantity, this.stock(product), { get: key => criteria[key] == null ? null : String(criteria[key]) }, purpose);
+    if (captured.status !== PurchaseCaptureStatus.Ready) { this.state.error.set(captured.status.label); return; }
+    this.state.error.set(''); void this.router.navigate(['/demo/login'], { queryParams: { returnUrl: captured.target.url } });
+  }
   setQuantity(sku: string, raw: number | null): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN), 'Carrito actualizado.'); }
   remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
-  get authReturnQuery(): { returnUrl: string } { return { returnUrl: DemoReturnDestination.fromWire(this.route.snapshot.queryParamMap.get('returnUrl')).url }; }
-  context(context: DemoContext, role = UserRole.Admin): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; if (this.state.login(context, actor, role)) void this.router.navigateByUrl(context === DemoContext.Admin ? role === UserRole.Operator ? '/demo/user/customers' : '/demo/user/home' : this.authReturnQuery.returnUrl); }
-  register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => this.state.commerce.registerActor({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }), 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
+  get authReturnQuery(): { returnUrl: string } | null { return this.continuation.query(this.route.snapshot.queryParamMap.get('returnUrl')); }
+  get accessReturnQuery(): { returnUrl: string } | null { return this.continuation.route(this.router.url); }
+  context(context: DemoContext, role = UserRole.Admin): void {
+    const destination = this.continuation.resolve.execute(this.route.snapshot.queryParamMap.get('returnUrl'), DemoScreen.Login, context, role);
+    const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente';
+    const target = this.continuation.complete.execute(destination, () => this.state.login(context, actor, role));
+    if (target !== null) void this.router.navigateByUrl(target);
+  }
+  register(): void {
+    if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; }
+    const destination = this.continuation.resolve.execute(this.route.snapshot.queryParamMap.get('returnUrl'), DemoScreen.Register, DemoContext.Customer, UserRole.Unknown);
+    const id = `customer-${crypto.randomUUID()}`;
+    if (!this.state.run(() => this.state.commerce.registerActor({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }), 'Cuenta demo creada.')) return;
+    const target = this.continuation.complete.execute(destination, () => this.state.login(DemoContext.Customer, id));
+    if (target !== null) void this.router.navigateByUrl(target);
+  }
   nextStep(): void { if (this.step() === CheckoutStep.Address && this.deliveryMethod() !== DemoDeliveryMethod.Pickup && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección o retiro en el comercio.'); return; } if (this.step() === CheckoutStep.Delivery && (!this.delivery || this.deliveryMethod() === DemoDeliveryMethod.Unknown || (this.deliveryMethod() === DemoDeliveryMethod.Home && !this.state.actor.addresses.some(address => address.id === this.addressId)))) { this.state.error.set('Confirmá la entrega; domicilio requiere una dirección válida.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
   checkout(): void {
     if (this.paymentPhase() === DemoPaymentPhase.Processing) return;

@@ -19,7 +19,7 @@ test('SC03 is an actual route and exposes neutral retryable outcomes without dat
   await page.clock.install();
   await page.goto('/demo/login');
   await cta(page, 'login-recover-link').click();
-  await expect(page).toHaveURL(/\/demo\/recover\?/);
+  await expect(page).toHaveURL(/\/demo\/recover(?:\?|$)/);
   await expect(page.getByRole('heading', { name: 'Recuperar acceso', exact: true })).toBeVisible();
   const before = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
   const email = page.getByLabel('Email', { exact: true });

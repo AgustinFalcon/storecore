@@ -1,6 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { demoSeed } from '../src/app/demo/demo-model';
+import { DemoProductVariant, demoSeed } from '../src/app/demo/demo-model';
 import { DemoRecoveryPhase } from '../src/app/demo/identity/demo-recovery-phase';
 
 const action = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
@@ -9,6 +9,13 @@ async function login(page: Page, admin = false, email = 'cliente@demo.invalid') 
 async function confirm(page: Page) { await action(page,'operation-confirm').click(); }
 const observed = new Set<string>();
 const executed = new Set<string>();
+
+test('guest buyer CTAs keep a live selection through access links without an automatic purchase', async ({ page }) => {
+ await path(page,'catalog/DEMO-001'); await page.getByLabel('Variante',{exact:true}).selectOption(DemoProductVariant.Case.wire); await page.getByLabel('Cantidad',{exact:true}).fill('2');
+ await action(page,'product-add-cart').click(); expect(new URL(new URL(page.url()).searchParams.get('returnUrl')!,'https://demo.invalid').searchParams.get('quantity')).toBe('2');
+ await action(page,'login-register-link').click(); await action(page,'login-register-link').click(); await action(page,'login-recover-link').click(); await action(page,'recovery-login').click();
+ await page.getByLabel('Contraseña',{exact:true}).fill('demo'); await action(page,'login-submit').click(); await action(page,'login-customer').click(); await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('2'); await expect(action(page,'shell-cart')).toContainText('0');
+});
 
 test('SC16 draft preview and leave dialogs execute every new content CTA', async ({ page }) => {
  await path(page,'user/content'); await action(page,'content-login').click();
@@ -27,7 +34,7 @@ test('SC03 recovery CTAs have executed scenarios in the shared inventory', async
  await expect(page.getByRole('status')).toContainText(DemoRecoveryPhase.Sent.label);
  await page.getByText('Explorar resultados simulados',{exact:true}).click();
  for(const phase of DemoRecoveryPhase.specimens) { await action(page,`recovery-scene-${phase.wire || 'unknown'}`).click(); await expect(page.getByRole('status')).toContainText(phase.label); }
- await action(page,'recovery-login').click(); await expect(page).toHaveURL(/\/demo\/login\?/);
+ await action(page,'recovery-login').click(); await expect(page).toHaveURL(/\/demo\/login$/);
 });
 
 test('commercial payment shipping channel tabs and watchlist actions', async ({page}) => {
