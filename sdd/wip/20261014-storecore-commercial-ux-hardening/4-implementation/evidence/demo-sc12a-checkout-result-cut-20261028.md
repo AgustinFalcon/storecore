@@ -1,8 +1,9 @@
 # SC12A Demo checkout result — local cut
 
 Base `958769e973021ecd34d983cd0f0605ad5f1f7be6`. Authorized scope recorded
-before implementation, 2026-10-28. Status: verified locally; no promotion,
-remote CI or exact-SHA independent approval is claimed.
+before implementation, 2026-10-28. Status: verified locally after accessibility
+amendment of `d5dc4d9`; previous105-test evidence is historical only. Final
+exact-SHA independent review remains required; no promotion/CI claim.
 
 ## Contract
 
@@ -29,9 +30,34 @@ claim; no provider, fiscal or actual shipping/payment activation is included.
 - [x] Closed outcome/presenter and narrow shipment policy with tests.
 - [x] Dedicated result UI, actor isolation, explicit actions and accessibility.
 - [x] Owner E2E and shared CTA/regression updates.
-- [x] Verify/builds/full Demo and honest evidence closeout.
+- [x] Amended verify/builds/full Demo and honest evidence closeout.
 
 ## Local checks and review amendments
+
+### Heading-focus amendment
+
+Exact-SHA UX review reproduced Confirmar→resultado leaving activeElement BODY.
+The result now focuses its authorized h1 after render on entry, order-ID changes
+and outcome changes; scenario-shell-only changes must preserve the user's focus.
+Component and real-browser journey/direct/reused-route regressions were added. Gates
+below remain historical until the amended source is validated; no assertion
+will be weakened or replaced by manual focus in the test.
+
+- Focused result/component:2 files /9 tests PASS10:07:51UTC, including actual
+  rendered DOM focus and ID/outcome changes; same-outcome and shell changes do
+  not steal focus.
+- Amended verify: architecture/lint PASS,85 files /539 tests PASS; Real build
+  PASS10:08:44UTC. OwnerSC12A11 +SC11A12 =23/23 PASS41.8s. Browser assertions
+  cover Enter on actual Confirmar→focused h1, direct reload, reused result ID,
+  missing ID and scenario-select focus retention without manual heading focus.
+- Full amended `npm.cmd run test:demo`: **106/106 PASS**,0 unexpected/skipped/
+  flaky; start2026-10-28 10:09:58.228UTC, duration236790.398ms, no retries.
+  Final Demo build PASS10:09:57UTC; `.last-run.json` passed / failedTests[].
+  Shared CTA inventory and existing checkout/SC26 regressions pass unchanged.
+- Final diff check PASS. No product-source edits after these amended gates,
+  only SDD closeout. No commit/push, backend/schema change or external write.
+
+### Historical pre-focus-amendment gates
 
 - Focused checkout/result plus safe-return: 8 files /70 tests PASS,
   2026-10-28 09:52:04UTC. Final verify includes the subsequent component test.

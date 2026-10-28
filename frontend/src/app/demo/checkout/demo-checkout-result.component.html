@@ -1,7 +1,7 @@
 <section class="page store-page result-page">
  @if (!allowed) { <div class="empty-state"><h1>Ingresá para consultar tu pedido</h1><p>El resultado está vinculado a tu cuenta de cliente Demo.</p><a data-cta="result-login" routerLink="/demo/login" [queryParams]="returnQuery" class="button primary">Elegir acceso</a></div> } @else {
  @let view = result();
- <header class="page-heading"><div><p class="eyebrow">RESULTADO DE COMPRA · DEMOSTRACIÓN</p><h1>{{ view.outcome.title }}</h1></div></header>
+ <header class="page-heading"><div><p class="eyebrow">RESULTADO DE COMPRA · DEMOSTRACIÓN</p><h1 #resultHeading id="result-heading" tabindex="-1">{{ view.outcome.title }}</h1></div></header>
  <p class="result-description" role="status">{{ view.outcome.description }}</p>
  <p class="demo-note">Los datos y las operaciones son simulados. Este resultado no certifica un cobro, envío, reintegro ni comprobante fiscal real.</p>
  <div class="result-actions">@if (view.order; as order) { <a data-cta="result-view-order" class="button primary" [routerLink]="['/demo/customer/orders', order.id]">{{ view.outcome.actionLabel }}</a> } @else { <a data-cta="result-missing-orders" class="button primary" routerLink="/demo/customer/orders">{{ view.outcome.actionLabel }}</a> }<a data-cta="result-catalog" routerLink="/demo/catalog">Volver al catálogo</a></div>

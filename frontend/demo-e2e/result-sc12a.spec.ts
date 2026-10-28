@@ -8,18 +8,32 @@ import { OrderStatus, PaymentStatus, ShipmentStatus } from '../src/app/domain/or
 const cta = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
 function fixture(scenario = DemoScenario.Approved, delivery = DemoDeliveryMethod.Home) { const commerce = new DemoCommerce(demoSeed(), () => '2026-10-28T12:00:00Z', () => 'SC12A'); commerce.add('cliente', 'DEMO-001', 2, DemoProductVariant.Case); const order = commerce.checkout('cliente', 'SC12A', 'address-cliente', scenario, DemoPaymentMethod.Card, delivery); return { snapshot: commerce.snapshot, order }; }
 async function login(page: Page) { await page.goto('/demo/login'); await page.getByLabel('Contraseña', { exact: true }).fill('demo'); await cta(page, 'login-submit').click(); await cta(page, 'login-customer').click(); }
-async function open(page: Page, snapshot: DemoSnapshot, id: string) { await page.goto('/demo/login'); await page.evaluate(raw => { localStorage.setItem('storecore.commercial-demo.v1', raw); sessionStorage.clear(); }, JSON.stringify(snapshot)); await login(page); await page.goto('/demo/checkout/result/'+id); }
+async function open(page: Page, snapshot: DemoSnapshot, id: string) { await page.goto('/demo/login'); await page.evaluate(raw => { localStorage.setItem('storecore.commercial-demo.v1', raw); sessionStorage.clear(); }, JSON.stringify(snapshot)); await login(page); await page.goto('/demo/checkout/result/'+id); await expect(page.getByRole('heading', { level: 1 })).toBeFocused(); }
 async function storage(page: Page) { return page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } })); }
 
 test('SC12A new coherent outcomes use persisted facts; shell/query/reload never decide payment or mutate storage', async ({ page }) => {
   for (const entry of [{ scenario: DemoScenario.Approved, outcome: Outcome.Approved, shipment: ShipmentStatus.Preparing }, { scenario: DemoScenario.Pending, outcome: Outcome.Pending, shipment: ShipmentStatus.Pending }, { scenario: DemoScenario.Rejected, outcome: Outcome.Rejected, shipment: ShipmentStatus.Cancelled }]) {
     const { snapshot, order } = fixture(entry.scenario); await open(page, snapshot, order.id); const before = await storage(page);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(entry.outcome.title); await expect(page.locator('.result-facts')).toContainText(entry.shipment.label);
-    await cta(page, 'shell-scenario').selectOption(DemoScenario.Approved.wire); await page.goto(page.url()+'?outcome=approved'); await page.reload();
+    await cta(page, 'shell-scenario').focus(); await cta(page, 'shell-scenario').selectOption(DemoScenario.Rejected.wire); await expect(cta(page, 'shell-scenario')).toBeFocused(); await page.goto(page.url()+'?outcome=approved'); await page.reload(); await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(entry.outcome.title); expect(await storage(page)).toEqual(before);
     await expect(page.locator('[data-cta^="order-payment-"]')).toHaveCount(0); await expect(page.locator('.result-line')).toContainText(DemoProductVariant.Case.label);
     await cta(page, 'result-view-order').click(); await expect(page).toHaveURL(new RegExp('/demo/customer/orders/'+order.id+'$')); expect(await storage(page)).toEqual(before);
   }
+});
+
+test('SC12A real Confirmar journey, direct reload and reused result ID focus the new heading', async ({ page }) => {
+  await login(page); await page.goto('/demo/catalog/DEMO-001'); await cta(page, 'product-add-cart').click(); await page.goto('/demo/checkout');
+  await page.getByRole('radio').check(); await cta(page, 'checkout-step-next').click(); await cta(page, 'checkout-delivery-confirm').check(); await cta(page, 'checkout-step-next').click();
+  await cta(page, 'checkout-confirm').focus(); await page.keyboard.press('Enter'); await expect(page).toHaveURL(/checkout\/result\/DEMO-/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(Outcome.Approved.title); await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+  await page.reload(); await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+  await cta(page, 'result-catalog').focus();
+  await page.evaluate(() => { history.pushState(null, '', '/demo/checkout/result/DEMO-100'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await expect(page.getByRole('heading', { name: 'Pedido DEMO-100', exact: true })).toBeVisible(); await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
+  await cta(page, 'result-catalog').focus();
+  await page.evaluate(() => { history.pushState(null, '', '/demo/checkout/result/missing-focus'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(Outcome.Unavailable.title); await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
 });
 
 test('SC12A pending decisions remain explicit in order detail and update coherent shipment', async ({ page }) => {
