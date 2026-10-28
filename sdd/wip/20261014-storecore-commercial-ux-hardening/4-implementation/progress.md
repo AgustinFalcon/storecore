@@ -538,3 +538,39 @@ Implemented provisionally on base `a6ce9fa926650c9a1a109d9f02281d22046157b4`: de
 - Final local checks: independent `npm run verify` PASS with **70 files / 421 tests**, lint, architecture **6/6 + scan** and Real build; independent final `npm run test:demo` **44/44 PASS** on the Demo build that includes the missing-persistence login guard. Final directed SC26 browser **11/11 PASS** at 19:42:33 UTC, 22.7 s, no skipped/flaky, 20 Axe scenes with zero total violations and 19 local PNG. See current evidence for exact build/run boundaries.
 - Current evidence: `evidence/demo-sc26-customer-administration-cut-20261027.md`. The 20261019 SC26 epoch/journal evidence is explicitly historical/superseded and is not reused as certification. TASK-013 overall remains pending; global Stitch/reviews/CI gates are separate. No commit, push, PR, merge, publish or backend changes.
 - Exact-SHA review of provisional `02516d1` raised three P2 (unknown delivery cost rendered as zero, Operator reset authority, empty persisted wire falling back to Active). All three were remediated with closed-domain copy/guards and regression tests. Post-fix verification: **70 files / 424 tests**, directed SC26 **11/11** and full Demo **44/44 PASS**; a new exact-SHA review is required before PR publication.
+
+## 2026-10-28 — SC03 dedicated Demo recovery promotion cut
+
+Based on `a65115f`, implemented a dedicated public `/demo/recover` surface with
+closed phases, request/simulation step objects, cancellable scheduler and
+generation fence. The UI discloses simulation, treats arbitrary emails neutrally
+and changes no credentials, account permission, snapshot or session. A single
+return-target decoder allows customer Demo routes and preserves purchase query
+parameters; ordinary login only consumes that target for CUSTOMER. Existing
+Admin/Operator landings, session epochs and transactional persistence remain the
+authority. No backend or SC22–26 code was copied from the dirty integration tree.
+
+Current evidence and honest run boundaries are recorded in
+`evidence/demo-sc03-access-recovery-cut-20261028.md`: focused 33 tests,
+`verify` 74 files / 457 tests with architecture/lint/Real build PASS, Demo build
+PASS and directed browser 8/8 with Axe/reflow/keyboard across five widths.
+The initial full Demo run exposed a missing execution in the shared CTA
+inventory; its actual SC03 scenario was added and final rebuild plus full
+Demo rerun passed **53/53** with no retries/skips. TASK-010 overall stays pending. Historical dirty-tree
+evidence is not reused. No commit, push, PR, deployment or homologation.
+
+### SC03 exact-SHA P2 amendments after `d706a9e`
+
+Two review findings were corrected locally: the recovered product destination
+now applies the canonical supported variant and valid quantity to the PDP (not
+only its URL), and encoded/dot path syntax is rejected before URL normalization.
+A pure `DemoProductSelection` boundary handles initial/query/SKU navigation;
+unsupported variants render Unknown and invalid amounts cannot mutate the cart.
+The owner E2E now uses actual Case/2 and asserts selection, reload and persisted
+cart effects, plus malformed/unavailable selection and encoded-dot regressions.
+
+Amended checks: focused **5 files / 52 tests**, `verify` **75 files / 476 tests**
+plus architecture/lint/Real build PASS, Demo build PASS, SC03 Chromium **9/9**
+and final full Demo **54/54 PASS**, no skips/flaky/retries. Exact run boundaries
+are in the SC03 evidence; previous 53/53 and exact-SHA reviews do not certify
+this amendment. TASK-010/global design and promotion gates remain open.

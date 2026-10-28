@@ -12,6 +12,8 @@ import { DemoCatalogPresenter } from './catalog/demo-catalog-presenter';
 import { trapDemoDialogFocus } from './demo-dialog-focus';
 
 import { UserRole } from '../domain/user/user-role';
+import { DemoReturnDestination } from './identity/demo-return-destination';
+import { DemoProductSelection } from './catalog/demo-product-selection';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -142,7 +144,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { effect(() => { this.state.sessionEpoch(); this.cancelProcessing(); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.variant.set(DemoProductVariant.Standard); this.quantity = 1; this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { effect(() => { this.state.sessionEpoch(); this.cancelProcessing(); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   productImage(product: DemoProduct): string { return `/assets/demo/${/^DEMO-0(0[1-9]|1[0-2])$/.test(product.sku) ? product.sku : 'DEMO-010'}.svg`; }
   get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
@@ -184,12 +186,18 @@ export class DemoPageComponent {
   clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
   selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
+  private restoreProductSelection(): void {
+    if (this.screen !== DemoScreen.Product) return;
+    const selected = DemoProductSelection.fromWire(this.route.snapshot.queryParamMap, this.variants, this.product ? this.stock(this.product) : 0);
+    this.variant.set(selected.variant); this.quantity = selected.quantity;
+  }
   add(product: DemoProduct): void { if (this.state.context() !== DemoContext.Customer) { void this.router.navigate(['/demo/login']); return; } this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`); }
   setQuantity(sku: string, raw: number | null): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN), 'Carrito actualizado.'); }
   remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
-  context(context: DemoContext, role = UserRole.Admin): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; if (this.state.login(context, actor, role)) void this.router.navigate([context === DemoContext.Admin ? role === UserRole.Operator ? '/demo/user/customers' : '/demo/user/home' : '/demo']); }
+  get authReturnQuery(): { returnUrl: string } { return { returnUrl: DemoReturnDestination.fromWire(this.route.snapshot.queryParamMap.get('returnUrl')).url }; }
+  context(context: DemoContext, role = UserRole.Admin): void { const actor = this.state.data.actors.find(value => value.email.toLowerCase() === this.email.toLowerCase())?.id ?? 'cliente'; if (this.state.login(context, actor, role)) void this.router.navigateByUrl(context === DemoContext.Admin ? role === UserRole.Operator ? '/demo/user/customers' : '/demo/user/home' : this.authReturnQuery.returnUrl); }
   register(): void { if (!this.profileName.trim() || !this.email.includes('@') || this.password.length < 4) { this.state.error.set('Completá nombre, email válido y contraseña de al menos 4 caracteres.'); return; } const id = `customer-${crypto.randomUUID()}`; if (this.state.run(() => this.state.commerce.registerActor({ id, email: this.email, firstName: this.profileName, lastName: this.profileLastName, phone: '', addresses: [], cart: [], favorites: [] }), 'Cuenta demo creada.')) { this.state.login(DemoContext.Customer, id); void this.router.navigate(['/demo/customer/profile']); } }
   nextStep(): void { if (this.step() === CheckoutStep.Address && this.deliveryMethod() !== DemoDeliveryMethod.Pickup && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección o retiro en el comercio.'); return; } if (this.step() === CheckoutStep.Delivery && (!this.delivery || this.deliveryMethod() === DemoDeliveryMethod.Unknown || (this.deliveryMethod() === DemoDeliveryMethod.Home && !this.state.actor.addresses.some(address => address.id === this.addressId)))) { this.state.error.set('Confirmá la entrega; domicilio requiere una dirección válida.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
   checkout(): void {
