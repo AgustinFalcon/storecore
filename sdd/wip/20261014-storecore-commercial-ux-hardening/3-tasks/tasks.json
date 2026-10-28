@@ -111,6 +111,7 @@
     },
     {
       "id": "TASK-012",
+      "demo_sc13_cut_20261028": { "status": "verified_local", "base": "993074c", "scope": "Dedicated CUSTOMER history: strict recorded dates, stable chronology, closed payment filters, historical product search, pagination, safe empty/error/unknown and detail return. New orders capture injected clock once; no legacy rewrite or post-sale aggregate.", "evidence": "4-implementation/evidence/demo-sc13-order-history-cut-20261028.md", "remaining": ["SC14 rich post-sale", "Real parity", "global visual/CI/exact-head review gates"] },
       "title": "Completar pedidos y posventa de cliente",
       "description": "Implementar lista, detalle, timeline, tracking e incidentes/devoluciones simuladas con estados coherentes. Mostrar estado fiscal no fiscal sin emitir documentos ni inventar integración.",
       "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008", "TASK-011"],
