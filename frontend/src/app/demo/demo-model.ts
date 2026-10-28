@@ -5,6 +5,7 @@ import { DemoDeliveryQuote } from './checkout/demo-delivery-quote';
 import { DemoPaymentShipmentPolicy } from './checkout/demo-payment-shipment-policy';
 import { AftercareCodec,type AftercareLedger } from './aftercare/aftercare-ledger';
 import { ReturnStage,ReturnOutcome,ReturnReason,RefundStatus } from './aftercare/aftercare-types';
+import { CatalogProductPolicy } from './admin-catalog/catalog-policy';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 
@@ -210,9 +211,10 @@ export class DemoCommerce {
     if (!editingSku && existing) throw new Error('El SKU ya existe. Editá el producto existente.');
     if (editingSku && (!existing || product.sku !== editingSku)) throw new Error('No se puede cambiar el SKU de un producto existente.');
     const reserved = existing?.reserved ?? 0;
+    new CatalogProductPolicy().validate({...product,supportsCase:product.supportsCase===true,reserved},DemoProductVariant.Case.extraUnit);
     if (!product.name.trim() || !product.sku.trim() || !Number.isSafeInteger(product.price) || product.price <= 0 || !Number.isInteger(product.onHand) || product.onHand < reserved) throw new Error('Revisá nombre, SKU, precio y stock; respetá las reservas existentes.');
     if (existing) Object.assign(existing, { ...product, supportsCase: product.supportsCase === true, reserved }); else this.snapshot.products.push({ ...product, supportsCase: product.supportsCase === true, reserved: 0 });
-    this.commit(true);
+    this.commit();
   }
   saveCampaign(campaign: DemoCampaign): void { this.requireModule(DemoModuleId.Catalog); if (!campaign.title.trim() || !this.snapshot.products.some(value => value.sku === campaign.sku) || campaign.percent <= 0 || campaign.percent > 70 || campaign.from > campaign.until) throw new Error('Revisá el título, producto, descuento (1–70%) y vigencia.'); const index = this.snapshot.campaigns.findIndex(value => value.id === campaign.id); if (index < 0) this.snapshot.campaigns.push({ ...campaign }); else this.snapshot.campaigns[index] = { ...campaign }; this.commit(); }
   touch(): void { this.commit(); }
@@ -227,6 +229,8 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const legacyAftercare=state.version!==4;
   const legacyContent = state.version === 1 || state.version === 2;
   if (state.products.some(value => !value.sku || !Number.isSafeInteger(value.price) || value.price <= 0 || !Number.isInteger(value.onHand) || !Number.isInteger(value.reserved) || value.reserved < 0 || value.onHand < value.reserved)) throw new Error('Stock o precios inválidos. Restablecé la demostración.');
+  state.products=state.products.map(product=>({...product,supportsCase:product.supportsCase===undefined?true:product.supportsCase}));
+  state.products.forEach(product=>new CatalogProductPolicy().validate(product,DemoProductVariant.Case.extraUnit));
   const skus = new Set(state.products.map(product => product.sku));
   if (skus.size !== state.products.length || !state.actors.some(actor => actor.id === 'cliente') || state.actors.some(actor => !actor.id || typeof actor.email !== 'string' || typeof actor.firstName !== 'string' || !Array.isArray(actor.addresses) || !Array.isArray(actor.cart) || !Array.isArray(actor.favorites) || actor.cart.some(line => !skus.has(line.sku) || !Number.isInteger(line.quantity) || line.quantity < 1) || actor.addresses.some(address => !address.id || typeof address.street !== 'string' || typeof address.city !== 'string' || typeof address.postal !== 'string'))) throw new Error('La identidad o el carrito demo guardado son inválidos. Restablecé la demostración.');
   if (state.orders.some(order => !order.id || !state.actors.some(actor => actor.id === order.actor) || !Array.isArray(order.lines) || !Array.isArray(order.history) || !Number.isSafeInteger(order.total) || order.total < 0 || order.lines.some(line => !skus.has(line.sku) || !Number.isInteger(line.quantity) || line.quantity < 1 || !Number.isSafeInteger(line.unit) || line.unit < 0))) throw new Error('El historial demo guardado es inválido. Restablecé la demostración.');
@@ -247,7 +251,6 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.orders = state.orders.map(order => ({ ...order, lines: order.lines.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
   state.actors = state.actors.map(actor => ({ ...actor, cart: actor.cart.map(line => ({ ...line, variant: line.variant ? DemoProductVariant.fromWire(line.variant.wire) : DemoProductVariant.Standard })) }));
   if (state.products.some(product => product.supportsCase !== undefined && typeof product.supportsCase !== 'boolean')) throw new Error('Las variantes demo guardadas son inválidas. Restablecé la demostración.');
-  state.products = state.products.map(product => ({ ...product, supportsCase: product.supportsCase ?? true }));
   const normalizedEmails = state.actors.map(actor => actor.email.trim().toLowerCase());
   if (new Set(normalizedEmails).size !== normalizedEmails.length) throw new Error('La identidad demo guardada contiene emails duplicados. Restablecé la demostración.');
   const requiredReservations = new Map<string, number>();
