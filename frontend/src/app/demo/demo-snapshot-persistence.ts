@@ -18,7 +18,7 @@ export class DemoSnapshotPersistence {
 
   load(fallback: DemoSnapshot): PersistedDemoSnapshot {
     const raw = this.storage.getItem(DemoSnapshotPersistence.key);
-    return { raw, snapshot: raw ? decodeSnapshot(raw) : decodeSnapshot(JSON.stringify(fallback)) };
+    return { raw, snapshot: raw !== null ? decodeSnapshot(raw) : decodeSnapshot(JSON.stringify(fallback)) };
   }
 
   raw(): string | null {
@@ -27,17 +27,17 @@ export class DemoSnapshotPersistence {
 
   current(fallback: DemoSnapshot): DemoSnapshot {
     const raw = this.raw();
-    return raw ? decodeSnapshot(raw) : decodeSnapshot(JSON.stringify(fallback));
+    return raw !== null ? decodeSnapshot(raw) : decodeSnapshot(JSON.stringify(fallback));
   }
 
   revisionOr(fallback: number): number {
     const raw = this.raw();
-    return raw ? decodeSnapshot(raw).revision : fallback;
+    return raw !== null ? decodeSnapshot(raw).revision : fallback;
   }
 
   assertUnchanged(expectedRaw: string | null, expectedRevision: number): void {
     const raw = this.raw();
-    if (raw !== expectedRaw || (raw && decodeSnapshot(raw).revision !== expectedRevision)) {
+    if (raw !== expectedRaw || (raw !== null && decodeSnapshot(raw).revision !== expectedRevision)) {
       throw new DemoSnapshotConflict('Los datos cambiaron en otra pestaña. Recargá antes de guardar.');
     }
   }
@@ -57,6 +57,7 @@ export class DemoSnapshotPersistence {
   private commit(snapshot: DemoSnapshot, priorRaw: string | null): PersistedDemoSnapshot {
     const candidateRaw = JSON.stringify(snapshot);
     decodeSnapshot(candidateRaw);
+    if (candidateRaw === priorRaw) return { raw: priorRaw, snapshot: decodeSnapshot(candidateRaw) };
     try {
       this.storage.setItem(DemoSnapshotPersistence.key, candidateRaw);
       const storedRaw = this.storage.getItem(DemoSnapshotPersistence.key);

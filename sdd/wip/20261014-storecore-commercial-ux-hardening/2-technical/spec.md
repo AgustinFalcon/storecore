@@ -200,6 +200,21 @@ The Real RMA transition is closed and whole-order only and follows the productiv
 - `SC-SURF-24` reads capabilities for Admin and Operator through the existing frontend binding. Productive mutation is deferred: the current frontend port lacks the reasoned/versioned command and `capabilityCommandStatus` reconciliation required by this design. The future owning cut must promote those port/repository extensions and tests before exposing the Admin CTA. The closed productive operational state is `CapabilityModuleState` (`DISABLED`, `READ_ONLY`, `ACTIVE`, `PAUSED`, `ERROR`, `Unknown`); availability and delivery level are separate closed presentation types. Future modules without a productive `CapabilityModuleId` are informational only.
 - `SC-SURF-25` is Admin-only. Real accepts the server profile schema: `universal-tools-profile`, `1.0.0`, compatibility `1.x`, `content.homeSections` and non-empty `mergeSelection.homeSections`. Preview and merge send the exact same locally retained manifest text; editing or selecting invalidates the preview. No server preview ID, hash, CAS or idempotency guarantee exists. The presenter translates the server diff into closed `ADD`, `UPDATE`, `UNCHANGED`, `Unknown` values. General settings, export and reset are Demo-only typed commands with an explicit field allowlist and deterministic before/after snapshots.
 - `SC-SURF-26` is Demo-only. Admin and Operator read; Admin alone writes account state. `CustomerAccountState` is `ACTIVE`, `RESTRICTED`, `Unknown`. The restriction command is idempotent and owns its effect on Demo session/login/checkout; order/refund/return aggregates are never mutated. The fixture joins `customer-2209` to `ORD-1015` by ID rather than inferred name or email.
+
+SC26 promotion 2026-10-27 connects the dedicated `demo/customers` feature to
+`main.demo.ts`, `DemoApplicationState` and `DemoCommerce`. The existing `UserRole`
+type supplies authority; Operator is limited to customer reads and order detail
+reads, never global admin mutation. Snapshot v2 owns a closed account state and
+monotonic access generation per account. The sole decoder explicitly migrates v1;
+missing/invalid v2 authority becomes Unknown. Malformed persistence cannot restore
+authorization from a seed. Session generation is checked at rehydrate, login and
+transaction time, including immediately before deferred checkout execution;
+reactivation increments generation and requires a new login. Actor/logout changes
+cancel pending callbacks and confirmations. Web Locks supplies the existing single
+writer boundary; a read-only tab does not open account mutation. No parallel epoch
+journal or localStorage CAS is introduced. See current evidence
+`4-implementation/evidence/demo-sc26-customer-administration-cut-20261027.md`;
+the 20261019 SC26 journal evidence is historical and non-certifying for this cut.
 - `design-manifest.json.targetApplicability` is authoritative for SC-SURF-24..26 as well. Views use typed action objects for role, target, preconditions and unavailable alternatives; they do not branch on raw strings.
 
 ### Canonical operational ledger

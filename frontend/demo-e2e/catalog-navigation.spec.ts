@@ -1,10 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { demoSeed } from '../src/app/demo/demo-model';
 
 const cta = (page: import('@playwright/test').Page, id: string) => page.locator(`[data-cta="${id}"]`);
+const secondPage = `Página 2 de ${Math.ceil(demoSeed().products.filter(product => product.active).length / 6)}`;
 
 test('catalog context survives product navigation, reload and browser history', async ({ page }) => {
   await page.goto('/demo/catalog?sort=name&page=2');
-  await expect(page.getByText('Página 2 de 2', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(secondPage, { exact: true }).first()).toBeVisible();
   await expect(page.getByLabel('Hasta $')).toHaveValue('');
   const firstCard = page.locator('.product-card').first();
   const sku = await firstCard.locator('[data-cta^="product-open-"]').getAttribute('data-cta');
@@ -20,12 +22,12 @@ test('catalog context survives product navigation, reload and browser history', 
   await cta(page, 'product-back').click();
   await expect(page).toHaveURL(/sort=name/);
   await expect(page).toHaveURL(/page=2/);
-  await expect(page.getByText('Página 2 de 2', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(secondPage, { exact: true }).first()).toBeVisible();
   await expect(page.locator(`[data-cta="${sku}"]`)).toBeVisible();
   await page.goBack();
   await expect(page.locator('main h1')).toBeVisible();
   await page.goForward();
-  await expect(page.getByText('Página 2 de 2', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(secondPage, { exact: true }).first()).toBeVisible();
 });
 
 test('filters are URL state, reset pagination and recover unknown values', async ({ page }) => {

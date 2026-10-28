@@ -1,0 +1,27 @@
+<section class="page customers-page">
+@if (!state.authorizationAvailable) { <div class="empty-state"><h1>No se pudieron leer los datos Demo</h1><p role="alert">{{ state.error() }}</p><p>La autorización permanece cerrada. Revisá los datos guardados o usá Restablecer para reparar explícitamente la demostración.</p><button (click)="reload()">Reintentar lectura</button></div> }
+@else if (!allowed) { <div class="empty-state"><h1>Acceso denegado</h1><p>La administración de clientes requiere un usuario interno autorizado.</p><a routerLink="/demo/login">Elegir acceso Demo</a></div> }
+@else {
+<header class="page-heading"><div><p class="eyebrow">TU COMERCIO · DEMOSTRACIÓN</p><h1>Clientes</h1><p>Consultá perfiles e historial de compras de esta demostración.</p></div><span class="badge">{{ state.role().label }}</span></header>
+<div class="section-heading"><label>Buscar clientes<input type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Nombre, email o ID"/></label><label>Estado de la cuenta<select [ngModel]="filter().wire" (ngModelChange)="changeFilter($event)">@for (option of filters; track option.wire) { <option [value]="option.wire">{{ option.label }}</option> }</select></label></div>
+@if (hasFilters) { <button (click)="clearFilters()">Limpiar filtros</button> }
+<p aria-live="polite">{{ customers.length }} clientes encontrados</p>
+<div class="customer-grid">@for (customer of customers; track customer.id) { <article class="card"><span class="badge">{{ customer.access?.state?.label || AccountState.Unknown.label }}</span><h2>{{ customer.firstName }} {{ customer.lastName }}</h2><p>{{ customer.email }}</p><p class="muted">{{ customer.id }}</p><button [attr.data-cta]="'customer-open-' + customer.id" (click)="open(customer)">Ver ficha</button></article> } @empty { <div class="empty-state"><h2>{{ state.data.actors.length ? 'No hay resultados' : 'Todavía no hay clientes' }}</h2><p>Probá otro nombre, email o estado de cuenta.</p><button (click)="clearFilters()">Limpiar filtros</button></div> }</div>
+}
+</section>
+<dialog (keydown)="trapFocus($event)" id="customer-summary" aria-labelledby="customer-summary-title" (cancel)="$event.preventDefault(); closeDetail()">
+<p role="status" aria-live="polite">{{ feedback() }}</p>
+@if (allowed && !state.writerStatus().writable) { <p role="status">{{ state.writerStatus().guidance }} La consulta está disponible; los cambios de cuenta están bloqueados.</p> }
+@if (selected; as customer) { <h2 id="customer-summary-title" tabindex="-1">{{ customer.firstName }} {{ customer.lastName }}</h2><p>{{ customer.id }} · {{ customer.access?.state?.label || AccountState.Unknown.label }}</p><p>{{ customer.email }}</p><p>{{ customer.phone || 'Sin teléfono informado' }}</p><h3>Direcciones de muestra</h3>@for (address of customer.addresses; track address.id) { <p>{{ address.label }} · {{ address.id }}<br/>{{ address.street }}, {{ address.city }}@if (address.postal) { · CP {{ address.postal }} }</p> } @empty { <p>Sin direcciones informadas.</p> }
+<h3>Pedidos del cliente</h3>@for (order of orders; track order.id) { <p><a [routerLink]="['/demo/user/orders', order.id]">{{ order.id }} · {{ money(order.total) }}</a><br/>{{ order.payment.label }} · {{ order.shipment.label }}</p> } @empty { <p>Sin pedidos registrados.</p> }
+@if (customer.access?.reason) { <p>Motivo registrado: {{ customer.access!.reason }}</p> }
+<div class="actions">@if (writable && customer.access?.state === AccountState.Active) { <button (click)="prepare(Command.Restrict)">Restringir cuenta</button> } @if (writable && customer.access?.state === AccountState.Restricted) { <button (click)="prepare(Command.Reactivate)">Reactivar cuenta</button> } <button (click)="closeDetail()">Cerrar ficha</button></div>
+} @else if (allowed && selectedId()) { <h2 id="customer-summary-title">Cliente no encontrado</h2><p>El cliente seleccionado ya no está disponible. Volvé al listado y actualizá los datos.</p><button (click)="closeDetail()">Volver a clientes</button> }
+</dialog>
+<dialog (keydown)="trapFocus($event)" id="confirm-account-state" aria-labelledby="confirm-account-title" (cancel)="$event.preventDefault(); closeConfirmation()">
+<h2 id="confirm-account-title">{{ command().label }}</h2><p>{{ selected?.firstName }} {{ selected?.lastName }} · {{ selected?.id }}</p>
+<p>Restringir cierra la sesión Demo de esta cuenta y bloquea nuevos ingresos, checkout y creación de pedidos. Conserva perfil, direcciones, carrito, pedidos, devoluciones y reembolsos. No cancela pedidos ni emite reembolsos. Reactivar permite un nuevo inicio de sesión sin restaurar sesiones anteriores.</p>
+@if (command() === Command.Restrict) { <label>Motivo de restricción<textarea required maxlength="500" [(ngModel)]="reason"></textarea></label> }
+@if (state.error()) { <p role="alert">{{ state.error() }}</p> }
+<div class="actions"><button (click)="closeConfirmation()">Cancelar</button><button class="primary" [disabled]="command() === Command.Restrict && !reason.trim()" (click)="confirm()">Confirmar cambio</button></div>
+</dialog>

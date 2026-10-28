@@ -51,7 +51,14 @@ describe('DemoSnapshotPersistence', () => {
     localStorage.setItem(DemoSnapshotPersistence.key, '{corrupt');
     expect(() => repository().current(demoSeed())).toThrow();
     expect(() => repository().replace(demoSeed())).not.toThrow();
-    expect(repository().current(demoSeed()).version).toBe(1);
+    expect(repository().current(demoSeed()).version).toBe(2);
+  });
+
+  it('treats an empty persisted value as corrupt instead of restoring the active fallback', () => {
+    localStorage.setItem(DemoSnapshotPersistence.key, '');
+    expect(() => repository().load(demoSeed())).toThrow();
+    expect(() => repository().current(demoSeed())).toThrow();
+    expect(() => repository().revisionOr(0)).toThrow();
   });
 
   it('restores prior durable data when readback verification fails', () => {

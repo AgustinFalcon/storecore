@@ -116,6 +116,7 @@
     },
     {
       "id": "TASK-013",
+      "demo_sc26_cut_20261027": { "status": "implemented_provisional", "scope": "/demo/user/customers only; dedicated feature; closed account states/filter/commands; UserRole authority; snapshot v2 access-generation migration; rehydrate/login/deferred-checkout authorization; accessible customer/confirmation dialogs and mobile admin drawer", "owner_e2e": "frontend/demo-e2e/sc26-customer-administration.spec.ts", "evidence": "4-implementation/evidence/demo-sc26-customer-administration-cut-20261027.md", "remaining_gates": ["Stitch global visual gate", "dual final exact-head review", "CI exact-head NOT_RUN", "TASK-013 other surfaces remain separately scoped"] },
       "title": "Completar dashboard, contenido y administración de clientes",
       "description": "Implementar dashboard demo derivado, edición/preview de contenido y nueva superficie de clientes. En producción, home operador conserva sólo navegación autorizada hasta existir un contrato de métricas/clientes.",
       "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007", "TASK-008"],

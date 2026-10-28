@@ -250,6 +250,14 @@ Real cut 2026-10-27: Admin-only `/user/profile-import` uses actual HTTP reposito
 - Restricting requires a reason and confirmation, changes `ACTIVE -> RESTRICTED`, clears that customer's Demo session, denies new login and blocks new checkout/order creation. It preserves profile, addresses, cart, historical orders, returns and refunds and never cancels or refunds an order. Reactivation changes `RESTRICTED -> ACTIVE`, permits a future login/checkout and does not recreate a cleared session.
 - States include populated, empty, no result, active, restricted, unknown, customer-not-found, loading, saving, success, cancellation and read/write failure. Credentials, secrets and session tokens never appear; Unknown denies mutation.
 
+The local synchronous SC26 runtime does not fabricate observable loading/saving
+delays: confirmation commits once within the synchronous command and repeat is
+idempotent. A read failure is visibly distinct from access denied and offers retry
+or explicit reset; failure preserves the reason draft for retry. Success is
+announced in the affected customer's open summary with a stable focus destination.
+At mobile widths the administrative navigation is a separate accessible drawer;
+it does not permanently push the customer task below the navigation links.
+
 ## Cross-surface states
 
 - Access denied offers a safe destination without privileged-content leakage.
