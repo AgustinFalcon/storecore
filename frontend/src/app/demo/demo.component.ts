@@ -1,4 +1,4 @@
-import { Component, effect, computed, inject, signal, DestroyRef } from '@angular/core';
+import { Component, effect, computed, inject, signal, DestroyRef, afterNextRender, Injector } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -16,6 +16,8 @@ import { AccessSelectionPurpose, DemoAccessContinuation, PurchaseCaptureStatus }
 import { DemoProductSelection } from './catalog/demo-product-selection';
 import { demoProductImage } from './catalog/demo-product-image';
 import { demoMoney } from './demo-money';
+import { DemoCheckoutFlow, DemoCheckoutIssue, type CheckoutFacts } from './checkout/demo-checkout-flow';
+import { DeliveryConfirmation, DemoDeliveryAcceptance, DemoDeliveryQuote } from './checkout/demo-delivery-quote';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -77,6 +79,12 @@ export class DemoPageComponent {
   readonly Method = DemoPaymentMethod;
   readonly Phase = DemoPaymentPhase;
   readonly Delivery = DemoDeliveryMethod;
+  readonly DeliveryConfirmation = DeliveryConfirmation;
+  readonly CheckoutIssue = DemoCheckoutIssue;
+  readonly checkoutIssue = signal(DemoCheckoutIssue.None);
+  private readonly checkoutFlow = new DemoCheckoutFlow();
+  private readonly deliveryAcceptance = new DemoDeliveryAcceptance();
+  private readonly injector = inject(Injector);
   readonly MLTab = DemoMLTab;
   readonly Sync = DemoSyncStatus;
   readonly paymentMethod = signal(DemoPaymentMethod.Card);
@@ -127,7 +135,12 @@ export class DemoPageComponent {
   chooseContext = false;
   quantity = 1;
   addressId = '';
-  delivery = false;
+  get delivery(): boolean { return this.deliveryConfirmation === DeliveryConfirmation.Confirmed; }
+  set delivery(confirmed: boolean) { if (confirmed) this.deliveryAcceptance.confirm(this.deliveryQuote, this.checkoutCartIdentity); else this.deliveryAcceptance.reset(); this.checkoutIssue.set(DemoCheckoutIssue.None); }
+  get deliveryQuote(): DemoDeliveryQuote { return DemoDeliveryQuote.create(this.deliveryMethod(), this.state.actor.addresses.find(value => value.id === this.addressId), this.state.data.settings.deliveryDays); }
+  private get checkoutCartIdentity(): string { return JSON.stringify([this.state.actorId(), this.state.sessionEpoch(), this.cartLines.map(line => [line.sku, line.variant.wire, line.quantity, line.unit])]); }
+  get deliveryConfirmation(): DeliveryConfirmation { return this.deliveryAcceptance.state(this.deliveryQuote, this.checkoutCartIdentity); }
+  private get checkoutFacts(): CheckoutFacts { return { quote: this.deliveryQuote, confirmation: this.deliveryConfirmation, hasItems: this.cartLines.length > 0 }; }
   profileName = this.state.actor.firstName;
   profileLastName = this.state.actor.lastName;
   profilePhone = this.state.actor.phone;
@@ -144,12 +157,17 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { effect(() => { this.state.sessionEpoch(); this.cancelProcessing(); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { effect(() => { this.state.sessionEpoch(); this.deliveryAcceptance.reset(); clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Ready); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   readonly productImage = demoProductImage;
-  get checkoutTotal(): number { return this.total + this.deliveryMethod().cost; }
+  get checkoutTotal(): number { return this.total + (this.deliveryQuote.valid ? this.deliveryQuote.cost : 0); }
   selectPayment(raw: string): void { this.paymentMethod.set(DemoPaymentMethod.fromWire(raw)); }
-  selectDelivery(raw: string): void { this.deliveryMethod.set(DemoDeliveryMethod.fromWire(raw)); this.delivery = this.deliveryMethod() !== DemoDeliveryMethod.Unknown; }
+  selectDelivery(raw: string): void { const method = DemoDeliveryMethod.fromWire(raw); if (method !== this.deliveryMethod()) this.deliveryAcceptance.reset(); this.deliveryMethod.set(method); this.checkoutIssue.set(DemoCheckoutIssue.None); }
+  selectCheckoutAddress(id: string): void { if (id !== this.addressId) this.deliveryAcceptance.reset(); this.addressId = id; this.checkoutIssue.set(DemoCheckoutIssue.None); }
+  private focusCheckout(id: string): void { afterNextRender(() => (document.getElementById(id) ?? document.getElementById('checkout-destination-control'))?.focus(), { injector: this.injector }); }
+  keepCheckoutFocusVisible(event: FocusEvent): void { const target = event.target; const strip = document.querySelector('.checkout-total-strip'); if (!(target instanceof HTMLElement) || !strip) return; const top = target.getBoundingClientRect().top, bottom = strip.getBoundingClientRect().bottom; if (top < bottom + 12) window.scrollBy(0, top - bottom - 12); }
+  checkoutStep(step: CheckoutStep): void { if (this.paymentPhase() === DemoPaymentPhase.Processing) return; this.checkoutIssue.set(DemoCheckoutIssue.None); this.step.set(step); this.focusCheckout('checkout-stage-title'); }
+  private showCheckoutIssue(issue: DemoCheckoutIssue): void { this.checkoutIssue.set(issue); this.focusCheckout(issue === DemoCheckoutIssue.MissingAddress ? 'checkout-addresses' : issue === DemoCheckoutIssue.MissingDelivery ? 'checkout-delivery-confirm' : issue === DemoCheckoutIssue.MissingPayment ? 'checkout-payment-control' : 'checkout-stage-title'); }
   selectMLTab(tab: DemoMLTab): void { this.mlTab.set(tab); }
   mlKeyboard(event: KeyboardEvent): void { const index = DemoMLTab.all.indexOf(this.mlTab()); const next = event.key === 'ArrowRight' ? (index + 1) % DemoMLTab.all.length : event.key === 'ArrowLeft' ? (index + DemoMLTab.all.length - 1) % DemoMLTab.all.length : event.key === 'Home' ? 0 : event.key === 'End' ? DemoMLTab.all.length - 1 : -1; if (next < 0) return; event.preventDefault(); const tab = DemoMLTab.all[next]; this.mlTab.set(tab); setTimeout(() => document.getElementById(`ml-tab-${tab.wire}`)?.focus()); }
   get screen(): DemoScreen { return DemoScreen.fromWire(this.route.snapshot.data['screen']); }
@@ -223,15 +241,17 @@ export class DemoPageComponent {
     const target = this.continuation.complete.execute(destination, () => this.state.login(DemoContext.Customer, id));
     if (target !== null) void this.router.navigateByUrl(target);
   }
-  nextStep(): void { if (this.step() === CheckoutStep.Address && this.deliveryMethod() !== DemoDeliveryMethod.Pickup && !this.state.actor.addresses.some(address => address.id === this.addressId)) { this.state.error.set('Seleccioná una dirección o retiro en el comercio.'); return; } if (this.step() === CheckoutStep.Delivery && (!this.delivery || this.deliveryMethod() === DemoDeliveryMethod.Unknown || (this.deliveryMethod() === DemoDeliveryMethod.Home && !this.state.actor.addresses.some(address => address.id === this.addressId)))) { this.state.error.set('Confirmá la entrega; domicilio requiere una dirección válida.'); return; } this.state.error.set(''); this.step.set(this.step().next()); }
+  nextStep(): void { const result = this.checkoutFlow.advance(this.step(), this.checkoutFacts); if (result.issue !== DemoCheckoutIssue.None) { this.showCheckoutIssue(result.issue); return; } this.state.error.set(''); this.checkoutStep(result.step); }
   checkout(): void {
     if (this.paymentPhase() === DemoPaymentPhase.Processing) return;
-    if (this.paymentMethod() === DemoPaymentMethod.Unknown || this.deliveryMethod() === DemoDeliveryMethod.Unknown) { this.state.error.set('Seleccioná pago y entrega.'); return; }
+    const issue = this.checkoutFlow.validateSubmission(this.paymentMethod(), this.checkoutFacts);
+    if (issue !== DemoCheckoutIssue.None) { if (issue === DemoCheckoutIssue.MissingAddress) this.step.set(CheckoutStep.Address); else if (issue === DemoCheckoutIssue.MissingDelivery) this.step.set(CheckoutStep.Delivery); this.showCheckoutIssue(issue); return; }
     try { this.state.validateCustomerSession(); } catch (error) { this.state.error.set(error instanceof Error ? error.message : 'Sesión no válida.'); return; }
     const epoch = this.state.sessionEpoch();
     const actorId = this.state.actorId(), addressId = this.addressId, scenario = this.state.scenario(), method = this.paymentMethod(), delivery = this.deliveryMethod();
+    const acceptedQuote = this.deliveryQuote, acceptedCart = this.checkoutCartIdentity;
     this.paymentPhase.set(DemoPaymentPhase.Processing);
-    this.paymentTimer = setTimeout(() => { if (epoch !== this.state.sessionEpoch() || this.state.context() !== DemoContext.Customer) return; let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(actorId, this.request, addressId, scenario, method, delivery).id; }, 'Pedido registrado.')) void this.router.navigate(['/demo/checkout/result', id]); this.paymentPhase.set(DemoPaymentPhase.Ready); }, 750);
+    this.paymentTimer = setTimeout(() => { if (epoch !== this.state.sessionEpoch() || this.state.context() !== DemoContext.Customer) return; if (!acceptedQuote.sameAs(this.deliveryQuote) || acceptedCart !== this.checkoutCartIdentity) this.deliveryAcceptance.reset(); const currentIssue = this.checkoutFlow.validateSubmission(method, this.checkoutFacts); if (currentIssue !== DemoCheckoutIssue.None) { this.paymentPhase.set(DemoPaymentPhase.Ready); this.step.set(currentIssue === DemoCheckoutIssue.MissingAddress ? CheckoutStep.Address : CheckoutStep.Delivery); this.showCheckoutIssue(currentIssue); return; } let id = ''; if (this.state.run(() => { id = this.state.commerce.checkout(actorId, this.request, addressId, scenario, method, delivery).id; }, 'Pedido registrado.')) void this.router.navigate(['/demo/checkout/result', id]); this.paymentPhase.set(DemoPaymentPhase.Ready); }, 750);
   }
   cancelProcessing(): void { clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Cancelled); }
   cancelPayment(): void { if (this.screen.admin && this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.cancelPayment(order.id), 'Pago cancelado. Reserva de stock liberada.'); }
@@ -252,7 +272,7 @@ export class DemoPageComponent {
   saveProduct(): void { if (this.state.run(() => this.state.commerce.saveProduct({ ...this.draftProduct }, this.editingSku), `Producto ${this.draftProduct.sku} guardado.`)) this.close(); }
   archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...product, active: !product.active }, product.sku), product.active ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
   editAddress(address?: DemoAddress): void { this.draftAddress = address ? { ...address } : { id: crypto.randomUUID(), label: 'Casa', street: '', city: '', postal: '', primary: false }; this.open(DemoDialog.Address); }
-  saveAddress(): void { if (!this.draftAddress.street.trim() || !this.draftAddress.city.trim() || !this.draftAddress.postal.trim()) { this.state.error.set('Completá calle, ciudad y código postal.'); return; } if (this.state.run(() => { const actor = this.state.actor; const index = actor.addresses.findIndex(value => value.id === this.draftAddress.id); if (this.draftAddress.primary) actor.addresses.forEach(value => value.primary = false); if (index < 0) actor.addresses.push({ ...this.draftAddress, primary: actor.addresses.length === 0 || this.draftAddress.primary }); else actor.addresses[index] = { ...this.draftAddress }; this.state.commerce.touch(); }, 'Dirección guardada.')) this.close(); }
+  saveAddress(): void { if (!this.draftAddress.street.trim() || !this.draftAddress.city.trim() || !this.draftAddress.postal.trim()) { this.state.error.set('Completá calle, ciudad y código postal.'); return; } if (this.state.run(() => { const actor = this.state.actor; const index = actor.addresses.findIndex(value => value.id === this.draftAddress.id); if (this.draftAddress.primary) actor.addresses.forEach(value => value.primary = false); if (index < 0) actor.addresses.push({ ...this.draftAddress, primary: actor.addresses.length === 0 || this.draftAddress.primary }); else actor.addresses[index] = { ...this.draftAddress }; this.state.commerce.touch(); }, 'Dirección guardada.')) { this.close(); if (this.screen === DemoScreen.Checkout) { this.selectCheckoutAddress(this.draftAddress.id); this.focusCheckout('checkout-addresses'); } } }
   deleteAddress(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses = this.state.actor.addresses.filter(value => value.id !== address.id); if (address.primary && this.state.actor.addresses[0]) this.state.actor.addresses[0].primary = true; this.state.commerce.touch(); }, 'Dirección eliminada.'); }
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
