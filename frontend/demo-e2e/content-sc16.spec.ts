@@ -3,6 +3,7 @@ import { expect, Page, test } from '@playwright/test';
 import { ContentDraftIssue } from '../src/app/demo/content/content-draft';
 import { ContentEditPhase, ContentDraftStatus } from '../src/app/demo/content/content-types';
 import { UserRole } from '../src/app/domain/user/user-role';
+import { demoSeed } from '../src/app/demo/demo-model';
 
 const cta = (page: Page, id: string) => page.locator('[data-cta="'+id+'"]');
 const snapshot = (page: Page) => page.evaluate(() => localStorage.getItem('storecore.commercial-demo.v1'));
@@ -24,7 +25,7 @@ test('SC16 preview uses unsaved copy; saving/reload preserves draft but never pu
   expect(await snapshot(page)).toBe(before);
   await cta(page, 'content-preview-close').click(); await expect(cta(page, 'content-preview')).toBeFocused();
   await cta(page, 'content-save').click(); await expect(page.locator('.draft-status')).toContainText(ContentEditPhase.Saved.label);
-  const saved = JSON.parse((await snapshot(page))!); expect(saved.version).toBe(3); expect(saved.title).toBe(homeTitle); expect(saved.contentDraft.title).toBe('Portada en preparación');
+  const saved = JSON.parse((await snapshot(page))!); expect(saved.version).toBe(demoSeed().version); expect(saved.title).toBe(homeTitle); expect(saved.contentDraft.title).toBe('Portada en preparación');
   await page.reload(); await expect(title).toHaveValue('Portada en preparación');
   await cta(page, 'content-current-store').click(); await expect(page.getByRole('heading', { name: homeTitle, exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Portada en preparación', exact: true })).toHaveCount(0);

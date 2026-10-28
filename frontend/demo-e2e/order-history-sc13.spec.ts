@@ -49,7 +49,7 @@ test('SC13 actor isolation, empty account, guest/USER and corrupt durable data n
 test('SC13 terminal, delivered and unknown snapshots remain distinct and never auto-resolve or expose incidents',async({page})=>{
   const snapshot=demoSeed(), source=snapshot.orders[0];
   const cases=[{id:'rejected',payment:PaymentStatus.Rejected,status:OrderStatus.Cancelled,shipment:ShipmentStatus.Cancelled},{id:'cancelled',payment:PaymentStatus.Cancelled,status:OrderStatus.Cancelled,shipment:ShipmentStatus.Cancelled},{id:'delivered',payment:PaymentStatus.Approved,status:OrderStatus.Paid,shipment:ShipmentStatus.Delivered},{id:'refunded',payment:PaymentStatus.Refunded,status:OrderStatus.Refunded,shipment:ShipmentStatus.Delivered},{id:'unknown',payment:PaymentStatus.Unknown,status:OrderStatus.Unknown,shipment:ShipmentStatus.Unknown}];
-  snapshot.orders=cases.map(entry=>({...source,...entry,request:entry.id,createdDate:'2026-10-28',incident:'DO-NOT-DISCLOSE'}));await open(page,snapshot);const before=await storage(page);
+  snapshot.aftercare={returns:[],incidents:[]};snapshot.orders=cases.map(entry=>({...source,...entry,request:entry.id,createdDate:'2026-10-28',incident:'DO-NOT-DISCLOSE'}));await open(page,snapshot);const before=await storage(page);
   for(const entry of cases){const row=page.locator('.history-order').filter({has:page.getByRole('heading',{name:entry.id,exact:true})});await expect(row).toContainText(entry.payment.label);await expect(row).toContainText(entry.shipment.label);await expect(row.getByRole('link')).toHaveCount(1);}
   await expect(page.locator('.history-page')).not.toContainText('DO-NOT-DISCLOSE');await expect(page.locator('.history-warning')).toHaveCount(2);await page.reload();expect(await storage(page)).toEqual(before);
 });

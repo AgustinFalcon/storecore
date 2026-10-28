@@ -17,6 +17,7 @@ export class DemoOrderDate {
     if (this.precision !== other.precision) return this.precision === OrderDatePrecision.Day ? -1 : 1;
     return this.precision === OrderDatePrecision.Instant ? (other.time ?? 0)-(this.time ?? 0) : 0;
   }
+  isNotAfter(other:DemoOrderDate):boolean|null {if(this.civilDay===null||other.civilDay===null)return null;if(this.precision===OrderDatePrecision.Instant&&other.precision===OrderDatePrecision.Instant)return (this.time??0)<=(other.time??0);return this.civilDay<=other.civilDay;}
   static fromWire(raw: unknown): DemoOrderDate {
     const unknown = () => new DemoOrderDate(OrderDatePrecision.Unknown, null, OrderDatePrecision.Unknown.label);
     if (typeof raw !== 'string') return unknown();
