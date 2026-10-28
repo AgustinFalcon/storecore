@@ -1,9 +1,10 @@
 import type { DemoProduct } from '../demo-model';
 import { CatalogIssue,CatalogValidationError,ProductPublication } from './catalog-types';
 export class CatalogProductPolicy {
+  validSku(raw:unknown):raw is string{return typeof raw==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(raw);}
   validate(product:DemoProduct,caseExtra:number):void{
     const fail=(issue:CatalogIssue):never=>{throw new CatalogValidationError(issue);};
-    if(typeof product.sku!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(product.sku))fail(CatalogIssue.SKU);
+    if(!this.validSku(product.sku))fail(CatalogIssue.SKU);
     if(typeof product.name!=='string'||!product.name.trim()||product.name.length>160)fail(CatalogIssue.Name);
     if(typeof product.brand!=='string'||!product.brand.trim()||product.brand.length>80)fail(CatalogIssue.Brand);
     if(typeof product.category!=='string'||!product.category.trim()||product.category.length>80)fail(CatalogIssue.Category);

@@ -44,7 +44,7 @@ export class OverviewAction {
   static readonly Inventory=new OverviewAction('dashboard-inventory','Gestionar inventario','/demo/user/inventory',DemoModuleId.Catalog);
   static readonly Products=new OverviewAction('dashboard-products','Gestionar productos','/demo/user/catalog',DemoModuleId.Catalog,true);
   static readonly Content=new OverviewAction('dashboard-content','Editar borrador de portada','/demo/user/content',null,true);
-  static readonly Offers=new OverviewAction('dashboard-offers','Revisar ofertas','/demo/user/offers',DemoModuleId.Catalog);
+  static readonly Offers=new OverviewAction('dashboard-offers','Revisar ofertas','/demo/user/offers',DemoModuleId.Catalog,true);
   static readonly Customers=new OverviewAction('dashboard-customers','Consultar clientes','/demo/user/customers',null,true);
   static readonly Channel=new OverviewAction('dashboard-alert-channel','Revisar canal simulado','/demo/user/mercadolibre',DemoModuleId.MercadoLibre);
   static readonly Settings=new OverviewAction('dashboard-settings','Configuración','/demo/user/profile-import',null);
