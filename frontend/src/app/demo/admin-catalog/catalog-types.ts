@@ -5,6 +5,8 @@ export class ProductPublication {
   static readonly Unknown=new ProductPublication('','Publicación no reconocida',null,'Acción no disponible','No se permiten cambios con un estado no reconocido.');
   static readonly all=[this.Published,this.Archived];
   static fromWire(raw:unknown):ProductPublication{return this.all.find(value=>value.wire===raw||value.active===raw)??this.Unknown;}
+  get published():boolean{return this.active===true;}
+  get confirmation():string{return this.effect;}
   next():ProductPublication{return this===ProductPublication.Published?ProductPublication.Archived:this===ProductPublication.Archived?ProductPublication.Published:ProductPublication.Unknown;}
 }
 export class CatalogAvailability {

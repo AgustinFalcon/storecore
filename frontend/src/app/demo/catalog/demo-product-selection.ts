@@ -7,7 +7,7 @@ export class DemoProductSelection {
 
   static fromWire(query: CatalogQueryReader, variants: readonly DemoProductVariant[], available: number): DemoProductSelection {
     const rawVariant = query.get('variant');
-    const requested = rawVariant === null ? DemoProductVariant.Standard : DemoProductVariant.fromWire(rawVariant);
+    const requested = rawVariant === null ? variants[0]??DemoProductVariant.Unknown : DemoProductVariant.fromWire(rawVariant);
     const variant = variants.includes(requested) ? requested : DemoProductVariant.Unknown;
     const rawQuantity = query.get('quantity');
     const quantity = rawQuantity === null ? 1 : /^\d+$/.test(rawQuantity) ? Number(rawQuantity) : Number.NaN;

@@ -1,11 +1,4 @@
-export class ProductPublication {
-  private constructor(readonly wire: string, readonly label: string, readonly published: boolean, readonly actionLabel: string, readonly confirmation: string) {}
-  static readonly Published = new ProductPublication('PUBLISHED', 'Publicado', true, 'Archivar', 'Archivar retira el producto de la tienda y conserva variantes, stock e historial.');
-  static readonly Archived = new ProductPublication('ARCHIVED', 'Archivado', false, 'Publicar', 'Publicar muestra el producto y sus variantes habilitadas en la tienda.');
-  static readonly Unknown = new ProductPublication('', 'Publicación desconocida', false, 'No disponible', 'El estado no permite cambios.');
-  static fromWire(raw: unknown): ProductPublication { return [this.Published, this.Archived].find(value => value.wire === raw) ?? this.Unknown; }
-  get next(): ProductPublication { return this === ProductPublication.Published ? ProductPublication.Archived : this === ProductPublication.Archived ? ProductPublication.Published : ProductPublication.Unknown; }
-}
+export { ProductPublication } from '../admin-catalog/catalog-types';
 export class VariantSaleState {
   private constructor(readonly wire: string, readonly label: string, readonly active: boolean) {}
   static readonly Active = new VariantSaleState('ACTIVE', 'Habilitada para vender', true);

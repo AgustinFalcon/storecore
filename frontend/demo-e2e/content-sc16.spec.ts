@@ -19,7 +19,7 @@ test('SC16 preview uses unsaved copy; saving/reload preserves draft but never pu
   await cta(page, 'content-preview').click();
   const preview = page.getByRole('dialog', { name: 'Vista previa del borrador' });
   await expect(preview.getByRole('heading', { name: 'Portada en preparación', exact: true })).toBeVisible();
-  await expect(preview.locator('.category-card')).toHaveCount(3);
+  await expect(preview.locator('.category-card')).toHaveCount(new Set(demoSeed().products.filter(product=>product.active).map(product=>product.category)).size);
   await expect(preview.locator('.product-card')).toHaveCount(4);
   expect(await preview.locator('.product-image').evaluateAll(images => images.every(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
   expect(await snapshot(page)).toBe(before);

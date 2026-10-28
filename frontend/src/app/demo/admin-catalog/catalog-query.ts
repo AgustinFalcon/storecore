@@ -1,5 +1,6 @@
 import { CatalogPublicationFilter,CatalogStockFilter,ProductPublication,CatalogAvailability,CatalogPriceSource } from './catalog-types';
 import type { DemoProduct,DemoSnapshot } from '../demo-model';
+import { CatalogDetailsRead } from '../rich-catalog/catalog-details';
 export const normalizeCatalogSearch=(value:string)=>value.trim().normalize('NFD').replace(/\p{Diacritic}/gu,'').toLocaleLowerCase('es-AR');
 export class AdminCatalogCriteria {
   private constructor(readonly q:string,readonly publication:CatalogPublicationFilter,readonly stock:CatalogStockFilter,readonly brand:string,readonly category:string,readonly page:number,readonly valid:boolean){}
@@ -12,7 +13,7 @@ export class AdminCatalogCriteria {
 }
 export interface AdminCatalogRow {product:DemoProduct;publication:ProductPublication;available:number|null;current:number|null;availability:CatalogAvailability;priceSource:CatalogPriceSource;}
 export class ProjectCatalogRowsStep {
-  execute(snapshot:DemoSnapshot,price:(sku:string)=>number):AdminCatalogRow[]{return snapshot.products.map(product=>{let current:number|null;try{const amount=price(product.sku);current=Number.isSafeInteger(amount)&&amount>0?amount:null;}catch{current=null;}const publication=ProductPublication.fromWire(product.active),available=Number.isSafeInteger(product.onHand)&&Number.isSafeInteger(product.reserved)&&product.onHand>=product.reserved&&product.reserved>=0?product.onHand-product.reserved:null;return{product,publication,available,current,availability:CatalogAvailability.resolve(publication,available,snapshot.settings.lowStockThreshold),priceSource:CatalogPriceSource.resolve(product.price,current)};});}
+  execute(snapshot:DemoSnapshot,price:(sku:string)=>number):AdminCatalogRow[]{return snapshot.products.map(product=>{let current:number|null;try{const amount=price(product.sku);current=Number.isSafeInteger(amount)&&amount>0?amount:null;}catch{current=null;}const publication=ProductPublication.fromWire(product.active),available=CatalogDetailsRead.balance(snapshot,product);return{product,publication,available,current,availability:CatalogAvailability.resolve(publication,available,snapshot.settings.lowStockThreshold),priceSource:CatalogPriceSource.resolve(product.price,current)};});}
 }
 export class FilterCatalogRowsStep {
   execute(rows:readonly AdminCatalogRow[],criteria:AdminCatalogCriteria,threshold:number):AdminCatalogRow[]{const q=normalizeCatalogSearch(criteria.q);return !criteria.valid?[]:rows.filter(row=>(criteria.publication===CatalogPublicationFilter.All||criteria.publication.publication===row.publication)&&criteria.stock.matches(row.available,row.publication,threshold)&&(!criteria.brand||criteria.brand===row.product.brand)&&(!criteria.category||criteria.category===row.product.category)&&(!q||normalizeCatalogSearch(row.product.sku+' '+row.product.name+' '+row.product.brand).includes(q)));}

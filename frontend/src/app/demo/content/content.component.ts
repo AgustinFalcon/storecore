@@ -9,6 +9,7 @@ import { trapDemoDialogFocus } from '../demo-dialog-focus';
 import { ContentDraft, ContentDraftIssue } from './content-draft';
 import { ContentFlow } from './content-flow';
 import { ContentDialog, ContentDraftStatus, ContentEditPhase, ContentDiscardIntent } from './content-types';
+import { CatalogBuyerPresenter } from '../rich-catalog/catalog-buyer-presenter';
 
 @Component({ selector: 'sc-demo-content', imports: [FormsModule, RouterLink], templateUrl: './content.component.html', styleUrls: ['../demo.scss', './content.component.scss'] })
 export class DemoContentComponent {
@@ -20,7 +21,8 @@ export class DemoContentComponent {
   readonly Issue = ContentDraftIssue;
   readonly trapFocus = trapDemoDialogFocus;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
-  readonly productImage = demoProductImage;
+  readonly productImage = (product:DemoProduct):string=>this.productFacts(product).asset?.src??demoProductImage(product);
+  productFacts(product:DemoProduct){return new CatalogBuyerPresenter().execute(this.state.data,product,variant=>this.state.commerce.price(product.sku,variant));}
   readonly reorderAnnouncement = signal('');
   readonly modal = viewChild<ElementRef<HTMLDialogElement>>('modal');
   readonly dialog = signal(ContentDialog.None);
