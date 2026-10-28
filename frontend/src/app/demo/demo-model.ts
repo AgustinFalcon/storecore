@@ -13,6 +13,9 @@ import { SyncCatalogDetailsAfterBasicSaveStep } from './rich-catalog/catalog-det
 import { QuoteCatalogPresentationStep } from './rich-catalog/catalog-price';
 import { EnrichCatalogDemoSeedStep } from './rich-catalog/catalog-rich-seed';
 import { CaptureCatalogOrderLineStep,CatalogOrderLineCodec,CalculateCatalogOrderTotalStep,type CatalogOrderLineFacts } from './rich-catalog/catalog-order-line';
+import {OfferCodec,MigrateOffersV5ToV6Step,type DemoOffer} from './offers/offer-record';
+import {OfferInstant,DEMO_OFFER_REFERENCE} from './offers/offer-clock';
+import {SeedPolicyOffersStep} from './offers/offer-seed';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoDeliveryMethod, DemoDeliverySnapshot, DemoSyncJob, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
 
@@ -87,7 +90,7 @@ export interface DemoOrder { fulfillment?: DemoDeliveryMethod; createdDate?: str
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
 export interface DemoMovement { id: string; sku: string; delta: number; reason: string; }
-export interface DemoSnapshot { version: number; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
+export interface DemoSnapshot { version: number; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
 export function demoSeed(): DemoSnapshot {
@@ -101,7 +104,7 @@ export function demoSeed(): DemoSnapshot {
   const actors = [actor('cliente', 'Alex'), actor('cliente2', 'Sam'), rocio]; actors.forEach(value => value.access = { state: CustomerAccountState.Active, generation: 0, reason: '' });
   const seed = { version: 3, revision: 0, products, actors, orders, campaigns: [{ id: 'offer-1', title: 'Equipá tu taller', sku: products[0].sku, percent: 10, active: true, from: '2026-01-01', until: '2027-12-31' }], listings: products.slice(0, 4).map(product => ({ sku: product.sku, linked: true, observed: product.onHand, error: false })), movements: [], title: 'Todo para tu próximo proyecto', subtitle: 'Herramientas, seguridad y organización. Elegí calidad, comprá con confianza.', blocks: [{ id: 'service', title: 'Te ayudamos a elegir', body: 'Encontrá herramientas y equipamiento para cada etapa de tu proyecto.' }, { id: 'quality', title: 'Calidad que te acompaña', body: 'Garantía y asistencia personalizada para trabajar con confianza.' }], settings: { homepageItems: 4, lowStockThreshold: 5, deliveryDays: 5, trackingPrefix: 'SIM', mlRows: 6 }, modules: DemoModuleId.all.map(id => ({ id, enabled: true })), competitors: [{ id: 'competitor-1', name: 'Comercio de muestra A', price: products[0].price + 50000, history: [products[0].price + 80000, products[0].price + 50000], unread: false }], mlConnected: false };
   const aftercare:AftercareLedger={returns:[{id:'RETURN-1015-1',orderId:'ORD-1015',actorId:rocio.id,reason:ReturnReason.ChangedMind,stage:ReturnStage.Refunded,outcome:ReturnOutcome.Accepted,lines:[{index:0,sku:'LUM-042',variant:DemoProductVariant.Standard,quantity:1,unit:8450000}],refund:{status:RefundStatus.Refunded,amount:8450000},events:[{id:'REFUND-1015-1',stage:ReturnStage.Refunded,date:'2026-10-16'}]}],incidents:[]};
-  return new EnrichCatalogDemoSeedStep().execute({ ...seed, version:5, catalogDetails:new MigrateCatalogV4ToV5Step().execute(products),aftercare, contentDraft: ContentDraft.clone(seed) });
+  return new EnrichCatalogDemoSeedStep().execute({ ...seed, version:6,offers:[...new MigrateOffersV5ToV6Step().execute(seed.campaigns),...new SeedPolicyOffersStep().execute()],offerReference:DEMO_OFFER_REFERENCE, catalogDetails:new MigrateCatalogV4ToV5Step().execute(products),aftercare, contentDraft: ContentDraft.clone(seed) });
 }
 
 /** All financial amounts are integer minor units; this coordinator is framework-free. */
@@ -130,7 +133,7 @@ export class DemoCommerce {
   changeCustomerAccount(role: UserRole, actorId: string, command: CustomerAccountCommand, reason: string): void { if (!CustomerAdministrationAuthority.canWrite(role)) throw new Error('Sólo un administrador puede cambiar la cuenta.'); const access = this.actor(actorId).access; if (!access) throw new Error('Estado de cuenta desconocido.'); if (command.apply(access, reason)) this.commit(); }
   product(sku: string): DemoProduct { const product = this.snapshot.products.find(value => value.sku === sku); if (!product) throw new Error('Producto no encontrado.'); return product; }
   available(sku: string,variant?:DemoProductVariant): number { return CatalogDetailsRead.available(this.snapshot,this.product(sku),variant); }
-  price(sku: string,variant?:DemoProductVariant,reference?:string): number { return new QuoteCatalogPresentationStep().execute(this.snapshot,this.product(sku),reference??(this.snapshot.campaigns.some(value=>value.sku===sku&&value.active)?this.now():''),variant)??Number.NaN; }
+  price(sku: string,variant?:DemoProductVariant,reference?:string): number { return new QuoteCatalogPresentationStep().execute(this.snapshot,this.product(sku),reference??this.snapshot.offerReference,variant)??Number.NaN; }
   setQuantity(actorId: string, sku: string, quantity: number,variant?:DemoProductVariant): void {
     if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error('Ingresá una cantidad entera de al menos 1 unidad. Para quitar el producto usá Quitar.');
     const actor = this.actor(actorId); const existing = actor.cart.find(line => line.sku === sku);
@@ -227,8 +230,8 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('Snapshot inválido.');
   const state = parsed as DemoSnapshot;
-  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
-  const legacyCatalog=state.version!==5;
+  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
+  const legacyOffers=state.version!==6;const legacyCatalog=state.version!==5&&state.version!==6;
   const legacyAftercare=state.version===1||state.version===2||state.version===3;
   const legacyContent = state.version === 1 || state.version === 2;
   if (state.products.some(value => !value.sku || !Number.isSafeInteger(value.price) || value.price <= 0 || !Number.isInteger(value.onHand) || !Number.isInteger(value.reserved) || value.reserved < 0 || value.onHand < value.reserved)) throw new Error('Stock o precios inválidos. Restablecé la demostración.');
@@ -266,6 +269,6 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.contentDraft = legacyContent && !Object.prototype.hasOwnProperty.call(state, 'contentDraft') ? ContentDraft.fromWire({ title: state.title, subtitle: state.subtitle, blocks: state.blocks }) : ContentDraft.fromWire(state.contentDraft);
   state.aftercare=legacyAftercare&&!Object.prototype.hasOwnProperty.call(state,'aftercare')?{returns:[],incidents:[]}:AftercareCodec.fromWire(state.aftercare,state.orders);
   state.catalogDetails=CatalogDetailsCodec.fromWire(legacyCatalog&&!Object.prototype.hasOwnProperty.call(state,'catalogDetails')?new MigrateCatalogV4ToV5Step().execute(state.products):state.catalogDetails,state.products);
-  state.version=5;
+  state.offers=OfferCodec.fromWire(legacyOffers&&!Object.prototype.hasOwnProperty.call(state,'offers')?new MigrateOffersV5ToV6Step().execute(state.campaigns):state.offers);state.offerReference=legacyOffers&&!Object.prototype.hasOwnProperty.call(state,'offerReference')?DEMO_OFFER_REFERENCE:state.offerReference;if(!OfferInstant.fromWire(state.offerReference).known)throw new Error('La fecha de simulación guardada no es válida.');state.version=6;
   return state;
 }

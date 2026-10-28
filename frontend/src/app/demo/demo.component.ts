@@ -12,6 +12,7 @@ import { DemoCatalogPresenter } from './catalog/demo-catalog-presenter';
 import { trapDemoDialogFocus } from './demo-dialog-focus';
 
 import { UserRole } from '../domain/user/user-role';
+import {OfferInstant} from './offers/offer-clock';
 import { AccessSelectionPurpose, DemoAccessContinuation, PurchaseCaptureStatus } from './identity/demo-access-continuation';
 import { DemoProductSelection } from './catalog/demo-product-selection';
 import { demoProductImage } from './catalog/demo-product-image';
@@ -45,6 +46,7 @@ export class DemoDialog {
 }
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
+  get simulationDate():string{return this.state.authorizationAvailable?OfferInstant.fromWire(this.state.data.offerReference).label:'Fecha no disponible';}
   readonly trapFocus = trapDemoDialogFocus;
   readonly state = inject(DemoApplicationState);
   readonly router = inject(Router);
@@ -300,8 +302,8 @@ export class DemoPageComponent {
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
   editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
-  saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Oferta guardada; el precio efectivo se actualiza en tienda.')) this.close(); }
-  toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Vigencia de la oferta actualizada.'); }
+  saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Campaña editorial guardada en esta Demo; no modifica la cotización de ofertas.')) this.close(); }
+  toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Registro editorial actualizado; la oferta aplicada no cambia.'); }
   adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
   saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
