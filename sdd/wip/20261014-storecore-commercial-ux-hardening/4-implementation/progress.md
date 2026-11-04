@@ -665,3 +665,21 @@ change is included in this local cut.
   `36699a7bcd7c48996d7c7dee8e6a059950c3bdf4551ae18768d91177440271b2`.
 - Evidence: `evidence/demo-sc22-inventory-cut-20261104.md`. No push, PR, merge,
   deployment or homologation is claimed. SC23 and later surfaces remain open.
+
+## 2026-11-04 — SC23 Mercado Libre Demo final local gate
+
+- Added a dedicated, explicitly simulated five-area channel surface. Account/mapping
+  generations, Stock/Price/Publication intents, attempts and outcomes are independent
+  closed types; only a separate simulation action can produce a simulated result.
+- Mapping identity, retry, supersession, Unknown and recovery are validated by domain,
+  codec and UI. Cross-session remap/reconnect requires reviewing the exact new target.
+  SC22 stock and Catalog pricing remain read-only inputs; no network/provider effect.
+- Real stays GET-only and competitor information stays non-actionable. All 17 SKU,
+  pagination, correlated filters and responsive/accessibility states are executable.
+- Final gates: verify **826**, focal SC23 **47/47**, browser baseline **125/125**
+  plus final directed **29/29**, CTA
+  **665/665**, architecture/lint and both builds. Astra domain/security and UX/product
+  gates returned `APPROVE — 0 P0–P3` on fingerprint
+  `5d71f7c44856f87b80efdefa52a89f859e939d65afed9f83c446c37f15c409a4`.
+- Evidence: `evidence/demo-sc23-mercadolibre-cut-20261104.md`. No push, PR, merge,
+  deployment or homologation is claimed. SC24 and later surfaces remain open.

@@ -1,3 +1,5 @@
+import {MLLedgerCodec} from './mercadolibre/ml-codec';
+import type {MLLedger} from './mercadolibre/ml-types';
 import {InventoryMovementCodec,type InventoryAudit} from './inventory/inventory-types';
 import {MigrateOrdersV7ToV8Step} from './admin-orders/order-migration';
 import {DemoPickupStage,DemoIncidentState,DemoHistoricalVariant,DemoOrderMetadataCodec,AuthorizeLegacyDemoOrderStep} from './admin-orders/order-types';
@@ -95,7 +97,7 @@ export interface DemoOrder { pickupStage?:DemoPickupStage;incidentStatus?:DemoIn
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
 export interface DemoMovement { id: string; sku: string; delta: number; reason: string; inventory?:InventoryAudit; }
-export interface DemoSnapshot { version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
+export interface DemoSnapshot { mercadolibre?:MLLedger; version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
 export function demoSeed(): DemoSnapshot { return new MigrateOrdersV7ToV8Step().execute(demoSeedV7()); }
@@ -280,6 +282,8 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.catalogDetails=CatalogDetailsCodec.fromWire(legacyCatalog&&!Object.prototype.hasOwnProperty.call(state,'catalogDetails')?new MigrateCatalogV4ToV5Step().execute(state.products):state.catalogDetails,state.products);
   state.offers=OfferCodec.fromWire(legacyOffers&&!Object.prototype.hasOwnProperty.call(state,'offers')?new MigrateOffersV5ToV6Step().execute(state.campaigns):state.offers);state.offerReference=legacyOffers&&!Object.prototype.hasOwnProperty.call(state,'offerReference')?DEMO_OFFER_REFERENCE:state.offerReference;if(!OfferInstant.fromWire(state.offerReference).known)throw new Error('La fecha de simulación guardada no es válida.');state.campaignRecords=CampaignRecordCodec.fromWire(campaignRecords);state.version=7;
   state.orders=state.orders.map(order=>({...DemoOrderMetadataCodec.fromWire(order),lines:order.lines.map(line=>({...line,...(line.historicalVariant?{historicalVariant:DemoHistoricalVariant.fromWire(line.historicalVariant.wire)}:{})}))}));
+  state.mercadolibre=MLLedgerCodec.fromWire(state.mercadolibre);
+  if(state.mercadolibre.mappings.some(m=>!skus.has(m.sku))||state.mercadolibre.intents.some(i=>!skus.has(i.sku)))throw Error('SKU Mercado Libre desconocido.');
   if(wasV8){state.version=8;return state;}
   return new MigrateOrdersV7ToV8Step().execute(state);
 }
