@@ -1,7 +1,9 @@
 import {ShipmentStatus} from '../../domain/order/commerce-states';
 import {DemoDeliveryMethod} from '../demo-process-types';
 import type {DemoOrder,DemoSnapshot} from '../demo-model';
-import {IncidentStatus,IncidentReason,ReturnStage,ReturnOutcome,RefundStatus,ReturnReason} from '../aftercare/aftercare-types';
+import {IncidentStatus,IncidentReason,ReturnStage,RefundStatus} from '../aftercare/aftercare-types';
+import {ReturnRecordPolicy} from '../aftercare/aftercare-ledger';
+import {DemoProductVariant} from '../catalog/product-variant';
 
 export class DemoPickupStage {
  private constructor(readonly wire:string,readonly label:string){}
@@ -12,6 +14,12 @@ export class DemoHistoricalVariant {
  private constructor(readonly wire:string,readonly label:string){}
  static readonly Kit=new DemoHistoricalVariant('kit-completo','Kit completo');static readonly BareTool=new DemoHistoricalVariant('bare-tool','Herramienta sola');static readonly Standard=new DemoHistoricalVariant('standard','Estándar');static readonly OutletUnit01=new DemoHistoricalVariant('outlet-unit-01','Unidad Outlet 01');static readonly Unknown=new DemoHistoricalVariant('UNKNOWN','Presentación desconocida');
  static readonly all=[this.Kit,this.BareTool,this.Standard,this.OutletUnit01];static fromWire(raw:unknown){return this.all.find(x=>x.wire===raw)??this.Unknown;}
+}
+export class OrderLinePresentation {
+ private constructor(readonly historical:DemoHistoricalVariant|null,readonly variant:DemoProductVariant|null,readonly label:string){}
+ static readonly Unknown=new OrderLinePresentation(null,null,'Presentación no disponible');
+ private static readonly all=[null,...DemoHistoricalVariant.all].flatMap(historical=>[null,...DemoProductVariant.all].map(variant=>new OrderLinePresentation(historical,variant,historical?(variant&&variant!==DemoProductVariant.Standard?historical.label+' · '+variant.label:historical.label):variant?.label??this.Unknown.label)));
+ static project(line:{historicalVariant?:DemoHistoricalVariant;variant?:DemoProductVariant}){if(!line.historicalVariant&&!line.variant||line.historicalVariant===DemoHistoricalVariant.Unknown||line.variant===DemoProductVariant.Unknown)return this.Unknown;return this.all.find(value=>value.historical===(line.historicalVariant??null)&&value.variant===(line.variant??null))??this.Unknown;}
 }
 export class DemoIncidentState {
  private constructor(readonly wire:string,readonly label:string){}
@@ -39,7 +47,7 @@ export class DemoAftercareState {
  private constructor(readonly wire:string,readonly label:string,readonly blocks:boolean){}
  static readonly None=new DemoAftercareState('NONE','Sin devolución',false);static readonly Active=new DemoAftercareState('ACTIVE','Devolución activa',true);static readonly Refunded=new DemoAftercareState('REFUNDED','Reembolsada',false);static readonly Closed=new DemoAftercareState('CLOSED','Devolución finalizada',false);static readonly Unknown=new DemoAftercareState('UNKNOWN','Posventa desconocida',true);
  static readonly all=[this.None,this.Active,this.Refunded,this.Closed];static fromWire(raw:unknown){return this.all.find(x=>x.wire===raw)??this.Unknown;}
- static project(snapshot:DemoSnapshot,order:DemoOrder){const rows=snapshot.aftercare.returns.filter(x=>x.orderId===order.id);if(order.returned||order.id==='ORD-1021'&&!rows.length||rows.some(x=>x.events.some(event=>event.stage===ReturnStage.Unknown)||x.stage===ReturnStage.Unknown||x.outcome===ReturnOutcome.Unknown||x.reason===ReturnReason.Unknown||x.refund.status===RefundStatus.Unknown))return this.Unknown;if(rows.some(x=>!x.stage.terminal&&x.stage!==ReturnStage.Refunded))return this.Active;if(rows.some(x=>x.refund.status===RefundStatus.Refunded))return this.Refunded;return rows.length?this.Closed:this.None;}
+ static project(snapshot:DemoSnapshot,order:DemoOrder){const rows=snapshot.aftercare.returns.filter(x=>x.orderId===order.id);if(order.returned||order.id==='ORD-1021'&&!rows.length||rows.some(x=>!ReturnRecordPolicy.known(x)))return this.Unknown;if(rows.some(x=>!x.stage.terminal&&x.stage!==ReturnStage.Refunded))return this.Active;if(rows.some(x=>x.refund.status===RefundStatus.Refunded))return this.Refunded;return rows.length?this.Closed:this.None;}
  static label(snapshot:DemoSnapshot,order:DemoOrder){const state=this.project(snapshot,order);if(state!==this.Refunded)return state.label;const refunded=snapshot.aftercare.returns.filter(x=>x.orderId===order.id&&x.refund.status===RefundStatus.Refunded).flatMap(x=>x.lines).reduce((n,x)=>n+x.quantity,0),total=order.lines.reduce((n,x)=>n+x.quantity,0);return refunded<total?`${refunded} reembolsada / ${total-refunded} disponible`:state.label;}
 }
 export class DemoOrderOperations {

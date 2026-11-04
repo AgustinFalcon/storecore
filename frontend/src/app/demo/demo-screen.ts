@@ -22,7 +22,7 @@ export class DemoScreen {
   static readonly Promos = new DemoScreen('user/promos', 'Campañas', true);
   static readonly Customers = new DemoScreen('user/customers', 'Clientes', true);
   static readonly AdminOrders = new DemoScreen('user/orders', 'Pedidos y entregas', true);
-  static readonly AdminOrder = new DemoScreen('user/orders/:id', 'Preparar pedido', true);
+  static readonly AdminOrder = new DemoScreen('user/orders/:id', 'Detalle del pedido', true);
   static readonly Inventory = new DemoScreen('user/inventory', 'Inventario', true);
   static readonly ML = new DemoScreen('user/mercadolibre', 'Mercado Libre', true);
   static readonly Capabilities = new DemoScreen('user/capabilities', 'Módulos del comercio', true);

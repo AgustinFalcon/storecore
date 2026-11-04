@@ -52,7 +52,7 @@ export class DemoApplicationState {
   }
   get canResetDemo(): boolean { return !this.authorizationReadable || this.context() !== DemoContext.Admin || this.role() === UserRole.Admin; }
   get actor() { this.revision(); return this.commerce.actor(this.actorId()); }
-  run(action: () => void, result: string): boolean {
+  run(action: () => void, result: string, onFailure?: (error:unknown)=>void): boolean {
     this.error.set(''); this.message.set('');
     const before = JSON.stringify(this.commerce.snapshot);
     try {
@@ -61,7 +61,7 @@ export class DemoApplicationState {
       const persisted = this.persistence.transact(this.persistedRaw, this.persistedRevision, () => { action(); return this.commerce.snapshot; });
       this.commerce.snapshot = persisted.snapshot; this.persistedRaw = persisted.raw; this.persistedRevision = persisted.snapshot.revision;
       this.revision.update(value => value + 1); this.message.set(result); this.revokeAffectedSession(); return true;
-    } catch (error) { this.commerce.snapshot = decodeSnapshot(before); this.revision.update(value => value + 1); this.error.set(error instanceof Error ? error.message : 'No se pudo completar la operación.'); return false; }
+    } catch (error) { this.commerce.snapshot = decodeSnapshot(before); this.revision.update(value => value + 1); this.error.set(error instanceof Error ? error.message : 'No se pudo completar la operación.'); onFailure?.(error); return false; }
   }
   login(context: DemoContext, actor = 'cliente', role = UserRole.Admin): boolean {
     try {

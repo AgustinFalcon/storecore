@@ -625,3 +625,25 @@ change is included in this local cut.
 - Evidence: `evidence/demo-sc20-admin-orders-cut-20261104.md`. No commit, push,
   PR, merge, deployment or homologation is claimed. SC21 and the remaining
   promotion/integration sequence stay open.
+
+## 2026-11-04 — SC21 Demo operational detail and aftercare final local gate
+
+- Added a capability-selected detail host: Queue orders use the dedicated SC21
+  feature, Legacy orders keep their existing operations and Unknown fails safe.
+  SC20 logistics/incidents remain the single policy and return navigation keeps
+  queue filters and focus.
+- Preserved the historical first refund for ORD-1015 and implemented a separate
+  five-step case for the remaining unit: request, receive, inspect, dispose and
+  refund. The new and historical graphs coexist; stock disposition and refund are
+  separate idempotent effects with durable command identity and recovery.
+- Customer-originated requests survive reload, Customer projections omit internal
+  notes, Unknown hides unverifiable balances, and active-case progress is separate
+  from history. Review/confirmation, keyboard focus and responsive behavior cover
+  every step and failure recovery.
+- Final gates: verify **744/744**, architecture **6/6**, lint, Real/Demo builds,
+  focal **81/81**, browser SC21 + CTA **34/34**, prior combined regression **59/59**.
+  Independent Astra domain/security and UX/product/accessibility gates both returned
+  `APPROVE — 0 P0–P3` on fingerprint
+  `8301CC499708D355381154A750402AA57AB08C63456F00D03F5F68B0F730943E`.
+- Evidence: `evidence/demo-sc21-order-detail-cut-20261104.md`. No push, PR, merge,
+  deployment or homologation is claimed. SC22 and later surfaces remain open.

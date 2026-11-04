@@ -5,17 +5,27 @@ export class ReturnStage {
   static readonly Approved=new ReturnStage('approved','Devolución aprobada');
   static readonly Rejected=new ReturnStage('rejected','Solicitud rechazada');
   static readonly Received=new ReturnStage('received','Productos recibidos');
+  static readonly Inspected=new ReturnStage('inspected','Inspección registrada');
+  static readonly Disposed=new ReturnStage('disposed','Disposición registrada');
   static readonly RefundPending=new ReturnStage('refund-pending','Reintegro pendiente');
   static readonly Refunded=new ReturnStage('refunded','Reintegro simulado registrado');
   static readonly Cancelled=new ReturnStage('cancelled','Solicitud cancelada');
   static readonly Closed=new ReturnStage('closed','Solicitud cerrada');
   static readonly Unknown=new ReturnStage('','Estado de devolución desconocido');
-  static readonly all=[this.Submitted,this.Review,this.Approved,this.Rejected,this.Received,this.RefundPending,this.Refunded,this.Cancelled,this.Closed];
+  static readonly all=[this.Submitted,this.Review,this.Approved,this.Rejected,this.Received,this.Inspected,this.Disposed,this.RefundPending,this.Refunded,this.Cancelled,this.Closed];
   static fromWire(raw:unknown):ReturnStage {return this.all.find(value=>value.wire===raw)??this.Unknown;}
   get canCancel():boolean{return this===ReturnStage.Submitted;}
   get terminal():boolean{return [ReturnStage.Rejected,ReturnStage.Cancelled,ReturnStage.Closed].includes(this);}
   preservesClosure(outcome:ReturnOutcome):boolean{return this===ReturnStage.Rejected?outcome===ReturnOutcome.Rejected:this===ReturnStage.Cancelled?outcome===ReturnOutcome.Cancelled:this===ReturnStage.Refunded&&outcome===ReturnOutcome.Accepted;}
-  permitsNext(next:ReturnStage):boolean {const transitions=new Map<ReturnStage,readonly ReturnStage[]>([[ReturnStage.Submitted,[ReturnStage.Review,ReturnStage.Cancelled]],[ReturnStage.Review,[ReturnStage.Approved,ReturnStage.Rejected]],[ReturnStage.Approved,[ReturnStage.Received]],[ReturnStage.Received,[ReturnStage.RefundPending]],[ReturnStage.RefundPending,[ReturnStage.Refunded]],[ReturnStage.Refunded,[ReturnStage.Closed]],[ReturnStage.Rejected,[ReturnStage.Closed]],[ReturnStage.Cancelled,[ReturnStage.Closed]]]);return transitions.get(this)?.includes(next)??false;}
+  permitsNext(next:ReturnStage):boolean {const transitions=new Map<ReturnStage,readonly ReturnStage[]>([[ReturnStage.Submitted,[ReturnStage.Review,ReturnStage.Received,ReturnStage.Cancelled]],[ReturnStage.Review,[ReturnStage.Approved,ReturnStage.Rejected]],[ReturnStage.Approved,[ReturnStage.Received]],[ReturnStage.Received,[ReturnStage.RefundPending,ReturnStage.Inspected]],[ReturnStage.Inspected,[ReturnStage.Disposed]],[ReturnStage.Disposed,[ReturnStage.Refunded]],[ReturnStage.RefundPending,[ReturnStage.Refunded]],[ReturnStage.Refunded,[ReturnStage.Closed]],[ReturnStage.Rejected,[ReturnStage.Closed]],[ReturnStage.Cancelled,[ReturnStage.Closed]]]);return transitions.get(this)?.includes(next)??false;}
+}
+export class ReturnDisposition {
+ private constructor(readonly wire:string,readonly label:string){}
+ static readonly Sellable=new ReturnDisposition('sellable','Apto para la venta');static readonly Damaged=new ReturnDisposition('damaged','Dañado · no disponible para la venta');static readonly Unknown=new ReturnDisposition('','Disposición desconocida');static readonly all=[this.Sellable,this.Damaged];static fromWire(raw:unknown){return this.all.find(x=>x.wire===raw)??this.Unknown;}
+}
+export class ReturnCommandResult {
+ private constructor(readonly wire:string,readonly label:string){}
+ static readonly Editing=new ReturnCommandResult('editing','Completar datos');static readonly Reviewing=new ReturnCommandResult('reviewing','Revisar y confirmar');static readonly Saving=new ReturnCommandResult('saving','Guardando');static readonly Applied=new ReturnCommandResult('applied','Operación guardada');static readonly AlreadyApplied=new ReturnCommandResult('already-applied','Esta operación ya estaba guardada');static readonly Blocked=new ReturnCommandResult('blocked','La operación no está disponible');static readonly Conflict=new ReturnCommandResult('conflict','Los datos cambiaron. Actualizá y revisá antes de confirmar');static readonly Failed=new ReturnCommandResult('failed','No se pudo guardar. Actualizá y revisá antes de confirmar');static readonly Unauthorized=new ReturnCommandResult('unauthorized','El acceso ya no está disponible');static readonly Unknown=new ReturnCommandResult('','Resultado desconocido');static readonly all=[this.Editing,this.Reviewing,this.Saving,this.Applied,this.AlreadyApplied,this.Blocked,this.Conflict,this.Failed,this.Unauthorized];static fromWire(raw:unknown){return this.all.find(x=>x.wire===raw)??this.Unknown;}
 }
 export class ReturnOutcome {
   private constructor(readonly wire:string,readonly label:string,readonly consumes:boolean){}

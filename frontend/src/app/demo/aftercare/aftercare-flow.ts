@@ -1,8 +1,7 @@
 import { DemoContext,DemoProductVariant,type DemoOrder,type DemoSnapshot } from '../demo-model';
 import { ShipmentStatus } from '../../domain/order/commerce-states';
 import { PresentResultStep,DemoResultOutcome } from '../checkout/demo-checkout-result';
-import { DemoOrderDate,OrderDatePrecision } from '../orders/demo-order-date';
-import { AftercareCodec,returnAmount,type ReturnLine,type ReturnRecord } from './aftercare-ledger';
+import { AftercareCodec,returnAmount,type ReturnLine,type ReturnRecord,ReturnRecordPolicy } from './aftercare-ledger';
 import { AftercareIssue,ReturnStage,ReturnOutcome,ReturnReason,RefundStatus,IncidentReason,IncidentStatus } from './aftercare-types';
 
 export interface AftercareAuthority {context:DemoContext;actorId:string;epoch:number;expectedEpoch:number;}
@@ -19,7 +18,7 @@ export class AftercareEligibilityStep {
   execute(snapshot:DemoSnapshot,order:DemoOrder):AftercareIssue {
     if(order.returned)return AftercareIssue.Legacy;
     const records=snapshot.aftercare.returns.filter(row=>row.orderId===order.id);
-    if(records.some(row=>row.stage===ReturnStage.Unknown||row.outcome===ReturnOutcome.Unknown||row.reason===ReturnReason.Unknown||row.refund.status===RefundStatus.Unknown||row.lines.some(line=>line.variant===DemoProductVariant.Unknown)||row.events.some(event=>event.stage===ReturnStage.Unknown||DemoOrderDate.fromWire(event.date).precision===OrderDatePrecision.Unknown)))return AftercareIssue.Unknown;
+    if(records.some(row=>!ReturnRecordPolicy.known(row)))return AftercareIssue.Unknown;
     if(this.result.execute(order).outcome!==DemoResultOutcome.Approved||order.shipment!==ShipmentStatus.Delivered)return AftercareIssue.Ineligible;
     if(records.some(row=>!row.stage.terminal&&row.stage!==ReturnStage.Refunded))return AftercareIssue.Active;
     if(order.lines.every((_,index)=>this.available(snapshot,order,index)<=0))return AftercareIssue.Exhausted;
@@ -72,7 +71,7 @@ export class RefundSummaryStep {
   execute(order:DemoOrder,records:readonly ReturnRecord[]) {
     if(order.returned)return{status:RefundStatus.Unknown,amount:null,remaining:null};
     const relevant=records.filter(row=>row.orderId===order.id),amount=relevant.reduce((sum,row)=>sum+row.refund.amount,0),goods=returnAmount(order.lines.map((line,index)=>({...line,index,variant:line.variant??DemoProductVariant.Standard})));
-    const status=relevant.some(row=>row.refund.status===RefundStatus.Unknown||row.stage===ReturnStage.Unknown||row.outcome===ReturnOutcome.Unknown||row.events.some(event=>event.stage===ReturnStage.Unknown||DemoOrderDate.fromWire(event.date).precision===OrderDatePrecision.Unknown))?RefundStatus.Unknown:amount>0?amount<goods?RefundStatus.PartiallyRefunded:RefundStatus.Refunded:relevant.some(row=>row.refund.status===RefundStatus.Pending)?RefundStatus.Pending:RefundStatus.None;
-    return{status,amount,remaining:goods-amount};
+    const status=relevant.some(row=>!ReturnRecordPolicy.known(row))?RefundStatus.Unknown:amount>0?amount<goods?RefundStatus.PartiallyRefunded:RefundStatus.Refunded:relevant.some(row=>row.refund.status===RefundStatus.Pending)?RefundStatus.Pending:RefundStatus.None;
+    return status===RefundStatus.Unknown?{status,amount:null,remaining:null}:{status,amount,remaining:goods-amount};
   }
 }
