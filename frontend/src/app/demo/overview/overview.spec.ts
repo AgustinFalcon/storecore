@@ -1,6 +1,6 @@
 import { UserRole } from '../../domain/user/user-role';
 import { PaymentStatus,OrderStatus,ShipmentStatus } from '../../domain/order/commerce-states';
-import { demoSeed,DemoContext,DemoModuleId } from '../demo-model';
+import { demoSeedV7 as demoSeed,DemoContext,DemoModuleId } from '../demo-model';
 import { DemoOrderDate } from '../orders/demo-order-date';
 import { RefundStatus,ReturnOutcome } from '../aftercare/aftercare-types';
 import { OverviewRange,OverviewAccess,OverviewAction,OverviewTaskKind } from './overview-types';

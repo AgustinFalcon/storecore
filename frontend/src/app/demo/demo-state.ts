@@ -37,6 +37,11 @@ export class DemoApplicationState {
   }
   get data() { this.revision(); return this.commerce.snapshot; }
   get authorizationAvailable(): boolean { return this.authorizationReadable; }
+  /** Explicit read-only reconciliation for an authorized operational command. */
+  reloadOrderSnapshot(actor:string,epoch:number):boolean {
+    if(!this.authorizationReadable||this.context()!==DemoContext.Admin||![UserRole.Admin,UserRole.Operator].includes(this.role())||this.actorId()!==actor||this.sessionEpoch()!==epoch)return false;
+    try{const persisted=this.persistence.load(this.commerce.snapshot);if(this.actorId()!==actor||this.sessionEpoch()!==epoch)return false;this.commerce.snapshot=persisted.snapshot;this.persistedRaw=persisted.raw;this.persistedRevision=persisted.snapshot.revision;this.revision.update(value=>value+1);return true;}catch(error){this.error.set(error instanceof Error?error.message:'No se pudo revisar el estado actual.');return false;}
+  }
   get canEditContent(): boolean { return this.authorizationReadable && ContentAuthority.permits(this.context(), this.role()); }
   saveContentDraft(draft: ContentDraftData, epoch: number): boolean {
     if (!this.canEditContent || epoch !== this.sessionEpoch()) return false;

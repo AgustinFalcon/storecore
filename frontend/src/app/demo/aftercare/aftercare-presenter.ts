@@ -4,6 +4,7 @@ import { DemoOrderDate,OrderDatePrecision } from '../orders/demo-order-date';
 import { AftercareEligibilityStep,RefundSummaryStep,CancelSubmittedStep } from './aftercare-flow';
 import { AftercareIssue } from './aftercare-types';
 import { returnAmount } from './aftercare-ledger';
+import {DemoOrderOperations} from '../admin-orders/order-types';
 
 export class DemoAftercarePresenter {
   private readonly result=new DemoCheckoutResultPresenter();private readonly eligibility=new AftercareEligibilityStep();private readonly refund=new RefundSummaryStep();
@@ -11,8 +12,8 @@ export class DemoAftercarePresenter {
     const result=this.result.execute(snapshot.orders,id,context,actor),order=result.order;
     if(!order)return null;
     const returns=snapshot.aftercare.returns.filter(row=>row.orderId===order.id&&row.actorId===actor),incidents=snapshot.aftercare.incidents.filter(row=>row.orderId===order.id&&row.actorId===actor),date=DemoOrderDate.fromWire(order.createdDate);
-    const eligibility=this.eligibility.execute(snapshot,order),refund=this.refund.execute(order,returns);
-    return{order,result,date,returns:returns.map(row=>({...row,canCancel:new CancelSubmittedStep().permits(snapshot,order,row),amount:returnAmount(row.lines),events:row.events.map(event=>({...event,date:DemoOrderDate.fromWire(event.date)}))})),incidents:incidents.map(row=>({...row,date:DemoOrderDate.fromWire(row.date)})),eligibility,refund,lines:order.lines.map((line,index)=>({...line,index,available:eligibility===AftercareIssue.Legacy||eligibility===AftercareIssue.Unknown?null:this.eligibility.available(snapshot,order,index)})),canRequest:eligibility===AftercareIssue.None,canIncident:result.outcome===DemoResultOutcome.Approved,createdKnown:date.precision!==OrderDatePrecision.Unknown};
+    const eligibility=this.eligibility.execute(snapshot,order),refund=this.refund.execute(order,returns),operations=DemoOrderOperations.fromWire(order);
+    return{order,result,date,operations,canResolvePayment:operations===DemoOrderOperations.Legacy&&result.outcome===DemoResultOutcome.Pending,canRetryPayment:operations===DemoOrderOperations.Legacy&&[DemoResultOutcome.Rejected,DemoResultOutcome.Cancelled].includes(result.outcome),returns:returns.map(row=>({...row,canCancel:new CancelSubmittedStep().permits(snapshot,order,row),amount:returnAmount(row.lines),events:row.events.map(event=>({...event,date:DemoOrderDate.fromWire(event.date)}))})),incidents:incidents.map(row=>({...row,date:DemoOrderDate.fromWire(row.date)})),eligibility,refund,lines:order.lines.map((line,index)=>({...line,index,available:eligibility===AftercareIssue.Legacy||eligibility===AftercareIssue.Unknown?null:this.eligibility.available(snapshot,order,index)})),canRequest:eligibility===AftercareIssue.None,canIncident:result.outcome===DemoResultOutcome.Approved,createdKnown:date.precision!==OrderDatePrecision.Unknown};
   }
 }
 export function safeReceipt(order:DemoOrder,money:(value:number)=>string):string {

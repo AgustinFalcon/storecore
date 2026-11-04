@@ -603,3 +603,25 @@ TASK-013 overall remains pending; SC15, Real content parity, rich banners and
 category controls, global visual/review/CI and homologation remain separate.
 Historical dirty-tree claims are not reused. No commit, push, PR or backend
 change is included in this local cut.
+
+## 2026-11-04 — SC20 Demo administrative orders final local gate
+
+- Implemented the dedicated `/demo/user/orders` queue on base `8255d814`, using
+  the canonical twelve-order ledger, additive V8 migration, closed domain axes,
+  per-order Ship/Deliver/Collect commands, URL state, informative selection and
+  exact CSV export. No backend or Real route changed.
+- Removed every reachable legacy bypass: Queue orders are read-only in the old
+  detail and return to the canonical focused queue; customer payment actions use
+  the same closed operation capability. Legacy Demo flows and SC14 aftercare stay
+  separate and covered.
+- Legacy incident translation is general and ID-independent. Dialog recovery,
+  filtered-row focus, export retry, Unknown and write/conflict failure states have
+  unit/component and browser coverage.
+- Final gates: **702/702** verify, architecture **6/6**, lint, Real and Demo builds,
+  focal **35/35**, Chromium SC20 **12/12**, aftercare + CTA **37/37**. Independent
+  Astra technical and UX/product/accessibility re-reviews both returned
+  `APPROVE — 0 P0–P3` on source fingerprint
+  `44533724DDFC019AA32598400C50899651CA86584A32BB2F7CA1D315DB8B4790`.
+- Evidence: `evidence/demo-sc20-admin-orders-cut-20261104.md`. No commit, push,
+  PR, merge, deployment or homologation is claimed. SC21 and the remaining
+  promotion/integration sequence stay open.
