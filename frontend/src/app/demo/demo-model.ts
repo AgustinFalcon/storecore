@@ -1,3 +1,4 @@
+import {InventoryMovementCodec,type InventoryAudit} from './inventory/inventory-types';
 import {MigrateOrdersV7ToV8Step} from './admin-orders/order-migration';
 import {DemoPickupStage,DemoIncidentState,DemoHistoricalVariant,DemoOrderMetadataCodec,AuthorizeLegacyDemoOrderStep} from './admin-orders/order-types';
 import {CampaignRecordCodec,MigrateCampaignsV6ToV7Step,type DemoCampaignRecord} from './campaigns/campaign-record';
@@ -93,7 +94,7 @@ export interface DemoActor { access?: CustomerAccountAccess; id: string; email: 
 export interface DemoOrder { pickupStage?:DemoPickupStage;incidentStatus?:DemoIncidentState; fulfillment?: DemoDeliveryMethod; createdDate?: string; id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { historicalVariant?:DemoHistoricalVariant;sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant;catalog?:CatalogOrderLineFacts }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
-export interface DemoMovement { id: string; sku: string; delta: number; reason: string; }
+export interface DemoMovement { id: string; sku: string; delta: number; reason: string; inventory?:InventoryAudit; }
 export interface DemoSnapshot { version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
@@ -237,6 +238,8 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const state = parsed as DemoSnapshot;
   if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6&&state.version!==7&&state.version!==8) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
   const wasV8=state.version===8;
+  state.movements=state.movements.map(row=>{if(!row||typeof row.id!=='string'||!row.id||typeof row.sku!=='string'||!Number.isSafeInteger(row.delta)||typeof row.reason!=='string')throw Error('Movimiento inválido.');const inventory=InventoryMovementCodec.fromWire(row.inventory);if(inventory&&(inventory.commandId!==row.id||inventory.after.physical-inventory.before.physical!==row.delta))throw Error('Movimiento incoherente.');if(inventory)InventoryMovementCodec.validateEnvelope(inventory,row.sku,row.delta,row.reason);return{id:row.id,sku:row.sku,delta:row.delta,reason:row.reason,...(inventory?{inventory}:{})};});
+  if(state.movements.some(row=>row.inventory&&state.movements.filter(other=>other.id===row.id).length!==1))throw Error('Movimiento de inventario duplicado.');
   const campaignRecords=new MigrateCampaignsV6ToV7Step().execute(state);const legacyOffers=state.version<=5;const legacyCatalog=state.version<=4;
   const legacyAftercare=state.version===1||state.version===2||state.version===3;
   const legacyContent = state.version === 1 || state.version === 2;

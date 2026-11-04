@@ -647,3 +647,21 @@ change is included in this local cut.
   `8301CC499708D355381154A750402AA57AB08C63456F00D03F5F68B0F730943E`.
 - Evidence: `evidence/demo-sc21-order-detail-cut-20261104.md`. No push, PR, merge,
   deployment or homologation is claimed. SC22 and later surfaces remain open.
+
+## 2026-11-04 — SC22 Demo inventory final local gate
+
+- Implemented a dedicated SKU-pool inventory surface with derived physical,
+  reserved, not-sellable and sellable balances, independent health/publication/
+  condition filters and honest Unknown/legacy movement projection.
+- Physical adjustment and absolute reconciliation are separate closed commands.
+  They preserve reservation/condition/publication, never enqueue ML work and record
+  new auditable idempotent movements through the existing writer/CAS/readback path.
+- SC21 dispositions appear without replay. Catalog, Legacy orders and SC26→SC21
+  navigation preserve typed return context; local validation and recovery keep draft
+  and focus across four responsive widths.
+- Final gates: verify **779**, focal **43/43**, full Demo **240/240**, Real inventory
+  read-only **6/6**, both builds, architecture/lint. Independent Astra domain/security
+  and UX/product/accessibility gates returned `APPROVE — 0 P0–P3` on fingerprint
+  `36699a7bcd7c48996d7c7dee8e6a059950c3bdf4551ae18768d91177440271b2`.
+- Evidence: `evidence/demo-sc22-inventory-cut-20261104.md`. No push, PR, merge,
+  deployment or homologation is claimed. SC23 and later surfaces remain open.

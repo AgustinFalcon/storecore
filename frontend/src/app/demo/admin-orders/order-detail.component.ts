@@ -1,5 +1,6 @@
 import {Component,ElementRef,afterRenderEffect,effect,inject,signal,untracked,viewChild} from '@angular/core';
 import {FormsModule} from '@angular/forms';
+import {InventoryReturnComponent} from '../inventory/inventory-return.component';
 import {ActivatedRoute,RouterLink} from '@angular/router';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map} from 'rxjs';
@@ -21,7 +22,7 @@ export class DetailDialog {
  private constructor(readonly label:string){}
  static readonly Return=new DetailDialog('Confirmar operación de devolución');static readonly Delivery=new DetailDialog('Confirmar entrega');static readonly Incident=new DetailDialog('Resolver incidencia operativa');static readonly Receipt=new DetailDialog('Comprobante Demo · no fiscal');
 }
-@Component({selector:'sc-demo-order-detail',imports:[FormsModule,RouterLink],templateUrl:'./order-detail.component.html',styleUrls:['../demo.scss','./order-detail.component.scss']})
+@Component({selector:'sc-demo-order-detail',imports:[InventoryReturnComponent,FormsModule,RouterLink],templateUrl:'./order-detail.component.html',styleUrls:['../demo.scss','./order-detail.component.scss']})
 export class DemoOrderDetailComponent {
  readonly state=inject(DemoApplicationState);private readonly route=inject(ActivatedRoute);private readonly browser=inject(DemoBrowserEffects);
  readonly id=toSignal(this.route.paramMap.pipe(map(p=>p.get('id')??'')),{initialValue:''});

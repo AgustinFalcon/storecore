@@ -88,10 +88,10 @@ test('SC16 failed write retains buffer and Home; retry saves only draft', async 
   expect(JSON.parse((await snapshot(page))!).title).not.toBe('Retry retained');
 });
 
-test('SC16 Operator edits the dedicated surface without gaining inventory authority; Customer and Unknown cannot enter', async ({ page }) => {
+test('SC16 Operator edits content and enters SC22 inventory; Customer and Unknown cannot enter content', async ({ page }) => {
   await login(page, UserRole.Operator); const title = page.getByLabel('Título principal', { exact: true });
   await title.fill('Operator draft'); await cta(page, 'content-save').click(); await expect(page.locator('.draft-status')).toContainText(ContentEditPhase.Saved.label);
-  await page.goto('/demo/user/inventory'); await expect(page.getByRole('heading', { name: 'Ingresá para continuar' })).toBeVisible();
+  await page.goto('/demo/user/inventory'); await expect(page.getByRole('heading', { name: 'Inventario',exact:true })).toBeVisible();await expect(cta(page,'inventory-adjust-DEMO-001')).toBeEnabled();
   await page.goto('/demo/user/content'); await title.fill('Private unsaved');
   await cta(page, 'shell-logout').click(); await expect(page).toHaveURL(/\/demo\/login$/);
   await page.goto('/demo/user/content'); await expect(page.getByRole('heading', { name: 'Acceso denegado' })).toBeVisible();

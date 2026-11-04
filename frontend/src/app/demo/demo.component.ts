@@ -1,4 +1,5 @@
 import {DemoOrderOperations} from './admin-orders/order-types';
+import {InventoryReturnComponent} from './inventory/inventory-return.component';
 import {AuthorizeCampaignsStep} from './campaigns/campaign-flow';
 import { Component, effect, computed, inject, signal, DestroyRef, afterNextRender, Injector } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -35,7 +36,6 @@ export class DemoDialog {
   static readonly Reset = new DemoDialog('Restablecer demostración');
   static readonly Product = new DemoDialog('Editar producto');
   static readonly Address = new DemoDialog('Dirección de entrega');
-  static readonly Adjustment = new DemoDialog('Ajustar inventario');
   static readonly Information = new DemoDialog('Información');
   static readonly Confirm = new DemoDialog('Confirmar operación');
   static readonly Module = new DemoDialog('Configurar módulo');
@@ -43,7 +43,7 @@ export class DemoDialog {
   static readonly Receipt = new DemoDialog('Comprobante de demostración');
   static readonly Incident = new DemoDialog('Registrar incidencia');
   static readonly Unknown = new DemoDialog('Acción desconocida');
-  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
 }
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
@@ -74,7 +74,7 @@ export class DemoRootComponent {
   confirmReset(): void { if (this.state.reset()) { this.closeReset(); void this.router.navigate(['/demo/login']); } }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [FormsModule, RouterLink,CatalogGalleryComponent,CatalogConditionComponent], templateUrl: './demo-page.html', styleUrls: ['./demo.scss','./rich-catalog/catalog-buyer.scss'] })
+@Component({ selector: 'sc-demo-page', imports: [InventoryReturnComponent,FormsModule, RouterLink,CatalogGalleryComponent,CatalogConditionComponent], templateUrl: './demo-page.html', styleUrls: ['./demo.scss','./rich-catalog/catalog-buyer.scss'] })
 export class DemoPageComponent {
   get historyCriteria(): OrderHistoryCriteria { return OrderHistoryCriteria.fromWire({ q:this.route.snapshot.queryParamMap.get('q'),payment:this.route.snapshot.queryParamMap.get('payment'),page:this.route.snapshot.queryParamMap.get('page') }); }
   readonly Role = UserRole;
@@ -171,9 +171,6 @@ export class DemoPageComponent {
   draftSettings: DemoSettings = { ...this.state.data.settings };
   draftModule = DemoModuleId.Unknown;
   info = '';
-  adjustmentSku = '';
-  adjustmentDelta = 1;
-  adjustmentReason = '';
   selectedOrderStatus: PaymentStatus | null = null;
   draftProduct: DemoProduct = { sku: '', name: '', category: 'Herramientas', brand: 'Norte', description: '', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar', supportsCase: false };
   draftAddress: DemoAddress = { id: '', label: 'Casa', street: '', city: '', postal: '', primary: false };
@@ -220,7 +217,6 @@ export class DemoPageComponent {
   changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.updateCatalog(); }
   changeMaximum(raw: number | null): void { const value = Number(raw); this.maxPrice.set(raw !== null && Number.isFinite(value) && value >= 0 ? value : null); this.updateCatalog(); }
   changeStock(available: boolean): void { this.stockScope.set(available ? CatalogStockScope.Available : CatalogStockScope.All); this.updateCatalog(); }
-  movements(product: DemoProduct): void { const rows = this.state.data.movements.filter(value => value.sku === product.sku); this.information(rows.length ? rows.map(value => `${value.delta > 0 ? '+' : ''}${value.delta} unidades · ${value.reason}`).join('\n') : 'Sin movimientos posteriores al stock inicial de demostración.'); }
   competitorHistory(history: number[]): void { this.information('Historial simulado: ' + history.map(value => this.money(value)).join(' → ')); }
   readonly money = demoMoney;
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
@@ -304,8 +300,6 @@ export class DemoPageComponent {
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
-  adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
-  saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { if(!this.canMutateLegacyOrder)return; if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
   receiveReturn(): void { if(!this.canMutateLegacyOrder)return; if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   connectML(): void { this.state.run(() => { this.state.data.mlConnected = !this.state.data.mlConnected; this.state.commerce.touch(); }, this.state.data.mlConnected ? 'Cuenta simulada desconectada.' : 'Cuenta simulada conectada.'); }

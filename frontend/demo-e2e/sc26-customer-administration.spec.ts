@@ -98,12 +98,17 @@ test('SC26 Admin canonical search, exact ownership, nested dialog keyboard and o
   await expect(summary(page)).toBeVisible();
   await summary(page).getByRole('link', { name: new RegExp(order.id) }).click();
   await expect(page).toHaveURL(`/demo/user/orders/${order.id}`);
-  await expect(page.locator('main')).toContainText('Medio de pago no informado');
+  await expect(page.getByRole('heading',{name:'Pedido '+order.id,exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Estado del pedido'})).toContainText(order.payment.label);
+  await expect(page.locator('main')).toContainText(customer.email);
   await expect(page.locator('main')).toContainText(order.tracking);
   await expect(page.locator('main')).not.toContainText('Tarjeta de crédito');
   await cta(page, 'order-receipt').click();
-  await expect(page.locator('.receipt-preview')).toContainText(`Entrega ${order.fulfillment?.label} · Costo no informado`);
-  await expect(page.locator('.receipt-preview')).not.toContainText(/Entrega\s+\$\s*0/);
+  await expect(page.getByRole('dialog')).toContainText('COMPROBANTE DEMO — NO FISCAL');
+  await expect(page.getByRole('dialog')).toContainText(order.id);
+  for(const line of order.lines)await expect(page.getByRole('dialog')).toContainText(line.name+' × '+line.quantity);
+  await expect(page.getByRole('dialog')).toContainText('Sin cobro real ni validez fiscal.');
+  await expect(page.getByRole('dialog')).not.toContainText(/Entrega\s+\$\s*0/);
   await page.keyboard.press('Escape');
   await axe(page, info, 'canonical-order');
 });
@@ -223,16 +228,18 @@ test('SC26 restriction revokes existing customer session, blocks login/checkout,
   expect((await stored(page)).orders).toEqual(before.orders);
 });
 
-test('SC26 Operator consults and opens order without mutation controls; Customer and Unknown denied', async ({ page }) => {
+test('SC26 Operator consults customer and opens SC21 operational detail; Customer and Unknown denied', async ({ page }) => {
   await login(page, DemoContext.Admin, UserRole.Operator);
   await openCustomer(page);
   await expect(summary(page).getByRole('button', { name: CustomerAccountCommand.Restrict.label })).toHaveCount(0);
   await summary(page).getByRole('link', { name: new RegExp(order.id) }).click();
   await expect(page).toHaveURL(`/demo/user/orders/${order.id}`);
   for (const id of ['order-incident-open', 'order-return-receive', 'order-shipment-advance', 'order-payment-resolve']) await expect(cta(page, id)).toHaveCount(0);
+  await expect(cta(page,'order-return-next')).toHaveText('Solicitar devolución');
   await expect(cta(page, 'shell-reset-open')).toBeDisabled();
   await cta(page, 'order-list-back').click();
-  await expect(page).toHaveURL('/demo/user/customers');
+  await expect(page).toHaveURL('/demo/user/orders?focus='+order.id);
+  await expect(cta(page,'order-open-'+order.id)).toBeFocused();
   await login(page, DemoContext.Customer);
   await page.goto('/demo/user/customers');
   await expect(page.getByRole('heading', { name: 'Acceso denegado' })).toBeVisible();
