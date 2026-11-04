@@ -5,6 +5,10 @@ import type { CatalogQueryReader } from './demo-catalog-location';
 export class DemoProductSelection {
   private constructor(readonly variant: DemoProductVariant, readonly quantity: number) {}
 
+  static forVariant(variant: DemoProductVariant): DemoProductSelection { return this.fromWire({ get: key => key === 'variant' ? variant.wire : null }, [variant], 0); }
+
+  get query(): { variant: string } { return { variant: this.variant.wire }; }
+
   static fromWire(query: CatalogQueryReader, variants: readonly DemoProductVariant[], available: number): DemoProductSelection {
     const rawVariant = query.get('variant');
     const requested = rawVariant === null ? variants[0]??DemoProductVariant.Unknown : DemoProductVariant.fromWire(rawVariant);

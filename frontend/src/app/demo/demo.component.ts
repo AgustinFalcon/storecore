@@ -1,9 +1,10 @@
+import {AuthorizeCampaignsStep} from './campaigns/campaign-flow';
 import { Component, effect, computed, inject, signal, DestroyRef, afterNextRender, Injector } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CatalogSort, CheckoutStep, DemoAddress, DemoCampaign, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoSettings } from './demo-model';
+import { CatalogSort, CheckoutStep, DemoAddress, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoSettings } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoPaymentPhase, DemoDeliveryMethod, DemoMLTab, DemoSyncStatus, DemoCompetitor } from './demo-process-types';
@@ -33,7 +34,6 @@ export class DemoDialog {
   static readonly Reset = new DemoDialog('Restablecer demostración');
   static readonly Product = new DemoDialog('Editar producto');
   static readonly Address = new DemoDialog('Dirección de entrega');
-  static readonly Campaign = new DemoDialog('Oferta o campaña');
   static readonly Adjustment = new DemoDialog('Ajustar inventario');
   static readonly Information = new DemoDialog('Información');
   static readonly Confirm = new DemoDialog('Confirmar operación');
@@ -42,7 +42,7 @@ export class DemoDialog {
   static readonly Receipt = new DemoDialog('Comprobante de demostración');
   static readonly Incident = new DemoDialog('Registrar incidencia');
   static readonly Unknown = new DemoDialog('Acción desconocida');
-  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Campaign, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Adjustment, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
 }
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
@@ -53,7 +53,7 @@ export class DemoRootComponent {
   readonly Role = UserRole;
   readonly Context = DemoContext;
   readonly scenarios = DemoScenario.all;
-  readonly navigation = DemoScreen.all.filter(screen => screen.admin && screen !== DemoScreen.AdminOrder);
+  get navigation() { return DemoScreen.all.filter(screen => screen.admin && screen !== DemoScreen.AdminOrder && (screen !== DemoScreen.Promos || new AuthorizeCampaignsStep().permits({context:this.state.context(),role:this.state.role(),actor:this.state.actorId(),expectedActor:this.state.actorId(),epoch:this.state.sessionEpoch(),expectedEpoch:this.state.sessionEpoch(),readable:this.state.authorizationAvailable},this.state.data))); }
   mobileOpen = false;
   adminMenuOpen = false;
   private adminMenuFocus: HTMLElement | null = null;
@@ -176,7 +176,6 @@ export class DemoPageComponent {
   selectedOrderStatus: PaymentStatus | null = null;
   draftProduct: DemoProduct = { sku: '', name: '', category: 'Herramientas', brand: 'Norte', description: '', price: 10000, original: 10000, onHand: 1, reserved: 0, active: true, tone: '#e6a63f', variant: 'Estándar', supportsCase: false };
   draftAddress: DemoAddress = { id: '', label: 'Casa', street: '', city: '', postal: '', primary: false };
-  draftCampaign: DemoCampaign = { id: '', title: '', sku: '', percent: 10, active: true, from: '2026-10-08', until: '2027-12-31' };
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
@@ -301,9 +300,6 @@ export class DemoPageComponent {
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
   saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
   cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
-  editCampaign(campaign?: DemoCampaign): void { this.draftCampaign = campaign ? { ...campaign } : { ...this.draftCampaign, id: crypto.randomUUID(), title: '', sku: this.state.data.products[0].sku }; this.open(DemoDialog.Campaign); }
-  saveCampaign(): void { if (this.state.run(() => this.state.commerce.saveCampaign(this.draftCampaign), 'Campaña editorial guardada en esta Demo; no modifica la cotización de ofertas.')) this.close(); }
-  toggleCampaign(campaign: DemoCampaign): void { this.state.run(() => this.state.commerce.saveCampaign({ ...campaign, active: !campaign.active }), 'Registro editorial actualizado; la oferta aplicada no cambia.'); }
   adjust(product: DemoProduct): void { this.adjustmentSku = product.sku; this.adjustmentDelta = 1; this.adjustmentReason = ''; this.open(DemoDialog.Adjustment); }
   saveAdjustment(): void { if (this.state.run(() => this.state.commerce.adjust(this.adjustmentSku, Number(this.adjustmentDelta), this.adjustmentReason), 'Movimiento de inventario registrado.')) this.close(); }
   advance(): void { if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }

@@ -1,0 +1,71 @@
+<section class="campaigns">
+ <h1 #campaignHeading tabindex="-1">Campañas</h1>
+ <p class="notice">DEMO · Registros editoriales y decisiones simuladas. No cambia precios, stock ni publica en la tienda. El margen declarado no es rentabilidad verificada ni certificación de proveedor.</p>
+ @if (!allowed) { <p role="alert">Acceso reservado al Administrador con Catálogo habilitado.</p> }
+ @else {
+ <p>Fecha de simulación: {{ reference().label }} · America/Argentina/Buenos_Aires</p>
+ @if (state.data.campaigns.length) { <p>Se conservan {{ state.data.campaigns.length }} registros legacy como referencia no aprobada; no se convierten en campañas ni descuentos.</p> }
+ <p role="status">{{ feedback() }}</p>@if (savedId()) { <button id="campaign-show-saved" data-cta="campaign-show-saved" (click)="showSaved()">Ubicar registro guardado</button> }
+ <button data-cta="campaign-create" class="primary" [disabled]="!writable" (click)="edit()">Nueva campaña</button>
+ <div class="filters">
+  <label>Buscar ID, título o SKU<input type="search" [ngModel]="criteria().q" (ngModelChange)="update('q',$event)"/></label>
+  <label>Vigencia<select [ngModel]="criteria().lifecycle.wire" (ngModelChange)="update('lifecycle',$event)">@for (filter of lifecycleFilters;track filter.wire) { <option [value]="filter.wire">{{ filter.label }}</option> }</select></label>
+  <label>Aprobación<select [ngModel]="criteria().approval.wire" (ngModelChange)="update('approval',$event)">@for (filter of approvalFilters;track filter.wire) { <option [value]="filter.wire">{{ filter.label }}</option> }</select></label>
+  <label>Estado de revisión<select [ngModel]="criteria().revisionStatus.wire" (ngModelChange)="update('revisionStatus',$event)">@for (filter of revisionFilters;track filter.wire) { <option [value]="filter.wire">{{ filter.label }}</option> }</select></label>
+  <button data-cta="campaign-reset-filters" (click)="clear()">Limpiar filtros</button>
+ </div>
+ @if (!criteria().valid) { <p role="alert">Filtro no reconocido. Limpiá los filtros para recuperar resultados.</p> }
+ @else { <p aria-label="Filtros aplicados">{{ criteria().q }} · {{ criteria().lifecycle.label }} · {{ criteria().approval.label }} · {{ criteria().revisionStatus.label }}</p><p>{{ view().start }}–{{ view().end }} de {{ view().count }} registros · Orden por ID</p> }
+ @if (!view().all.length) { <p>No hay campañas editoriales. Creá un borrador para comenzar.</p> }
+ @else if (!view().rows.length) { <p>No hay resultados. Limpiá los filtros.</p> }
+ <div class="campaign-grid">
+ @for (row of view().rows;track row.record.id) {
+  <article class="card" tabindex="-1" [attr.id]="row.record.id">
+   <span>{{ row.record.id }} · Revisión {{ row.record.revision }}</span><h2>{{ row.record.title }}</h2>
+   <p>{{ row.record.revisionStatus.label }} · {{ row.lifecycle.label }} · {{ row.record.approval.label }}</p>
+   <p>{{ row.validity.label }}</p>
+   <ul aria-label="SKU de campaña">@for (sku of row.record.skus;track sku) { <li>{{ sku }}</li> }</ul>
+   <dl><dt>Ventana BA</dt><dd>{{ date(row.record.startsAt) }} — {{ date(row.record.endsAt) }}</dd><dt>Prioridad</dt><dd>{{ row.record.priority }}</dd><dt>Margen declarado, no verificado</dt><dd>{{ row.record.declaredMarginBps === null ? 'No informado' : row.record.declaredMarginBps + ' bps' }}</dd></dl>
+   <div class="actions">
+    <button [attr.data-cta]="'campaign-preview-'+row.record.id" [attr.aria-label]="'Vista previa de '+row.record.title" (click)="preview(row.record)">Vista previa</button>
+    @if (editable(row.record)) {
+     <button [attr.data-cta]="'campaign-edit-'+row.record.id" [disabled]="!writable" [attr.aria-label]="(row.record.revisionStatus === Revision.Current ? 'Crear revisión ' : 'Editar borrador ')+row.record.title" (click)="edit(row.record)">{{ row.record.revisionStatus === Revision.Current ? 'Crear revisión' : 'Editar borrador' }}</button>
+     @if (row.record.revisionStatus === Revision.Candidate) { <button [attr.data-cta]="'campaign-approve-'+row.record.id" [disabled]="!writable" [attr.aria-label]="'Aprobar '+row.record.title" (click)="openCommand(row.record,Command.Approve)">Aprobar</button> }
+     @else { <button [attr.data-cta]="'campaign-activation-'+row.record.id" [disabled]="!writable" [attr.aria-label]="(row.record.activation === Activation.Enabled ? Command.Pause.label : Command.Resume.label)+' '+row.record.title" (click)="openCommand(row.record,row.record.activation === Activation.Enabled ? Command.Pause : Command.Resume)">{{ row.record.activation === Activation.Enabled ? Command.Pause.label : Command.Resume.label }}</button> }
+    }
+    <button [attr.data-cta]="'campaign-history-'+row.record.id" [attr.aria-label]="'Ver historial de '+row.record.title" (click)="selectFamily(row.record.familyId)">Ver historial</button>
+   </div>
+  </article>
+ }
+ </div>
+ <nav aria-label="Páginas de campañas"><button data-cta="campaign-page-prev" [disabled]="view().page === 0" (click)="page(view().page-1)">Anterior</button><span>{{ view().page+1 }} / {{ view().pages }}</span><button data-cta="campaign-page-next" [disabled]="view().page+1 >= view().pages" (click)="page(view().page+1)">Siguiente</button></nav>
+ @if (family()) { <section aria-label="Historial de revisiones"><h2>Historial de {{ family() }}</h2><p>{{ history().length }} revisiones históricas de sólo lectura · {{ supersededCount }} reemplazadas · {{ staleCount }} borradores desactualizados</p><label>Estado del historial<select data-cta="campaign-history-filter" [ngModel]="historyFilter().wire" (ngModelChange)="changeHistoryFilter($event)">@for (filter of historyFilters;track filter.wire) { <option [value]="filter.wire">{{ filter.label }}</option> }</select></label><p>{{ visibleHistory().length }} de {{ history().length }} revisiones históricas</p>@for (row of visibleHistory();track row.id) { <article class="card"><h3>{{ row.title }} · Revisión {{ row.revision }}</h3><p>{{ row.revisionStatus.label }}</p><button [attr.data-cta]="'campaign-history-preview-'+row.id" (click)="preview(row)">Vista previa histórica</button></article> }<button data-cta="campaign-history-close" (click)="selectFamily('')">Cerrar historial</button></section> }
+ }
+</section>
+@if (phase()) {
+ <dialog #campaignModal aria-labelledby="campaign-dialog-title" (keydown)="trap($event)" (cancel)="$event.preventDefault(); requestClose()">
+ <h2 id="campaign-dialog-title" tabindex="-1">{{ discarding() ? 'Descartar cambios de campaña' : phase()!.label }}</h2>
+ <p id="campaign-error" tabindex="-1" role="alert">{{ error() }}</p>
+ @if (discarding()) { <p>Los cambios sin guardar se perderán.</p><div class="actions"><button data-cta="campaign-discard" (click)="discard()">Descartar cambios</button><button data-cta="campaign-stay" (click)="requestClose()">Seguir editando</button></div> }
+ @else {
+ @if (phase() === Phase.Editing && buffer) {
+  <form (submit)="$event.preventDefault(); previewDraft()">
+   <fieldset><legend>Registro editorial</legend><label>Título<input id="campaign-title" name="title" maxlength="120" [(ngModel)]="buffer.value.title" [attr.aria-invalid]="issue() === Issue.Title" aria-describedby="campaign-error"/></label></fieldset>
+   <fieldset id="campaign-scope" tabindex="-1" aria-describedby="campaign-error"><legend>Alcance explícito · {{ buffer.value.skus.length }}/20 SKU</legend>@for (product of products;track product.sku) { <label class="check"><input type="checkbox" [attr.id]="'campaign-scope-'+product.sku" [checked]="buffer.value.skus.includes(product.sku)" (change)="buffer.toggle(product.sku,$any($event.target).checked)"/>{{ product.sku }} · {{ product.name }}</label> }</fieldset>
+   <fieldset><legend>Ventana en Buenos Aires</legend><label>Inicio<input id="campaign-start" name="start" type="datetime-local" [(ngModel)]="buffer.start" [attr.aria-invalid]="issue() === Issue.Interval" aria-describedby="campaign-error"/></label><label>Fin exclusivo<input name="end" type="datetime-local" [(ngModel)]="buffer.end" [attr.aria-invalid]="issue() === Issue.Interval" aria-describedby="campaign-error"/></label></fieldset>
+   <fieldset><legend>Anotaciones declaradas</legend><label>Prioridad<input id="campaign-priority" name="priority" inputmode="numeric" [(ngModel)]="buffer.priority" [attr.aria-invalid]="issue() === Issue.Priority" aria-describedby="campaign-error"/></label><label>Margen declarado en bps (0–10000)<input id="campaign-margin" name="margin" inputmode="numeric" [(ngModel)]="buffer.margin" [attr.aria-invalid]="issue() === Issue.Margin" aria-describedby="campaign-error"/></label><p>Sin aprobación. El precio se administra en Ofertas; aquí no se evalúa rentabilidad.</p></fieldset>
+   <div class="actions"><button data-cta="campaign-preview-draft" type="submit" class="primary">Previsualizar borrador</button><button data-cta="campaign-cancel" type="button" (click)="requestClose()">Cancelar</button></div>
+  </form>
+ }
+ @else if (candidate();as row) {
+  <h3>{{ row.title }}</h3><p>{{ row.id }} · {{ row.revisionStatus.label }} · {{ row.approval.label }} · {{ row.activation.label }}</p><p>Alcance: {{ row.skus.join(', ') }}</p><p>{{ date(row.startsAt) }} — {{ date(row.endsAt) }}</p><p>Prioridad {{ row.priority }} · Margen declarado {{ row.declaredMarginBps === null ? 'no informado' : row.declaredMarginBps + ' bps' }}</p>
+  @if (row.approvalMetadata;as metadata) { <p>Aprobación simulada: {{ metadata.actorId }} · {{ metadata.role.label }} · {{ date(metadata.approvedAt) }}</p> }
+  <p>No cambia precios, stock ni publica en la tienda. Inicio de vigencia editorial: {{ date(row.startsAt) }}. La fuente única de precio sigue siendo SC18.</p>
+  <ul class="preview-lines">@for (line of lines();track line.sku+line.variant.wire) { <li><strong>{{ line.sku }} · {{ line.variant.label }}</strong><p>Base <span class="money">{{ money(line.base) }}</span> · Actual <span [class.money]="line.current.unit !== null">{{ money(line.current.unit) }}</span></p><p>Fuente: {{ line.current.source.label }} {{ line.current.offerId }}</p>@for (future of line.future;track future.offer.id) { <p>Proyección futura SC18 {{ future.offer.id }} · {{ date(future.offer.startsAt) }}: <span [class.money]="future.projected !== null">{{ money(future.projected) }}</span> · {{ future.eligibility.label }} · {{ future.issue.label }}. No es el precio actual.</p> }<a [attr.data-cta]="'campaign-product-'+line.sku+'-'+line.variant.wire" [routerLink]="['/demo/catalog',line.sku]" [queryParams]="line.selection.query">Ver ficha {{ line.sku }} · {{ line.variant.label }}</a><p>{{ line.eligibility.label }}{{ line.eligibility.purchasable ? ' · '+line.available+' unidades' : '' }}</p></li> }</ul>
+  @if (phase() === Phase.Confirming) { <div class="change-summary"><h4>Antes</h4>@if (before();as original) { <p>{{ original.id }} · {{ original.title }} · {{ original.skus.join(', ') }}</p><p>{{ date(original.startsAt) }} — {{ date(original.endsAt) }} · {{ original.approval.label }} · {{ original.activation.label }}</p> } @else { <p>Sin registro previo.</p> }<h4>Después</h4><p>{{ row.id }} · {{ row.title }} · {{ row.skus.join(', ') }}</p><p>{{ date(row.startsAt) }} — {{ date(row.endsAt) }} · {{ command() === Command.Approve ? Approval.Approved.label : row.approval.label }} · {{ command() === Command.Pause ? Activation.Paused.label : command() === Command.Resume ? Activation.Enabled.label : row.activation.label }}</p></div><p>{{ command().label }} para esta revisión. {{ command() === Command.Approve ? 'Captura al Administrador actual y la fecha de simulación como decisión simulada.' : '' }}</p><button data-cta="campaign-confirm" class="primary" (click)="confirm()">Confirmar {{ command().label }}</button> }
+  @else if (buffer) { <button data-cta="campaign-review-draft" class="primary" (click)="review()">Revisar guardado de borrador</button> }
+  <button data-cta="campaign-back" (click)="back()">{{ buffer ? 'Volver al editor' : 'Cerrar vista previa' }}</button>
+ }
+ }
+ </dialog>
+}

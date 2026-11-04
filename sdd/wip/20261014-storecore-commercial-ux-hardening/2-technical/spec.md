@@ -179,7 +179,7 @@ Success feedback occurs only after validation and successful persistence.
 - Product Real uses the existing product administration port. Original-list price, variant activation and Outlet unit/lot commands remain Demo-only until productive contracts exist.
 - Offers are Demo-only in the reviewed SHA. Real read/write behavior remains deferred until an owning cut promotes a route, closed lifecycle type, application port, HTTP repository, backend contract and tests.
 - Campaign Real is the existing `ManualPromo` by single SKU. Multi-product scope, audience, creative, communications and enriched status transitions are Demo-only.
-- Entity lifecycle and form/load state are separate closed types. Views never encode `saving`, `invalid` or `failure` as offer/campaign lifecycle values.
+- Entity lifecycle, temporal validity and form/load state are separate closed types. Views never encode `saving`, `invalid` or `failure` as offer/campaign lifecycle values. An invalid campaign interval is `CampaignTemporalValidity.Invalid`; its lifecycle is unavailable/`Unknown`, mutation remains blocked and the validation issue is rendered separately.
 
 ### SC-SURF-20..23 target capability matrix
 
