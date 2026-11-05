@@ -5,9 +5,8 @@ import { tapResponse } from '@ngrx/operators';
 import { filter, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { UserSession } from '../../core/auth/user-session';
-import { HomeContentDraft, ManualPromo } from '../../domain/user/user.entity';
+import { ManualPromo } from '../../domain/user/user.entity';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
-import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
 import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.usecase';
 
@@ -17,7 +16,6 @@ export interface UserState {
   readonly authenticated: boolean;
   readonly email: string;
   readonly password: string;
-  readonly home: HomeContentDraft;
   readonly promos: readonly ManualPromo[];
   readonly promoDraft: ManualPromo;
 }
@@ -40,7 +38,6 @@ export class UserStore extends ComponentStore<UserState> {
   constructor(
     private readonly signIn: SignInUserUseCase,
     private readonly signOutUser: SignOutUserUseCase,
-    private readonly saveHome: SaveHomeContentUseCase,
     private readonly promos: ManagePromosUseCase,
     private readonly session: UserSession,
     private readonly router: Router,
@@ -51,7 +48,6 @@ export class UserStore extends ComponentStore<UserState> {
       authenticated: session.authenticated(),
       email: '',
       password: '',
-      home: { title: '', body: '' },
       promos: [],
       promoDraft: emptyPromo,
     });
@@ -64,12 +60,10 @@ export class UserStore extends ComponentStore<UserState> {
   readonly loading$ = this.select((s) => s.loading);
   readonly errorMessage$ = this.select((s) => s.errorMessage);
   readonly authenticated$ = this.select((s) => s.authenticated);
-  readonly home$ = this.select((s) => s.home);
   readonly promos$ = this.select((s) => s.promos);
 
   readonly setEmail = this.updater((s, email: string) => ({ ...s, email }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
-  readonly setHome = this.updater((s, home: HomeContentDraft) => ({ ...s, home }));
   readonly setPromoDraft = this.updater((s, promoDraft: ManualPromo) => ({ ...s, promoDraft }));
 
   readonly submitSignIn = this.effect<void>((trigger$) =>
@@ -119,41 +113,6 @@ export class UserStore extends ComponentStore<UserState> {
               });
               void this.router.navigateByUrl('/login');
             },
-          }),
-        ),
-      ),
-    ),
-  );
-
-  readonly loadHome = this.effect<void>((trigger$) =>
-    trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap(() =>
-        this.saveHome.load().pipe(
-          tapResponse({
-            next: (home) => this.patchState({ home, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
-          }),
-        ),
-      ),
-    ),
-  );
-
-  readonly persistHome = this.effect<void>((trigger$) =>
-    trigger$.pipe(
-      tap(() => {
-        if (!this.snapshot.home.title.trim()) {
-          this.patchState({ loading: false, errorMessage: 'El título es obligatorio.' });
-          return;
-        }
-        this.patchState({ loading: true, errorMessage: '' });
-      }),
-      filter(() => Boolean(this.snapshot.home.title.trim())),
-      switchMap(() =>
-        this.saveHome.execute(this.snapshot.home).pipe(
-          tapResponse({
-            next: (home) => this.patchState({ home, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
       ),

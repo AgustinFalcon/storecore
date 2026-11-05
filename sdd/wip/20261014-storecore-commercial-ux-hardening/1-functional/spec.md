@@ -154,7 +154,7 @@ Each surface must record role, target (`demo`, `real` or both), fixture, closed 
 
 - Supports copy, banners, categories and actual preview.
 - States: editing, validation, unsaved, saving, success and failure.
-- Saving persists a draft; it does not claim that the content was published. The current Real contract is limited to `title`, `body` and optional `blocks { id, title, body }`. Rich banner/category controls are explicitly Demo-only until a productive field and command exist.
+- Demo saving persists a draft; it does not claim that the content was published. The current Real command publishes the hero `title` and `body` to the public home, so its action and success feedback explicitly say publish. The Real editor previews those two supported fields; banner/category controls and draft publication workflow remain Demo-only until productive fields and commands exist. See `design/sc16-real-publication-closure-addendum.md` for this reconciliation with the existing backend contract.
 - Admin and Operator may access the surface. Preview renders the SC-SURF-01 composition with the edited draft; leaving with unsaved changes requires explicit discard.
 
 #### SC-SURF-17 — Product administration

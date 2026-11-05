@@ -2,3 +2,5 @@
 .customers-page .empty-state p { color:#526577; }
 
 .page-heading { flex-wrap:wrap; gap:16px; align-items:flex-start; } .page-heading>div { flex:1 1 220px; min-width:0; } .page-heading p,.page-heading h1,.badge,button,label,h2,h3 { overflow-wrap:anywhere; } .badge { max-width:100%; box-sizing:border-box; white-space:normal; } .section-heading>label { flex:1 1 200px; } .card { min-width:0; } .actions>button { min-width:0; max-width:100%; white-space:normal; } dialog h2 { overflow-wrap:anywhere; }
+
+@media(max-width:480px){.customers-page{padding-top:12px}.page-heading>div,.section-heading>label{flex-basis:auto;width:100%}}

@@ -2,16 +2,36 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="content-title">Contenido del home</h1>
-    <p class="sc-page__lede">Esto alimenta el home público. Sin fixtures ni hero inventado.</p>
+    <p class="sc-page__lede">Editá el título y el texto de la portada. Publicar actualiza el contenido visible en tu tienda.</p>
   </header>
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
-  <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
+  <p role="status" aria-live="polite">{{ state.phase.label }}</p>
+  <sc-feature-status [loading]="state.phase.busy" [error]="state.errorMessage" (retry)="retryOperation()" />
+  @if (state.published !== null) {
+  <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()" aria-describedby="content-publish-help">
+    <fieldset [disabled]="state.phase.busy">
+    <legend>Editar portada de la tienda</legend>
     <label>Título
-      <input required name="homeTitle" [ngModel]="state.home.title" (ngModelChange)="patch({ title: $event })" />
+      <input required name="homeTitle" [ngModel]="state.home.title" (ngModelChange)="patch({ title: $event })" [attr.aria-invalid]="state.phase === Phase.Invalid" />
     </label>
     <label>Cuerpo
       <textarea name="homeBody" [ngModel]="state.home.body" (ngModelChange)="patch({ body: $event })"></textarea>
     </label>
-    <button type="submit" class="sc-btn sc-btn--primary">Publicar</button>
+    <p id="content-publish-help">La vista previa muestra el título y el cuerpo antes de publicarlos. Las categorías y ofertas conservan su configuración actual.</p>
+    <div class="content-actions">
+      <button type="submit" class="sc-btn sc-btn--primary" [disabled]="!dirty">Publicar cambios</button>
+      <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!dirty" (click)="discard.emit()">Descartar cambios</button>
+    </div>
+    </fieldset>
   </form>
+  <section class="sc-panel content-preview" aria-labelledby="content-preview-title">
+    <h2 id="content-preview-title">Vista previa de la portada</h2>
+    <p>{{ dirty ? 'Previsualización local de tus cambios. Todavía no se publicaron.' : 'Vista del contenido confirmado por la tienda.' }}</p>
+    <article class="sc-carousel__slide">
+      <p class="sc-carousel__kicker">En esta tienda</p>
+      <h3>{{ state.home.title || 'Título de la portada' }}</h3>
+      <p class="content-preview-body">{{ state.home.body || 'El texto de la portada aparecerá aquí.' }}</p>
+      <span class="sc-btn sc-btn--primary" aria-hidden="true">Ir al catálogo</span>
+    </article>
+  </section>
+  }
 </section>

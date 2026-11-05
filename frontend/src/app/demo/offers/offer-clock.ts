@@ -1,11 +1,12 @@
 import {DemoOrderDate,OrderDatePrecision} from '../orders/demo-order-date';
+const offerCivilDayFormatter=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'});
 export const DEMO_OFFER_REFERENCE='2026-10-15T12:00:00-03:00';
 export class OfferInstant {
  private constructor(readonly wire:string,readonly time:number|null,readonly label:string){}
  static readonly Unknown=new OfferInstant('',null,'Fecha no disponible');
  static fromWire(raw:unknown):OfferInstant{const date=DemoOrderDate.fromWire(raw);return typeof raw==='string'&&date.precision===OrderDatePrecision.Instant&&date.time!==null?new OfferInstant(raw,date.time,date.label):this.Unknown;}
  get known(){return this.time!==null;}
- get civilDay():string{return this.time===null?'':new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(this.time);}
+ get civilDay():string{return this.time===null?'':offerCivilDayFormatter.format(this.time);}
 }
 export interface OfferClockPort {capture():OfferInstant;}
 /** A persisted simulation instant, not wall time; reload never recaptures Date.now. */

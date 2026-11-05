@@ -1,3 +1,6 @@
+const civilDayFormatter = new Intl.DateTimeFormat('en', { timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit' });
+const instantLabelFormatter = new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'short', timeStyle: 'short' });
+
 export class OrderDatePrecision {
   private constructor(readonly label: string) {}
   static readonly Day = new OrderDatePrecision('Día registrado');
@@ -41,8 +44,8 @@ export class DemoOrderDate {
     if (zone !== 'Z' && (Number(zone.slice(1,3)) > 23 || Number(zone.slice(4,6)) > 59)) return unknown();
     const time = Date.parse(raw);
     if (!Number.isFinite(time)) return unknown();
-    const civil = new Intl.DateTimeFormat('en', { timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit' }).formatToParts(time);
+    const civil = civilDayFormatter.formatToParts(time);
     const key = Number(civil.find(part=>part.type==='year')?.value)*10000+Number(civil.find(part=>part.type==='month')?.value)*100+Number(civil.find(part=>part.type==='day')?.value);
-    return new DemoOrderDate(OrderDatePrecision.Instant, time, new Intl.DateTimeFormat('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'short', timeStyle: 'short' }).format(time)+' (Buenos Aires)',key);
+    return new DemoOrderDate(OrderDatePrecision.Instant, time, instantLabelFormatter.format(time)+' (Buenos Aires)',key);
   }
 }
