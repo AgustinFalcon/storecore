@@ -20,6 +20,7 @@ export class DemoProfileComponent {
   private snapshot:ReturnType<DemoApplicationState['readProfile']>|null=null;
   private reviewed:DemoProfileManifest|null=null;private previewText='';private busy=false;private alive=true;private trigger:HTMLElement|null=null;
   private dialogReview:{authority:string;raw:string|null;revision:number}|null=null;
+  private static readonly routeDraftKey='storecore.demo.profile-route-draft';
   get authorized():boolean{return !this.revoked()&&this.state.canConfigureProfile;}
   get configDirty():boolean{return JSON.stringify(this.draft)!==JSON.stringify(this.baseline);}
   get canSave():boolean{return this.canPersist&&this.configDirty&&this.conflicts.length===0;}
@@ -36,9 +37,18 @@ export class DemoProfileComponent {
   get canWrite():boolean{return this.authorized&&!this.busy&&this.phase()!==ProfileImportPhase.ResultUncertain&&this.snapshot!==null;}
   readonly json=(v:unknown)=>v===undefined?'No existe':JSON.stringify(v,null,2);
   constructor(){
-    effect(()=>{this.state.context();this.state.role();this.state.actorId();this.state.sessionEpoch();this.state.sessionGeneration();untracked(()=>{this.revoked.set(false);this.refresh(true);});});
-    inject(DestroyRef).onDestroy(()=>{this.alive=false;this.clear();});
+    effect(()=>{this.state.context();this.state.role();this.state.actorId();this.state.sessionEpoch();this.state.sessionGeneration();untracked(()=>{this.revoked.set(false);if(this.refresh(true))this.restoreRouteDraft();});});
+    inject(DestroyRef).onDestroy(()=>{this.persistRouteDraft();this.alive=false;this.clear();});
   }
+  private persistRouteDraft():void{
+    if(!this.authorized||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}
+    sessionStorage.setItem(DemoProfileComponent.routeDraftKey,JSON.stringify({authority:this.owner,draft:this.draft,manifest:this.manifest}));
+  }
+  private restoreRouteDraft():void{
+    const raw=sessionStorage.getItem(DemoProfileComponent.routeDraftKey);if(!raw||!this.authorized)return;
+    try{const saved=JSON.parse(raw) as {authority?:unknown;draft?:unknown;manifest?:unknown};if(saved.authority!==this.owner)throw Error('authority');this.draft=StoreProfileCodec.fromWire(saved.draft);this.manifest=typeof saved.manifest==='string'?saved.manifest:'';this.phase.set(ProfileImportPhase.Editing);this.configStatus='Recuperamos los cambios pendientes de esta sesión.';this.status=this.manifest?'Recuperamos el manifiesto pendiente. Previsualizalo antes de aplicarlo.':'';}catch{sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);}
+  }
+  @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent):void{if(this.authorized&&(this.configDirty||!!this.manifest.trim())){this.persistRouteDraft();event.preventDefault();event.returnValue='';}}
   private clear():void{this.close(false);this.snapshot=null;this.owner='';this.reviewed=null;this.previewText='';this.manifest='';this.changes=[];this.selection=[];this.exportText='';this.draft=StoreProfileCodec.reset();this.baseline=StoreProfileCodec.reset();this.resetBefore=StoreProfileCodec.reset();this.configError='';this.configStatus='';this.conflicts=[];this.error='';this.status='';this.validity.set(PreviewValidity.Missing);this.phase.set(ProfileImportPhase.AccessDenied);}
   refresh(clear=false):boolean{
     const priorAuthority=this.owner,recovering=this.snapshot===null&&!!this.owner;
@@ -120,7 +130,7 @@ export class DemoProfileComponent {
       // Rebase import against the current config proposal; only a settings write consumes it.
       if(!isImport&&profile){this.draft={...profile};this.baseline={...profile};this.conflicts=[];}
       if(!this.refresh()){this.status='';this.configStatus='';if(!isImport)this.phase.set(ProfileImportPhase.Editing);this.focusHeading();return;}
-      if(isImport){this.status=result.label;this.phase.set(ProfileImportPhase.Succeeded);this.focusHeading();}
+      if(isImport){this.manifest='';sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);this.status=result.label;this.phase.set(ProfileImportPhase.Succeeded);this.focusHeading();}
       else{this.configStatus=result.label;this.focusHeading();}
     }else{
       this.snapshot=null;this.phase.set(isImport?(result===ProfileCommandResult.Uncertain?ProfileImportPhase.ResultUncertain:ProfileImportPhase.Failed):ProfileImportPhase.Editing);
