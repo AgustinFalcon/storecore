@@ -44,7 +44,8 @@ export class DemoProfileComponent {
   }
   private persistRouteDraft():void{
     const authority=this.routeDraftOwner;if(!authority||authority!==this.routeDraftAuthority())return;
-    try{if(!this.authorized||!ProfileRouteDraftCodec.acceptsManifest(this.manifest)||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(authority,this.baseline,this.draft,this.manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
+    const manifest=this.phase()===ProfileImportPhase.Editing?this.manifest:'';
+    try{if(!this.authorized||!ProfileRouteDraftCodec.acceptsManifest(manifest)||(!this.configDirty&&!manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(authority,this.baseline,this.draft,manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
   }
   private restoreRouteDraft():void{
     let raw:string|null=null;try{raw=sessionStorage.getItem(DemoProfileComponent.routeDraftKey);}catch{return;}const saved=ProfileRouteDraftCodec.decode(raw);if(!saved||!this.authorized||saved.authority!==this.routeDraftAuthority()){try{sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);}catch{/* A blocked storage cleanup must not block navigation. */}return;}
