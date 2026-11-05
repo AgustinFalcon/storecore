@@ -43,6 +43,10 @@ test('SC25 preview is pure; selection invalidates it; selected merge never publi
  await selectAndReview(page,manifest([section('hero','Título cambiado')]));await expect(host(page)).toContainText(ProfileDiffOperation.Update.label);await(await expand(page)).fill(manifest([section('hero','Edición posterior')]));await expect(cta(page,'configuration-import')).toBeDisabled();expect((await stored(page)).profileSections).toEqual([section('hero','Título importado')]);
 });
 
+test('SC25 reviewed safe draft survives route exit but requires a fresh preview',async({page})=>{
+ await open(page);await selectAndReview(page);const reviewed=await(await expand(page)).inputValue();await expect(cta(page,'configuration-import')).toBeEnabled();const before=await raw(page);await page.goto('/demo/user/inventory');await page.goBack();await expect(await expand(page)).toHaveValue(reviewed);await expect(cta(page,'configuration-import')).toBeDisabled();expect(await raw(page)).toBe(before);
+});
+
 test('SC25 rejects incompatible, malformed, secret and invalid selection without storage or HTTP',async({page})=>{
  let requests=0;await page.route('**/api/**',route=>{requests++;return route.abort();});await open(page);const before=await raw(page);
  for(const text of ['{',manifest().replace('"1.x"','"2.x"'),manifest().replace('"1.0.0"','"9.0.0"'),manifest().replace('"universal-tools-profile"','"other"'),manifest([section('hero','token=secret')]),manifest([section('hero','X')],['missing']),manifest([section('hero','X')],['hero','hero'])]){await preview(page,text,false);await expect(cta(page,'configuration-import')).toBeDisabled();expect(await raw(page)).toBe(before);}
