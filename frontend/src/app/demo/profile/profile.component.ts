@@ -18,6 +18,7 @@ export class DemoProfileComponent {
   configError='';configStatus='';conflicts:ProfileSettingField[]=[];
   private baseline=StoreProfileCodec.reset();private readonly revoked=signal(false);
   private owner='';
+  private routeDraftOwner='';
   private snapshot:ReturnType<DemoApplicationState['readProfile']>|null=null;
   private reviewed:DemoProfileManifest|null=null;private previewText='';private busy=false;private alive=true;private trigger:HTMLElement|null=null;
   private dialogReview:{authority:string;raw:string|null;revision:number}|null=null;
@@ -42,7 +43,8 @@ export class DemoProfileComponent {
     inject(DestroyRef).onDestroy(()=>{this.persistRouteDraft();this.alive=false;this.clear();});
   }
   private persistRouteDraft():void{
-    try{if(!this.authorized||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(this.routeDraftAuthority(),this.baseline,this.draft,this.manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
+    const authority=this.routeDraftOwner;if(!authority||authority!==this.routeDraftAuthority())return;
+    try{if(!this.authorized||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(authority,this.baseline,this.draft,this.manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
   }
   private restoreRouteDraft():void{
     let raw:string|null=null;try{raw=sessionStorage.getItem(DemoProfileComponent.routeDraftKey);}catch{return;}const saved=ProfileRouteDraftCodec.decode(raw);if(!saved||!this.authorized||saved.authority!==this.routeDraftAuthority()){try{sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);}catch{/* A blocked storage cleanup must not block navigation. */}return;}
@@ -52,12 +54,12 @@ export class DemoProfileComponent {
   }
   private routeDraftAuthority():string{return JSON.stringify([this.state.actorId(),this.state.sessionGeneration()]);}
   @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent):void{if(this.authorized&&(this.configDirty||!!this.manifest.trim())){event.preventDefault();event.returnValue='';this.persistRouteDraft();}}
-  private clear():void{this.close(false);this.snapshot=null;this.owner='';this.reviewed=null;this.previewText='';this.manifest='';this.changes=[];this.selection=[];this.exportText='';this.draft=StoreProfileCodec.reset();this.baseline=StoreProfileCodec.reset();this.resetBefore=StoreProfileCodec.reset();this.configError='';this.configStatus='';this.conflicts=[];this.error='';this.status='';this.validity.set(PreviewValidity.Missing);this.phase.set(ProfileImportPhase.AccessDenied);}
+  private clear():void{this.close(false);this.snapshot=null;this.owner='';this.routeDraftOwner='';this.reviewed=null;this.previewText='';this.manifest='';this.changes=[];this.selection=[];this.exportText='';this.draft=StoreProfileCodec.reset();this.baseline=StoreProfileCodec.reset();this.resetBefore=StoreProfileCodec.reset();this.configError='';this.configStatus='';this.conflicts=[];this.error='';this.status='';this.validity.set(PreviewValidity.Missing);this.phase.set(ProfileImportPhase.AccessDenied);}
   refresh(clear=false):boolean{
     const priorAuthority=this.owner,recovering=this.snapshot===null&&!!this.owner;
     if(!this.authorized){this.clear();this.focusHeading();return false;}
     try{
-      const loaded=this.state.readProfile(),initial=clear||priorAuthority!==loaded.authority;
+      const loaded=this.state.readProfile(),routeAuthority=this.routeDraftAuthority(),initial=clear||priorAuthority!==loaded.authority;
       const hadDialog=this.dialog()!==ProfileDialog.None;this.close(false);if(hadDialog)this.focusHeading();if(initial)this.clear();
       const rebased={...loaded.profile};
       if(!initial){
@@ -69,7 +71,7 @@ export class DemoProfileComponent {
         }
         this.conflicts=conflicts;
       }
-      this.draft=rebased;this.baseline={...loaded.profile};this.snapshot=loaded;this.owner=loaded.authority;
+      this.draft=rebased;this.baseline={...loaded.profile};this.snapshot=loaded;this.owner=loaded.authority;this.routeDraftOwner=routeAuthority;
       this.reviewed=null;this.previewText='';this.changes=[];this.selection=[];this.validity.set(PreviewValidity.Missing);this.phase.set(ProfileImportPhase.Editing);
       this.error='';this.configError='';if(recovering){this.configStatus='Estado local recuperado. Revisá la propuesta y volvé a confirmar.';this.status=this.manifest?'Estado local recuperado. Volvé a previsualizar y confirmar.':'';}return true;
     }catch(error){
