@@ -8,7 +8,7 @@ import { FulfillmentComponent } from './features/admin/fulfillment.component';
 import { ProfileImportComponent } from './features/admin/profile-import.component';
 import { UserCapabilitiesComponent } from './features/admin/user-capabilities.component';
 import { UserCatalogComponent } from './features/admin/user-catalog.component';
-import { UserContentComponent } from './features/admin/user-content.component';
+import { UserContentComponent, userContentLeaveGuard } from './features/admin/user-content.component';
 import { UserInventoryComponent } from './features/admin/user-inventory.component';
 import { UserLayoutComponent } from './features/admin/user-layout.component';
 import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
@@ -27,6 +27,7 @@ import { ShellComponent } from './features/shell/shell.component';
 import { CatalogPageComponent } from './features/storefront/catalog-page.component';
 import { ProductPageComponent } from './features/storefront/product-page.component';
 import { StorefrontHomeComponent } from './features/storefront/storefront-home.component';
+import { NotFoundComponent } from './features/navigation/not-found.component';
 
 const legacyLoginRedirect: RedirectFunction = ({ queryParams }) => {
   const destination = ReturnDestination.fromWire(queryParams['returnTo']);
@@ -56,6 +57,7 @@ export const routes: Routes = [
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
           { path: 'orders', component: CustomerOrdersComponent, title: 'Órdenes', canActivate: [customerGuard] },
           { path: 'orders/:id', component: CustomerOrderDetailComponent, title: 'Orden', canActivate: [customerGuard] },
+          { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },
         ],
       },
       {
@@ -65,7 +67,7 @@ export const routes: Routes = [
           { path: '', pathMatch: 'full', redirectTo: 'home' },
           { path: 'session', redirectTo: legacyLoginRedirect },
           { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
-          { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard] },
+          { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard], canDeactivate: [userContentLeaveGuard] },
           { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
           { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
           { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
@@ -74,9 +76,10 @@ export const routes: Routes = [
           { path: 'mercadolibre', component: UserMercadoLibreComponent, title: 'Mercado Libre', canActivate: [userGuard] },
           { path: 'capabilities', component: UserCapabilitiesComponent, title: 'Capabilities', canActivate: [userGuard] },
           { path: 'profile-import', component: ProfileImportComponent, title: 'Perfil', canActivate: [userGuard] },
+          { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },
         ],
       },
+      { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },
     ],
   },
-  { path: '**', redirectTo: '' },
 ];

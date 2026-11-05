@@ -1,0 +1,17 @@
+.history-page { max-width:1100px; }
+h1:focus,.results-heading:focus { outline:3px solid var(--accent); outline-offset:6px; scroll-margin-block:24px; }
+.history-records { display:grid; gap:20px; margin-block:24px; }
+.history-order { min-width:0; overflow-wrap:anywhere; }
+.history-order>header { display:flex; justify-content:space-between; align-items:start; gap:16px; }
+.history-order h3 { margin:0; font-size:1.2rem; }
+.history-date { color:var(--muted); }
+.history-facts { display:flex; gap:40px; flex-wrap:wrap; }
+.history-facts dt { font-size:.85rem; color:var(--muted); }
+.history-facts dd { margin:6px 0; font-weight:700; }
+.history-lines { padding:0; list-style:none; }
+.history-lines li { border-top:1px solid var(--line); padding-block:14px; }
+.history-lines p { margin:6px 0; }
+.history-warning { background:var(--canvas); border-left:4px solid var(--accent); padding:14px; }
+.history-page .filter-bar { align-items:end; }
+.history-page button,.history-page .button,.history-page select { min-height:44px; }
+@media(max-width:600px) { .history-order>header { flex-direction:column; } .history-page .filter-bar { display:grid; grid-template-columns:minmax(0,1fr); } .history-page .pagination { flex-wrap:wrap; } }

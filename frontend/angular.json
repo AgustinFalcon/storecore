@@ -19,9 +19,39 @@
             "inlineStyleLanguage": "scss"
           },
           "configurations": {
-            "production": { "outputHashing": "all" },
+            "production": {
+              "outputHashing": "all",
+              "budgets": [
+                { "type": "initial", "maximumWarning": "700kB", "maximumError": "900kB" },
+                { "type": "anyComponentStyle", "maximumWarning": "12kB", "maximumError": "20kB" }
+              ]
+            },
             "development": { "optimization": false, "sourceMap": true },
-              "demo": { "browser": "src/main.demo.ts", "index": { "input": "src/index.demo.html", "output": "index.html" }, "tsConfig": "tsconfig.demo.json", "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }], "optimization": false, "sourceMap": true, "preserveSymlinks": true, "outputPath": "dist/storecore-demo" }
+              "demo": {
+                "browser": "src/main.demo.ts",
+                "index": { "input": "src/index.demo.html", "output": "index.html" },
+                "tsConfig": "tsconfig.demo.json",
+                "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }],
+                "optimization": true,
+                "sourceMap": false,
+                "preserveSymlinks": true,
+                "outputHashing": "all",
+                "outputPath": "dist/storecore-demo",
+                "budgets": [
+                  { "type": "initial", "maximumWarning": "1.9MB", "maximumError": "2MB" },
+                  { "type": "anyComponentStyle", "maximumWarning": "36kB", "maximumError": "40kB" }
+                ]
+              },
+              "demo-test": {
+                "browser": "src/main.demo.ts",
+                "index": { "input": "src/index.demo.html", "output": "index.html" },
+                "tsConfig": "tsconfig.demo.json",
+                "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }],
+                "optimization": false,
+                "sourceMap": true,
+                "preserveSymlinks": true,
+                "outputPath": "dist/storecore-demo"
+              }
           },
           "defaultConfiguration": "production"
         },

@@ -1,0 +1,8 @@
+<section class="rich-gallery" [attr.aria-label]="'Galería de '+name()">
+<div class="product-art large" [class.detail]="selectedId()!==details().media[0].id"><img class="product-image" [src]="asset(selected).src" [alt]="selected.alt"/></div>
+<p class="muted">{{asset(selected).kind.label}}</p>
+@if(details().media.length>1){<div class="gallery-controls">@for(media of details().media;track media.id;let index=$index){<button [attr.data-cta]="index===0?'gallery-front':index===1?'gallery-detail':'gallery-select-'+media.id" [attr.aria-pressed]="selected.id===media.id" (click)="select(media)"><img [src]="asset(media).src" alt=""/><span>Imagen {{index+1}}</span></button>}</div>}
+@if(allowZoom()){<button data-cta="catalog-gallery-zoom" (click)="open()">Ampliar imagen {{details().media.indexOf(selected)+1}}</button>}
+<p class="notice">Imágenes simuladas para la demostración; reemplazar por fotos reales de la unidad antes de publicar.</p>
+</section>
+@if(zoom()){<dialog #zoomDialog aria-labelledby="catalog-zoom-heading" (keydown)="trap($event)" (cancel)="$event.preventDefault();close()"><h2 id="catalog-zoom-heading">Imagen ampliada de {{name()}}</h2><button data-cta="catalog-gallery-close" (click)="close()">Cerrar imagen ampliada</button><img class="zoom-image" [src]="asset(selected).src" [alt]="selected.alt"/><p>{{asset(selected).kind.label}}</p></dialog>}

@@ -1,0 +1,16 @@
+<section class="page recovery-page">
+  <div class="auth-layout">
+    <div class="auth-art"><p class="eyebrow">ACCESO DEMO</p><h1>Recuperar acceso</h1><p>Recorré los resultados de una recuperación con datos simulados.</p><p class="demo-note">No se envían emails ni se cambian credenciales, permisos o sesiones reales o Demo.</p></div>
+    <div class="card auth-card">
+      <form (submit)="$event.preventDefault(); request()">
+        <h2>Solicitar enlace de muestra</h2>
+        <label for="recovery-email">Email<input id="recovery-email" required type="email" name="recoveryEmail" autocomplete="email" [(ngModel)]="email" [disabled]="!phase.canRequest" [attr.aria-describedby]="error ? 'recovery-error' : null"/></label>
+        @if (error) { <p id="recovery-error" role="alert">{{ error }}</p> }
+        <button data-cta="recovery-submit" class="primary" type="submit" [disabled]="!phase.canRequest">{{ phase === Phase.Submitting ? phase.label : 'Solicitar enlace demo' }}</button>
+      </form>
+      <div class="recovery-result" role="status" aria-live="polite" aria-atomic="true"><h3>{{ phase.label }}</h3><p>{{ phase.description }}</p></div>
+      <a data-cta="recovery-login" routerLink="/demo/login" [queryParams]="returnQuery">Volver a ingresar</a>
+      <details class="recovery-specimens"><summary>Explorar resultados simulados</summary><p>Estas escenas no verifican un token ni recuperan una cuenta.</p><div class="actions">@for (specimen of specimens; track specimen) { <button type="button" [attr.data-cta]="'recovery-scene-' + (specimen.wire || 'unknown')" (click)="simulate(specimen)">{{ specimen.label }}</button> }</div></details>
+    </div>
+  </div>
+</section>

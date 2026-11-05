@@ -9,7 +9,7 @@ export class UserAction {
   static readonly Orders = new UserAction('/user/orders', 'Fulfillment', [UserRole.Admin, UserRole.Operator]);
   static readonly Inventory = new UserAction('/user/inventory', 'Inventario', [UserRole.Admin, UserRole.Operator]);
   static readonly MercadoLibre = new UserAction('/user/mercadolibre', 'Mercado Libre', [UserRole.Admin, UserRole.Operator]);
-  static readonly Capabilities = new UserAction('/user/capabilities', 'Capabilities', [UserRole.Admin]);
+  static readonly Capabilities = new UserAction('/user/capabilities', 'Capabilities', [UserRole.Admin, UserRole.Operator]);
   static readonly ProfileImport = new UserAction('/user/profile-import', 'Importar perfil', [UserRole.Admin]);
   permits(roles: readonly UserRole[]): boolean { return this.roles.some((role) => roles.includes(role)); }
   static forRoles(roles: readonly UserRole[]): readonly UserAction[] { return ACTIONS.filter((action) => action.permits(roles)); }

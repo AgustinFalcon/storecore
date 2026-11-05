@@ -20,6 +20,9 @@ export class CheckoutPageViewComponent {
   @Output() readonly pay = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
 
+  get merchandiseTotal():number{return this.state.cart.lines.reduce((total,line)=>total+line.effectiveUnitPrice*line.quantity,0);}
+  amount(value:number):string{return new Intl.NumberFormat('es-AR',{style:'currency',currency:this.state.cart.currency||'ARS'}).format(value);}
+
   get canPay(): boolean {
     return this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
       && this.state.addresses.some((address) => address.id === this.state.addressId) && this.state.currency.length > 0;

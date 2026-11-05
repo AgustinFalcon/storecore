@@ -7,6 +7,6 @@ describe('profile manifest', () => {
   });
 
   it('redacts secret-looking fragments from a preview diff', () => {
-    expect(redactPreview({ compatible: true, version: '1.0.0', diff: 'token=abc' }).diff).toBe('[redacted]=abc');
+    expect(redactPreview({ compatible: true, version: '1.0.0', diff: 'token=abc' }).diff).toBe('[redacted]');
   });
 });

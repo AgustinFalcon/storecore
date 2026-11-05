@@ -42,3 +42,20 @@ export function domainBoundaryFailures(path, text) {
   visit(source);
   return [...new Set(failures)];
 }
+/** Demo fixtures are executable only through the dedicated Demo entry. */
+export function fixtureLaneFailures(path, text) {
+  const rel=path.replaceAll('\\','/');
+  const demo=rel.startsWith('demo/');
+  const failures=[];
+  if(/store_id\s*[:=]/i.test(text))failures.push(`${rel}: store_id is forbidden`);
+  if(!demo&&/(class\s+\w*(Fixture|InMemory)\w*|universal-tools-profile)/i.test(text))failures.push(`${rel}: production lane cannot register fixtures or Universal Tools`);
+  if(!demo){
+    const source=ts.createSourceFile(rel,text,ts.ScriptTarget.Latest,true);
+    function visit(node){
+      if(ts.isStringLiteralLike(node)&&node.text.startsWith('.')&&posix.normalize(posix.join(posix.dirname(rel),node.text)).startsWith('demo/'))failures.push(`${rel}: production lane cannot import Demo`);
+      ts.forEachChild(node,visit);
+    }
+    visit(source);
+  }
+  return [...new Set(failures)];
+}

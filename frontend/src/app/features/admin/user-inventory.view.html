@@ -1,45 +1,53 @@
-<section class="sc-page sc-console" aria-labelledby="inv-title">
-  <header class="sc-page-head">
-    <p class="sc-kicker">Sólo lectura</p>
-    <h1 id="inv-title">Inventario WEB</h1>
-    <p class="sc-page__lede">Disponibilidad derivada. Esta pantalla no escribe stock.</p>
+<section class="sc-page sc-console inventory" aria-labelledby="inv-title" [attr.aria-busy]="state.loading">
+  <header class="sc-page-head inventory__head">
+    <div><p class="sc-kicker">Operaciones · Sólo lectura</p><h1 id="inv-title">Inventario WEB</h1><p class="sc-page__lede">Consultá la disponibilidad de cada SKU y sus reservas.</p></div>
+    @if (!state.readState.isAccessDenied) {
+      <button type="button" class="inventory__refresh" [disabled]="state.loading" (click)="retry.emit()">{{ state.loading && state.hasSnapshot ? 'Actualizando…' : 'Actualizar inventario' }}</button>
+    }
   </header>
-  <sc-feature-status
-    [loading]="loading"
-    [error]="error"
-    [empty]="!loading && rows.length === 0"
-    emptyText="No hay filas de inventario."
-    (retry)="retry.emit()"
-  />
-  @if (rows.length) {
-    <ul class="sc-metrics">
-      <li class="sc-metric"><span>SKUs</span><strong>{{ rows.length }}</strong></li>
-      <li class="sc-metric"><span>Disponible</span><strong>{{ availableTotal }}</strong></li>
-      <li class="sc-metric"><span>Reservado</span><strong>{{ reservedTotal }}</strong></li>
-      <li class="sc-metric"><span>Safety</span><strong>{{ safetyTotal }}</strong></li>
-    </ul>
-    <p class="sc-callout sc-callout--info">Los totales salen de las filas ya cargadas. No hay ajuste desde esta vista.</p>
-    <div class="sc-table-wrap">
-      <table class="sc-table">
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>Disponible</th>
-            <th>Reservado</th>
-            <th>Safety</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of rows; track row.sku) {
-            <tr>
-              <td class="sc-mono">{{ row.sku }}</td>
-              <td>{{ row.availableQuantity }}</td>
-              <td>{{ row.reservedQuantity }}</td>
-              <td>{{ row.safetyStock }}</td>
+  @if (state.readState.isAccessDenied) {
+    <div class="inventory__notice" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión interna con permiso para consultar el inventario.</p></div>
+  } @else if (unknownReadState) {
+    <div class="inventory__notice" role="alert"><h2>Estado de lectura no reconocido</h2><p>Actualizá el inventario para volver a consultar los datos.</p></div>
+  } @else {
+    @if (state.loading) { <p class="inventory__notice" role="status">{{ state.hasSnapshot ? 'Actualizando inventario. Conservamos la última consulta mientras se carga.' : 'Cargando inventario…' }}</p> }
+    @if (state.errorMessage) {
+      <div class="inventory__notice inventory__notice--error" role="alert">
+        <h2>{{ state.readState.isStale ? 'No pudimos actualizar el inventario' : 'No pudimos cargar el inventario' }}</h2><p>{{ state.errorMessage }}</p>
+        @if (state.readState.isStale) { <p>Datos de la última consulta. Pueden haber cambiado.</p> }
+        <button type="button" [disabled]="state.loading" (click)="retry.emit()">Reintentar</button>
+      </div>
+    }
+    @if (state.hasSnapshot) {
+      <ul class="inventory__metrics" aria-label="Resumen de todos los SKU cargados">
+        <li><span>SKU cargados</span><strong>{{ state.rows.length }}</strong></li><li><span>Disponible</span><strong>{{ availableTotal ?? 'No informado' }}</strong></li>
+        <li><span>Reservado</span><strong>{{ reservedTotal ?? 'No informado' }}</strong></li><li><span>Stock de seguridad</span><strong>{{ safetyTotal ?? 'No informado' }}</strong></li>
+      </ul>
+      <p class="inventory__explanation">Disponible es el saldo neto informado por el sistema. Las reservas no se descuentan nuevamente. El stock de seguridad se muestra por separado.</p>
+      <div class="inventory__filters" role="search" aria-label="Filtrar inventario">
+        <label for="inventory-query">Buscar por SKU<input id="inventory-query" type="search" placeholder="Ingresá un SKU" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label>
+        <label for="inventory-filter">Disponibilidad<select id="inventory-filter" [ngModel]="state.filter" (ngModelChange)="filterChange.emit($event)">
+          @for (filter of filters; track filter) { <option [ngValue]="filter">{{ filter.label }}</option> }
+        </select></label>
+        <button type="button" (click)="clearFilters.emit()">Limpiar filtros</button>
+      </div>
+      <p class="inventory__count" role="status">{{ visibleRows.length }} de {{ state.rows.length }} SKU</p>
+      @if (!state.rows.length) {
+        <div class="inventory__notice"><h2>Sin inventario para mostrar</h2><p>La consulta no devolvió SKU. Podés volver a actualizar.</p></div>
+      } @else if (!visibleRows.length) {
+        <div class="inventory__notice"><h2>Sin coincidencias</h2><p>Probá con otro SKU o limpiá los filtros.</p><button type="button" (click)="clearFilters.emit()">Mostrar todo el inventario</button></div>
+      } @else {
+        <table class="inventory__table">
+          <caption>Inventario WEB por SKU. Resumen de la consulta completa; filtros aplicados sólo al listado.</caption>
+          <thead><tr><th scope="col">SKU</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th></tr></thead>
+          <tbody>@for (row of visibleRows; track row.sku) {
+            <tr><th scope="row" class="inventory__sku">{{ row.sku }}</th>
+              <td data-label="Disponibilidad"><span class="inventory__badge" [attr.data-tone]="row.availability.tone">{{ row.availability.label }}</span></td>
+              <td data-label="Disponible">{{ row.availableQuantity ?? 'No informado' }}</td><td data-label="Reservado">{{ row.reservedQuantity ?? 'No informado' }}</td><td data-label="Stock de seguridad">{{ row.safetyStock ?? 'No informado' }}</td>
             </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+          }</tbody>
+        </table>
+      }
+    }
   }
 </section>

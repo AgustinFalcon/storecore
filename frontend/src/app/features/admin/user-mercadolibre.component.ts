@@ -1,28 +1,30 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
-import { InstallationStore } from './installation.store';
+import { ChangeDetectionStrategy, Component, effect } from '@angular/core';
+import { UserSession } from '../../core/auth/user-session';
+import { UserMercadoLibreStore } from './user-mercadolibre.store';
 import { UserMercadoLibreViewComponent } from './user-mercadolibre.view';
 
 @Component({
   selector: 'sc-user-mercadolibre',
   imports: [AsyncPipe, UserMercadoLibreViewComponent],
-  providers: [InstallationStore],
+  providers: [UserMercadoLibreStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (store.state$ | async; as state) {
+    @if (store.vm$ | async; as state) {
       <sc-user-mercadolibre-view
         [state]="state"
-        (draftChange)="store.setListingDraft($event)"
-        (save)="store.persistListing()"
-        (retry)="store.loadMercadoLibre()"
+        (refresh)="store.loadMercadoLibre()"
+        (queryChange)="store.setQuery($event)"
+        (clearQuery)="store.clearQuery()"
       />
     }
   `,
 })
-export class UserMercadoLibreComponent implements OnInit {
-  constructor(readonly store: InstallationStore) {}
-
-  ngOnInit(): void {
-    this.store.loadMercadoLibre();
+export class UserMercadoLibreComponent {
+  constructor(readonly store: UserMercadoLibreStore, session: UserSession) {
+    effect(() => {
+      const actorChanged = store.setActor(session.authenticated() ? session.principal() : null);
+      if (actorChanged) store.loadMercadoLibre();
+    });
   }
 }

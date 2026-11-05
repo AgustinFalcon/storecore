@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { domainBoundaryFailures } from './domain-boundary.mjs';
+import { domainBoundaryFailures, fixtureLaneFailures } from './domain-boundary.mjs';
 
 const root = join(import.meta.dirname, '..');
 const src = join(root, 'src', 'app');
@@ -21,9 +21,7 @@ for (const file of files) {
 
   failures.push(...domainBoundaryFailures(rel, text));
 
-  if (/(class\s+\w*(Fixture|InMemory)\w*|universal-tools-profile|store_id\s*[:=])/i.test(text)) {
-    failures.push(`${rel}: production lane cannot register fixtures, Universal Tools or store_id`);
-  }
+  failures.push(...fixtureLaneFailures(rel, text));
 
   if (rel.endsWith('.view.ts') && (text.includes('ComponentStore') || text.includes('HttpClient') || text.includes('UseCase'))) {
     failures.push(`${rel}: view must stay presentational (no Store, HTTP or UseCase)`);

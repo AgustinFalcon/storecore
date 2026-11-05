@@ -1,7 +1,13 @@
 import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/auth/auth.interceptor';
-import { ApplicationConfig } from '@angular/core';
+import { ApplicationConfig, inject } from '@angular/core';
+import { SurfaceTarget } from './domain/navigation/surface-identity';
+import { provideSurfaceIdentity } from './features/navigation/surface-host';
+import { AccessCoordinator } from './core/auth/access-coordinator';
+import { AccessContext } from './domain/access/access-context';
+import { CustomerSession } from './core/auth/customer-session';
+import { UserSession } from './core/auth/user-session';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
 import { CART_REPOSITORY } from './core/tokens/cart.tokens';
@@ -21,6 +27,17 @@ import { UserHttpRepository } from './data/user/user-http.repository';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    ...provideSurfaceIdentity(SurfaceTarget.Real, () => {
+      const access = inject(AccessCoordinator);
+      const customer = inject(CustomerSession);
+      const user = inject(UserSession);
+      return () => {
+        const context = access.state().activeContext;
+        if (context === AccessContext.Customer) return `customer:${customer.actorIdentity() ?? 'unavailable'}`;
+        if (context === AccessContext.User) return `user:${user.principal()?.id ?? 'unavailable'}`;
+        return 'public';
+      };
+    }),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideRouter(routes),
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpRepository },

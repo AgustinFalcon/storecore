@@ -12,6 +12,8 @@ import { ReturnDestination } from '../../domain/access/return-destination';
 import { ThemeAppearance } from '../../core/theme/theme-appearance';
 import { CartStore } from '../cart/cart.store';
 import { ShellStore } from './shell.store';
+import { SurfaceIdentity, SurfaceTarget } from '../../domain/navigation/surface-identity';
+import { matchedSurface } from '../navigation/surface-host';
 
 @Component({
   selector: 'sc-shell',
@@ -46,7 +48,7 @@ export class ShellComponent implements OnInit {
     this.access.rehydrate().subscribe({
       next: (state) => {
         if (state.permits(AccessContext.Customer)) this.cart.load();
-        if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login')) {
+        if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login') && matchedSurface(this.router.routerState.snapshot.root, SurfaceTarget.Real) !== SurfaceIdentity.Unknown) {
           const path = this.router.url.split(/[?#]/, 1)[0];
           const destination = ReturnDestination.fromPath(path);
           void this.router.navigate(['/login'], {

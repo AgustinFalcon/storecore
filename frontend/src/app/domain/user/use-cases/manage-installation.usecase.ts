@@ -1,7 +1,5 @@
 import { Observable } from 'rxjs';
 import {
-  CapabilityModule,
-  CapabilityState,
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
@@ -10,14 +8,6 @@ import { IUserRepository } from '../user.repository';
 
 export class ManageInstallationUseCase {
   constructor(private readonly repo: IUserRepository) {}
-
-  listCapabilities(): Observable<readonly CapabilityModule[]> {
-    return this.repo.listCapabilities();
-  }
-
-  setCapability(module: string, state: CapabilityState): Observable<CapabilityModule> {
-    return this.repo.setCapability(module, state);
-  }
 
   listInventory(): Observable<readonly InventoryRow[]> {
     return this.repo.listInventory();

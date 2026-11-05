@@ -1,0 +1,7 @@
+:host { display: block; min-width: 0; }
+fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+legend { font-weight: 700; margin-bottom: 1rem; }
+.content-actions { display: flex; flex-wrap: wrap; gap: 1rem; }
+.content-preview { margin-top: 1.5rem; overflow-wrap: anywhere; }
+.content-preview .sc-carousel__kicker { opacity: 1; color: #475569; }
+.content-preview-body { white-space: pre-wrap; }
