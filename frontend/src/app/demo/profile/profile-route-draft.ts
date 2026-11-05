@@ -1,4 +1,5 @@
 import type {StoreProfile} from './profile-domain';
+import {manifestLooksUnsafe} from '../../domain/user/profile-manifest';
 
 export interface ProfileRouteFields {storeName:string;supportEmail:string;supportPhone:string;}
 export interface ProfileRouteDraft {authority:string;baseline:ProfileRouteFields;draft:ProfileRouteFields;manifest:string;}
@@ -12,12 +13,14 @@ const fields=(value:unknown):ProfileRouteFields|null=>{
 
 /** One session-storage boundary for incomplete route drafts; final profile validation remains separate. */
 export class ProfileRouteDraftCodec {
+  static acceptsManifest(manifest:string):boolean{return !manifestLooksUnsafe(manifest);}
   static encode(authority:string,baseline:StoreProfile,draft:StoreProfile,manifest:string):string{
+    if(!this.acceptsManifest(manifest))throw Error('Unsafe route draft manifest');
     return JSON.stringify({authority,baseline:this.pick(baseline),draft:this.pick(draft),manifest});
   }
   static decode(raw:string|null):ProfileRouteDraft|null{
     if(raw===null)return null;
-    try{const value=JSON.parse(raw) as unknown;if(!record(value)||typeof value['authority']!=='string'||typeof value['manifest']!=='string'||value['manifest'].length>100000)return null;const baseline=fields(value['baseline']),draft=fields(value['draft']);return baseline&&draft?{authority:value['authority'],baseline,draft,manifest:value['manifest']}:null;}catch{return null;}
+    try{const value=JSON.parse(raw) as unknown;if(!record(value)||typeof value['authority']!=='string'||typeof value['manifest']!=='string'||value['manifest'].length>100000||!this.acceptsManifest(value['manifest']))return null;const baseline=fields(value['baseline']),draft=fields(value['draft']);return baseline&&draft?{authority:value['authority'],baseline,draft,manifest:value['manifest']}:null;}catch{return null;}
   }
   private static pick(profile:StoreProfile):ProfileRouteFields{return{storeName:profile.storeName,supportEmail:profile.supportEmail,supportPhone:profile.supportPhone};}
 }
