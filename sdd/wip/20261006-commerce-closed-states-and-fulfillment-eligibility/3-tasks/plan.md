@@ -1,10 +1,10 @@
 # Plan incremental con gates
 
 GO documental registrado en `sdd/reviews/20261006-commerce-fulfillment-plan-sol.md`.
-Implementación integrada por PR #171; ninguna tarea cerrada todavía por los
-gates residuales de aceptación. Verify exact-head `37630043935` y dual GPT-6.1
-Sol APPROVED están registrados en progress.md; browser CFE específico y
-clean/upgrade siguen pendientes. No hubo CI push de master ni homologación.
+Implementación integrada por PR #171. La aceptación local acumulativa del
+2026-11-05 cierra CFE-T01–T05: browser 17/17 y backend/migraciones 37/37 PASS
+sobre PostgreSQL 16. CFE-T06 permanece abierta para CI y reviews independientes
+del SHA documental exacto. No hubo homologación externa.
 GO documental no es review de implementación ni aprobación de publicación.
 El estado actual y los bloqueos de ejecución están en tasks.json/progress.md.
 
@@ -41,28 +41,28 @@ FE=`frontend/src/app/`. Targets nuevos son propuestos, no archivos implementados
 - R01 → T01/T02/T04 → BE domain/Commerce.kt + nuevos CommerceStates y adapters;
   FE domain/order/order.entity.ts, fulfillment-transition.ts y data/mappers/http-mappers.ts
   → nuevos CommerceStatesTest y order-state/mapper specs: todos los casos,
-  unknown/null/malformado y compatibilidad; FixtureOnly, NOT_RUN.
+  unknown/null/malformado y compatibilidad; PASS acumulativo local, ver evidencia 2026-11-05.
 - R02 → T02/T03 → nueva FulfillmentEligibility y adapter/port de evidencia,
   BE infrastructure/JdbcOrderService.kt y mporders/MpOrderApplicationWorker.kt
   → nuevo FulfillmentEligibilityTest + BT CommerceHttpIntegrationTest y
-  MpOrdersCheckoutIntegrationTest: E01–E04/E08; RealLocal pendiente, NOT_RUN.
+  MpOrdersCheckoutIntegrationTest: E01–E04/E08; RealLocal PASS 2026-11-05.
 - R03/R06 → T03 → pasos de shipment y coordinator/JdbcOrderService
   → integración PostgreSQL E03/E05/E06: secuencia, doble actor, rollback;
-  RealLocal pendiente, NOT_RUN.
+  RealLocal PASS 2026-11-05.
 - R04/R05 → T03/T04 → paso ReceiveReturn, RMA mapper/domain y
   FE features/admin/fulfillment.view.*, fulfillment.store.ts
   → E04/E05/E07 y unit UI: recepción completa, histórico bloqueado,
-  INSPECTED/ADJUSTED sin efectos; RealLocal pendiente, NOT_RUN.
+  INSPECTED/ADJUSTED sin efectos; RealLocal PASS 2026-11-05.
 - R07 → T04/T05 → FE data/repositories de order, domain/order/use-cases,
   customer order/checkout views y admin fulfillment; OrderController
   → E01/E02/E07/E08, HTTP destination + readback tras reload; RealLocal
-  pendiente, NOT_RUN. MockHttp sólo valida representación Unknown.
+  PASS 2026-11-05. MockHttp sólo valida representación Unknown.
 - R08 → T01/T05 → BT CommerceHttpIntegrationTest,
   MpOrdersCheckoutIntegrationTest, FE fulfillment-transition.spec.ts y suite
-  Playwright existente extendida → E01–E09 y artifacts de run exacto;
-  RealLocal/CI pendiente, NOT_RUN. Nunca reemplazar aceptación por skip.
+  Playwright existente extendida → E01–E09; RealLocal PASS 2026-11-05,
+  CI del commit documental pendiente. Nunca reemplazar aceptación por skip.
 - R01–R08 → T06 → sdd/reviews + este WIP → dual review base/head + CI exacto;
-  Review NOT_RUN, Publication BLOCKED. Toda fila necesita revision/file real,
+  Review IN_PROGRESS, CI PENDING, Publication BLOCKED. Toda fila necesita revision/file real,
   test/run, clasificación y disposición antes de cierre.
 
 ## Escenarios obligatorios
