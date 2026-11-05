@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, Page, test, TestInfo } from '@playwright/test';
 import { DemoContext, DemoSnapshot, decodeSnapshot, demoSeed } from '../src/app/demo/demo-model';
-import { CustomerAccountCommand, CustomerAccountState } from '../src/app/demo/customers/customer-account';
+import { CustomerAccountCommand, CustomerAccountResult, CustomerAccountState } from '../src/app/demo/customers/customer-account';
 import { UserRole } from '../src/app/domain/user/user-role';
 
 const key = 'storecore.commercial-demo.v1';
@@ -28,6 +28,14 @@ async function openCustomer(page: Page) {
   await expect(summary(page)).toBeVisible();
 }
 
+async function returnedCustomer(page: Page) {
+  await expect(page).toHaveURL('/demo/user/customers?focus=' + customer.id);
+  await expect(summary(page)).toBeVisible();
+  await expect(summary(page).getByRole('heading', { name: fullName, exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(cta(page, `customer-open-${customer.id}`)).toBeFocused();
+}
+
 async function stored(page: Page): Promise<DemoSnapshot> {
   const raw = await page.evaluate(storageKey => localStorage.getItem(storageKey), key);
   return raw ? decodeSnapshot(raw) : demoSeed();
@@ -44,7 +52,73 @@ async function frame(page: Page, info: TestInfo, scene: string) {
   expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${scene}: document overflow`).toBe(true);
   const clipping = await page.locator('dialog[open]').evaluateAll(elements => elements.map(element => ({ id: element.id, width: element.clientWidth, scroll: element.scrollWidth, left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right })).filter(item => item.scroll > item.width + 1 || item.left < 0 || item.right > innerWidth + 1));
   expect.soft(clipping, `${scene}: dialog overflow`).toEqual([]);
+  const overflowing = await page.locator('.customers-page .page-heading, .customers-page .page-header, .customer-grid, .customer-grid article, .customers-page .badge, dialog[open] .badge').evaluateAll(elements => elements.filter(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1 || element.scrollWidth > element.clientWidth + 1);
+  }).map(element => ({ class: element.className, text: element.textContent?.slice(0, 90) })));
+  expect.soft(overflowing, `${scene}: header, list or badge overflow`).toEqual([]);
   await axe(page, info, scene);
+}
+
+async function text200(page: Page) {
+  const doubled = await page.evaluate(() => {
+    const nodes = [...document.querySelectorAll<HTMLElement>('*')];
+    for (const node of nodes) if (node.dataset['sc26Font'] !== undefined) {
+      node.style.fontSize = node.dataset['sc26Font'];
+      delete node.dataset['sc26Font'];
+    }
+    const sizes = nodes.map(node => parseFloat(getComputedStyle(node).fontSize));
+    nodes.forEach((node, index) => {
+      node.dataset['sc26Font'] = node.style.fontSize;
+      node.style.fontSize = `${sizes[index] * 2}px`;
+    });
+    return nodes.every((node, index) => Math.abs(parseFloat(getComputedStyle(node).fontSize) - sizes[index] * 2) < .1);
+  });
+  expect(doubled, 'Every rendered element uses twice its computed font size').toBe(true);
+}
+
+async function faultAfterAccountWrite(page: Page) {
+  await page.evaluate(storageKey => {
+    const getItem = Storage.prototype.getItem;
+    const setItem = Storage.prototype.setItem;
+    const removeItem = Storage.prototype.removeItem;
+    const fault = { writes: 0, appliedWrites: 0, readFailures: 0, restored: false };
+    Object.assign(window, { sc26StorageFault: fault });
+    Storage.prototype.setItem = function (key, value) {
+      if (this === localStorage && key === storageKey) {
+        fault.writes++;
+        if (fault.appliedWrites > 0 && !fault.restored) throw new Error('SC26 rollback unavailable');
+        fault.appliedWrites++;
+      }
+      return setItem.call(this, key, value);
+    };
+    Storage.prototype.getItem = function (key) {
+      if (this === localStorage && key === storageKey && fault.appliedWrites > 0 && !fault.restored) {
+        fault.readFailures++;
+        throw new Error('SC26 readback unavailable');
+      }
+      return getItem.call(this, key);
+    };
+    Storage.prototype.removeItem = function (key) {
+      if (this === localStorage && key === storageKey && fault.appliedWrites > 0 && !fault.restored) {
+        fault.writes++;
+        throw new Error('SC26 rollback unavailable');
+      }
+      return removeItem.call(this, key);
+    };
+    window.addEventListener('sc26-restore-storage', () => { fault.restored = true; });
+  }, key);
+}
+
+async function restoreText(page: Page) {
+  await page.evaluate(() => document.querySelectorAll<HTMLElement>('[data-sc26-font]').forEach(node => {
+    node.style.fontSize = node.dataset['sc26Font'] ?? '';
+    delete node.dataset['sc26Font'];
+  }));
+}
+
+async function faultCounts(page: Page) {
+  return page.evaluate(() => (window as Window & { sc26StorageFault?: { writes: number; appliedWrites: number; readFailures: number } }).sc26StorageFault!);
 }
 
 test.beforeEach(async ({ context }) => {
@@ -111,6 +185,8 @@ test('SC26 Admin canonical search, exact ownership, nested dialog keyboard and o
   await expect(page.getByRole('dialog')).not.toContainText(/Entrega\s+\$\s*0/);
   await page.keyboard.press('Escape');
   await axe(page, info, 'canonical-order');
+  await cta(page, 'order-list-back').click();
+  await returnedCustomer(page);
 });
 
 for (const width of [320, 390, 768, 1440]) {
@@ -153,7 +229,11 @@ test('SC26 cancellation and failed write preserve snapshot and entered reason', 
   await reason.fill('Motivo conservado si falla el guardado');
   await page.evaluate(storageKey => {
     const original = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (key, value) { if (key === storageKey) throw new DOMException('No se pudo guardar la demostración', 'QuotaExceededError'); original.call(this, key, value); };
+    let rejectNext = true;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === storageKey && rejectNext) { rejectNext = false; throw new DOMException('No se pudo guardar la demostración', 'QuotaExceededError'); }
+      original.call(this, key, value);
+    };
   }, key);
   await confirmation(page).getByRole('button', { name: 'Confirmar cambio' }).click();
   await expect(confirmation(page).getByRole('alert')).toContainText('No se pudo guardar');
@@ -238,8 +318,7 @@ test('SC26 Operator consults customer and opens SC21 operational detail; Custome
   await expect(cta(page,'order-return-next')).toHaveText('Solicitar devolución');
   await expect(cta(page, 'shell-reset-open')).toBeDisabled();
   await cta(page, 'order-list-back').click();
-  await expect(page).toHaveURL('/demo/user/orders?focus='+order.id);
-  await expect(cta(page,'order-open-'+order.id)).toBeFocused();
+  await returnedCustomer(page);
   await login(page, DemoContext.Customer);
   await page.goto('/demo/user/customers');
   await expect(page.getByRole('heading', { name: 'Acceso denegado' })).toBeVisible();
@@ -296,3 +375,125 @@ test('SC26 Unknown account is safely readable and corrupt persistence offers con
   await page.getByRole('button', { name: 'Reintentar lectura' }).click();
   await expect(page.getByRole('heading', { name: 'Clientes', exact: true })).toBeVisible();
 });
+
+for (const command of [CustomerAccountCommand.Restrict, CustomerAccountCommand.Reactivate]) {
+  test(`SC26 ${command.wire} uncertain result reconciles without replay and preserves session rules`, async ({ page: admin, context }, info) => {
+    await login(admin);
+    await openCustomer(admin);
+    const affected = await context.newPage();
+    await login(affected, DemoContext.Customer);
+    await affected.goto('/demo/checkout');
+    const originalSession = await affected.evaluate(() => Object.fromEntries(Object.entries(sessionStorage)));
+    if (command === CustomerAccountCommand.Reactivate) {
+      await summary(admin).getByRole('button', { name: CustomerAccountCommand.Restrict.label }).click();
+      await admin.getByLabel('Motivo de restricción', { exact: true }).fill('Preparar reactivación incierta');
+      await confirmation(admin).getByRole('button', { name: 'Confirmar cambio' }).click();
+      await expect(cta(affected, 'access-login')).toBeVisible();
+    }
+    const before = await stored(admin);
+    await summary(admin).getByRole('button', { name: command.label }).click();
+    if (command === CustomerAccountCommand.Restrict) await admin.getByLabel('Motivo de restricción', { exact: true }).fill('Restricción con resultado incierto');
+    await faultAfterAccountWrite(admin);
+    await confirmation(admin, command).getByRole('button', { name: 'Confirmar cambio' }).click();
+    await expect(summary(admin).getByRole('alert')).toContainText(CustomerAccountResult.Uncertain.label);
+    await expect(summary(admin).getByRole('button', { name: CustomerAccountCommand.Restrict.label })).toHaveCount(0);
+    await expect(summary(admin).getByRole('button', { name: CustomerAccountCommand.Reactivate.label })).toHaveCount(0);
+    await expect(summary(admin)).not.toContainText(CustomerAccountResult.Saved.label);
+    await expect(summary(admin).locator('p').filter({ hasText: `${customer.id} ·` })).not.toContainText(before.actors.find(actor => actor.id === customer.id)!.access!.state.label);
+    await expect(cta(affected, 'access-login')).toBeVisible();
+    expect(await affected.evaluate(() => sessionStorage.getItem('storecore.demo.context'))).toBeNull();
+    const failed = await faultCounts(admin);
+    expect(failed.appliedWrites).toBe(1);
+    expect(failed.writes).toBeGreaterThanOrEqual(2);
+    expect(failed.readFailures).toBeGreaterThanOrEqual(1);
+    await cta(admin, 'customer-account-reconcile').click();
+    await expect(summary(admin).getByRole('alert')).toContainText(CustomerAccountResult.Uncertain.label);
+    expect((await faultCounts(admin)).writes).toBe(failed.writes);
+    expect((await faultCounts(admin)).appliedWrites).toBe(1);
+    await admin.evaluate(() => window.dispatchEvent(new Event('sc26-restore-storage')));
+    const persisted = await stored(admin);
+    const expectedState = command === CustomerAccountCommand.Restrict ? CustomerAccountState.Restricted : CustomerAccountState.Active;
+    expect(persisted.actors.find(actor => actor.id === customer.id)!.access!.state).toBe(expectedState);
+    expect(persisted.revision).toBe(before.revision + 1);
+    expect(persisted.orders).toEqual(before.orders);
+    expect(persisted.aftercare).toEqual(before.aftercare);
+    expect({ ...persisted.actors.find(actor => actor.id === customer.id), access: undefined }).toEqual({ ...before.actors.find(actor => actor.id === customer.id), access: undefined });
+    expect(persisted.actors.find(actor => actor.id === customer.id)!.cart).toEqual(before.actors.find(actor => actor.id === customer.id)!.cart);
+    expect(persisted.actors.find(actor => actor.id === customer.id)!.addresses).toEqual(before.actors.find(actor => actor.id === customer.id)!.addresses);
+    await frame(admin, info, 'uncertain');
+    const reconcile = cta(admin, 'customer-account-reconcile');
+    await reconcile.focus();
+    await admin.keyboard.press('Enter');
+    await expect(summary(admin)).toContainText(expectedState.label);
+    await expect(reconcile).toHaveCount(0);
+    expect(await stored(admin)).toEqual(persisted);
+    expect((await faultCounts(admin)).writes).toBe(failed.writes);
+    expect((await faultCounts(admin)).appliedWrites).toBe(1);
+    expect(await summary(admin).evaluate(node => node.contains(document.activeElement))).toBe(true);
+    await affected.evaluate(values => { for (const [key, value] of Object.entries(values)) sessionStorage.setItem(key, value); }, originalSession);
+    await affected.reload();
+    await expect(cta(affected, 'access-login')).toBeVisible();
+    expect(await affected.evaluate(() => sessionStorage.getItem('storecore.demo.context'))).toBeNull();
+  });
+}
+
+test('SC26 order origin is transient and refresh, direct and forged query fall back to Orders', async ({ page }) => {
+  await login(page);
+  await openCustomer(page);
+  await summary(page).getByRole('link', { name: new RegExp(order.id) }).click();
+  await page.reload();
+  await cta(page, 'order-list-back').click();
+  await expect(page).toHaveURL('/demo/user/orders?focus=' + order.id);
+  await expect(cta(page, 'order-open-' + order.id)).toBeFocused();
+  for (const suffix of ['', '?origin=Customers&returnUrl=https://example.invalid']) {
+    await page.goto(`/demo/user/orders/${order.id}${suffix}`);
+    await cta(page, 'order-list-back').click();
+    await expect(page).toHaveURL('/demo/user/orders?focus=' + order.id);
+    await expect(cta(page, 'order-open-' + order.id)).toBeFocused();
+  }
+});
+
+for (const width of [320, 390, 768, 1440]) {
+  test(`SC26 actual text200 list summary restriction reactivation focus and Axe ${width}`, async ({ page }, info) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width, height: 900 });
+    await login(page);
+    await page.goto('/demo/user/customers');
+    await text200(page);
+    await frame(page, info, 'list-text200');
+    await restoreText(page);
+    const opener = cta(page, `customer-open-${customer.id}`);
+    await opener.focus();
+    await page.keyboard.press('Enter');
+    await text200(page);
+    await frame(page, info, 'summary-text200');
+    await restoreText(page);
+    for (const command of [CustomerAccountCommand.Restrict, CustomerAccountCommand.Reactivate]) {
+      const trigger = summary(page).getByRole('button', { name: command.label });
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      const dialog = confirmation(page, command);
+      expect(await dialog.evaluate(node => node.contains(document.activeElement))).toBe(true);
+      if (command === CustomerAccountCommand.Restrict) await page.getByLabel('Motivo de restricción', { exact: true }).fill('Texto ampliado y teclado');
+      await text200(page);
+      await frame(page, info, `${command.wire}-text200`);
+      const confirm = dialog.getByRole('button', { name: 'Confirmar cambio' });
+      await confirm.scrollIntoViewIfNeeded();
+      await expect(confirm).toBeInViewport();
+      await page.screenshot({ path: info.outputPath(`${command.wire}-text200-controls.png`) });
+      for (let index = 0; index < 6; index++) {
+        await page.keyboard.press('Tab');
+        expect(await dialog.evaluate(node => node.contains(document.activeElement) || (document.activeElement === document.body && !document.hasFocus()))).toBe(true);
+      }
+      await page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+      await restoreText(page);
+      await trigger.click();
+      if (command === CustomerAccountCommand.Restrict) await page.getByLabel('Motivo de restricción', { exact: true }).fill('Texto ampliado y teclado');
+      await dialog.getByRole('button', { name: 'Confirmar cambio' }).click();
+      expect(await summary(page).evaluate(node => node.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(opener).toBeFocused();
+  });
+}

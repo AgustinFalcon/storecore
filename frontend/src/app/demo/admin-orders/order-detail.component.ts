@@ -1,7 +1,8 @@
+import {OrderNavigationOrigin} from './order-navigation-origin';
 import {Component,ElementRef,afterRenderEffect,effect,inject,signal,untracked,viewChild} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {InventoryReturnComponent} from '../inventory/inventory-return.component';
-import {ActivatedRoute,RouterLink} from '@angular/router';
+import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map} from 'rxjs';
 import {DemoApplicationState} from '../demo-state';
@@ -25,6 +26,9 @@ export class DetailDialog {
 @Component({selector:'sc-demo-order-detail',imports:[InventoryReturnComponent,FormsModule,RouterLink],templateUrl:'./order-detail.component.html',styleUrls:['../demo.scss','./order-detail.component.scss']})
 export class DemoOrderDetailComponent {
  readonly state=inject(DemoApplicationState);private readonly route=inject(ActivatedRoute);private readonly browser=inject(DemoBrowserEffects);
+ private readonly router=inject(Router);
+ private readonly navigation=this.router.currentNavigation()??this.router.lastSuccessfulNavigation();
+ readonly navigationOrigin=OrderNavigationOrigin.fromWire(this.navigation?.trigger==='imperative'&&this.navigation.previousNavigation!==null?this.navigation.extras.state?.['orderOrigin']:undefined);
  readonly id=toSignal(this.route.paramMap.pipe(map(p=>p.get('id')??'')),{initialValue:''});
  readonly query=toSignal(this.route.queryParamMap.pipe(map(p=>Object.fromEntries(['q','focus',...OrderQueueAxis.all.map(a=>a.wire)].map(k=>[k,p.get(k)])))),{initialValue:{}});
  readonly axes=OrderQueueAxis.all;readonly money=demoMoney;readonly date=DemoOrderDate.fromWire;readonly amount=returnAmount;readonly trap=trapDemoDialogFocus;
@@ -40,7 +44,7 @@ export class DemoOrderDetailComponent {
  get authority():OrderAuthority{return{context:this.state.context(),role:this.state.role(),actor:this.state.actorId(),epoch:this.state.sessionEpoch(),readable:this.state.authorizationAvailable};}
  get allowed(){return new AuthorizeDemoOrdersStep().permits(this.authority);}
  get order(){return this.allowed?this.state.data.orders.find(order=>order.id===this.id())??null:null;}
- get destination(){return OrderReturnDestination.fromWire(this.query(),this.id());}
+ get destination(){return this.navigationOrigin.destination(this.order?.actor??'',OrderReturnDestination.fromWire(this.query(),this.id()));}
  get buyer(){const order=this.order;if(!order)return null;return this.state.data.actors.find(a=>a.id===order.actor)??null;}
  get records(){const order=this.order;return order?this.state.data.aftercare.returns.filter(r=>r.orderId===order.id):[];}
  get activeRecord(){return this.intent?this.records.find(record=>record.id===this.intent?.recordId)??null:null;}

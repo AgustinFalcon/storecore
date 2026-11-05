@@ -1,11 +1,11 @@
 import {StoreProfileCodec,ProfileSectionsCodec,ProfileAuthorityRevoked,MergeDemoProfileStep,ProfileCommandResult,type StoreProfile,type DemoProfileManifest} from './profile/profile-domain';
-import {DemoProfileWriteFailure} from './demo-snapshot-persistence';
+import {DemoCustomerWriteUncertain,DemoProfileWriteFailure} from './demo-snapshot-persistence';
 import { Injectable, signal } from '@angular/core';
 import { DemoCommerce, DemoContext, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoSnapshotPersistence } from './demo-snapshot-persistence';
 import { DemoSnapshotWriter } from './demo-snapshot-writer';
 import { UserRole } from '../domain/user/user-role';
-import { CustomerAccountCommand, CustomerAdministrationAuthority } from './customers/customer-account';
+import { CustomerAccountCommand, CustomerAccountResult, CustomerAdministrationAuthority } from './customers/customer-account';
 import { ContentDraft, type ContentDraftData } from './content/content-draft';
 import { ContentAuthority } from './content/content-types';
 import { ApplyCapabilityStep, CapabilityCommandPhase as Phase, CapabilityLedgerCodec, type CapabilityProposal } from './capabilities/capability-ledger';
@@ -163,7 +163,42 @@ export class DemoApplicationState {
     if (!access?.state.permitsAccess || access.generation !== this.customerGeneration) throw new Error('La sesión Demo fue revocada. Iniciá sesión nuevamente.');
   }
   private revokeAffectedSession(): void { if (this.context() === DemoContext.Customer) { try { this.validateCustomerSession(); } catch { this.logout(); } } }
-  changeCustomerAccount(id: string, command: CustomerAccountCommand, reason: string): boolean { if (this.context() !== DemoContext.Admin || !CustomerAdministrationAuthority.canWrite(this.role())) { this.error.set('Acceso denegado.'); return false; } return this.run(() => this.commerce.changeCustomerAccount(this.role(), id, command, reason), 'Estado de la cuenta guardado en esta Demo.'); }
+  readonly customerAccountUncertain = signal(false);
+  private customerWriting = false;
+  changeCustomerAccount(id: string, command: CustomerAccountCommand, reason: string): CustomerAccountResult {
+    const actor = this.actorId(), epoch = this.sessionEpoch(), session = this.sessionGeneration();
+    const authorized = () => this.authorizationReadable && this.context() === DemoContext.Admin && CustomerAdministrationAuthority.canWrite(this.role()) && this.actorId() === actor && this.sessionEpoch() === epoch && this.sessionGeneration() === session && !!session && this.data.actors.some(value => value.id === actor);
+    if (!authorized()) return CustomerAccountResult.Denied;
+    if (this.customerAccountUncertain()) return CustomerAccountResult.Uncertain;
+    if (this.customerWriting) return CustomerAccountResult.Conflict;
+    this.customerWriting = true; this.error.set(''); this.message.set('');
+    try {
+      const persisted = this.persistence.transactCustomer(this.persistedRaw, this.persistedRevision, () => {
+        const candidate = new DemoCommerce(); candidate.snapshot = decodeSnapshot(JSON.stringify(this.data));
+        candidate.changeCustomerAccount(this.role(), id, command, reason);
+        return candidate.snapshot;
+      }, () => { if (!authorized()) throw new Error('Acceso denegado.'); });
+      this.commerce.snapshot = persisted.snapshot; this.persistedRaw = persisted.raw; this.persistedRevision = persisted.snapshot.revision; this.revision.update(value => value + 1);
+      this.message.set(CustomerAccountResult.Saved.label); return CustomerAccountResult.Saved;
+    } catch (error) {
+      const result = error instanceof DemoCustomerWriteUncertain ? CustomerAccountResult.Uncertain : !authorized() ? CustomerAccountResult.Denied : error instanceof DemoSnapshotConflict ? CustomerAccountResult.Conflict : CustomerAccountResult.Failed;
+      if (result === CustomerAccountResult.Uncertain) this.customerAccountUncertain.set(true);
+      this.error.set(result === CustomerAccountResult.Failed && error instanceof Error ? error.message : result.label);
+      return result;
+    } finally { this.customerWriting = false; }
+  }
+  /** Explicit observation only; never resends a customer command. */
+  reconcileCustomerAccount(): boolean {
+    if (!this.authorizationReadable || this.context() !== DemoContext.Admin || !CustomerAdministrationAuthority.canRead(this.role())) return false;
+    const actor = this.actorId(), epoch = this.sessionEpoch(), session = this.sessionGeneration();
+    try {
+      const first = this.persistence.load(this.commerce.snapshot), fresh = this.persistence.load(this.commerce.snapshot);
+      if (first.raw !== fresh.raw || this.actorId() !== actor || this.sessionEpoch() !== epoch || this.sessionGeneration() !== session) return false;
+      if (fresh.raw === null && this.persistedRaw !== null) throw new Error('Los datos guardados desaparecieron.');
+      this.commerce.snapshot = fresh.snapshot; this.persistedRaw = fresh.raw; this.persistedRevision = fresh.snapshot.revision; this.revision.update(value => value + 1);
+      this.customerAccountUncertain.set(false); this.error.set(''); return true;
+    } catch { this.error.set(CustomerAccountResult.Uncertain.label); return false; }
+  }
   logout(): void { this.sessionGeneration.set('');sessionStorage.removeItem('storecore.demo.session-generation');sessionStorage.removeItem('storecore.demo.capability-pending'); this.sessionEpoch.update(value => value + 1); this.customerGeneration = null; this.role.set(UserRole.Unknown); this.context.set(DemoContext.Unknown); sessionStorage.removeItem('storecore.demo.context'); sessionStorage.removeItem('storecore.demo.actor'); sessionStorage.removeItem('storecore.demo.generation'); sessionStorage.removeItem('storecore.demo.role'); this.message.set('Sesión demo cerrada.'); }
   reset(): boolean {
     if (!this.canResetDemo) { this.error.set('El rol Operador no puede restablecer los datos Demo.'); return false; }
@@ -174,7 +209,7 @@ export class DemoApplicationState {
       next.actors.forEach(actor => { if (actor.access) actor.access.generation = next.revision; });
       const persisted = this.persistence.replace(next);
       this.commerce.snapshot = persisted.snapshot; this.persistedRevision = persisted.snapshot.revision; this.persistedRaw = persisted.raw;
-      this.authorizationReadable = true;
+      this.authorizationReadable = true; this.customerAccountUncertain.set(false);
       this.actorId.set('cliente'); this.logout(); this.scenario.set(DemoScenario.Approved); this.revision.update(value => value + 1); this.error.set(''); this.message.set('Demostración restablecida.');
       return true;
     } catch { this.error.set('No se pudo restablecer la demostración.'); return false; }

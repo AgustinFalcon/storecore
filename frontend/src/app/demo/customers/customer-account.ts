@@ -36,6 +36,17 @@ export class CustomerAccountCommand {
 }
 
 export interface CustomerAccountAccess { state: CustomerAccountState; generation: number; reason: string; }
+/** Outcomes describe durable knowledge rather than exceptions. */
+export class CustomerAccountResult {
+  private constructor(readonly wire: string, readonly label: string) {}
+  static readonly Saved = new CustomerAccountResult('SAVED', 'Cambio guardado en esta Demo.');
+  static readonly Failed = new CustomerAccountResult('FAILED', 'No se guardó el cambio. Conservamos tu propuesta.');
+  static readonly Conflict = new CustomerAccountResult('CONFLICT', 'Los datos cambiaron en otra pestaña. Releé antes de continuar.');
+  static readonly Uncertain = new CustomerAccountResult('UNCERTAIN', 'Resultado incierto. Consultá el estado guardado antes de continuar.');
+  static readonly Denied = new CustomerAccountResult('DENIED', 'Acceso denegado.');
+  static readonly Unknown = new CustomerAccountResult('', 'Resultado desconocido. Consultá el estado guardado.');
+  static fromWire(raw: unknown): CustomerAccountResult { return [this.Saved, this.Failed, this.Conflict, this.Uncertain, this.Denied].find(value => value.wire === raw) ?? this.Unknown; }
+}
 export class CustomerAdministrationAuthority {
   static canRead(role: UserRole): boolean { return role === UserRole.Admin || role === UserRole.Operator; }
   static canWrite(role: UserRole): boolean { return role === UserRole.Admin; }

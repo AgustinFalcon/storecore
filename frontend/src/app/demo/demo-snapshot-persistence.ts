@@ -48,6 +48,31 @@ export class DemoSnapshotPersistence {
     return this.commit(mutation(), expectedRaw);
   }
 
+  /** Account writes require proof of rollback before reporting a known failure. */
+  transactCustomer(expectedRaw: string | null, expectedRevision: number, mutation: () => DemoSnapshot, authorize: () => void): PersistedDemoSnapshot {
+    this.assertWriter();
+    this.assertUnchanged(expectedRaw, expectedRevision);
+    const candidateRaw = JSON.stringify(mutation());
+    decodeSnapshot(candidateRaw);
+    if (candidateRaw === expectedRaw) return { raw: expectedRaw, snapshot: decodeSnapshot(candidateRaw) };
+    this.assertWriter();
+    this.assertUnchanged(expectedRaw, expectedRevision);
+    authorize();
+    try {
+      this.storage.setItem(DemoSnapshotPersistence.key, candidateRaw);
+      const raw = this.raw();
+      if (raw !== candidateRaw) throw new Error('No se pudo verificar el cambio de cuenta.');
+      return { raw, snapshot: decodeSnapshot(raw) };
+    } catch (error) {
+      try {
+        if (expectedRaw === null) this.storage.removeItem(DemoSnapshotPersistence.key);
+        else this.storage.setItem(DemoSnapshotPersistence.key, expectedRaw);
+        if (this.raw() !== expectedRaw) throw new Error('Rollback no verificado.');
+      } catch { throw new DemoCustomerWriteUncertain(); }
+      throw error;
+    }
+  }
+
   /** SC25 never rolls back an uncertain write or retries a command. */
   transactProfile(expectedRaw:string|null, expectedRevision:number, mutation:()=>DemoSnapshot):PersistedDemoSnapshot {
     this.assertWriter();try{this.assertUnchanged(expectedRaw,expectedRevision);}catch(error){if(error instanceof DemoSnapshotConflict)throw error;throw new DemoProfileWriteFailure();}
@@ -85,3 +110,4 @@ export class DemoSnapshotPersistence {
 
 export class DemoProfileWriteFailure extends Error {}
 export class DemoProfileWriteUncertain extends Error {}
+export class DemoCustomerWriteUncertain extends Error {}

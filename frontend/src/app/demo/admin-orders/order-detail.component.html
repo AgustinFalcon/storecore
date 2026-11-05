@@ -3,7 +3,7 @@
  @else if(!allowed){<h1>Acceso denegado</h1><p>Ingresá con una identidad de administración u operador.</p><a routerLink="/demo/login" data-cta="order-detail-login">Ingresar</a>@if(!state.authorizationAvailable){<p role="alert">No se pudo leer el pedido. Los datos guardados requieren revisión.</p><button type="button" data-cta="order-detail-retry-read" (click)="retryRead()">Reintentar lectura</button>}}
  @else if(order;as order){
  <sc-inventory-return/>
- <a [routerLink]="destination.path" [queryParams]="destination.params" data-cta="order-list-back">← Volver a pedidos</a>
+ <a [routerLink]="destination.path" [queryParams]="destination.params" data-cta="order-list-back">← {{ navigationOrigin.label }}</a>
  <header><div><p class="eyebrow">OPERACIONES · DEMO</p><h1 #heading tabindex="-1">Pedido {{order.id}}</h1><p>{{date(order.createdDate).label}}</p></div><button type="button" data-cta="order-receipt" (click)="receipt()">Ver comprobante Demo</button></header>
  <p class="demo-note">Demostración: las operaciones no generan cobros ni envíos reales.</p>
  @if(!known){<p role="status">Hay datos no reconocidos o incoherentes. Las operaciones permanecen bloqueadas.</p>}
