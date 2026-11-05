@@ -35,7 +35,7 @@ export class DemoOrderMetadataCodec {
  }
 }
 export class DemoIncidentProjectionStep {
- execute(snapshot:DemoSnapshot,order:DemoOrder):DemoIncidentState{const states=snapshot.aftercare.incidents.filter(x=>x.orderId===order.id).map(x=>x.status),own=order.incidentStatus??DemoIncidentState.None;if(own===DemoIncidentState.Unknown||states.includes(IncidentStatus.Unknown)||snapshot.aftercare.incidents.some(x=>x.orderId===order.id&&x.reason===IncidentReason.Unknown))return DemoIncidentState.Unknown;if(own===DemoIncidentState.Open||states.includes(IncidentStatus.Submitted))return DemoIncidentState.Open;if(own===DemoIncidentState.StockReview)return own;if(own===DemoIncidentState.Resolved||states.includes(IncidentStatus.Closed))return DemoIncidentState.Resolved;return DemoIncidentState.None;}
+ execute(snapshot:DemoSnapshot,order:DemoOrder):DemoIncidentState{const states=snapshot.aftercare.incidents.filter(x=>x.orderId===order.id).map(x=>x.status),own=order.incidentStatus??(order.incident?DemoIncidentState.Open:DemoIncidentState.None);if(own===DemoIncidentState.Unknown||states.includes(IncidentStatus.Unknown)||snapshot.aftercare.incidents.some(x=>x.orderId===order.id&&x.reason===IncidentReason.Unknown))return DemoIncidentState.Unknown;if(own===DemoIncidentState.Open||states.includes(IncidentStatus.Submitted))return DemoIncidentState.Open;if(own===DemoIncidentState.StockReview)return own;if(own===DemoIncidentState.Resolved||states.includes(IncidentStatus.Closed))return DemoIncidentState.Resolved;return DemoIncidentState.None;}
 }
 export class DemoFulfillmentState {
  private constructor(readonly wire:string,readonly label:string){}
@@ -50,16 +50,25 @@ export class DemoAftercareState {
  static project(snapshot:DemoSnapshot,order:DemoOrder){const rows=snapshot.aftercare.returns.filter(x=>x.orderId===order.id);if(order.returned||order.id==='ORD-1021'&&!rows.length||rows.some(x=>!ReturnRecordPolicy.known(x)))return this.Unknown;if(rows.some(x=>!x.stage.terminal&&x.stage!==ReturnStage.Refunded))return this.Active;if(rows.some(x=>x.refund.status===RefundStatus.Refunded))return this.Refunded;return rows.length?this.Closed:this.None;}
  static label(snapshot:DemoSnapshot,order:DemoOrder){const state=this.project(snapshot,order);if(state!==this.Refunded)return state.label;const refunded=snapshot.aftercare.returns.filter(x=>x.orderId===order.id&&x.refund.status===RefundStatus.Refunded).flatMap(x=>x.lines).reduce((n,x)=>n+x.quantity,0),total=order.lines.reduce((n,x)=>n+x.quantity,0);return refunded<total?`${refunded} reembolsada / ${total-refunded} disponible`:state.label;}
 }
+/** Persisted authority; identifiers never grant runtime capability. */
+export class DemoOrderOrigin {
+ private constructor(readonly wire:string,readonly label:string){}
+ static readonly Canonical=new DemoOrderOrigin('CANONICAL','Pedido operativo');
+ static readonly Legacy=new DemoOrderOrigin('LEGACY','Pedido Demo legacy');
+ static readonly Unknown=new DemoOrderOrigin('UNKNOWN','Origen no reconocido · sólo lectura');
+ static readonly all=[this.Canonical,this.Legacy];
+ static fromWire(raw:unknown){return this.all.find(value=>value.wire===raw)??this.Unknown;}
+}
 export class DemoOrderOperations {
  private constructor(readonly wire:string,readonly label:string){}
  static readonly Queue=new DemoOrderOperations('QUEUE','Gestionar entrega en pedidos');static readonly Legacy=new DemoOrderOperations('LEGACY','Escenario legacy');static readonly Unknown=new DemoOrderOperations('UNKNOWN','Operaciones desconocidas');static readonly all=[this.Queue,this.Legacy];
- static fromWire(order:unknown):DemoOrderOperations{if(typeof order==='string')return this.all.find(value=>value.wire===order)??this.Unknown;return order&&typeof order==='object'&&typeof (order as {id?:unknown}).id==='string'?DemoOrderScope.operations((order as {id:string}).id):this.Unknown;}
+ static fromWire(order:unknown):DemoOrderOperations{if(typeof order==='string')return this.all.find(value=>value.wire===order)??this.Unknown;return order&&typeof order==='object'&&typeof (order as {id?:unknown}).id==='string'?this.forOrigin((order as DemoOrder).origin):this.Unknown;}
+ static forOrigin(origin:DemoOrderOrigin|undefined){return origin===DemoOrderOrigin.Canonical?this.Queue:origin===DemoOrderOrigin.Legacy?this.Legacy:this.Unknown;}
  get customerPaymentGuidance():string{return this===DemoOrderOperations.Queue?'Podés consultar el pago registrado. Su actualización se gestiona desde el comercio.':'Las operaciones de pago no están disponibles para este pedido.';}
 }
 export class DemoOrderScope {
  static readonly ids=Object.freeze(['ORD-1007','ORD-1012','ORD-1013','ORD-1014','ORD-1015','ORD-1016','ORD-1017','ORD-1018','ORD-1019','ORD-1020','ORD-1021','ORD-1022']);
  static includes(id:string){return this.ids.includes(id);}
- static operations(id:string):DemoOrderOperations{return !id.trim()?DemoOrderOperations.Unknown:this.includes(id)?DemoOrderOperations.Queue:DemoOrderOperations.Legacy;}
 }
 export class AuthorizeLegacyDemoOrderStep {
  execute(order:DemoOrder|undefined):DemoOrder {if(DemoOrderOperations.fromWire(order)!==DemoOrderOperations.Legacy)throw new Error('Este pedido se gestiona con los comandos de la cola operativa.');return order!;}

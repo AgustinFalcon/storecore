@@ -15,7 +15,7 @@ describe('SC25 closed contracts and isolated snapshot upgrade',()=>{
   for(const patch of [{storeName:''},{supportEmail:'bad'},{supportPhone:'abc'},{currency:'USD'},{timezone:'UTC'},{extra:'x'}])expect(()=>Store.fromWire({...Store.baseline(),...patch})).toThrow();
  });
  it('migrates v9 additively, ignores unrelated legacy title and requires complete v10',()=>{
-  const raw=decodeSnapshot(JSON.stringify(demoSeed()));raw.version=9;delete raw.storeProfile;delete raw.profileSections;raw.title='SC16 stays';const prior=JSON.stringify(raw);const next=decodeSnapshot(prior);expect(next.version).toBe(10);expect(next.storeProfile).toEqual(Store.baseline());expect(next.profileSections).toEqual([]);const{storeProfile:_,profileSections:__,...rest}=next;void _;void __;expect(JSON.parse(JSON.stringify({...rest,version:9}))).toEqual(JSON.parse(prior));expect(decodeSnapshot(JSON.stringify(next))).toEqual(next);
+  const raw=decodeSnapshot(JSON.stringify(demoSeed()));raw.version=9;delete raw.storeProfile;delete raw.profileSections;raw.title='SC16 stays';const prior=JSON.stringify(raw);const next=decodeSnapshot(prior);expect(next.version).toBe(11);expect(next.storeProfile).toEqual(Store.baseline());expect(next.profileSections).toEqual([]);const{storeProfile:_,profileSections:__,...rest}=next;void _;void __;expect(JSON.parse(JSON.stringify({...rest,version:9}))).toEqual(JSON.parse(prior));expect(decodeSnapshot(JSON.stringify(next))).toEqual(next);
   for(const key of ['storeProfile','profileSections'])for(const value of [undefined,null,{},false]){const invalid={...next,[key]:value};expect(()=>decodeSnapshot(JSON.stringify(invalid))).toThrow();}
  });
  it('validates exact metadata, shape, unique selection and unsafe escaped credentials locally',()=>{

@@ -1,3 +1,4 @@
+import { CatalogConditionFilter } from './catalog-condition-filter';
 import { CatalogSort } from '../demo-model';
 import { CatalogStockScope, DemoCatalogLocation } from './demo-catalog-location';
 
@@ -7,8 +8,8 @@ describe('DemoCatalogLocation', () => {
 
   it('round-trips supported public criteria and drops foreign values', () => {
     const parsed = location.fromQuery(query({ q: ' taladro ', category: 'Herramientas', brand: 'Norte', stock: 'available', max: '1200', sort: 'price-down', page: '3', foreign: 'discard' }));
-    expect(parsed).toEqual({ search: 'taladro', category: 'Herramientas', brand: 'Norte', stock: CatalogStockScope.Available, maxPrice: 1200, sort: CatalogSort.PriceDown, page: 2 });
-    expect(location.toQuery(parsed)).toEqual({ q: 'taladro', category: 'Herramientas', brand: 'Norte', stock: 'available', max: 1200, sort: 'price-down', page: 3 });
+    expect(parsed).toEqual({ search: 'taladro', category: 'Herramientas', brand: 'Norte', stock: CatalogStockScope.Available, condition: CatalogConditionFilter.All, maxPrice: 1200, sort: CatalogSort.PriceDown, page: 2 });
+    expect(location.toQuery(parsed)).toEqual({ q: 'taladro', category: 'Herramientas', brand: 'Norte', stock: 'available', condition: null, max: 1200, sort: 'price-down', page: 3 });
   });
 
   it('distinguishes an absent maximum from an explicit zero', () => {

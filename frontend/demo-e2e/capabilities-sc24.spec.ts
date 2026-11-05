@@ -1,8 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import {expect,test, type Page} from '@playwright/test';
+import { exerciseCapabilitiesCtas } from './capability-scenarios';
 const key='storecore.commercial-demo.v1';
 async function open(page:Page,operator=false){await page.goto('/demo/login');await page.getByLabel('Contraseña',{exact:true}).fill('demo');await page.locator('[data-cta="login-submit"]').click();await page.locator(`[data-cta="${operator?'login-operator':'login-admin'}"]`).click();await page.goto('/demo/user/capabilities');}
 async function bounds(page:Page){expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1)).toBe(true);}
+test('SC24 discovery filters information owners and local change execute the real user flow', async ({ page }) => {
+  await exerciseCapabilitiesCtas(page);
+});
 for(const width of [1440,768,390,320])test(`SC24 cards dialog focus axe and text200 ${width}`,async({page},info)=>{
  test.setTimeout(60000);await page.setViewportSize({width,height:900});await open(page);await expect(page.locator('.capability-card')).toHaveCount(7);await expect(page.locator('.capabilities__metrics')).toContainText('7');await bounds(page);expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);await page.screenshot({path:info.outputPath('modules.png'),fullPage:true});const opener=page.getByRole('button',{name:'Ver información de Catálogo',exact:true});await opener.click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(opener).toBeFocused();await page.evaluate(()=>{const nodes=[...document.body.querySelectorAll<HTMLElement>('*')],sizes=nodes.map(n=>parseFloat(getComputedStyle(n).fontSize));nodes.forEach((n,i)=>n.style.fontSize=sizes[i]*2+'px');});await bounds(page);await opener.click();expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);await page.getByRole('dialog').screenshot({path:info.outputPath('text200.png')});await page.keyboard.press('Escape');
 });

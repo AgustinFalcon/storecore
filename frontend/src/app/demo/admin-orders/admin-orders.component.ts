@@ -9,7 +9,7 @@ import {demoMoney} from '../demo-money';
 import {trapDemoDialogFocus} from '../demo-dialog-focus';
 import {AuthorizeDemoOrdersStep,type OrderAuthority,type OrderIntent,type DemoOrderCommand,orderCommands} from './order-flow';
 import {OrderQueueQuery,OrderQueueAxis,ExportDemoOrdersStep} from './order-query';
-import {DemoAftercareState,DemoOrderScope} from './order-types';
+import {DemoAftercareState,DemoOrderOrigin} from './order-types';
 import {DemoBrowserEffects} from './demo-browser-effects';
 export class OrderDialog {
  private constructor(readonly wire:string,readonly label:string){}
@@ -32,8 +32,9 @@ export class DemoAdminOrdersComponent {
  readonly fresh=signal<DemoOrder|null>(null);
  get targetId(){return this.allowed?this.intent?.id??'':'';}
  readonly visibleSelected=computed(()=>this.rows().filter(x=>this.selected().has(x.id)).length);
- readonly selectedCount=computed(()=>this.allowed?this.state.data.orders.filter(x=>DemoOrderScope.includes(x.id)&&this.selected().has(x.id)).length:0);
+ readonly selectedCount=computed(()=>this.allowed?this.state.data.orders.filter(x=>this.selected().has(x.id)).length:0);
  readonly hiddenSelected=computed(()=>this.selectedCount()-this.visibleSelected());
+ origin(order:DemoOrder){return order.origin??DemoOrderOrigin.Unknown;}
  buyer(order:DemoOrder){if(!this.allowed)return '';const a=this.state.data.actors.find(x=>x.id===order.actor);return a?`${a.firstName} ${a.lastName}`:'Identidad no disponible';}
  contact(order:DemoOrder){return this.allowed?this.state.data.actors.find(x=>x.id===order.actor)?.email??'':'';}
  aftercare(order:DemoOrder){return DemoAftercareState.label(this.state.data,order);}

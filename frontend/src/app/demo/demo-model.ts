@@ -3,8 +3,8 @@ import {CapabilityLedgerCodec,type CapabilityLedger} from './capabilities/capabi
 import {MLLedgerCodec} from './mercadolibre/ml-codec';
 import type {MLLedger} from './mercadolibre/ml-types';
 import {InventoryMovementCodec,type InventoryAudit} from './inventory/inventory-types';
-import {MigrateOrdersV7ToV8Step} from './admin-orders/order-migration';
-import {DemoPickupStage,DemoIncidentState,DemoHistoricalVariant,DemoOrderMetadataCodec,AuthorizeLegacyDemoOrderStep} from './admin-orders/order-types';
+import {MigrateOrdersV7ToV8Step,MigrateOrderOriginV10ToV11Step} from './admin-orders/order-migration';
+import {DemoOrderOrigin,DemoPickupStage,DemoIncidentState,DemoHistoricalVariant,DemoOrderMetadataCodec,AuthorizeLegacyDemoOrderStep} from './admin-orders/order-types';
 import {CampaignRecordCodec,MigrateCampaignsV6ToV7Step,type DemoCampaignRecord} from './campaigns/campaign-record';
 import {SeedCampaignRecordsStep} from './campaigns/campaign-seed';
 import { CustomerAccountAccess, CustomerAccountState, CustomerAccountCommand, CustomerAdministrationAuthority, decodeCustomerAccess } from './customers/customer-account';
@@ -94,15 +94,15 @@ export interface DemoSettings { homepageItems: number; lowStockThreshold: number
 export interface DemoContentBlock { id: string; title: string; body: string; }
 export interface DemoProduct { sku: string; name: string; category: string; brand: string; description: string; price: number; original: number; onHand: number; reserved: number; active: boolean; tone: string; variant: string; supportsCase?: boolean; }
 export interface DemoAddress { id: string; label: string; street: string; city: string; postal: string; primary: boolean; }
-export interface DemoActor { access?: CustomerAccountAccess; id: string; email: string; firstName: string; lastName: string; phone: string; addresses: DemoAddress[]; favorites: string[]; cart: { sku: string; quantity: number; variant: DemoProductVariant }[]; }
-export interface DemoOrder { pickupStage?:DemoPickupStage;incidentStatus?:DemoIncidentState; fulfillment?: DemoDeliveryMethod; createdDate?: string; id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { historicalVariant?:DemoHistoricalVariant;sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant;catalog?:CatalogOrderLineFacts }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
+export interface DemoActor { access?: CustomerAccountAccess; id: string; email: string; firstName: string; lastName: string; phone: string; addresses: DemoAddress[]; favorites: string[]; cart: { reviewedUnit?:number; sku: string; quantity: number; variant: DemoProductVariant }[]; }
+export interface DemoOrder { origin?:DemoOrderOrigin; addressId?:string; pickupStage?:DemoPickupStage;incidentStatus?:DemoIncidentState; fulfillment?: DemoDeliveryMethod; createdDate?: string; id: string; actor: string; request: string; status: OrderStatus; payment: PaymentStatus; shipment: ShipmentStatus; lines: { historicalVariant?:DemoHistoricalVariant;sku: string; name: string; quantity: number; unit: number; variant?: DemoProductVariant;catalog?:CatalogOrderLineFacts }[]; total: number; address: string; tracking: string; history: string[]; returned: boolean; method?: DemoPaymentMethod; delivery?: DemoDeliverySnapshot; incident?: string; }
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
 export interface DemoMovement { id: string; sku: string; delta: number; reason: string; inventory?:InventoryAudit; }
 export interface DemoSnapshot { storeProfile?:StoreProfile; profileSections?:ProfileSection[]; capabilities?:CapabilityLedger; mercadolibre?:MLLedger; version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
-export function demoSeed(): DemoSnapshot { const snapshot=new MigrateOrdersV7ToV8Step().execute(demoSeedV7());snapshot.capabilities=CapabilityLedgerCodec.baseline();snapshot.storeProfile=StoreProfileCodec.baseline();snapshot.profileSections=[];snapshot.version=10;return snapshot; }
+export function demoSeed(): DemoSnapshot { const snapshot=new MigrateOrdersV7ToV8Step().execute(demoSeedV7());snapshot.capabilities=CapabilityLedgerCodec.baseline();snapshot.storeProfile=StoreProfileCodec.baseline();snapshot.profileSections=[];return new MigrateOrderOriginV10ToV11Step().execute(snapshot); }
 /** Previous schema fixture retained for deterministic upgrade tests. */
 export function demoSeedV7(): DemoSnapshot {
   const products = NAMES.map((name, index): DemoProduct => ({ sku: `DEMO-${String(index + 1).padStart(3, '0')}`, name, category: ['Herramientas', 'Seguridad', 'Organización'][Math.floor(index / 6) === 0 ? 0 : index < 9 ? 1 : 2], brand: ['Norte', 'Avance', 'Taller'][index % 3], description: 'Producto de catálogo simulado. Las características y condiciones comerciales se informan en la ficha de cada artículo.', price: (12500 + index * 8500) * 100, original: (14500 + index * 8500) * 100, onHand: index === 5 ? 0 : index === 8 ? 2 : 18 + index, reserved: 0, active: true, tone: ['#e6a63f', '#667b94', '#a5b49b'][index % 3], variant: 'Estándar' }));
@@ -162,9 +162,15 @@ export class DemoCommerce {
     const existing = this.actor(actorId).cart.find(line => line.sku === sku);
     if (existing && existing.variant !== variant) throw new Error('Este producto ya está en tu carrito con otra presentación. Quitalo antes de cambiar la variante.');
     this.setQuantity(actorId, sku, (existing?.quantity ?? 0) + quantity,variant);
-    const saved = this.actor(actorId).cart.find(line => line.sku === sku); if (saved) saved.variant = variant;
+    const saved = this.actor(actorId).cart.find(line => line.sku === sku); if (saved) { saved.variant = variant; if (!existing) saved.reviewedUnit=this.price(sku,variant); }
   }
   favorite(actorId: string, sku: string): void { const actor = this.actor(actorId); actor.favorites = actor.favorites.includes(sku) ? actor.favorites.filter(value => value !== sku) : [...actor.favorites, sku]; this.commit(); }
+  deleteAddress(actorId:string,addressId:string):void {
+    this.assertCustomerAccess(actorId);const actor=this.actor(actorId);
+    if(this.snapshot.orders.some(order=>order.actor===actorId&&order.addressId===addressId))throw new Error('Esta dirección está vinculada a un pedido. Conservamos la dirección.');
+    if(!actor.addresses.some(address=>address.id===addressId))throw new Error('Dirección no disponible.');
+    const wasPrimary=actor.addresses.find(address=>address.id===addressId)!.primary;actor.addresses=actor.addresses.filter(address=>address.id!==addressId);if(wasPrimary&&actor.addresses[0])actor.addresses[0].primary=true;this.commit();
+  }
   checkout(actorId: string, request: string, addressId: string, scenario: DemoScenario, method = DemoPaymentMethod.Card, deliveryMethod?: DemoDeliveryMethod): DemoOrder {
     this.assertCustomerAccess(actorId);
     const existing = this.snapshot.orders.find(order => order.actor === actorId && order.request === request); if (existing) return existing;
@@ -180,7 +186,7 @@ export class DemoCommerce {
     if (actor.cart.some(line => line.variant === DemoProductVariant.Case && this.product(line.sku).supportsCase !== true)) throw new Error('Una presentación dejó de estar disponible. Quitá el producto y seleccioná otra variante.');
     const lines = actor.cart.map(line => ({ ...line, name: `${this.product(line.sku).name} · ${line.variant.label}`, unit: this.price(line.sku,line.variant,createdDate),catalog:new CaptureCatalogOrderLineStep().execute(this.snapshot,line.sku) }));
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
-    const order: DemoOrder = { id: `DEMO-${this.id()}`, actor: actorId, request, createdDate, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: new CalculateCatalogOrderTotalStep().execute(lines), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${createdDate}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
+    const order: DemoOrder = { origin:DemoOrderOrigin.Legacy,fulfillment:deliveryMethod??DemoDeliveryMethod.Home,...(deliveryMethod!==DemoDeliveryMethod.Pickup&&address?{addressId:address.id}:{}), id: `DEMO-${this.id()}`, actor: actorId, request, createdDate, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: new CalculateCatalogOrderTotalStep().execute(lines), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${createdDate}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
     order.method = method;
     if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total = new CalculateCatalogOrderTotalStep().execute(lines,order.delivery.cost); }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
@@ -240,8 +246,10 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('Snapshot inválido.');
   const state = parsed as DemoSnapshot;
-  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6&&state.version!==7&&state.version!==8&&state.version!==9&&state.version!==10) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
+  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6&&state.version!==7&&state.version!==8&&state.version!==9&&state.version!==10&&state.version!==11) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
   const originalVersion=state.version;
+  if(state.orders.some(order=>order.addressId!==undefined&&(typeof order.addressId!=='string'||!order.addressId.trim())))throw new Error('Referencia de dirección inválida.');
+  if(state.actors.some(actor=>actor.cart?.some(line=>line.reviewedUnit!==undefined&&(!Number.isSafeInteger(line.reviewedUnit)||line.reviewedUnit<0))))throw new Error('Precio revisado inválido.');
   state.storeProfile=originalVersion>=10?StoreProfileCodec.fromWire(state.storeProfile):StoreProfileCodec.baseline();
   state.profileSections=originalVersion>=10?ProfileSectionsCodec.fromStoredWire(state.profileSections):[];
   state.capabilities=state.version>=9||Object.prototype.hasOwnProperty.call(state,'capabilities')?CapabilityLedgerCodec.fromWire(state.capabilities):CapabilityLedgerCodec.baseline();
@@ -290,6 +298,7 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.orders=state.orders.map(order=>({...DemoOrderMetadataCodec.fromWire(order),lines:order.lines.map(line=>({...line,...(line.historicalVariant?{historicalVariant:DemoHistoricalVariant.fromWire(line.historicalVariant.wire)}:{})}))}));
   state.mercadolibre=MLLedgerCodec.fromWire(state.mercadolibre);
   if(state.mercadolibre.mappings.some(m=>!skus.has(m.sku))||state.mercadolibre.intents.some(i=>!skus.has(i.sku)))throw Error('SKU Mercado Libre desconocido.');
-  if(wasV8){state.version=10;return state;}
-  const upgraded=new MigrateOrdersV7ToV8Step().execute(state);upgraded.version=10;return upgraded;
+  const upgraded=wasV8?state:new MigrateOrdersV7ToV8Step().execute(state);
+  if(originalVersion<11)return new MigrateOrderOriginV10ToV11Step().execute(upgraded);
+  upgraded.orders=upgraded.orders.map(order=>({...order,origin:DemoOrderOrigin.fromWire(order.origin?.wire)}));upgraded.version=11;return upgraded;
 }

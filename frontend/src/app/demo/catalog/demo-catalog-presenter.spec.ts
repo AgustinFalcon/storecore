@@ -1,10 +1,11 @@
+import { CatalogConditionFilter } from './catalog-condition-filter';
 import { CatalogSort, demoSeed } from '../demo-model';
 import { CatalogStockScope, type DemoCatalogCriteria } from './demo-catalog-location';
 import { DemoCatalogPresenter } from './demo-catalog-presenter';
 
 describe('DemoCatalogPresenter', () => {
   const presenter = new DemoCatalogPresenter(2);
-  const criteria: DemoCatalogCriteria = { search: '', category: '', brand: '', stock: CatalogStockScope.All, maxPrice: null, sort: CatalogSort.Featured, page: 0 };
+  const criteria: DemoCatalogCriteria = { search: '', category: '', brand: '', stock: CatalogStockScope.All, condition: CatalogConditionFilter.All, maxPrice: null, sort: CatalogSort.Featured, page: 0 };
 
   it('filters archived products with typed criteria without mutating the source', () => {
     const products = demoSeed().products;

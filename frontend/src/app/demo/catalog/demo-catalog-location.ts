@@ -1,3 +1,4 @@
+import { CatalogConditionFilter } from './catalog-condition-filter';
 import { CatalogSort } from '../demo-model';
 
 export class CatalogStockScope {
@@ -19,6 +20,7 @@ export interface DemoCatalogCriteria {
   readonly category: string;
   readonly brand: string;
   readonly stock: CatalogStockScope;
+  readonly condition: CatalogConditionFilter;
   readonly maxPrice: number | null;
   readonly sort: CatalogSort;
   readonly page: number;
@@ -39,6 +41,7 @@ export class DemoCatalogLocation {
       category: query.get('category') ?? '',
       brand: query.get('brand') ?? '',
       stock: CatalogStockScope.fromWire(query.get('stock')),
+      condition: CatalogConditionFilter.fromWire(query.get('condition')),
       maxPrice: maximum !== null && Number.isFinite(maximum) && maximum >= 0 ? maximum : null,
       sort: query.get('sort') === null ? CatalogSort.Featured : CatalogSort.fromWire(query.get('sort')),
       page: Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage - 1 : 0,
@@ -48,6 +51,7 @@ export class DemoCatalogLocation {
   toQuery(criteria: DemoCatalogCriteria): Record<string, string | number | null> {
     return {
       q: criteria.search || null,
+      condition: criteria.condition === CatalogConditionFilter.All ? null : criteria.condition.wire,
       category: criteria.category || null,
       brand: criteria.brand || null,
       stock: criteria.stock === CatalogStockScope.Available ? criteria.stock.wire : null,

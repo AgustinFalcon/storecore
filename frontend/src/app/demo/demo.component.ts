@@ -1,3 +1,6 @@
+import { CartReviewState } from './buyer/cart-review';
+import { DemoPasswordComponent } from './buyer/password-demo.component';
+import { CatalogConditionFilter } from './catalog/catalog-condition-filter';
 import {DemoOrderOperations} from './admin-orders/order-types';
 import {InventoryReturnComponent} from './inventory/inventory-return.component';
 import {AuthorizeCampaignsStep} from './campaigns/campaign-flow';
@@ -74,7 +77,7 @@ export class DemoRootComponent {
   confirmReset(): void { if (this.state.reset()) { this.closeReset(); void this.router.navigate(['/demo/login']); } }
 }
 
-@Component({ selector: 'sc-demo-page', imports: [InventoryReturnComponent,FormsModule, RouterLink,CatalogGalleryComponent,CatalogConditionComponent], templateUrl: './demo-page.html', styleUrls: ['./demo.scss','./rich-catalog/catalog-buyer.scss'] })
+@Component({ selector: 'sc-demo-page', imports: [DemoPasswordComponent,InventoryReturnComponent,FormsModule, RouterLink,CatalogGalleryComponent,CatalogConditionComponent], templateUrl: './demo-page.html', styleUrls: ['./demo.scss','./rich-catalog/catalog-buyer.scss'] })
 export class DemoPageComponent {
   get historyCriteria(): OrderHistoryCriteria { return OrderHistoryCriteria.fromWire({ q:this.route.snapshot.queryParamMap.get('q'),payment:this.route.snapshot.queryParamMap.get('payment'),page:this.route.snapshot.queryParamMap.get('page') }); }
   readonly Role = UserRole;
@@ -104,6 +107,8 @@ export class DemoPageComponent {
   incidentReason = '';
   readonly sorts = CatalogSort.all;
   readonly CatalogStock = CatalogStockScope;
+  readonly ConditionFilter = CatalogConditionFilter;
+  readonly condition = signal(CatalogConditionFilter.All);
   readonly Gallery = DemoGalleryView;
   readonly gallery = signal(DemoGalleryView.Front);
   get variants(): readonly DemoProductVariant[] { return this.productDetails?.variants.map(value=>value.variant)??(this.product?.supportsCase===true?DemoProductVariant.all:[DemoProductVariant.Standard]); }
@@ -138,11 +143,11 @@ export class DemoPageComponent {
   private readonly continuation = new DemoAccessContinuation();
   readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
   readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
-  readonly filtered = computed(() => this.catalogPresenter.filter(this.state.data.products, this.catalogCriteria, product => this.state.commerce.available(product.sku), product => this.state.commerce.price(product.sku)));
+  readonly filtered = computed(() => this.catalogPresenter.filter(this.state.data.products, this.catalogCriteria, product => this.state.commerce.available(product.sku), product => this.state.commerce.price(product.sku), product => CatalogDetailsRead.detail(this.state.data,product.sku)));
   readonly effectivePage = computed(() => this.catalogPresenter.pageIndex(this.filtered().length, this.page()));
   readonly catalogPageCount = computed(() => this.catalogPresenter.pageCount(this.filtered().length));
   readonly products = computed(() => this.catalogPresenter.page(this.filtered(), this.page()));
-  readonly catalogLocationIssue = computed(() => this.sort() === CatalogSort.Unknown || this.stockScope() === CatalogStockScope.Unknown);
+  readonly catalogLocationIssue = computed(() => this.condition() === CatalogConditionFilter.Unknown || this.sort() === CatalogSort.Unknown || this.stockScope() === CatalogStockScope.Unknown);
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
   private confirmation: (() => void) | null = null;
@@ -159,6 +164,9 @@ export class DemoPageComponent {
   private get checkoutCartIdentity(): string { return JSON.stringify([this.state.actorId(), this.state.sessionEpoch(), this.cartLines.map(line => [line.sku, line.variant.wire, line.quantity, line.unit,line.details])]); }
   get deliveryConfirmation(): DeliveryConfirmation { return this.deliveryAcceptance.state(this.deliveryQuote, this.checkoutCartIdentity); }
   private get checkoutFacts(): CheckoutFacts { return { quote: this.deliveryQuote, confirmation: this.deliveryConfirmation, hasItems: this.cartLines.length > 0 }; }
+  profileNameError = false;
+  profilePhoneError = false;
+  readonly quantityErrors = new Map<string,string>();
   profileName = this.state.actor.firstName;
   profileLastName = this.state.actor.lastName;
   profilePhone = this.state.actor.phone;
@@ -171,7 +179,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { effect(() => { this.state.sessionEpoch(); this.deliveryAcceptance.reset(); clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Ready); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { effect(() => { this.state.sessionEpoch(); this.deliveryAcceptance.reset(); clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Ready); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.condition.set(criteria.condition); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   readonly productImage = demoProductImage;
   get checkoutTotal(): number { return this.total + (this.deliveryQuote.valid ? this.deliveryQuote.cost : 0); }
@@ -190,6 +198,12 @@ export class DemoPageComponent {
   get product(): DemoProduct | undefined { this.state.revision(); return this.state.data.products.find(product => product.sku === this.route.snapshot.paramMap.get('sku')); }
   get order() { const order = this.state.data.orders.find(order => order.id === (this.route.snapshot.paramMap.get('id') ?? this.route.snapshot.paramMap.get('orderId'))); return this.screen.admin || order?.actor === this.state.actorId() ? order : undefined; }
   get orders() { return this.state.data.orders.filter(order => (this.screen.admin || order.actor === this.state.actorId()) && (!this.selectedOrderStatus || order.payment === this.selectedOrderStatus) && (!this.search() || order.id.toLowerCase().includes(this.search().toLowerCase()))); }
+  readonly CartReview=CartReviewState;
+  reviewState(line:{unit:number;reviewedUnit?:number;quantity:number;sku:string;variant:DemoProductVariant}):CartReviewState{return CartReviewState.evaluate(line.unit,line.reviewedUnit,line.quantity,this.state.commerce.available(line.sku,line.variant));}
+  get cartNeedsReview():boolean{return this.cartLines.some(line=>this.reviewState(line).blocksCheckout);}
+  reviewCart():void {this.state.run(()=>{for(const line of this.state.actor.cart){const unit=this.state.commerce.price(line.sku,line.variant);const status=CartReviewState.evaluate(unit,line.reviewedUnit,line.quantity,this.state.commerce.available(line.sku,line.variant));if(status===CartReviewState.Unavailable)throw Error('Ajustá o quitá los productos no disponibles antes de confirmar precios.');line.reviewedUnit=unit;}this.state.commerce.touch();},'Precios actuales revisados. Podés continuar.');}
+  addFavorite(product:DemoProduct):void {this.state.run(()=>this.state.commerce.add(this.state.actorId(),product.sku,1,DemoProductVariant.Standard),product.name+' agregado al carrito.');}
+  favoriteAvailable(product:DemoProduct):boolean{return product.active&&this.state.commerce.available(product.sku,DemoProductVariant.Standard)>0&&Number.isSafeInteger(this.state.commerce.price(product.sku,DemoProductVariant.Standard));}
   get cartLines() { return this.state.actor.cart.map(line => ({ ...line, product: this.state.commerce.product(line.sku), unit: this.state.commerce.price(line.sku,line.variant),details:CatalogDetailsRead.detail(this.state.data,line.sku) })); }
   get total(): number { return this.cartLines.reduce((sum, line) => sum + line.unit * line.quantity, 0); }
   get revenue(): number { return this.state.data.orders.filter(order => order.payment === PaymentStatus.Approved).reduce((sum, order) => sum + order.total, 0); }
@@ -201,10 +215,11 @@ export class DemoPageComponent {
   get favoriteProducts(): DemoProduct[] { return this.state.data.products.filter(product => this.favorite(product.sku)); }
   get adminProducts(): DemoProduct[] { return this.state.data.products.filter(product => !this.search() || `${product.name} ${product.sku}`.toLowerCase().includes(this.search().toLowerCase())); }
   filterOrders(raw: string): void { this.selectedOrderStatus = raw ? PaymentStatus.fromWire(raw) : null; }
-  private get catalogCriteria(): DemoCatalogCriteria { return { search: this.search(), category: this.category(), brand: this.brand(), stock: this.stockScope(), maxPrice: this.maxPrice(), sort: this.sort(), page: this.page() }; }
+  private get catalogCriteria(): DemoCatalogCriteria { return { search: this.search(), category: this.category(), brand: this.brand(), stock: this.stockScope(), condition: this.condition(), maxPrice: this.maxPrice(), sort: this.sort(), page: this.page() }; }
   get catalogQueryParams(): Record<string, string | number | null> { return this.catalogLocation.toQuery({ ...this.catalogCriteria, page: this.effectivePage() }); }
   updateCatalog(): void { this.page.set(0); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogLocation.toQuery({ ...this.catalogCriteria, page: 0 }), replaceUrl: true }); }
   changeCatalogPage(next: number): void { this.page.set(this.catalogPresenter.pageIndex(this.filtered().length, next)); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogQueryParams }); }
+  changeCondition(raw:string):void {this.condition.set(CatalogConditionFilter.fromWire(raw));this.updateCatalog();}
   changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.updateCatalog(); }
   changeMaximum(raw: number | null): void { const value = Number(raw); this.maxPrice.set(raw !== null && Number.isFinite(value) && value >= 0 ? value : null); this.updateCatalog(); }
   changeStock(available: boolean): void { this.stockScope.set(available ? CatalogStockScope.Available : CatalogStockScope.All); this.updateCatalog(); }
@@ -214,7 +229,7 @@ export class DemoPageComponent {
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
   get draftPrice(): number { return this.draftProduct.price / 100; }
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
-  clearFilters(): void { this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
+  clearFilters(): void { this.condition.set(CatalogConditionFilter.All); this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { if (this.screen === DemoScreen.Product && this.product?.sku === sku) this.requestProductAccess(this.product, AccessSelectionPurpose.Favorite); else void this.router.navigate(['/demo/login'], { queryParams: this.continuation.route(this.router.url) }); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
   selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
   private restoreProductSelection(): void {
@@ -234,7 +249,13 @@ export class DemoPageComponent {
     if (captured.status !== PurchaseCaptureStatus.Ready) { this.state.error.set(captured.status.label); return; }
     this.state.error.set(''); void this.router.navigate(['/demo/login'], { queryParams: { returnUrl: captured.target.url } });
   }
-  setQuantity(sku: string, raw: number | null): void { this.state.run(() => this.state.commerce.setQuantity(this.state.actorId(), sku, raw ?? Number.NaN), 'Carrito actualizado.'); }
+  setQuantity(sku: string, raw: number | null): void {
+ const line=this.cartLines.find(value=>value.sku===sku);if(!line)return;
+ const amount=raw??Number.NaN,available=this.state.commerce.available(sku,line.variant);
+ if(!Number.isSafeInteger(amount)||amount<1||amount>available){this.state.message.set('');this.state.error.set('');this.quantityErrors.set(sku,line.product.name+': ingresá una cantidad entera entre 1 y '+available+'.');this.focusCheckout('cart-quantity-'+sku);return;}
+ if(this.state.run(()=>this.state.commerce.setQuantity(this.state.actorId(),sku,amount),'Carrito actualizado.'))this.quantityErrors.delete(sku);
+ else{this.quantityErrors.set(sku,line.product.name+': '+this.state.error());this.focusCheckout('cart-quantity-'+sku);}
+ }
   remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
@@ -254,8 +275,9 @@ export class DemoPageComponent {
     const target = this.continuation.complete.execute(destination, () => this.state.login(DemoContext.Customer, id));
     if (target !== null) void this.router.navigateByUrl(target);
   }
-  nextStep(): void { const result = this.checkoutFlow.advance(this.step(), this.checkoutFacts); if (result.issue !== DemoCheckoutIssue.None) { this.showCheckoutIssue(result.issue); return; } this.state.error.set(''); this.checkoutStep(result.step); }
+  nextStep(): void { if(this.cartNeedsReview){this.state.error.set('Revisá precios y disponibilidad en tu carrito antes de continuar.');return;} const result = this.checkoutFlow.advance(this.step(), this.checkoutFacts); if (result.issue !== DemoCheckoutIssue.None) { this.showCheckoutIssue(result.issue); return; } this.state.error.set(''); this.checkoutStep(result.step); }
   checkout(): void {
+    if(this.cartNeedsReview){this.state.error.set('Revisá precios y disponibilidad en tu carrito antes de confirmar.');return;}
     if (this.paymentPhase() === DemoPaymentPhase.Processing) return;
     const issue = this.checkoutFlow.validateSubmission(this.paymentMethod(), this.checkoutFacts);
     if (issue !== DemoCheckoutIssue.None) { if (issue === DemoCheckoutIssue.MissingAddress) this.step.set(CheckoutStep.Address); else if (issue === DemoCheckoutIssue.MissingDelivery) this.step.set(CheckoutStep.Delivery); this.showCheckoutIssue(issue); return; }
@@ -286,10 +308,10 @@ export class DemoPageComponent {
   archive(product: DemoProduct): void { this.state.run(() => this.state.commerce.saveProduct({ ...product, active: !product.active }, product.sku), product.active ? 'Producto archivado; ya no aparece en tienda.' : 'Producto publicado en tienda.'); }
   editAddress(address?: DemoAddress): void { this.draftAddress = address ? { ...address } : { id: crypto.randomUUID(), label: 'Casa', street: '', city: '', postal: '', primary: false }; this.open(DemoDialog.Address); }
   saveAddress(): void { if (!this.draftAddress.street.trim() || !this.draftAddress.city.trim() || !this.draftAddress.postal.trim()) { this.state.error.set('Completá calle, ciudad y código postal.'); return; } if (this.state.run(() => { const actor = this.state.actor; const index = actor.addresses.findIndex(value => value.id === this.draftAddress.id); if (this.draftAddress.primary) actor.addresses.forEach(value => value.primary = false); if (index < 0) actor.addresses.push({ ...this.draftAddress, primary: actor.addresses.length === 0 || this.draftAddress.primary }); else actor.addresses[index] = { ...this.draftAddress }; this.state.commerce.touch(); }, 'Dirección guardada.')) { this.close(); if (this.screen === DemoScreen.Checkout) { this.selectCheckoutAddress(this.draftAddress.id); this.focusCheckout('checkout-addresses'); } } }
-  deleteAddress(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses = this.state.actor.addresses.filter(value => value.id !== address.id); if (address.primary && this.state.actor.addresses[0]) this.state.actor.addresses[0].primary = true; this.state.commerce.touch(); }, 'Dirección eliminada.'); }
+  deleteAddress(address: DemoAddress): void { this.state.run(() => this.state.commerce.deleteAddress(this.state.actorId(),address.id), 'Dirección eliminada.'); }
   primary(address: DemoAddress): void { this.state.run(() => { this.state.actor.addresses.forEach(value => value.primary = value.id === address.id); this.state.commerce.touch(); }, 'Dirección principal actualizada.'); }
-  saveProfile(): void { if (!this.profileName.trim()) { this.state.error.set('Ingresá tu nombre.'); return; } this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
-  cancelProfile(): void { this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
+  saveProfile(): void { this.profileNameError=!this.profileName.trim();this.profilePhoneError=!!this.profilePhone.trim()&&!/^[+()0-9 .-]{6,30}$/.test(this.profilePhone.trim());if(this.profileNameError||this.profilePhoneError){this.focusCheckout(this.profileNameError?'profile-name':'profile-phone');return;} this.state.run(() => { Object.assign(this.state.actor, { firstName: this.profileName, lastName: this.profileLastName, phone: this.profilePhone }); this.state.commerce.touch(); }, 'Perfil actualizado.'); }
+  cancelProfile(): void { this.profileNameError=false;this.profilePhoneError=false;this.profileName = this.state.actor.firstName; this.profileLastName = this.state.actor.lastName; this.profilePhone = this.state.actor.phone; }
   advance(): void { if(!this.canMutateLegacyOrder)return; if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.advance(order.id), 'Estado de entrega actualizado.'); }
   receiveReturn(): void { if(!this.canMutateLegacyOrder)return; if (this.state.role() !== UserRole.Admin) return; const order = this.order; if (order) this.state.run(() => this.state.commerce.receiveReturn(order.id), 'Devolución recibida para inspección.'); }
   private technicalActor='';

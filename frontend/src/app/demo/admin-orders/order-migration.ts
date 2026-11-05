@@ -9,7 +9,7 @@ import {ProductCondition,OutletScope} from '../catalog/catalog-types';
 import {ItemCondition} from '../rich-catalog/catalog-details-types';
 import {ReturnStage,ReturnOutcome,ReturnReason,RefundStatus} from '../aftercare/aftercare-types';
 import {AftercareCodec} from '../aftercare/aftercare-ledger';
-import {DemoHistoricalVariant as Variant,DemoPickupStage as Pickup,DemoIncidentState as Incident,DemoOrderMetadataCodec} from './order-types';
+import {DemoHistoricalVariant as Variant,DemoPickupStage as Pickup,DemoIncidentState as Incident,DemoOrderMetadataCodec,DemoOrderOrigin,DemoOrderScope} from './order-types';
 
 // Immutable insertion facts, consumed once by V8. Runtime queue reads only snapshot.orders.
 const fixtures=[
@@ -41,5 +41,12 @@ export class MigrateOrdersV7ToV8Step {
   }
   const order=next.orders.find(x=>x.id==='ORD-1021')!,stages=[ReturnStage.Submitted,ReturnStage.Review,ReturnStage.Approved,ReturnStage.Received,ReturnStage.RefundPending,ReturnStage.Refunded];const record={id:'RETURN-1021-1',orderId:order.id,actorId:order.actor,reason:ReturnReason.ChangedMind,outcome:ReturnOutcome.Accepted,stage:ReturnStage.Refunded,lines:[{index:0,sku:'VLD-043',variant:DemoProductVariant.Standard,quantity:1,unit:7190000}],refund:{status:RefundStatus.Refunded,amount:7190000},events:stages.map((stage,index)=>({id:'RETURN-1021-1-'+index,stage,date:'2026-10-11'}))};const existing=next.aftercare.returns.find(x=>x.id===record.id||x.orderId===order.id);if(existing){if(JSON.stringify(existing)!==JSON.stringify(AftercareCodec.fromWire({returns:[record],incidents:[]},next.orders).returns[0]))fail();}else next.aftercare.returns.push(record);
   next.orders=next.orders.map(order=>DemoOrderMetadataCodec.fromWire(order));AftercareCodec.fromWire(next.aftercare,next.orders);const aggregate=new Map<string,number>();for(const order of next.orders.filter(x=>x.payment===PaymentStatus.Pending))for(const line of order.lines)aggregate.set(line.sku,(aggregate.get(line.sku)??0)+line.quantity);for(const product of next.products){if(product.reserved!==(aggregate.get(product.sku)??0))fail();new CatalogProductPolicy().validate(product,DemoProductVariant.Case.extraUnit);}for(const detail of next.catalogDetails)CatalogDetailsPolicy.validate(detail,next.products.find(x=>x.sku===detail.sku)!,true);next.version=8;return next;
+ }
+}
+
+/** Once-only migration for snapshots predating persisted authority. */
+export class MigrateOrderOriginV10ToV11Step {
+ execute(snapshot:DemoSnapshot):DemoSnapshot {
+  return {...snapshot,version:11,orders:snapshot.orders.map(order=>({...order,origin:Object.prototype.hasOwnProperty.call(order,'origin')?DemoOrderOrigin.fromWire(order.origin?.wire):DemoOrderScope.includes(order.id)?DemoOrderOrigin.Canonical:DemoOrderOrigin.Legacy}))};
  }
 }

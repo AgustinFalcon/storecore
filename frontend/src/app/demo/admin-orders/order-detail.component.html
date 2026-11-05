@@ -1,4 +1,4 @@
-<section class="detail-page" data-surface-id="SC-SURF-21">
+<section class="detail-page">
  @if(!ready()){<p role="status">Cargando pedido…</p>}
  @else if(!allowed){<h1>Acceso denegado</h1><p>Ingresá con una identidad de administración u operador.</p><a routerLink="/demo/login" data-cta="order-detail-login">Ingresar</a>@if(!state.authorizationAvailable){<p role="alert">No se pudo leer el pedido. Los datos guardados requieren revisión.</p><button type="button" data-cta="order-detail-retry-read" (click)="retryRead()">Reintentar lectura</button>}}
  @else if(order;as order){

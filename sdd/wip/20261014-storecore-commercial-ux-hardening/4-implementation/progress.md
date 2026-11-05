@@ -695,3 +695,21 @@ change is included in this local cut.
   `94E8D4E214A82C0A6F17D4F6EF7EE9EDB59BBBB19FE3D18F110D8900D98A1AAE`.
 - Evidence: `evidence/demo-sc24-capabilities-cut-20261104.md`. SC25–26 and global
   visual/integration/homologation gates remain open.
+
+## 2026-11-05 — StoreCore global R8 frontend closure
+
+- Closed the cross-surface gaps after SC25/SC26: exact identity for all 26 Demo
+  routes, explicit Demo/Real Not Found, buyer SC04/05/07–10, Real checkout copy,
+  SC15 incident projection and SC20/21 Canonical/Legacy/Unknown composition.
+- The full gate exposed and corrected denied-login storage mutation, missing
+  unauthorized recovery, stale Legacy commands, typed SC22 return loss, a focus
+  synchronization race and obsolete checkout expectations.
+- Astra then found one P1 in Real checkout: a decimal currency amount was divided
+  by 100. The corrected formatter and mapper-level decimal test were re-reviewed.
+- Final gates on the corrected source: architecture **7/7**, lint, **925/925**
+  unit/component, Real and Demo builds, Demo **329/329**, CTA **27/27** with zero
+  unexecuted actions, and Real/a11y **44/44**.
+- Astra product/UX/code and security both returned `APPROVE`, with no P0–P3 open.
+  Evidence: `evidence/demo-storecore-global-r8-cut-20261105.md`.
+- Backend integrations, packaging, remote CI, deployment, homologation, final
+  performance gate and BlackStore remain separate; this entry does not claim them.

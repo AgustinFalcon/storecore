@@ -1,3 +1,4 @@
+import type { CatalogDetails } from '../rich-catalog/catalog-details';
 import { type DemoProduct } from '../demo-model';
 import { CatalogStockScope, type DemoCatalogCriteria } from './demo-catalog-location';
 
@@ -10,10 +11,11 @@ export class DemoCatalogPresenter {
     criteria: DemoCatalogCriteria,
     available: (product: DemoProduct) => number,
     effectivePrice: (product: DemoProduct) => number,
+    details?: (product: DemoProduct) => CatalogDetails | undefined,
   ): DemoProduct[] {
     const search = criteria.search.trim().toLocaleLowerCase('es-AR');
     return products
-      .filter(product => product.active
+      .filter(product => (!details || criteria.condition.matches(details(product))) && product.active
         && (!search || `${product.name} ${product.sku}`.toLocaleLowerCase('es-AR').includes(search))
         && (!criteria.category || product.category === criteria.category)
         && (!criteria.brand || product.brand === criteria.brand)

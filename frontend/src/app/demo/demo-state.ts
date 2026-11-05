@@ -143,12 +143,12 @@ export class DemoApplicationState {
   }
   login(context: DemoContext, actor = 'cliente', role = UserRole.Admin): boolean {
     try {
-      sessionStorage.removeItem('storecore.demo.capability-pending');
-      const sessionGeneration=crypto.randomUUID();this.sessionGeneration.set(sessionGeneration);sessionStorage.setItem('storecore.demo.session-generation',sessionGeneration);
       if (!this.authorizationReadable) throw new Error('La autorización guardada no es válida. Restablecé la demo.');
       if (this.persistedRaw !== null && this.persistence.raw() === null) throw new Error('Los datos guardados desaparecieron. Recargá la Demo.');
       const current = this.persistence.current(this.commerce.snapshot); const access = current.actors.find(value => value.id === actor)?.access;
       if (context === DemoContext.Customer && !access?.state.permitsAccess) throw new Error('Esta cuenta está restringida o no tiene un estado reconocido.');
+      sessionStorage.removeItem('storecore.demo.capability-pending');
+      const sessionGeneration=crypto.randomUUID();this.sessionGeneration.set(sessionGeneration);sessionStorage.setItem('storecore.demo.session-generation',sessionGeneration);
       this.sessionEpoch.update(value => value + 1); this.actorId.set(actor); this.context.set(context); this.role.set(context === DemoContext.Admin ? role : UserRole.Unknown);
       this.customerGeneration = context === DemoContext.Customer ? access!.generation : null;
       sessionStorage.setItem('storecore.demo.context', context.wire); sessionStorage.setItem('storecore.demo.actor', actor); sessionStorage.setItem('storecore.demo.role', this.role().wire);

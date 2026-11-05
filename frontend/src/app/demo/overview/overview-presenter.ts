@@ -8,9 +8,10 @@ import { DemoOrderDate } from '../orders/demo-order-date';
 import { ReturnStage,RefundStatus,IncidentStatus,IncidentReason,AftercareIssue } from '../aftercare/aftercare-types';
 import { RefundSummaryStep,AftercareEligibilityStep } from '../aftercare/aftercare-flow';
 import { OverviewAccess,OverviewAction,OverviewRange,OverviewTaskKind,overviewDateKnown } from './overview-types';
+import {DemoIncidentState,DemoIncidentProjectionStep} from '../admin-orders/order-types';
 import { CatalogDetailsRead } from '../rich-catalog/catalog-details';
 
-export interface OverviewOrder {readonly order:DemoOrder;readonly date:DemoOrderDate;readonly customer:string;readonly outcome:DemoResultOutcome;readonly task:OverviewTaskKind|null;}
+export interface OverviewOrder {readonly order:DemoOrder;readonly date:DemoOrderDate;readonly customer:string;readonly outcome:DemoResultOutcome;readonly task:OverviewTaskKind|null;readonly incident:DemoIncidentState;}
 export interface OverviewAuthority {readonly context:DemoContext;readonly role:UserRole;readonly readable:boolean;}
 export class AuthorizeOverviewStep {execute(authority:OverviewAuthority):OverviewAccess{return OverviewAccess.resolve(authority.context,authority.role,authority.readable);}}
 export class SelectOverviewPeriodStep {
@@ -20,9 +21,10 @@ export class ProjectOverviewOrdersStep {
   private readonly result=new PresentResultStep();
   execute(snapshot:DemoSnapshot):OverviewOrder[]{return snapshot.orders.map(order=>{
     const outcome=this.result.execute(order).outcome;
-    const task=order.incident?OverviewTaskKind.Incident:[DemoResultOutcome.Review,DemoResultOutcome.Unknown].includes(outcome)?OverviewTaskKind.Review:outcome===DemoResultOutcome.Pending?OverviewTaskKind.Pending:outcome===DemoResultOutcome.Approved&&order.shipment===ShipmentStatus.Preparing?OverviewTaskKind.Prepare:outcome===DemoResultOutcome.Approved&&order.shipment===ShipmentStatus.Shipped?OverviewTaskKind.Shipping:null;
+    const incident=new DemoIncidentProjectionStep().execute(snapshot,order);
+    const task=incident===DemoIncidentState.Open?OverviewTaskKind.Incident:[DemoIncidentState.StockReview,DemoIncidentState.Unknown].includes(incident)?OverviewTaskKind.Review:[DemoResultOutcome.Review,DemoResultOutcome.Unknown].includes(outcome)?OverviewTaskKind.Review:outcome===DemoResultOutcome.Pending?OverviewTaskKind.Pending:outcome===DemoResultOutcome.Approved&&order.shipment===ShipmentStatus.Preparing?OverviewTaskKind.Prepare:outcome===DemoResultOutcome.Approved&&order.shipment===ShipmentStatus.Shipped?OverviewTaskKind.Shipping:null;
     const actor=snapshot.actors.find(actor=>actor.id===order.actor);
-    return{order,date:DemoOrderDate.fromWire(order.createdDate),customer:actor?[actor.firstName,actor.lastName].filter(Boolean).join(' '):'Cliente no disponible',outcome,task};
+    return{order,date:DemoOrderDate.fromWire(order.createdDate),customer:actor?[actor.firstName,actor.lastName].filter(Boolean).join(' '):'Cliente no disponible',outcome,task,incident};
   }).sort((left,right)=>left.date.compareNewest(right.date));}
 }
 export class ProjectOverviewMetricsStep {
@@ -42,7 +44,7 @@ export class ProjectOverviewCurrentWorkStep {
     const refundRows=snapshot.orders.map(order=>({summary:summary.execute(order,snapshot.aftercare.returns),unknown:order.returned||eligibility.execute(snapshot,order)===AftercareIssue.Unknown}));
     const unknownAftercare=refundRows.filter(row=>row.unknown||row.summary.status===RefundStatus.Unknown).length+incidents.filter(row=>row.status===IncidentStatus.Unknown||row.reason===IncidentReason.Unknown||!overviewDateKnown(DemoOrderDate.fromWire(row.date))).length;
     let refunded:number|null=0;try{for(const row of refundRows){if(row.unknown||row.summary.status===RefundStatus.Unknown||row.summary.amount===null){refunded=null;break;}refunded=DemoMoney.add(refunded!,row.summary.amount);}}catch{refunded=null;}
-    return{tasks:rows.filter(row=>row.task!==null).sort((left,right)=>(left.task?.priority??5)-(right.task?.priority??5)),pending:rows.filter(row=>row.outcome===DemoResultOutcome.Pending).length,legacyIncidents:rows.filter(row=>!!row.order.incident).length,stock,lowStock:validThreshold?stock.filter(row=>row.available!==null&&row.available>0&&row.available<threshold):[],outOfStock:stock.filter(row=>row.available===0),stockUnknown:stock.filter(row=>row.available===null).length,threshold:validThreshold?threshold:null,activeProducts:stock.length,accounts:[CustomerAccountState.Active,CustomerAccountState.Restricted,CustomerAccountState.Unknown].map(status=>({status,count:snapshot.actors.filter(actor=>(actor.access?.state??CustomerAccountState.Unknown)===status).length})),returns,incidents,unknownAftercare,refunded,syncErrors:snapshot.listings.filter(row=>row.error).length,competitorAlerts:snapshot.competitors.filter(row=>row.unread).length};
+    return{tasks:rows.filter(row=>row.task!==null).sort((left,right)=>(left.task?.priority??5)-(right.task?.priority??5)),pending:rows.filter(row=>row.outcome===DemoResultOutcome.Pending).length,legacyIncidents:rows.filter(row=>[DemoIncidentState.Open,DemoIncidentState.StockReview].includes(row.incident)).length,stock,lowStock:validThreshold?stock.filter(row=>row.available!==null&&row.available>0&&row.available<threshold):[],outOfStock:stock.filter(row=>row.available===0),stockUnknown:stock.filter(row=>row.available===null).length,threshold:validThreshold?threshold:null,activeProducts:stock.length,accounts:[CustomerAccountState.Active,CustomerAccountState.Restricted,CustomerAccountState.Unknown].map(status=>({status,count:snapshot.actors.filter(actor=>(actor.access?.state??CustomerAccountState.Unknown)===status).length})),returns,incidents,unknownAftercare,refunded,syncErrors:snapshot.listings.filter(row=>row.error).length,competitorAlerts:snapshot.competitors.filter(row=>row.unread).length};
   }
 }
 export class DemoOverviewPresenter {

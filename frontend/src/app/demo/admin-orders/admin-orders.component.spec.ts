@@ -27,7 +27,7 @@ describe('SC20 component selection and transaction fences',()=>{
  it('closes dialog phases at their decoder boundary',()=>{for(const value of OrderDialog.all)expect(OrderDialog.fromWire(value.wire)).toBe(value);for(const raw of [null,undefined,'future',0,false,{}])expect(OrderDialog.fromWire(raw)).toBe(OrderDialog.Unknown);});
  it('renders all six axes and semantic mixed selection for both operational roles',async()=>{
   const {fixture,component,state}=setup(UserRole.Operator);fixture.detectChanges();await fixture.whenStable();
-  expect(fixture.nativeElement.querySelectorAll('[data-order-id]')).toHaveLength(12);expect(fixture.nativeElement.querySelectorAll('[data-order-id="ORD-1012"] dt')).toHaveLength(6);
+  expect(fixture.nativeElement.querySelectorAll('[data-order-id]')).toHaveLength(15);expect(fixture.nativeElement.querySelectorAll('[data-order-id="ORD-1012"] dt')).toHaveLength(6);
   const header=fixture.nativeElement.querySelector('[aria-label="Seleccionar resultados visibles"]') as HTMLInputElement;expect(header.indeterminate).toBe(true);expect(header.checked).toBe(false);expect(component.selectedCount()).toBe(2);
   state.context.set(DemoContext.Customer);fixture.detectChanges();await fixture.whenStable();expect(fixture.nativeElement.querySelectorAll('[data-order-id]')).toHaveLength(0);expect(component.selectedCount()).toBe(0);expect(component.selected().size).toBe(0);
  });
@@ -39,7 +39,7 @@ describe('SC20 component selection and transaction fences',()=>{
   component.toggleVisible();expect([...component.selected()]).toEqual(['ORD-1019']);const navigate=vi.spyOn(TestBed.inject(Router),'navigate').mockResolvedValue(true);component.clearFilters();expect(navigate).toHaveBeenCalled();expect([...component.selected()]).toEqual(['ORD-1019']);component.clearSelection();fixture.detectChanges();await fixture.whenStable();expect(component.selectedCount()).toBe(0);expect((fixture.nativeElement.querySelector('header button') as HTMLButtonElement).disabled).toBe(true);
  });
  it('blocks malformed URL transitions and leaves typing focus intact on query changes',async()=>{
-  const {fixture,component,state}=setup();fixture.detectChanges();await fixture.whenStable();const search=fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;search.focus();params.next(convertToParamMap({payment:'future'}));fixture.detectChanges();await fixture.whenStable();expect(document.activeElement).toBe(search);expect(component.query().known).toBe(false);expect(component.action(state.data.orders.find(row=>row.id==='ORD-1013')!)).toBeNull();expect(component.rows()).toHaveLength(12);
+  const {fixture,component,state}=setup();fixture.detectChanges();await fixture.whenStable();const search=fixture.nativeElement.querySelector('input[type="search"]') as HTMLInputElement;search.focus();params.next(convertToParamMap({payment:'future'}));fixture.detectChanges();await fixture.whenStable();expect(document.activeElement).toBe(search);expect(component.query().known).toBe(false);expect(component.action(state.data.orders.find(row=>row.id==='ORD-1013')!)).toBeNull();expect(component.rows()).toHaveLength(15);
  });
  it('preserves proposal, filter, selection and focus when persistence fails',async()=>{
   const {fixture,component,state}=setup();params.next(convertToParamMap({q:'ORD-1013'}));fixture.detectChanges();await fixture.whenStable();const trigger=fixture.nativeElement.querySelector('[data-order-id="ORD-1013"] button') as HTMLButtonElement;trigger.focus();trigger.click();fixture.detectChanges();await fixture.whenStable();

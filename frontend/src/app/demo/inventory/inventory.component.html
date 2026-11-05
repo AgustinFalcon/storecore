@@ -1,4 +1,4 @@
-<section #root class="inventory-page" data-surface-id="SC-SURF-22">
+<section #root class="inventory-page">
 <header><p class="eyebrow">Operación Demo · existencias por SKU</p><h1 #heading tabindex="-1">Inventario</h1><p>Ajustes locales auditados. Las presentaciones comparten existencias.</p></header>
 @if(!ready()){<p role="status">Cargando inventario…</p>}@else if(!allowed){<p role="alert">Acceso denegado. Iniciá una sesión Admin u Operador.</p><a data-cta="inventory-login" routerLink="/demo/login">Ingresar</a>@if(!state.authorizationAvailable){<p role="alert">No se pudo leer el inventario guardado. Los datos requieren revisión.</p><button data-cta="inventory-retry-read" (click)="retryRead()">Reintentar lectura</button>}}@else{
 <p class="demo-note">{{state.writerStatus().guidance}}</p>

@@ -19,6 +19,21 @@ describe('SC26 executable session integration', () => {
   it('persists one restriction write, repeat writes nothing and cancellation writes nothing', () => { const state = admin(); const write = vi.spyOn(Storage.prototype, 'setItem'); expect(write).not.toHaveBeenCalled(); expect(state.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo')).toBe(Result.Saved); expect(write).toHaveBeenCalledTimes(1); state.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo'); expect(write).toHaveBeenCalledTimes(1); });
   it('rejects an operator command and customer command', () => { const state = admin(); state.login(DemoContext.Admin, 'cliente', UserRole.Operator); expect(state.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo')).toBe(Result.Denied); state.login(DemoContext.Customer); expect(state.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo')).toBe(Result.Denied); });
   it('blocks login while restricted and requires a new login after reactivation', () => { const state = admin(); state.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo'); expect(state.login(DemoContext.Customer, 'customer-2209')).toBe(false); state.changeCustomerAccount('customer-2209', Command.Reactivate, ''); expect(state.login(DemoContext.Customer, 'customer-2209')).toBe(true); expect(() => state.validateCustomerSession()).not.toThrow(); });
+  it('denied customer login preserves existing session generation, pending command and storage', () => {
+    for (const accountState of [State.Restricted, State.Unknown]) {
+      const state = admin();
+      state.data.actors.find(actor => actor.id === 'cliente')!.access!.state = accountState;
+      sessionStorage.setItem('storecore.demo.capability-pending', 'pending-command');
+      const before = { local: { ...localStorage }, session: { ...sessionStorage }, context: state.context(), actor: state.actorId(), role: state.role(), epoch: state.sessionEpoch(), generation: state.sessionGeneration() };
+      const write = vi.spyOn(Storage.prototype, 'setItem');
+      const remove = vi.spyOn(Storage.prototype, 'removeItem');
+      expect(state.login(DemoContext.Customer, 'cliente')).toBe(false);
+      expect(write).not.toHaveBeenCalled();
+      expect(remove).not.toHaveBeenCalled();
+      expect({ local: { ...localStorage }, session: { ...sessionStorage }, context: state.context(), actor: state.actorId(), role: state.role(), epoch: state.sessionEpoch(), generation: state.sessionGeneration() }).toEqual(before);
+      write.mockRestore(); remove.mockRestore(); sessionStorage.clear();
+    }
+  });
   it('revokes the affected session across storage events while keeping unrelated account access', () => {
     const customer = new DemoApplicationState(); customer.login(DemoContext.Customer, 'customer-2209'); const staff = admin(); staff.changeCustomerAccount('customer-2209', Command.Restrict, 'motivo');
     window.dispatchEvent(new StorageEvent('storage', { key: DemoSnapshotPersistence.key })); expect(customer.context()).toBe(DemoContext.Unknown); expect(staff.context()).toBe(DemoContext.Admin);

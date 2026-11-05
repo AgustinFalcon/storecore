@@ -5,7 +5,7 @@ import {AftercareEligibilityStep,ValidateReturnProposalStep} from '../aftercare/
 import {ReturnStage,ReturnOutcome,ReturnReason,RefundStatus,ReturnDisposition,ReturnCommandResult,AftercareIssue} from '../aftercare/aftercare-types';
 import {AuthorizeDemoOrdersStep,type OrderAuthority} from './order-flow';
 import {CatalogDetailsPolicy,CatalogDetailsRead} from '../rich-catalog/catalog-details';
-import {DemoOrderScope,DemoIncidentState,DemoFulfillmentState,DemoIncidentProjectionStep,DemoAftercareState,OrderLinePresentation} from './order-types';
+import {DemoOrderOrigin,DemoIncidentState,DemoFulfillmentState,DemoIncidentProjectionStep,DemoAftercareState,OrderLinePresentation} from './order-types';
 import {OrderQueueQuery} from './order-query';
 import {DemoOrderDate,OrderDatePrecision} from '../orders/demo-order-date';
 
@@ -21,7 +21,7 @@ export class ReturnCaseSection {
 }
 export class OrderReturnDestination {
  private constructor(readonly query:OrderQueueQuery,readonly focus:string){}
- static fromWire(raw:Record<string,unknown>,id:string){const query=OrderQueueQuery.fromWire(raw);return new OrderReturnDestination(query.known?query:OrderQueueQuery.fromWire({}),typeof raw['focus']==='string'&&DemoOrderScope.includes(raw['focus'])?raw['focus']:DemoOrderScope.includes(id)?id:'');}
+ static fromWire(raw:Record<string,unknown>,id:string){const query=OrderQueueQuery.fromWire(raw);return new OrderReturnDestination(query.known?query:OrderQueueQuery.fromWire({}),typeof raw['focus']==='string'&&raw['focus']===id?raw['focus']:id);}
  readonly path='/demo/user/orders';get params(){return{...this.query.params,focus:this.focus||null};}
 }
 export abstract class OperationalReturnStep {
@@ -31,7 +31,7 @@ export abstract class OperationalReturnStep {
  protected abstract fields(command:ReturnCommand):object;
  protected abstract apply(snapshot:DemoSnapshot,order:DemoOrder,record:ReturnRecord|undefined,command:ReturnCommand):ReturnRecord;
  permits(snapshot:DemoSnapshot,order:DemoOrder):boolean{
-  if(order.lines.some(line=>OrderLinePresentation.project(line)===OrderLinePresentation.Unknown)||!DemoOrderScope.includes(order.id)||order.payment!==PaymentStatus.Approved||order.status!==OrderStatus.Paid||order.shipment!==ShipmentStatus.Delivered||order.returned||DemoFulfillmentState.project(order)===DemoFulfillmentState.Unknown||new DemoIncidentProjectionStep().execute(snapshot,order)===DemoIncidentState.Unknown)return false;
+  if(order.lines.some(line=>OrderLinePresentation.project(line)===OrderLinePresentation.Unknown)||order.origin!==DemoOrderOrigin.Canonical||order.payment!==PaymentStatus.Approved||order.status!==OrderStatus.Paid||order.shipment!==ShipmentStatus.Delivered||order.returned||DemoFulfillmentState.project(order)===DemoFulfillmentState.Unknown||new DemoIncidentProjectionStep().execute(snapshot,order)===DemoIncidentState.Unknown)return false;
   const rows=snapshot.aftercare.returns.filter(r=>r.orderId===order.id);
   if(rows.some(row=>row.stage===ReturnStage.Unknown||row.outcome===ReturnOutcome.Unknown||row.reason===ReturnReason.Unknown||row.refund.status===RefundStatus.Unknown||row.operations?.disposition===ReturnDisposition.Unknown||row.events.some(event=>event.stage===ReturnStage.Unknown||DemoOrderDate.fromWire(event.date).precision===OrderDatePrecision.Unknown)||row.lines.some(line=>line.variant===DemoProductVariant.Unknown)))return false;
   if(this.origin===null)return new AftercareEligibilityStep().execute(snapshot,order)===AftercareIssue.None;
@@ -92,7 +92,7 @@ export class OperationalReturnFlow {
 }
 export class ResolveOperationalIncidentStep {
  readonly label='Resolver incidencia';
- private coherent(snapshot:DemoSnapshot,order:DemoOrder){return DemoOrderScope.includes(order.id)&&order.lines.every(line=>OrderLinePresentation.project(line)!==OrderLinePresentation.Unknown)&&order.payment===PaymentStatus.Approved&&order.status===OrderStatus.Paid&&DemoFulfillmentState.project(order)!==DemoFulfillmentState.Unknown&&new DemoIncidentProjectionStep().execute(snapshot,order)!==DemoIncidentState.Unknown&&DemoAftercareState.project(snapshot,order)!==DemoAftercareState.Unknown&&snapshot.aftercare.returns.filter(record=>record.orderId===order.id).every(record=>ReturnRecordPolicy.known(record));}
+ private coherent(snapshot:DemoSnapshot,order:DemoOrder){return order.origin===DemoOrderOrigin.Canonical&&order.lines.every(line=>OrderLinePresentation.project(line)!==OrderLinePresentation.Unknown)&&order.payment===PaymentStatus.Approved&&order.status===OrderStatus.Paid&&DemoFulfillmentState.project(order)!==DemoFulfillmentState.Unknown&&new DemoIncidentProjectionStep().execute(snapshot,order)!==DemoIncidentState.Unknown&&DemoAftercareState.project(snapshot,order)!==DemoAftercareState.Unknown&&snapshot.aftercare.returns.filter(record=>record.orderId===order.id).every(record=>ReturnRecordPolicy.known(record));}
  permits(snapshot:DemoSnapshot,order:DemoOrder){return this.coherent(snapshot,order)&&order.incidentStatus===DemoIncidentState.Open;}
  execute(snapshot:DemoSnapshot,a:OrderAuthority,intent:{actor:string;epoch:number;revision:number;id:string}):ReturnCommandResult{if(!new AuthorizeDemoOrdersStep().permits(a)||a.actor!==intent.actor||a.epoch!==intent.epoch)return ReturnCommandResult.Unauthorized;const order=snapshot.orders.find(o=>o.id===intent.id);if(!order||!this.coherent(snapshot,order))return ReturnCommandResult.Blocked;if(order.incidentStatus===DemoIncidentState.Resolved)return ReturnCommandResult.AlreadyApplied;if(!this.permits(snapshot,order))return ReturnCommandResult.Blocked;if(snapshot.revision!==intent.revision)return ReturnCommandResult.Conflict;order.incidentStatus=DemoIncidentState.Resolved;order.history.push('Incidencia operativa resuelta · '+a.actor);snapshot.revision++;return ReturnCommandResult.Applied;}
 }
