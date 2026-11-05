@@ -44,7 +44,7 @@ export class DemoProfileComponent {
   }
   private persistRouteDraft():void{
     const authority=this.routeDraftOwner;if(!authority||authority!==this.routeDraftAuthority())return;
-    const manifest=this.phase()===ProfileImportPhase.Editing?this.manifest:'';
+    const manifest=[ProfileImportPhase.Editing,ProfileImportPhase.Reviewing].includes(this.phase())?this.manifest:'';
     try{if(!this.authorized||!ProfileRouteDraftCodec.acceptsManifest(manifest)||(!this.configDirty&&!manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(authority,this.baseline,this.draft,manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
   }
   private restoreRouteDraft():void{
