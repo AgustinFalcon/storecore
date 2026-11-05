@@ -1,5 +1,7 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { distinctUntilChanged, map } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { CustomerOrderDetailViewComponent } from './customer-order-detail.view';
 import { CustomerOrderDetailStore } from './customer-order-detail.store';
@@ -19,13 +21,18 @@ import { CustomerOrderDetailStore } from './customer-order-detail.store';
   `,
 })
 export class CustomerOrderDetailComponent implements OnInit {
+  private readonly destroyRef = inject(DestroyRef);
   constructor(
     readonly store: CustomerOrderDetailStore,
     private readonly route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
-    this.reload();
+    this.route.paramMap.pipe(
+      map((params) => params.get('id') ?? ''),
+      distinctUntilChanged(),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe((id) => this.store.load(id));
   }
 
   reload(): void {
