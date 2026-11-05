@@ -48,7 +48,7 @@ export class OverviewAction {
   static readonly Customers=new OverviewAction('dashboard-customers','Consultar clientes','/demo/user/customers',null,true);
   static readonly Channel=new OverviewAction('dashboard-alert-channel','Revisar canal simulado','/demo/user/mercadolibre',DemoModuleId.MercadoLibre);
   static readonly Settings=new OverviewAction('dashboard-settings','Configuración','/demo/user/profile-import',null);
-  static readonly Modules=new OverviewAction('dashboard-modules','Módulos del comercio','/demo/user/capabilities',null);
+  static readonly Modules=new OverviewAction('dashboard-modules','Módulos del comercio','/demo/user/capabilities',null,true);
   static readonly all=[this.Orders,this.Revenue,this.Payments,this.Stock,this.LowStock,this.Inventory,this.Products,this.Content,this.Offers,this.Customers,this.Channel,this.Settings,this.Modules];
   permits(role:UserRole,snapshot:DemoSnapshot):boolean{return (role===UserRole.Admin||role===UserRole.Operator&&this.operator)&&(!this.module||OverviewAction.moduleEnabled(snapshot,this.module));}
   static moduleEnabled(snapshot:DemoSnapshot,id:DemoModuleId):boolean{const rows=snapshot.modules.filter(value=>value.id===id);return rows.length===1&&rows[0].enabled===true;}

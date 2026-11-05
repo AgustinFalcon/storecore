@@ -6,6 +6,8 @@ import { UserRole } from '../domain/user/user-role';
 import { CustomerAccountCommand, CustomerAdministrationAuthority } from './customers/customer-account';
 import { ContentDraft, type ContentDraftData } from './content/content-draft';
 import { ContentAuthority } from './content/content-types';
+import { ApplyCapabilityStep, CapabilityCommandPhase as Phase, CapabilityLedgerCodec, type CapabilityProposal } from './capabilities/capability-ledger';
+import { DemoSnapshotConflict } from './catalog/catalog-types';
 
 @Injectable({ providedIn: 'root' })
 export class DemoApplicationState {
@@ -20,6 +22,7 @@ export class DemoApplicationState {
   readonly error = signal('');
   readonly role = signal(UserRole.Unknown);
   readonly sessionEpoch = signal(0);
+  readonly sessionGeneration = signal('');
   private customerGeneration: number | null = null;
   private authorizationReadable = true;
   private persistedRevision = 0;
@@ -34,9 +37,46 @@ export class DemoApplicationState {
       if (savedContext === DemoContext.Admin) { this.context.set(savedContext); this.role.set(UserRole.fromWire(sessionStorage.getItem('storecore.demo.role'))); }
       else if (savedContext === DemoContext.Customer) { const raw = sessionStorage.getItem('storecore.demo.generation'); this.customerGeneration = raw !== null && /^\d+$/.test(raw) ? Number(raw) : null; try { this.validateCustomerSession(); this.context.set(savedContext); } catch { this.logout(); } }
     }
+    if(this.context()!==DemoContext.Unknown){const generation=sessionStorage.getItem('storecore.demo.session-generation')||crypto.randomUUID();this.sessionGeneration.set(generation);sessionStorage.setItem('storecore.demo.session-generation',generation);}
   }
   get data() { this.revision(); return this.commerce.snapshot; }
   get authorizationAvailable(): boolean { return this.authorizationReadable; }
+  get canReadCapabilities():boolean{return this.authorizationReadable&&this.context()===DemoContext.Admin&&[UserRole.Admin,UserRole.Operator].includes(this.role());}
+  get canWriteCapabilities():boolean{return this.canReadCapabilities&&this.role()===UserRole.Admin;}
+  applyCapability(proposal:CapabilityProposal):Phase {
+    const authorized=()=>this.canWriteCapabilities&&this.actorId()===proposal.actor&&this.sessionEpoch()===proposal.epoch&&this.sessionGeneration()===proposal.sessionGeneration;
+    if(!authorized())return Phase.Unauthorized;
+    let result=Phase.Uncertain;
+    this.run(()=>{
+      if(!authorized())throw Error('El contexto cambió.');
+      const ledger=this.data.capabilities??=CapabilityLedgerCodec.baseline();
+      result=new ApplyCapabilityStep().execute(ledger,proposal);
+      if(result===Phase.Conflict)throw new DemoSnapshotConflict('La versión o identidad del comando cambió.');
+      if(result===Phase.Failed)throw Error('La propuesta no es válida.');
+      if(result===Phase.Confirmed)this.commerce.touch();
+    },'Registro comercial guardado localmente. No cambia productos ni rutas.',error=>{result=error instanceof DemoSnapshotConflict?Phase.Conflict:Phase.Uncertain;});
+    return authorized()?result:Phase.Unauthorized;
+  }
+  recoverCapability(proposal:CapabilityProposal):Phase {
+    const authorized=()=>this.canWriteCapabilities&&this.actorId()===proposal.actor&&this.sessionGeneration()===proposal.sessionGeneration;
+    if(!authorized())return Phase.Unauthorized;
+    const epoch=this.sessionEpoch();
+    try{
+      const persisted=this.persistence.load(this.commerce.snapshot);
+      if(!authorized()||epoch!==this.sessionEpoch())return Phase.Unauthorized;
+      // A fallback snapshot is useful for first exploration, never proof of a durable command.
+      const receipt=persisted.raw===null?undefined:persisted.snapshot.capabilities?.receipts.find(r=>r.commandId===proposal.commandId);
+      const fresh=this.persistence.load(this.commerce.snapshot);
+      if(!authorized()||epoch!==this.sessionEpoch())return Phase.Unauthorized;
+      if((persisted.raw===null)!==(fresh.raw===null))return Phase.Uncertain;
+      if(fresh.raw===null)return Phase.Conflict;
+      const freshReceipt=fresh.snapshot.capabilities?.receipts.find(r=>r.commandId===proposal.commandId);
+      if(!receipt&&freshReceipt)return Phase.Uncertain;
+      if(receipt&&(freshReceipt?.payload!==receipt.payload||freshReceipt.version!==receipt.version))return Phase.Uncertain;
+      this.commerce.snapshot=fresh.snapshot;this.persistedRaw=fresh.raw;this.persistedRevision=fresh.snapshot.revision;this.revision.update(value=>value+1);
+      return receipt?(receipt.payload===ApplyCapabilityStep.payload(proposal)?Phase.AlreadyApplied:Phase.Conflict):Phase.Conflict;
+    }catch{return Phase.Uncertain;}
+  }
   /** Explicit read-only reconciliation for an authorized operational command. */
   reloadOrderSnapshot(actor:string,epoch:number):boolean {
     if(!this.authorizationReadable||this.context()!==DemoContext.Admin||![UserRole.Admin,UserRole.Operator].includes(this.role())||this.actorId()!==actor||this.sessionEpoch()!==epoch)return false;
@@ -65,6 +105,8 @@ export class DemoApplicationState {
   }
   login(context: DemoContext, actor = 'cliente', role = UserRole.Admin): boolean {
     try {
+      sessionStorage.removeItem('storecore.demo.capability-pending');
+      const sessionGeneration=crypto.randomUUID();this.sessionGeneration.set(sessionGeneration);sessionStorage.setItem('storecore.demo.session-generation',sessionGeneration);
       if (!this.authorizationReadable) throw new Error('La autorización guardada no es válida. Restablecé la demo.');
       if (this.persistedRaw !== null && this.persistence.raw() === null) throw new Error('Los datos guardados desaparecieron. Recargá la Demo.');
       const current = this.persistence.current(this.commerce.snapshot); const access = current.actors.find(value => value.id === actor)?.access;
@@ -84,7 +126,7 @@ export class DemoApplicationState {
   }
   private revokeAffectedSession(): void { if (this.context() === DemoContext.Customer) { try { this.validateCustomerSession(); } catch { this.logout(); } } }
   changeCustomerAccount(id: string, command: CustomerAccountCommand, reason: string): boolean { if (this.context() !== DemoContext.Admin || !CustomerAdministrationAuthority.canWrite(this.role())) { this.error.set('Acceso denegado.'); return false; } return this.run(() => this.commerce.changeCustomerAccount(this.role(), id, command, reason), 'Estado de la cuenta guardado en esta Demo.'); }
-  logout(): void { this.sessionEpoch.update(value => value + 1); this.customerGeneration = null; this.role.set(UserRole.Unknown); this.context.set(DemoContext.Unknown); sessionStorage.removeItem('storecore.demo.context'); sessionStorage.removeItem('storecore.demo.actor'); sessionStorage.removeItem('storecore.demo.generation'); sessionStorage.removeItem('storecore.demo.role'); this.message.set('Sesión demo cerrada.'); }
+  logout(): void { this.sessionGeneration.set('');sessionStorage.removeItem('storecore.demo.session-generation');sessionStorage.removeItem('storecore.demo.capability-pending'); this.sessionEpoch.update(value => value + 1); this.customerGeneration = null; this.role.set(UserRole.Unknown); this.context.set(DemoContext.Unknown); sessionStorage.removeItem('storecore.demo.context'); sessionStorage.removeItem('storecore.demo.actor'); sessionStorage.removeItem('storecore.demo.generation'); sessionStorage.removeItem('storecore.demo.role'); this.message.set('Sesión demo cerrada.'); }
   reset(): boolean {
     if (!this.canResetDemo) { this.error.set('El rol Operador no puede restablecer los datos Demo.'); return false; }
     try {

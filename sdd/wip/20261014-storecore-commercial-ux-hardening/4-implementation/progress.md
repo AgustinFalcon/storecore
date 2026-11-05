@@ -683,3 +683,15 @@ change is included in this local cut.
   `5d71f7c44856f87b80efdefa52a89f859e939d65afed9f83c446c37f15c409a4`.
 - Evidence: `evidence/demo-sc23-mercadolibre-cut-20261104.md`. No push, PR, merge,
   deployment or homologation is claimed. SC24 and later surfaces remain open.
+
+## 2026-11-04 — SC24 Demo capabilities final local gate
+
+- Added seven honest capability cards and a typed Modules/Technical host. Commercial
+  capability facts remain independent from the four legacy switches and five settings.
+- CATALOG is the only mutable Demo capability and uses versioned, reasoned, durable,
+  byte-idempotent commands with receipt/list recovery and session-generation fencing.
+- Final gates: verify **856**, browser **36/36**, builds/lint/architecture and both
+  independent Astra gates `APPROVE — 0 P0–P3` on fingerprint
+  `94E8D4E214A82C0A6F17D4F6EF7EE9EDB59BBBB19FE3D18F110D8900D98A1AAE`.
+- Evidence: `evidence/demo-sc24-capabilities-cut-20261104.md`. SC25–26 and global
+  visual/integration/homologation gates remain open.

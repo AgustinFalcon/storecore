@@ -1,3 +1,4 @@
+import {CapabilityLedgerCodec,type CapabilityLedger} from './capabilities/capability-ledger';
 import {MLLedgerCodec} from './mercadolibre/ml-codec';
 import type {MLLedger} from './mercadolibre/ml-types';
 import {InventoryMovementCodec,type InventoryAudit} from './inventory/inventory-types';
@@ -97,10 +98,10 @@ export interface DemoOrder { pickupStage?:DemoPickupStage;incidentStatus?:DemoIn
 export interface DemoCampaign { id: string; title: string; sku: string; percent: number; active: boolean; from: string; until: string; }
 export interface DemoListing { sku: string; linked: boolean; observed: number; error: boolean; desired?: number; confirmed?: number; }
 export interface DemoMovement { id: string; sku: string; delta: number; reason: string; inventory?:InventoryAudit; }
-export interface DemoSnapshot { mercadolibre?:MLLedger; version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
+export interface DemoSnapshot { capabilities?:CapabilityLedger; mercadolibre?:MLLedger; version: number; campaignRecords:DemoCampaignRecord[]; offers:DemoOffer[];offerReference:string; catalogDetails:CatalogDetails[]; aftercare:AftercareLedger; contentDraft: ContentDraftData; revision: number; products: DemoProduct[]; actors: DemoActor[]; orders: DemoOrder[]; campaigns: DemoCampaign[]; listings: DemoListing[]; movements: DemoMovement[]; title: string; subtitle: string; blocks: DemoContentBlock[]; settings: DemoSettings; modules: { id: DemoModuleId; enabled: boolean }[]; competitors: DemoCompetitor[]; mlConnected: boolean; syncJobs?: DemoSyncJob[]; }
 
 const NAMES = ['Taladro inalámbrico 20 V', 'Amoladora angular 115 mm', 'Kit de herramientas 108 piezas', 'Atornillador compacto', 'Sierra circular profesional', 'Lijadora orbital', 'Guantes de trabajo', 'Anteojos de protección', 'Casco de seguridad', 'Organizador modular', 'Caja de herramientas', 'Cinta métrica 8 m'];
-export function demoSeed(): DemoSnapshot { return new MigrateOrdersV7ToV8Step().execute(demoSeedV7()); }
+export function demoSeed(): DemoSnapshot { const snapshot=new MigrateOrdersV7ToV8Step().execute(demoSeedV7());snapshot.capabilities=CapabilityLedgerCodec.baseline();snapshot.version=9;return snapshot; }
 /** Previous schema fixture retained for deterministic upgrade tests. */
 export function demoSeedV7(): DemoSnapshot {
   const products = NAMES.map((name, index): DemoProduct => ({ sku: `DEMO-${String(index + 1).padStart(3, '0')}`, name, category: ['Herramientas', 'Seguridad', 'Organización'][Math.floor(index / 6) === 0 ? 0 : index < 9 ? 1 : 2], brand: ['Norte', 'Avance', 'Taller'][index % 3], description: 'Producto de catálogo simulado. Las características y condiciones comerciales se informan en la ficha de cada artículo.', price: (12500 + index * 8500) * 100, original: (14500 + index * 8500) * 100, onHand: index === 5 ? 0 : index === 8 ? 2 : 18 + index, reserved: 0, active: true, tone: ['#e6a63f', '#667b94', '#a5b49b'][index % 3], variant: 'Estándar' }));
@@ -238,8 +239,9 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   const parsed: unknown = JSON.parse(raw);
   if (!parsed || typeof parsed !== 'object') throw new Error('Snapshot inválido.');
   const state = parsed as DemoSnapshot;
-  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6&&state.version!==7&&state.version!==8) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
-  const wasV8=state.version===8;
+  if ((state.version !== 1 && state.version !== 2 && state.version !== 3 && state.version !== 4 && state.version!==5&&state.version!==6&&state.version!==7&&state.version!==8&&state.version!==9) || !Number.isInteger(state.revision) || !Array.isArray(state.products) || !Array.isArray(state.actors) || !Array.isArray(state.orders) || !Array.isArray(state.campaigns) || !Array.isArray(state.listings) || !Array.isArray(state.movements) || !Array.isArray(state.modules) || !Array.isArray(state.competitors)) throw new Error('La demo guardada tiene otra versión. Restablecé sus datos.');
+  state.capabilities=state.version===9||Object.prototype.hasOwnProperty.call(state,'capabilities')?CapabilityLedgerCodec.fromWire(state.capabilities):CapabilityLedgerCodec.baseline();
+  const wasV8=state.version>=8;
   state.movements=state.movements.map(row=>{if(!row||typeof row.id!=='string'||!row.id||typeof row.sku!=='string'||!Number.isSafeInteger(row.delta)||typeof row.reason!=='string')throw Error('Movimiento inválido.');const inventory=InventoryMovementCodec.fromWire(row.inventory);if(inventory&&(inventory.commandId!==row.id||inventory.after.physical-inventory.before.physical!==row.delta))throw Error('Movimiento incoherente.');if(inventory)InventoryMovementCodec.validateEnvelope(inventory,row.sku,row.delta,row.reason);return{id:row.id,sku:row.sku,delta:row.delta,reason:row.reason,...(inventory?{inventory}:{})};});
   if(state.movements.some(row=>row.inventory&&state.movements.filter(other=>other.id===row.id).length!==1))throw Error('Movimiento de inventario duplicado.');
   const campaignRecords=new MigrateCampaignsV6ToV7Step().execute(state);const legacyOffers=state.version<=5;const legacyCatalog=state.version<=4;
@@ -284,6 +286,6 @@ export function decodeSnapshot(raw: string): DemoSnapshot {
   state.orders=state.orders.map(order=>({...DemoOrderMetadataCodec.fromWire(order),lines:order.lines.map(line=>({...line,...(line.historicalVariant?{historicalVariant:DemoHistoricalVariant.fromWire(line.historicalVariant.wire)}:{})}))}));
   state.mercadolibre=MLLedgerCodec.fromWire(state.mercadolibre);
   if(state.mercadolibre.mappings.some(m=>!skus.has(m.sku))||state.mercadolibre.intents.some(i=>!skus.has(i.sku)))throw Error('SKU Mercado Libre desconocido.');
-  if(wasV8){state.version=8;return state;}
-  return new MigrateOrdersV7ToV8Step().execute(state);
+  if(wasV8){state.version=9;return state;}
+  const upgraded=new MigrateOrdersV7ToV8Step().execute(state);upgraded.version=9;return upgraded;
 }
