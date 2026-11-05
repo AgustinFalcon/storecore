@@ -4,11 +4,11 @@
   "stack_profile": "frontend",
   "project_type": "production",
   "execution_strategy": "incremental-gated",
-  "status": "building",
+  "status": "local_gates_green_review_ci_pending",
   "stats": {
     "total": 5,
-    "done": 3,
-    "pending": 2
+    "done": 4,
+    "pending": 1
   },
   "tasks": [
     {
@@ -64,7 +64,7 @@
     {
       "id": "TASK-RDI-004",
       "title": "Execute navigation and race regression suite",
-      "status": "pending",
+      "status": "done",
       "depends_on": [
         "TASK-RDI-001",
         "TASK-RDI-002",
@@ -73,14 +73,12 @@
       "files": [
         "frontend/src/app/features/detail-route-navigation.spec.ts",
         "frontend/src/app/features/detail-read-cancellation.spec.ts",
-        "frontend/src/app/features/admin/user-order-detail.store.spec.ts",
-        "frontend/src/app/features/admin/user-order-detail.view.spec.ts",
-        "frontend/src/app/features/cart/checkout-result.component.spec.ts"
+        "frontend/src/app/features/admin/user-order-detail.store.spec.ts"
       ],
       "acceptance_criteria": [
         "AC-RDI-1 through AC-RDI-6 pass runtime tests"
       ],
-      "evidence": "22 regression tests authored plus checkout adaptation, including the review P2 A-to-B-to-A occupancy sequence and separate in-flight orders. ngc app/spec, tsc app/spec, lint and architecture pass; ng test and ng build blocked by host filesystem access in esbuild."
+      "evidence": "Current-master port: 23 focused tests pass; full Angular suite 973/973 passes; production build, app/spec TypeScript, lint, architecture 7/7 and diff-check pass. Includes current-error authoritative refetch, stale-error no-refetch, A-to-B-to-A occupancy and separate in-flight orders."
     },
     {
       "id": "TASK-RDI-005",

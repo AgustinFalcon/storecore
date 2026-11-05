@@ -1,8 +1,8 @@
 # Reactive detail route identity — issue #142
 
-Status: implementation_local_unreviewed.
-Baseline: origin/integration/storecore-int at a8874ad.
-Scope: integration only; frontend detail navigation.
+Status: local_gates_green_review_ci_pending.
+Baseline: `master` at `9b84ac86c963052baa8879fe3f0b995142dd3c66`.
+Scope: current-master frontend detail navigation.
 
 The user authorized implementation during the full frontend/backend integration
 validation. This record documents that authorization; it does not claim a Sol

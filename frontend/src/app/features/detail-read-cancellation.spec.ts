@@ -1,5 +1,6 @@
 import { Subject } from 'rxjs';
-import { CustomerOrder, OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/order.entity';
+import { CustomerOrder } from '../domain/order/order.entity';
+import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { GetMyOrderUseCase } from '../domain/order/use-cases/get-my-order.usecase';
 import { ProductDetail } from '../domain/catalog/product-detail.entity';
 import { GetProductUseCase } from '../domain/catalog/use-cases/get-product.usecase';

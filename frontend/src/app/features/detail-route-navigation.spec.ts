@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { BehaviorSubject, of } from 'rxjs';
+import { CustomerCartAccess } from '../domain/cart/customer-cart-access';
 import { CartStore } from './cart/cart.store';
 import { CheckoutResultComponent } from './cart/checkout-result.component';
 import { CustomerOrderDetailComponent } from './orders/customer-order-detail.component';
@@ -41,7 +42,7 @@ for (const entry of cases) {
         imports: [entry.component],
         providers: [
           { provide: ActivatedRoute, useValue: { paramMap: params.asObservable() } },
-          { provide: CartStore, useValue: { load: vi.fn() } },
+          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
         ],
       }).compileComponents();
       const fixture = TestBed.createComponent(entry.component);
@@ -63,7 +64,7 @@ for (const entry of cases) {
       await TestBed.configureTestingModule({
         providers: [
           provideRouter([{ path: entry.path, component: entry.component }]),
-          { provide: CartStore, useValue: { load: vi.fn() } },
+          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
         ],
       }).compileComponents();
       const harness = await RouterTestingHarness.create();

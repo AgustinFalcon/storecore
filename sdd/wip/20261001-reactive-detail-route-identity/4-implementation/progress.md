@@ -1,31 +1,34 @@
 # Local progress — issue #142
 
-Checkout: work/storecore-reactive-detail-route-identity.
-Branch: fix/int-reactive-detail-route-identity.
-Base: a8874ad.
+Worktree: `C:/Users/agustin/Documents/Codex/sc-ri`.
+Branch: `codex/storecore-route-identity-master`.
+Base: StoreCore `master` `9b84ac86c963052baa8879fe3f0b995142dd3c66`.
 
-Implemented route subscriptions in four detail containers, admin load-generation
-response fencing, current-order command guards, tracking draft reset and busy
-controls. Added actual-router reuse tests and delayed-response store tests;
-retained checkout forged-return-query coverage.
+The historical integration implementation was ported as an isolated diff onto
+current master. Four detail containers subscribe to route identity with
+deduplication and teardown. The admin order store fences GET and mutation
+outcomes by route generation, preserves per-order mutation occupancy across
+A→B→A, blocks commands outside the current identity and refetches authoritative
+state only when a mutation of the current generation fails.
 
-Architecture and ESLint passed. TypeScript app/spec checking and Angular ngc
-app/spec template compilation passed after correcting test compilation errors.
-git diff --check passed. Angular test execution and production bundling
-encountered host filesystem access failures in esbuild resolving project paths
-and Angular imports (Cannot read directory ../../../../../../..: Access denied),
-so no runtime test success or successful production build is claimed.
+The port retained current-master authority and domain contracts:
 
-Added eight router/teardown tests, two customer/product cancellation tests, eleven
-admin cancellation/mutation tests and one tracking/busy view test. Existing
-checkout query-authority test was adapted to the reactive paramMap contract.
+- product cart reads use closed `CustomerCartAccess`, not a generic session;
+- order/payment/shipment/RMA/eligibility values remain closed domain types;
+- server-provided shipment/RMA actions and fail-closed eligibility are kept;
+- deleted legacy component specs were not restored.
 
-Review P2 correction: shared GET loading did not preserve POST occupancy through
-A to B to A. Mutation occupancy now lives independently per order identity and
-is released by finalize regardless of route generation. Four exact race tests
-cover pending ship/RMA success/error after the returned A GET finishes, rejection
-of both repeated command types, and release permitting a later command. A fifth
-test verifies concurrent different-order shipments retain separate occupancy.
+Local evidence on 2026-11-05:
 
-No commit, push, PR, merge, deploy, archive or release performed. Required
-reviews and hosted verification remain pending.
+- focused route/race suite: 23/23 PASS;
+- full Angular suite: 973/973 PASS (131 files);
+- the first full run exposed one unrelated order-dependent Demo test failure;
+  its isolated rerun passed 2/2 and the immediate full rerun passed 973/973;
+- TypeScript app and spec: PASS;
+- architecture: 7/7 PASS;
+- ESLint: PASS;
+- production build: PASS, 613.23 kB raw / 136.69 kB estimated transfer;
+- `git diff --check`: PASS.
+
+Exact-head independent review, hosted CI, PR and merge remain pending. No
+homologation, deploy, provider activation or backend contract is claimed.

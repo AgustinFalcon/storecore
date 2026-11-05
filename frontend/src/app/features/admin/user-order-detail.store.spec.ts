@@ -1,5 +1,14 @@
 import { Subject } from 'rxjs';
-import { AdminOrder, OrderStatus, PaymentStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/order.entity';
+import { AdminOrder } from '../../domain/order/order.entity';
+import {
+  FulfillmentEligibility,
+  OrderStatus,
+  PaymentStatus,
+  RmaStatus,
+  RmaTransition,
+  ShipmentStatus,
+  ShipmentTransition,
+} from '../../domain/order/commerce-states';
 import { GetAdminOrderUseCase } from '../../domain/order/use-cases/get-admin-order.usecase';
 import { AdvanceFulfillmentUseCase } from '../../domain/order/use-cases/advance-fulfillment.usecase';
 import { UserOrderDetailStore } from './user-order-detail.store';
@@ -10,7 +19,10 @@ class TestOrderStore extends UserOrderDetailStore {
 
 function order(id: string): AdminOrder {
   return { id, orderStatus: OrderStatus.Paid, paymentStatus: PaymentStatus.Approved,
-    shipmentStatus: ShipmentStatus.Preparing, rmaStatus: null, tracking: null, total: 0, lines: [] };
+    shipmentStatus: ShipmentStatus.Preparing, rmaStatus: RmaStatus.None,
+    fulfillmentEligibility: FulfillmentEligibility.Eligible,
+    shipmentAction: ShipmentTransition.Shipped, rmaAction: RmaTransition.Received,
+    tracking: null, total: 0, lines: [] };
 }
 
 describe('UserOrderDetailStore route identity', () => {
@@ -45,6 +57,7 @@ describe('UserOrderDetailStore route identity', () => {
           response.complete();
         }
         else response.error(new Error('old mutation failed'));
+        expect(getAdmin.execute).toHaveBeenCalledTimes(3);
         expect(store.snapshot()).toEqual({ ...before, mutatingOrderIds: [] });
         reads.get('A')!.next(order('A'));
         expect(store.snapshot().order?.id).toBe('A');
@@ -86,6 +99,33 @@ describe('UserOrderDetailStore route identity', () => {
     expect(store.snapshot().loading).toBe(false);
     store.ngOnDestroy();
   });
+
+  for (const mutation of ['ship', 'rma'] as const) {
+    it('refetches the current order after a failed ' + mutation + ' and blocks commands during recovery', () => {
+      const initial = new Subject<AdminOrder>();
+      const recovery = new Subject<AdminOrder>();
+      const getAdmin = { execute: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(recovery) };
+      const response = new Subject<AdminOrder>();
+      const advance = { ship: vi.fn(() => response), rma: vi.fn(() => response) };
+      const store = new TestOrderStore(getAdmin as unknown as GetAdminOrderUseCase, advance as unknown as AdvanceFulfillmentUseCase);
+      store.load('A');
+      initial.next(order('A'));
+      if (mutation === 'ship') store.ship({ orderId: 'A', status: ShipmentTransition.Shipped, tracking: 'TRACK' });
+      else store.rma({ orderId: 'A', status: RmaTransition.Received });
+      response.error(new Error('transport outcome ambiguous'));
+      expect(getAdmin.execute).toHaveBeenCalledTimes(2);
+      expect(store.snapshot().loading).toBe(true);
+      store.ship({ orderId: 'A', status: ShipmentTransition.Shipped, tracking: 'SECOND' });
+      store.rma({ orderId: 'A', status: RmaTransition.Received });
+      expect(advance.ship).toHaveBeenCalledTimes(mutation === 'ship' ? 1 : 0);
+      expect(advance.rma).toHaveBeenCalledTimes(mutation === 'rma' ? 1 : 0);
+      recovery.error(new Error('recovery unavailable'));
+      expect(store.snapshot().loading).toBe(false);
+      expect(store.snapshot().order).toBeNull();
+      expect(store.snapshot().errorMessage).not.toBe('');
+      store.ngOnDestroy();
+    });
+  }
 
   for (const mutation of ['ship', 'rma'] as const) {
     for (const outcome of ['success', 'error'] as const) {
