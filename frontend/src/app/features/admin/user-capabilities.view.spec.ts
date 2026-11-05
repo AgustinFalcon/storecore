@@ -56,7 +56,8 @@ describe('User capabilities read-only presentation', () => {
     vi.useFakeTimers();
     const fixture = render();
     const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-    dialog.showModal = vi.fn();
+    const showModal = vi.fn();
+    Object.defineProperty(dialog, 'showModal', { configurable: true, value: showModal });
     const catalog = fixture.componentInstance.cards[0];
     fixture.componentInstance.openInformation(catalog, { currentTarget: null } as unknown as Event);
     expect(fixture.componentInstance.activeCard()?.operationalLabel).toBe(CapabilityModuleState.Active.label);
@@ -70,7 +71,7 @@ describe('User capabilities read-only presentation', () => {
     fixture.detectChanges();
     vi.runAllTimers();
     expect(fixture.componentInstance.activeCard()).toBeNull();
-    expect(dialog.showModal).not.toHaveBeenCalled();
+    expect(showModal).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
@@ -78,7 +79,8 @@ describe('User capabilities read-only presentation', () => {
     vi.useFakeTimers();
     const fixture = render();
     const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
-    dialog.showModal = vi.fn();
+    const showModal = vi.fn();
+    Object.defineProperty(dialog, 'showModal', { configurable: true, value: showModal });
     fixture.componentInstance.openInformation(
       fixture.componentInstance.cards[0],
       { currentTarget: null } as unknown as Event,
@@ -87,7 +89,7 @@ describe('User capabilities read-only presentation', () => {
     fixture.destroy();
     vi.runAllTimers();
 
-    expect(dialog.showModal).not.toHaveBeenCalled();
+    expect(showModal).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 
