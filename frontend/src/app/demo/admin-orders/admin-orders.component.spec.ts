@@ -55,4 +55,15 @@ describe('SC20 component selection and transaction fences',()=>{
   component.confirm();expect(component.failure()).toBeTruthy();const writes=vi.spyOn(Storage.prototype,'setItem');component.reviewCurrent();expect(writes).not.toHaveBeenCalled();expect(component.fresh()?.tracking).toBe('OTHER-TAB');expect(component.proposal()).toBe('MY-PROPOSAL');expect([...component.selected()]).toEqual(selection);component.confirm();expect(component.dialog()).toBe(OrderDialog.Transition);expect(component.failure()).toBeTruthy();expect(localStorage.getItem(DemoSnapshotPersistence.key)).toBe(durable);expect(state.data.orders.find(order=>order.id==='ORD-1013')?.tracking).toBe('OTHER-TAB');
   state.logout();const reads=vi.spyOn(Storage.prototype,'getItem');expect(state.reloadOrderSnapshot('cliente',state.sessionEpoch())).toBe(false);expect(reads).not.toHaveBeenCalled();
  });
+ it('fails closed when durable data disappears during an operational refresh',()=>{
+  const {state}=setup();
+  expect(state.run(()=>state.commerce.touch(),'Datos guardados.')).toBe(true);
+  const before=JSON.stringify(state.data);
+  localStorage.removeItem(DemoSnapshotPersistence.key);
+  expect(state.reloadOrderSnapshot(state.actorId(),state.sessionEpoch())).toBe(false);
+  expect(JSON.stringify(state.data)).toBe(before);
+  expect(state.error()).toContain('desaparecieron');
+  expect(state.run(()=>state.commerce.touch(),'No debe guardarse.')).toBe(false);
+  expect(localStorage.getItem(DemoSnapshotPersistence.key)).toBeNull();
+ });
 });
