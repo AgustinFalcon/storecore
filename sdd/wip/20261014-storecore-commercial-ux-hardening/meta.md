@@ -79,3 +79,20 @@ declaración de frontend final, entrega visual o cierre del feature.
 Cuando Stitch recupere capacidad se generan artefactos inmutables nuevos para
 SC20, SC21B y SC22..26, se ejecutan los gates UI/UX/Product Owner coordinados y se
 aplican las diferencias antes de TASK-019. No se falsean IDs, capturas ni veredictos.
+
+## Resolución 2026-11-05 — sustitución controlada del gate visual estático
+
+Stitch no produjo los artefactos finales faltantes y, por lo tanto, este SDD no
+afirma un `APPROVE` de Stitch para SC20, SC21B ni SC22..26. Los veredictos
+`CHANGES_REQUESTED` históricos se preservan en `design-reviews.json`.
+
+Por autorización explícita del usuario, el gate estático pendiente fue sustituido
+por una revisión coordinada sobre el frontend Angular ejecutable completo. El mismo
+corte `982bdc6` cubrió las 26 superficies Demo, la paridad Real permitida, reflow,
+texto al 200 %, accesibilidad, producto, rendimiento, código y seguridad. Los
+resultados están en `4-implementation/evidence/final-reviews.json` y
+`4-implementation/evidence/storecore-frontend-final-closure-20261105.md`.
+
+Estado final local: DESIGN_EXECUTABLE APPROVED; IMPLEMENTATION APPROVED; EVIDENCE
+COMPLETE; FINAL_REVIEW APPROVED. CI remoto, despliegue y homologaciones siguen
+`NOT_RUN` y no se infieren de esta sustitución.

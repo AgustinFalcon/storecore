@@ -713,3 +713,16 @@ change is included in this local cut.
   Evidence: `evidence/demo-storecore-global-r8-cut-20261105.md`.
 - Backend integrations, packaging, remote CI, deployment, homologation, final
   performance gate and BlackStore remain separate; this entry does not claim them.
+
+## 2026-11-05 — StoreCore frontend final local certification
+
+- Promoted the final frontend code cut as `982bdc6`, closing SC16 Real content,
+  200% text/reflow corrections, performance work and reproducible secure packaging.
+- SDD-kit is now **24/24 done**. Exact-source gates passed: architecture **7/7**,
+  unit/component **936/936**, Demo **329/329**, Real/a11y **46/46**, both optimized
+  builds, three Docker targets, deep-route/cache/header smoke and `/ping`.
+- Independent Astra UI/UX, Product, Performance, Code/Bug and Security reviews all
+  returned `APPROVE — P0–P3 = 0` after the nginx header correction.
+- Consolidated evidence: `evidence/storecore-frontend-final-closure-20261105.md`.
+- Remote CI, PR/merge, deployment and provider homologations remain explicitly
+  outside this local frontend certification.

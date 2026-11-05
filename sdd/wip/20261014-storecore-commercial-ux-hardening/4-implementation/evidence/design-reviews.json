@@ -1,6 +1,6 @@
 {
   "revision": "operator-batch-01-astra-approved",
-  "scope": "Static visual specifications approved through SC-SURF-19; operator SC-SURF-20..26, full 26-surface G2 and Angular behavior remain open",
+  "scope": "Historical static-design ledger. Full Stitch approval was not obtained after capacity exhaustion; the user-authorized controlled exception is resolved by the executable 26-surface Angular gate recorded in final-reviews.json. Historical CHANGES_REQUESTED entries remain preserved and are not represented as Stitch approvals.",
   "stitchProjectId": "6473866243657965808",
   "screens": {
     "SC-SURF-01": "fc50b7624d004c25a85f22ce700ef5a6",
@@ -16,6 +16,16 @@
     "TASK-002, TASK-003 and full G2 remain open until all 26 surfaces and responsive evidence are approved.",
     "No Angular source change is authorized before TASK-004 closes."
   ],
+  "finalResolution": {
+    "status": "SUPERSEDED_BY_EXECUTABLE_GATE",
+    "reason": "Stitch capacity exhaustion had no verifiable ETA. The user explicitly authorized implementation from the approved briefs and later review of the complete executable frontend.",
+    "honesty": "SC20, SC21B and SC22..26 never received a final Stitch APPROVE; their old CHANGES_REQUESTED records remain historical evidence.",
+    "replacementGate": "final-reviews.json",
+    "replacementScope": "The same final Angular code cut 982bdc6, all 26 Demo surfaces, allowed Real parity, 320/390/768/1440 reflow, 200% text, accessibility and Product/UI/UX review.",
+    "verdict": "EXECUTABLE_DESIGN_APPROVED",
+    "openP1": 0,
+    "openP2": 0
+  },
   "batches": [
     {
       "batchId": "storefront-01",
