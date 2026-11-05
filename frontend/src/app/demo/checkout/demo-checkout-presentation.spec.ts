@@ -4,11 +4,13 @@ import { of } from 'rxjs';
 import { DemoPageComponent } from '../demo.component';
 import { DemoApplicationState } from '../demo-state';
 import { DemoSnapshotWriter } from '../demo-snapshot-writer';
-import { DemoContext, CheckoutStep } from '../demo-model';
+import { DemoContext, CheckoutStep, DemoProductVariant } from '../demo-model';
 import { DemoScreen } from '../demo-screen';
 import { DemoDeliveryMethod as Method } from '../demo-process-types';
 import { DeliveryConfirmation as Confirmation } from './demo-delivery-quote';
 import { DemoCheckoutIssue as Issue } from './demo-checkout-flow';
+import { CatalogDetailsRead } from '../rich-catalog/catalog-details';
+import { VariantSaleState } from '../catalog/catalog-types';
 
 describe('SC11A checkout presentation lifetime', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); vi.useFakeTimers(); vi.spyOn(DemoSnapshotWriter.browser, 'assertWritable').mockImplementation(() => {}); });
@@ -54,4 +56,6 @@ describe('SC11A checkout presentation lifetime', () => {
     const { state, component, navigate } = setup(); const before = JSON.stringify(state.data); vi.spyOn(state, 'run').mockReturnValue(false);
     component.checkout(); vi.advanceTimersByTime(800); expect(navigate).not.toHaveBeenCalled(); expect(JSON.stringify(state.data)).toBe(before);
   });
+  it('blocks checkout presentation while a visible cart quantity is invalid',()=>{const{component}=setup();component.setQuantity('DEMO-001',0);expect(component.cartHasQuantityErrors).toBe(true);component.setQuantity('DEMO-001',1);expect(component.cartHasQuantityErrors).toBe(false);});
+  it('adds a favorite using its available active presentation instead of assuming Standard',()=>{const{state,component}=setup();expect(state.run(()=>state.commerce.remove('cliente','DEMO-001'),'removed')).toBe(true);const product=state.commerce.product('DEMO-001'),details=CatalogDetailsRead.detail(state.data,product.sku);expect(details).toBeDefined();details!.variants.find(value=>value.variant===DemoProductVariant.Standard)!.state=VariantSaleState.Disabled;details!.variants.find(value=>value.variant===DemoProductVariant.Case)!.state=VariantSaleState.Active;expect(component.favoriteVariant(product)).toBe(DemoProductVariant.Case);component.addFavorite(product);expect(state.actor.cart).toEqual([expect.objectContaining({sku:'DEMO-001',variant:DemoProductVariant.Case,quantity:1})]);});
 });

@@ -1,5 +1,5 @@
 import {Component,ElementRef,afterRenderEffect,inject,viewChild} from '@angular/core';
-import {ActivatedRoute,RouterLink} from '@angular/router';
+import {ActivatedRoute,Router,RouterLink} from '@angular/router';
 import {toSignal} from '@angular/core/rxjs-interop';
 import {map} from 'rxjs';
 import {DemoApplicationState} from '../demo-state';
@@ -10,6 +10,7 @@ import {OrderQueueAxis} from './order-query';
 import {OrderReturnDestination} from './order-detail-flow';
 import {DemoBrowserEffects} from './demo-browser-effects';
 import {InventoryReturnComponent} from '../inventory/inventory-return.component';
+import {OrderNavigationOrigin} from './order-navigation-origin';
 /** Honest read-only continuation outside the canonical operational workflow. */
 @Component({selector:'sc-demo-legacy-order-detail',imports:[RouterLink,InventoryReturnComponent],styleUrls:['../demo.scss'],template:`
 <section class="page">
@@ -21,9 +22,11 @@ import {InventoryReturnComponent} from '../inventory/inventory-return.component'
 <p>No se emite documentación fiscal ni se presume una gestión posventa para este pedido.</p>
 <sc-inventory-return/>
 }@else{<p>Pedido no disponible. Conservamos el acceso a la cola autorizada.</p>}
-<a data-cta="legacy-order-back" [routerLink]="destination.path" [queryParams]="destination.params">Volver a pedidos</a>}</section>`})
+<a data-cta="legacy-order-back" [routerLink]="destination.path" [queryParams]="destination.params">{{navigationOrigin.label}}</a>}</section>`})
 export class DemoLegacyOrderDetailComponent {
  readonly state=inject(DemoApplicationState);private readonly route=inject(ActivatedRoute);readonly money=demoMoney;private readonly browser=inject(DemoBrowserEffects);
+ private readonly navigation=inject(Router).getCurrentNavigation();
+ readonly navigationOrigin=OrderNavigationOrigin.fromWire(this.navigation?.trigger==='imperative'&&this.navigation.previousNavigation!==null?this.navigation.extras.state?.['orderOrigin']:undefined);
  readonly id=toSignal(this.route.paramMap.pipe(map(p=>p.get('id')??'')),{initialValue:''});
  readonly query=toSignal(this.route.queryParamMap.pipe(map(p=>Object.fromEntries(['q','focus',...OrderQueueAxis.all.map(a=>a.wire)].map(k=>[k,p.get(k)])))),{initialValue:{}});
  get allowed(){const s=this.state;return new AuthorizeDemoOrdersStep().permits({context:s.context(),role:s.role(),actor:s.actorId(),epoch:s.sessionEpoch(),readable:s.authorizationAvailable});}
@@ -31,7 +34,7 @@ export class DemoLegacyOrderDetailComponent {
  retryRead(){this.browser.retryRead();}
  get origin(){return this.order?.origin??DemoOrderOrigin.Unknown;}
  get incident(){return this.order?new DemoIncidentProjectionStep().execute(this.state.data,this.order):DemoIncidentState.Unknown;}
- get destination(){return OrderReturnDestination.fromWire(this.query(),this.id());}
+ get destination(){return this.navigationOrigin.destination(this.order?.actor??'',OrderReturnDestination.fromWire(this.query(),this.id()));}
  private readonly heading=viewChild<ElementRef<HTMLElement>>('heading');private focused=false;
  constructor(){afterRenderEffect(()=>{const heading=this.heading();if(heading&&!this.focused){this.focused=true;heading.nativeElement.focus();}});}
 }
