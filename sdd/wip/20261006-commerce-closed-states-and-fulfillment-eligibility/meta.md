@@ -1,7 +1,7 @@
 # Commerce closed states and fulfillment eligibility
 
 Feature: `20261006-commerce-closed-states-and-fulfillment-eligibility`.
-Status: `implementation_in_progress`; PR #171 MERGED; CI y reviews duales exact-head aprobados; gates residuales de aceptación pendientes.
+Status: `exact_head_gate_in_progress`; PR #171 MERGED; aceptación local T01–T05 cerrada; CI y reviews del close-out documental pendientes.
 Branch: `fix/commerce-fulfillment-eligibility`.
 Source baseline: `de6a0d7cce780d3db3785468489b237b322b82d9` on the master-derived checkout.
 Language: Spanish. Owner: StoreCore core maintainers; Sol owns GO/NO-GO.

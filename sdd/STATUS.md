@@ -72,10 +72,12 @@ sin inspección ni reposición. Verify exact-head `37630043935` terminó success
 en frontend, backend y `unified-access-real-e2e`; dos reviews independientes
 GPT-6.1 Sol APPROVED sin P0–P3 verificaron ese head y el fingerprint
 `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
-No hubo CI push de master. Browser CFE específico, clean/upgrade y cualquier
-variante de aceptación sin evidencia explícita siguen pendientes; acceso
-unificado real no equivale a aceptación browser de fulfillment. Sin archive,
-homologación, release ni activación. Progreso/evidencia y límites están en el WIP.
+No hubo CI push de master. El corte acumulativo local del 2026-11-05 sobre
+`8b8ff478` cerró CFE-T01–T05: browser real 17/17 (5 CFE, 12 acceso) y
+backend/migraciones PostgreSQL 16 37/37, con clean V1–V11, upgrade V8→V9 y
+validación no-op del baseline publicado V11 preservando checksums e histórico.
+CFE-T06 permanece abierto para CI y reviews del SHA documental exacto. Sin
+archive, homologación, release ni activación. Progreso/evidencia y límites están en el WIP.
 Disposición/reposición por ítem se difiere al backlog `TODO-045`.
 
 ## Fiscal externo

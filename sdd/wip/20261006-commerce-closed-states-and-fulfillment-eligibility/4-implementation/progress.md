@@ -315,3 +315,22 @@ Integración PostgreSQL y browser CFE siguen NOT_RUN para este diff. No se decla
 E01–E09 cerrado, rojo inicial, clean/upgrade nuevo, CI ni reviews exact-head.
 E09 histórico conserva su evidencia previa; este corte no cambia migraciones.
 Gates/tareas abiertos, sin archive/release/deploy/homologación/activación live.
+
+## 2026-11-05 — CFE-T05 cerrada localmente sobre master integrado
+
+Base exacta `8b8ff478cb0ea596941f9db203bcfbb7357accf0`. Se empaquetó el
+backend y se ejecutó el harness acumulativo con PostgreSQL 16 descartable,
+Spring real, Angular HTTPS y proveedor loopback firmado. `npm run
+test:ua-real` terminó 17/17 PASS en 2.6 minutos: 4 journeys CFE reales, el
+caso Unknown MockHttp separado y 12 escenarios de acceso unificado.
+
+La matriz backend/migraciones focalizada terminó 37/37 PASS sobre PostgreSQL
+16.14. Incluyó instalación limpia V1–V11, upgrade publicado V8→V9,
+validación no-op del baseline V11 conservando checksums y una fila histórica,
+CommerceHttpIntegrationTest, MpOrdersCheckoutIntegrationTest y
+JdbcFulfillmentEvidenceBoundaryTest. Evidencia detallada en
+`evidence/cfe-acceptance-local-20261105.md`.
+
+CFE-T01–T05 pasan a done. CFE-T06 sigue in_progress hasta commit/PR, CI y dos
+reviews independientes del SHA exacto. No se declara homologación externa,
+publicación, activación live, disposición/restock ni ampliación del contrato POS.
