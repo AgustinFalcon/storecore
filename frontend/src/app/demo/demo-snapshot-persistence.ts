@@ -48,6 +48,16 @@ export class DemoSnapshotPersistence {
     return this.commit(mutation(), expectedRaw);
   }
 
+  /** SC25 never rolls back an uncertain write or retries a command. */
+  transactProfile(expectedRaw:string|null, expectedRevision:number, mutation:()=>DemoSnapshot):PersistedDemoSnapshot {
+    this.assertWriter();try{this.assertUnchanged(expectedRaw,expectedRevision);}catch(error){if(error instanceof DemoSnapshotConflict)throw error;throw new DemoProfileWriteFailure();}
+    let candidateRaw:string;try{candidateRaw=JSON.stringify(mutation());decodeSnapshot(candidateRaw);}catch{throw new DemoProfileWriteFailure();}
+    if(candidateRaw===expectedRaw)return{raw:expectedRaw,snapshot:decodeSnapshot(candidateRaw)};
+    try { this.storage.setItem(DemoSnapshotPersistence.key,candidateRaw); }
+    catch(error){if(error instanceof DOMException&&error.name==='QuotaExceededError')throw new DemoProfileWriteFailure();throw new DemoProfileWriteUncertain();}
+    try {const raw=this.storage.getItem(DemoSnapshotPersistence.key);if(raw!==candidateRaw)throw new Error();return{raw,snapshot:decodeSnapshot(raw)};}
+    catch{throw new DemoProfileWriteUncertain();}
+  }
   /** Explicit repair path. Normal writes never bypass decoding of current persistence. */
   replace(snapshot: DemoSnapshot): PersistedDemoSnapshot {
     this.assertWriter();
@@ -72,3 +82,6 @@ export class DemoSnapshotPersistence {
     }
   }
 }
+
+export class DemoProfileWriteFailure extends Error {}
+export class DemoProfileWriteUncertain extends Error {}

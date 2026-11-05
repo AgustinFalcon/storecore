@@ -1,0 +1,36 @@
+@if (!authorized) {
+<section class="card"><h1 id="configuration-denied-heading" tabindex="-1">Acceso denegado</h1><p>Esta configuración Demo está disponible únicamente para ADMIN.</p></section>
+} @else {
+<header><p class="eyebrow">ADMIN · DEMO LOCAL</p><h1 id="configuration-heading" tabindex="-1">Configuración del comercio</h1><p>Datos de contacto y simulador de importación. Los cambios se guardan en este navegador.</p></header>
+<div data-testid="configuration-result">@if (configError) {<p role="alert" class="message error">{{ configError }}</p>}<p role="status" aria-live="polite">{{ configStatus }}</p></div>
+<p data-testid="configuration-writer-status" role="status">{{ state.writerStatus().guidance }}</p>
+<section class="card"><h2>Datos del comercio</h2><form (submit)="$event.preventDefault(); save()" class="form-grid">
+<label>Nombre del comercio<input name="storeName" [(ngModel)]="draft.storeName" required maxlength="160" [disabled]="!canWrite"/></label>
+<label>Email de soporte<input name="supportEmail" type="email" [(ngModel)]="draft.supportEmail" [disabled]="!canWrite"/></label>
+<label>Teléfono de soporte<input name="supportPhone" type="tel" [(ngModel)]="draft.supportPhone" [disabled]="!canWrite"/></label>
+<label>Moneda<input name="currency" [value]="draft.currency.label" readonly/></label>
+<label>Zona horaria<input name="timezone" [value]="draft.timezone.label" readonly/></label>
+@if(conflicts.length){<div role="alert"><p>Otra pestaña cambió campos que también editaste: @for(field of conflicts; track field.key){ {{ field.label }}. } Elegí qué propuesta conservar antes de guardar.</p><button data-cta="configuration-accept-remote" type="button" (click)="acceptRemote()">Usar valores actuales</button><button data-cta="configuration-keep-draft" type="button" (click)="keepDraft()">Conservar mi propuesta</button></div>}
+<div class="actions"><button data-cta="configuration-save" class="primary" type="submit" [disabled]="!canSave">Guardar configuración</button><button data-cta="configuration-export" type="button" (click)="open(Dialog.Export)" [disabled]="!canWrite">Exportar configuración</button><button data-cta="configuration-reset" type="button" (click)="open(Dialog.Reset)" [disabled]="!canPersist">Restablecer configuración</button></div>
+</form><p>Email y teléfono son opcionales. Moneda y zona horaria son fijas.</p></section>
+<details class="card"><summary>Importar perfil</summary><p>Simulador local compatible con homeSections. Agrega o actualiza secciones seleccionadas; no publica la portada ni realiza solicitudes HTTP.</p>
+<div data-testid="profile-import-result">@if(error){<p role="alert">{{ error }}</p>}<p role="status">{{ status }}</p></div>
+<label>Manifiesto del perfil<textarea id="profile-manifest" rows="12" [ngModel]="manifest" (ngModelChange)="manifest=$event; edit()" [disabled]="!canWrite"></textarea></label>
+<div class="actions"><button data-cta="configuration-sample" (click)="example()" [disabled]="!canWrite">Cargar ejemplo</button><button data-cta="configuration-validate" (click)="preview()" [disabled]="!canWrite">Validar y previsualizar</button><button data-cta="configuration-cancel" (click)="manifest=''; changes=[]; selection=[]; edit()" [disabled]="!canWrite">Descartar</button></div>
+<p role="status">{{ phase().label }} · {{ validity().label }}</p>
+@for (change of changes; track change.sectionKey) {
+<article class="diff"><h3>{{ change.sectionKey }} · {{ change.operation.label }} ({{ change.operation.wire }})</h3><label class="selection"><input type="checkbox" [checked]="selection.includes(change.sectionKey)" (change)="select(change.sectionKey,$any($event.target).checked)" [disabled]="!canWrite"/>Seleccionar {{ change.sectionKey }}</label><div class="before-after"><div><h4>Anterior</h4><pre>{{ json(change.before) }}</pre></div><div><h4>Entrante</h4><pre>{{ json(change.after) }}</pre></div></div></article>
+}
+@if(reviewNeedsAttention){<p>La selección no produce cambios o el estado revisado dejó de estar vigente. Revisá la selección y volvé a previsualizar.</p>}
+<button data-cta="configuration-import" class="primary" (click)="open(Dialog.Merge)" [disabled]="!canMerge">Importar selección</button>
+</details>
+<button data-cta="configuration-reload" (click)="refresh()">Releer estado local</button>
+<dialog #modal aria-labelledby="profile-dialog-heading" (cancel)="$event.preventDefault(); close()" (keydown)="trapFocus($event)">
+<h2 id="profile-dialog-heading" tabindex="-1">{{ dialog().label }}</h2>
+@if (dialog()===Dialog.Export) {<p>Export parcial: exactamente cinco valores persistidos. No es un backup integral ni un manifiesto Real importable.</p><pre>{{ exportText }}</pre><button data-cta="configuration-export-confirm" (click)="download()">Descargar JSON</button>}
+@if (dialog()===Dialog.Reset) {<p>Revisá todos los valores antes de confirmar. Sólo cambia la configuración.</p><div class="before-after"><div><h3>Antes</h3><pre>{{ json(resetBefore) }}</pre></div><div><h3>Después</h3><pre>{{ json(resetProfile) }}</pre></div></div><button data-cta="configuration-reset-confirm" [disabled]="!canPersist" (click)="reset()">Confirmar restablecimiento</button>}
+@if (dialog()===Dialog.Preview) {<p>{{ validity().label }}. Revisá el diff y seleccioná las secciones en el editor. Cambiar selección requiere una nueva vista previa.</p>@for (change of changes; track change.sectionKey) {<h3>{{ change.sectionKey }} · {{ change.operation.label }} ({{ change.operation.wire }})</h3><div class="before-after"><div><h4>Anterior</h4><pre>{{ json(change.before) }}</pre></div><div><h4>Entrante</h4><pre>{{ json(change.after) }}</pre></div></div>}}
+@if (dialog()===Dialog.Merge) {<p>Se agregarán o actualizarán únicamente estas secciones locales. Las demás se conservan; la portada no se publica.</p><p>{{ selection.join(', ') }}</p><button data-cta="configuration-import-confirm" [disabled]="!canMerge" (click)="merge()">Confirmar importación</button>}
+<button autofocus (click)="close()">Cancelar</button>
+</dialog>
+}

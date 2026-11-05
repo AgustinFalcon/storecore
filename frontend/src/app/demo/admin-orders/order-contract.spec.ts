@@ -22,7 +22,7 @@ describe('SC20 V8 migration contract',()=>{
  it('roundtrips authentic V7 to V8 twice, preserving legacy and SC19 aftercare bytes',()=>{
   const previous=demoSeedV7(),legacy=JSON.stringify(previous.orders.filter(row=>row.id.startsWith('DEMO-'))),existing=JSON.stringify(order(previous,'ORD-1015')),returns=JSON.stringify(previous.aftercare.returns),stock=previous.products.find(row=>row.sku==='DEMO-001')!;
   const next=decodeSnapshot(JSON.stringify(previous));
-  expect(next.version).toBe(9);expect(JSON.stringify(next.orders.filter(row=>row.id.startsWith('DEMO-')))).toBe(legacy);
+  expect(next.version).toBe(10);expect(JSON.stringify(next.orders.filter(row=>row.id.startsWith('DEMO-')))).toBe(legacy);
   expect(JSON.stringify(order(next,'ORD-1015'))).toBe(existing);
   expect(JSON.stringify(next.aftercare.returns.filter(row=>row.orderId==='ORD-1015'))).toBe(returns);
   expect(next.orders.filter(row=>DemoOrderScope.includes(row.id)).map(row=>row.id).sort()).toEqual([...DemoOrderScope.ids].sort());

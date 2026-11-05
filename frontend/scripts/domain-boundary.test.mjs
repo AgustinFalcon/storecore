@@ -47,3 +47,12 @@ test('local domain references and allowed RxJS types remain valid', () => {
   assert.deepEqual(check('domain/a.ts', '/* /// <reference types="@angular/core" /> */'), []);
   assert.deepEqual(check('core/a.ts', '/// <reference types="@angular/core" />'), []);
 });
+
+import { fixtureLaneFailures as fixtures } from './domain-boundary.mjs';
+test('contractual Universal Tools fixture is Demo only; store_id remains forbidden everywhere',()=>{
+ for(const path of ['features/a.ts','domain/a.ts','data/a.ts'])for(const source of ["const name='universal-tools-profile';",'class FixtureRepository {}','class InMemoryRepository {}'])assert.equal(fixtures(path,source).length,1);
+ for(const path of ['demo/profile/profile-domain.ts','demo/a.spec.ts','demo\\profile\\a.ts'])assert.deepEqual(fixtures(path,"const name='universal-tools-profile'; class FixtureRepository {}"),[]);
+ for(const path of ['demo/a.ts','data/a.ts'])assert.equal(fixtures(path,"const x={store_id:'x'};").length,1);
+ for(const source of ["import { A } from '../../demo/a';","export { A } from '../../demo/a';","const a=import('../../demo/a');","type A=import('../../demo/a').A;"])assert.equal(fixtures('features/admin/a.ts',source).length,1);
+ assert.deepEqual(fixtures('demo/profile/a.ts',"import { A } from '../../domain/a';"),[]);
+});

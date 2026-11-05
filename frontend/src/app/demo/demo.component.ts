@@ -124,7 +124,6 @@ export class DemoPageComponent {
   readonly Module = DemoModuleId;
   readonly Math = Math;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
-  readonly sampleManifest = JSON.stringify({ version: 1, title: 'Tu taller, mejor equipado' }, null, 2);
   readonly dialog = signal(DemoDialog.None);
   readonly step = signal(CheckoutStep.Address);
   readonly page = signal(0);
@@ -299,7 +298,4 @@ export class DemoPageComponent {
   moduleToggle(id: DemoModuleId): void { const actor=this.state.actorId(),epoch=this.state.sessionEpoch(); if(!this.state.canWriteCapabilities)return; this.confirm(`Cambiar el estado de ${id.label} afecta sus operaciones simuladas.`, () => this.state.run(() => { this.technicalAuthorized(actor,epoch); const module = this.state.data.modules.find(value => value.id === id); if (!module || id === DemoModuleId.Unknown) throw new Error('Módulo desconocido.'); module.enabled = !module.enabled; this.state.commerce.touch(); }, 'Estado del módulo demo guardado.')); }
   configureModule(id: DemoModuleId): void { if(!this.state.canWriteCapabilities)return;this.technicalActor=this.state.actorId();this.technicalEpoch=this.state.sessionEpoch(); this.draftModule = id; this.draftSettings = { ...this.state.data.settings }; this.open(DemoDialog.Module); }
   saveModule(): void { if (this.draftModule === DemoModuleId.Unknown) { this.state.error.set('Módulo no reconocido.'); return; } if (this.state.run(() => {this.technicalAuthorized(this.technicalActor,this.technicalEpoch);this.state.commerce.saveSettings(this.draftSettings);}, `${this.draftModule.label}: configuración guardada.`)) this.close(); }
-  validateManifest(): void { try { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string') throw new Error('El perfil requiere un título de comercio.'); this.information(`Perfil válido. Nuevo título: ${parsed.title}. La importación actualiza solamente el contenido de esta demo.`); } catch { this.state.error.set('El perfil no es JSON válido o le falta title.'); } }
-  importManifest(): void { this.state.run(() => { const parsed: unknown = JSON.parse(this.manifest); if (!parsed || typeof parsed !== 'object' || !('title' in parsed) || typeof parsed.title !== 'string' || !parsed.title.trim()) throw new Error('Perfil inválido.'); this.state.data.title = parsed.title; this.state.commerce.touch(); }, 'Perfil importado en la demo.'); }
-  exportProfile(): void { const blob = new Blob([JSON.stringify({ version: 1, title: this.state.data.title, subtitle: this.state.data.subtitle }, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'comercio-demo.json'; anchor.click(); URL.revokeObjectURL(url); }
 }

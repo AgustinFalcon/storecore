@@ -1,3 +1,5 @@
+import {StoreProfileCodec,ProfileSectionsCodec,ProfileAuthorityRevoked,MergeDemoProfileStep,ProfileCommandResult,type StoreProfile,type DemoProfileManifest} from './profile/profile-domain';
+import {DemoProfileWriteFailure} from './demo-snapshot-persistence';
 import { Injectable, signal } from '@angular/core';
 import { DemoCommerce, DemoContext, DemoScenario, decodeSnapshot, demoSeed } from './demo-model';
 import { DemoSnapshotPersistence } from './demo-snapshot-persistence';
@@ -89,6 +91,42 @@ export class DemoApplicationState {
       if (!this.canEditContent || epoch !== this.sessionEpoch()) throw new Error('El contexto cambió. Ingresá nuevamente.');
       this.data.contentDraft = ContentDraft.fromWire(draft); this.commerce.touch();
     }, 'Borrador guardado en esta Demo. La tienda actual no cambió.');
+  }
+  get canConfigureProfile():boolean{return this.authorizationReadable&&this.context()===DemoContext.Admin&&this.role()===UserRole.Admin&&!!this.sessionGeneration()&&this.data.actors.some(a=>a.id===this.actorId());}
+  profileAuthority():string{return JSON.stringify([this.actorId(),this.sessionEpoch(),this.sessionGeneration()]);}
+  readProfile(){
+    if(!this.canConfigureProfile)throw Error('Acceso denegado.');
+    const authority=this.profileAuthority(),raw=this.persistence.raw();
+    let snapshot;
+    try{snapshot=decodeSnapshot(raw??JSON.stringify(this.commerce.snapshot));}catch{throw new ProfileAuthorityRevoked('El snapshot no permite verificar la autoridad.');}
+    const loaded={raw,snapshot};
+    if(!this.canConfigureProfile||authority!==this.profileAuthority()||!loaded.snapshot.actors.some(a=>a.id===this.actorId()))throw new ProfileAuthorityRevoked('Acceso denegado.');
+    if(this.persistedRaw!==null&&loaded.raw===null)throw new DemoSnapshotConflict('Los datos guardados desaparecieron. Recargá la Demo.');
+    return{authority,raw:loaded.raw,revision:loaded.snapshot.revision,profile:StoreProfileCodec.fromWire(loaded.snapshot.storeProfile),sections:ProfileSectionsCodec.fromStoredWire(loaded.snapshot.profileSections)};
+  }
+  private profileWriting=false;
+  writeProfile(expected:{authority:string;raw:string|null;revision:number},profile:StoreProfile|null,manifest:DemoProfileManifest|null):ProfileCommandResult {
+    const authorized=()=>this.canConfigureProfile&&this.profileAuthority()===expected.authority;
+    if(!authorized())return ProfileCommandResult.Denied;
+    if(this.profileWriting)return ProfileCommandResult.Conflict;
+    try{this.readProfile();}catch(error){return error instanceof ProfileAuthorityRevoked?ProfileCommandResult.Denied:error instanceof DemoSnapshotConflict?ProfileCommandResult.Conflict:ProfileCommandResult.Failed;}
+    this.profileWriting=true;let authorityLost=false;
+    try{
+      const result=this.persistence.transactProfile(expected.raw,expected.revision,()=>{
+        if(!authorized())throw Error('Acceso denegado.');
+        const candidate=decodeSnapshot(JSON.stringify(this.persistence.current(this.commerce.snapshot)));
+        if(!candidate.actors.some(a=>a.id===this.actorId())){authorityLost=true;throw new ProfileAuthorityRevoked('Acceso denegado.');}
+        const prior=JSON.stringify([candidate.storeProfile,candidate.profileSections]);
+        if(profile)candidate.storeProfile=StoreProfileCodec.fromWire(profile);
+        else if(manifest)candidate.profileSections=new MergeDemoProfileStep().execute(ProfileSectionsCodec.fromStoredWire(candidate.profileSections),manifest);
+        else throw Error('Comando desconocido.');
+        if(!authorized())throw Error('Acceso denegado.');
+        if(prior!==JSON.stringify([candidate.storeProfile,candidate.profileSections])||expected.raw===null)candidate.revision++;return candidate;
+      });
+      if(!authorized())return ProfileCommandResult.Denied;
+      this.commerce.snapshot=result.snapshot;this.persistedRaw=result.raw;this.persistedRevision=result.snapshot.revision;this.revision.update(v=>v+1);return ProfileCommandResult.Saved;
+    }catch(error){return authorityLost||!authorized()?ProfileCommandResult.Denied:error instanceof DemoSnapshotConflict?ProfileCommandResult.Conflict:error instanceof DemoProfileWriteFailure?ProfileCommandResult.Failed:ProfileCommandResult.Uncertain;}
+    finally{this.profileWriting=false;}
   }
   get canResetDemo(): boolean { return !this.authorizationReadable || this.context() !== DemoContext.Admin || this.role() === UserRole.Admin; }
   get actor() { this.revision(); return this.commerce.actor(this.actorId()); }
