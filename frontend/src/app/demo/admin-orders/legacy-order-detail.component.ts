@@ -25,7 +25,8 @@ import {OrderNavigationOrigin} from './order-navigation-origin';
 <a data-cta="legacy-order-back" [routerLink]="destination.path" [queryParams]="destination.params">{{navigationOrigin.label}}</a>}</section>`})
 export class DemoLegacyOrderDetailComponent {
  readonly state=inject(DemoApplicationState);private readonly route=inject(ActivatedRoute);readonly money=demoMoney;private readonly browser=inject(DemoBrowserEffects);
- private readonly navigation=inject(Router).getCurrentNavigation();
+ private readonly router=inject(Router);
+ private readonly navigation=this.router.currentNavigation()??this.router.lastSuccessfulNavigation();
  readonly navigationOrigin=OrderNavigationOrigin.fromWire(this.navigation?.trigger==='imperative'&&this.navigation.previousNavigation!==null?this.navigation.extras.state?.['orderOrigin']:undefined);
  readonly id=toSignal(this.route.paramMap.pipe(map(p=>p.get('id')??'')),{initialValue:''});
  readonly query=toSignal(this.route.queryParamMap.pipe(map(p=>Object.fromEntries(['q','focus',...OrderQueueAxis.all.map(a=>a.wire)].map(k=>[k,p.get(k)])))),{initialValue:{}});

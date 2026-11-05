@@ -258,7 +258,7 @@ export class DemoPageComponent {
  if(this.state.run(()=>this.state.commerce.setQuantity(this.state.actorId(),sku,amount),'Carrito actualizado.'))this.quantityErrors.delete(sku);
  else{this.quantityErrors.set(sku,line.product.name+': '+this.state.error());this.focusCheckout('cart-quantity-'+sku);}
  }
-  remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) this.removed = removed; }
+  remove(sku: string): void { const removed = this.state.actor.cart.find(line => line.sku === sku) ?? null; if (this.state.run(() => this.state.commerce.remove(this.state.actorId(), sku), 'Producto quitado del carrito.')) { this.quantityErrors.delete(sku); this.removed = removed; } }
   restore(): void { const removed = this.removed; if (removed && this.state.run(() => this.state.commerce.add(this.state.actorId(), removed.sku, removed.quantity, removed.variant), 'Producto restaurado.')) this.removed = null; }
   signIn(): void { if (!this.email.trim() || !this.password.trim()) { this.state.error.set('Completá email y contraseña de demostración.'); return; } this.chooseContext = true; }
   get authReturnQuery(): { returnUrl: string } | null { return this.continuation.query(this.route.snapshot.queryParamMap.get('returnUrl')); }
