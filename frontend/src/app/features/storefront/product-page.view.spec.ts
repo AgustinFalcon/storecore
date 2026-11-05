@@ -4,6 +4,21 @@ import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { ProductPageViewComponent } from './product-page.view';
 
 describe('ProductPage closed cart controls', () => {
+  it('resets product-local gallery and quantity state when the reused route changes SKU', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const product = (sku: string, images: string[]) => ({ sku, name: sku, description: '', brand: '', category: '', images, variants: [], price: { base: 1, effective: 1, desired: null, observed: null, priceVersion: '1' }, offerRef: null, active: true });
+    fixture.componentRef.setInput('product', product('A', ['a-1.jpg', 'a-2.jpg']));
+    fixture.detectChanges();
+    fixture.componentInstance.activeImage = 'a-2.jpg';
+    fixture.componentInstance.quantity = 4;
+    fixture.componentRef.setInput('product', product('B', ['b-1.jpg']));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.activeImage).toBe('');
+    expect(fixture.componentInstance.quantity).toBe(1);
+    expect((fixture.nativeElement.querySelector('.sc-zoom img') as HTMLImageElement).src).toContain('b-1.jpg');
+  });
+
   it('orients dual USER sessions to CUSTOMER selection and emits no add until permitted', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(ProductPageViewComponent);

@@ -57,9 +57,10 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
           tapResponse({
             next: (order) => {
               if (generation === this.routeGeneration) this.patchState({ order });
+              else if (this.currentOrderId === cmd.orderId) this.load(cmd.orderId);
             },
             error: (err: unknown) => {
-              if (generation === this.routeGeneration) {
+              if (this.currentOrderId === cmd.orderId) {
                 this.load(cmd.orderId);
                 this.patchState({ errorMessage: getApiErrorMessage(err) });
               }
@@ -81,9 +82,10 @@ export class UserOrderDetailStore extends ComponentStore<UserOrderDetailState> {
           tapResponse({
             next: (order) => {
               if (generation === this.routeGeneration) this.patchState({ order });
+              else if (this.currentOrderId === cmd.orderId) this.load(cmd.orderId);
             },
             error: (err: unknown) => {
-              if (generation === this.routeGeneration) {
+              if (this.currentOrderId === cmd.orderId) {
                 this.load(cmd.orderId);
                 this.patchState({ errorMessage: getApiErrorMessage(err) });
               }

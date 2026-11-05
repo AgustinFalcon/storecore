@@ -20,15 +20,21 @@ The port retained current-master authority and domain contracts:
 
 Local evidence on 2026-11-05:
 
-- focused route/race suite: 23/23 PASS;
-- full Angular suite: 973/973 PASS (131 files);
+- focused route/race/view suite: 26/26 PASS;
+- full Angular suite: 975/975 PASS (132 files);
 - the first full run exposed one unrelated order-dependent Demo test failure;
-  its isolated rerun passed 2/2 and the immediate full rerun passed 973/973;
+  its isolated rerun passed 2/2 and subsequent full runs passed;
 - TypeScript app and spec: PASS;
 - architecture: 7/7 PASS;
 - ESLint: PASS;
-- production build: PASS, 613.23 kB raw / 136.69 kB estimated transfer;
+- production build: PASS, 613.48 kB raw / 136.70 kB estimated transfer;
 - `git diff --check`: PASS.
 
-Exact-head independent review, hosted CI, PR and merge remain pending. No
+The first exact-head product review found two P2 issues: product-local gallery
+state survived a SKU change, and a completed A mutation could unlock a stale A
+snapshot after A→B→A. Both were fixed with actual-view coverage and an
+authoritative same-identity refresh that keeps commands blocked until its GET
+settles. SDD P3 evidence inconsistencies were also reconciled.
+
+Exact-head re-review, hosted CI, PR and merge remain pending. No
 homologation, deploy, provider activation or backend contract is claimed.

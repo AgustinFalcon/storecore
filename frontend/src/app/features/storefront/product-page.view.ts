@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Cart } from '../../domain/cart/cart.entity';
@@ -12,7 +12,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './product-page.view.html',
 })
-export class ProductPageViewComponent {
+export class ProductPageViewComponent implements OnChanges {
   @Input() product: ProductDetail | null = null;
   @Input() cart: Cart | null = null;
   @Input() loading = false;
@@ -24,6 +24,14 @@ export class ProductPageViewComponent {
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly selectCustomer = new EventEmitter<void>();
+
+  ngOnChanges(changes: SimpleChanges): void {
+    const product = changes['product'];
+    if (product && product.previousValue?.sku !== product.currentValue?.sku) {
+      this.activeImage = '';
+      this.quantity = 1;
+    }
+  }
 
   get hasDiscount(): boolean {
     return !!this.product && this.product.price.base > this.product.price.effective;

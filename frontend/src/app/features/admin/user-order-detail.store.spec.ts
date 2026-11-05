@@ -51,17 +51,18 @@ describe('UserOrderDetailStore route identity', () => {
         expect(advance.rma).toHaveBeenCalledTimes(mutation === 'rma' ? 1 : 0);
         reads.get('B')!.next(order('B'));
         store.load('A');
-        const before = store.snapshot();
         if (outcome === 'success') {
           response.next(order('A'));
           response.complete();
         }
         else response.error(new Error('old mutation failed'));
-        expect(getAdmin.execute).toHaveBeenCalledTimes(3);
-        expect(store.snapshot()).toEqual({ ...before, mutatingOrderIds: [] });
+        expect(getAdmin.execute).toHaveBeenCalledTimes(4);
+        expect(store.snapshot().order).toBeNull();
+        expect(store.snapshot().loading).toBe(true);
+        expect(store.snapshot().mutatingOrderIds).toEqual([]);
         reads.get('A')!.next(order('A'));
         expect(store.snapshot().order?.id).toBe('A');
-        expect(store.snapshot().errorMessage).toBe('');
+        expect(store.snapshot().errorMessage === '').toBe(outcome === 'success');
         store.ngOnDestroy();
       });
     }
@@ -161,9 +162,13 @@ describe('UserOrderDetailStore route identity', () => {
           pending.next({ ...order('A'), tracking: 'OLD' });
           pending.complete();
         } else pending.error(new Error('old mutation failed'));
-        expect(store.snapshot().order).toEqual(order('A'));
-        expect(store.snapshot().errorMessage).toBe('');
+        expect(store.snapshot().order).toBeNull();
+        expect(store.snapshot().loading).toBe(true);
         expect(store.snapshot().mutatingOrderIds).toEqual([]);
+        expect(busy).toBe(true);
+        reads.get('A')!.next(order('A'));
+        expect(store.snapshot().order).toEqual(order('A'));
+        expect(store.snapshot().errorMessage === '').toBe(outcome === 'success');
         expect(busy).toBe(false);
         advance.rma.mockReturnValue(next);
         store.rma({ orderId: 'A', status: RmaTransition.Received });

@@ -1,8 +1,8 @@
 # Current-master local evidence — RDI
 
 - Base: `9b84ac86c963052baa8879fe3f0b995142dd3c66`.
-- Focused Angular tests: 23/23 PASS.
-- Full Angular tests: 973/973 PASS across 131 files.
+- Focused Angular tests: 26/26 PASS.
+- Full Angular tests: 975/975 PASS across 132 files.
 - TypeScript app/spec: PASS.
 - Architecture boundary: 7/7 PASS.
 - ESLint: PASS.

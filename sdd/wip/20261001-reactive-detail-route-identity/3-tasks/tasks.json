@@ -27,7 +27,7 @@
         "AC-RDI-2",
         "AC-RDI-6"
       ],
-      "evidence": "Implementation local; Angular app/spec compilation passes. Runtime tests pending host access resolution."
+      "evidence": "Implemented on current master; reactive-route runtime coverage passes locally."
     },
     {
       "id": "TASK-RDI-002",
@@ -43,7 +43,7 @@
         "AC-RDI-3",
         "AC-RDI-4"
       ],
-      "evidence": "Generation fence and command identity/loading guard implemented; delayed outcome tests authored, execution pending."
+      "evidence": "Generation fence, command identity/loading guard and authoritative refresh after returned-to mutation completion pass local runtime tests."
     },
     {
       "id": "TASK-RDI-003",
@@ -59,7 +59,7 @@
       "acceptance_criteria": [
         "AC-RDI-5"
       ],
-      "evidence": "View implementation and regression test authored; ngc and lint pass."
+      "evidence": "Actual view regression covers tracking reset and absence of actionable controls while busy; ngc, runtime and lint pass."
     },
     {
       "id": "TASK-RDI-004",
@@ -73,12 +73,14 @@
       "files": [
         "frontend/src/app/features/detail-route-navigation.spec.ts",
         "frontend/src/app/features/detail-read-cancellation.spec.ts",
-        "frontend/src/app/features/admin/user-order-detail.store.spec.ts"
+        "frontend/src/app/features/admin/user-order-detail.store.spec.ts",
+        "frontend/src/app/features/admin/user-order-detail.view.spec.ts",
+        "frontend/src/app/features/storefront/product-page.view.spec.ts"
       ],
       "acceptance_criteria": [
         "AC-RDI-1 through AC-RDI-6 pass runtime tests"
       ],
-      "evidence": "Current-master port: 23 focused tests pass; full Angular suite 973/973 passes; production build, app/spec TypeScript, lint, architecture 7/7 and diff-check pass. Includes current-error authoritative refetch, stale-error no-refetch, A-to-B-to-A occupancy and separate in-flight orders."
+      "evidence": "Current-master port after review remediation: 26 focused tests pass; full Angular suite 975/975 passes; production build, app/spec TypeScript, lint, architecture 7/7 and diff-check pass. Includes current-error authoritative refetch, no cross-identity refetch, returned-to identity refresh, A-to-B-to-A occupancy, separate in-flight orders, product-local reset and tracking/busy view behavior."
     },
     {
       "id": "TASK-RDI-005",

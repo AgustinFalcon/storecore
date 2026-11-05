@@ -8,8 +8,8 @@
 5. RDI-005: record local checks and limitations; obtain required reviews and
    hosted checks before any integration.
 
-RDI-001–003 implemented locally. RDI-004 tests are authored and compile, but
-runtime execution remains pending due to the host filesystem access failure.
-RDI-005 remains open for review/hosted gates.
+RDI-001–003 are implemented on current master. RDI-004 has local runtime,
+TypeScript, lint, architecture and production-build evidence. RDI-005 remains
+open for exact-head re-review, hosted CI and integration.
 User implementation authorization recorded in meta.md; no unexecuted approval
 is represented as a completed gate.
