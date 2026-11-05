@@ -4,6 +4,7 @@ import { DemoApplicationState } from '../demo-state';
 import { trapDemoDialogFocus } from '../demo-dialog-focus';
 import { PreviewValidity, ProfileImportPhase } from '../../domain/user/profile-import';
 import { StoreProfileCodec, ProfileAuthorityRevoked, ProfileSettingField, ProfileDiffOperation, ParseDemoProfileStep, PreviewDemoProfileStep, ProfileCompatibility, ProfileCommandResult, ProfileDialog, DEMO_PROFILE_EXAMPLE, type DemoProfileChange, type DemoProfileManifest } from './profile-domain';
+import {ProfileRouteDraftCodec} from './profile-route-draft';
 
 @Component({selector:'sc-demo-profile',imports:[FormsModule],templateUrl:'./profile.component.html',styleUrls:['../demo.scss','./profile.component.scss']})
 export class DemoProfileComponent {
@@ -41,14 +42,15 @@ export class DemoProfileComponent {
     inject(DestroyRef).onDestroy(()=>{this.persistRouteDraft();this.alive=false;this.clear();});
   }
   private persistRouteDraft():void{
-    if(!this.authorized||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}
-    sessionStorage.setItem(DemoProfileComponent.routeDraftKey,JSON.stringify({authority:this.owner,draft:this.draft,manifest:this.manifest}));
+    try{if(!this.authorized||(!this.configDirty&&!this.manifest.trim())){sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);return;}sessionStorage.setItem(DemoProfileComponent.routeDraftKey,ProfileRouteDraftCodec.encode(this.owner,this.baseline,this.draft,this.manifest));}catch{/* beforeunload still warns; navigation never fails because browser storage is unavailable. */}
   }
   private restoreRouteDraft():void{
-    const raw=sessionStorage.getItem(DemoProfileComponent.routeDraftKey);if(!raw||!this.authorized)return;
-    try{const saved=JSON.parse(raw) as {authority?:unknown;draft?:unknown;manifest?:unknown};if(saved.authority!==this.owner)throw Error('authority');this.draft=StoreProfileCodec.fromWire(saved.draft);this.manifest=typeof saved.manifest==='string'?saved.manifest:'';this.phase.set(ProfileImportPhase.Editing);this.configStatus='Recuperamos los cambios pendientes de esta sesión.';this.status=this.manifest?'Recuperamos el manifiesto pendiente. Previsualizalo antes de aplicarlo.':'';}catch{sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);}
+    let raw:string|null=null;try{raw=sessionStorage.getItem(DemoProfileComponent.routeDraftKey);}catch{return;}const saved=ProfileRouteDraftCodec.decode(raw);if(!saved||!this.authorized||saved.authority!==this.owner){try{sessionStorage.removeItem(DemoProfileComponent.routeDraftKey);}catch{}return;}
+    const rebased={...this.baseline};const conflicts:ProfileSettingField[]=[];
+    for(const field of ProfileSettingField.values){if(saved.draft[field.key]===saved.baseline[field.key])continue;rebased[field.key]=saved.draft[field.key];if(this.baseline[field.key]!==saved.baseline[field.key]&&this.baseline[field.key]!==saved.draft[field.key])conflicts.push(field);}
+    this.draft=rebased;this.conflicts=conflicts;this.manifest=saved.manifest;this.phase.set(ProfileImportPhase.Editing);this.configStatus=conflicts.length?'Recuperamos la propuesta con cambios concurrentes. Elegí qué versión conservar.':'Recuperamos los cambios pendientes de esta sesión.';this.status=this.manifest?'Recuperamos el manifiesto pendiente. Previsualizalo antes de aplicarlo.':'';
   }
-  @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent):void{if(this.authorized&&(this.configDirty||!!this.manifest.trim())){this.persistRouteDraft();event.preventDefault();event.returnValue='';}}
+  @HostListener('window:beforeunload',['$event']) beforeUnload(event:BeforeUnloadEvent):void{if(this.authorized&&(this.configDirty||!!this.manifest.trim())){event.preventDefault();event.returnValue='';this.persistRouteDraft();}}
   private clear():void{this.close(false);this.snapshot=null;this.owner='';this.reviewed=null;this.previewText='';this.manifest='';this.changes=[];this.selection=[];this.exportText='';this.draft=StoreProfileCodec.reset();this.baseline=StoreProfileCodec.reset();this.resetBefore=StoreProfileCodec.reset();this.configError='';this.configStatus='';this.conflicts=[];this.error='';this.status='';this.validity.set(PreviewValidity.Missing);this.phase.set(ProfileImportPhase.AccessDenied);}
   refresh(clear=false):boolean{
     const priorAuthority=this.owner,recovering=this.snapshot===null&&!!this.owner;
