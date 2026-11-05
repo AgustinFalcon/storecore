@@ -16,7 +16,9 @@ old order.
   overwrite the current route, including a return to the same order identifier.
   Commands require the loaded current order, no GET in progress and no mutation
   for that order in progress, including after returning A to B to A and finishing
-  the new A GET before the old A POST.
+  the new A GET before the old A POST. When that old POST finishes while A is
+  visible again, the screen refreshes A authoritatively before re-enabling
+  commands; an old failure may surface its error only in that same A context.
 - AC-RDI-5: changing the order identity clears the tracking draft. Fulfillment
   buttons are disabled while loading.
 - AC-RDI-6: route subscriptions end with the component lifetime.

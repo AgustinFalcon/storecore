@@ -8,8 +8,10 @@ The historical integration implementation was ported as an isolated diff onto
 current master. Four detail containers subscribe to route identity with
 deduplication and teardown. The admin order store fences GET and mutation
 outcomes by route generation, preserves per-order mutation occupancy across
-A→B→A, blocks commands outside the current identity and refetches authoritative
-state only when a mutation of the current generation fails.
+A→B→A and blocks commands outside the current identity. A current-generation
+failure and any obsolete mutation that finishes while its identity is visible
+again both trigger an authoritative refresh; obsolete response bodies never
+patch the returned-to screen directly.
 
 The port retained current-master authority and domain contracts:
 
