@@ -43,6 +43,21 @@ Se corrigieron los tres puntos:
 
 La aceptación automática exige ahora primer producto dentro del viewport en 390/768/1440, ausencia de la categoría archivada y botón Buscar sin salto. Sobre el código corregido se repitieron `npm run verify` y los 335 escenarios Demo: PASS. Astra no llegó a emitir un veredicto final por límite de uso, por lo que no se reclama `APPROVE` independiente para este segundo corte.
 
+## Revisión independiente GPT-6.1 Sol y segundo cierre
+
+Al no estar disponible Astra, GPT-6.1 Sol realizó una revisión independiente read-only del commit `301c8b3` y emitió `REQUEST_CHANGES` sin P0/P1. Reprodujo cuatro P2 y un P3: feedback de carrito fuera del punto de acción en PDP móvil, producto no identificable dentro del primer viewport, filtros móviles abiertos por defecto, ficha sin especificaciones concretas y salto semántico `h1` → `h3` en tarjetas.
+
+El segundo corte corrige esos hallazgos sin ampliar integraciones:
+
+- feedback local de éxito/error asociado a Cantidad, con estado cerrado, `aria-invalid`, `aria-describedby` y foco de error;
+- carrusel comercial horizontal y hero compacto: nombre y precio completos dentro del viewport en 390/768/1440;
+- catálogo móvil con filtros secundarios cerrados por defecto y tarjetas identificables antes del scroll;
+- especificaciones Demo concretas por producto, con traductor y fallback sin mutar snapshots históricos;
+- títulos de producto `h2`, eliminando el salto semántico detectado por Axe;
+- PDP móvil prioriza identidad, precio y compra antes de la galería simulada.
+
+Gates exact-source posteriores: arquitectura 7/7, lint, 134 archivos / 988 tests unitarios, build productivo y 335/335 recorridos Demo en 17,6 minutos. Los tests responsive ya no aceptan un borde de tarjeta: exigen nombre y precio completos dentro del viewport y producto identificable en catálogo móvil. El veredicto final independiente se registra únicamente después de revisar este nuevo commit.
+
 ## Límites
 
 Este cierre acredita diseño frontend y comportamiento Demo local de Fase 1. No acredita backend completo, CI remoto, PR/merge, deploy, Mercado Pago, ARCA, Correo Argentino ni Mercado Libre live. Las representaciones de esos proveedores siguen explícitamente simuladas y sin secretos.

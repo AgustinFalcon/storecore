@@ -769,3 +769,12 @@ change is included in this local cut.
 - Added executable acceptance for first product inside the 390/768/1440 viewport, no archived public category and non-wrapping search.
 - Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 16.8 minutes.
 - The Astra reviewer did not produce a final verdict because its usage quota expired; no independent `APPROVE` is claimed for this remediation cut.
+
+## 2026-11-06 — Sol independent review remediation
+
+- GPT-6.1 Sol reviewed commit `301c8b3` read-only and returned `REQUEST_CHANGES`: no P0/P1, four visual/product P2s and one semantic P3.
+- Added adjacent accessible PDP cart feedback, concrete product specifications, responsive closed catalog filters, semantic product headings and mobile-first PDP ordering.
+- Reworked Home discovery so the complete product name and price—not merely a card edge—fit inside 390/768/1440 viewports; compact mobile catalog cards expose identity before scrolling.
+- Preserved historical snapshot byte stability: specification fallback is presented at the read boundary and is not injected into stored legacy products.
+- Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 17.6 minutes.
+- A fresh independent verdict is required on the resulting commit; this entry does not pre-claim approval.

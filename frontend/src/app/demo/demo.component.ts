@@ -9,7 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink, RouterOutlet, RouterLinkActive } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DemoApplicationState } from './demo-state';
-import { CatalogSort, CheckoutStep, DemoAddress, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoSettings } from './demo-model';
+import { CatalogSort, CheckoutStep, DemoAddress, DemoContext, DemoProduct, DemoScenario, DemoGalleryView, DemoProductVariant, DemoModuleId, DemoSettings, demoProductSpecifications } from './demo-model';
 import { DemoScreen } from './demo-screen';
 import { PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { DemoPaymentMethod, DemoPaymentPhase, DemoDeliveryMethod, DemoSyncStatus } from './demo-process-types';
@@ -48,6 +48,15 @@ export class DemoDialog {
   static readonly Incident = new DemoDialog('Registrar incidencia');
   static readonly Unknown = new DemoDialog('Acción desconocida');
   static fromWire(raw: unknown): DemoDialog { return [this.None, this.Reset, this.Product, this.Address, this.Information, this.Confirm, this.Module, this.Tracking, this.Receipt, this.Incident].find(value => value.label === raw) ?? this.Unknown; }
+}
+export class ProductActionFeedback {
+  private constructor(readonly wire:string,readonly cssClass:string,readonly role:'status'|'alert'|null){}
+  static readonly None=new ProductActionFeedback('none','',null);
+  static readonly Success=new ProductActionFeedback('success','success','status');
+  static readonly Error=new ProductActionFeedback('error','error','alert');
+  static readonly Unknown=new ProductActionFeedback('','error','alert');
+  static readonly all=[this.None,this.Success,this.Error];
+  static fromWire(raw:unknown):ProductActionFeedback{return this.all.find(value=>value.wire===raw)??this.Unknown;}
 }
 @Component({ selector: 'sc-root', imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule], templateUrl: './demo-shell.html', styleUrl: './demo.scss' })
 export class DemoRootComponent {
@@ -157,6 +166,10 @@ export class DemoPageComponent {
     const start = this.effectiveFeaturedPage() * this.featuredPageSize;
     return this.featuredCatalog().slice(start, start + this.featuredPageSize);
   });
+  readonly catalogFiltersOpen=signal(typeof window==='undefined'||typeof window.matchMedia!=='function'||!window.matchMedia('(max-width: 768px)').matches);
+  readonly ProductFeedback=ProductActionFeedback;
+  readonly productFeedback=signal(ProductActionFeedback.None);
+  productFeedbackMessage='';
   readonly catalogLocationIssue = computed(() => this.condition() === CatalogConditionFilter.Unknown || this.sort() === CatalogSort.Unknown || this.stockScope() === CatalogStockScope.Unknown);
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
@@ -192,7 +205,7 @@ export class DemoPageComponent {
   configName = 'Mi comercio';
   manifest = '';
   removed: { sku: string; quantity: number; variant: DemoProductVariant } | null = null;
-  constructor() { effect(() => { this.state.sessionEpoch(); this.deliveryAcceptance.reset(); clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Ready); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.condition.set(criteria.condition); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.gallery.set(DemoGalleryView.Front); }); }
+  constructor() { effect(() => { this.state.sessionEpoch(); this.deliveryAcceptance.reset(); clearTimeout(this.paymentTimer); this.paymentPhase.set(DemoPaymentPhase.Ready); this.confirmation = null; this.close(); }); inject(DestroyRef).onDestroy(() => clearTimeout(this.paymentTimer)); this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe(params => { this.restoreProductSelection(); if (this.screen !== DemoScreen.Catalog && this.screen !== DemoScreen.Product) return; const criteria = this.catalogLocation.fromQuery(params); this.condition.set(criteria.condition); this.search.set(criteria.search); this.category.set(criteria.category); this.brand.set(criteria.brand); this.stockScope.set(criteria.stock); this.maxPrice.set(criteria.maxPrice); this.sort.set(criteria.sort); this.page.set(criteria.page); }); this.route.paramMap.pipe(takeUntilDestroyed()).subscribe(() => { this.restoreProductSelection(); this.clearProductFeedback(); this.gallery.set(DemoGalleryView.Front); }); }
   get relatedProducts(): DemoProduct[] { return this.state.data.products.filter(value => value.active && value.sku !== this.product?.sku && value.category === this.product?.category).slice(0,4); }
   readonly productImage = demoProductImage;
   get checkoutTotal(): number { return this.total + (this.deliveryQuote.valid ? this.deliveryQuote.cost : 0); }
@@ -240,6 +253,7 @@ export class DemoPageComponent {
   changeMaximum(raw: number | null): void { const value = Number(raw); this.maxPrice.set(raw !== null && Number.isFinite(value) && value >= 0 ? value : null); this.updateCatalog(); }
   changeStock(available: boolean): void { this.stockScope.set(available ? CatalogStockScope.Available : CatalogStockScope.All); this.updateCatalog(); }
   readonly money = demoMoney;
+  readonly productSpecifications=demoProductSpecifications;
   stock(product: DemoProduct): number { return this.state.commerce.available(product.sku); }
   stockBalance(product:DemoProduct):number|null{return CatalogDetailsRead.balance(this.state.data,product);}
   favorite(sku: string): boolean { return this.state.context() === DemoContext.Customer && this.state.actor.favorites.includes(sku); }
@@ -247,7 +261,10 @@ export class DemoPageComponent {
   set draftPrice(value: number) { this.draftProduct.price = Math.round(Number(value) * 100); }
   clearFilters(): void { this.condition.set(CatalogConditionFilter.All); this.search.set(''); this.category.set(''); this.brand.set(''); this.maxPrice.set(null); this.stockScope.set(CatalogStockScope.All); this.sort.set(CatalogSort.Featured); this.page.set(0); void this.router.navigate(['/demo/catalog'], { replaceUrl: true }); }
   toggleFavorite(sku: string): void { if (this.state.context() !== DemoContext.Customer) { if (this.screen === DemoScreen.Product && this.product?.sku === sku) this.requestProductAccess(this.product, AccessSelectionPurpose.Favorite); else void this.router.navigate(['/demo/login'], { queryParams: this.continuation.route(this.router.url) }); return; } this.state.run(() => this.state.commerce.favorite(this.state.actorId(), sku), 'Favoritos actualizados.'); }
-  selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw)); }
+  selectVariant(raw: string): void { this.variant.set(DemoProductVariant.fromWire(raw));this.clearProductFeedback(); }
+  syncCatalogFilters(event:Event):void{const target=event.currentTarget;if(target instanceof HTMLDetailsElement)this.catalogFiltersOpen.set(target.open);}
+  clearProductFeedback():void{this.productFeedback.set(ProductActionFeedback.None);this.productFeedbackMessage='';}
+  private showProductFeedback(state:ProductActionFeedback,message:string,focus=false):void{this.productFeedback.set(state);this.productFeedbackMessage=message;if(focus)this.focusCheckout('product-quantity');}
   private restoreProductSelection(): void {
     if (this.screen !== DemoScreen.Product) return;
     const selected = DemoProductSelection.fromWire(this.route.snapshot.queryParamMap, this.availableVariants, this.product ? this.stock(this.product) : 0);
@@ -257,7 +274,14 @@ export class DemoPageComponent {
     if (this.state.context() !== DemoContext.Customer) {
       this.requestProductAccess(product); return;
     }
-    this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()), `${product.name} · ${this.variant().label} agregado a tu carrito.`);
+    this.clearProductFeedback();
+    if(!Number.isSafeInteger(this.quantity)||this.quantity<1||this.quantity>this.selectedStock){
+      this.state.message.set('');this.state.error.set('');
+      this.showProductFeedback(ProductActionFeedback.Error,`Ingresá una cantidad entera entre 1 y ${this.selectedStock}.`,true);return;
+    }
+    const result=`${product.name} · ${this.variant().label} agregado a tu carrito.`;
+    if(this.state.run(() => this.state.commerce.add(this.state.actorId(), product.sku, this.quantity, this.variant()),result))this.showProductFeedback(ProductActionFeedback.Success,result);
+    else this.showProductFeedback(ProductActionFeedback.Error,this.state.error()||'No se pudo agregar el producto.',true);
   }
   private requestProductAccess(product: DemoProduct, purpose = AccessSelectionPurpose.Purchase): void {
     const criteria = this.catalogQueryParams;
