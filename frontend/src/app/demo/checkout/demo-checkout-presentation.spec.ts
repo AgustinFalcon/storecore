@@ -29,6 +29,23 @@ describe('SC11A checkout presentation lifetime', () => {
     component.selectDelivery(Method.Pickup.wire); component.selectDelivery(Method.Home.wire); expect(component.deliveryConfirmation).toBe(Confirmation.Pending);
     component.delivery = true; const address = component.addressId; component.selectCheckoutAddress('other'); component.selectCheckoutAddress(address); expect(component.deliveryConfirmation).toBe(Confirmation.Pending);
   });
+  it('offers only home delivery for an ineligible cart and blocks a bypassed pickup selection', () => {
+    const { state, component, navigate } = setup(); const before = JSON.stringify(state.data);
+    expect(component.deliveryMethods).toEqual([Method.Home]);
+    component.selectDelivery(Method.Pickup.wire); component.delivery = true;
+    expect(component.deliveryQuote.valid).toBe(false); component.checkout(); vi.advanceTimersByTime(800);
+    expect(navigate).not.toHaveBeenCalled(); expect(JSON.stringify(state.data)).toBe(before);
+    expect(component.deliveryMethod()).toBe(Method.Pickup); expect(component.pickupDestination.availability.label).toContain('domicilio');
+    component.selectDelivery(Method.Home.wire); expect(component.deliveryQuote.valid).toBe(true);
+  });
+  it('invalidates accepted pickup when a mixed cart loses eligibility', () => {
+    const { state, component, navigate } = setup(); state.commerce.remove('cliente', 'DEMO-001'); state.commerce.add('cliente', 'DEMO-002', 1);
+    expect(component.deliveryMethods).toContain(Method.Pickup); component.selectDelivery(Method.Pickup.wire); component.delivery = true;
+    expect(component.deliveryConfirmation).toBe(Confirmation.Confirmed);
+    state.commerce.add('cliente', 'DEMO-001', 1); expect(component.deliveryQuote.valid).toBe(false); expect(component.deliveryConfirmation).toBe(Confirmation.Pending);
+    const before = JSON.stringify(state.data); component.checkout(); vi.advanceTimersByTime(800);
+    expect(JSON.stringify(state.data)).toBe(before); expect(navigate).not.toHaveBeenCalled();
+  });
   it('executes duplicate submission only once', () => {
     const { state, component, navigate } = setup(); const before = state.data.orders.length;
     component.checkout(); component.checkout(); vi.advanceTimersByTime(800);

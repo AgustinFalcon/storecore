@@ -62,6 +62,14 @@ test('SC16 validation explains and focuses each invalid field without storage wr
   const body = page.locator('#content-block-body-0'); await body.fill(' '); await cta(page, 'content-save').click();
   await expect(body).toBeFocused(); await expect(body).toHaveAttribute('aria-invalid', 'true'); await expect(page.locator('#content-block-body-issue-0')).toHaveText(ContentDraftIssue.BlockBody.label);
   await expect(page.locator('.field-error:visible')).toHaveCount(1);
+  await body.fill('Valid body');
+  const bannerTitle = page.locator('#banner-title-0'); await bannerTitle.fill(' '); await cta(page, 'content-save').click();
+  await expect(bannerTitle).toBeFocused(); await expect(bannerTitle).toHaveAttribute('aria-invalid', 'true'); await expect(bannerTitle).toHaveAttribute('aria-describedby', 'banner-title-issue-0');
+  await expect(page.locator('#banner-title-issue-0')).toHaveText('Completá el título del banner.');
+  await bannerTitle.fill('Valid banner');
+  const bannerBody = page.locator('#banner-body-0'); await bannerBody.fill(' '); await cta(page, 'content-save').click();
+  await expect(bannerBody).toBeFocused(); await expect(bannerBody).toHaveAttribute('aria-invalid', 'true'); await expect(bannerBody).toHaveAttribute('aria-describedby', 'banner-body-issue-0');
+  await expect(page.locator('#banner-body-issue-0')).toHaveText('Completá la descripción del banner.');
   expect(await snapshot(page)).toBe(before); expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
 
@@ -76,6 +84,40 @@ test('SC16 keyboard reorder retains focus on the moved block and announces previ
   await expect(page.locator('[data-block-editor-id="quality"] input')).toBeFocused();
   await cta(page, 'content-preview').click(); await expect(page.locator('[data-preview-block]').first()).toHaveAttribute('data-preview-block', 'quality');
   await page.keyboard.press('Escape'); await expect(cta(page, 'content-preview')).toBeFocused();
+});
+
+test('SC16 merchandising reorder and removal retain a useful keyboard focus target', async ({ page }) => {
+  await login(page); await cta(page, 'content-banner-add').click();
+  const bannerDown = page.locator('[data-banner-editor]:has([data-cta="content-banner-down"]:not(:disabled))').first();
+  const bannerId = await bannerDown.getAttribute('data-banner-editor');
+  if (!bannerId) throw new Error('Missing movable banner identity');
+  await bannerDown.locator('[data-cta="content-banner-down"]').focus(); await page.keyboard.press('Enter');
+  const focusedBanner = page.locator('[data-banner-editor="'+bannerId+'"]');
+  await expect(focusedBanner.locator('[data-cta="content-banner-up"]')).toBeFocused();
+  await focusedBanner.getByRole('button', { name: /Eliminar banner/ }).click();
+  await expect(page.locator('[data-banner-editor] input:focus')).toHaveCount(1);
+
+  const categoryDown = page.locator('[data-category-editor]:has([data-cta="content-category-down"]:not(:disabled))').first();
+  const category = await categoryDown.getAttribute('data-category-editor');
+  if (!category) throw new Error('Missing movable category identity');
+  await categoryDown.locator('[data-cta="content-category-down"]').focus(); await page.keyboard.press('Enter');
+  const focusedCategory = page.locator('[data-category-editor="'+category+'"]');
+  await expect(focusedCategory.locator('button:focus')).toHaveCount(1); await expect(focusedCategory.locator('button:focus')).toBeEnabled();
+  await focusedCategory.getByRole('button', { name: /Quitar categoría/ }).click();
+  await expect(page.locator('[data-cta="content-category-remove"]:focus')).toHaveCount(1);
+});
+
+test('SC16 exposes and removes a saved category whose final active product disappeared', async ({ page }) => {
+  await login(page); const title = page.getByLabel('Título principal', { exact: true }); await title.fill((await title.inputValue())+' '); await cta(page, 'content-save').click();
+  await page.evaluate(() => {
+    const key = 'storecore.commercial-demo.v1', raw = localStorage.getItem(key); if (!raw) throw new Error('Missing demo snapshot');
+    const value = JSON.parse(raw); value.contentDraft.categories = [...value.contentDraft.categories, 'Categoría retirada']; localStorage.setItem(key, JSON.stringify(value));
+  });
+  await page.reload(); const retired = page.locator('[data-category-editor="Categoría retirada"]');
+  await expect(retired).toContainText('Sin productos activos; no se mostrará en la portada.');
+  await cta(page, 'content-preview').click(); await expect(page.getByRole('dialog').getByText('Categoría retirada', { exact: true })).toHaveCount(0); await page.keyboard.press('Escape');
+  await retired.getByRole('button', { name: 'Quitar categoría Categoría retirada' }).click(); await cta(page, 'content-save').click(); await page.reload();
+  await expect(page.locator('[data-category-editor="Categoría retirada"]')).toHaveCount(0);
 });
 
 test('SC16 failed write retains buffer and Home; retry saves only draft', async ({ page }) => {

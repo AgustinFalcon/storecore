@@ -10,6 +10,7 @@ import { ContentDraft, ContentDraftIssue } from './content-draft';
 import { ContentFlow } from './content-flow';
 import { ContentDialog, ContentDraftStatus, ContentEditPhase, ContentDiscardIntent } from './content-types';
 import { CatalogBuyerPresenter } from '../rich-catalog/catalog-buyer-presenter';
+import { AddContentItemStep, ContentBannerTheme, ContentBannerDestination, MerchandisingItemKind, MoveContentItemStep, RemoveContentItemStep, SelectContentCategoryStep } from './content-merchandising';
 
 @Component({ selector: 'sc-demo-content', imports: [FormsModule, RouterLink], templateUrl: './content.component.html', styleUrls: ['../demo.scss', './content.component.scss'] })
 export class DemoContentComponent {
@@ -19,6 +20,8 @@ export class DemoContentComponent {
   readonly Phase = ContentEditPhase;
   readonly Dialog = ContentDialog;
   readonly Issue = ContentDraftIssue;
+  readonly bannerThemes = ContentBannerTheme.all;
+  readonly bannerDestinations = ContentBannerDestination.all;
   readonly trapFocus = trapDemoDialogFocus;
   readonly activeProduct = (product: DemoProduct): boolean => product.active;
   readonly productImage = (product:DemoProduct):string=>this.productFacts(product).asset?.src??demoProductImage(product);
@@ -44,6 +47,58 @@ export class DemoContentComponent {
   get status(): ContentDraftStatus { return ContentDraftStatus.of(this.current.dirty); }
   get discardIntent(): ContentDiscardIntent { return ContentDiscardIntent.of(this.decision !== null); }
   get categories(): string[] { return [...new Set(this.state.data.products.filter(this.activeProduct).map(product => product.category))]; }
+  get selectedCategories(): string[] { return this.current.draft.categories ?? this.categories; }
+  get previewCategories(): string[] { return (this.previewDraft.categories ?? this.categories).filter(category => this.categories.includes(category)); }
+  categoryActive(category: string): boolean { return this.categories.includes(category); }
+  addBanner(): void {
+    if (!this.flow.canEdit || (this.flow.draft.banners?.length ?? 0) >= 3) return;
+    this.flow.draft.banners = new AddContentItemStep().execute(this.flow.draft.banners ?? [], { id: crypto.randomUUID(), title: 'Prepará tu próximo proyecto', body: 'Descubrí productos para trabajar con confianza.', theme: ContentBannerTheme.Workshop, destination: ContentBannerDestination.Catalog }, 3); this.flow.edit();
+  }
+  removeBanner(index: number): void {
+    if (!this.flow.canEdit) return; const banners = this.flow.draft.banners ?? [], fallback = banners[index + 1] ?? banners[index - 1];
+    this.flow.draft.banners = new RemoveContentItemStep().execute(banners, index); this.flow.edit(); this.reorderAnnouncement.set('Banner eliminado.');
+    this.restoreRemovalFocus(MerchandisingItemKind.Banner, fallback?.id);
+  }
+  changeBannerTheme(index: number, raw: unknown): void { const banner = this.flow.draft.banners?.[index]; if (!this.flow.canEdit || !banner) return; banner.theme = ContentBannerTheme.fromWire(raw); this.flow.edit(); }
+  changeBannerDestination(index: number, raw: unknown): void { const banner = this.flow.draft.banners?.[index]; if (!this.flow.canEdit || !banner) return; banner.destination = ContentBannerDestination.fromWire(raw); this.flow.edit(); }
+  toggleCategory(category: string, selected: boolean): void {
+    if (!this.flow.canEdit || selected && !this.categories.includes(category)) return;
+    this.flow.draft.categories = new SelectContentCategoryStep().execute(this.selectedCategories, category, selected, this.categories.includes(category)); this.flow.edit();
+  }
+  removeCategory(category: string): void {
+    if (!this.flow.canEdit) return; const categories = this.selectedCategories, index = categories.indexOf(category), fallback = categories[index + 1] ?? categories[index - 1];
+    this.toggleCategory(category, false); this.reorderAnnouncement.set('Categoría '+category+' eliminada.'); this.restoreRemovalFocus(MerchandisingItemKind.Category, fallback);
+  }
+  moveCategory(index: number, delta: number): void {
+    if (!this.flow.canEdit) return; const category = this.selectedCategories[index]; if (!category) return;
+    this.flow.draft.categories = new MoveContentItemStep().execute(this.selectedCategories, index, delta); this.flow.edit();
+    const position = this.selectedCategories.indexOf(category); this.reorderAnnouncement.set(category+', categoría '+(position+1)+' de '+this.selectedCategories.length+'.');
+    this.restoreMerchandisingFocus(MerchandisingItemKind.Category, category, delta);
+  }
+  moveBanner(index: number, delta: number): void {
+    if (!this.flow.canEdit) return; const banner = this.flow.draft.banners?.[index]; if (!banner) return;
+    this.flow.draft.banners = new MoveContentItemStep().execute(this.flow.draft.banners ?? [], index, delta); this.flow.edit();
+    const position = this.flow.draft.banners.findIndex(value => value.id === banner.id); this.reorderAnnouncement.set(banner.title+', banner '+(position+1)+' de '+this.flow.draft.banners.length+'.');
+    this.restoreMerchandisingFocus(MerchandisingItemKind.Banner, banner.id, delta);
+  }
+  invalidBannerTitle(index: number): boolean { return this.current.phase === ContentEditPhase.Invalid && this.current.issue === ContentDraftIssue.Banner && !this.current.draft.banners?.[index]?.title.trim(); }
+  invalidBannerBody(index: number): boolean { return this.current.phase === ContentEditPhase.Invalid && this.current.issue === ContentDraftIssue.Banner && !this.current.draft.banners?.[index]?.body.trim(); }
+  private restoreMerchandisingFocus(kind: MerchandisingItemKind, identity: string, delta: number): void {
+    const epoch = this.state.sessionEpoch(); setTimeout(() => {
+      if (!this.alive || epoch !== this.state.sessionEpoch()) return;
+      const owner = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>(kind.editorSelector)).find(element => element.dataset[kind.datasetKey] === identity);
+      const preferred = owner?.querySelector<HTMLButtonElement>(`[data-cta="content-${kind.ctaSegment}-${delta < 0 ? 'up' : 'down'}"]`);
+      const fallback = owner?.querySelector<HTMLButtonElement>(`[data-cta="content-${kind.ctaSegment}-${delta < 0 ? 'down' : 'up'}"]`);
+      (preferred && !preferred.disabled ? preferred : fallback && !fallback.disabled ? fallback : undefined)?.focus();
+    }, 0);
+  }
+  private restoreRemovalFocus(kind: MerchandisingItemKind, identity?: string): void {
+    const epoch = this.state.sessionEpoch(); setTimeout(() => {
+      if (!this.alive || epoch !== this.state.sessionEpoch()) return;
+      const owner = identity ? Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>(kind.editorSelector)).find(element => element.dataset[kind.datasetKey] === identity) : undefined;
+      (owner?.querySelector<HTMLElement>(kind.ownerRemovalFocusSelector) ?? this.host.nativeElement.querySelector<HTMLElement>(kind.emptyRemovalFocusSelector))?.focus();
+    }, 0);
+  }
   invalid(value: string): boolean { return this.current.phase === ContentEditPhase.Invalid && !value.trim(); }
   readonly money = demoMoney;
   reorder(index: number, delta: number): void {
@@ -67,7 +122,8 @@ export class DemoContentComponent {
     await this.flow.save();
     if (!this.alive || this.flow.phase !== ContentEditPhase.Invalid) return;
     const index = this.flow.draft.blocks.findIndex(block => !block.title.trim() || !block.body.trim());
-    const id = this.flow.issue === ContentDraftIssue.Title ? 'content-title' : index >= 0 ? !this.flow.draft.blocks[index].title.trim() ? 'content-block-title-'+index : 'content-block-body-'+index : 'content-title';
+    const bannerIndex = this.flow.draft.banners?.findIndex(banner => !banner.title.trim() || !banner.body.trim()) ?? -1;
+    const id = this.flow.issue === ContentDraftIssue.Banner && bannerIndex >= 0 ? (!this.flow.draft.banners![bannerIndex].title.trim() ? 'banner-title-' : 'banner-body-')+bannerIndex : this.flow.issue === ContentDraftIssue.Title ? 'content-title' : index >= 0 ? !this.flow.draft.blocks[index].title.trim() ? 'content-block-title-'+index : 'content-block-body-'+index : 'content-title';
     this.host.nativeElement.querySelector<HTMLElement>('#'+id)?.focus();
   }
   openPreview(): void { if (!this.flow.canEdit) return; this.previewDraft = this.flow.preview(); this.open(ContentDialog.Preview); }

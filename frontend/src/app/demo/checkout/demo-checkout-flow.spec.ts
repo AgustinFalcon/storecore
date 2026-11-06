@@ -2,6 +2,7 @@ import { CheckoutStep } from '../demo-model';
 import { DemoDeliveryMethod, DemoPaymentMethod } from '../demo-process-types';
 import { DemoCheckoutFlow, DemoCheckoutIssue } from './demo-checkout-flow';
 import { DemoDeliveryQuote as Quote, DeliveryConfirmation as Confirmation } from './demo-delivery-quote';
+import { PickupDestination } from './catalog-pickup';
 
 describe('DemoCheckoutFlow', () => {
   const flow = new DemoCheckoutFlow();
@@ -16,7 +17,7 @@ describe('DemoCheckoutFlow', () => {
   });
 
   it('allows pickup without a postal address and fails unknown submission closed', () => {
-    const pickup = { ...facts, quote: Quote.create(DemoDeliveryMethod.Pickup, undefined, 0), confirmation: Confirmation.Confirmed };
+    const pickup = { ...facts, quote: Quote.create(DemoDeliveryMethod.Pickup, undefined, 0, PickupDestination.fromWire('Sucursal')), confirmation: Confirmation.Confirmed };
     expect(flow.advance(CheckoutStep.Address, pickup).issue).toBe(DemoCheckoutIssue.None);
     expect(flow.validateSubmission(DemoPaymentMethod.Unknown, pickup)).toBe(DemoCheckoutIssue.MissingPayment);
     expect(flow.validateSubmission(DemoPaymentMethod.Card, pickup)).toBe(DemoCheckoutIssue.None);

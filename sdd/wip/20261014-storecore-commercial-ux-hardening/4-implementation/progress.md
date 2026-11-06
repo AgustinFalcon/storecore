@@ -726,3 +726,19 @@ change is included in this local cut.
 - Consolidated evidence: `evidence/storecore-frontend-final-closure-20261105.md`.
 - Remote CI, PR/merge, deployment and provider homologations remain explicitly
   outside this local frontend certification.
+
+## 2026-11-06 — Strict residual frontend gap closure locally approved
+
+- Reopened only the two acceptance gaps found by coordinated strict review:
+  SC16 Demo banner/category authoring and current-cart pickup eligibility.
+- Implemented closed merchandising/pickup types, sole wire boundaries, Demo draft
+  persistence/preview, configured-destination policy and duplicate domain defense.
+- Directed verification is green: 6 unit/component files / 38 tests and 51/51
+  browser scenarios across SC16, all 26 route identities and every visible CTA.
+- The first full Demo repetition exposed eight integration failures; all were
+  corrected. Final exact-source gates pass: architecture 7/7, lint, 134 files /
+  988 unit/component tests, optimized Real build and 334/334 Demo browser tests.
+- Coordinated Astra Product and UX/UI reviews both returned `APPROVE` without
+  P1/P2 after the category-removal, focus, responsive and closed-kind fixes.
+  Exact-head Sol reviews, CI, PR and merge remain intentionally unclaimed.
+- Evidence: `evidence/frontend-final-gap-closure-20261106.md`.

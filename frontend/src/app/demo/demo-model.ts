@@ -11,6 +11,7 @@ import { CustomerAccountAccess, CustomerAccountState, CustomerAccountCommand, Cu
 import { UserRole } from '../domain/user/user-role';
 import { ContentDraft, type ContentDraftData } from './content/content-draft';
 import { DemoDeliveryQuote } from './checkout/demo-delivery-quote';
+import { QuoteCatalogPickupStep } from './checkout/catalog-pickup';
 import { DemoPaymentShipmentPolicy } from './checkout/demo-payment-shipment-policy';
 import { AftercareCodec,type AftercareLedger } from './aftercare/aftercare-ledger';
 import { ReturnStage,ReturnOutcome,ReturnReason,RefundStatus } from './aftercare/aftercare-types';
@@ -115,7 +116,9 @@ export function demoSeedV7(): DemoSnapshot {
   const actors = [actor('cliente', 'Alex'), actor('cliente2', 'Sam'), rocio]; actors.forEach(value => value.access = { state: CustomerAccountState.Active, generation: 0, reason: '' });
   const seed = { version: 3, revision: 0, products, actors, orders, campaigns: [{ id: 'offer-1', title: 'Equipá tu taller', sku: products[0].sku, percent: 10, active: true, from: '2026-01-01', until: '2027-12-31' }], listings: products.slice(0, 4).map(product => ({ sku: product.sku, linked: true, observed: product.onHand, error: false })), movements: [], title: 'Todo para tu próximo proyecto', subtitle: 'Herramientas, seguridad y organización. Elegí calidad, comprá con confianza.', blocks: [{ id: 'service', title: 'Te ayudamos a elegir', body: 'Encontrá herramientas y equipamiento para cada etapa de tu proyecto.' }, { id: 'quality', title: 'Calidad que te acompaña', body: 'Garantía y asistencia personalizada para trabajar con confianza.' }], settings: { homepageItems: 4, lowStockThreshold: 5, deliveryDays: 5, trackingPrefix: 'SIM', mlRows: 6 }, modules: DemoModuleId.all.map(id => ({ id, enabled: true })), competitors: [{ id: 'competitor-1', name: 'Comercio de muestra A', price: products[0].price + 50000, history: [products[0].price + 80000, products[0].price + 50000], unread: false }], mlConnected: false };
   const aftercare:AftercareLedger={returns:[{id:'RETURN-1015-1',orderId:'ORD-1015',actorId:rocio.id,reason:ReturnReason.ChangedMind,stage:ReturnStage.Refunded,outcome:ReturnOutcome.Accepted,lines:[{index:0,sku:'LUM-042',variant:DemoProductVariant.Standard,quantity:1,unit:8450000}],refund:{status:RefundStatus.Refunded,amount:8450000},events:[{id:'REFUND-1015-1',stage:ReturnStage.Refunded,date:'2026-10-16'}]}],incidents:[]};
-  return new EnrichCatalogDemoSeedStep().execute({ ...seed, version:7,campaignRecords:new SeedCampaignRecordsStep().execute(),offers:[...new MigrateOffersV5ToV6Step().execute(seed.campaigns),...new SeedPolicyOffersStep().execute()],offerReference:DEMO_OFFER_REFERENCE, catalogDetails:new MigrateCatalogV4ToV5Step().execute(products),aftercare, contentDraft: ContentDraft.clone(seed) });
+  const snapshot = new EnrichCatalogDemoSeedStep().execute({ ...seed, version:7,campaignRecords:new SeedCampaignRecordsStep().execute(),offers:[...new MigrateOffersV5ToV6Step().execute(seed.campaigns),...new SeedPolicyOffersStep().execute()],offerReference:DEMO_OFFER_REFERENCE, catalogDetails:new MigrateCatalogV4ToV5Step().execute(products),aftercare, contentDraft: ContentDraft.clone(seed) });
+  snapshot.contentDraft = ContentDraft.seed(seed, snapshot.products.filter(product => product.active).map(product => product.category));
+  return snapshot;
 }
 
 /** All financial amounts are integer minor units; this coordinator is framework-free. */
@@ -178,6 +181,8 @@ export class DemoCommerce {
     if (scenario === DemoScenario.Error) throw new Error('El pago simulado no respondió. Conservamos tu carrito; seleccioná pago aprobado y reintentá.');
     if (scenario === DemoScenario.Unknown || method === DemoPaymentMethod.Unknown || deliveryMethod === DemoDeliveryMethod.Unknown) throw new Error('Elegí un escenario, pago y entrega válidos.');
     const actor = this.actor(actorId); const address = actor.addresses.find(value => value.id === addressId);
+    const pickup = new QuoteCatalogPickupStep().execute(this.snapshot, actor.cart);
+    if (deliveryMethod === DemoDeliveryMethod.Pickup && !pickup.availability.eligible) throw new Error(pickup.availability.label);
     if ((!address && deliveryMethod !== DemoDeliveryMethod.Pickup) || !actor.cart.length) throw new Error('Agregá productos y seleccioná una dirección.');
     const createdDate = this.now();
     if (actor.cart.some(line => !this.product(line.sku).active)) throw new Error('Un producto del carrito está archivado. Revisá el carrito y quitalo antes de confirmar.');
@@ -188,7 +193,7 @@ export class DemoCommerce {
     const approved = scenario === DemoScenario.Approved; const rejected = scenario === DemoScenario.Rejected;
     const order: DemoOrder = { origin:DemoOrderOrigin.Legacy,fulfillment:deliveryMethod??DemoDeliveryMethod.Home,...(deliveryMethod!==DemoDeliveryMethod.Pickup&&address?{addressId:address.id}:{}), id: `DEMO-${this.id()}`, actor: actorId, request, createdDate, status: approved ? OrderStatus.Paid : rejected ? OrderStatus.Cancelled : OrderStatus.PendingPayment, payment: approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending, shipment: DemoPaymentShipmentPolicy.forPayment(approved ? PaymentStatus.Approved : rejected ? PaymentStatus.Rejected : PaymentStatus.Pending), lines, total: new CalculateCatalogOrderTotalStep().execute(lines), address: address ? `${address.street} · ${address.city}` : 'Retiro en comercio de muestra', tracking: '', history: [`Pedido creado · ${createdDate}`, `Pago ${scenario.label.toLowerCase()} (simulado)`], returned: false };
     order.method = method;
-    if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays).snapshot(); order.address = order.delivery.destination; order.total = new CalculateCatalogOrderTotalStep().execute(lines,order.delivery.cost); }
+    if (deliveryMethod) { order.delivery = DemoDeliveryQuote.create(deliveryMethod, address, this.snapshot.settings.deliveryDays, pickup).snapshot(); order.address = order.delivery.destination; order.total = new CalculateCatalogOrderTotalStep().execute(lines,order.delivery.cost); }
     for (const line of lines) { const product = this.product(line.sku); if (approved) { product.onHand -= line.quantity; this.snapshot.movements.push({ id: `${order.id}-${line.sku}`, sku: line.sku, delta: -line.quantity, reason: `Compra ${order.id}` }); } else if (!rejected) product.reserved += line.quantity; }
     this.snapshot.orders.push(order); actor.cart = []; this.commit(approved,createdDate); return order;
   }

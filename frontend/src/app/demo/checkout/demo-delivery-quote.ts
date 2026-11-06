@@ -1,13 +1,14 @@
 import type { DemoAddress } from '../demo-model';
 import { DemoDeliveryMethod, type DemoDeliverySnapshot } from '../demo-process-types';
+import { PickupDestination } from './catalog-pickup';
 
 /** Pure shared source for the visible offer and the persisted delivery facts. */
 export class DemoDeliveryQuote {
   private constructor(readonly method: DemoDeliveryMethod, readonly addressId: string, readonly destination: string, readonly cost: number, readonly days: number) {}
   static readonly Unknown = new DemoDeliveryQuote(DemoDeliveryMethod.Unknown, '', '', NaN, 0);
-  static create(method: DemoDeliveryMethod, address: DemoAddress | undefined, homeDays: number): DemoDeliveryQuote {
+  static create(method: DemoDeliveryMethod, address: DemoAddress | undefined, homeDays: number, pickup = PickupDestination.NotConfigured): DemoDeliveryQuote {
     if (method === DemoDeliveryMethod.Unknown) return this.Unknown;
-    if (method === DemoDeliveryMethod.Pickup) return new DemoDeliveryQuote(method, '', 'Comercio de muestra · Retiro con DNI y número de pedido', method.cost, method.days);
+    if (method === DemoDeliveryMethod.Pickup) return pickup.availability.eligible ? new DemoDeliveryQuote(method, '', pickup.location, method.cost, method.days) : this.Unknown;
     if (!address?.street.trim() || !address.city.trim() || !address.postal.trim() || !Number.isSafeInteger(homeDays) || homeDays < 1) return this.Unknown;
     return new DemoDeliveryQuote(method, address.id, `${address.street} · ${address.city} · CP ${address.postal}`, method.cost, homeDays);
   }

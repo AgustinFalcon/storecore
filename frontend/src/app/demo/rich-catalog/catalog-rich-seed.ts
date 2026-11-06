@@ -10,6 +10,7 @@ export class EnrichCatalogDemoSeedStep {
     first.condition=ItemCondition.New;first.warrantyTerms='Condiciones comerciales no definidas en esta demostración. Consultá antes de una compra real.';
     first.media=[{id:first.sku+'-front',assetId:'DEMO-001',alt:'Ilustración Demo de un taladro nuevo; no es fotografía de una unidad real'},{id:first.sku+'-detail',assetId:'DEMO-001-detail',alt:'Detalle ilustrado del cuerpo del taladro Demo; no es fotografía ni evidencia de condición'}];
     snapshot.catalogDetails.find(value=>value.sku==='DEMO-002')!.variants.find(value=>value.variant===DemoProductVariant.Case)!.state=VariantSaleState.Disabled;
+    snapshot.catalogDetails.find(value=>value.sku==='DEMO-002')!.variants.find(value=>value.variant===DemoProductVariant.Standard)!.pickupLocation='Sucursal de muestra · Retiro con DNI y número de pedido';
     const own=snapshot.catalogDetails.find(value=>value.sku==='DEMO-004')!.variants.find(value=>value.variant===DemoProductVariant.Case)!;own.price=3925500;own.original=4200000;own.pricing=CatalogPricingBasis.OwnBase;
     snapshot.catalogDetails.find(value=>value.sku==='DEMO-005')!.variants.find(value=>value.variant===DemoProductVariant.Standard)!.state=VariantSaleState.Disabled;
     this.outlet(snapshot,'VLD-043','Taladro Outlet retenido',1,1,OutletScope.Unit,ItemCondition.Used,'UNIT-RETAINED-043');
