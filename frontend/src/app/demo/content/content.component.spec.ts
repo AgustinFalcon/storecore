@@ -43,4 +43,24 @@ describe('SC16 lifecycle and navigation adapter', () => {
     const clean = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
     component.beforeUnload(clean); expect(clean.defaultPrevented).toBe(false); fixture.destroy();
   });
+  it('edits banners and category order with isolated preview, discard and authority guards', () => {
+    const { component, fixture, state } = setup();
+    component.flow.discard(); const categories = [...component.selectedCategories], savedBanners = component.flow.preview().banners;
+    component.addBanner(); component.addBanner(); component.addBanner(); component.addBanner();
+    expect(component.flow.draft.banners).toHaveLength(3);
+    component.flow.draft.banners![0].title = 'Primero'; component.flow.draft.banners![1].title = 'Segundo'; component.moveBanner(0, 1);
+    expect(component.flow.preview().banners![0].title).toBe('Segundo');
+    component.toggleCategory(categories[0], false); expect(component.selectedCategories).not.toContain(categories[0]);
+    component.toggleCategory(categories[0], true); expect(component.selectedCategories.at(-1)).toBe(categories[0]);
+    component.moveCategory(component.selectedCategories.length - 1, -1);
+    expect(component.flow.dirty).toBe(true); component.flow.discard(); expect(component.flow.draft.banners).toEqual(savedBanners); expect(component.selectedCategories).toEqual(categories);
+    state.logout(); component.canLeave(); component.addBanner(); component.toggleCategory(categories[0], true);
+    expect(component.flow.draft.banners).toEqual([]); expect(component.flow.draft.categories).toEqual([]); fixture.destroy();
+  });
+  it('lets an administrator remove a saved category after its last active product disappears', () => {
+    const { component, fixture } = setup(); component.flow.draft.categories = ['Categoría retirada']; component.flow.edit();
+    expect(component.selectedCategories).toEqual(['Categoría retirada']); expect(component.previewCategories).toEqual([]);
+    component.removeCategory('Categoría retirada');
+    expect(component.flow.draft.categories).toEqual([]); expect(component.flow.dirty).toBe(true); fixture.destroy();
+  });
 });

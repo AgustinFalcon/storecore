@@ -3,8 +3,9 @@ import { DemoProductVariant } from '../catalog/product-variant';
 import { OutletScope,ProductCondition,VariantSaleState } from '../catalog/catalog-types';
 import { ItemCondition,CatalogDetailError,CatalogDetailIssue,CatalogPricingBasis,CatalogCompareAt } from './catalog-details-types';
 import { CatalogMediaRegistry } from './catalog-media';
+import { PickupAvailability, PickupDestination } from '../checkout/catalog-pickup';
 export interface CatalogMedia {id:string;assetId:string;alt:string;}
-export interface CatalogPresentation {variant:DemoProductVariant;state:VariantSaleState;price:number;original:number|null;pricing:CatalogPricingBasis;comparison:CatalogCompareAt;}
+export interface CatalogPresentation {variant:DemoProductVariant;state:VariantSaleState;price:number;original:number|null;pricing:CatalogPricingBasis;comparison:CatalogCompareAt;pickupLocation?:string;}
 export interface CatalogOutlet {scope:OutletScope;reference:string;notes:string;defects:string;}
 export interface CatalogDetails {sku:string;media:CatalogMedia[];variants:CatalogPresentation[];kind:ProductCondition;condition:ItemCondition;warrantyTerms:string;notSellable:number;outlet:CatalogOutlet|null;}
 const text=(raw:unknown,max:number)=>typeof raw==='string'&&!!raw.trim()&&raw.length<=max;
@@ -13,6 +14,7 @@ export class CatalogDetailsPolicy {
   static known(detail:CatalogDetails):boolean{return detail.kind!==ProductCondition.Unknown&&detail.condition!==ItemCondition.Unknown&&detail.variants.every(variant=>variant.state!==VariantSaleState.Unknown&&variant.pricing!==CatalogPricingBasis.Unknown&&variant.comparison!==CatalogCompareAt.Unknown)&&(!detail.outlet||detail.outlet.scope!==OutletScope.Unknown);}
   static validate(detail:CatalogDetails,product:DemoProduct,allowUnknown=false):void{
     const fail=(issue:CatalogDetailIssue):never=>{throw new CatalogDetailError(issue);};
+    if(detail.variants?.some(value=>PickupDestination.fromWire(value.pickupLocation).availability===PickupAvailability.Unknown))fail(CatalogDetailIssue.Variant);
     if(detail.sku!==product.sku||!Array.isArray(detail.media)||detail.media.length<1||detail.media.length>8||new Set(detail.media.map(item=>item.id)).size!==detail.media.length||new Set(detail.media.map(item=>item.assetId)).size!==detail.media.length||detail.media.some(item=>!text(item.id,80)||!CatalogMediaRegistry.find(item.assetId)||!text(item.alt,240)))fail(CatalogDetailIssue.Media);
     if(!Array.isArray(detail.variants)||detail.variants.length<1||detail.variants.length>2||new Set(detail.variants.map(value=>value.variant)).size!==detail.variants.length||detail.variants.some(value=>value.variant===DemoProductVariant.Unknown||!Number.isSafeInteger(value.price)||value.price<1||value.original!==null&&(!Number.isSafeInteger(value.original)||value.original<value.price)||value.comparison===CatalogCompareAt.Known&&value.original===null||value.comparison===CatalogCompareAt.Unavailable&&(value.original!==null||value.variant!==DemoProductVariant.Case||value.pricing!==CatalogPricingBasis.LegacySurcharge)))fail(CatalogDetailIssue.Variant);
     const standard=detail.variants.find(value=>value.variant===DemoProductVariant.Standard),caseVariant=detail.variants.find(value=>value.variant===DemoProductVariant.Case);

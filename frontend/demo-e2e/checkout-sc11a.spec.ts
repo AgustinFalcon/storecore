@@ -6,10 +6,23 @@ import { DemoProductVariant as Variant } from '../src/app/demo/demo-model';
 
 const cta = (page: Page, id: string) => page.locator(`[data-cta="${id}"]`);
 async function login(page: Page) { await page.goto('/demo/login'); await page.getByLabel('Contraseña', { exact: true }).fill('demo'); await cta(page, 'login-submit').click(); await cta(page, 'login-customer').click(); }
-async function cart(page: Page) { await login(page); await page.goto('/demo/catalog/DEMO-001'); await cta(page, 'product-variant').selectOption(Variant.Case.wire); await page.getByLabel('Cantidad', { exact: true }).fill('2'); await cta(page, 'product-add-cart').click(); await page.goto('/demo/checkout'); }
+async function cart(page: Page, pickup = false) { await login(page); await page.goto('/demo/catalog/'+(pickup ? 'DEMO-002' : 'DEMO-001')); await cta(page, 'product-variant').selectOption(pickup ? Variant.Standard.wire : Variant.Case.wire); await page.getByLabel('Cantidad', { exact: true }).fill('2'); await cta(page, 'product-add-cart').click(); await page.goto('/demo/checkout'); }
 async function destination(page: Page, method = Method.Home) { await cta(page, 'checkout-destination').selectOption(method.wire); if (method === Method.Home) await page.getByRole('radio').first().check(); await cta(page, 'checkout-step-next').click(); }
 async function review(page: Page) { await cta(page, 'checkout-delivery-confirm').check(); await cta(page, 'checkout-step-next').click(); }
 async function stored(page: Page) { return page.evaluate(() => localStorage.getItem('storecore.commercial-demo.v1')); }
+
+test('SC11A pickup follows the selected presentations and blocks a mixed cart after reload', async ({ page }) => {
+  await cart(page, true); await expect(cta(page, 'checkout-destination').locator('option[value="pickup"]')).toHaveCount(1);
+  await destination(page, Method.Pickup); await expect(page.locator('.checkout-delivery-details')).toContainText('Sucursal de muestra');
+  await page.goto('/demo/catalog/DEMO-001'); await expect(page.locator('[data-pickup-availability]')).toContainText('Retiro no disponible');
+  await cta(page, 'product-add-cart').click(); await page.goto('/demo/checkout'); await page.reload();
+  await expect(cta(page, 'checkout-destination').locator('option[value="pickup"]')).toHaveCount(0);
+  await expect(page.locator('#checkout-pickup-guidance')).toContainText('Elegí envío a domicilio');
+  const mixed = JSON.parse((await stored(page))!); expect(mixed.actors.find((actor: { id: string }) => actor.id === 'cliente').cart).toHaveLength(2);
+  await page.goto('/demo/cart'); await cta(page, 'cart-remove-DEMO-001').click(); await page.goto('/demo/checkout'); await page.reload();
+  await destination(page, Method.Pickup); await review(page); await cta(page, 'checkout-confirm').click();
+  await expect(page).toHaveURL(/checkout\/result/); await expect(page.locator('main')).toContainText('Sucursal de muestra');
+});
 
 test('SC11A validates and focuses groups, never confirms by selector and preserves only unchanged acceptance', async ({ page }) => {
   await cart(page); const before = await stored(page);
@@ -20,14 +33,14 @@ test('SC11A validates and focuses groups, never confirms by selector and preserv
   await review(page); await expect(page.locator('.checkout-review-line')).toContainText(Variant.Case.label); await expect(page.locator('.checkout-review-line')).toContainText('Cantidad 2');
   await expect(page.getByRole('status')).toContainText(DemoPaymentPhase.Ready.label);
   await cta(page, 'checkout-review-edit-destination').click(); await cta(page, 'checkout-step-next').click(); await expect(cta(page, 'checkout-delivery-confirm')).toBeChecked();
-  await cta(page, 'checkout-delivery-edit').click(); await cta(page, 'checkout-destination').selectOption(Method.Pickup.wire); await expect(page.getByRole('radio')).toHaveCount(0);
-  await cta(page, 'checkout-destination').selectOption(Method.Home.wire); await cta(page, 'checkout-step-next').click(); await expect(cta(page, 'checkout-delivery-confirm')).not.toBeChecked();
+  await cta(page, 'checkout-delivery-edit').click(); await expect(cta(page, 'checkout-destination').locator('option[value="pickup"]')).toHaveCount(0);
+  await expect(page.locator('#checkout-pickup-guidance')).toContainText('Elegí envío a domicilio'); await cta(page, 'checkout-step-next').click(); await expect(cta(page, 'checkout-delivery-confirm')).toBeChecked();
   expect(await stored(page)).toBe(before);
 });
 
 for (const method of Method.all) {
   test(`SC11A ${method.wire} review equals persisted order and receipt after reload`, async ({ page }) => {
-    await cart(page); await destination(page, method); await review(page);
+    await cart(page, method === Method.Pickup); await destination(page, method); await review(page);
     const details = page.locator('.checkout-delivery-details'); const destinationText = await details.locator('p').first().innerText();
     const total = await page.locator('.summary .total strong').innerText(); await expect(cta(page, 'checkout-confirm')).toContainText(total);
     await cta(page, 'checkout-confirm').click(); await expect(page).toHaveURL(/checkout\/result/); await expect(page.locator('.summary-row.total')).toContainText(total);

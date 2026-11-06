@@ -25,11 +25,11 @@ describe('SC16 closed domain and isolated drafts', () => {
     reordered.blocks[0].title = 'Changed';
     expect(original.blocks[0].id).toBe('a'); expect(original.blocks[1].title).toBe('B');
     expect(ContentDraft.same(original, copy)).toBe(true);
-    expect(ContentDraft.reorder(original, 0, -1)).toEqual(original);
+    expect(ContentDraft.reorder(original, 0, -1)).toEqual(ContentDraft.clone(original));
   });
   it('validates fields and rejects malformed structures and duplicate IDs at one wire boundary', () => {
     expect(ContentDraft.issue({ ...draft(), title: ' ' })).toBe(Issue.Title);
     for (const raw of [null, {}, [], { ...draft(), extra: true }, { ...draft(), blocks: [{ id: 'x', title: '', body: 'body' }] }, { ...draft(), blocks: [{ id: 'x', title: 'X', body: '' }] }, { ...draft(), blocks: [{ id: 'x', title: 'X', body: 'x' }, { id: 'x', title: 'Y', body: 'y' }] }]) expect(() => ContentDraft.fromWire(raw)).toThrow(Issue.Unknown.label);
-    expect(ContentDraft.fromWire(draft())).toEqual(draft());
+    expect(ContentDraft.fromWire(draft())).toEqual(ContentDraft.clone(draft()));
   });
 });

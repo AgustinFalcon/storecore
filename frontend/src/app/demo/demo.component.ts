@@ -32,6 +32,7 @@ import { CatalogConditionComponent } from './rich-catalog/catalog-condition.comp
 import { VariantSaleState } from './catalog/catalog-types';
 import { CatalogBuyerPresenter } from './rich-catalog/catalog-buyer-presenter';
 import { CatalogCompareAt } from './rich-catalog/catalog-details-types';
+import { QuoteCatalogPickupStep } from './checkout/catalog-pickup';
 
 export class DemoDialog {
   private constructor(readonly label: string) {}
@@ -160,7 +161,10 @@ export class DemoPageComponent {
   addressId = '';
   get delivery(): boolean { return this.deliveryConfirmation === DeliveryConfirmation.Confirmed; }
   set delivery(confirmed: boolean) { if (confirmed) this.deliveryAcceptance.confirm(this.deliveryQuote, this.checkoutCartIdentity); else this.deliveryAcceptance.reset(); this.checkoutIssue.set(DemoCheckoutIssue.None); }
-  get deliveryQuote(): DemoDeliveryQuote { return DemoDeliveryQuote.create(this.deliveryMethod(), this.state.actor.addresses.find(value => value.id === this.addressId), this.state.data.settings.deliveryDays); }
+  get pickupDestination() { return new QuoteCatalogPickupStep().execute(this.state.data, this.state.actor.cart); }
+  get productPickupDestination() { return new QuoteCatalogPickupStep().execute(this.state.data, this.product ? [{ sku: this.product.sku, variant: this.variant() }] : []); }
+  get deliveryMethods(): readonly DemoDeliveryMethod[] { return this.pickupDestination.availability.eligible ? DemoDeliveryMethod.all : [DemoDeliveryMethod.Home]; }
+  get deliveryQuote(): DemoDeliveryQuote { return DemoDeliveryQuote.create(this.deliveryMethod(), this.state.actor.addresses.find(value => value.id === this.addressId), this.state.data.settings.deliveryDays, this.pickupDestination); }
   private get checkoutCartIdentity(): string { return JSON.stringify([this.state.actorId(), this.state.sessionEpoch(), this.cartLines.map(line => [line.sku, line.variant.wire, line.quantity, line.unit,line.details])]); }
   get deliveryConfirmation(): DeliveryConfirmation { return this.deliveryAcceptance.state(this.deliveryQuote, this.checkoutCartIdentity); }
   private get checkoutFacts(): CheckoutFacts { return { quote: this.deliveryQuote, confirmation: this.deliveryConfirmation, hasItems: this.cartLines.length > 0 }; }
