@@ -350,6 +350,17 @@ APPROVE sin P1/P2. Se habilitan TASK-002 y TASK-003 en Stitch.
 - `DemoBrowserEffects` es el único borde de navegador para foco inmediato/diferido, apertura y cierre de diálogo, descarga, impresión y reload. `DemoRootComponent` y `DemoPageComponent` dejaron de usar directamente `document`, `window`, `URL` y `Blob`.
 - El controlador modal conserva foco inicial, Escape, cierre explícito y restauración al invocador; descargas y exportaciones se generan mediante un puerto de URL de blob inyectable y probado sin acoplar dominio ni presenters al navegador.
 - La auditoría final de `src/app/demo` no encontró accesos directos al navegador fuera del borde, comparaciones examinadas de estados contra strings mágicos ni marcadores `TODO/FIXME`.
+
+## Revalidación de completitud frontend — 2026-11-06
+
+- Se contrastaron las 26 superficies canónicas con rutas, estados, mocks y CTA de comprador y administración. No apareció una funcionalidad base omitida dentro del alcance Demo aprobado.
+- `npm run verify` PASS: arquitectura 7/7, lint, 134 archivos / 988 pruebas y build productivo.
+- La primera repetición del browser gate expuso una carrera del auditor SC16 al usar selectores posicionales durante reordenamiento; el runtime fue reproducido y confirmado correcto en navegador real.
+- El auditor ahora espera el render y sigue banner/categoría por identidad estable. La matriz global posterior pasó **28/28** y acreditó cero CTA sin escenario.
+- El test SC15 ahora espera la propagación de `OverviewRange.Week`; focal 2/2 y `npm run verify` final 134 archivos / 988 pruebas PASS.
+- `npm run test:demo` final sobre el source corregido: **334/334 PASS** en Chromium (16.4 min).
+- Evidencia: `4-implementation/evidence/frontend-completeness-revalidation-20261106.md`.
+- Sin cambios de alcance: providers reales, CI remoto, deploy y homologaciones continúan no afirmados.
 - Verificación unitaria: **115 archivos / 511 tests PASS**. Lint PASS; arquitectura **6/6 PASS**; build producción PASS (**623,74 kB raw / 141,38 kB estimado**).
 - Verificación de navegador posterior al corte: CTA + regresiones responsive **14/14 PASS** y matriz Demo completa **52/52 PASS** en Chromium, incluidos 390/768/1440, checkout con todos los resultados, diálogos/foco, identidad, catálogo, operaciones, 404, persistencia y aislamiento de red.
 - TASK-007 queda `done`: persistencia, consultas, comandos, políticas, editores, presenters, flujo de pasos y efectos están separados por responsabilidad; `DemoCommerce` coordina y delega, y las vistas consumen modelos tipados y emiten intent mediante métodos tipados.
