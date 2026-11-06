@@ -58,6 +58,8 @@ El segundo corte corrige esos hallazgos sin ampliar integraciones:
 
 Gates exact-source posteriores: arquitectura 7/7, lint, 134 archivos / 988 tests unitarios, build productivo y 335/335 recorridos Demo en 17,6 minutos. Los tests responsive ya no aceptan un borde de tarjeta: exigen nombre y precio completos dentro del viewport y producto identificable en catálogo móvil. El veredicto final independiente se registra únicamente después de revisar este nuevo commit.
 
+La segunda revisión Sol confirmó los cinco cierres pero encontró una nueva superposición P2 entre Favorito y el nombre de la segunda tarjeta a 768 px. El control se reubicó sobre la imagen y la aceptación mide geométricamente cero intersección favorito–título en 390/768/1440. Durante la repetición de gates aparecieron dos unit tests sensibles a storage heredado entre archivos; se agregó limpieza previa explícita y se obtuvieron dos ejecuciones consecutivas de 988/988, seguidas de `npm run verify` completo y una nueva suite Demo **335/335 en 16,0 minutos**. No se reclama aprobación independiente hasta el siguiente veredicto Sol sobre este corte.
+
 ## Límites
 
 Este cierre acredita diseño frontend y comportamiento Demo local de Fase 1. No acredita backend completo, CI remoto, PR/merge, deploy, Mercado Pago, ARCA, Correo Argentino ni Mercado Libre live. Las representaciones de esos proveedores siguen explícitamente simuladas y sin secretos.

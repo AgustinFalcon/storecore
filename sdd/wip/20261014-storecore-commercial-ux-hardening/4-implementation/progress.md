@@ -778,3 +778,11 @@ change is included in this local cut.
 - Preserved historical snapshot byte stability: specification fallback is presented at the read boundary and is not injected into stored legacy products.
 - Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 17.6 minutes.
 - A fresh independent verdict is required on the resulting commit; this entry does not pre-claim approval.
+
+## 2026-11-06 — Tablet overlap and deterministic gate closure
+
+- Sol confirmed all five original findings on `28c3295` but reproduced one new P2: the absolute Favorite control covered `115` in the second 768px carousel title.
+- Moved Favorite onto the image column and added a geometric zero-overlap assertion for every featured title/control at 390/768/1440.
+- Stabilized two pre-existing unit fixtures that cleared browser storage only after, not before, their tests; two consecutive full unit runs now pass 988/988.
+- Final local gates after this correction: architecture 7/7, lint, 134 files / 988 tests, productive build and Demo 335/335 in 16.0 minutes.
+- Final independent verdict remains required; no approval is claimed in advance.
