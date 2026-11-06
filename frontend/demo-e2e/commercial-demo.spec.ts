@@ -21,6 +21,20 @@ test('commercial tabs mobile cards local assets and keyboard are usable', async(
 });
 async function login(page: Page, admin = false, email?: string) { await page.goto('/demo/login'); if (email) await page.getByLabel('Email', { exact: true }).fill(email); await page.getByLabel('Contraseña', { exact: true }).fill('demo'); await cta(page, 'login-submit').click(); await cta(page, admin ? 'login-admin' : 'login-customer').click(); }
 test.beforeEach(async ({ page }) => { await page.route('**/*', route => { const url = new URL(route.request().url()); if (url.hostname !== '127.0.0.1' || url.pathname.startsWith('/api')) throw new Error(`Unexpected network request: ${url}`); return route.continue(); }); });
+test('storefront featured products are a complete accessible carousel', async ({ page }) => {
+ await page.goto('/demo');
+ await expect(page.locator('.featured-carousel .product-card')).toHaveCount(2);
+ await expect(page.locator('.featured-actions')).toContainText('Selección 1 de 2');
+ await expect(cta(page,'home-featured-previous')).toBeDisabled();
+ const firstSku = await page.locator('.featured-carousel .product-card').first().locator('[data-cta^="product-open-"]').getAttribute('data-cta');
+ await cta(page,'home-featured-next').click();
+ await expect(page.locator('.featured-actions')).toContainText('Selección 2 de 2');
+ await expect(cta(page,'home-featured-next')).toBeDisabled();
+ await expect(page.locator('.featured-carousel .product-card').first().locator('[data-cta^="product-open-"]')).not.toHaveAttribute('data-cta', firstSku!);
+ await cta(page,'home-featured-previous').click();
+ await expect(page.locator('.featured-actions')).toContainText('Selección 1 de 2');
+ expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
+});
 test('buy → result → admin queue → honest legacy detail → queue, with no backend', async ({ page }) => {
  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); await login(page);
  await page.goto('/demo/catalog/DEMO-001'); await cta(page, 'product-add-cart').click(); await expect(cta(page, 'shell-cart')).toContainText('1'); await cta(page, 'product-review-cart').click(); await expect(page.getByRole('heading', { name: 'Taladro inalámbrico 20 V' })).toBeVisible(); await cta(page, 'cart-checkout').click(); await page.getByRole('radio').check(); await cta(page, 'checkout-step-next').click(); await page.getByRole('checkbox').check(); await cta(page, 'checkout-step-next').click(); await cta(page, 'checkout-confirm').click(); await expect(page).toHaveURL(/checkout\/result\/DEMO-/); await expect(page.getByRole('heading', { name: DemoResultOutcome.Approved.title })).toBeVisible();

@@ -148,6 +148,15 @@ export class DemoPageComponent {
   readonly effectivePage = computed(() => this.catalogPresenter.pageIndex(this.filtered().length, this.page()));
   readonly catalogPageCount = computed(() => this.catalogPresenter.pageCount(this.filtered().length));
   readonly products = computed(() => this.catalogPresenter.page(this.filtered(), this.page()));
+  private readonly featuredPageSize = 2;
+  readonly featuredPage = signal(0);
+  readonly featuredCatalog = computed(() => this.state.data.products.filter(this.activeProduct).slice(0, this.state.data.settings.homepageItems));
+  readonly featuredPageCount = computed(() => Math.max(1, Math.ceil(this.featuredCatalog().length / this.featuredPageSize)));
+  readonly effectiveFeaturedPage = computed(() => Math.min(this.featuredPage(), this.featuredPageCount() - 1));
+  readonly featuredProducts = computed(() => {
+    const start = this.effectiveFeaturedPage() * this.featuredPageSize;
+    return this.featuredCatalog().slice(start, start + this.featuredPageSize);
+  });
   readonly catalogLocationIssue = computed(() => this.condition() === CatalogConditionFilter.Unknown || this.sort() === CatalogSort.Unknown || this.stockScope() === CatalogStockScope.Unknown);
   private request = crypto.randomUUID();
   private focusBeforeDialog: HTMLElement | null = null;
@@ -225,6 +234,7 @@ export class DemoPageComponent {
   get catalogQueryParams(): Record<string, string | number | null> { return this.catalogLocation.toQuery({ ...this.catalogCriteria, page: this.effectivePage() }); }
   updateCatalog(): void { this.page.set(0); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogLocation.toQuery({ ...this.catalogCriteria, page: 0 }), replaceUrl: true }); }
   changeCatalogPage(next: number): void { this.page.set(this.catalogPresenter.pageIndex(this.filtered().length, next)); void this.router.navigate([], { relativeTo: this.route, queryParams: this.catalogQueryParams }); }
+  changeFeaturedPage(next: number): void { this.featuredPage.set(Math.max(0, Math.min(next, this.featuredPageCount() - 1))); }
   changeCondition(raw:string):void {this.condition.set(CatalogConditionFilter.fromWire(raw));this.updateCatalog();}
   changeSort(raw: string): void { this.sort.set(CatalogSort.fromWire(raw)); this.updateCatalog(); }
   changeMaximum(raw: number | null): void { const value = Number(raw); this.maxPrice.set(raw !== null && Number.isFinite(value) && value >= 0 ? value : null); this.updateCatalog(); }

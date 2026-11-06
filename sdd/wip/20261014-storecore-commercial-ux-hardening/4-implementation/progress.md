@@ -753,3 +753,11 @@ change is included in this local cut.
   P1/P2 after the category-removal, focus, responsive and closed-kind fixes.
   Exact-head Sol reviews, CI, PR and merge remain intentionally unclaimed.
 - Evidence: `evidence/frontend-final-gap-closure-20261106.md`.
+
+## 2026-11-06 — Phase 1 client-presentation matrix and storefront carousel
+
+- Reconciled the commercial Phase 1 checklist against all 26 executable surfaces; no additional base route was missing.
+- Replaced the static Home featured grid with an accessible configurable carousel and registered both controls in the exhaustive CTA matrix.
+- Kept brands/categories as product facets in Demo and preserved the existing productive facet commands; no second mock authority was introduced.
+- Final local gates: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build, focused carousel Axe 1/1, CTA matrix 28/28 and full Demo 335/335.
+- Evidence: `evidence/frontend-phase1-client-presentation-closure-20261106.md`. No remote CI, review, PR, merge, deploy or provider homologation is claimed.
