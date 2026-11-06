@@ -142,8 +142,8 @@ export class DemoPageComponent {
   private readonly catalogPresenter = new DemoCatalogPresenter();
   private readonly catalogLocation = new DemoCatalogLocation();
   private readonly continuation = new DemoAccessContinuation();
-  readonly categories = computed(() => [...new Set(this.state.data.products.map(product => product.category))]);
-  readonly brands = computed(() => [...new Set(this.state.data.products.map(product => product.brand))]);
+  readonly categories = computed(() => [...new Set(this.state.data.products.filter(this.activeProduct).map(product => product.category))]);
+  readonly brands = computed(() => [...new Set(this.state.data.products.filter(this.activeProduct).map(product => product.brand))]);
   readonly filtered = computed(() => this.catalogPresenter.filter(this.state.data.products, this.catalogCriteria, product => this.state.commerce.available(product.sku), product => this.state.commerce.price(product.sku), product => CatalogDetailsRead.detail(this.state.data,product.sku)));
   readonly effectivePage = computed(() => this.catalogPresenter.pageIndex(this.filtered().length, this.page()));
   readonly catalogPageCount = computed(() => this.catalogPresenter.pageCount(this.filtered().length));

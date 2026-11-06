@@ -23,6 +23,11 @@ async function login(page: Page, admin = false, email?: string) { await page.got
 test.beforeEach(async ({ page }) => { await page.route('**/*', route => { const url = new URL(route.request().url()); if (url.hostname !== '127.0.0.1' || url.pathname.startsWith('/api')) throw new Error(`Unexpected network request: ${url}`); return route.continue(); }); });
 test('storefront featured products are a complete accessible carousel', async ({ page }) => {
  await page.goto('/demo');
+ await expect(page.locator('[data-cta="home-category-Histórico"]')).toHaveCount(0);
+ const firstCard = await page.locator('.featured-carousel .product-card').first().boundingBox();
+ expect(firstCard).not.toBeNull();
+ expect(firstCard!.y).toBeLessThan(900);
+ await expect(cta(page,'shell-search')).toHaveCSS('white-space','nowrap');
  await expect(page.locator('.featured-carousel .product-card')).toHaveCount(2);
  await expect(page.locator('.featured-actions')).toContainText('Selección 1 de 2');
  await expect(cta(page,'home-featured-previous')).toBeDisabled();
@@ -52,7 +57,7 @@ test('content draft preview preserves storefront and SC23 preserves inventory', 
  await page.goto('/demo/user/mercadolibre'); await cta(page,'ml-tab-listings').click(); await expect(page.locator('[data-sku=DEMO-001]')).toContainText('17'); await page.goto('/demo/user/inventory'); const row=page.getByRole('row').filter({hasText:'DEMO-001'}); await expect(row).toContainText('17'); await cta(page,'inventory-adjust-DEMO-001').click(); await page.getByLabel('Unidades').fill('3'); await page.getByLabel('Motivo').fill('Ingreso demo'); await cta(page,'adjustment-save').click(); await cta(page,'inventory-confirm').click(); await cta(page,'inventory-close').click(); await expect(row).toContainText('20');
 });
 for (const viewport of [{width:390,height:844},{width:768,height:1024},{width:1440,height:900}]) {
- test(`responsive design ${viewport.width}`,async({page},testInfo)=>{ await page.setViewportSize(viewport); await page.goto('/demo'); await expect(page.getByRole('heading',{name:'Todo para tu próximo proyecto'})).toBeVisible(); expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1)).toBe(true); await page.screenshot({path:testInfo.outputPath(`storefront-${viewport.width}.png`),fullPage:true}); const axe=await new AxeBuilder({page}).analyze(); expect(axe.violations).toEqual([]); await login(page,true); await page.goto('/demo/user/home'); expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1)).toBe(true); await page.screenshot({path:testInfo.outputPath(`dashboard-${viewport.width}.png`),fullPage:true}); });
+ test(`responsive design ${viewport.width}`,async({page},testInfo)=>{ await page.setViewportSize(viewport); await page.goto('/demo'); await expect(page.getByRole('heading',{name:'Todo para tu próximo proyecto'})).toBeVisible(); const firstCard=await page.locator('.featured-carousel .product-card').first().boundingBox(); expect(firstCard).not.toBeNull(); expect(firstCard!.y).toBeLessThan(viewport.height); expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1)).toBe(true); await page.screenshot({path:testInfo.outputPath(`storefront-${viewport.width}.png`),fullPage:true}); const axe=await new AxeBuilder({page}).analyze(); expect(axe.violations).toEqual([]); await login(page,true); await page.goto('/demo/user/home'); expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1)).toBe(true); await page.screenshot({path:testInfo.outputPath(`dashboard-${viewport.width}.png`),fullPage:true}); });
 }
 test('offer changes storefront/cart, modal Escape restores focus and reset restores baseline', async ({ page }) => {
  await login(page,true); await page.goto('/demo/user/offers'); await cta(page,'offer-edit-LEGACY-0001').click(); await expect(page.getByRole('dialog')).toBeVisible(); await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).not.toBeVisible(); await expect(cta(page,'offer-edit-LEGACY-0001')).toBeFocused();

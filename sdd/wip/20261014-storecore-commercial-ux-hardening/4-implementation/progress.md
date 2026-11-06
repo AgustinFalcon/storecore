@@ -761,3 +761,11 @@ change is included in this local cut.
 - Kept brands/categories as product facets in Demo and preserved the existing productive facet commands; no second mock authority was introduced.
 - Final local gates: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build, focused carousel Axe 1/1, CTA matrix 28/28 and full Demo 335/335.
 - Evidence: `evidence/frontend-phase1-client-presentation-closure-20261106.md`. No remote CI, review, PR, merge, deploy or provider homologation is claimed.
+
+## 2026-11-06 — Independent visual P2 remediation
+
+- An independent Astra pass reproduced three visual P2s before its usage limit: wrapping Search CTA, late product discovery and an archived `Histórico` public facet.
+- Remediated search sizing, moved the carousel directly below a compact hero, compacted the 390px hero and filtered public facets to active products only.
+- Added executable acceptance for first product inside the 390/768/1440 viewport, no archived public category and non-wrapping search.
+- Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 16.8 minutes.
+- The Astra reviewer did not produce a final verdict because its usage quota expired; no independent `APPROVE` is claimed for this remediation cut.

@@ -31,6 +31,18 @@ El addendum funcional y la matriz están en `4-implementation/design/phase1-clie
 - responsive ejercido en 320, 390, 768, 900 y 1440 según la superficie; Home comercial verificada en 390/768/1440.
 - ningún request a backend o proveedor externo permitido por la suite Demo.
 
+## Revisión visual independiente y remediación
+
+Una auditoría independiente GPT-6 Astra alcanzó a reproducir tres P2 antes de agotar su cuota: el texto del botón Buscar podía quebrarse; los productos aparecían demasiado tarde en la Home, especialmente en móvil; y la categoría `Histórico` se derivaba de productos archivados.
+
+Se corrigieron los tres puntos:
+
+- búsqueda con ancho mínimo y `white-space: nowrap`;
+- productos destacados inmediatamente después del hero y hero móvil compacto sin arte decorativo;
+- marcas/categorías públicas derivadas sólo de productos activos.
+
+La aceptación automática exige ahora primer producto dentro del viewport en 390/768/1440, ausencia de la categoría archivada y botón Buscar sin salto. Sobre el código corregido se repitieron `npm run verify` y los 335 escenarios Demo: PASS. Astra no llegó a emitir un veredicto final por límite de uso, por lo que no se reclama `APPROVE` independiente para este segundo corte.
+
 ## Límites
 
 Este cierre acredita diseño frontend y comportamiento Demo local de Fase 1. No acredita backend completo, CI remoto, PR/merge, deploy, Mercado Pago, ARCA, Correo Argentino ni Mercado Libre live. Las representaciones de esos proveedores siguen explícitamente simuladas y sin secretos.
