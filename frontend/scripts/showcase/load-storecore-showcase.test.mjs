@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ShowcaseCapability, ShowcaseCapabilityState, ShowcaseConfig, ShowcaseStage } from './load-storecore-showcase.mjs';
+import {
+  ShowcaseAdapterMode, ShowcaseCapability, ShowcaseCapabilityState, ShowcaseConfig,
+  ShowcaseOrderStatus, ShowcasePaymentStatus, ShowcaseRole, ShowcaseStage,
+} from './load-storecore-showcase.mjs';
 
 const valid = {
   baseUrl: 'http://127.0.0.1:8080', origin: 'http://localhost:4200',
@@ -11,6 +14,17 @@ test('closed stage translates known and unknown wires', () => {
   assert.equal(ShowcaseStage.fromWire('CART'), ShowcaseStage.Cart);
   assert.equal(ShowcaseStage.fromWire('future-stage'), ShowcaseStage.Unknown);
   assert.throws(() => new ShowcaseStage(null, 'INJECTED', 'Injected'), /closed/);
+});
+
+test('roles, adapter modes and commerce statuses translate unknown wires closed', () => {
+  assert.equal(ShowcaseRole.fromWire('ADMIN'), ShowcaseRole.Admin);
+  assert.equal(ShowcaseRole.fromWire('OWNER'), ShowcaseRole.Unknown);
+  assert.equal(ShowcaseAdapterMode.fromWire('unconfigured'), ShowcaseAdapterMode.Unconfigured);
+  assert.equal(ShowcaseAdapterMode.fromWire('official'), ShowcaseAdapterMode.Unknown);
+  assert.equal(ShowcasePaymentStatus.fromWire('PENDING'), ShowcasePaymentStatus.Pending);
+  assert.equal(ShowcasePaymentStatus.fromWire('APPROVED'), ShowcasePaymentStatus.Unknown);
+  assert.equal(ShowcaseOrderStatus.fromWire('PENDING_PAYMENT'), ShowcaseOrderStatus.PendingPayment);
+  assert.equal(ShowcaseOrderStatus.fromWire('PAID'), ShowcaseOrderStatus.Unknown);
 });
 
 test('showcase capabilities and states are closed and fail unknown wires closed', () => {

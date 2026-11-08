@@ -6,6 +6,7 @@ const CONSTRUCTION_TOKEN = Symbol('ShowcaseStage');
 export class ShowcaseStage {
   static Preflight = new ShowcaseStage(CONSTRUCTION_TOKEN, 'PREFLIGHT', 'Preflight');
   static AdminAuthentication = new ShowcaseStage(CONSTRUCTION_TOKEN, 'ADMIN_AUTHENTICATION', 'Admin authentication');
+  static ExternalSafety = new ShowcaseStage(CONSTRUCTION_TOKEN, 'EXTERNAL_SAFETY', 'External integration safety');
   static CapabilityActivation = new ShowcaseStage(CONSTRUCTION_TOKEN, 'CAPABILITY_ACTIVATION', 'Capability activation');
   static CommercialContent = new ShowcaseStage(CONSTRUCTION_TOKEN, 'COMMERCIAL_CONTENT', 'Commercial content');
   static CustomerIdentity = new ShowcaseStage(CONSTRUCTION_TOKEN, 'CUSTOMER_IDENTITY', 'Customer identity');
@@ -15,7 +16,8 @@ export class ShowcaseStage {
   static Verification = new ShowcaseStage(CONSTRUCTION_TOKEN, 'VERIFICATION', 'Verification');
   static Unknown = new ShowcaseStage(CONSTRUCTION_TOKEN, 'UNKNOWN', 'Unknown');
   static values = Object.freeze([
-    ShowcaseStage.Preflight, ShowcaseStage.AdminAuthentication, ShowcaseStage.CapabilityActivation, ShowcaseStage.CommercialContent,
+    ShowcaseStage.Preflight, ShowcaseStage.AdminAuthentication, ShowcaseStage.ExternalSafety,
+    ShowcaseStage.CapabilityActivation, ShowcaseStage.CommercialContent,
     ShowcaseStage.CustomerIdentity, ShowcaseStage.CustomerAddress, ShowcaseStage.PendingOrder,
     ShowcaseStage.Cart, ShowcaseStage.Verification,
   ]);
@@ -73,6 +75,78 @@ export class ShowcaseCapabilityState {
 
   static fromWire(value) {
     return ShowcaseCapabilityState.values.find((state) => state.wire === value) ?? ShowcaseCapabilityState.Unknown;
+  }
+}
+
+const ROLE_CONSTRUCTION_TOKEN = Symbol('ShowcaseRole');
+
+export class ShowcaseRole {
+  static Admin = new ShowcaseRole(ROLE_CONSTRUCTION_TOKEN, 'ADMIN');
+  static Unknown = new ShowcaseRole(ROLE_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([ShowcaseRole.Admin]);
+
+  constructor(token, wire) {
+    if (token !== ROLE_CONSTRUCTION_TOKEN) throw new TypeError('ShowcaseRole is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcaseRole.values.find((role) => role.wire === value) ?? ShowcaseRole.Unknown;
+  }
+}
+
+const ADAPTER_MODE_CONSTRUCTION_TOKEN = Symbol('ShowcaseAdapterMode');
+
+export class ShowcaseAdapterMode {
+  static Unconfigured = new ShowcaseAdapterMode(ADAPTER_MODE_CONSTRUCTION_TOKEN, 'unconfigured');
+  static Unknown = new ShowcaseAdapterMode(ADAPTER_MODE_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([ShowcaseAdapterMode.Unconfigured]);
+
+  constructor(token, wire) {
+    if (token !== ADAPTER_MODE_CONSTRUCTION_TOKEN) throw new TypeError('ShowcaseAdapterMode is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcaseAdapterMode.values.find((mode) => mode.wire === value) ?? ShowcaseAdapterMode.Unknown;
+  }
+}
+
+const PAYMENT_STATUS_CONSTRUCTION_TOKEN = Symbol('ShowcasePaymentStatus');
+
+export class ShowcasePaymentStatus {
+  static Pending = new ShowcasePaymentStatus(PAYMENT_STATUS_CONSTRUCTION_TOKEN, 'PENDING');
+  static Unknown = new ShowcasePaymentStatus(PAYMENT_STATUS_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([ShowcasePaymentStatus.Pending]);
+
+  constructor(token, wire) {
+    if (token !== PAYMENT_STATUS_CONSTRUCTION_TOKEN) throw new TypeError('ShowcasePaymentStatus is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcasePaymentStatus.values.find((status) => status.wire === value) ?? ShowcasePaymentStatus.Unknown;
+  }
+}
+
+const ORDER_STATUS_CONSTRUCTION_TOKEN = Symbol('ShowcaseOrderStatus');
+
+export class ShowcaseOrderStatus {
+  static PendingPayment = new ShowcaseOrderStatus(ORDER_STATUS_CONSTRUCTION_TOKEN, 'PENDING_PAYMENT');
+  static Unknown = new ShowcaseOrderStatus(ORDER_STATUS_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([ShowcaseOrderStatus.PendingPayment]);
+
+  constructor(token, wire) {
+    if (token !== ORDER_STATUS_CONSTRUCTION_TOKEN) throw new TypeError('ShowcaseOrderStatus is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcaseOrderStatus.values.find((status) => status.wire === value) ?? ShowcaseOrderStatus.Unknown;
   }
 }
 
@@ -170,7 +244,14 @@ const STEPS = Object.freeze([
   }),
   step(ShowcaseStage.AdminAuthentication, async (ctx) => {
     const principal = await ctx.admin.request('/api/v1/internal/auth/login', { method: 'POST', body: { email: ctx.config.adminEmail, password: ctx.config.adminPassword } });
-    if (!Array.isArray(principal?.roles) || !principal.roles.includes('ADMIN')) throw new Error('SHOWCASE_ADMIN_ROLE_REQUIRED');
+    const roles = Array.isArray(principal?.roles) ? principal.roles.map(ShowcaseRole.fromWire) : [];
+    if (!roles.includes(ShowcaseRole.Admin)) throw new Error('SHOWCASE_ADMIN_ROLE_REQUIRED');
+  }),
+  step(ShowcaseStage.ExternalSafety, async (ctx) => {
+    const safety = await ctx.admin.request('/api/v1/user/showcase-safety');
+    if (ShowcaseAdapterMode.fromWire(safety?.mpOrdersAdapter) !== ShowcaseAdapterMode.Unconfigured || safety?.externalCheckoutDisabled !== true) {
+      throw new Error('SHOWCASE_EXTERNAL_ADAPTER_CONFIGURED');
+    }
   }),
   step(ShowcaseStage.CapabilityActivation, async (ctx) => {
     const modules = await ctx.admin.request('/api/v1/user/capabilities');
@@ -190,6 +271,8 @@ const STEPS = Object.freeze([
   step(ShowcaseStage.CommercialContent, async (ctx) => {
     await ctx.admin.request('/api/v1/user/content/home', { method: 'PUT', csrf: true, body: { title: 'Todo para tu taller, en un solo lugar', body: 'Herramientas seleccionadas, stock visible y compra simple.' } });
     for (const product of PRODUCTS) {
+      const existing = await ctx.admin.request(`/api/v1/catalog/products/${encodeURIComponent(product.sku)}`, { expected: [200, 404] });
+      if (existing !== null) continue;
       await ctx.admin.request(`/api/v1/user/catalog/products/${encodeURIComponent(product.sku)}`, {
         method: 'PUT', csrf: true,
         body: { sku: product.sku, name: product.name, description: product.description, brand: product.brand, category: product.category, images: [product.image], price: { base: product.price }, active: true, variants: [{ sku: product.sku, name: product.name, availableQuantity: product.stock, stockAdjustmentReason: 'LOCAL_SHOWCASE_RECONCILIATION' }] },
@@ -216,10 +299,14 @@ const STEPS = Object.freeze([
   step(ShowcaseStage.PendingOrder, async (ctx) => {
     if (!ctx.config.includePendingOrder) return;
     const orders = await ctx.customer.request('/api/v1/customer/orders');
-    if (orders.length) return;
+    const existing = orders.find((order) => Array.isArray(order?.lines) && order.lines.some((line) => line?.sku === PRODUCTS[0].sku));
+    if (existing) {
+      requirePendingOrder(existing);
+      return;
+    }
     await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[0].sku, quantity: 1 } });
     const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, currency: 'ARS' } });
-    if (receipt.paymentStatus !== 'PENDING' || receipt.orderStatus !== 'PENDING_PAYMENT') throw new Error('SHOWCASE_CHECKOUT_MUST_REMAIN_PENDING');
+    requirePendingOrder(receipt);
     ctx.orderReceipt = receipt;
   }),
   step(ShowcaseStage.Cart, async (ctx) => {
@@ -237,6 +324,13 @@ const STEPS = Object.freeze([
     if (!Array.isArray(cart?.lines) || cart.lines.length < 2) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
   }),
 ]);
+
+function requirePendingOrder(order) {
+  if (ShowcasePaymentStatus.fromWire(order?.paymentStatus) !== ShowcasePaymentStatus.Pending ||
+      ShowcaseOrderStatus.fromWire(order?.orderStatus) !== ShowcaseOrderStatus.PendingPayment) {
+    throw new Error('SHOWCASE_CHECKOUT_MUST_REMAIN_PENDING');
+  }
+}
 
 export class ShowcaseLoader {
   constructor(config, onProgress = (stage) => console.log(`[showcase] ${stage.label}: OK`)) {

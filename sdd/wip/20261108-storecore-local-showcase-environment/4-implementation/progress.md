@@ -40,3 +40,31 @@
 - Final gates: showcase tests 4/4 PASS; architecture boundary tests 7/7 PASS;
   architecture scan PASS; lint PASS; Angular 134 test files / 988 tests PASS;
   production build PASS.
+
+## 2026-11-08 — PR #230 review remediation
+
+- The first independent Bugbot and security reviews reported four blocking
+  issues: checkout could be attempted without authoritative adapter safety,
+  replay could restore fixture stock after a reservation, an unrelated order
+  could suppress the pending-order check, and wire roles/statuses were compared
+  as magic strings.
+- Added a fail-closed ADMIN safety projection backed by the closed
+  `MpOrdersAdapterMode` enum. The loader now aborts unless the backend proves
+  that the Mercado Pago Orders adapter is `UNCONFIGURED` and external checkout
+  is disabled.
+- The loader now creates catalog fixtures only when absent, so replay preserves
+  reservations and operator inventory. Existing orders are matched by showcase
+  SKU and must still translate to the closed pending payment/order states.
+  ADMIN role, adapter mode, payment status and order status all enter through a
+  single `fromWire` translator with `Unknown` fallback and unit coverage.
+- Corrective gates: directed backend tests 15/15 PASS; loader tests 5/5 PASS;
+  backend suite 197/197 PASS; frontend architecture 7/7, lint, Angular 134 files
+  / 988 tests and production build PASS.
+- Repeated the real gate on a fresh disposable PostgreSQL 16 container and the
+  exact packaged jar. First load passed ten stages and created one pending
+  order; replay passed ten stages with `pendingOrderCreated=false`. Database
+  evidence after replay: three showcase products, one CUSTOMER, one order,
+  taladro stock `11 available + 1 reserved = 12 total`, order
+  `PENDING_PAYMENT`, payment `PENDING`.
+- The backend process and disposable database were stopped; ports 8080 and 5434
+  were closed and the temporary container was removed.

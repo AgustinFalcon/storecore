@@ -14,15 +14,17 @@ data class MpOrdersProperties(
     val accessTokenRef: String = "",
     val webhookSecretRef: String = "",
 ) {
-    fun adapterEnabled(): Boolean = adapter == "official" || adapter == "fake"
+    val adapterMode: MpOrdersAdapterMode get() = MpOrdersAdapterMode.fromWire(adapter)
+
+    fun adapterEnabled(): Boolean = adapterMode == MpOrdersAdapterMode.OFFICIAL || adapterMode == MpOrdersAdapterMode.FAKE
 
     fun identityReady(): Boolean =
         acceptedTopic.isNotBlank() && expectedUserId.isNotBlank() && expectedApplicationId.isNotBlank()
 
     fun signatureReady(): Boolean = adapterEnabled() && identityReady() &&
-        (adapter == "fake" || resolveRef(webhookSecretRef) != null)
+        (adapterMode == MpOrdersAdapterMode.FAKE || resolveRef(webhookSecretRef) != null)
 
-    fun remoteReady(): Boolean = adapter == "official" &&
+    fun remoteReady(): Boolean = adapterMode == MpOrdersAdapterMode.OFFICIAL &&
         identityReady() &&
         apiBaseUrl.isNotBlank() &&
         checkoutUrlHosts.isNotEmpty() &&
@@ -46,5 +48,17 @@ data class MpOrdersProperties(
 
     private companion object {
         val REF_NAME = Regex("^[A-Z][A-Z0-9_]{0,127}$")
+    }
+}
+
+enum class MpOrdersAdapterMode(val wire: String) {
+    UNCONFIGURED("unconfigured"),
+    FAKE("fake"),
+    OFFICIAL("official"),
+    UNKNOWN("unknown"),
+    ;
+
+    companion object {
+        fun fromWire(raw: String?): MpOrdersAdapterMode = entries.firstOrNull { it.wire == raw } ?: UNKNOWN
     }
 }

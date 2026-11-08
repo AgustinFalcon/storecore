@@ -14,7 +14,7 @@ class OfficialWebhookSignatureAdapter(
     private val secrets: InstallationSecretLookup,
 ) : OfficialWebhookSignaturePort {
     override fun configured(): Boolean =
-        properties.adapter == "official" &&
+        properties.adapterMode == MpOrdersAdapterMode.OFFICIAL &&
             properties.identityReady() &&
             properties.webhookSecretRef.isNotBlank() &&
             secrets.read(properties.webhookSecretRef) != null

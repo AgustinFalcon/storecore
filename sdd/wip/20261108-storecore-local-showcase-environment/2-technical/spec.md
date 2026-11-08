@@ -9,6 +9,8 @@ not a productive repository or Spring bean. It contains:
   instances and the single `fromWire` translator;
 - `ShowcaseCapability` and `ShowcaseCapabilityState`: closed allowlists for the
   base modules the showcase may activate and their accepted wire states;
+- closed role, adapter-mode, payment-status and order-status translators that
+  fail unknown wire values closed;
 - `ShowcaseConfig`: validates environment and rejects non-loopback targets;
 - `HttpSession`: owns one realm's in-memory cookie and rotating CSRF token;
 - ordered step objects, each responsible for one stage;
@@ -18,15 +20,20 @@ not a productive repository or Spring bean. It contains:
 
 1. preflight public health;
 2. ADMIN authentication;
-3. idempotent activation through the ADMIN API of `STOREFRONT`, `CATALOG`,
+3. authenticated backend safety read proving the MP Orders adapter is exactly
+   `unconfigured`; any configured or unknown mode aborts before capability or
+   commercial mutation;
+4. idempotent activation through the ADMIN API of `STOREFRONT`, `CATALOG`,
    `PROFILE_CONTENT`, `PAYMENTS_MP` and `MANUAL_FULFILLMENT` only;
-4. home and catalog upsert;
-5. CUSTOMER login-first, registering only when authentication proves the
+5. home update and create-only showcase catalog fixtures, preserving existing
+   inventory reservations on replay;
+6. CUSTOMER login-first, registering only when authentication proves the
    synthetic identity does not exist;
-6. deterministic default address;
-7. optional idempotent pending checkout;
-8. representative cart population;
-9. public and authenticated readback verification.
+7. deterministic default address;
+8. optional idempotent pending checkout; an existing order is reused only when
+   it contains the showcase SKU and remains pending payment;
+9. representative cart population;
+10. public and authenticated readback verification.
 
 The flow is open to a new step by adding one step object to the ordered list;
 existing steps are not rewritten.

@@ -51,7 +51,7 @@ class MpCheckoutAttemptService(
     }
 
     fun prepare(orderId: Long, idempotencyKey: UUID): Long {
-        if (!commands.configured() && properties.adapter != "fake") throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
+        if (!commands.configured() && properties.adapterMode != MpOrdersAdapterMode.FAKE) throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
         return transactions.execute {
             val order = jdbc.query(
                 "SELECT o.id,o.status,o.total,o.currency,p.id payment_id,p.status payment_status FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=? FOR UPDATE OF o",
@@ -111,7 +111,7 @@ class MpCheckoutAttemptService(
 
     fun postAndBind(attemptId: Long): Map<String, Any?> {
         val attempt = load(attemptId)
-        if (!commands.configured() && properties.adapter != "fake") throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
+        if (!commands.configured() && properties.adapterMode != MpOrdersAdapterMode.FAKE) throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
         transactions.execute {
             lockAttemptOrder(attemptId)
             jdbc.update("UPDATE mp_checkout_attempts SET state='POSTING',updated_at=now() WHERE id=? AND state IN ('CREATED','POSTING')", attemptId)
