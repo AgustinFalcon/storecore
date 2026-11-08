@@ -1,5 +1,6 @@
 package com.storecore.customers.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.customers.application.CustomerAdministrationUseCases
 import com.storecore.customers.application.CustomerNotFound
 import com.storecore.customers.application.CustomerSearchInvalid
@@ -18,6 +19,7 @@ data class ChangeCustomerStateRequest(val state: String)
 
 @RestController
 @RequestMapping("/api/v1/user/customers")
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class CustomerAdministrationController(
     private val customers: CustomerAdministrationUseCases,
     private val auth: RequestAuth,

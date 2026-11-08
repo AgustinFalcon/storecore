@@ -27,11 +27,25 @@ import java.util.UUID
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = ["storecore.installation-guard.enabled=false"])
 class CustomerAdministrationHttpIntegrationTest(
     @Autowired private val http: TestRestTemplate,
+    @Autowired private val context: org.springframework.context.ApplicationContext,
     @Autowired private val jdbc: JdbcTemplate,
     @Autowired private val passwords: com.storecore.identity.infrastructure.security.Argon2PasswordHasher,
     @Autowired private val identity: IdentityUseCases,
     @LocalServerPort private val port: Int,
 ) {
+    @Test
+    fun `enabled identity registers authenticated projection adapters`() {
+        listOf(
+            com.storecore.customers.infrastructure.CustomerAdministrationController::class.java,
+            com.storecore.customers.infrastructure.JdbcCustomerAdministrationRepository::class.java,
+            com.storecore.favorites.infrastructure.FavoriteController::class.java,
+            com.storecore.favorites.infrastructure.JdbcFavoriteRepository::class.java,
+            com.storecore.offers.infrastructure.OfferController::class.java,
+            com.storecore.offers.infrastructure.JdbcOfferRepository::class.java,
+            com.storecore.overview.infrastructure.OverviewController::class.java,
+            com.storecore.overview.infrastructure.JdbcOverviewRepository::class.java,
+        ).forEach { type -> assertNotNull(context.getBean(type), type.simpleName) }
+    }
     @Test
     fun `purpose limited reads authorize operator while only admin suspends and old sessions stay revoked`() {
         val admin = internalSession("customer-admin-${UUID.randomUUID()}@example.com", "ADMIN")

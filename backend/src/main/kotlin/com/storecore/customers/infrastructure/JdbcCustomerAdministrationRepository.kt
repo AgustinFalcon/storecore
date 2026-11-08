@@ -1,5 +1,6 @@
 package com.storecore.customers.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.customers.application.CustomerAdministrationRepository
 import com.storecore.customers.application.CustomerNotFound
 import com.storecore.customers.domain.CustomerAccountState
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Repository
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcCustomerAdministrationRepository(private val jdbc: JdbcTemplate) : CustomerAdministrationRepository {
     override fun search(criteria: CustomerSearch): CustomerPage {
         val clauses = mutableListOf<String>()

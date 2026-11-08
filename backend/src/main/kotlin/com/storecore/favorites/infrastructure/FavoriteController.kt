@@ -1,5 +1,6 @@
 package com.storecore.favorites.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.favorites.application.FavoriteLimitReached
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/customer/favorites")
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class FavoriteController(private val favorites: FavoriteUseCases, private val auth: RequestAuth, private val capabilities: CapabilityDecisionPort, private val mutations: IdentityMutationCoordinator) {
     @GetMapping fun list(http: HttpServletRequest): ResponseEntity<BaseResponse<Any?>> {
         val customer = auth.customer(http)

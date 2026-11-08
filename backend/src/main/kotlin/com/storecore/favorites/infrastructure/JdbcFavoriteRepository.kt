@@ -1,5 +1,6 @@
 package com.storecore.favorites.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.favorites.application.FavoriteLimitReached
 import com.storecore.favorites.application.FavoriteProductUnavailable
 import com.storecore.favorites.application.FavoriteRepository
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 
 @Repository
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcFavoriteRepository(private val jdbc: JdbcTemplate) : FavoriteRepository {
     override fun list(customer: CustomerPrincipal): List<FavoriteItem> = jdbc.query(
         """SELECT v.sku,p.name,p.base_price,im.url,f.added_at,

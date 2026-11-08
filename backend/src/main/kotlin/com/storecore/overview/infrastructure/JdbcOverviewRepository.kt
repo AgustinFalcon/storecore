@@ -1,5 +1,6 @@
 package com.storecore.overview.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.overview.application.OverviewRepository
 import com.storecore.overview.application.OverviewTimezoneUnavailable
 import com.storecore.overview.domain.*
@@ -14,6 +15,7 @@ import java.time.Instant
 import java.time.ZoneId
 
 @Repository
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepository {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     override fun read(period: OverviewPeriod): Overview {

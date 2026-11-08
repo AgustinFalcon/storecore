@@ -1,5 +1,6 @@
 package com.storecore.offers.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.offers.application.OfferNotFound
 import com.storecore.offers.application.OfferRepository
@@ -17,6 +18,7 @@ import java.math.BigDecimal
 import java.time.Instant
 
 @Repository
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcOfferRepository(private val jdbc: JdbcTemplate) : OfferRepository {
     override fun list(): List<OfferView> = jdbc.query(OFFER_SELECT + " ORDER BY o.priority DESC,o.id ASC", offerMapper)
 

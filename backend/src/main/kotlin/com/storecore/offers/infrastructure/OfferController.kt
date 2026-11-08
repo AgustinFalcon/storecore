@@ -1,5 +1,6 @@
 package com.storecore.offers.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
 import com.storecore.identity.infrastructure.web.BaseResponse
@@ -36,6 +37,7 @@ data class TransitionOfferRequest(val transition: String)
 
 @RestController
 @RequestMapping("/api/v1/user/offers")
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class OfferController(
     private val offers: OfferUseCases,
     private val auth: RequestAuth,

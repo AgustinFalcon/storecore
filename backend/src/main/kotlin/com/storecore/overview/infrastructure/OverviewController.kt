@@ -1,5 +1,6 @@
 package com.storecore.overview.infrastructure
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.identity.infrastructure.web.BaseResponse
 import com.storecore.identity.infrastructure.web.RequestAuth
 import com.storecore.overview.application.OverviewPeriodInvalid
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*
 
 @RestController
 @RequestMapping("/api/v1/user/overview")
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class OverviewController(private val overview: OverviewUseCases, private val auth: RequestAuth) {
     @GetMapping
     fun read(http: HttpServletRequest, @RequestParam period: String): ResponseEntity<BaseResponse<Any?>> {
