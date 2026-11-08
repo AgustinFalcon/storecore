@@ -269,3 +269,18 @@
 - Independent GPT-6.1 Sol code/product and security reviews APPROVED the same
   final dirty PSD-T08 snapshot with zero P0-P3. PSD-T08 is done; cumulative
   exact-SHA reviews remain owned by PSD-T09 and PSD-T10.
+- The first cumulative PSD-T09/T10 review of exact SHA `60632dd` returned three
+  P2 findings and one P3: Overview could trust a valid credit alongside an
+  additional orphan terminal payment, FAVORITES capability authorization could
+  commit outside the mutation transaction, order projections with historical
+  buyer/delivery data lacked `no-store`, and offer product status still crossed
+  the JDBC boundary as a string. Cross-surface review also found that a resolved
+  reversal without correlated commercial application was excluded by Overview
+  while the order projection failed closed.
+- Remediation now aligns Overview with the T06-C payment/reversal authority,
+  moves FAVORITES capability decisions into the CSRF-coordinated mutation,
+  applies `Cache-Control: no-store` to all four order reads and maps offer
+  product status through the closed `ProductStatus` type. A single sequential
+  PostgreSQL 16.14 gate passes 27/27 tests across commerce HTTP/concurrency,
+  Overview, offers, closed catalog state and architecture. Cumulative exact-SHA
+  reviews must be repeated; no prior approval is reused.

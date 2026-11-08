@@ -51,7 +51,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
     private fun revenue(from: Instant, to: Instant): OverviewFact<BigDecimal> {
         val row = jdbc.queryForMap(
             authorityCte("o.created_at>=? AND o.created_at<?") +
-                """SELECT count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR
+                """SELECT count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR orphan_accredited_payment OR
                          (NOT excluded AND ((paid AND NOT valid_authority) OR (NOT paid AND has_approved_payment)))) contradiction_count,
                           COALESCE(sum(total) FILTER (WHERE paid AND valid_authority AND NOT excluded AND NOT unresolved_incident AND NOT unresolved_reversal),0) revenue
                    FROM classified""",
@@ -66,7 +66,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
         val summary = jdbc.queryForMap(
             authorityCte("o.status IN ('CREATED','PENDING_PAYMENT')") +
                 """SELECT count(*) total_count,
-                          count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR
+                          count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR orphan_accredited_payment OR
                                                    (NOT excluded AND has_approved_payment)) contradiction_count
                    FROM classified""",
         )
@@ -96,7 +96,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
     private fun fulfillment(): OverviewQueue<FulfillmentItem> {
         val cte = authorityCte("o.status IN ('PAID','PAID_STOCK_REVIEW')")
         val summary = jdbc.queryForMap(
-            cte + """SELECT count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR
+            cte + """SELECT count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR orphan_accredited_payment OR
                                                       (NOT excluded AND NOT valid_authority)) payment_contradiction_count,
                               count(*) FILTER (WHERE shipment_status NOT IN ('PENDING','PREPARING','SHIPPED','DELIVERED','CANCELLED')) shipment_contradiction_count,
                               count(*) FILTER (WHERE valid_authority AND NOT excluded AND NOT unresolved_incident AND NOT unresolved_reversal AND
@@ -163,6 +163,12 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
                    AND c.confirmed_currency=so.currency) FILTER (WHERE c.id IS NOT NULL),FALSE) authority_consistent,
                  max(c.applied_at) FILTER (WHERE c.id IS NOT NULL) paid_at,
                  EXISTS(SELECT 1 FROM payments orphan WHERE orphan.order_id=so.id AND orphan.status='APPROVED') has_approved_payment,
+                 EXISTS(SELECT 1 FROM payments orphan
+                        WHERE orphan.order_id=so.id AND orphan.status IN ('APPROVED','REFUNDED','CHARGED_BACK')
+                          AND NOT EXISTS(SELECT 1 FROM mp_order_commercial_applications oc
+                                         JOIN mp_checkout_attempts oa ON oa.id=oc.attempt_id
+                                         WHERE oc.order_id=so.id AND oc.transition='PAYMENT_ACCREDITED'
+                                           AND oa.payment_id=orphan.id)) orphan_accredited_payment,
                  EXISTS(SELECT 1 FROM mp_order_commercial_applications tc
                         JOIN mp_checkout_attempts ta ON ta.id=tc.attempt_id
                         JOIN payments terminal ON terminal.id=ta.payment_id
@@ -173,7 +179,10 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
                           AND terminal.amount=ta.amount AND ta.amount=tc.confirmed_amount AND tc.confirmed_amount=so.total
                           AND terminal.currency=ta.currency AND ta.currency=tc.confirmed_currency AND tc.confirmed_currency=so.currency)
                    OR EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts ra ON ra.id=r.attempt_id
-                             WHERE ra.order_id=so.id AND r.review_status='RESOLVED' AND r.provider_order_id=ra.provider_order_id) excluded,
+                             WHERE ra.order_id=so.id AND r.review_status='RESOLVED' AND r.provider_order_id=ra.provider_order_id
+                               AND EXISTS(SELECT 1 FROM mp_order_commercial_applications rc
+                                          WHERE rc.order_id=so.id AND rc.attempt_id=ra.id
+                                            AND rc.provider_order_id=r.provider_order_id AND rc.transition='PAYMENT_ACCREDITED')) excluded,
                  EXISTS(SELECT 1 FROM mp_order_commercial_applications tc
                         JOIN mp_checkout_attempts ta ON ta.id=tc.attempt_id
                         JOIN payments terminal ON terminal.id=ta.payment_id
@@ -185,9 +194,12 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
                             AND terminal.currency=ta.currency AND ta.currency=tc.confirmed_currency AND tc.confirmed_currency=so.currency),FALSE))
                    OR EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts ra ON ra.id=r.attempt_id
                              WHERE ra.order_id=so.id AND r.review_status='RESOLVED'
-                               AND r.provider_order_id IS DISTINCT FROM ra.provider_order_id) invalid_exclusion_evidence,
+                               AND (r.provider_order_id IS DISTINCT FROM ra.provider_order_id
+                                 OR NOT EXISTS(SELECT 1 FROM mp_order_commercial_applications rc
+                                               WHERE rc.order_id=so.id AND rc.attempt_id=ra.id
+                                                 AND rc.provider_order_id=r.provider_order_id AND rc.transition='PAYMENT_ACCREDITED'))) invalid_exclusion_evidence,
                  EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts ra ON ra.id=r.attempt_id
-                        WHERE ra.order_id=so.id AND r.review_status IN ('OPEN','UNDER_REVIEW')) unresolved_reversal,
+                        WHERE ra.order_id=so.id AND r.review_status NOT IN ('RESOLVED','REJECTED')) unresolved_reversal,
                  EXISTS(SELECT 1 FROM mp_order_incidents i WHERE i.order_id=so.id AND i.review_status NOT IN ('RESOLVED','REJECTED')) unresolved_incident,
                  s.status shipment_status
           FROM scoped_orders so
@@ -198,7 +210,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
           GROUP BY so.id,so.order_number,so.status,so.total,so.currency,so.created_at,s.status
         ), classified AS (
           SELECT *,status IN ('PAID','PAID_STOCK_REVIEW') paid,
-                 authority_count=1 AND authority_consistent valid_authority
+                 authority_count=1 AND authority_consistent AND NOT orphan_accredited_payment valid_authority
           FROM authority
         ) """
 

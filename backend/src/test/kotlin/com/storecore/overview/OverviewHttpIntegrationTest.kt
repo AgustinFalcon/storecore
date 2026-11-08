@@ -63,6 +63,7 @@ class OverviewHttpIntegrationTest(
         assertTrue(body.contains("\"orderId\":$oldPaidId") && body.contains("\"shipmentState\":\"MISSING\""), "current fulfillment must include work created before TODAY: $body")
         assertTrue(body.contains("\"variantId\":$variantId") && body.contains("\"availableQuantity\":2") && body.contains("\"safetyStock\":5"), body)
         assertFalse(body.contains("overview-customer") || body.contains("password", true) || body.contains("buyerSnapshot", true))
+        assertAdditionalOrphanFailsClosed(paidId, operator)
         assertEquals(401, exchange("/api/v1/user/overview?period=TODAY", null).statusCode.value())
         assertEquals(400, exchange("/api/v1/user/overview?period=LAST_90_DAYS", operator).statusCode.value())
         jdbc.update("UPDATE installation_settings SET timezone='Not/A_Real_Zone' WHERE installation_id=1")
@@ -165,6 +166,22 @@ class OverviewHttpIntegrationTest(
         assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\""), "rejecting mismatched reversal must restore revenue: ${response.body}")
         assertTrue(response.body!!.contains("\"fulfillment\":{\"state\":\"KNOWN\""), "rejecting mismatched reversal must restore fulfillment: ${response.body}")
 
+        val uncreditedOrder = order(customerId, "PAID", "12.00")
+        val uncreditedPayment = jdbc.queryForObject(
+            "INSERT INTO payments(order_id,external_reference,status,amount) VALUES (?,?,'CANCELLED',12.00) RETURNING id",
+            Long::class.java, uncreditedOrder, "overview-uncredited-${UUID.randomUUID()}",
+        )!!
+        val uncreditedAttempt = attempt(uncreditedOrder, uncreditedPayment, "12.00")
+        reversal(uncreditedAttempt.id, "RESOLVED")
+        response = exchange("/api/v1/user/overview?period=TODAY", admin)
+        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"UNAVAILABLE\""), "a resolved reversal without a correlated credit cannot exclude contradictory authority: ${response.body}")
+        assertTrue(response.body!!.contains("\"fulfillment\":{\"state\":\"UNAVAILABLE\""), response.body)
+        application(uncreditedOrder, uncreditedAttempt, "12.00")
+        response = exchange("/api/v1/user/overview?period=TODAY", admin)
+        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\""), response.body)
+        assertTrue(response.body!!.contains("\"fulfillment\":{\"state\":\"KNOWN\""), response.body)
+        assertFalse(response.body!!.contains("\"orderId\":$uncreditedOrder"), "a correlated cancelled credit must stay excluded")
+
         val targetOrder = order(customerId, "PAID", "10.00")
         val sourceOrder = order(customerId, "CANCELLED", "10.00")
         val sourcePayment = jdbc.queryForObject(
@@ -176,6 +193,35 @@ class OverviewHttpIntegrationTest(
         response = exchange("/api/v1/user/overview?period=TODAY", admin)
         assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"UNAVAILABLE\",\"value\":null,\"reason\":\"PAYMENT_FACTS_INCOMPLETE\"}"), response.body)
         assertTrue(response.body!!.contains("\"fulfillment\":{\"state\":\"UNAVAILABLE\""), response.body)
+    }
+
+    private fun assertAdditionalOrphanFailsClosed(paidId: Long, operator: String) {
+        val orphanPayment = jdbc.queryForObject(
+            "INSERT INTO payments(order_id,external_reference,status,amount) VALUES (?,?,'PENDING',100.00) RETURNING id",
+            Long::class.java, paidId, "overview-extra-payment-${UUID.randomUUID()}",
+        )!!
+        try {
+            for (status in listOf("APPROVED", "REFUNDED", "CHARGED_BACK")) {
+                jdbc.update("UPDATE payments SET status=? WHERE id=?", status, orphanPayment)
+                val response = exchange("/api/v1/user/overview?period=TODAY", operator)
+                assertEquals(200, response.statusCode.value(), response.body)
+                val data = json.readTree(response.body).path("data")
+                for (fact in listOf("accreditedRevenue", "fulfillment")) {
+                    assertEquals("UNAVAILABLE", data.path(fact).path("state").asText(), "$status: ${response.body}")
+                    assertEquals("PAYMENT_FACTS_INCOMPLETE", data.path(fact).path("reason").asText())
+                }
+                assertTrue(data.path("accreditedRevenue").path("value").isNull)
+                assertEquals(0, data.path("fulfillment").path("items").size())
+            }
+        } finally {
+            jdbc.update("DELETE FROM payments WHERE id=?", orphanPayment)
+        }
+        val restored = json.readTree(exchange("/api/v1/user/overview?period=TODAY", operator).body).path("data")
+        assertEquals("KNOWN", restored.path("accreditedRevenue").path("state").asText())
+        assertEquals(0, restored.path("accreditedRevenue").path("value").decimalValue().compareTo(java.math.BigDecimal("100.00")))
+        assertEquals("KNOWN", restored.path("fulfillment").path("state").asText())
+        assertEquals(2, restored.path("fulfillment").path("totalCount").asInt())
+        assertEquals(1, restored.path("fulfillment").path("items").count { it.path("orderId").asLong() == paidId })
     }
 
     private fun customer(email: String): Long = jdbc.queryForObject(

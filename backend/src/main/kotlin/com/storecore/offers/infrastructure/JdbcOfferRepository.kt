@@ -1,6 +1,7 @@
 package com.storecore.offers.infrastructure
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import com.storecore.catalog.domain.ProductStatus
 import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.offers.application.OfferNotFound
 import com.storecore.offers.application.OfferRepository
@@ -25,7 +26,7 @@ open class JdbcOfferRepository(private val jdbc: JdbcTemplate) : OfferRepository
     @Transactional
     override fun create(actor: InternalUserPrincipal, draft: OfferDraft): OfferView {
         val products = resolveProducts(draft.skus)
-        if (products.size != draft.skus.size || products.any { !it.variantActive || it.productStatus != "ACTIVE" }) {
+        if (products.size != draft.skus.size || products.any { !it.variantActive || !it.productStatus.active }) {
             throw OfferValidationFailed()
         }
         if (draft.discountKind == DiscountKind.FIXED && products.any { draft.discountValue > it.basePrice }) {
@@ -92,7 +93,7 @@ open class JdbcOfferRepository(private val jdbc: JdbcTemplate) : OfferRepository
             """SELECT v.sku,v.active,p.id AS product_id,p.base_price,p.status
                FROM product_variants v JOIN products p ON p.id=v.product_id
                WHERE v.sku IN ($placeholders) ORDER BY p.id,v.sku""",
-            { rs, _ -> ProductScope(rs.getString("sku"), rs.getLong("product_id"), rs.getBigDecimal("base_price"), rs.getString("status"), rs.getBoolean("active")) },
+            { rs, _ -> ProductScope(rs.getString("sku"), rs.getLong("product_id"), rs.getBigDecimal("base_price"), ProductStatus.fromWire(rs.getString("status")), rs.getBoolean("active")) },
             *skus.toTypedArray(),
         )
     }
@@ -107,7 +108,7 @@ open class JdbcOfferRepository(private val jdbc: JdbcTemplate) : OfferRepository
         )
     }
 
-    private data class ProductScope(val sku: String, val productId: Long, val basePrice: BigDecimal, val productStatus: String, val variantActive: Boolean)
+    private data class ProductScope(val sku: String, val productId: Long, val basePrice: BigDecimal, val productStatus: ProductStatus, val variantActive: Boolean)
     private data class LockedOffer(val status: OfferStatus, val kind: DiscountKind, val value: BigDecimal, val minMarginPercent: BigDecimal, val endsAt: Instant)
 
     private companion object {

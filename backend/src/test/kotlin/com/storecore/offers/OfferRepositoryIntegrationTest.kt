@@ -16,6 +16,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.jdbc.datasource.DataSourceTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.PostgreSQLContainer
 import java.math.BigDecimal
 import java.time.Instant
@@ -72,6 +74,25 @@ class OfferRepositoryIntegrationTest {
         assertFailsWith<OfferValidationFailed> { repository.create(actor, draft(listOf("SKU-B"), DiscountKind.FIXED, "500.01")) }
         assertEquals(before, countOffers())
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM offer_products", Int::class.java))
+    }
+
+    @Test
+    fun `unknown product status fails closed before creating an offer`() {
+        TransactionTemplate(DataSourceTransactionManager(jdbc.dataSource!!)).executeWithoutResult { transaction ->
+            try {
+                // Model a future wire value without weakening the production schema.
+                jdbc.execute("ALTER TABLE products DROP CONSTRAINT products_check")
+                val before = countOffers()
+                for (status in listOf("FUTURE_STATUS", "UNKNOWN")) {
+                    product("SKU-$status", "100.00", status, true)
+                    assertFailsWith<OfferValidationFailed> { repository.create(actor, draft(listOf("SKU-$status"))) }
+                }
+                assertEquals(before, countOffers())
+                assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM offer_products", Int::class.java))
+            } finally {
+                transaction.setRollbackOnly()
+            }
+        }
     }
 
     @Test

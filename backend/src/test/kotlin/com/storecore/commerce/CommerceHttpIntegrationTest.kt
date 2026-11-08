@@ -2,6 +2,7 @@ package com.storecore.commerce
 
 import com.storecore.commerce.infrastructure.InboxApplicationWorker
 import com.storecore.commerce.infrastructure.JdbcInventoryService
+import com.storecore.configuration.domain.CapabilityState
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -434,11 +435,88 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `favorite capability revocation while csrf verification waits prevents writes and rotation`() {
+        val sku = "SKU-FAVORITE-RACE-${UUID.randomUUID()}"
+        putProduct(sku, "Favorite race item")
+        val email = "favorite-race-${UUID.randomUUID()}@example.com"
+        var owner = registerCustomer(email)
+        val ownerId = jdbc.queryForObject("SELECT id FROM customers WHERE email=?", Long::class.java, email)!!
+        val sessionId = jdbc.queryForObject("SELECT id FROM identity_sessions WHERE customer_id=? AND revoked_at IS NULL", UUID::class.java, ownerId)!!
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            for (state in listOf(CapabilityState.DISABLED, CapabilityState.PAUSED)) {
+                for (method in listOf(HttpMethod.PUT, HttpMethod.DELETE)) {
+                    activate("FAVORITES")
+                    jdbc.update("DELETE FROM customer_favorites WHERE customer_id=?", ownerId)
+                    if (method == HttpMethod.DELETE) {
+                        jdbc.update("INSERT INTO customer_favorites(customer_id,variant_id) SELECT ?,id FROM product_variants WHERE sku=?", ownerId, sku)
+                    }
+                    val beforeFavorites = jdbc.queryForList("SELECT * FROM customer_favorites WHERE customer_id=?", ownerId)
+                    val beforeTokens = jdbc.queryForList("SELECT * FROM identity_session_csrf_tokens WHERE session_id=? ORDER BY id", sessionId)
+                    jdbc.dataSource!!.connection.use { blocker ->
+                        blocker.autoCommit = false
+                        val blockerPid = blocker.createStatement().use { statement ->
+                            statement.executeQuery("SELECT pg_backend_pid()").use { result -> result.next(); result.getInt(1) }
+                        }
+                        // Block only CSRF verification, allowing authentication and the old pre-transaction decision to finish.
+                        blocker.prepareStatement("SELECT id FROM identity_session_csrf_tokens WHERE session_id=? AND retired_at IS NULL FOR UPDATE").use {
+                            it.setObject(1, sessionId)
+                            it.executeQuery().close()
+                        }
+                        val pending = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                            exchange("/api/v1/customer/favorites/$sku", method, null, owner.cookie, owner.csrf)
+                        }
+                        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                        var waiting = false
+                        while (!waiting && System.nanoTime() < deadline) {
+                            waiting = jdbc.queryForObject(
+                                "SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) AND query LIKE '%identity_session_csrf_tokens%')",
+                                Boolean::class.java, blockerPid,
+                            ) == true
+                            if (!waiting) Thread.sleep(20)
+                        }
+                        assertTrue(waiting, "favorite request must reach the CSRF row lock before capability revocation")
+                        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='FAVORITES'", Int::class.java)
+                        val actorId = adminUserId()
+                        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), "FAVORITES", version, state.wire, "{}", UUID.randomUUID(), "test revoke while CSRF waits")
+                        blocker.commit()
+                        val denied = pending.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                        assertEquals(409, denied.statusCode.value(), denied.body)
+                        assertTrue(denied.body!!.contains("CAPABILITY_${state.wire}"), denied.body)
+                        assertEquals(null, denied.headers.getFirst("X-CSRF-Token"))
+                    }
+                    assertEquals(beforeFavorites, jdbc.queryForList("SELECT * FROM customer_favorites WHERE customer_id=?", ownerId))
+                    assertEquals(beforeTokens, jdbc.queryForList("SELECT * FROM identity_session_csrf_tokens WHERE session_id=? ORDER BY id", sessionId))
+                    activate("FAVORITES")
+                    // The same token is still usable after rollback, and only a successful mutation rotates it.
+                    val recovered = exchange("/api/v1/customer/favorites/$sku", method, null, owner.cookie, owner.csrf)
+                    assertEquals(200, recovered.statusCode.value(), recovered.body)
+                    assertNotNull(recovered.headers.getFirst("X-CSRF-Token"))
+                    owner = owner.copy(csrf = recovered.headers.getFirst("X-CSRF-Token")!!)
+                }
+            }
+        } finally {
+            executor.shutdownNow()
+            activate("FAVORITES")
+        }
+    }
+
+    @Test
     fun `order projections are scoped paged correlated and keep post sale information safe`() {
         val email = "projection-${UUID.randomUUID()}@example.com"
         val owner = registerCustomer(email)
         val ownerId = jdbc.queryForObject("SELECT id FROM customers WHERE email=?", Long::class.java, email)!!
         val ids = (1..3).map { projectionOrder(ownerId) }
+        for ((path, session) in listOf(
+            "/api/v1/customer/orders" to owner,
+            "/api/v1/customer/orders/${ids.first()}" to owner,
+            "/api/v1/user/orders" to admin,
+            "/api/v1/user/orders/${ids.first()}" to admin,
+        )) {
+            val response = exchange(path, HttpMethod.GET, null, session.cookie)
+            assertEquals(200, response.statusCode.value(), response.body)
+            assertEquals("no-store", response.headers.cacheControl, path)
+        }
         jdbc.update("UPDATE orders SET created_at='2026-01-01T00:00:00Z' WHERE customer_id=?", ownerId)
         fun read(path: String, session: Session = owner) = exchange(path, HttpMethod.GET, null, session.cookie)
         val page = mapper.readTree(read("/api/v1/customer/orders?size=2").body!!).path("data")

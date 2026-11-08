@@ -29,8 +29,10 @@ class FavoriteController(private val favorites: FavoriteUseCases, private val au
     fun add(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable sku: String): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http)
         val customer = auth.customer(http)
-        capabilities.decide("FAVORITES", "MANAGE", CapabilityActor.Customer(customer))
-        val mutation = mutations.execute(customer, csrf) { favorites.add(customer, sku) }
+        val mutation = mutations.execute(customer, csrf) {
+            capabilities.decide("FAVORITES", "MANAGE", CapabilityActor.Customer(customer))
+            favorites.add(customer, sku)
+        }
         return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
             .header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok<Any?>(mutation.value))
     }
@@ -39,8 +41,10 @@ class FavoriteController(private val favorites: FavoriteUseCases, private val au
     fun remove(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable sku: String): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http)
         val customer = auth.customer(http)
-        capabilities.decide("FAVORITES", "MANAGE", CapabilityActor.Customer(customer))
-        val mutation = mutations.execute(customer, csrf) { favorites.remove(customer, sku) }
+        val mutation = mutations.execute(customer, csrf) {
+            capabilities.decide("FAVORITES", "MANAGE", CapabilityActor.Customer(customer))
+            favorites.remove(customer, sku)
+        }
         return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
             .header(RequestAuth.CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok<Any?>(mutation.value))
     }
