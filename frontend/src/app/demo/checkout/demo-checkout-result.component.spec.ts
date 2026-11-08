@@ -7,6 +7,7 @@ import { DemoContext, DemoScenario } from '../demo-model';
 import { PaymentStatus } from '../../domain/order/commerce-states';
 
 describe('SC12A result route and authority integration', () => {
+  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
   afterEach(() => { TestBed.resetTestingModule(); localStorage.clear(); sessionStorage.clear(); });
   it('reacts to reused route parameters and actor/realm changes without writing', () => {
     const params = new BehaviorSubject(convertToParamMap({ orderId: 'DEMO-100' }));

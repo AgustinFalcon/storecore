@@ -150,12 +150,26 @@ test('SC16 draft preview and leave dialogs execute every new content CTA', async
  await path(page,'user/content'); await action(page,'content-login').click();
  await login(page,true); await path(page,'user/content');
  const title=page.getByLabel('Título principal',{exact:true}); await title.fill('Private buffer');
+ const banners=page.locator('[data-banner-editor]');
+ const bannerCount=await banners.count();
  await action(page,'content-banner-add').click();
- await page.locator('[data-cta="content-banner-up"]:not(:disabled)').click();
- await page.locator('[data-cta="content-banner-down"]:not(:disabled)').click();
+ await expect(banners).toHaveCount(bannerCount+1);
+ const addedBanner=banners.last();
+ const addedBannerId=await addedBanner.getAttribute('data-banner-editor');
+ expect(addedBannerId).toBeTruthy();
+ await addedBanner.locator('[data-cta="content-banner-up"]').click();
+ const movedBanner=page.locator(`[data-banner-editor="${addedBannerId}"]`);
+ await expect(movedBanner.getByRole('heading',{name:'Banner 1',exact:true})).toBeVisible();
+ await expect(movedBanner.locator('[data-cta="content-banner-down"]')).toBeEnabled();
+ await movedBanner.locator('[data-cta="content-banner-down"]').click();
  await page.locator('[data-cta="content-banner-remove"]').last().click();
- await page.locator('[data-cta="content-category-down"]:not(:disabled)').first().click();
- await page.locator('[data-cta="content-category-up"]:not(:disabled)').first().click();
+ const movedCategory=page.locator('[data-category-editor]').first();
+ const movedCategoryId=await movedCategory.getAttribute('data-category-editor');
+ expect(movedCategoryId).toBeTruthy();
+ await movedCategory.locator('[data-cta="content-category-down"]').click();
+ const reorderedCategory=page.locator(`[data-category-editor="${movedCategoryId}"]`);
+ await expect(reorderedCategory.locator('[data-cta="content-category-up"]')).toBeEnabled();
+ await reorderedCategory.locator('[data-cta="content-category-up"]').click();
  await page.locator('[data-cta="content-category-remove"]').last().click();
  await page.locator('.category-choice input').last().check();
  await action(page,'content-preview').click(); await expect(page.getByRole('heading',{name:'Private buffer',exact:true})).toBeVisible(); await action(page,'content-preview-close').click();
@@ -207,7 +221,8 @@ test.afterAll(async({browser},testInfo)=>{ expect(browser.isConnected()).toBe(tr
 test('storefront controls, navigation and all product CTAs',async({page})=>{
  test.setTimeout(90000); await login(page); await path(page,'');
  for(const id of ['shell-brand','shell-catalog','shell-tools','shell-safety','shell-organization','shell-orders','shell-admin','shell-account','shell-cart','footer-contact','footer-shipping','footer-orders','home-shop','home-all-categories','home-all-products']) { await path(page,''); await action(page,id).click(); await expect(page.locator('main h1')).toBeVisible(); }
- for(const category of [...new Set(demoSeed().products.map(product=>product.category))]) { await path(page,''); await action(page,`home-category-${category}`).click(); await expect(page.getByLabel('Categoría',{exact:true})).toHaveValue(category); }
+ await path(page,''); await action(page,'home-featured-next').click(); await expect(page.locator('.featured-actions')).toContainText('Selección 2 de 2'); await action(page,'home-featured-previous').click(); await expect(page.locator('.featured-actions')).toContainText('Selección 1 de 2');
+ for(const category of [...new Set(demoSeed().products.filter(product=>product.active).map(product=>product.category))]) { await path(page,''); await action(page,`home-category-${category}`).click(); await expect(page.getByLabel('Categoría',{exact:true})).toHaveValue(category); }
  await path(page,''); await page.getByLabel('Buscar productos',{exact:true}).fill('Taladro'); await action(page,'shell-search').click(); await expect(page.getByLabel('Buscar',{exact:true})).toHaveValue('Taladro');
  await path(page,'catalog'); await page.getByLabel('Buscar',{exact:true}).fill('nada'); await expect(page.getByRole('heading',{name:'No encontramos productos'})).toBeVisible(); await action(page,'empty-clear').click(); await expect(page.locator('.product-card')).toHaveCount(6);
  await page.getByLabel('Categoría',{exact:true}).selectOption('Seguridad'); await expect(page.locator('.product-card')).toHaveCount(3); await page.getByLabel('Marca',{exact:true}).selectOption('Norte'); await expect(page.locator('.product-card')).toHaveCount(1); await action(page,'catalog-filter-clear').click(); await page.getByLabel('Hasta $',{exact:true}).fill('15000'); await expect(page.locator('.product-card')).toHaveCount(1); await action(page,'catalog-filter-clear').click(); await page.getByLabel('Con stock',{exact:true}).check(); await expect(page.locator('.muted').filter({hasText:`${demoSeed().products.filter(product => product.active && CatalogDetailsRead.balance(demoSeed(),product)! > 0).length} productos encontrados`})).toBeVisible(); await page.getByLabel('Ordenar',{exact:true}).selectOption('price-down'); await expect(page.locator('.product-card').first()).toContainText('Cinta métrica'); await action(page,'catalog-filter-clear').click();
@@ -272,7 +287,7 @@ test('gallery, priced variants, ordered content and module settings are stateful
  await login(page,true); await path(page,'user/content'); await action(page,'content-down-service').click(); await expect(page.locator('.content-block-editor').first().getByLabel('Título del bloque',{exact:true})).toHaveValue('Calidad que te acompaña'); await action(page,'content-up-service').click(); await action(page,'content-up-quality').click(); await action(page,'content-down-quality').click(); await action(page,'content-down-service').click(); await action(page,'content-save').click(); await action(page,'content-preview').click(); await expect(page.locator('[data-preview-block]').first()).toHaveAttribute('data-preview-block','quality'); await action(page,'content-preview-close').click(); await action(page,'content-current-store').click(); await expect(page.locator('[data-block]').first()).toHaveAttribute('data-block','service');
  await path(page,'user/capabilities?tab=technical');
  for(const id of ['Catálogo','Checkout','Envíos','Mercado Libre']) { await action(page,`module-configure-${id}`).click(); await action(page,'module-cancel').click(); await action(page,`module-configure-${id}`).click(); if(id==='Catálogo'){ await page.getByLabel('Productos destacados en portada').fill('6'); await page.getByLabel('Umbral de stock bajo').fill('8'); } if(id==='Checkout') await page.getByLabel('Días estimados de entrega').fill('3'); if(id==='Envíos') await page.getByLabel('Prefijo de seguimiento simulado').fill('DEMOEXP'); if(id==='Mercado Libre') await page.getByLabel('Productos por vista de sincronización').fill('4'); await action(page,'module-save').click(); await action(page,`module-configure-${id}`).click(); if(id==='Checkout') await expect(page.getByLabel('Días estimados de entrega')).toHaveValue('3'); await action(page,'module-cancel').click(); }
- await path(page,''); await expect(page.locator('.product-card')).toHaveCount(6); await path(page,'user/mercadolibre'); await action(page,'ml-tab-listings').click(); await expect(page.locator('tbody tr')).toHaveCount(4);
+ await path(page,''); await expect(page.locator('.featured-carousel .product-card')).toHaveCount(2); await expect(page.locator('.featured-actions')).toContainText('Selección 1 de 3'); await action(page,'home-featured-next').click(); await action(page,'home-featured-next').click(); await expect(page.locator('.featured-actions')).toContainText('Selección 3 de 3'); await path(page,'user/mercadolibre'); await action(page,'ml-tab-listings').click(); await expect(page.locator('tbody tr')).toHaveCount(4);
 });
 
 

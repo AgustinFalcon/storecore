@@ -350,6 +350,17 @@ APPROVE sin P1/P2. Se habilitan TASK-002 y TASK-003 en Stitch.
 - `DemoBrowserEffects` es el único borde de navegador para foco inmediato/diferido, apertura y cierre de diálogo, descarga, impresión y reload. `DemoRootComponent` y `DemoPageComponent` dejaron de usar directamente `document`, `window`, `URL` y `Blob`.
 - El controlador modal conserva foco inicial, Escape, cierre explícito y restauración al invocador; descargas y exportaciones se generan mediante un puerto de URL de blob inyectable y probado sin acoplar dominio ni presenters al navegador.
 - La auditoría final de `src/app/demo` no encontró accesos directos al navegador fuera del borde, comparaciones examinadas de estados contra strings mágicos ni marcadores `TODO/FIXME`.
+
+## Revalidación de completitud frontend — 2026-11-06
+
+- Se contrastaron las 26 superficies canónicas con rutas, estados, mocks y CTA de comprador y administración. No apareció una funcionalidad base omitida dentro del alcance Demo aprobado.
+- `npm run verify` PASS: arquitectura 7/7, lint, 134 archivos / 988 pruebas y build productivo.
+- La primera repetición del browser gate expuso una carrera del auditor SC16 al usar selectores posicionales durante reordenamiento; el runtime fue reproducido y confirmado correcto en navegador real.
+- El auditor ahora espera el render y sigue banner/categoría por identidad estable. La matriz global posterior pasó **28/28** y acreditó cero CTA sin escenario.
+- El test SC15 ahora espera la propagación de `OverviewRange.Week`; focal 2/2 y `npm run verify` final 134 archivos / 988 pruebas PASS.
+- `npm run test:demo` final sobre el source corregido: **334/334 PASS** en Chromium (16.4 min).
+- Evidencia: `4-implementation/evidence/frontend-completeness-revalidation-20261106.md`.
+- Sin cambios de alcance: providers reales, CI remoto, deploy y homologaciones continúan no afirmados.
 - Verificación unitaria: **115 archivos / 511 tests PASS**. Lint PASS; arquitectura **6/6 PASS**; build producción PASS (**623,74 kB raw / 141,38 kB estimado**).
 - Verificación de navegador posterior al corte: CTA + regresiones responsive **14/14 PASS** y matriz Demo completa **52/52 PASS** en Chromium, incluidos 390/768/1440, checkout con todos los resultados, diálogos/foco, identidad, catálogo, operaciones, 404, persistencia y aislamiento de red.
 - TASK-007 queda `done`: persistencia, consultas, comandos, políticas, editores, presenters, flujo de pasos y efectos están separados por responsabilidad; `DemoCommerce` coordina y delega, y las vistas consumen modelos tipados y emiten intent mediante métodos tipados.
@@ -742,3 +753,44 @@ change is included in this local cut.
   P1/P2 after the category-removal, focus, responsive and closed-kind fixes.
   Exact-head Sol reviews, CI, PR and merge remain intentionally unclaimed.
 - Evidence: `evidence/frontend-final-gap-closure-20261106.md`.
+
+## 2026-11-06 — Phase 1 client-presentation matrix and storefront carousel
+
+- Reconciled the commercial Phase 1 checklist against all 26 executable surfaces; no additional base route was missing.
+- Replaced the static Home featured grid with an accessible configurable carousel and registered both controls in the exhaustive CTA matrix.
+- Kept brands/categories as product facets in Demo and preserved the existing productive facet commands; no second mock authority was introduced.
+- Final local gates: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build, focused carousel Axe 1/1, CTA matrix 28/28 and full Demo 335/335.
+- Evidence: `evidence/frontend-phase1-client-presentation-closure-20261106.md`. No remote CI, review, PR, merge, deploy or provider homologation is claimed.
+
+## 2026-11-06 — Independent visual P2 remediation
+
+- An independent Astra pass reproduced three visual P2s before its usage limit: wrapping Search CTA, late product discovery and an archived `Histórico` public facet.
+- Remediated search sizing, moved the carousel directly below a compact hero, compacted the 390px hero and filtered public facets to active products only.
+- Added executable acceptance for first product inside the 390/768/1440 viewport, no archived public category and non-wrapping search.
+- Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 16.8 minutes.
+- The Astra reviewer did not produce a final verdict because its usage quota expired; no independent `APPROVE` is claimed for this remediation cut.
+
+## 2026-11-06 — Sol independent review remediation
+
+- GPT-6.1 Sol reviewed commit `301c8b3` read-only and returned `REQUEST_CHANGES`: no P0/P1, four visual/product P2s and one semantic P3.
+- Added adjacent accessible PDP cart feedback, concrete product specifications, responsive closed catalog filters, semantic product headings and mobile-first PDP ordering.
+- Reworked Home discovery so the complete product name and price—not merely a card edge—fit inside 390/768/1440 viewports; compact mobile catalog cards expose identity before scrolling.
+- Preserved historical snapshot byte stability: specification fallback is presented at the read boundary and is not injected into stored legacy products.
+- Exact-source gates after remediation: architecture 7/7, lint, 134 files / 988 unit-component tests, productive build and full Demo 335/335 in 17.6 minutes.
+- A fresh independent verdict is required on the resulting commit; this entry does not pre-claim approval.
+
+## 2026-11-06 — Tablet overlap and deterministic gate closure
+
+- Sol confirmed all five original findings on `28c3295` but reproduced one new P2: the absolute Favorite control covered `115` in the second 768px carousel title.
+- Moved Favorite onto the image column and added a geometric zero-overlap assertion for every featured title/control at 390/768/1440.
+- Stabilized two pre-existing unit fixtures that cleared browser storage only after, not before, their tests; two consecutive full unit runs now pass 988/988.
+- Final local gates after this correction: architecture 7/7, lint, 134 files / 988 tests, productive build and Demo 335/335 in 16.0 minutes.
+- Final independent verdict remains required; no approval is claimed in advance.
+
+## 2026-11-06 — Final independent frontend verdict
+
+- GPT-6.1 Sol revalidated code commit `60d550083136971c13ac516189b5cb9a967f6c35` read-only.
+- Verdict: **APPROVE**, with no P0–P3 findings in the StoreCore Demo frontend scope.
+- Reproduction confirmed zero Favorite/title overlap at 390/768/1440 and proved the geometric test fails against the previous defective position.
+- Twelve Axe checks across Home, Catalog, Favorites and PDP at the three target widths had no violations, overflow or page errors.
+- Approval excludes backend completeness, live providers, remote CI, PR/merge, deployment and homologation.
