@@ -127,3 +127,70 @@
 - 2026-11-08 — PSD-T06-C implemented. CUSTOMER and USER order projections now share a bounded max-50 page contract while preserving realm isolation and deterministic ordering. Payment facts are derived from correlated commercial application, checkout attempt and payment evidence; orphan, crossed, ambiguous or unresolved evidence fails closed in reads and aggregate-locked fulfillment writers. Timeline, delivery snapshot and return eligibility use closed types, explicit unavailable states and purpose-limited output without actor, audit or provider payload leakage. Backend PostgreSQL 16 focal gate PASS (43 tests). After two P2 review remediations, frontend verify PASS (architecture, lint, 152 files/1055 tests, production build), focal mapper/policy tests PASS (33/33) and focal Playwright PASS (4/4: CUSTOMER 390/768/1440 with axe/reflow plus USER pagination). Independent GPT-6.1 Sol code/product and security dirty-snapshot rereviews APPROVED with zero P0-P3. No external provider or homologation claim is made.
 
 - 2026-11-08 — PSD-T06-D implemented. Manual price policies now expose only persisted local authority, use closed DRAFT/ACTIVE/PAUSED/ENDED transitions and assign approval evidence exclusively on the server. Activation validates the database clock, price/window invariants and overlap under transaction and aggregate locks; a PostgreSQL race test proves that two concurrent sessions cannot establish competing active authority. Mercado Libre projections keep desired local state separate from historical observations: non-null observations are explicitly `UNVERIFIED`, absent observations are unavailable, and entity update time is never relabelled as observation time. ADMIN, capability, origin and CSRF boundaries are covered without emitting secrets, OAuth assertions, competitor facts or external writes. Backend PostgreSQL 16 focal gate PASS (22 tests). Frontend verify PASS (architecture 9/9, lint, 154 files/1061 tests and production build); focal Playwright PASS (12/12 at 390/768/1440 with axe/reflow, including navigation across 26 mappings and failed-page retry). The Playwright gate uses controlled HTTP responses and does not claim live Mercado Libre integration or homologation. The production build retains a non-failing initial-bundle warning of 739.19 kB against a 700 kB budget.
+
+- 2026-11-08 — PSD-T07 implementation prepared for independent review. The
+  loopback-only API loader adds ordered FAVORITES, OFFERS,
+  CUSTOMER_ADMINISTRATION and OVERVIEW step objects, with closed wire types and
+  fail-closed Unknown handling. The manifest assigns the four corresponding
+  surfaces to those stages. No production domain or migration changes are made.
+- Before any domain/capability write, preflight verifies MP is unconfigured,
+  external checkout is disabled and MARKETPLACE_ML, ML_PRICE_AUTOMATION,
+  ML_PROMOTION_ORCHESTRATOR, ML_COMPETITION_INSIGHTS, ML_VIRTUAL_KITS, CARRIERS
+  and BLACKSTORE_INTEGRATION are DISABLED. The entire local activation plan,
+  including positive Int config versions, is validated before its first write;
+  external safety is checked again at completion. Configured external modules
+  cause an abort, never automatic deactivation.
+- Ownership/replay: existing SHOW-* products are read with the ADMIN detail
+  endpoint, including inactive products, and never overwritten. Only products
+  created in this execution receive strict create-response and final-readback
+  checks: product/variant/media identities, written name/description/facets,
+  closed active states, base/original/effective price, ordered primary media and
+  known inventory quantities/formulas/availability. The final balance accounts
+  for this run's one pending-checkout reservation. Preexisting products receive
+  no fixture fingerprint, preserving operator changes. The catalog price
+  contract exposes no currency field; this loader does not invent one. Home uses the
+  T06 revision/sections contract and seeds showcase-home-v1 only into an empty
+  composition; any operator/unknown legacy composition is preserved. Existing
+  addresses and nonempty carts are reused untouched. First pending checkout
+  requires an empty cart, retains the stable per-customer idempotency key and
+  verifies receipt identity plus the persisted pending order and its exact line.
+  Order/customer reads consume validated pages (maximum 100 pages; 50 rows per
+  order page, the existing 25-row customer page), rejecting inconsistent totals,
+  duplicate identities and incomplete pages before inferring absence.
+- Favorites add only the reserved showcase SKU and retain unrelated relations.
+  A single SHOWCASE_LOCAL_OFFER_V1 draft with exact SHOW-only scope is created
+  or reused; existing state/window/discount edits are preserved, while ownership
+  ambiguity fails closed. Offers are never activated. The captured offer fields
+  must survive readback. The known offer-create HTTP 201/envelope 200 exception
+  is opt-in only at that call; other status/envelope mismatches remain errors.
+  CUSTOMER /me identity is verified before CUSTOMER writes. Admin customer
+  search/detail and overview reads validate real contract shapes, closed states,
+  unavailable facts and queue invariants without changing customer state or
+  inventing installation totals.
+- Evidence is a stateful real-loopback HTTP fake, not PostgreSQL/Spring/Angular
+  integration. Tests exercise loader.run first load and replay, zero replay
+  writes, operator preservation, later customer/order pages and over 100
+  unrelated catalog products, realm cookies/rotating CSRF, rejection without
+  mutation retries, strict status/envelopes, corrupt readbacks and nonempty-cart
+  checkout protection. Final local gate PASS: node --test
+  scripts/showcase/load-storecore-showcase.test.mjs
+  scripts/surface-data-manifest.test.mjs ran 71/71 tests (69 loader, 2 manifest)
+  in 26.81 seconds after product-readback remediation, including 14 product
+  corruption regressions. git diff --check PASS. These are the executed T07 gates;
+  frontend production verification and real database/browser gates were not run
+  for this loader-only cut.
+- Limits: sequential loader runs only. Offers have no API create-idempotency
+  key, so concurrent loaders can create duplicates; create-only product checks
+  also have a concurrent operator-create race without a create precondition.
+  No tombstone exists to distinguish intentional removal of a seeded favorite:
+  add-only replay may restore that reserved relation. Pending-order ownership
+  uses the exact SHOW SKU/quantity in the dedicated synthetic customer; multiple
+  matches abort. Unknown home blocks are preserved by skipping replacement,
+  rather than trying to round-trip unsupported write schemas. Paging over the
+  bound aborts without treating unseen rows as absent. The final contract gate
+  passes 71/71 checks (69 loader plus 2 manifest), including exact readback of
+  products created by the run while preserving pre-existing operator changes.
+  Independent GPT-6.1 Sol code/product and security rereviews APPROVED the
+  remediated dirty snapshot with zero P0-P3. PSD-T07 is done;
+  real-database/browser/migration execution remains PSD-T08. No provider
+  activation, deployment or homologation is claimed.
