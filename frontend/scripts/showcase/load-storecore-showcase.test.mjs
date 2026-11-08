@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  addressMatches,
   ShowcaseAdapterMode, ShowcaseCapability, ShowcaseCapabilityState, ShowcaseConfig,
   ShowcaseOrderStatus, ShowcasePaymentStatus, ShowcaseRole, ShowcaseStage,
 } from './load-storecore-showcase.mjs';
@@ -41,9 +42,19 @@ test('config accepts only explicit loopback targets', () => {
   assert.equal(config.customerEmail, 'showcase.customer@storecore.invalid');
   assert.throws(() => new ShowcaseConfig({ ...valid, baseUrl: 'https://store.example.com' }), /LOOPBACK_TARGET/);
   assert.throws(() => new ShowcaseConfig({ ...valid, origin: 'https://admin.example.com' }), /LOOPBACK_ORIGIN/);
+  assert.throws(() => new ShowcaseConfig({ ...valid, origin: 'https://localhost:4200' }), /LOOPBACK_ORIGIN/);
+  assert.throws(() => new ShowcaseConfig({ ...valid, origin: 'ftp://127.0.0.1' }), /LOOPBACK_ORIGIN/);
 });
 
 test('config requires admin authority and synthetic customer identity', () => {
   assert.throws(() => new ShowcaseConfig({ ...valid, adminPassword: '' }), /ADMIN_PASSWORD_REQUIRED/);
   assert.throws(() => new ShowcaseConfig({ ...valid, customerEmail: 'real@example.com' }), /INVALID_TLD/);
+});
+
+test('address reconciliation compares every deterministic fixture field', () => {
+  const expected = { street: 'Avenida Siempre Viva', number: '2209', city: 'Córdoba', province: 'Córdoba', postalCode: '5000', isDefault: true };
+  assert.equal(addressMatches({ id: 7, ...expected }, expected), true);
+  for (const [field, value] of [['street', 'Otra'], ['number', '2210'], ['city', 'Rosario'], ['province', 'Santa Fe'], ['postalCode', '2000'], ['isDefault', false]]) {
+    assert.equal(addressMatches({ id: 7, ...expected, [field]: value }, expected), false, field);
+  }
 });

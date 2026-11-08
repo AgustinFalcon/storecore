@@ -29,7 +29,8 @@ not a productive repository or Spring bean. It contains:
    inventory reservations on replay;
 6. CUSTOMER login-first, registering only when authentication proves the
    synthetic identity does not exist;
-7. deterministic default address;
+7. deterministic default address; all address fields are compared and any
+   drift on the matching fixture is reconciled through the customer update API;
 8. optional idempotent pending checkout; an existing order is reused only when
    it contains the showcase SKU and remains pending payment;
 9. representative cart population;
@@ -55,8 +56,8 @@ image URLs and `.invalid` identities. Stock updates use
 
 ## Safety
 
-Only `localhost`, `127.0.0.1` and `::1` are accepted. There is no override in
-this slice. The database reset remains an operator action targeted at a named
+Only plain `http:` targets and origins on `localhost`, `127.0.0.1` and `::1`
+are accepted. There is no override in this slice. The database reset remains an operator action targeted at a named
 disposable database and is deliberately not automated here.
 The installation singleton and first ADMIN remain provisioning prerequisites;
 the loader never inserts either directly. Future-optional modules and live

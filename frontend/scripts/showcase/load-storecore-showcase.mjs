@@ -156,13 +156,22 @@ const PRODUCTS = Object.freeze([
   Object.freeze({ sku: 'SHOW-SET-MANUAL', name: 'Set de herramientas 108 piezas', description: 'Kit organizado para mantenimiento general.', brand: 'Showcase Pro', category: 'Herramientas manuales', image: 'https://images.unsplash.com/photo-1530124566582-a618bc2615dc', price: 149500, stock: 15 }),
 ]);
 
+const SHOWCASE_ADDRESS = Object.freeze({
+  street: 'Avenida Siempre Viva',
+  number: '2209',
+  city: 'Córdoba',
+  province: 'Córdoba',
+  postalCode: '5000',
+  isDefault: true,
+});
+
 export class ShowcaseConfig {
   constructor({ baseUrl, origin, adminEmail, adminPassword, customerEmail, customerPassword, includePendingOrder }) {
     const target = new URL(required(baseUrl, 'STORECORE_SHOWCASE_BASE_URL'));
     const allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
     if (target.protocol !== 'http:' || !allowedHosts.has(target.hostname)) throw new Error('SHOWCASE_LOOPBACK_TARGET_REQUIRED');
     const browserOrigin = new URL(required(origin, 'STORECORE_SHOWCASE_ORIGIN'));
-    if (!allowedHosts.has(browserOrigin.hostname)) throw new Error('SHOWCASE_LOOPBACK_ORIGIN_REQUIRED');
+    if (browserOrigin.protocol !== 'http:' || !allowedHosts.has(browserOrigin.hostname)) throw new Error('SHOWCASE_LOOPBACK_ORIGIN_REQUIRED');
     this.baseUrl = target.href.replace(/\/$/, '');
     this.origin = browserOrigin.origin;
     this.adminEmail = required(adminEmail, 'STORECORE_SHOWCASE_ADMIN_EMAIL');
@@ -292,8 +301,12 @@ const STEPS = Object.freeze([
   }),
   step(ShowcaseStage.CustomerAddress, async (ctx) => {
     const addresses = await ctx.customer.request('/api/v1/customer/me/addresses');
-    const existing = addresses.find((address) => address.street === 'Avenida Siempre Viva' && address.number === '2209');
-    const address = existing ?? await ctx.customer.request('/api/v1/customer/me/addresses', { method: 'POST', csrf: true, body: { street: 'Avenida Siempre Viva', number: '2209', city: 'Córdoba', province: 'Córdoba', postalCode: '5000', isDefault: true } });
+    const existing = addresses.find((address) => address.street === SHOWCASE_ADDRESS.street && address.number === SHOWCASE_ADDRESS.number);
+    const address = existing === undefined
+      ? await ctx.customer.request('/api/v1/customer/me/addresses', { method: 'POST', csrf: true, body: SHOWCASE_ADDRESS })
+      : addressMatches(existing, SHOWCASE_ADDRESS)
+        ? existing
+        : await ctx.customer.request(`/api/v1/customer/me/addresses/${encodeURIComponent(String(existing.id))}`, { method: 'PUT', csrf: true, body: SHOWCASE_ADDRESS });
     ctx.addressId = String(address.id);
   }),
   step(ShowcaseStage.PendingOrder, async (ctx) => {
@@ -330,6 +343,15 @@ function requirePendingOrder(order) {
       ShowcaseOrderStatus.fromWire(order?.orderStatus) !== ShowcaseOrderStatus.PendingPayment) {
     throw new Error('SHOWCASE_CHECKOUT_MUST_REMAIN_PENDING');
   }
+}
+
+export function addressMatches(actual, expected) {
+  return actual?.street === expected.street &&
+    actual?.number === expected.number &&
+    actual?.city === expected.city &&
+    actual?.province === expected.province &&
+    actual?.postalCode === expected.postalCode &&
+    actual?.isDefault === expected.isDefault;
 }
 
 export class ShowcaseLoader {

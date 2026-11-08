@@ -68,3 +68,17 @@
   `PENDING_PAYMENT`, payment `PENDING`.
 - The backend process and disposable database were stopped; ports 8080 and 5434
   were closed and the temporary container was removed.
+- The second exact-SHA Bugbot review found two additional P2 issues: loopback
+  origin accepted non-HTTP protocols and address replay compared only street
+  plus number. The configuration now rejects HTTPS/FTP loopback origins, and
+  address replay compares all fixture fields and updates drift through the
+  existing customer address endpoint. Unit coverage exercises both boundaries;
+  a new exact-SHA review is required after the corrective commit.
+- Corrective evidence: loader tests 6/6 and the full frontend gate (architecture
+  7/7, lint, Angular 134 files / 988 tests, production build) passed. A fresh
+  real runtime was loaded once, then its synthetic address was changed to
+  Rosario/Santa Fe/2000/non-default. Replay restored Córdoba/Córdoba/5000/default
+  through the API, kept exactly one address and one order, reported
+  `pendingOrderCreated=false`, and preserved taladro inventory at
+  `11 available + 1 reserved = 12 total`. Backend, database and temporary
+  container were stopped and removed; ports 8080 and 5434 were closed.
