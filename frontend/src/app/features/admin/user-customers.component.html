@@ -1,0 +1,46 @@
+@if (store.viewState$ | async; as state) {
+<section class="sc-page sc-console" aria-labelledby="customers-title">
+  <header class="sc-page-head"><p class="sc-kicker">ATENCIÓN · CUENTAS</p><h1 id="customers-title">Clientes</h1><p class="sc-page__lede">Consultá sólo los datos necesarios para atención. Las direcciones, credenciales, sesiones y auditoría privada no se exponen en esta vista.</p></header>
+  <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); search(0)">
+    <label>Buscar cliente <input type="search" name="query" maxlength="100" placeholder="Nombre, apellido o email" [ngModel]="queryText()" (ngModelChange)="queryText.set($event)" /></label>
+    <label>Estado <select name="state" [ngModel]="stateFilter()" (ngModelChange)="stateFilter.set($event)"><option [ngValue]="null">Todas las cuentas</option>@for (item of states; track item.wire) { <option [ngValue]="item">{{ item.label }}</option> }</select></label>
+    <button class="sc-btn sc-btn--primary" type="submit" [disabled]="state.loading">{{ state.loading ? 'Buscando…' : 'Buscar' }}</button>
+  </form>
+  @if (queryError()) { <p class="sc-callout sc-callout--error" role="alert">{{ queryError() }}</p> }
+  @if (state.errorMessage) { <div class="sc-callout sc-callout--error" role="alert"><strong>No pudimos cargar clientes.</strong><p>{{ state.errorMessage }}</p><button type="button" class="sc-btn" (click)="search(state.page.page)">Reintentar</button></div> }
+  @if (!state.loading && !state.errorMessage && !state.page.items.length) { <div class="sc-empty"><h2>No hay clientes para mostrar</h2><p>Quitá los filtros o buscá con otro texto.</p></div> }
+  @if (state.page.items.length) {
+    <p role="status">{{ state.page.total }} clientes · página {{ state.page.page + 1 }}</p>
+    <div class="sc-table-wrap"><table class="sc-table"><thead><tr><th>Cliente</th><th>Contacto</th><th>Estado</th><th>Pedidos</th><th>Último pedido</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
+      @for (customer of state.page.items; track customer.id) {
+        <tr><td><strong>{{ customer.firstName }} {{ customer.lastName }}</strong><br /><small>#{{ customer.id }} · desde {{ customer.createdAt | date:'mediumDate' }}</small></td><td>{{ customer.email }}<br /><small>{{ customer.phone || 'Sin teléfono' }}</small></td><td><span class="sc-badge" [class.sc-badge--ok]="customer.state === states[0]" [class.sc-badge--warn]="customer.state === states[1]">{{ customer.state.label }}</span></td><td>{{ customer.orderCount }}</td><td>{{ customer.lastOrderAt ? (customer.lastOrderAt | date:'short') : 'Sin pedidos' }}</td><td><button type="button" class="sc-btn" (click)="open(customer, $event)">Ver detalle</button></td></tr>
+      }
+    </tbody></table></div>
+    <nav class="sc-actions" aria-label="Paginación de clientes"><button type="button" class="sc-btn" [disabled]="state.page.page === 0 || state.loading" (click)="search(state.page.page - 1)">Anterior</button><span>Página {{ state.page.page + 1 }} de {{ totalPages(state.page.total, state.page.pageSize) }}</span><button type="button" class="sc-btn" [disabled]="(state.page.page + 1) * state.page.pageSize >= state.page.total || state.loading" (click)="search(state.page.page + 1)">Siguiente</button></nav>
+  }
+
+  <dialog #detailDialog class="sc-panel sc-modal sc-modal--wide" aria-labelledby="customer-detail-title" (cancel)="$event.preventDefault(); closeDetail()">
+    <header class="sc-page-head sc-page-head--compact"><h2 id="customer-detail-title" tabindex="-1">Ficha de atención</h2><button type="button" class="sc-btn" aria-label="Cerrar ficha" (click)="closeDetail()">Cerrar</button></header>
+    @if (state.detailLoading) { <p role="status">Cargando cliente…</p> }
+    @if (state.detailError) { <p class="sc-callout sc-callout--error" role="alert">{{ state.detailError }}</p> }
+    @if (state.selected; as customer) {
+      <h3>{{ customer.firstName }} {{ customer.lastName }}</h3><p>{{ customer.email }} · {{ customer.phone || 'Sin teléfono' }}</p>
+      <dl class="sc-facts"><div><dt>Estado</dt><dd>{{ customer.state.label }}</dd></div><div><dt>Alta</dt><dd>{{ customer.createdAt | date:'medium' }}</dd></div><div><dt>Pedidos</dt><dd>{{ customer.orderCount }}</dd></div><div><dt>Último pedido</dt><dd>{{ customer.lastOrderAt ? (customer.lastOrderAt | date:'medium') : 'Sin pedidos' }}</dd></div></dl>
+      @if (state.feedback) { <p class="sc-callout" role="status">{{ state.feedback }}</p> }
+      @if (customer.state === unknownState) { <p class="sc-callout sc-callout--error">El estado no es reconocido. Las acciones quedan bloqueadas.</p> }
+      @if (canWrite() && transitionFor(customer) !== Transition.Unknown) { <div class="sc-actions"><button data-customer-transition type="button" class="sc-btn" [disabled]="state.mutating" (click)="prepare(customer)">{{ transitionFor(customer).label }}</button></div> }
+      @if (!canWrite()) { <p class="sc-callout">Tu rol permite consultar, pero sólo ADMIN puede cambiar el estado de una cuenta.</p> }
+    }
+  </dialog>
+
+  <dialog #confirmationDialog class="sc-panel sc-modal" aria-labelledby="customer-confirm-title" (cancel)="$event.preventDefault(); cancelTransition()">
+    @if (pendingTransition(); as pending) {
+      <h2 id="customer-confirm-title">{{ pending.transition.label }}</h2>
+      @if (pending.transition === Transition.Suspend) { <p>La cuenta perderá acceso inmediatamente y se revocarán todas sus sesiones CUSTOMER activas. Esta acción no elimina pedidos ni datos comerciales.</p> }
+      @else { <p>La cuenta podrá volver a ingresar, pero ninguna sesión anterior será restaurada: deberá autenticarse nuevamente.</p> }
+      <p><strong>{{ pending.customer.firstName }} {{ pending.customer.lastName }}</strong> · {{ pending.customer.email }}</p>
+      <div class="sc-actions"><button type="button" class="sc-btn" (click)="cancelTransition()">Cancelar</button><button data-confirm-customer type="button" class="sc-btn sc-btn--primary" [disabled]="state.mutating" (click)="confirmTransition()">Confirmar</button></div>
+    }
+  </dialog>
+</section>
+}

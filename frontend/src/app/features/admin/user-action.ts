@@ -7,6 +7,7 @@ export class UserAction {
   static readonly Catalog = new UserAction('/user/catalog', 'Catálogo', [UserRole.Admin, UserRole.Operator]);
   static readonly Promos = new UserAction('/user/promos', 'Promos', [UserRole.Admin]);
   static readonly Offers = new UserAction('/user/offers', 'Ofertas', [UserRole.Admin]);
+  static readonly Customers = new UserAction('/user/customers', 'Clientes', [UserRole.Admin, UserRole.Operator]);
   static readonly Orders = new UserAction('/user/orders', 'Fulfillment', [UserRole.Admin, UserRole.Operator]);
   static readonly Inventory = new UserAction('/user/inventory', 'Inventario', [UserRole.Admin, UserRole.Operator]);
   static readonly MercadoLibre = new UserAction('/user/mercadolibre', 'Mercado Libre', [UserRole.Admin, UserRole.Operator]);
@@ -15,4 +16,4 @@ export class UserAction {
   permits(roles: readonly UserRole[]): boolean { return this.roles.some((role) => roles.includes(role)); }
   static forRoles(roles: readonly UserRole[]): readonly UserAction[] { return ACTIONS.filter((action) => action.permits(roles)); }
 }
-const ACTIONS = [UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];
+const ACTIONS = [UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Customers, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];

@@ -13,8 +13,10 @@ import { IFavoriteRepository } from '../../domain/favorite/favorite.repository';
 import { IHealthRepository } from '../../domain/health/health.repository';
 import { ORDER_REPOSITORY } from '../tokens/order.tokens';
 import { OFFER_REPOSITORY } from '../tokens/offer.tokens';
+import { CUSTOMER_ADMIN_REPOSITORY } from '../tokens/customer-admin.tokens';
 import { IOrderRepository } from '../../domain/order/order.repository';
 import { IOfferRepository } from '../../domain/offer/offer.repository';
+import { ICustomerAdminRepository } from '../../domain/customer-admin/customer-admin.repository';
 import { USER_REPOSITORY } from '../tokens/user.tokens';
 import { IUserRepository } from '../../domain/user/user.repository';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
@@ -45,6 +47,9 @@ import { ListMyOrdersUseCase } from '../../domain/order/use-cases/list-my-orders
 import { CreateOfferUseCase } from '../../domain/offer/use-cases/create-offer.usecase';
 import { ListOffersUseCase } from '../../domain/offer/use-cases/list-offers.usecase';
 import { TransitionOfferUseCase } from '../../domain/offer/use-cases/transition-offer.usecase';
+import { GetCustomerUseCase } from '../../domain/customer-admin/use-cases/get-customer.usecase';
+import { ListCustomersUseCase } from '../../domain/customer-admin/use-cases/list-customers.usecase';
+import { TransitionCustomerUseCase } from '../../domain/customer-admin/use-cases/transition-customer.usecase';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
@@ -57,6 +62,9 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 
 /** Angular composition lives outside the framework-free use cases. */
 export const USE_CASE_PROVIDERS: Provider[] = [
+  { provide: GetCustomerUseCase, useFactory: (repo: ICustomerAdminRepository) => new GetCustomerUseCase(repo), deps: [CUSTOMER_ADMIN_REPOSITORY] },
+  { provide: ListCustomersUseCase, useFactory: (repo: ICustomerAdminRepository) => new ListCustomersUseCase(repo), deps: [CUSTOMER_ADMIN_REPOSITORY] },
+  { provide: TransitionCustomerUseCase, useFactory: (repo: ICustomerAdminRepository) => new TransitionCustomerUseCase(repo), deps: [CUSTOMER_ADMIN_REPOSITORY] },
   { provide: CreateOfferUseCase, useFactory: (repo: IOfferRepository) => new CreateOfferUseCase(repo), deps: [OFFER_REPOSITORY] },
   { provide: ListOffersUseCase, useFactory: (repo: IOfferRepository) => new ListOffersUseCase(repo), deps: [OFFER_REPOSITORY] },
   { provide: TransitionOfferUseCase, useFactory: (repo: IOfferRepository) => new TransitionOfferUseCase(repo), deps: [OFFER_REPOSITORY] },

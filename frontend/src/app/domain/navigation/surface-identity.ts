@@ -36,7 +36,7 @@ export class SurfaceIdentity {
   static readonly MercadoLibre = new SurfaceIdentity('SC-SURF-23', 'user/mercadolibre');
   static readonly Capabilities = new SurfaceIdentity('SC-SURF-24', 'user/capabilities');
   static readonly Configuration = new SurfaceIdentity('SC-SURF-25', 'user/profile-import');
-  static readonly Customers = new SurfaceIdentity('SC-SURF-26', 'user/customers', false);
+  static readonly Customers = new SurfaceIdentity('SC-SURF-26', 'user/customers');
   static readonly Unknown = new SurfaceIdentity('NOT-FOUND', '**', false);
   static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers];
   static fromWire(raw: unknown): SurfaceIdentity { return this.all.find(surface => surface.wire === raw) ?? this.Unknown; }

@@ -46,4 +46,21 @@
   1002 tests plus production build); backend PostgreSQL 16 focal gate PASS (14
   tests); independent GPT-6.1 Sol code/product and security re-reviews APPROVED
   with no P0-P3. The browser/a11y journey remains owned by PSD-T08.
+- Implemented PSD-T04 Customer Administration with ADMIN/OPERATOR
+  purpose-limited reads and ADMIN-only state mutation. Suspension, revocation of
+  all active CUSTOMER sessions and redacted audit commit or roll back together;
+  reactivation never restores a previous session.
+- Added the productive `/user/customers` HTTP-only Angular surface with closed
+  account states/transitions, typed filters, search, pagination, minimal detail,
+  role-aware actions and native confirmation dialogs.
+- Remediated review findings for delayed responses and filtered pagination:
+  detail selection/error/feedback are fenced by identity and generation, the
+  current typed query is reconciled after mutation, and an emptied last page is
+  clamped and reloaded. Regression tests cover both state filters and 26→25
+  record pagination.
+- PSD-T04 final local evidence: frontend `npm run verify` PASS (141 files,
+  1014 tests plus production build); backend PostgreSQL 16/Spring focal gate
+  PASS (5 tests including rollback and lock race); independent GPT-6.1 Sol
+  code/product and security re-reviews APPROVED with no P0-P3. Browser/a11y
+  remains owned by PSD-T08.
 

@@ -130,6 +130,7 @@ textarea:focus-visible {
 .sc-modal { width: min(32rem, calc(100% - 2rem)); border: 1px solid var(--sc-color-line); box-shadow: var(--sc-shadow-sm); }
 .sc-modal:not([open]) { display: none; }
 .sc-modal::backdrop { background: rgb(15 23 42 / 65%); }
+.sc-modal--wide { width: min(48rem, calc(100% - 2rem)); }
 
 @media (max-width: 42rem) { .sc-facts { grid-template-columns: 1fr; } }
 

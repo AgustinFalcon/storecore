@@ -61,6 +61,6 @@
     { "id": "SC-SURF-23", "name": "Mercado Libre operations", "route": "/user/mercadolibre", "state": "REAL", "read": ["GET /api/v1/user/mercadolibre/account", "GET /api/v1/user/mercadolibre/listings"], "writes": ["PUT /api/v1/user/mercadolibre/listings/{listingId}"], "loaderStage": null, "coverage": "LOCAL_MAPPING_ONLY_EXTERNAL_BLOCKED" },
     { "id": "SC-SURF-24", "name": "Capabilities", "route": "/user/capabilities", "state": "REAL", "read": ["GET /api/v1/user/capabilities"], "writes": [], "loaderStage": "CAPABILITY_ACTIVATION", "coverage": "READ_COMPLETE" },
     { "id": "SC-SURF-25", "name": "Configuration", "route": "/user/profile-import", "state": "REAL", "read": [], "writes": ["POST /api/v1/user/profiles/preview", "POST /api/v1/user/profiles/merge"], "loaderStage": null, "coverage": "PROFILE_IMPORT_COMPLETE" },
-    { "id": "SC-SURF-26", "name": "Customer administration", "route": null, "state": "DEMO_ONLY", "read": [], "writes": [], "loaderStage": null, "coverage": "PSD-T04" }
+    { "id": "SC-SURF-26", "name": "Customer administration", "route": "/user/customers", "state": "REAL", "read": ["GET /api/v1/user/customers", "GET /api/v1/user/customers/{id}"], "writes": ["POST /api/v1/user/customers/{id}/state"], "loaderStage": null, "coverage": "COMPLETE" }
   ]
 }
