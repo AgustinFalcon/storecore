@@ -27,6 +27,26 @@ view consumes labels and rules from those values and never compares literals.
 - `OfferTransition`: explicit `Activate`, `Pause`, `End`, `Unknown` step
   objects; no generic status assignment.
 - `OverviewPeriod`: `Today`, `Last7Days`, `Last30Days`, `Unknown`.
+- `FactState`: `Known`, `Unavailable`, `Unknown`.
+- `UnavailableReason`: `SourceMissing`, `SourceContradictory`,
+  `ExternalNotAvailable`, `Unknown`.
+- `HomeBlockKind`: `Hero`, `CategoryRail`, `ProductRail`, `PromoBanner`,
+  `Unknown`.
+- `ProductStatus`: `Draft`, `Active`, `Archived`, `Unknown`.
+- `CatalogSort`: `Relevance`, `NameAsc`, `PriceAsc`, `PriceDesc`, `Newest`,
+  `Unknown`.
+- `VariantAvailability`: `Available`, `OutOfStock`, `Unavailable`, `Unknown`.
+- `InventoryBalanceState`: `Known`, `Missing`, `Unknown`.
+- `OrderTimelineEventKind`: `OrderCreated`, `PaymentPending`,
+  `PaymentAccredited`, `PaymentReversed`, `ShipmentPreparing`,
+  `ShipmentShipped`, `ShipmentDelivered`, `ShipmentCancelled`,
+  `ReturnOpened`, `ReturnResolved`, `Unknown`.
+- `ReturnEligibility`: `Eligible`, `NotDelivered`, `AlreadyOpen`,
+  `PaymentUnverified`, `Unavailable`, `Unknown`.
+- `PricePolicyTransition`: `Activate`, `Pause`, `End`, `Unknown`.
+- `ChannelState`: `Disabled`, `ReadOnly`, `Active`, `Paused`, `Error`,
+  `Unknown`.
+- `ObservationFreshness`: `Unverified`, `Unknown`.
 
 Kotlin uses `enum`/sealed types. TypeScript uses private constructors, static
 instances and a single `fromWire`. Wire values enter through one mapper per
@@ -121,6 +141,162 @@ non-empty reason. Counts and contradiction checks are derived with SQL
 aggregates, not by loading every candidate or building one bind parameter per
 row. The UI names a truncated result explicitly instead of presenting it as a
 complete queue.
+
+### Productive data richness
+
+The four PSD-T06 slices are sequential: A content, B catalog/inventory, C
+orders/post-sale and D pricing/channels. A slice may reuse an existing endpoint
+and table, but it may not widen the authority of that source or introduce an
+external writer.
+
+All collection contracts use the common shape
+`Page<T>{items,page,size,total,truncated}`. `page` is zero-based, `size` is
+positive and capped at 50, `total` is an exact non-negative count and
+`truncated` is true when more authoritative rows exist outside the returned
+page. Ordering includes a stable unique tie-breaker. Invalid closed filters or
+sorts fail at the boundary; they are not passed to SQL as free-form values.
+
+Facts that can be absent or contradictory use
+`Fact<T>{state,value,reason}`. `KNOWN` requires a non-null value and null
+reason. `UNAVAILABLE` requires null value and a closed reason. `UNKNOWN` is the
+fail-closed result of an unrecognized wire state and cannot enable an action.
+
+#### PSD-T06-A — Content (SC-SURF-01, SC-SURF-16)
+
+`GET /api/v1/content/home` returns the public composition and
+`GET /api/v1/user/content/home` returns the ADMIN composition. Their envelope
+is `{revision,sections[]}` and each section is
+`{key,kind,active,sortOrder,content,updatedAt}`. Public reads return only active,
+known blocks in `sortOrder,key` order; ADMIN reads also return inactive and
+unknown legacy blocks.
+
+The exact typed content schemas are:
+
+- `HERO`: `{title,body,ctaLabel?,ctaPath?}` where title is 1..120 characters,
+  body is 0..500, optional ctaLabel is at most 80 and optional ctaPath is an
+  internal absolute application route;
+- `CATEGORY_RAIL`: `{title,categoryIds}` where title is 1..120 and categoryIds
+  contains 1..12 unique existing local category identifiers;
+- `PRODUCT_RAIL`: `{title,skus}` where title is 1..120 and skus contains 1..20
+  unique existing local variant SKUs;
+- `PROMO_BANNER`: `{title,body,ctaLabel?,ctaPath?}` where title is 1..120, body
+  is 0..300, optional ctaLabel is at most 80 and optional ctaPath is an internal
+  absolute application route.
+
+`kind` is persisted inside the JSON object. For legacy rows, only
+`section_key=hero` may translate to `HERO`, and only if its content validates
+the full HERO schema. Every other row without kind maps to `Unknown`, remains
+visible to ADMIN for diagnosis, is omitted from the public composition and has
+editing disabled until an explicit valid replacement removes it.
+
+`PUT /api/v1/user/content/home` is the single atomic `REPLACE` command with
+`{expectedRevision,sections[]}`. An additive migration creates one singleton
+home-composition revision row. The transaction locks it, compares
+`expectedRevision`, validates the complete replacement, replaces the sections,
+increments revision and writes a redacted audit event before commit. A stale
+revision returns HTTP 409 and changes nothing. The mutation is ADMIN-only,
+same-origin, USER-CSRF protected and executed through the existing mutation
+coordinator.
+
+Acceptance for A: no client default substitutes missing persisted content;
+public/admin visibility follows the active/known and legacy rules above;
+invalid schemas, external CTA paths, unknown kinds and stale concurrent
+mutations fail closed; ordered reads, legacy translation, 409 rollback and
+atomic replace/audit are covered against PostgreSQL.
+
+#### PSD-T06-B — Catalog and inventory (SC-SURF-04, SC-SURF-05,
+SC-SURF-17, SC-SURF-22)
+
+Catalog projections preserve product identity/status, variants, attributes,
+ordered media and price. `PriceProjection{base,original,effective,offer}` uses
+the local base price and an offer fact only when locally authoritative.
+Variant availability is derived from a distinct inventory fact; a missing
+balance yields `UNAVAILABLE`, never quantity zero. The inventory projection is
+`{variantId,sku,productName,variantLabel,available,reserved,onHand,safety,
+saleable,updatedAt,state}`; quantities are null when state is `MISSING`.
+Public reads exclude non-active products and variants. Administrative reads
+retain their closed status and do not duplicate a product merely because it
+has multiple variants.
+
+The inventory formulas are fixed by the existing balance semantics:
+`onHand = available + reserved` and
+`saleable = max(available - safety, 0)` because `available` is already net of
+active reservations. Availability precedence is: missing balance produces
+`UNAVAILABLE`; unknown or invalid inputs produce `UNKNOWN`; otherwise positive
+saleable produces `AVAILABLE` and zero saleable produces `OUT_OF_STOCK`.
+
+Acceptance for B: public/admin lists and product detail are paged or bounded,
+stably ordered and free of N+1 row loading; media/attribute order and variant
+identity survive round-trip; missing inventory and known zero have different
+wire/UI states; reserved and safety-stock cases prove both formulas and
+availability boundaries; no external offer, stock or price is fabricated.
+
+#### PSD-T06-C — Orders and post-sale (SC-SURF-13, SC-SURF-14,
+SC-SURF-20, SC-SURF-21)
+
+Order lists accept closed order/payment/shipment filters and return bounded,
+stable pages. CUSTOMER reads remain customer-scoped; USER reads remain
+role/capability-scoped. Detail exposes the locally stored header, lines,
+delivery snapshot, totals and a typed timeline appropriate to the realm.
+Historical buyer name or email is unavailable when the persisted buyer
+snapshot did not capture it.
+
+Payment success reuses the durable correlation rule established by PSD-T05:
+commercial application, accredited attempt and payment must agree on order,
+provider identity, amount and currency. Unresolved incidents, ambiguous
+reversal evidence or contradictory correlation make payment-derived facts
+`UNAVAILABLE`. Resolved reversal/refund/chargeback evidence excludes a payment
+from successful fulfillment; rejected reversal evidence does not. Shipment and
+return state are independently typed. Customer output never includes internal
+actor names, raw audit payloads or unrestricted provider payloads.
+
+`ReturnEligibility` is informational only in T06. Its precedence is:
+unavailable or reversed payment authority produces `PAYMENT_UNVERIFIED`;
+otherwise shipment other than `DELIVERED` produces `NOT_DELIVERED`; otherwise
+any persisted return that is not definitively absent produces `ALREADY_OPEN`,
+while an unavailable/unknown return read produces `UNAVAILABLE`; only valid
+accredited payment, delivered shipment and definitive absence of a return
+produce `ELIGIBLE`. T06 creates no CUSTOMER return command, right or return
+window.
+
+Acceptance for C: an orphan or crossed APPROVED payment never produces paid
+UI; current valid evidence does; unresolved/resolved/rejected reversal cases
+follow the closed rules; realm isolation, pagination, deterministic timeline
+ordering and return eligibility have PostgreSQL/HTTP regressions.
+
+#### PSD-T06-D — Pricing and channels (SC-SURF-19, SC-SURF-23)
+
+Manual price policy responses project only persisted fields, including local
+scope, currency, base/desired price, observed-price fact, effective promotional
+price, status, window, writer and server-owned approval evidence. `priority` is
+neither accepted nor returned because `channel_price_policies` has no authority
+for it. Activation, pause and end are explicit transition objects; a client
+cannot appoint its own approver or assign a generic state. Allowed transitions
+are Draft→Active, Active→Paused/Ended and Paused→Active/Ended. Ended and Unknown
+have no outgoing transition. Activate validates the server-time effective
+window, absence of an overlapping active policy for the same listing/scope,
+currency/scope and all price invariants, then records `approvedBy` and
+`approvedAt` from server authority in the same transaction. Cost/margin is
+unavailable until a local cost authority exists.
+
+Mercado Libre account/listing reads keep account and listing state closed.
+They expose desired local quantity/price separately from observed quantity and
+price facts, plus manual-intervention and update metadata supported locally.
+When an observed-price or observed-quantity column is non-null it is a stored
+historical observation with `freshness=UNVERIFIED`; it is not asserted to be
+current. A null observation is `UNAVAILABLE/EXTERNAL_NOT_AVAILABLE`; it is not
+collapsed to zero or `DISABLED`. Entity `updated_at` is change time, never an
+`observedAt` substitute. T06 defines no freshness TTL. A configured secret
+reference proves neither authorization nor provider availability and is never
+emitted. No OAuth call, listing mutation, competitor observation or other
+external write is introduced by T06.
+
+Acceptance for D: persisted window/approval and channel states survive
+round-trip without client fabrication; priority input is rejected and never
+exposed; transition/window/overlap rules are atomic; stored observations are
+explicitly unverified and missing observations are unavailable; paged listing
+reads remain bounded and deterministic; ADMIN/capability, same-origin,
+USER-CSRF, audit and transactional mutation rules remain enforced.
 
 ## Angular routing
 

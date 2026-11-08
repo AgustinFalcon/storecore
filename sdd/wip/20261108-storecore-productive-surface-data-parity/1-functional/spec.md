@@ -86,6 +86,52 @@ Libre screens receive all fields supported by their current local source of
 truth. Fields that require an external provider remain unavailable with an
 explicit delivery state, not fabricated sample values.
 
+The work is delivered as four sequential slices so that each authority and
+failure boundary can be reviewed independently:
+
+1. **PSD-T06-A — Content (SC-SURF-01, SC-SURF-16).** Public home content is
+   restricted to active, ordered blocks. ADMIN may inspect active and inactive
+   blocks and atomically replace the composition with typed content. A missing
+   configured value is not replaced with a brand, banner or marketing sentence
+   invented by the client. Legacy `hero` content may be translated only when it
+   validates as a hero; every other legacy block without a kind remains
+   admin-visible but is omitted publicly and cannot be edited as a known kind.
+2. **PSD-T06-B — Catalog and inventory (SC-SURF-04, SC-SURF-05,
+   SC-SURF-17, SC-SURF-22).** Public and administrative catalog projections
+   expose the locally stored product, variant, attribute, media, price and
+   inventory facts needed by their screens. Missing inventory is distinct from
+   a known zero balance. Lists are paged, ordered and bounded.
+3. **PSD-T06-C — Orders and post-sale (SC-SURF-13, SC-SURF-14,
+   SC-SURF-20, SC-SURF-21).** CUSTOMER and USER receive realm-appropriate,
+   paged order projections. Payment and fulfillment labels are based on
+   correlated durable evidence; a raw or orphan provider row cannot become a
+   successful payment. Timeline and return eligibility expose explicit unknown
+   or unavailable states and never leak internal actor or audit payloads.
+4. **PSD-T06-D — Pricing and channels (SC-SURF-19, SC-SURF-23).** Manual
+   price policies expose values actually stored by the local authority and use
+   explicit transitions. Mercado Libre account/listing projections distinguish
+   desired local state from observed external state. The absence of an
+   observation is unavailable, not zero, disabled or synchronized.
+
+Content replacement uses optimistic composition revision: the ADMIN submits
+the revision that was read, and a concurrent replacement produces conflict
+rather than overwriting it. Price-policy approval belongs to the server; a
+client cannot nominate an approver. Locally stored channel observations are
+historical but have no verified observation time, so their freshness remains
+unverified and they are never described as the provider's current value.
+
+Across all four slices, finite states enter through one closed translator.
+Unknown wire values fail closed. Collection responses expose an exact total
+and whether the returned page is truncated; they never materialize an
+unbounded table or silently present the first rows as the whole result.
+
+The local database cannot establish live carrier position or ETA, remote
+provider health, Mercado Libre fees/rank/competitor data, current external
+price or stock when no observation exists, product margin without a cost
+authority, or buyer name/email that was not captured in the historical order
+snapshot. Those facts remain explicitly unavailable. OAuth secret references
+and provider credentials are never returned to a screen.
+
 ### PSD-R08 — Recovery boundary
 
 Recovery remains `EXTERNAL_BLOCKED` until a separate security-approved email
@@ -110,4 +156,7 @@ operator changes and external integrations remain disabled.
 4. CUSTOMER/USER cookies, CSRF and authorization remain separate.
 5. No external provider, fiscal document, carrier label or competitor signal
    is activated or simulated as authoritative.
+6. PSD-T06-A through PSD-T06-D pass their own local-authority, closed-state,
+   unavailable-fact and bounded-collection acceptance before productive
+   richness is declared complete.
 

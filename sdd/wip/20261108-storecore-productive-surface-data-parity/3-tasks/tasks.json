@@ -2,14 +2,62 @@
   "feature": "20261108-storecore-productive-surface-data-parity",
   "status": "implementation",
   "execution_strategy": "sequential_vertical_slices",
-  "stats": { "total": 10, "done": 5, "in_progress": 0, "pending": 5 },
+  "stats": { "total": 10, "done": 5, "in_progress": 1, "pending": 4 },
   "tasks": [
     { "id": "PSD-T01", "title": "Freeze productive surface coverage manifest", "status": "done", "layer": 1, "complexity": "Medium", "depends_on": [], "requirements": ["PSD-R01", "PSD-R02", "PSD-R08"], "acceptance_criteria": ["All SC-SURF-01..26 have one honest current delivery state, source authority and explicit coverage residual/owner", "Manifest identities/current routes are mechanically checked against SurfaceIdentity and app.routes", "Declared current endpoints and loader stages are checked against controllers and the closed ShowcaseStage set"], "evidence": "surface-data-manifest.json plus frontend/scripts/surface-data-manifest.test.mjs; source-alignment test PASS on 2026-11-08" },
     { "id": "PSD-T02", "title": "Implement favorites vertical", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["PSD-T01"], "requirements": ["PSD-R02", "PSD-R03"], "acceptance_criteria": ["Customer-scoped idempotent CRUD works through HTTP", "Real Angular route has loading/empty/error/unknown states", "PostgreSQL browser journey is owned by cumulative PSD-T08"], "evidence": "Frontend verify PASS: 136 files/992 tests plus build, lint and architecture. Backend PostgreSQL 16 focal gate PASS: 22 tests across capability, migration, closed types and HTTP context. Independent GPT-6.1 Sol code/product and security re-reviews APPROVED with no P0-P3; real favorites browser journey remains explicitly deferred to PSD-T08." },
     { "id": "PSD-T03", "title": "Implement local offers vertical", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["PSD-T01"], "requirements": ["PSD-R02", "PSD-R04"], "acceptance_criteria": ["Closed offer transitions and validation are atomic", "Admin Angular route uses HTTP only", "No ML/external writer is activated"], "evidence": "Frontend npm run verify PASS: architecture, lint, 138 files/1002 tests and production build. Backend PostgreSQL 16 focal gate PASS: 14 tests across HTTP, closed types and repository transactions. Independent GPT-6.1 Sol code/product and security re-reviews APPROVED with no P0-P3; browser/a11y journey remains explicitly deferred to cumulative PSD-T08." },
     { "id": "PSD-T04", "title": "Implement customer administration vertical", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["PSD-T01"], "requirements": ["PSD-R02", "PSD-R05"], "acceptance_criteria": ["Purpose-limited search/detail reads are authorized", "Admin suspension revokes active customer sessions", "No secret or unnecessary PII is returned"], "evidence": "Frontend npm run verify PASS: architecture, lint, 141 files/1014 tests and production build. Backend PostgreSQL 16/Spring focal gate PASS: 5 tests covering role boundaries, purpose-limited projection, rollback and login/suspension race. Independent GPT-6.1 Sol code/product and security re-reviews APPROVED with no P0-P3; browser/a11y journey remains deferred to PSD-T08." },
     { "id": "PSD-T05", "title": "Implement operator overview read model", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["PSD-T01"], "requirements": ["PSD-R06"], "acceptance_criteria": ["Metrics and work queues are derived from authoritative rows", "Unavailable facts never render as fabricated zero", "Role/capability navigation remains fail-closed"], "evidence": "Frontend npm run verify PASS: architecture, lint, 142 files/1023 tests and production build. Backend PostgreSQL 16/Spring focal gate PASS: 6 tests covering closed types, role and period boundaries, durable payment authority, reversals/incidents, current bounded queues, truncation, unavailable facts and no PII. Independent GPT-6.1 Sol code/product and security final snapshot reviews APPROVED with no P0-P3; browser/a11y journey remains deferred to PSD-T08." },
-    { "id": "PSD-T06", "title": "Close productive data richness gaps", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"], "requirements": ["PSD-R07"], "acceptance_criteria": ["Existing real screens expose every locally authoritative field", "External-only facts are explicitly unavailable", "No Demo import enters production"] },
+    {
+      "id": "PSD-T06",
+      "title": "Close productive data richness gaps",
+      "status": "in_progress",
+      "layer": 1,
+      "complexity": "High",
+      "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"],
+      "requirements": ["PSD-R07"],
+      "acceptance_criteria": ["Existing real screens expose every locally authoritative field", "External-only facts are explicitly unavailable", "Collections are bounded, paged and deterministically ordered", "Unknown closed values and contradictory evidence fail closed", "No Demo import or external writer enters production"],
+      "subtasks": [
+        {
+          "id": "PSD-T06-A",
+          "title": "Enrich productive home content",
+          "status": "pending",
+          "depends_on": [],
+          "requirements": ["PSD-R07"],
+          "surfaces": ["SC-SURF-01", "SC-SURF-16"],
+          "acceptance_criteria": ["Public reads expose only ordered active known blocks while ADMIN reads include inactive and unknown legacy blocks", "Exact HERO/CATEGORY_RAIL/PRODUCT_RAIL/PROMO_BANNER schemas reject invalid content and external CTA paths", "A singleton composition revision makes REPLACE atomic and returns 409 without changes on stale expectedRevision", "Only a valid legacy section_key=hero translates; other kind-less rows remain admin-visible, public-omitted and write-disabled", "Missing persisted content is not replaced by an invented client default"]
+        },
+        {
+          "id": "PSD-T06-B",
+          "title": "Enrich catalog and inventory projections",
+          "status": "pending",
+          "depends_on": ["PSD-T06-A"],
+          "requirements": ["PSD-R07"],
+          "surfaces": ["SC-SURF-04", "SC-SURF-05", "SC-SURF-17", "SC-SURF-22"],
+          "acceptance_criteria": ["Product, variant, attribute, ordered media and locally authoritative price facts round-trip", "Missing inventory remains distinct from known zero", "onHand=available+reserved and saleable=max(available-safety,0), with reserved and safety-stock regressions", "Availability follows missing/unknown/positive-saleable/zero-saleable precedence", "Catalog and inventory collections are bounded, paged, stable and avoid N+1 loading"]
+        },
+        {
+          "id": "PSD-T06-C",
+          "title": "Enrich order and post-sale projections",
+          "status": "pending",
+          "depends_on": ["PSD-T06-B"],
+          "requirements": ["PSD-R07"],
+          "surfaces": ["SC-SURF-13", "SC-SURF-14", "SC-SURF-20", "SC-SURF-21"],
+          "acceptance_criteria": ["CUSTOMER and USER order reads are realm-isolated, paged and deterministically ordered", "Payment success and reversal behavior use durable correlated evidence and contradictory facts are unavailable", "Informational return eligibility applies payment, shipment and persisted-return precedence without adding a CUSTOMER return command/right/window", "Timeline and return eligibility are closed and customer output contains no internal actor or raw audit payload"]
+        },
+        {
+          "id": "PSD-T06-D",
+          "title": "Enrich pricing and channel projections",
+          "status": "pending",
+          "depends_on": ["PSD-T06-C"],
+          "requirements": ["PSD-R07"],
+          "surfaces": ["SC-SURF-19", "SC-SURF-23"],
+          "acceptance_criteria": ["Manual price policy responses preserve only persisted scope, window and server-owned approval evidence; unsupported request fields are rejected and not exposed", "Closed transitions, server-time window, overlap and price invariants commit atomically", "Desired channel state remains distinct from historical observations whose freshness is UNVERIFIED or absent observations that are unavailable", "Entity updatedAt is never presented as observedAt and no freshness TTL is claimed", "Channel lists are bounded and no secret, OAuth assertion, competitor fact or external writer is exposed"]
+        }
+      ],
+      "evidence": "2026-11-08 authority/schema/API audit completed; implementation has not started"
+    },
     { "id": "PSD-T07", "title": "Extend API-driven showcase loader", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"], "requirements": ["PSD-R09"], "acceptance_criteria": ["First load and replay pass without overwriting unrelated data", "Favorites/offers/customers/overview readback is verified", "External adapters remain disabled"] },
     { "id": "PSD-T08", "title": "Run real integration and migration gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["PSD-T06", "PSD-T07"], "requirements": ["PSD-R01", "PSD-R09"], "acceptance_criteria": ["Clean V1-V12 and V11 upgrade pass on PostgreSQL 16", "Spring/Angular real browser journeys pass", "Production and Demo builds remain isolated"] },
     { "id": "PSD-T09", "title": "Independent code and product review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["PSD-T08"], "requirements": ["PSD-R01", "PSD-R02", "PSD-R07"], "acceptance_criteria": ["Two independent GPT-6.1 Sol reviews run in parallel for each reviewable vertical and final cumulative SHA", "No P0-P2 product, UX or code finding remains", "Provider/model/effort/base/head/checks and limitations are recorded; any code change invalidates approvals"] },

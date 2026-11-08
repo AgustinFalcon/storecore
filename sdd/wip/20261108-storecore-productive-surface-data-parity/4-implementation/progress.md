@@ -81,4 +81,32 @@
   unavailable reasons and updated the manifest. Independent GPT-6.1 Sol
   code/product and security final snapshot reviews APPROVED with no P0-P3.
   Browser/a11y remains owned by PSD-T08; exact-SHA review follows the commit.
+- Audited PSD-T06 against the productive controllers, JDBC repositories, V1
+  schema and surface manifest. This is audit/planning evidence only: no T06
+  implementation or gate is claimed.
+- Recorded the sequential T06 split: A content (SC-SURF-01/16), B catalog and
+  inventory (SC-SURF-04/05/17/22), C orders and post-sale
+  (SC-SURF-13/14/20/21), and D pricing/channels (SC-SURF-19/23). All four
+  subtasks remain pending; the parent T06 is `in_progress` because its audit and
+  SDD contract are now active.
+- The audit found client/default fabrication in content, missing-inventory
+  collapse to zero, raw/orphan payment fallback, incomplete persisted promotion
+  projection, collapsed Mercado Libre states and unbounded or N+1 collection
+  reads. Each issue is now assigned to exactly one T06 slice.
+- Froze the unavailable boundary without inventing provider authority: live
+  carrier position/ETA, external provider health, ML fees/rank/competitor data,
+  unobserved remote stock/price, margin without cost authority, OAuth validity
+  and historical buyer identity not present in the order snapshot remain
+  unavailable. Provider secrets remain non-output data.
+- Remediated the T06 contract review before implementation. Content now has
+  exact per-kind schemas, explicit legacy behavior and an additive singleton
+  composition revision for atomic expected-revision replacement. Inventory now
+  freezes `onHand=available+reserved`, `saleable=max(available-safety,0)` and
+  missing/unknown/available/out-of-stock precedence.
+- Froze return eligibility as an informational projection only, with payment,
+  delivery and persisted-return precedence and no new CUSTOMER command, right
+  or time window. Pricing now exposes only fields backed by its local table and
+  defines closed policy transitions and server-owned approval. Non-null channel
+  observations are historical with unverified freshness, null observations are
+  unavailable, and entity update time is not presented as observation time.
 
