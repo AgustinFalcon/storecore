@@ -7,6 +7,8 @@ not a productive repository or Spring bean. It contains:
 
 - `ShowcaseStage`: closed value type with private construction token, static
   instances and the single `fromWire` translator;
+- `ShowcaseCapability` and `ShowcaseCapabilityState`: closed allowlists for the
+  base modules the showcase may activate and their accepted wire states;
 - `ShowcaseConfig`: validates environment and rejects non-loopback targets;
 - `HttpSession`: owns one realm's in-memory cookie and rotating CSRF token;
 - ordered step objects, each responsible for one stage;
@@ -16,12 +18,15 @@ not a productive repository or Spring bean. It contains:
 
 1. preflight public health;
 2. ADMIN authentication;
-3. home and catalog upsert;
-4. CUSTOMER register-or-login;
-5. deterministic default address;
-6. optional idempotent pending checkout;
-7. representative cart population;
-8. public and authenticated readback verification.
+3. idempotent activation through the ADMIN API of `STOREFRONT`, `CATALOG`,
+   `PROFILE_CONTENT`, `PAYMENTS_MP` and `MANUAL_FULFILLMENT` only;
+4. home and catalog upsert;
+5. CUSTOMER login-first, registering only when authentication proves the
+   synthetic identity does not exist;
+6. deterministic default address;
+7. optional idempotent pending checkout;
+8. representative cart population;
+9. public and authenticated readback verification.
 
 The flow is open to a new step by adding one step object to the ordered list;
 existing steps are not rewritten.
@@ -46,3 +51,6 @@ image URLs and `.invalid` identities. Stock updates use
 Only `localhost`, `127.0.0.1` and `::1` are accepted. There is no override in
 this slice. The database reset remains an operator action targeted at a named
 disposable database and is deliberately not automated here.
+The installation singleton and first ADMIN remain provisioning prerequisites;
+the loader never inserts either directly. Future-optional modules and live
+vendor adapters remain disabled.

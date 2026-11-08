@@ -6,6 +6,7 @@ const CONSTRUCTION_TOKEN = Symbol('ShowcaseStage');
 export class ShowcaseStage {
   static Preflight = new ShowcaseStage(CONSTRUCTION_TOKEN, 'PREFLIGHT', 'Preflight');
   static AdminAuthentication = new ShowcaseStage(CONSTRUCTION_TOKEN, 'ADMIN_AUTHENTICATION', 'Admin authentication');
+  static CapabilityActivation = new ShowcaseStage(CONSTRUCTION_TOKEN, 'CAPABILITY_ACTIVATION', 'Capability activation');
   static CommercialContent = new ShowcaseStage(CONSTRUCTION_TOKEN, 'COMMERCIAL_CONTENT', 'Commercial content');
   static CustomerIdentity = new ShowcaseStage(CONSTRUCTION_TOKEN, 'CUSTOMER_IDENTITY', 'Customer identity');
   static CustomerAddress = new ShowcaseStage(CONSTRUCTION_TOKEN, 'CUSTOMER_ADDRESS', 'Customer address');
@@ -14,7 +15,7 @@ export class ShowcaseStage {
   static Verification = new ShowcaseStage(CONSTRUCTION_TOKEN, 'VERIFICATION', 'Verification');
   static Unknown = new ShowcaseStage(CONSTRUCTION_TOKEN, 'UNKNOWN', 'Unknown');
   static values = Object.freeze([
-    ShowcaseStage.Preflight, ShowcaseStage.AdminAuthentication, ShowcaseStage.CommercialContent,
+    ShowcaseStage.Preflight, ShowcaseStage.AdminAuthentication, ShowcaseStage.CapabilityActivation, ShowcaseStage.CommercialContent,
     ShowcaseStage.CustomerIdentity, ShowcaseStage.CustomerAddress, ShowcaseStage.PendingOrder,
     ShowcaseStage.Cart, ShowcaseStage.Verification,
   ]);
@@ -28,6 +29,50 @@ export class ShowcaseStage {
 
   static fromWire(value) {
     return ShowcaseStage.values.find((stage) => stage.wire === value) ?? ShowcaseStage.Unknown;
+  }
+}
+
+const CAPABILITY_CONSTRUCTION_TOKEN = Symbol('ShowcaseCapability');
+
+export class ShowcaseCapability {
+  static Storefront = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'STOREFRONT');
+  static Catalog = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'CATALOG');
+  static ProfileContent = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'PROFILE_CONTENT');
+  static PaymentsMp = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'PAYMENTS_MP');
+  static ManualFulfillment = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'MANUAL_FULFILLMENT');
+  static Unknown = new ShowcaseCapability(CAPABILITY_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([
+    ShowcaseCapability.Storefront, ShowcaseCapability.Catalog, ShowcaseCapability.ProfileContent,
+    ShowcaseCapability.PaymentsMp, ShowcaseCapability.ManualFulfillment,
+  ]);
+
+  constructor(token, wire) {
+    if (token !== CAPABILITY_CONSTRUCTION_TOKEN) throw new TypeError('ShowcaseCapability is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcaseCapability.values.find((capability) => capability.wire === value) ?? ShowcaseCapability.Unknown;
+  }
+}
+
+const CAPABILITY_STATE_CONSTRUCTION_TOKEN = Symbol('ShowcaseCapabilityState');
+
+export class ShowcaseCapabilityState {
+  static Disabled = new ShowcaseCapabilityState(CAPABILITY_STATE_CONSTRUCTION_TOKEN, 'DISABLED');
+  static Active = new ShowcaseCapabilityState(CAPABILITY_STATE_CONSTRUCTION_TOKEN, 'ACTIVE');
+  static Unknown = new ShowcaseCapabilityState(CAPABILITY_STATE_CONSTRUCTION_TOKEN, 'unknown');
+  static values = Object.freeze([ShowcaseCapabilityState.Disabled, ShowcaseCapabilityState.Active]);
+
+  constructor(token, wire) {
+    if (token !== CAPABILITY_STATE_CONSTRUCTION_TOKEN) throw new TypeError('ShowcaseCapabilityState is closed');
+    this.wire = wire;
+    Object.freeze(this);
+  }
+
+  static fromWire(value) {
+    return ShowcaseCapabilityState.values.find((state) => state.wire === value) ?? ShowcaseCapabilityState.Unknown;
   }
 }
 
@@ -127,6 +172,21 @@ const STEPS = Object.freeze([
     const principal = await ctx.admin.request('/api/v1/internal/auth/login', { method: 'POST', body: { email: ctx.config.adminEmail, password: ctx.config.adminPassword } });
     if (!Array.isArray(principal?.roles) || !principal.roles.includes('ADMIN')) throw new Error('SHOWCASE_ADMIN_ROLE_REQUIRED');
   }),
+  step(ShowcaseStage.CapabilityActivation, async (ctx) => {
+    const modules = await ctx.admin.request('/api/v1/user/capabilities');
+    const byModule = new Map(modules.map((module) => [ShowcaseCapability.fromWire(module.module), module]));
+    for (const capability of ShowcaseCapability.values) {
+      const module = byModule.get(capability);
+      if (!module || !Number.isSafeInteger(module.configVersion)) throw new Error(`SHOWCASE_CAPABILITY_MISSING:${capability.wire}`);
+      const state = ShowcaseCapabilityState.fromWire(module.state);
+      if (state === ShowcaseCapabilityState.Active) continue;
+      if (state !== ShowcaseCapabilityState.Disabled) throw new Error(`SHOWCASE_CAPABILITY_STATE_UNSUPPORTED:${capability.wire}`);
+      await ctx.admin.request(`/api/v1/user/capabilities/${capability.wire}/state`, {
+        method: 'POST', csrf: true,
+        body: { state: ShowcaseCapabilityState.Active.wire, expectedConfigVersion: module.configVersion, reason: 'LOCAL_SHOWCASE_ACTIVATION' },
+      });
+    }
+  }),
   step(ShowcaseStage.CommercialContent, async (ctx) => {
     await ctx.admin.request('/api/v1/user/content/home', { method: 'PUT', csrf: true, body: { title: 'Todo para tu taller, en un solo lugar', body: 'Herramientas seleccionadas, stock visible y compra simple.' } });
     for (const product of PRODUCTS) {
@@ -137,10 +197,15 @@ const STEPS = Object.freeze([
     }
   }),
   step(ShowcaseStage.CustomerIdentity, async (ctx) => {
-    const registered = await ctx.customer.request('/api/v1/customer/auth/register', { method: 'POST', expected: [201, 409], body: { email: ctx.config.customerEmail, password: ctx.config.customerPassword, firstName: 'Cliente', lastName: 'Showcase' } });
-    if (registered === null) {
-      await ctx.customer.request('/api/v1/customer/auth/login', { method: 'POST', body: { email: ctx.config.customerEmail, password: ctx.config.customerPassword } });
-    }
+    const principal = await ctx.customer.request('/api/v1/customer/auth/login', {
+      method: 'POST', expected: [200, 401],
+      body: { email: ctx.config.customerEmail, password: ctx.config.customerPassword },
+    });
+    if (principal !== null) return;
+    await ctx.customer.request('/api/v1/customer/auth/register', {
+      method: 'POST', expected: [201],
+      body: { email: ctx.config.customerEmail, password: ctx.config.customerPassword, firstName: 'Cliente', lastName: 'Showcase' },
+    });
   }),
   step(ShowcaseStage.CustomerAddress, async (ctx) => {
     const addresses = await ctx.customer.request('/api/v1/customer/me/addresses');
