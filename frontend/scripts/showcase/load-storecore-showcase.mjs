@@ -342,9 +342,14 @@ async function externalSafety(ctx) {
     throw new Error('SHOWCASE_EXTERNAL_ADAPTER_CONFIGURED');
   }
   const modules = capabilityRows(await ctx.admin.request('/api/v1/user/capabilities'));
+  const external = capabilityRows(safety.externalCapabilities);
   for (const capability of ShowcaseExternalCapability.values) {
-    const row = modules.find((module) => ShowcaseExternalCapability.fromWire(module.module) === capability);
+    const row = external.find((module) => ShowcaseExternalCapability.fromWire(module.module) === capability);
     if (!row || ShowcaseCapabilityState.fromWire(row.state) !== ShowcaseCapabilityState.Disabled) throw new Error('SHOWCASE_EXTERNAL_CAPABILITY_ENABLED');
+    if (capability !== ShowcaseExternalCapability.Blackstore) {
+      const visible = modules.find((module) => ShowcaseExternalCapability.fromWire(module.module) === capability);
+      if (!visible || ShowcaseCapabilityState.fromWire(visible.state) !== ShowcaseCapabilityState.Disabled) throw new Error('SHOWCASE_EXTERNAL_CAPABILITY_ENABLED');
+    }
   }
   return modules;
 }

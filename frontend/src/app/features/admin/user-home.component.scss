@@ -3,7 +3,7 @@
 .overview__head { display: flex; align-items: end; justify-content: space-between; gap: var(--sc-space-5); }
 .overview__head p { margin-bottom: 0; max-width: 45rem; }
 .overview__head .sc-field { min-width: 12rem; }
-.overview__range { margin: 0; font-size: var(--sc-text-sm); color: var(--sc-color-faint-ink); }
+.overview__range { margin: 0; font-size: var(--sc-text-sm); color: var(--sc-color-muted-ink); }
 .overview__queues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sc-space-5); }
 .overview__queues .sc-card { margin: 0; }
 .overview__stock { grid-column: 1 / -1; }

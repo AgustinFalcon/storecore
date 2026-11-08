@@ -194,3 +194,78 @@
   remediated dirty snapshot with zero P0-P3. PSD-T07 is done;
   real-database/browser/migration execution remains PSD-T08. No provider
   activation, deployment or homologation is claimed.
+
+## 2026-11-08 — PSD-T08 local real integration gate (reviews pending)
+
+- Working snapshot is dirty over base/head
+  `31e030926229ae9bd185776cef0843eae8bbfa91`; no commit or CI success is claimed.
+  PSD-T08 remains `in_progress` until independent reviews and cumulative close-out.
+- Added `frontend/scripts/run-psd-real-e2e.mjs`, dedicated Playwright config,
+  TypeScript/lint gate and eight real API browser cases under `e2e-psd-real`.
+  Existing UA/CFE discovery remains separate at 17 cases; its provider simulator
+  is not used by PSD. The runner rejects non-PG16, non-loopback, wrong database
+  name, nonempty public schema and occupied application ports.
+- The runtime starts the freshly packaged Spring jar and updated showcase loader
+  under the unchanged ShowcaseConfig HTTP-only boundary, then stops Spring and restarts over the same database with
+  HTTPS installation Origin. Production Angular uses the optimized production
+  configuration; separately built Demo runs on its own static server. No loader
+  protocol boundary or production authentication/rate-limit rule was relaxed.
+  Browser DNS permits loopback only, so fixture media cannot call remote hosts.
+- Initial real loading found a contract gap hidden by T07 fixtures: the console
+  correctly omits BlackStore, but loader safety incorrectly required its console
+  row. The ADMIN-only safety endpoint now projects seven closed external-module
+  states from the capability authority, including hidden BlackStore, with
+  `UNKNOWN` on missing/duplicate authority and `Cache-Control: no-store`.
+  It exposes only adapter mode, checkout-disabled and module/state pairs, with
+  no credentials, config version, OAuth or provider-health fields. The console
+  continues hiding BlackStore. Loader fixtures now reproduce that separation;
+  missing/duplicate/unknown/active external safety fails before domain writes.
+- HTTP/payload safety gate PASS **4/4** on PostgreSQL 16: anonymous/CUSTOMER
+  rejected 401, OPERATOR rejected 403, ADMIN reads 200 without mutation CSRF or
+  Origin, strict minimal keys and noncacheability, plus closed missing/duplicate
+  cases. Command: `mvn -B
+  -Dtest=ShowcaseSafetyPayloadTest,ShowcaseSafetyHttpIntegrationTest package`.
+- Migration matrix PASS **18/18** on PostgreSQL **16.14**: clean V1–V14,
+  V11→V14 historical catalog/checksum/backfill/no-op, V13→V14 historical identity,
+  V8→V9 definer and V10 session-administration migrations. Command:
+  `mvn -B -Dtest=CoreSchemaMigrationTest,CatalogAttributeOrderMigrationTest,CfeBaselineUpgradeMigrationTest,CapabilityDefinerMigrationTest,CapabilitySessionAdministrationMigrationTest test`.
+  The older task wording V1–V12 is corrected to the actual current V14.
+- Real loader first load and replay each passed all **14 stages**. Assertions
+  verified first pending-order creation, replay reuse, stable order count and
+  inventory, and preservation of an unrelated offer created through the API.
+  Final database: migration 14, exactly one order; SHOW-TALADRO-18V has
+  `11 available + 1 reserved`, SHOW-AMOLADORA-850 `8 + 0`, SHOW-SET-MANUAL
+  `15 + 0`; all seven external capabilities remain `DISABLED`. MP adapter was
+  explicitly `unconfigured`, confirmed again after HTTPS restart.
+- Real Spring/Angular HTTPS Chromium gate PASS **8/8** in **17.4 s**:
+  favorites remove/add/reload; offer create/end/reload; OPERATOR customer/overview
+  reads and forbidden state mutation; foreign-realm CSRF rejection preserving
+  sessions; customer search/detail/suspension/reactivation with old sessions
+  remaining revoked; authoritative overview/inventory plus axe/reflow at
+  390/768/1440; API-driven Production and isolated Demo entrypoints. No API
+  interception or provider simulator was used. Browser evidence lives in ignored
+  `frontend/psd-real-results/` (report and playwright.log).
+- Real axe found overview date-range text at 4.39:1 contrast on the canvas;
+  changed that single rule to the existing muted-ink token. All three responsive
+  axe cases now pass. Test-only fixtures separate safety and browser ADMINs so
+  the normal bounded login-attempt budget remains intact.
+- Final `npm run verify` PASS: architecture **9/9** plus scan, lint, Angular
+  **154 files / 1061 tests**, optimized production build. Production initial
+  bundle **739.19 kB** retains a warning against the 700 kB warning threshold,
+  below its 900 kB error threshold. `npm run build:demo` PASS, initial **1.92 MB**
+  with its existing 1.90 MB warning / 2 MB error thresholds. `showcase:test`
+  PASS **73/73**; `check:psd-real` passes syntax, TS, eslint and eight-case
+  discovery. `check:ua-real` passes unchanged 17-case discovery. Diff check PASS.
+- All tracked Spring/Angular/Demo/Playwright children and scratch certificates
+  were cleaned by the runner. Only the explicitly created disposable container
+  `storecore-psd-t08` was removed. Final ports 5434/8080/4301/4390 have no listeners;
+  no operator PostgreSQL service or unrelated process was stopped.
+- Limits: local, sequential safety snapshots are not atomic locks against
+  concurrent ADMIN changes. This targeted browser suite does not claim every
+  PSD-T06 field/transition or the full Demo regression suite; those retain their
+  owning focal/domain/HTTP gates. No live vendor calls, payment accreditation,
+  fiscal/carrier certification, deployment, CI, release or final review approval
+  is claimed. Runbook: `docs/testing/productive-surface-real-e2e.md`.
+- Independent GPT-6.1 Sol code/product and security reviews APPROVED the same
+  final dirty PSD-T08 snapshot with zero P0-P3. PSD-T08 is done; cumulative
+  exact-SHA reviews remain owned by PSD-T09 and PSD-T10.

@@ -68,10 +68,11 @@ function overview() {
 // persistent mutations. It is API-contract evidence, not a PostgreSQL substitute.
 async function api(t, options = {}) {
   const state = {
-    modules: [...ShowcaseCapability.values, ...domain.ShowcaseExternalCapability.values].map((capability) => ({
+    modules: [...ShowcaseCapability.values, ...domain.ShowcaseExternalCapability.values.filter(value => value !== domain.ShowcaseExternalCapability.Blackstore)].map((capability) => ({
       module: capability.wire, state: ShowcaseCapabilityState.Disabled.wire, configVersion: 1,
     })),
-    safety: { mpOrdersAdapter: ShowcaseAdapterMode.Unconfigured.wire, externalCheckoutDisabled: true },
+    safety: { mpOrdersAdapter: ShowcaseAdapterMode.Unconfigured.wire, externalCheckoutDisabled: true,
+      externalCapabilities: domain.ShowcaseExternalCapability.values.map(capability => ({ module: capability.wire, state: ShowcaseCapabilityState.Disabled.wire })) },
     home: { revision: 0, sections: [] }, products: {}, customer: null, addresses: [], orders: [], cart: { lines: [] },
     favorites: [], offers: [], csrf: { user: '', customer: '' }, tokens: { user: 0, customer: 0 }, requests: [], writes: [], errors: [],
     overview: overview(),
@@ -266,11 +267,15 @@ test('later customer/order pages are scanned; catalog verification uses direct a
   assert.equal(state.requests.some((request) => request.path === '/api/v1/catalog'), false);
 });
 
-test('external adapters/capabilities and invalid late activation fail before every domain write', async (t) => {
+test('external adapters/capabilities and invalid late activation fail during sequential preflight before domain writes', async (t) => {
   for (const prepare of [
     (state) => { state.safety.mpOrdersAdapter = 'official'; },
     (state) => { state.safety.mpOrdersAdapter = 'future'; },
     (state) => { state.safety.externalCheckoutDisabled = false; },
+    (state) => { state.safety.externalCapabilities.find(row => row.module === domain.ShowcaseExternalCapability.Blackstore.wire).state = ShowcaseCapabilityState.Active.wire; },
+    (state) => { state.safety.externalCapabilities.find(row => row.module === domain.ShowcaseExternalCapability.Blackstore.wire).state = 'future'; },
+    (state) => { state.safety.externalCapabilities = state.safety.externalCapabilities.filter(row => row.module !== domain.ShowcaseExternalCapability.Blackstore.wire); },
+    (state) => { state.safety.externalCapabilities.push(clone(state.safety.externalCapabilities[0])); },
     (state) => { state.modules.find((row) => row.module === domain.ShowcaseExternalCapability.Marketplace.wire).state = ShowcaseCapabilityState.Active.wire; },
     (state) => { state.modules.find((row) => row.module === domain.ShowcaseExternalCapability.Carriers.wire).state = 'future'; },
     (state) => { state.modules.find((row) => row.module === ShowcaseCapability.ManualPromotions.wire).state = 'future'; },
@@ -278,7 +283,7 @@ test('external adapters/capabilities and invalid late activation fail before eve
     (state) => { state.modules.find((row) => row.module === ShowcaseCapability.ManualPromotions.wire).configVersion = 2147483648; },
   ]) await t.test('preflight rejection', async (t) => {
     const { state, run } = await api(t, { prepare });
-    await assert.rejects(run(), /SHOWCASE_(EXTERNAL|CAPABILITY)/);
+    await assert.rejects(run(), /SHOWCASE_(EXTERNAL|CAPABILIT)/);
     assert.deepEqual(state.writes, []);
   });
 });
