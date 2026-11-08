@@ -1,0 +1,11 @@
+{
+  "feature": "20261108-storecore-local-showcase-environment",
+  "status": "implementation_in_progress",
+  "stats": { "total": 4, "done": 2, "in_progress": 1, "pending": 1 },
+  "tasks": [
+    { "id": "SCE-T01", "title": "Approve functional and technical boundary", "status": "done", "requirements": ["SCE-R01", "SCE-R02", "SCE-R04"] },
+    { "id": "SCE-T02", "title": "Implement closed stages, safe config and API client", "status": "done", "requirements": ["SCE-R01", "SCE-R02", "SCE-R05"] },
+    { "id": "SCE-T03", "title": "Implement idempotent showcase steps and verification", "status": "in_progress", "requirements": ["SCE-R03", "SCE-R04", "SCE-R05"] },
+    { "id": "SCE-T04", "title": "Run local integration evidence and review", "status": "pending", "requirements": ["SCE-R01", "SCE-R02", "SCE-R03", "SCE-R04", "SCE-R05"] }
+  ]
+}
