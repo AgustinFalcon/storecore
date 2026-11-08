@@ -7,8 +7,10 @@ import org.springframework.core.type.AnnotatedTypeMetadata
 
 class MpOrdersAdapterEnabledCondition : Condition {
     override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata): Boolean {
-        val adapter = context.environment.getProperty("storecore.integrations.mp-orders.adapter", "unconfigured")
-        return adapter == "official" || adapter == "fake"
+        return when (MpOrdersAdapterMode.fromWire(context.environment.getProperty("storecore.integrations.mp-orders.adapter", "unconfigured"))) {
+            MpOrdersAdapterMode.OFFICIAL, MpOrdersAdapterMode.FAKE -> true
+            MpOrdersAdapterMode.UNCONFIGURED, MpOrdersAdapterMode.UNKNOWN -> false
+        }
     }
 }
 
