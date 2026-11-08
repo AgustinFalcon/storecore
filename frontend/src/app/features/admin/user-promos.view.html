@@ -1,62 +1,17 @@
-<section class="sc-page sc-console" aria-labelledby="promos-title">
-  <header class="sc-page-head">
-    <p class="sc-kicker">MANUAL</p>
-    <h1 id="promos-title">Promos MANUAL</h1>
-    <p class="sc-page__lede">Writer MANUAL. El API rechaza solapes ACTIVE. Sin automatización ML.</p>
-  </header>
-  <sc-feature-status
-    [loading]="state.loading"
-    [error]="state.errorMessage"
-    [empty]="!state.loading && state.promos.length === 0"
-    emptyText="No hay promos MANUAL."
-    (retry)="retry.emit()"
-  />
-  <div class="sc-workbench">
-    <div class="sc-workbench__main">
-      <h2>Reglas registradas</h2>
-      @if (state.promos.length) {
-        <div class="sc-table-wrap">
-          <table class="sc-table">
-            <thead>
-              <tr>
-                <th>SKU</th>
-                <th>Vigencia</th>
-                <th>Prio</th>
-                <th>Margen</th>
-                <th>Moneda</th>
-                <th>Aprobador</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (promo of state.promos; track promo.id) {
-                <tr>
-                  <td>{{ promo.listingSku }} <span class="sc-badge sc-badge--info">MANUAL</span></td>
-                  <td>{{ promo.validFrom }} – {{ promo.validTo }}</td>
-                  <td>{{ promo.priority }}</td>
-                  <td>{{ promo.margin }}</td>
-                  <td>{{ promo.currency }}</td>
-                  <td>{{ promo.approvedBy }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-    </div>
-    <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()">
-      <h2>Crear promo manual</h2>
-      <label>SKU <input required name="sku" [ngModel]="state.promoDraft.listingSku" (ngModelChange)="patch({ listingSku: $event })" /></label>
-      <label>Moneda <input required name="currency" [ngModel]="state.promoDraft.currency" (ngModelChange)="patch({ currency: $event })" /></label>
-      <div class="sc-fields-2">
-        <label>Desde <input required type="date" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label>
-        <label>Hasta <input required type="date" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
-      </div>
-      <label>Prioridad <input type="number" name="priority" [ngModel]="state.promoDraft.priority" (ngModelChange)="patch({ priority: +$event })" /></label>
-      <label>Margen <input type="number" name="margin" [ngModel]="state.promoDraft.margin" (ngModelChange)="patch({ margin: +$event })" /></label>
-      <label>Aprobador <input name="approvedBy" [ngModel]="state.promoDraft.approvedBy" (ngModelChange)="patch({ approvedBy: $event })" /></label>
-      <label>Aprobado <input type="datetime-local" name="approvedAt" [ngModel]="state.promoDraft.approvedAt" (ngModelChange)="patch({ approvedAt: $event })" /></label>
-      <p class="sc-callout">El aprobador queda en el registro. Esta pantalla no dispara Mercado Libre.</p>
-      <button type="submit" class="sc-btn sc-btn--primary">Crear promo</button>
-    </form>
-  </div>
-</section>
+<section class="sc-page sc-console" aria-labelledby="promos-title" [attr.aria-busy]="state.loading">
+<header class="sc-page-head"><p class="sc-kicker">PRECIOS · MANUAL</p><h1 id="promos-title">Políticas de precio manual</h1><p class="sc-page__lede">Precios y vigencia locales. La activación valida ventana y solapes y registra la aprobación del servidor.</p></header>
+<sc-feature-status [loading]="state.loading" [error]="state.errorMessage" [empty]="!state.loading && !state.errorMessage && state.promos.length === 0" emptyText="No hay políticas en esta página." (retry)="retry.emit()" />
+<div class="sc-workbench"><div class="sc-workbench__main"><h2>Reglas registradas</h2><p role="status">Página {{ state.page + 1 }} · {{ state.total }} políticas</p>
+<div class="sc-card-grid">@for (promo of state.promos; track promo.id) { <article class="sc-card"><header><h3>{{ promo.listingSku }}</h3><span class="sc-badge">{{ promo.status.label }}</span></header><dl class="sc-facts">
+<div><dt>Alcance</dt><dd>{{ promo.priceScope.label }}</dd></div><div><dt>Moneda</dt><dd>{{ promo.currency.label }}</dd></div><div><dt>Precio base</dt><dd>{{ promo.basePrice }}</dd></div><div><dt>Precio deseado local</dt><dd>{{ promo.desiredPrice }}</dd></div><div><dt>Precio promocional efectivo</dt><dd>{{ promo.effectivePromoPrice ?? 'No disponible' }}</dd></div>
+<div><dt>Precio observado</dt><dd>{{ promo.observedPrice.value ?? 'No disponible' }} · {{ promo.observedPrice.freshness.label }} @if (promo.observedPrice.reason) { · {{ promo.observedPrice.reason.label }} }</dd></div>
+<div><dt>Vigencia</dt><dd>{{ promo.validFrom }} – {{ promo.validTo }}</dd></div><div><dt>Writer</dt><dd>{{ promo.writer.label }}</dd></div><div><dt>Aprobador registrado</dt><dd>{{ promo.approvedBy ?? 'Sin aprobación' }}</dd></div><div><dt>Aprobado el</dt><dd>{{ promo.approvedAt ?? 'Sin aprobación' }}</dd></div></dl>
+<div class="sc-actions">@for (action of transitions(promo); track action.wire) { <button type="button" class="sc-btn" [disabled]="state.loading" (click)="transition.emit({ promo, transition: action })">{{ action.label }}</button> }</div></article> }</div>
+<nav class="sc-actions" aria-label="Páginas de políticas"><button type="button" class="sc-btn" [disabled]="state.loading || state.page === 0" (click)="pageChange.emit(state.page - 1)">Anterior</button><button type="button" class="sc-btn" [disabled]="state.loading || (state.page + 1) * 25 >= state.total" (click)="pageChange.emit(state.page + 1)">Siguiente</button></nav></div>
+<form class="sc-panel" (submit)="$event.preventDefault(); submit()"><h2>Crear borrador</h2>
+<label>SKU <input required name="sku" [ngModel]="state.promoDraft.listingSku" (ngModelChange)="patch({ listingSku: $event })" /></label><p>Moneda: {{ state.promoDraft.currency.label }} · Writer manual</p>
+<label>Alcance <select name="scope" [ngModel]="state.promoDraft.priceScope" (ngModelChange)="patch({ priceScope: $event })">@for (scope of scopes; track scope.wire) { <option [ngValue]="scope">{{ scope.label }}</option> }</select></label>
+<label>Precio deseado local <input required type="number" min="0" step="0.01" name="desired" [ngModel]="state.promoDraft.desiredPrice" (ngModelChange)="patch({ desiredPrice: $event })" /></label>
+<label>Precio promocional efectivo (opcional) <input type="number" min="0" step="0.01" name="effective" [ngModel]="state.promoDraft.effectivePromoPrice" (ngModelChange)="patch({ effectivePromoPrice: $event })" /></label>
+<label>Desde <input required type="datetime-local" name="from" [ngModel]="state.promoDraft.validFrom" (ngModelChange)="patch({ validFrom: $event })" /></label><label>Hasta <input required type="datetime-local" name="to" [ngModel]="state.promoDraft.validTo" (ngModelChange)="patch({ validTo: $event })" /></label>
+<p class="sc-callout">Costo y margen no disponibles: falta una autoridad local de costos. La aprobación se registra al activar.</p>@if (formError()) { <p class="sc-callout sc-callout--error" role="alert">{{ formError() }}</p> }<button type="submit" class="sc-btn sc-btn--primary" [disabled]="state.loading">Crear borrador</button></form></div></section>

@@ -1,4 +1,6 @@
 import { BoundedRows } from '../../domain/catalog/bounded-rows';
+import { CreateManualPromo, PolicyTransition } from '../../domain/user/channel-pricing';
+import { mapChannelPage, mapChannelAccount, mapChannelListing, mapPricePolicy } from './channel-pricing.mapper';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
@@ -12,6 +14,7 @@ import {
   ManualPromo,
   MercadoLibreAccount,
   MercadoLibreListing,
+  MercadoLibreMapping,
   ProfilePreview,
   UserCredentials,
   UserSessionResult,
@@ -21,14 +24,9 @@ import {
   mapCapabilities,
   mapFacet,
   mapInventory,
-  mapListing,
-  mapListings,
-  mapMercadoLibreAccount,
   mapPreview,
   mapProductDetail,
   mapProductDetails,
-  mapPromo,
-  mapPromos,
   mapUserSession,
 } from '../mappers/http-mappers';
 
@@ -56,16 +54,24 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapUserSession(readApiBody<unknown>(body))));
   }
 
-  listPromos(): Observable<readonly ManualPromo[]> {
+  listPromos(page = 0): Observable<BoundedRows<ManualPromo>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/promos`)
-      .pipe(map((body) => mapPromos(readApiBody<unknown>(body))));
+      .get<unknown>(`${environment.apiBaseUrl}/user/promos`, { params: { page, size: 25 } })
+      .pipe(map((body) => mapChannelPage(readApiBody<unknown>(body), mapPricePolicy)));
   }
 
-  savePromo(promo: ManualPromo): Observable<ManualPromo> {
+  savePromo(promo: CreateManualPromo): Observable<ManualPromo> {
     return this.http
-      .post<unknown>(`${environment.apiBaseUrl}/user/promos`, promo)
-      .pipe(map((body) => mapPromo(readApiBody<unknown>(body))));
+      .post<unknown>(`${environment.apiBaseUrl}/user/promos`, {
+        listingSku: promo.listingSku, currency: promo.currency.wire, priceScope: promo.priceScope.wire,
+        desiredPrice: promo.desiredPrice, effectivePromoPrice: promo.effectivePromoPrice,
+        validFrom: promo.validFrom, validTo: promo.validTo, writer: promo.writer.wire,
+      }).pipe(map((body) => mapPricePolicy(readApiBody<unknown>(body))));
+  }
+
+  transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo> {
+    return this.http.post<unknown>(`${environment.apiBaseUrl}/user/promos/${encodeURIComponent(id)}/state`, { transition: transition.wire })
+      .pipe(map(body => mapPricePolicy(readApiBody(body))));
   }
 
   listCatalog(): Observable<BoundedRows<ProductDetail>> {
@@ -123,18 +129,18 @@ export class UserHttpRepository implements IUserRepository {
   readMercadoLibreAccount(): Observable<MercadoLibreAccount> {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/mercadolibre/account`)
-      .pipe(map((body) => mapMercadoLibreAccount(readApiBody<unknown>(body))));
+      .pipe(map((body) => mapChannelAccount(readApiBody<unknown>(body))));
   }
 
-  listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]> {
+  listMercadoLibreListings(page = 0): Observable<BoundedRows<MercadoLibreListing>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/mercadolibre/listings`)
-      .pipe(map((body) => mapListings(readApiBody<unknown>(body))));
+      .get<unknown>(`${environment.apiBaseUrl}/user/mercadolibre/listings`, { params: { page, size: 25 } })
+      .pipe(map((body) => mapChannelPage(readApiBody<unknown>(body), mapChannelListing)));
   }
 
-  saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing> {
+  saveMercadoLibreListing(listing: MercadoLibreMapping): Observable<MercadoLibreListing> {
     return this.http
       .put<unknown>(`${environment.apiBaseUrl}/user/mercadolibre/listings/${listing.listingId}`, listing)
-      .pipe(map((body) => mapListing(readApiBody<unknown>(body))));
+      .pipe(map((body) => mapChannelListing(readApiBody<unknown>(body))));
   }
 }

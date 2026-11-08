@@ -14,6 +14,7 @@ import { UserMercadoLibreViewComponent } from './user-mercadolibre.view';
       <sc-user-mercadolibre-view
         [state]="state"
         (refresh)="store.loadMercadoLibre()"
+        (pageChange)="store.goToPage($event)"
         (queryChange)="store.setQuery($event)"
         (clearQuery)="store.clearQuery()"
       />

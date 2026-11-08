@@ -1,3 +1,4 @@
+import { CreateManualPromo, PolicyStatus, PolicyTransition, PriceCurrency, PriceScope, PriceWriter } from '../../domain/user/channel-pricing';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
@@ -17,21 +18,12 @@ export interface UserState {
   readonly email: string;
   readonly password: string;
   readonly promos: readonly ManualPromo[];
-  readonly promoDraft: ManualPromo;
+  readonly promoDraft: CreateManualPromo;
+  readonly page: number;
+  readonly total: number;
 }
 
-const emptyPromo: ManualPromo = {
-  id: '',
-  listingSku: '',
-  currency: 'ARS',
-  validFrom: '',
-  validTo: '',
-  priority: 1,
-  margin: 0,
-  approvedBy: '',
-  approvedAt: '',
-  writer: 'MANUAL',
-};
+const emptyPromo: CreateManualPromo = { listingSku: '', currency: PriceCurrency.Ars, priceScope: PriceScope.Default, desiredPrice: 0, effectivePromoPrice: null, validFrom: '', validTo: '', writer: PriceWriter.Manual };
 
 @Injectable()
 export class UserStore extends ComponentStore<UserState> {
@@ -48,7 +40,7 @@ export class UserStore extends ComponentStore<UserState> {
       authenticated: session.authenticated(),
       email: '',
       password: '',
-      promos: [],
+      promos: [], page: 0, total: 0,
       promoDraft: emptyPromo,
     });
   }
@@ -64,7 +56,7 @@ export class UserStore extends ComponentStore<UserState> {
 
   readonly setEmail = this.updater((s, email: string) => ({ ...s, email }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
-  readonly setPromoDraft = this.updater((s, promoDraft: ManualPromo) => ({ ...s, promoDraft }));
+  readonly setPromoDraft = this.updater((s, promoDraft: CreateManualPromo) => ({ ...s, promoDraft }));
 
   readonly submitSignIn = this.effect<void>((trigger$) =>
     trigger$.pipe(
@@ -123,9 +115,9 @@ export class UserStore extends ComponentStore<UserState> {
     trigger$.pipe(
       tap(() => this.patchState({ loading: true, errorMessage: '' })),
       switchMap(() =>
-        this.promos.list().pipe(
+        this.promos.list(this.snapshot.page).pipe(
           tapResponse({
-            next: (items) => this.patchState({ promos: items, loading: false }),
+            next: (items) => this.patchState({ promos: items, page: items.metadata.page, total: items.metadata.total, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
@@ -137,7 +129,7 @@ export class UserStore extends ComponentStore<UserState> {
     trigger$.pipe(
       tap(() => {
         const draft = this.snapshot.promoDraft;
-        if (!draft.listingSku.trim() || !draft.currency.trim() || !draft.validFrom || !draft.validTo) {
+        if (!draft.listingSku.trim() || draft.currency === PriceCurrency.Unknown || !draft.validFrom || !draft.validTo) {
           this.patchState({ loading: false, errorMessage: 'SKU, moneda y vigencia son obligatorios.' });
           return;
         }
@@ -145,7 +137,7 @@ export class UserStore extends ComponentStore<UserState> {
       }),
       filter(() => {
         const draft = this.snapshot.promoDraft;
-        return Boolean(draft.listingSku.trim() && draft.currency.trim() && draft.validFrom && draft.validTo);
+        return Boolean(draft.listingSku.trim() && draft.currency !== PriceCurrency.Unknown && draft.validFrom && draft.validTo);
       }),
       switchMap(() =>
         this.promos.save(this.snapshot.promoDraft).pipe(
@@ -160,5 +152,14 @@ export class UserStore extends ComponentStore<UserState> {
       ),
     ),
   );
+
+  goToPage(page: number): void { if (!Number.isInteger(page) || page < 0 || page > 10000) return; this.patchState({ page }); this.loadPromos(); }
+  readonly transitionPromo = this.effect<{ promo: ManualPromo; transition: PolicyTransition }>(requests => requests.pipe(
+    filter(({ promo, transition }) => promo.status !== PolicyStatus.Unknown && promo.priceScope !== PriceScope.Unknown && promo.writer !== PriceWriter.Unknown && promo.currency !== PriceCurrency.Unknown && PolicyTransition.for(promo.status).includes(transition)),
+    tap(() => this.patchState({ loading: true, errorMessage: '' })),
+    switchMap(({ promo, transition }) => this.promos.transition(promo.id, transition).pipe(tapResponse({
+      next: () => this.loadPromos(), error: (error: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }),
+    }))),
+  ));
 
 }

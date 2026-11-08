@@ -4,7 +4,7 @@
     @if (!state.readPhase.isAccessDenied) { <button type="button" class="ml__refresh" [disabled]="state.loading" (click)="refresh.emit()">{{ state.readPhase.isRefreshing ? 'Actualizando…' : 'Actualizar datos' }}</button> }
   </header>
   @if (state.readPhase.isAccessDenied) {
-    <div class="ml__notice ml__notice--error" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión interna con permiso para consultar Mercado Libre.</p></div>
+    <div class="ml__notice ml__notice--error" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión ADMIN con permiso para consultar Mercado Libre.</p></div>
   } @else if (unknownReadPhase) {
     <div class="ml__notice ml__notice--error" role="alert"><h2>Estado de lectura no reconocido</h2><p>Actualizá los datos para volver a consultar el canal de forma segura.</p></div>
   } @else {
@@ -19,23 +19,28 @@
     @if (state.hasSnapshot) {
       <section class="ml__account" aria-labelledby="ml-account-title">
         <div><p class="ml__eyebrow">Cuenta del comercio</p><h2 id="ml-account-title">Vinculación del canal</h2>
-          @if (state.account) { <p class="ml__account-ref"><span>Referencia</span><strong>{{ maskedAccountRef }}</strong></p> }
+          @if (state.account) { <p class="ml__account-ref"><span>Referencia</span><strong>{{ maskedAccountRef }}</strong></p><p>Registro actualizado: {{ state.account.updatedAt ?? 'No disponible' }}</p>@if (state.account.reason) { <p>{{ state.account.reason.label }}</p> } }
           @else { <p>No hay información de cuenta disponible.</p> }
         </div>
-        @if (state.account) { <div class="ml__account-state"><span class="ml__badge" [attr.data-tone]="state.account.status.tone">{{ state.account.status.label }}</span><span class="ml__authorization">{{ state.account.authorized ? 'Cuenta autorizada' : 'Cuenta no autorizada' }}</span></div> }
+        @if (state.account) { <div class="ml__account-state"><span class="ml__badge" [attr.data-tone]="state.account.status.tone">{{ state.account.status.label }}</span><span class="ml__authorization">{{ state.account.availability.label }}</span></div> }
       </section>
+      <p>Estado local registrado: no certifica autorización OAuth ni disponibilidad del proveedor.</p>
       <ul class="ml__metrics" aria-label="Resumen de mapeos cargados"><li><span>Mapeos</span><strong>{{ presentation.mappingCount }}</strong></li><li><span>SKU vinculados</span><strong>{{ presentation.uniqueSkuCount }}</strong></li><li><span>Con variación</span><strong>{{ presentation.variationCount }}</strong></li></ul>
       <aside class="ml__deferred" aria-labelledby="ml-deferred-title"><div><p class="ml__eyebrow">Próxima etapa</p><h2 id="ml-deferred-title">Sincronización e inteligencia comercial</h2></div><p>La conexión OAuth, cambios de publicaciones, sincronización de precio o stock y seguimiento de competidores todavía no están habilitados en esta pantalla.</p></aside>
       <section class="ml__list" aria-labelledby="ml-list-title">
-        <div class="ml__list-head"><div><p class="ml__eyebrow">Publicaciones</p><h2 id="ml-list-title">Mapeos publicación → SKU</h2></div><label for="ml-query">Buscar publicación, variación o SKU<input id="ml-query" type="search" autocomplete="off" placeholder="Ej.: MLA123 o WEB-KIT" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label></div>
-        <p class="ml__count" role="status">{{ presentation.visibleListings.length }} de {{ state.listings.length }} mapeos</p>
+        <div class="ml__list-head"><div><p class="ml__eyebrow">Publicaciones</p><h2 id="ml-list-title">Mapeos publicación → SKU</h2></div><label for="ml-query">Buscar en esta página: publicación, variación o SKU<input id="ml-query" type="search" autocomplete="off" placeholder="Ej.: MLA123 o WEB-KIT" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label></div>
+        <p class="ml__count" role="status">{{ presentation.visibleListings.length }} de {{ state.listings.length }} mapeos en página {{ state.page + 1 }} · {{ state.total }} en total</p>
         @if (!state.listings.length) { <div class="ml__notice"><h3>Sin publicaciones vinculadas</h3><p>La consulta no devolvió mapeos para esta cuenta.</p></div> }
         @else if (!presentation.visibleListings.length) { <div class="ml__notice"><h3>Sin coincidencias</h3><p>Probá con otra publicación, variación o SKU.</p><button type="button" (click)="clearQuery.emit()">Mostrar todos los mapeos</button></div> }
         @else {
-          <table class="ml__table"><caption>Relación de publicaciones y variaciones de Mercado Libre con los SKU locales. Datos de sólo lectura.</caption><thead><tr><th scope="col">Publicación</th><th scope="col">Variación</th><th scope="col">SKU local</th></tr></thead><tbody>
-            @for (listing of presentation.visibleListings; track listing.listingId + ':' + listing.variationId) { <tr><th scope="row" class="ml__mono">{{ listing.listingId }}</th><td data-label="Variación" class="ml__mono">{{ listing.variationId || 'Sin variación' }}</td><td data-label="SKU local" class="ml__mono ml__sku">{{ listing.sku }}</td></tr> }
+          <table class="ml__table"><caption>Relación de publicaciones y variaciones de Mercado Libre con los SKU locales. Datos de sólo lectura.</caption><thead><tr><th scope="col">Publicación</th><th scope="col">Variación</th><th scope="col">SKU local</th><th scope="col">Estado y valores locales</th><th scope="col">Observaciones históricas</th></tr></thead><tbody>
+            @for (listing of presentation.visibleListings; track listing.listingId + ':' + listing.variationId) { <tr><th scope="row" class="ml__mono">{{ listing.listingId }}</th><td data-label="Variación" class="ml__mono">{{ listing.variationId || 'Sin variación' }}</td><td data-label="SKU local" class="ml__mono ml__sku">{{ listing.sku }}</td><td data-label="Estado y valores locales"><p>{{ listing.status.label }}</p><p>Cantidad deseada: {{ listing.desiredQuantity }}</p><p>Precio deseado: {{ listing.desiredPrice ?? 'No disponible' }}</p><p>Intervención manual: {{ listing.manualInterventionRequired ? 'Requerida' : 'No requerida' }}</p><p>Registro actualizado: {{ listing.updatedAt ?? 'No disponible' }}</p></td><td data-label="Observaciones históricas"><p>Cantidad observada: {{ listing.observedQuantity.value ?? 'No disponible' }} · {{ listing.observedQuantity.freshness.label }}</p>@if (listing.observedQuantity.reason) { <p>{{ listing.observedQuantity.reason.label }}</p> }<p>Precio observado: {{ listing.observedPrice.value ?? 'No disponible' }} · {{ listing.observedPrice.freshness.label }}</p>@if (listing.observedPrice.reason) { <p>{{ listing.observedPrice.reason.label }}</p> }</td></tr> }
           </tbody></table>
         }
+        <nav class="sc-actions" aria-label="Páginas de publicaciones">
+          <button type="button" [disabled]="state.loading || state.page === 0" (click)="pageChange.emit(state.page - 1)">Anterior</button>
+          <button type="button" [disabled]="state.loading || state.page >= 10000 || (state.page + 1) * 25 >= state.total" (click)="pageChange.emit(state.page + 1)">Siguiente</button>
+        </nav>
       </section>
     }
   }

@@ -1,8 +1,7 @@
-import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapListings, mapMercadoLibreAccount, mapPreview, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapPreview, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
 import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
-import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus } from '../../domain/order/commerce-states';
 import { InventoryState } from '../../domain/catalog/catalog-states';
 
@@ -39,58 +38,6 @@ describe('http-mappers', () => {
       { module: 'FUTURE_A', state: 'ACTIVE', configVersion: 1 },
       { module: 'FUTURE_B', state: 'ACTIVE', configVersion: 2 },
     ])).toHaveLength(2);
-  });
-
-  it('decodes the Mercado Libre account through its closed status translator', () => {
-    expect(mapMercadoLibreAccount({ authorized: true, accountRef: ' seller-42 ', status: 'ACTIVE' })).toEqual({
-      authorized: true,
-      accountRef: 'seller-42',
-      status: MercadoLibreAccountStatus.Active,
-    });
-    expect(mapMercadoLibreAccount({ authorized: false, accountRef: '', status: 'FUTURE_STATE' }).status)
-      .toBe(MercadoLibreAccountStatus.Unknown);
-    expect(mapMercadoLibreAccount({ authorized: false, accountRef: '', status: 'DISABLED' })).toEqual({
-      authorized: false,
-      accountRef: '',
-      status: MercadoLibreAccountStatus.Disabled,
-    });
-  });
-
-  it('rejects malformed Mercado Libre account identities and wire shapes', () => {
-    for (const invalid of [null, undefined, [], '', 1, true, {}, { authorized: 'true', accountRef: '', status: 'ACTIVE' },
-      { authorized: false, accountRef: 2, status: 'DISABLED' }, { authorized: true, accountRef: '  ', status: 'ACTIVE' }]) {
-      expect(() => mapMercadoLibreAccount(invalid)).toThrow();
-    }
-    for (const contradictory of [
-      { authorized: false, accountRef: 'seller-42', status: 'DISABLED' },
-      { authorized: false, accountRef: '', status: 'ACTIVE' },
-      { authorized: false, accountRef: '', status: 'READ_ONLY' },
-      { authorized: true, accountRef: 'seller-42', status: 'DISABLED' },
-    ]) expect(() => mapMercadoLibreAccount(contradictory)).toThrow(/cuenta/i);
-  });
-
-  it('decodes unique Mercado Libre listing identities without coercion', () => {
-    expect(mapListings([
-      { listingId: ' MLA-1 ', variationId: '', sku: ' SKU-1 ' },
-      { listingId: 'MLA-1', variationId: ' VAR-2 ', sku: 'SKU-2' },
-    ])).toEqual([
-      { listingId: 'MLA-1', variationId: '', sku: 'SKU-1' },
-      { listingId: 'MLA-1', variationId: 'VAR-2', sku: 'SKU-2' },
-    ]);
-    expect(mapListings([])).toEqual([]);
-  });
-
-  it('fails closed for malformed or duplicate Mercado Libre listings', () => {
-    for (const invalid of [undefined, null, {}, { items: [] }, '', 1, true]) expect(() => mapListings(invalid)).toThrow();
-    for (const row of [null, [], {}, { listingId: '', variationId: '', sku: 'SKU' },
-      { listingId: 1, variationId: '', sku: 'SKU' }, { listingId: 'MLA', variationId: null, sku: 'SKU' },
-      { listingId: 'MLA', variationId: '', sku: ' ' }, { listingId: 'MLA', variationId: '', sku: 1 }]) {
-      expect(() => mapListings([row])).toThrow();
-    }
-    expect(() => mapListings([
-      { listingId: ' MLA-1 ', variationId: ' VAR-1 ', sku: 'SKU-1' },
-      { listingId: 'MLA-1', variationId: 'VAR-1', sku: 'SKU-2' },
-    ])).toThrow(/duplicada/);
   });
 
   it('decodes authoritative inventory without quantity coercion or subtraction', () => {

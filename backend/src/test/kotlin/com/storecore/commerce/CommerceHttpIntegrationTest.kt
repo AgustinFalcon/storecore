@@ -144,20 +144,205 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
-    fun `promo overlap conflicts`() {
+    fun `manual policy approval and lifecycle are server owned and overlap is atomic`() {
         val sku = "SKU-PROMO-${UUID.randomUUID()}"
         putProduct(sku, "Promo Item", available = 5, safety = 0)
         val from = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
         val to = from.plus(2, ChronoUnit.DAYS)
-        val promo = """{"listingSku":"$sku","currency":"ARS","validFrom":"$from","validTo":"$to","priority":10,"margin":15,"approvedBy":"${adminUserId()}","approvedAt":"${Instant.now()}","writer":"MANUAL"}"""
+        val promo = """{"listingSku":"$sku","currency":"ARS","priceScope":"CAMPAIGN","desiredPrice":90,"effectivePromoPrice":80,"validFrom":"$from","validTo":"$to","writer":"MANUAL"}"""
+        val before = jdbc.queryForObject("SELECT count(*) FROM channel_price_policies", Long::class.java)
+        for (extra in listOf("\"priority\":10", "\"margin\":15", "\"approvedBy\":\"1\"", "\"approvedAt\":\"$from\"", "\"status\":\"ACTIVE\"")) {
+            assertEquals(400, exchange("/api/v1/user/promos", HttpMethod.POST, promo.dropLast(1) + "," + extra + "}", admin.cookie, admin.csrf).statusCode.value())
+        }
+        assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM channel_price_policies", Long::class.java))
+        assertEquals(403, exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie).statusCode.value())
+        assertEquals(401, exchange("/api/v1/user/promos", HttpMethod.POST, promo, customer.cookie, customer.csrf).statusCode.value())
         val created = exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie, admin.csrf)
-        assertEquals(200, created.statusCode.value())
+        assertEquals(200, created.statusCode.value(), created.body)
+        val draft = mapper.readTree(created.body).path("data")
+        assertEquals("DRAFT", draft.path("status").asText())
+        assertTrue(draft.path("approvedBy").isNull && draft.path("approvedAt").isNull)
+        assertTrue(!draft.has("priority") && !draft.has("margin"))
+        val id = draft.path("id").asLong()
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM offers WHERE name=?", Int::class.java, "manual-$sku"))
         admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
-        val overlap = exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie, admin.csrf)
+        val active = exchange("/api/v1/user/promos/$id/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", admin.cookie, admin.csrf)
+        assertEquals(200, active.statusCode.value(), active.body)
+        val approved = mapper.readTree(active.body).path("data")
+        assertEquals(adminUserId().toString(), approved.path("approvedBy").asText())
+        assertTrue(Instant.parse(approved.path("approvedAt").asText()).isBefore(Instant.now().plusSeconds(1)))
+        admin = admin.copy(csrf = active.headers.getFirst("X-CSRF-Token")!!)
+        val other = exchange("/api/v1/user/promos", HttpMethod.POST, promo, admin.cookie, admin.csrf)
+        val otherId = mapper.readTree(other.body).path("data").path("id").asLong()
+        admin = admin.copy(csrf = other.headers.getFirst("X-CSRF-Token")!!)
+        val overlap = exchange("/api/v1/user/promos/$otherId/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", admin.cookie, admin.csrf)
         assertEquals(409, overlap.statusCode.value())
         assertTrue(overlap.body!!.contains("PROMO_WINDOW_OVERLAP"))
-        admin = admin.copy(csrf = overlap.headers.getFirst("X-CSRF-Token") ?: admin.csrf)
+        assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM channel_price_policies WHERE id=?", String::class.java, otherId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE aggregate_type='channel_price_policies' AND aggregate_id=? AND event_type='PRICE_POLICY_ACTIVE'", Int::class.java, otherId))
+        for (command in listOf("PAUSE", "ACTIVATE", "END")) {
+            val response = exchange("/api/v1/user/promos/$id/state", HttpMethod.POST, """{"transition":"$command"}""", admin.cookie, admin.csrf)
+            assertEquals(200, response.statusCode.value(), response.body)
+            admin = admin.copy(csrf = response.headers.getFirst("X-CSRF-Token")!!)
+        }
+        assertEquals(400, exchange("/api/v1/user/promos/$id/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", admin.cookie, admin.csrf).statusCode.value())
+        val listed = exchange("/api/v1/user/promos?size=50", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, listed.statusCode.value(), listed.body)
+        assertTrue(mapper.readTree(listed.body).path("data").path("items").isArray)
+        assertEquals(400, exchange("/api/v1/user/promos?size=51", HttpMethod.GET, null, admin.cookie).statusCode.value())
+    }
+
+    @Test
+    fun `concurrent manual activations serialize one effective authority and roll back the loser`() {
+        val sku = "SKU-PRICE-RACE-${UUID.randomUUID()}"
+        putProduct(sku, "Concurrent policy")
+        val from = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
+        val to = from.plusSeconds(3600)
+        val body = """{"listingSku":"$sku","currency":"ARS","priceScope":"DEFAULT","desiredPrice":90,"validFrom":"$from","validTo":"$to"}"""
+        val ids = (1..2).map {
+            val response = exchange("/api/v1/user/promos", HttpMethod.POST, body, admin.cookie, admin.csrf)
+            assertEquals(200, response.statusCode.value(), response.body)
+            admin = admin.copy(csrf = response.headers.getFirst("X-CSRF-Token")!!)
+            mapper.readTree(response.body).path("data").path("id").asLong()
+        }
+        val competitor = provisionAdmin("admin-race-${UUID.randomUUID()}@example.com")
+        val sessions = listOf(admin, competitor)
+        val ready = java.util.concurrent.CountDownLatch(2)
+        val start = java.util.concurrent.CountDownLatch(1)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        val responses = try {
+            val futures = ids.zip(sessions).map { (id, session) ->
+                executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    ready.countDown()
+                    check(start.await(10, java.util.concurrent.TimeUnit.SECONDS))
+                    exchange("/api/v1/user/promos/$id/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", session.cookie, session.csrf)
+                }
+            }
+            assertTrue(ready.await(10, java.util.concurrent.TimeUnit.SECONDS))
+            start.countDown()
+            futures.map { it.get(30, java.util.concurrent.TimeUnit.SECONDS) }
+        } finally {
+            start.countDown()
+            executor.shutdownNow()
+        }
+        assertEquals(listOf(200, 409), responses.map { it.statusCode.value() }.sorted(), responses.map { it.body }.toString())
+        val winner = responses.indexOfFirst { it.statusCode.value() == 200 }
+        val loser = 1 - winner
+        assertTrue(responses[loser].body!!.contains("PROMO_WINDOW_OVERLAP"))
+        assertTrue(responses[loser].headers.getFirst("X-CSRF-Token") == null)
+        assertNotNull(responses[winner].headers.getFirst("X-CSRF-Token"))
+        assertEquals("ACTIVE", jdbc.queryForObject("SELECT status FROM channel_price_policies WHERE id=?", String::class.java, ids[winner]))
+        assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM channel_price_policies WHERE id=?", String::class.java, ids[loser]))
+        assertTrue(jdbc.queryForMap("SELECT approved_by,approved_at FROM channel_price_policies WHERE id=?", ids[loser]).values.all { it == null })
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM channel_price_policies WHERE id IN (?,?) AND status='ACTIVE'", Int::class.java, ids[0], ids[1]))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE aggregate_type='channel_price_policies' AND aggregate_id IN (?,?) AND event_type='PRICE_POLICY_ACTIVE'", Int::class.java, ids[0], ids[1]))
+        // A failed transaction preserves the losing session's CSRF token.
+        val retry = exchange("/api/v1/user/promos/${ids[loser]}/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", sessions[loser].cookie, sessions[loser].csrf)
+        assertEquals(409, retry.statusCode.value(), retry.body)
+    }
+
+    @Test
+    fun `ml local mapping enforces admin capability same origin csrf and atomic audit`() {
+        val sku = "SKU-MAPPING-${UUID.randomUUID()}"
+        putProduct(sku, "Local mapping")
+        val accountKey = "mapping-${UUID.randomUUID()}"
+        jdbc.update("INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state) VALUES (?,'MERCADO_LIBRE','ref:local-only','ACTIVE')", accountKey)
+        try {
+        val listingId = "mapping-${UUID.randomUUID()}"
+        val path = "/api/v1/user/mercadolibre/listings/$listingId"
+        val body = """{"sku":"$sku","variationId":"v"}"""
+        val operator = provisionAdmin("operator-${UUID.randomUUID()}@example.com", "OPERATOR")
+        val outboxBefore = jdbc.queryForObject("SELECT count(*) FROM channel_outbox", Long::class.java)
+        assertEquals(401, exchange(path, HttpMethod.PUT, body, customer.cookie, customer.csrf).statusCode.value())
+        assertEquals(403, exchange(path, HttpMethod.PUT, body, operator.cookie, operator.csrf).statusCode.value())
+        assertEquals(403, exchange("/api/v1/user/mercadolibre/account", HttpMethod.GET, null, operator.cookie).statusCode.value())
+        assertEquals(403, exchange("/api/v1/user/mercadolibre/listings", HttpMethod.GET, null, operator.cookie).statusCode.value())
+        assertEquals(403, exchange(path, HttpMethod.PUT, body, admin.cookie).statusCode.value())
+        assertEquals(403, exchange(path, HttpMethod.PUT, body, admin.cookie, "invalid").statusCode.value())
+        assertEquals(403, exchange(path, HttpMethod.PUT, body, admin.cookie, admin.csrf, "https://foreign.invalid").statusCode.value())
+        val actorId = jdbc.queryForObject("SELECT id FROM users WHERE email LIKE 'admin-%' ORDER BY id DESC LIMIT 1", Long::class.java)!!
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MARKETPLACE_ML'", Int::class.java)
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), "MARKETPLACE_ML", version, "PAUSED", "{}", UUID.randomUUID(), "test")
+        try {
+            val denied = exchange(path, HttpMethod.PUT, body, admin.cookie, admin.csrf)
+            assertEquals(409, denied.statusCode.value(), denied.body)
+            assertTrue(denied.body!!.contains("CAPABILITY_PAUSED"))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM channel_listings WHERE external_listing_id=?", Int::class.java, listingId))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='ML_LOCAL_MAPPING_SAVED' AND payload_redacted->>'reference'=?", Int::class.java, listingId))
+        } finally { activate("MARKETPLACE_ML") }
+        val staleCsrf = admin.csrf
+        val saved = exchange(path, HttpMethod.PUT, body, admin.cookie, admin.csrf)
+        assertEquals(200, saved.statusCode.value(), saved.body)
+        admin = admin.copy(csrf = saved.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals("UNAVAILABLE", mapper.readTree(saved.body).path("data").path("observedQuantity").path("state").asText())
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM channel_listings WHERE external_listing_id=?", Int::class.java, listingId))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='ML_LOCAL_MAPPING_SAVED' AND payload_redacted->>'reference'=?", Int::class.java, listingId))
+        assertEquals(403, exchange(path, HttpMethod.PUT, body, admin.cookie, staleCsrf).statusCode.value())
+        assertEquals(outboxBefore, jdbc.queryForObject("SELECT count(*) FROM channel_outbox", Long::class.java))
+        } finally {
+            jdbc.update("UPDATE channel_accounts SET state='PAUSED' WHERE account_key=?", accountKey)
+        }
+    }
+
+    @Test
+    fun `expired policy cannot activate and invalid monetary scope inputs do not persist`() {
+        val sku = "SKU-EXPIRED-${UUID.randomUUID()}"
+        putProduct(sku, "Expired policy")
+        val from = Instant.now().minusSeconds(120)
+        val to = from.plusSeconds(60)
+        val body = """{"listingSku":"$sku","currency":"ARS","desiredPrice":90,"validFrom":"$from","validTo":"$to"}"""
+        val created = exchange("/api/v1/user/promos", HttpMethod.POST, body, admin.cookie, admin.csrf)
+        assertEquals(200, created.statusCode.value(), created.body)
+        admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
+        val id = mapper.readTree(created.body).path("data").path("id").asLong()
+        val rejected = exchange("/api/v1/user/promos/$id/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", admin.cookie, admin.csrf)
+        assertEquals(400, rejected.statusCode.value())
+        assertTrue(jdbc.queryForMap("SELECT approved_by,approved_at FROM channel_price_policies WHERE id=?", id).values.all { it == null })
+        for (invalid in listOf(body.replace("\"ARS\"", "\"USD\""), body.replace("\"desiredPrice\":90", "\"desiredPrice\":-1"),
+            body.replace("\"desiredPrice\":90", "\"desiredPrice\":1.123"), body.dropLast(1) + ",\"priceScope\":\"FUTURE\"}",
+            body.dropLast(1) + ",\"effectivePromoPrice\":100}")) {
+            assertEquals(400, exchange("/api/v1/user/promos", HttpMethod.POST, invalid, admin.cookie, admin.csrf).statusCode.value())
+        }
+    }
+
+    @Test
+    fun `channel projections distinguish historical observations from missing external evidence`() {
+        val sku = "SKU-CHANNEL-${UUID.randomUUID()}"
+        putProduct(sku, "Channel item")
+        val account = jdbc.queryForObject("INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state) VALUES (?,'MERCADO_LIBRE','ref:must-never-leak','PAUSED') RETURNING id", Long::class.java, "channel-${UUID.randomUUID()}")!!
+        val variant = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, sku)!!
+        val listing = jdbc.queryForObject("""INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,desired_quantity,observed_quantity,manual_intervention_required,state,updated_at)
+            VALUES (?,'historical','v',?,9,3,true,'ERROR',now()-interval '30 days') RETURNING id""", Long::class.java, account, variant)!!
+        jdbc.update("""INSERT INTO channel_price_policies(listing_id,base_price,desired_price,observed_price,effective_from,effective_to) VALUES (?,100,90,85,now(),now()+interval '1 day')""", listing)
+        jdbc.update("INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,state) VALUES (?,'missing','v',?,'DISABLED')", account, variant)
+        // Page through stable bounded reads; pre-existing data from other tests cannot conceal these rows.
+        val all = mutableListOf<com.fasterxml.jackson.databind.JsonNode>()
+        var page = 0
+        do {
+            val response = exchange("/api/v1/user/mercadolibre/listings?page=$page&size=50", HttpMethod.GET, null, admin.cookie)
+            assertEquals(200, response.statusCode.value(), response.body)
+            val data = mapper.readTree(response.body).path("data")
+            all.addAll(data.path("items").toList())
+            page++
+        } while (all.size < data.path("total").asInt())
+        val historical = all.first { it.path("sku").asText() == sku && it.path("listingId").asText() == "historical" }
+        assertEquals("ERROR", historical.path("status").asText())
+        assertEquals(9, historical.path("desiredQuantity").asInt())
+        assertEquals(3, historical.path("observedQuantity").path("value").asInt())
+        assertEquals("UNVERIFIED", historical.path("observedQuantity").path("freshness").asText())
+        assertEquals(90, historical.path("desiredPrice").asInt())
+        assertEquals(85, historical.path("observedPrice").path("value").asInt())
+        assertEquals("UNVERIFIED", historical.path("observedPrice").path("freshness").asText())
+        assertTrue(historical.path("manualInterventionRequired").asBoolean())
+        assertTrue(!historical.has("observedAt") && !historical.path("observedPrice").has("observedAt"))
+        val missing = all.first { it.path("sku").asText() == sku && it.path("listingId").asText() == "missing" }
+        assertTrue(missing.path("observedQuantity").path("value").isNull)
+        assertEquals("UNAVAILABLE", missing.path("observedPrice").path("state").asText())
+        assertEquals("EXTERNAL_NOT_AVAILABLE", missing.path("observedPrice").path("reason").asText())
+        assertEquals(400, exchange("/api/v1/user/mercadolibre/listings?size=51", HttpMethod.GET, null, admin.cookie).statusCode.value())
+        val accountResponse = exchange("/api/v1/user/mercadolibre/account", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, accountResponse.statusCode.value(), accountResponse.body)
+        assertTrue(!accountResponse.body!!.contains("authorized") && !accountResponse.body!!.contains("secret"))
     }
 
     @Test
@@ -341,10 +526,10 @@ class CommerceHttpIntegrationTest(
         actorId,
     )!!
 
-    private fun provisionAdmin(email: String): Session {
+    private fun provisionAdmin(email: String, role: String = "ADMIN"): Session {
         val hash = passwords.hash("a-very-long-password".toCharArray())
         val userId = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES(?,?, 'Admin','User') RETURNING id", Long::class.java, email, hash)
-        jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code='ADMIN'", userId)
+        jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?, id FROM roles WHERE code=?", userId, role)
         val login = exchange("/api/v1/internal/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
         val cookie = login.headers.getFirst(HttpHeaders.SET_COOKIE) ?: error("admin login ${login.statusCode} ${login.body}")
         val csrf = login.headers.getFirst("X-CSRF-Token") ?: error("admin login missing csrf ${login.statusCode} ${login.body}")
@@ -363,11 +548,11 @@ class CommerceHttpIntegrationTest(
 
     private fun adminUserId() = jdbc.queryForObject("SELECT id FROM users WHERE email LIKE 'admin-%' ORDER BY id DESC LIMIT 1", Long::class.java)!!
 
-    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null) = http.exchange(
+    private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null, origin: String = "http://localhost:4200") = http.exchange(
         URI("http://localhost:$port$path"), method,
         HttpEntity(body, HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
-            set(HttpHeaders.ORIGIN, "http://localhost:4200")
+            set(HttpHeaders.ORIGIN, origin)
             cookie?.let { set(HttpHeaders.COOKIE, it) }
             csrf?.let { set("X-CSRF-Token", it) }
         }), String::class.java,

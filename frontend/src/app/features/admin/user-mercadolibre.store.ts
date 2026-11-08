@@ -18,6 +18,8 @@ export interface UserMercadoLibreState {
   readonly readPhase: MercadoLibreReadPhase;
   readonly hasSnapshot: boolean;
   readonly query: string;
+  readonly page: number;
+  readonly total: number;
 }
 
 function initialState(actor: UserSessionResult | null = null): UserMercadoLibreState {
@@ -29,7 +31,7 @@ function initialState(actor: UserSessionResult | null = null): UserMercadoLibreS
     errorMessage: '',
     readPhase: MercadoLibreReadPhase.Idle,
     hasSnapshot: false,
-    query: '',
+    query: '', page: 0, total: 0,
   };
 }
 
@@ -46,7 +48,7 @@ export class UserMercadoLibreStore extends ComponentStore<UserMercadoLibreState>
   readonly clearQuery = (): void => this.patchState({ query: '' });
 
   setActor(principal: UserSessionResult | null): boolean {
-    const roles = principal?.roles.filter((role) => role === UserRole.Admin || role === UserRole.Operator) ?? [];
+    const roles = principal?.roles.filter((role) => role === UserRole.Admin) ?? [];
     const actor = principal?.id.trim() && roles.length ? { ...principal, id: principal.id.trim(), roles } : null;
     const actorKey = actor ? JSON.stringify([actor.id, roles.map((role) => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
@@ -56,8 +58,15 @@ export class UserMercadoLibreStore extends ComponentStore<UserMercadoLibreState>
     return true;
   }
 
-  readonly loadMercadoLibre = this.effect<void>((trigger$) => trigger$.pipe(
-    switchMap(() => {
+  goToPage(page: number): void {
+    const state = this.snapshot;
+    if (state.loading || !state.hasSnapshot || !Number.isInteger(page) || page < 0 || page > 10000 || page === state.page || page * 25 >= state.total) return;
+    this.patchState({ query: '' });
+    this.loadMercadoLibre(page);
+  }
+  readonly loadMercadoLibre = this.effect<number | void>((trigger$) => trigger$.pipe(
+    switchMap((page) => {
+      const requestedPage = typeof page === 'number' ? page : this.snapshot.page;
       const generation = ++this.generation;
       if (!this.actorKey) {
         this.setState({ ...initialState(), readPhase: MercadoLibreReadPhase.AccessDenied });
@@ -70,11 +79,11 @@ export class UserMercadoLibreStore extends ComponentStore<UserMercadoLibreState>
       });
       return defer(() => forkJoin({
         account: this.ops.readMercadoLibreAccount(),
-        listings: this.ops.listMercadoLibreListings(),
+        listings: this.ops.listMercadoLibreListings(requestedPage),
       })).pipe(tapResponse({
         next: ({ account, listings }) => {
           if (generation !== this.generation) return;
-          this.patchState({ account, listings, loading: false, errorMessage: '', hasSnapshot: true, readPhase: MercadoLibreReadPhase.Ready });
+          this.patchState({ account, listings, page: listings.metadata.page, total: listings.metadata.total, loading: false, errorMessage: '', hasSnapshot: true, readPhase: MercadoLibreReadPhase.Ready });
         },
         error: (error: unknown) => {
           if (generation !== this.generation) return;

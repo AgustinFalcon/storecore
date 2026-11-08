@@ -15,6 +15,8 @@ import { UserStore } from './user.store';
         (draftChange)="store.setPromoDraft($event)"
         (save)="store.persistPromo()"
         (retry)="store.loadPromos()"
+        (pageChange)="store.goToPage($event)"
+        (transition)="store.transitionPromo($event)"
       />
     }
   `,

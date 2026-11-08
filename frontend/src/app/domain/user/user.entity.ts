@@ -1,4 +1,5 @@
 import { InventoryState } from '../catalog/catalog-states';
+import { ChannelAvailability, ChannelFactReason, ChannelObservation, CreateManualPromo, ListingStatus, PolicyStatus } from './channel-pricing';
 import { UserRole } from './user-role';
 import { InventoryAvailability } from './inventory-availability';
 import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
@@ -15,17 +16,13 @@ export interface UserCredentials {
   readonly password: string;
 }
 
-export interface ManualPromo {
+export interface ManualPromo extends CreateManualPromo {
   readonly id: string;
-  readonly listingSku: string;
-  readonly currency: string;
-  readonly validFrom: string;
-  readonly validTo: string;
-  readonly priority: number;
-  readonly margin: number;
-  readonly approvedBy: string;
-  readonly approvedAt: string;
-  readonly writer: 'MANUAL';
+  readonly basePrice: number;
+  readonly observedPrice: ChannelObservation;
+  readonly status: PolicyStatus;
+  readonly approvedBy: string | null;
+  readonly approvedAt: string | null;
 }
 
 export interface ProfilePreview {
@@ -56,13 +53,26 @@ export interface InventoryRow {
 }
 
 export interface MercadoLibreAccount {
-  readonly authorized: boolean;
-  readonly accountRef: string;
+  readonly accountRef: string | null;
   readonly status: MercadoLibreAccountStatus;
+  readonly availability: ChannelAvailability;
+  readonly reason: ChannelFactReason | null;
+  readonly updatedAt: string | null;
 }
 
-export interface MercadoLibreListing {
+export interface MercadoLibreMapping {
   readonly listingId: string;
   readonly variationId: string;
   readonly sku: string;
+}
+
+export interface MercadoLibreListing extends MercadoLibreMapping {
+  readonly accountRef: string;
+  readonly status: ListingStatus;
+  readonly desiredQuantity: number;
+  readonly desiredPrice: number | null;
+  readonly observedQuantity: ChannelObservation;
+  readonly observedPrice: ChannelObservation;
+  readonly manualInterventionRequired: boolean;
+  readonly updatedAt: string | null;
 }

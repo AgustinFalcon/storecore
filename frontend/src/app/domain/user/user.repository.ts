@@ -1,4 +1,5 @@
 import { BoundedRows } from '../catalog/bounded-rows';
+import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
@@ -8,6 +9,7 @@ import {
   ManualPromo,
   MercadoLibreAccount,
   MercadoLibreListing,
+  MercadoLibreMapping,
   ProfilePreview,
   UserCredentials,
   UserSessionResult,
@@ -18,8 +20,9 @@ export interface IUserRepository {
   logout(): Observable<void>;
   readCsrf(): Observable<void>;
   readMe(): Observable<UserSessionResult>;
-  listPromos(): Observable<readonly ManualPromo[]>;
-  savePromo(promo: ManualPromo): Observable<ManualPromo>;
+  listPromos(page?: number): Observable<BoundedRows<ManualPromo>>;
+  savePromo(promo: CreateManualPromo): Observable<ManualPromo>;
+  transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo>;
   listCatalog(): Observable<BoundedRows<ProductDetail>>;
   saveProduct(product: ProductDetail): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
@@ -29,6 +32,6 @@ export interface IUserRepository {
   listCapabilities(): Observable<readonly CapabilityModule[]>;
   listInventory(): Observable<BoundedRows<InventoryRow>>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
-  listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]>;
-  saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing>;
+  listMercadoLibreListings(page?: number): Observable<BoundedRows<MercadoLibreListing>>;
+  saveMercadoLibreListing(listing: MercadoLibreMapping): Observable<MercadoLibreListing>;
 }

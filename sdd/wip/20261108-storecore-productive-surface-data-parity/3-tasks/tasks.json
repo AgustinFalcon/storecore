@@ -2,7 +2,7 @@
   "feature": "20261108-storecore-productive-surface-data-parity",
   "status": "implementation",
   "execution_strategy": "sequential_vertical_slices",
-  "stats": { "total": 10, "done": 5, "in_progress": 1, "pending": 4 },
+  "stats": { "total": 10, "done": 6, "in_progress": 0, "pending": 4 },
   "tasks": [
     { "id": "PSD-T01", "title": "Freeze productive surface coverage manifest", "status": "done", "layer": 1, "complexity": "Medium", "depends_on": [], "requirements": ["PSD-R01", "PSD-R02", "PSD-R08"], "acceptance_criteria": ["All SC-SURF-01..26 have one honest current delivery state, source authority and explicit coverage residual/owner", "Manifest identities/current routes are mechanically checked against SurfaceIdentity and app.routes", "Declared current endpoints and loader stages are checked against controllers and the closed ShowcaseStage set"], "evidence": "surface-data-manifest.json plus frontend/scripts/surface-data-manifest.test.mjs; source-alignment test PASS on 2026-11-08" },
     { "id": "PSD-T02", "title": "Implement favorites vertical", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["PSD-T01"], "requirements": ["PSD-R02", "PSD-R03"], "acceptance_criteria": ["Customer-scoped idempotent CRUD works through HTTP", "Real Angular route has loading/empty/error/unknown states", "PostgreSQL browser journey is owned by cumulative PSD-T08"], "evidence": "Frontend verify PASS: 136 files/992 tests plus build, lint and architecture. Backend PostgreSQL 16 focal gate PASS: 22 tests across capability, migration, closed types and HTTP context. Independent GPT-6.1 Sol code/product and security re-reviews APPROVED with no P0-P3; real favorites browser journey remains explicitly deferred to PSD-T08." },
@@ -12,7 +12,7 @@
     {
       "id": "PSD-T06",
       "title": "Close productive data richness gaps",
-      "status": "in_progress",
+      "status": "done",
       "layer": 1,
       "complexity": "High",
       "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"],
@@ -52,14 +52,15 @@
         {
           "id": "PSD-T06-D",
           "title": "Enrich pricing and channel projections",
-          "status": "pending",
+          "status": "done",
           "depends_on": ["PSD-T06-C"],
           "requirements": ["PSD-R07"],
           "surfaces": ["SC-SURF-19", "SC-SURF-23"],
-          "acceptance_criteria": ["Manual price policy responses preserve only persisted scope, window and server-owned approval evidence; unsupported request fields are rejected and not exposed", "Closed transitions, server-time window, overlap and price invariants commit atomically", "Desired channel state remains distinct from historical observations whose freshness is UNVERIFIED or absent observations that are unavailable", "Entity updatedAt is never presented as observedAt and no freshness TTL is claimed", "Channel lists are bounded and no secret, OAuth assertion, competitor fact or external writer is exposed"]
+          "acceptance_criteria": ["Manual price policy responses preserve only persisted scope, window and server-owned approval evidence; unsupported request fields are rejected and not exposed", "Closed transitions, server-time window, overlap and price invariants commit atomically", "Desired channel state remains distinct from historical observations whose freshness is UNVERIFIED or absent observations that are unavailable", "Entity updatedAt is never presented as observedAt and no freshness TTL is claimed", "Channel lists are bounded and no secret, OAuth assertion, competitor fact or external writer is exposed"],
+          "evidence": "Backend PostgreSQL 16 focal gate PASS: 22 tests across closed pricing/channel domain, atomic activation concurrency, ADMIN/capability/origin/CSRF HTTP boundaries, inbox and architecture. Frontend verify PASS: architecture 9/9, lint, 154 files/1061 tests and production build; focal Playwright 12/12 covers pricing and Mercado Libre at 390/768/1440 with axe and reflow, including navigation across 26 mappings and failed-page retry. The browser gate uses controlled HTTP responses and does not claim a live external Mercado Libre integration."
         }
       ],
-      "evidence": "PSD-T06-A home composition, PSD-T06-B catalog/inventory and PSD-T06-C order/post-sale are implemented with local gates and independent dirty-snapshot reviews approved; PSD-T06-D pricing/channel remains pending."
+      "evidence": "PSD-T06-A home composition, PSD-T06-B catalog/inventory, PSD-T06-C order/post-sale and PSD-T06-D pricing/channel are implemented with bounded local-authority projections and local gates. External provider authority and live Mercado Libre certification remain explicitly outside this task."
     },
     { "id": "PSD-T07", "title": "Extend API-driven showcase loader", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"], "requirements": ["PSD-R09"], "acceptance_criteria": ["First load and replay pass without overwriting unrelated data", "Favorites/offers/customers/overview readback is verified", "External adapters remain disabled"] },
     { "id": "PSD-T08", "title": "Run real integration and migration gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["PSD-T06", "PSD-T07"], "requirements": ["PSD-R01", "PSD-R09"], "acceptance_criteria": ["Clean V1-V12 and V11 upgrade pass on PostgreSQL 16", "Spring/Angular real browser journeys pass", "Production and Demo builds remain isolated"] },
