@@ -159,6 +159,35 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `local offers require admin csrf and expose only committed transitions`() {
+        val sku = "SKU-OFFER-${UUID.randomUUID()}"
+        putProduct(sku, "Offer Item")
+        val startsAt = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
+        val endsAt = startsAt.plus(2, ChronoUnit.DAYS)
+        val body = """{"name":"Oferta web","priority":7,"startsAt":"$startsAt","endsAt":"$endsAt","discountKind":"PERCENT","discountValue":12.5,"minMarginPercent":0,"skus":["$sku"]}"""
+        val before = jdbc.queryForObject("SELECT count(*) FROM offers", Int::class.java)
+        val noCsrf = exchange("/api/v1/user/offers", HttpMethod.POST, body, admin.cookie)
+        assertEquals(403, noCsrf.statusCode.value())
+        val customerDenied = exchange("/api/v1/user/offers", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(401, customerDenied.statusCode.value())
+        assertEquals(before, jdbc.queryForObject("SELECT count(*) FROM offers", Int::class.java))
+
+        val created = exchange("/api/v1/user/offers", HttpMethod.POST, body, admin.cookie, admin.csrf)
+        assertEquals(201, created.statusCode.value(), created.body)
+        assertTrue(created.body!!.contains("\"status\":\"DRAFT\"") && created.body!!.contains(sku))
+        admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
+        val id = mapper.readTree(created.body!!).path("data").path("id").asLong()
+        val active = exchange("/api/v1/user/offers/$id/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", admin.cookie, admin.csrf)
+        assertEquals(200, active.statusCode.value(), active.body)
+        assertTrue(active.body!!.contains("\"status\":\"ACTIVE\""))
+        admin = admin.copy(csrf = active.headers.getFirst("X-CSRF-Token")!!)
+        val listed = exchange("/api/v1/user/offers", HttpMethod.GET, null, admin.cookie)
+        assertEquals(200, listed.statusCode.value())
+        assertTrue(listed.headers.cacheControl.contains("no-store"))
+        assertTrue(listed.body!!.contains("Oferta web") && listed.body!!.contains("\"approvedAt\":"))
+    }
+
+    @Test
     fun `checkout without official accreditation rejects every fulfillment command without effects`() {
         val sku = "SKU-UNPAID-${UUID.randomUUID()}"
         putProduct(sku, "Unpaid item", available = 5, safety = 0)

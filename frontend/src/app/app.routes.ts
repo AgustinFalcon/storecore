@@ -13,6 +13,7 @@ import { UserInventoryComponent } from './features/admin/user-inventory.componen
 import { UserLayoutComponent } from './features/admin/user-layout.component';
 import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
 import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
+import { UserOffersComponent } from './features/admin/user-offers.component';
 import { UserPromosComponent } from './features/admin/user-promos.component';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
@@ -71,6 +72,7 @@ export const routes: Routes = [
           { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
           { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard], canDeactivate: [userContentLeaveGuard] },
           { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
+          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard] },
           { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
           { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
           { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard] },

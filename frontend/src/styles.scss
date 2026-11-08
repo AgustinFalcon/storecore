@@ -119,6 +119,20 @@ textarea:focus-visible {
   margin: var(--sc-space-5) 0;
 }
 
+.sc-card-grid { display: grid; gap: var(--sc-space-4); }
+.sc-card header,
+.sc-page-head--compact,
+.sc-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--sc-space-3); flex-wrap: wrap; }
+.sc-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sc-space-3); }
+.sc-facts div { min-width: 0; }
+.sc-facts dt { color: var(--sc-color-muted-ink); font-size: var(--sc-text-sm); }
+.sc-facts dd { margin: var(--sc-space-1) 0 0; overflow-wrap: anywhere; }
+.sc-modal { width: min(32rem, calc(100% - 2rem)); border: 1px solid var(--sc-color-line); box-shadow: var(--sc-shadow-sm); }
+.sc-modal:not([open]) { display: none; }
+.sc-modal::backdrop { background: rgb(15 23 42 / 65%); }
+
+@media (max-width: 42rem) { .sc-facts { grid-template-columns: 1fr; } }
+
 .stack--wide {
   max-width: 40rem;
 }

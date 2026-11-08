@@ -16,6 +16,7 @@ import { CUSTOMER_REPOSITORY } from './core/tokens/customer.tokens';
 import { HEALTH_REPOSITORY } from './core/tokens/health.tokens';
 import { FAVORITE_REPOSITORY } from './core/tokens/favorite.tokens';
 import { ORDER_REPOSITORY } from './core/tokens/order.tokens';
+import { OFFER_REPOSITORY } from './core/tokens/offer.tokens';
 import { USER_REPOSITORY } from './core/tokens/user.tokens';
 import { ACCESS_REPOSITORY } from './core/tokens/access.tokens';
 import { AccessHttpRepository } from './data/access/access-http.repository';
@@ -25,6 +26,7 @@ import { CustomerHttpRepository } from './data/customer/customer-http.repository
 import { HealthHttpRepository } from './data/health/health-http.repository';
 import { FavoriteHttpRepository } from './data/favorite/favorite-http.repository';
 import { OrderHttpRepository } from './data/order/order-http.repository';
+import { OfferHttpRepository } from './data/offer/offer-http.repository';
 import { UserHttpRepository } from './data/user/user-http.repository';
 
 export const appConfig: ApplicationConfig = {
@@ -48,6 +50,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CUSTOMER_REPOSITORY, useClass: CustomerHttpRepository },
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },
+    { provide: OFFER_REPOSITORY, useClass: OfferHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     ...USE_CASE_PROVIDERS,

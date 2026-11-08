@@ -31,4 +31,19 @@
   backend PostgreSQL 16 focal gate PASS (22 tests); both independent GPT-6.1
   Sol code/product and security re-reviews APPROVED with no P0-P3. The real
   browser journey remains owned by cumulative PSD-T08 and is not claimed here.
+- Implemented PSD-T03 Local Offers end to end over the existing
+  `offers`/`offer_products` authority: ADMIN-only capability checks, USER CSRF,
+  atomic create/transition flows, audit events, deterministic winner order and
+  no Mercado Libre or external writer.
+- Added the productive `/user/offers` Angular surface with HTTP-only data,
+  closed status/discount/transition types, strict wire mapping, validation,
+  explicit product-wide variant scope and an accessible confirmation dialog.
+- Remediated both review rounds: unknown aggregate values now disable every
+  action in view and store, finite values remain typed until the HTTP boundary,
+  the transition set is not extensible, and the native dialog hides when
+  closed, opens after render, handles Escape and restores focus.
+- PSD-T03 final local evidence: frontend `npm run verify` PASS (138 files,
+  1002 tests plus production build); backend PostgreSQL 16 focal gate PASS (14
+  tests); independent GPT-6.1 Sol code/product and security re-reviews APPROVED
+  with no P0-P3. The browser/a11y journey remains owned by PSD-T08.
 

@@ -28,7 +28,7 @@ export class SurfaceIdentity {
   static readonly Overview = new SurfaceIdentity('SC-SURF-15', 'user/home');
   static readonly Content = new SurfaceIdentity('SC-SURF-16', 'user/content');
   static readonly AdminCatalog = new SurfaceIdentity('SC-SURF-17', 'user/catalog');
-  static readonly Offers = new SurfaceIdentity('SC-SURF-18', 'user/offers', false);
+  static readonly Offers = new SurfaceIdentity('SC-SURF-18', 'user/offers');
   static readonly Campaigns = new SurfaceIdentity('SC-SURF-19', 'user/promos');
   static readonly AdminOrders = new SurfaceIdentity('SC-SURF-20', 'user/orders');
   static readonly AdminOrder = new SurfaceIdentity('SC-SURF-21', 'user/orders/:id');

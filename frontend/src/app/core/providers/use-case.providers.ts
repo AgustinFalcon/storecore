@@ -12,7 +12,9 @@ import { FAVORITE_REPOSITORY } from '../tokens/favorite.tokens';
 import { IFavoriteRepository } from '../../domain/favorite/favorite.repository';
 import { IHealthRepository } from '../../domain/health/health.repository';
 import { ORDER_REPOSITORY } from '../tokens/order.tokens';
+import { OFFER_REPOSITORY } from '../tokens/offer.tokens';
 import { IOrderRepository } from '../../domain/order/order.repository';
+import { IOfferRepository } from '../../domain/offer/offer.repository';
 import { USER_REPOSITORY } from '../tokens/user.tokens';
 import { IUserRepository } from '../../domain/user/user.repository';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
@@ -40,6 +42,9 @@ import { GetAdminOrderUseCase } from '../../domain/order/use-cases/get-admin-ord
 import { GetMyOrderUseCase } from '../../domain/order/use-cases/get-my-order.usecase';
 import { ListAdminOrdersUseCase } from '../../domain/order/use-cases/list-admin-orders.usecase';
 import { ListMyOrdersUseCase } from '../../domain/order/use-cases/list-my-orders.usecase';
+import { CreateOfferUseCase } from '../../domain/offer/use-cases/create-offer.usecase';
+import { ListOffersUseCase } from '../../domain/offer/use-cases/list-offers.usecase';
+import { TransitionOfferUseCase } from '../../domain/offer/use-cases/transition-offer.usecase';
 import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
@@ -52,6 +57,9 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 
 /** Angular composition lives outside the framework-free use cases. */
 export const USE_CASE_PROVIDERS: Provider[] = [
+  { provide: CreateOfferUseCase, useFactory: (repo: IOfferRepository) => new CreateOfferUseCase(repo), deps: [OFFER_REPOSITORY] },
+  { provide: ListOffersUseCase, useFactory: (repo: IOfferRepository) => new ListOffersUseCase(repo), deps: [OFFER_REPOSITORY] },
+  { provide: TransitionOfferUseCase, useFactory: (repo: IOfferRepository) => new TransitionOfferUseCase(repo), deps: [OFFER_REPOSITORY] },
   { provide: AddFavoriteUseCase, useFactory: (repo: IFavoriteRepository) => new AddFavoriteUseCase(repo), deps: [FAVORITE_REPOSITORY] },
   { provide: ListFavoritesUseCase, useFactory: (repo: IFavoriteRepository) => new ListFavoritesUseCase(repo), deps: [FAVORITE_REPOSITORY] },
   { provide: RemoveFavoriteUseCase, useFactory: (repo: IFavoriteRepository) => new RemoveFavoriteUseCase(repo), deps: [FAVORITE_REPOSITORY] },
