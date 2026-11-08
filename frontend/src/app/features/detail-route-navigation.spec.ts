@@ -12,6 +12,7 @@ import { UserOrderDetailComponent } from './admin/user-order-detail.component';
 import { UserOrderDetailStore } from './admin/user-order-detail.store';
 import { ProductPageComponent } from './storefront/product-page.component';
 import { CatalogStore } from './storefront/catalog.store';
+import { CustomerFavoritesStore } from './identity/customer-favorites.store';
 
 class DetailStore {
   readonly order$ = new BehaviorSubject<{ id: string } | null>(null);
@@ -43,6 +44,7 @@ for (const entry of cases) {
         providers: [
           { provide: ActivatedRoute, useValue: { paramMap: params.asObservable() } },
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
+          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
       const fixture = TestBed.createComponent(entry.component);
@@ -65,6 +67,7 @@ for (const entry of cases) {
         providers: [
           provideRouter([{ path: entry.path, component: entry.component }]),
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
+          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
       const harness = await RouterTestingHarness.create();

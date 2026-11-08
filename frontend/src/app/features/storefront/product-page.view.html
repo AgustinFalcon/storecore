@@ -71,6 +71,18 @@
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>
+        @if (access.canMutate) {
+          <button
+            type="button"
+            class="sc-btn sc-btn--ghost sc-btn--block"
+            [class.is-on]="favorite"
+            [disabled]="favoriteBusy"
+            (click)="toggleFavorite.emit(product.sku)"
+          >
+            {{ favoriteBusy ? 'Actualizando…' : favorite ? '♥ Quitar de favoritos' : '♡ Guardar en favoritos' }}
+          </button>
+          @if (favoriteFeedback) { <p class="sc-price__meta" role="status">{{ favoriteFeedback }}</p> }
+        }
       </div>
     </div>
   }

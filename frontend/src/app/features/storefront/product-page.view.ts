@@ -18,12 +18,16 @@ export class ProductPageViewComponent implements OnChanges {
   @Input() loading = false;
   @Input() error = '';
   @Input() access = CustomerCartAccess.Unknown;
+  @Input() favorite = false;
+  @Input() favoriteBusy = false;
+  @Input() favoriteFeedback = '';
   quantity = 1;
   activeImage = '';
 
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly selectCustomer = new EventEmitter<void>();
+  @Output() readonly toggleFavorite = new EventEmitter<string>();
 
   ngOnChanges(changes: SimpleChanges): void {
     const product = changes['product'];

@@ -1,6 +1,7 @@
 package com.storecore.configuration.domain
 
 import com.storecore.identity.domain.InternalUserPrincipal
+import com.storecore.identity.domain.CustomerPrincipal
 
 enum class CapabilityState(val wire: String) {
     DISABLED("DISABLED"),
@@ -24,6 +25,7 @@ sealed interface CapabilityActor {
     data object Public : CapabilityActor
     data object System : CapabilityActor
     data class Internal(val principal: InternalUserPrincipal) : CapabilityActor
+    data class Customer(val principal: CustomerPrincipal) : CapabilityActor
 }
 
 data class CapabilityModuleView(

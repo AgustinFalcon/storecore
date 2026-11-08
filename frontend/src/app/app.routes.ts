@@ -20,6 +20,7 @@ import { CheckoutResultComponent } from './features/cart/checkout-result.compone
 import { CustomerAddressesComponent } from './features/identity/customer-addresses.component';
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
 import { CustomerProfileComponent } from './features/identity/customer-profile.component';
+import { CustomerFavoritesComponent } from './features/identity/customer-favorites.component';
 import { CustomerRegisterComponent } from './features/identity/customer-register.component';
 import { CustomerOrderDetailComponent } from './features/orders/customer-order-detail.component';
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
@@ -55,6 +56,7 @@ export const routes: Routes = [
           { path: 'register', component: CustomerRegisterComponent, title: 'Registro' },
           { path: 'profile', component: CustomerProfileComponent, title: 'Perfil', canActivate: [customerGuard] },
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
+          { path: 'favorites', component: CustomerFavoritesComponent, title: 'Favoritos', canActivate: [customerGuard] },
           { path: 'orders', component: CustomerOrdersComponent, title: 'Órdenes', canActivate: [customerGuard] },
           { path: 'orders/:id', component: CustomerOrderDetailComponent, title: 'Orden', canActivate: [customerGuard] },
           { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },

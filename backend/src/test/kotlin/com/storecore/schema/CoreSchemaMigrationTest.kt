@@ -66,9 +66,12 @@ class CoreSchemaMigrationTest {
     }
 
     @Test
-    fun `future optional module remains disabled while core modules can change state`() {
+    fun `promoted favorites capability can be enabled while other optional modules remain guarded`() {
         connection().use { connection ->
-            assertThrows(PSQLException::class.java) { connection.createStatement().use { it.executeUpdate("UPDATE module_configurations SET state = 'ACTIVE' WHERE module_code = 'FAVORITES'") } }
+            assertEquals(0, scalar(connection, "SELECT COUNT(*) FROM capability_modules WHERE module_code='FAVORITES' AND future_optional"))
+            assertEquals(1, scalar(connection, "SELECT COUNT(*) FROM capability_actions WHERE module_code='FAVORITES' AND action_code='READ' AND customer_allowed AND action_kind='READ'"))
+            assertEquals(1, scalar(connection, "SELECT COUNT(*) FROM capability_actions WHERE module_code='FAVORITES' AND action_code='MANAGE' AND customer_allowed"))
+            assertThrows(PSQLException::class.java) { connection.createStatement().use { it.executeUpdate("UPDATE module_configurations SET state = 'ACTIVE' WHERE module_code = 'LOYALTY'") } }
             connection.createStatement().use {
                 it.executeUpdate("INSERT INTO users(email, password_hash, first_name, last_name) VALUES ('schema-fixture@example.com', '\$argon2id\$fixture', 'Schema', 'Fixture') ON CONFLICT (email) DO NOTHING")
                 assertEquals(

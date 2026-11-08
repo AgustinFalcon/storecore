@@ -1,0 +1,46 @@
+@if (store.viewState$ | async; as state) {
+  <section class="sc-page" aria-labelledby="favorites-title" [attr.aria-busy]="state.loading">
+    <header class="sc-page-head">
+      <p class="sc-kicker">Cuenta customer</p>
+      <h1 id="favorites-title">Tus favoritos</h1>
+      <p class="sc-page__lede">Guardá productos para encontrarlos rápido y revisá si siguen disponibles.</p>
+    </header>
+    <sc-feature-status
+      [loading]="state.loading"
+      [error]="state.errorMessage"
+      [empty]="!state.loading && !state.errorMessage && state.items.length === 0"
+      emptyText="Todavía no guardaste productos. Explorá el catálogo y marcá tus preferidos."
+      (retry)="store.load()"
+    />
+    @if (state.feedback) { <p class="sc-notice sc-notice--ok" role="status">{{ state.feedback }}</p> }
+    @if (state.items.length > 0) {
+      <div class="sc-favorites-grid">
+        @for (item of state.items; track item.sku) {
+          <article class="sc-favorite-card">
+            <a class="sc-favorite-card__media" [routerLink]="['/catalog', item.sku]">
+              @if (item.imageUrl) { <img [src]="item.imageUrl" [alt]="item.name" /> }
+              @else { <span aria-hidden="true">▧</span> }
+            </a>
+            <div class="sc-favorite-card__body">
+              <p class="sc-mono">SKU {{ item.sku }}</p>
+              <h2><a [routerLink]="['/catalog', item.sku]">{{ item.name }}</a></h2>
+              <p class="sc-price">{{ item.price }}</p>
+              <span class="sc-badge" [class.sc-badge--ok]="item.availability.canPurchase" [class.sc-badge--warn]="!item.availability.canPurchase">
+                {{ item.availability.label }}
+              </span>
+              @if (!item.availability.canPurchase) {
+                <p class="sc-price__meta">Podés conservarlo para consultar su ficha o quitarlo de la lista.</p>
+              }
+              <div class="sc-favorite-card__actions">
+                <a class="sc-btn sc-btn--ghost" [routerLink]="['/catalog', item.sku]">Ver producto</a>
+                <button type="button" class="sc-btn sc-btn--danger" [disabled]="!!state.mutationSku || !item.availability.canRemove" (click)="store.remove(item.sku)">
+                  {{ state.mutationSku === item.sku ? 'Quitando…' : 'Quitar' }}
+                </button>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+}

@@ -19,7 +19,7 @@ export class SurfaceIdentity {
   static readonly Registration = new SurfaceIdentity('SC-SURF-06', 'customer/register');
   static readonly Profile = new SurfaceIdentity('SC-SURF-07', 'customer/profile');
   static readonly Addresses = new SurfaceIdentity('SC-SURF-08', 'customer/addresses');
-  static readonly Favorites = new SurfaceIdentity('SC-SURF-09', 'customer/favorites', false);
+  static readonly Favorites = new SurfaceIdentity('SC-SURF-09', 'customer/favorites');
   static readonly Cart = new SurfaceIdentity('SC-SURF-10', 'cart');
   static readonly Checkout = new SurfaceIdentity('SC-SURF-11', 'checkout');
   static readonly Result = new SurfaceIdentity('SC-SURF-12', 'checkout/result/:orderId');

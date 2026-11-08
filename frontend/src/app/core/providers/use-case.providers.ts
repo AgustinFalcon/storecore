@@ -8,6 +8,8 @@ import { ICatalogRepository } from '../../domain/catalog/catalog.repository';
 import { CUSTOMER_REPOSITORY } from '../tokens/customer.tokens';
 import { ICustomerRepository } from '../../domain/customer/customer.repository';
 import { HEALTH_REPOSITORY } from '../tokens/health.tokens';
+import { FAVORITE_REPOSITORY } from '../tokens/favorite.tokens';
+import { IFavoriteRepository } from '../../domain/favorite/favorite.repository';
 import { IHealthRepository } from '../../domain/health/health.repository';
 import { ORDER_REPOSITORY } from '../tokens/order.tokens';
 import { IOrderRepository } from '../../domain/order/order.repository';
@@ -30,6 +32,9 @@ import { SaveCustomerProfileUseCase } from '../../domain/customer/use-cases/save
 import { SignInCustomerUseCase } from '../../domain/customer/use-cases/sign-in-customer.usecase';
 import { SignOutCustomerUseCase } from '../../domain/customer/use-cases/sign-out-customer.usecase';
 import { GetHealthUseCase } from '../../domain/health/use-cases/get-health.usecase';
+import { AddFavoriteUseCase } from '../../domain/favorite/use-cases/add-favorite.usecase';
+import { ListFavoritesUseCase } from '../../domain/favorite/use-cases/list-favorites.usecase';
+import { RemoveFavoriteUseCase } from '../../domain/favorite/use-cases/remove-favorite.usecase';
 import { AdvanceFulfillmentUseCase } from '../../domain/order/use-cases/advance-fulfillment.usecase';
 import { GetAdminOrderUseCase } from '../../domain/order/use-cases/get-admin-order.usecase';
 import { GetMyOrderUseCase } from '../../domain/order/use-cases/get-my-order.usecase';
@@ -47,6 +52,9 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 
 /** Angular composition lives outside the framework-free use cases. */
 export const USE_CASE_PROVIDERS: Provider[] = [
+  { provide: AddFavoriteUseCase, useFactory: (repo: IFavoriteRepository) => new AddFavoriteUseCase(repo), deps: [FAVORITE_REPOSITORY] },
+  { provide: ListFavoritesUseCase, useFactory: (repo: IFavoriteRepository) => new ListFavoritesUseCase(repo), deps: [FAVORITE_REPOSITORY] },
+  { provide: RemoveFavoriteUseCase, useFactory: (repo: IFavoriteRepository) => new RemoveFavoriteUseCase(repo), deps: [FAVORITE_REPOSITORY] },
   { provide: AddCartLineUseCase, useFactory: (repo: ICartRepository) => new AddCartLineUseCase(repo), deps: [CART_REPOSITORY] },
   { provide: CheckoutCartUseCase, useFactory: (repo: ICartRepository) => new CheckoutCartUseCase(repo), deps: [CART_REPOSITORY] },
   { provide: GetCartUseCase, useFactory: (repo: ICartRepository) => new GetCartUseCase(repo), deps: [CART_REPOSITORY] },
