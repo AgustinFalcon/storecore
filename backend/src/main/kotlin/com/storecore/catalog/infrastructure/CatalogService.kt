@@ -13,8 +13,6 @@ import javax.sql.DataSource
 
 data class CatalogProduct(val sku: String, val name: String, val description: String, val brand: String, val category: String, val images: List<String>, val variants: List<Map<String, Any?>>, val price: Map<String, Any?>, val offerRef: String?, val active: Boolean)
 data class CatalogFacet(val id: Long, val name: String)
-data class HomeContent(val title: String, val blocks: List<Map<String, Any?>>)
-data class HomeDraft(val title: String, val body: String)
 
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
@@ -36,9 +34,6 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         return CatalogProduct(sku, row["name"] as String, row["description"] as String, row["brand"] as String, row["category"] as String, images, variants, mapOf("base" to base, "desired" to null, "observed" to null, "effective" to base, "priceVersion" to "catalog-${row["id"]}"), null, row["status"] == "ACTIVE")
     }
     fun adminList(): List<CatalogProduct> = jdbc.query("SELECT v.sku FROM product_variants v JOIN products p ON p.id=v.product_id ORDER BY p.name,v.id", { rs, _ -> rs.getString("sku") }).mapNotNull { product(it, admin = true) }
-    fun home(): HomeContent { val rows = jdbc.query("SELECT section_key,content FROM home_content_sections WHERE active ORDER BY sort_order,id", { rs, _ -> rs.getString("section_key") to mapper.readTree(rs.getString("content")) }); val title = rows.firstOrNull { it.first == "hero" }?.second?.path("title")?.asText() ?: "StoreCore"; return HomeContent(title, rows.map { mapOf("id" to it.first, "title" to it.second.path("title").asText(it.first), "body" to it.second.path("body").asText("")) }) }
-    fun adminHomeDraft(): HomeDraft { val json = jdbc.query("SELECT content FROM home_content_sections WHERE section_key='hero'", { rs, _ -> mapper.readTree(rs.getString("content")) }).firstOrNull(); return HomeDraft(json?.path("title")?.asText() ?: "StoreCore", json?.path("body")?.asText() ?: "") }
-    fun saveHome(title: String, body: String, actor: Long): HomeDraft { val json = mapper.createObjectNode().put("title", title).put("body", body); jdbc.update("INSERT INTO home_content_sections(section_key,content,active,sort_order,updated_by) VALUES ('hero',?::jsonb,true,0,?) ON CONFLICT(section_key) DO UPDATE SET content=excluded.content,updated_by=excluded.updated_by,updated_at=now()", json.toString(), actor); audit(actor,"HOME_CONTENT_UPDATED","home_content_sections","hero"); return adminHomeDraft() }
     fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean, actor: Long): CatalogProduct {
         val brandId = named("brands", brand); val categoryId = named("categories", category)
         val base = number(price["base"]) ?: number(price["effective"]) ?: BigDecimal.ZERO

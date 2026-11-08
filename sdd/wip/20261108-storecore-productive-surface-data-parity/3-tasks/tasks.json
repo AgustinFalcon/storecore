@@ -22,11 +22,12 @@
         {
           "id": "PSD-T06-A",
           "title": "Enrich productive home content",
-          "status": "pending",
+          "status": "done",
           "depends_on": [],
           "requirements": ["PSD-R07"],
           "surfaces": ["SC-SURF-01", "SC-SURF-16"],
-          "acceptance_criteria": ["Public reads expose only ordered active known blocks while ADMIN reads include inactive and unknown legacy blocks", "Exact HERO/CATEGORY_RAIL/PRODUCT_RAIL/PROMO_BANNER schemas reject invalid content and external CTA paths", "A singleton composition revision makes REPLACE atomic and returns 409 without changes on stale expectedRevision", "Only a valid legacy section_key=hero translates; other kind-less rows remain admin-visible, public-omitted and write-disabled", "Missing persisted content is not replaced by an invented client default"]
+          "acceptance_criteria": ["Public reads expose only ordered active known blocks while ADMIN reads include inactive and unknown legacy blocks", "Exact HERO/CATEGORY_RAIL/PRODUCT_RAIL/PROMO_BANNER schemas reject invalid content, external CTA paths and CTA paths above 2048 characters", "A singleton composition revision makes REPLACE atomic and returns 409 without changes on stale expectedRevision", "Direct replacement and cumulative profile merges enforce the shared 100-section composition bound under the singleton lock", "Only a valid legacy section_key=hero translates; other kind-less rows remain admin-visible, public-omitted and write-disabled", "Missing persisted content is not replaced by an invented client default"],
+          "evidence": "Backend HomeContent 8/8 + ProfileImport 4/4 + V13 baseline 1/1 PASS; frontend verify 147 files/1037 tests, architecture, lint and production build PASS; Playwright content 2/2 at 320/1440 with axe/no-overflow PASS; independent code/product and security reviews APPROVED on 2026-11-08"
         },
         {
           "id": "PSD-T06-B",

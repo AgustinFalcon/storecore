@@ -1,6 +1,5 @@
 import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { HomeContent, HomeBlock } from '../../domain/catalog/home-content.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
@@ -13,7 +12,6 @@ import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import {
   CapabilityModule,
-  HomeContentDraft,
   InventoryRow,
   ManualPromo,
   MercadoLibreAccount,
@@ -160,23 +158,6 @@ export function mapProductDetail(value: unknown): ProductDetail {
 
 export function mapProductDetails(value: unknown): readonly ProductDetail[] {
   return items(value).map(mapProductDetail);
-}
-
-export function mapHome(value: unknown): HomeContent {
-  const row = asRecord(value);
-  return {
-    title: text(row['title']),
-    blocks: items(row['blocks']).map((block) => {
-      const item = asRecord(block);
-      const mapped: HomeBlock = { id: text(item['id']), title: text(item['title']), body: text(item['body']) };
-      return mapped;
-    }),
-  };
-}
-
-export function mapHomeDraft(value: unknown): HomeContentDraft {
-  const row = asRecord(value);
-  return { title: text(row['title']), body: text(row['body']) };
 }
 
 function mapCartLine(value: unknown): CartLine {

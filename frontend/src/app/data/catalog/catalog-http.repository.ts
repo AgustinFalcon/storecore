@@ -6,10 +6,9 @@ import { readApiBody } from '../../core/api/base-response';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { ICatalogRepository } from '../../domain/catalog/catalog.repository';
-import { HomeContent } from '../../domain/catalog/home-content.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
-import { mapFacets, mapHome, mapProductDetail, mapProductSummaries } from '../mappers/http-mappers';
+import { mapFacets, mapProductDetail, mapProductSummaries } from '../mappers/http-mappers';
 
 @Injectable()
 export class CatalogHttpRepository implements ICatalogRepository {
@@ -36,7 +35,7 @@ export class CatalogHttpRepository implements ICatalogRepository {
 
   readProduct(sku: string): Observable<ProductDetail> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/catalog/products/${sku}`)
+      .get<unknown>(`${environment.apiBaseUrl}/catalog/products/${encodeURIComponent(sku)}`)
       .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));
   }
 
@@ -52,9 +51,4 @@ export class CatalogHttpRepository implements ICatalogRepository {
       .pipe(map((body) => mapFacets(readApiBody<unknown>(body))));
   }
 
-  readHome(): Observable<HomeContent> {
-    return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/content/home`)
-      .pipe(map((body) => mapHome(readApiBody<unknown>(body))));
-  }
 }

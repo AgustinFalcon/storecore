@@ -7,7 +7,6 @@ import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import {
   CapabilityModule,
-  HomeContentDraft,
   InventoryRow,
   ManualPromo,
   MercadoLibreAccount,
@@ -20,7 +19,6 @@ import { IUserRepository } from '../../domain/user/user.repository';
 import {
   mapCapabilities,
   mapFacet,
-  mapHomeDraft,
   mapInventory,
   mapListing,
   mapListings,
@@ -55,18 +53,6 @@ export class UserHttpRepository implements IUserRepository {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/internal/me`)
       .pipe(map((body) => mapUserSession(readApiBody<unknown>(body))));
-  }
-
-  readHome(): Observable<HomeContentDraft> {
-    return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/content/home`)
-      .pipe(map((body) => mapHomeDraft(readApiBody<unknown>(body))));
-  }
-
-  saveHome(draft: HomeContentDraft): Observable<HomeContentDraft> {
-    return this.http
-      .put<unknown>(`${environment.apiBaseUrl}/user/content/home`, draft)
-      .pipe(map((body) => mapHomeDraft(readApiBody<unknown>(body))));
   }
 
   listPromos(): Observable<readonly ManualPromo[]> {

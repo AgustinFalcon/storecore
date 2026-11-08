@@ -96,6 +96,9 @@ failure boundary can be reviewed independently:
    invented by the client. Legacy `hero` content may be translated only when it
    validates as a hero; every other legacy block without a kind remains
    admin-visible but is omitted publicly and cannot be edited as a known kind.
+   A composition contains at most 100 blocks across direct replacement and
+   cumulative profile merges, so a public read cannot amplify an unbounded set
+   of catalog references.
 2. **PSD-T06-B — Catalog and inventory (SC-SURF-04, SC-SURF-05,
    SC-SURF-17, SC-SURF-22).** Public and administrative catalog projections
    expose the locally stored product, variant, attribute, media, price and

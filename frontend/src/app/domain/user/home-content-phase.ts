@@ -7,8 +7,9 @@ export class HomeContentPhase {
   static readonly Saving = new HomeContentPhase('saving', 'Publicando cambios. Esperá antes de salir.', true);
   static readonly Success = new HomeContentPhase('success', 'Contenido publicado correctamente.');
   static readonly Error = new HomeContentPhase('error', 'No pudimos completar la operación.');
+  static readonly Conflict = new HomeContentPhase('conflict', 'La versión publicada cambió. Cargá la versión actual y revisá tu borrador antes de publicar.');
   static readonly AccessDenied = new HomeContentPhase('access-denied', 'Tu sesión no permite editar el contenido. Volvé a ingresar.');
   static readonly Unknown = new HomeContentPhase('unknown', 'Estado no reconocido.');
-  static readonly all = [this.Loading, this.Clean, this.Editing, this.Invalid, this.Saving, this.Success, this.Error, this.AccessDenied];
+  static readonly all = [this.Loading, this.Clean, this.Editing, this.Invalid, this.Saving, this.Success, this.Error, this.Conflict, this.AccessDenied];
   static fromWire(raw: unknown): HomeContentPhase { return this.all.find((value) => value.wire === raw) ?? this.Unknown; }
 }

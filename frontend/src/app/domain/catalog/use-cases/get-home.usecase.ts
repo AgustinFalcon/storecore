@@ -1,11 +1,11 @@
 import { Observable } from 'rxjs';
-import { ICatalogRepository } from '../catalog.repository';
-import { HomeContent } from '../home-content.entity';
+import { IContentRepository } from '../../content/content.repository';
+import { HomeComposition } from '../../content/home-composition';
 
 export class GetHomeUseCase {
-  constructor(private readonly repo: ICatalogRepository) {}
+  constructor(private readonly repo: IContentRepository) {}
 
-  execute(): Observable<HomeContent> {
-    return this.repo.readHome();
+  execute(): Observable<HomeComposition> {
+    return this.repo.readPublic();
   }
 }

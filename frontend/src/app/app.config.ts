@@ -1,4 +1,6 @@
 import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
+import { CONTENT_REPOSITORY } from './core/tokens/content.tokens';
+import { ContentHttpRepository } from './data/content/content-http.repository';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { ApplicationConfig, inject } from '@angular/core';
@@ -51,6 +53,7 @@ export const appConfig: ApplicationConfig = {
     { provide: HEALTH_REPOSITORY, useClass: HealthHttpRepository },
     { provide: FAVORITE_REPOSITORY, useClass: FavoriteHttpRepository },
     { provide: CATALOG_REPOSITORY, useClass: CatalogHttpRepository },
+    { provide: CONTENT_REPOSITORY, useClass: ContentHttpRepository },
     { provide: CUSTOMER_REPOSITORY, useClass: CustomerHttpRepository },
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },

@@ -14,11 +14,6 @@ export interface UserCredentials {
   readonly password: string;
 }
 
-export interface HomeContentDraft {
-  readonly title: string;
-  readonly body: string;
-}
-
 export interface ManualPromo {
   readonly id: string;
   readonly listingSku: string;

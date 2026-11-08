@@ -3,7 +3,6 @@ import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
 import {
   CapabilityModule,
-  HomeContentDraft,
   InventoryRow,
   ManualPromo,
   MercadoLibreAccount,
@@ -18,8 +17,6 @@ export interface IUserRepository {
   logout(): Observable<void>;
   readCsrf(): Observable<void>;
   readMe(): Observable<UserSessionResult>;
-  readHome(): Observable<HomeContentDraft>;
-  saveHome(draft: HomeContentDraft): Observable<HomeContentDraft>;
   listPromos(): Observable<readonly ManualPromo[]>;
   savePromo(promo: ManualPromo): Observable<ManualPromo>;
   listCatalog(): Observable<readonly ProductDetail[]>;

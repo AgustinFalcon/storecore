@@ -1,4 +1,7 @@
 import { Provider } from '@angular/core';
+import { CONTENT_REPOSITORY } from '../tokens/content.tokens';
+import { IContentRepository } from '../../domain/content/content.repository';
+import { ManageHomeCompositionUseCase } from '../../domain/content/manage-home-composition.usecase';
 import { CustomerSession } from '../auth/customer-session';
 import { UserSession } from '../auth/user-session';
 import { CART_REPOSITORY } from '../tokens/cart.tokens';
@@ -59,7 +62,6 @@ import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-in
 import { ReadCapabilitiesUseCase } from '../../domain/user/use-cases/read-capabilities.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
-import { SaveHomeContentUseCase } from '../../domain/user/use-cases/save-home-content.usecase';
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
 import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.usecase';
 
@@ -78,7 +80,7 @@ export const USE_CASE_PROVIDERS: Provider[] = [
   { provide: AddCartLineUseCase, useFactory: (repo: ICartRepository) => new AddCartLineUseCase(repo), deps: [CART_REPOSITORY] },
   { provide: CheckoutCartUseCase, useFactory: (repo: ICartRepository) => new CheckoutCartUseCase(repo), deps: [CART_REPOSITORY] },
   { provide: GetCartUseCase, useFactory: (repo: ICartRepository) => new GetCartUseCase(repo), deps: [CART_REPOSITORY] },
-  { provide: GetHomeUseCase, useFactory: (repo: ICatalogRepository) => new GetHomeUseCase(repo), deps: [CATALOG_REPOSITORY] },
+  { provide: GetHomeUseCase, useFactory: (repo: IContentRepository) => new GetHomeUseCase(repo), deps: [CONTENT_REPOSITORY] },
   { provide: GetProductUseCase, useFactory: (repo: ICatalogRepository) => new GetProductUseCase(repo), deps: [CATALOG_REPOSITORY] },
   { provide: ListCatalogFacetsUseCase, useFactory: (repo: ICatalogRepository) => new ListCatalogFacetsUseCase(repo), deps: [CATALOG_REPOSITORY] },
   { provide: SearchCatalogUseCase, useFactory: (repo: ICatalogRepository) => new SearchCatalogUseCase(repo), deps: [CATALOG_REPOSITORY] },
@@ -103,7 +105,7 @@ export const USE_CASE_PROVIDERS: Provider[] = [
   { provide: ReadCapabilitiesUseCase, useFactory: (repo: IUserRepository) => new ReadCapabilitiesUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManagePromosUseCase, useFactory: (repo: IUserRepository) => new ManagePromosUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ProbeUserSessionUseCase, useFactory: (repo: IUserRepository, session: UserSession) => new ProbeUserSessionUseCase(repo, session), deps: [USER_REPOSITORY, UserSession] },
-  { provide: SaveHomeContentUseCase, useFactory: (repo: IUserRepository) => new SaveHomeContentUseCase(repo), deps: [USER_REPOSITORY] },
+  { provide: ManageHomeCompositionUseCase, useFactory: (repo: IContentRepository) => new ManageHomeCompositionUseCase(repo), deps: [CONTENT_REPOSITORY] },
   { provide: SignInUserUseCase, useFactory: (repo: IUserRepository, session: UserSession) => new SignInUserUseCase(repo, session), deps: [USER_REPOSITORY, UserSession] },
   { provide: SignOutUserUseCase, useFactory: (repo: IUserRepository, session: UserSession) => new SignOutUserUseCase(repo, session), deps: [USER_REPOSITORY, UserSession] },
 ];

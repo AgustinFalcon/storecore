@@ -174,14 +174,14 @@ The exact typed content schemas are:
 
 - `HERO`: `{title,body,ctaLabel?,ctaPath?}` where title is 1..120 characters,
   body is 0..500, optional ctaLabel is at most 80 and optional ctaPath is an
-  internal absolute application route;
+  internal absolute application route of at most 2048 characters;
 - `CATEGORY_RAIL`: `{title,categoryIds}` where title is 1..120 and categoryIds
   contains 1..12 unique existing local category identifiers;
 - `PRODUCT_RAIL`: `{title,skus}` where title is 1..120 and skus contains 1..20
   unique existing local variant SKUs;
 - `PROMO_BANNER`: `{title,body,ctaLabel?,ctaPath?}` where title is 1..120, body
   is 0..300, optional ctaLabel is at most 80 and optional ctaPath is an internal
-  absolute application route.
+  absolute application route of at most 2048 characters.
 
 `kind` is persisted inside the JSON object. For legacy rows, only
 `section_key=hero` may translate to `HERO`, and only if its content validates
@@ -196,7 +196,9 @@ home-composition revision row. The transaction locks it, compares
 increments revision and writes a redacted audit event before commit. A stale
 revision returns HTTP 409 and changes nothing. The mutation is ADMIN-only,
 same-origin, USER-CSRF protected and executed through the existing mutation
-coordinator.
+coordinator. A complete composition is bounded to 100 sections. The existing
+partial universal-profile merge shares the same singleton lock and revision and
+must reject a merge when the resulting composition would exceed that bound.
 
 Acceptance for A: no client default substitutes missing persisted content;
 public/admin visibility follows the active/known and legacy rules above;

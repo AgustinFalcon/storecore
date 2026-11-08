@@ -10,7 +10,6 @@ describe('SearchCatalogUseCase', () => {
       readProduct: () => of() as never,
       listBrands: () => of([]),
       listCategories: () => of([]),
-      readHome: () => of() as never,
     };
     const useCase = new SearchCatalogUseCase(repo);
     const items = await firstValueFrom(useCase.execute({ ...emptyCatalogQuery, query: 'sku-1' }));

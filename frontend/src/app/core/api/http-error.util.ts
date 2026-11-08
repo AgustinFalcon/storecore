@@ -18,6 +18,8 @@ export function getApiErrorMessage(err: unknown): string {
         return 'No hay permiso para esta acción.';
       case 404:
         return 'El recurso solicitado no existe.';
+      case 409:
+        return 'El recurso cambió desde tu última lectura. Conservamos tus cambios; cargá la versión actual y revisalos antes de volver a publicar.';
       case 500:
       case 502:
       case 503:

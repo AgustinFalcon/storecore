@@ -1,6 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { UserRole } from '../src/app/domain/user/user-role';
+import { HomeBlockKind } from '../src/app/domain/content/home-composition';
 
 const envelope = (data: unknown) => ({ code: 200, data, message: null, errorCode: null, retryable: null, traceId: null });
 async function mockSession(page: Page): Promise<void> {
@@ -17,18 +18,20 @@ async function mockSession(page: Page): Promise<void> {
 for (const width of [320, 1440]) {
   test(`content preview, discard, navigation protection and confirmed publication at ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 }); await mockSession(page);
-    let confirmed = { title: 'Portada publicada', body: 'Texto original' }; let writes = 0; let fail = true;
+    let confirmed = { revision: 1, sections: [{key: 'hero', kind: HomeBlockKind.Hero.wire, active: true, sortOrder: 0, content: {title: 'Portada publicada', body: 'Texto original'}, updatedAt: null}] }; let writes = 0; let fail = true;
     await page.route('**/api/v1/user/content/home', async (route) => {
       if (route.request().method() === 'GET') return route.fulfill({ json: envelope(confirmed) });
       writes++;
       if (fail) return route.fulfill({ status: 503, json: envelope(null) });
-      confirmed = route.request().postDataJSON(); return route.fulfill({ json: envelope(confirmed) });
+      const command = route.request().postDataJSON();
+      expect(command.expectedRevision).toBe(confirmed.revision);
+      confirmed = {revision: confirmed.revision + 1, sections: command.sections}; return route.fulfill({ json: envelope(confirmed) });
     });
     await page.goto('/user/content'); const title = page.getByLabel('Título', { exact: true });
-    await expect(title).toHaveValue(confirmed.title);
+    await expect(title).toHaveValue(confirmed.sections[0].content.title);
     await expect(page.getByRole('button', { name: 'Publicar cambios', exact: true })).toBeDisabled();
     await title.fill('Nueva portada <img src=x onerror=alert(1)>');
-    const preview = page.getByRole('region', { name: 'Vista previa de la portada', exact: true });
+    const preview = page.getByRole('complementary', { name: 'Vista previa', exact: true });
     await expect(preview).toContainText('Nueva portada <img src=x onerror=alert(1)>');
     await expect(preview.locator('img')).toHaveCount(0);
     page.once('dialog', (dialog) => dialog.dismiss());

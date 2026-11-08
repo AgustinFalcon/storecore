@@ -5,7 +5,7 @@ import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
-import { HomeContent } from '../../domain/catalog/home-content.entity';
+import { HomeComposition } from '../../domain/content/home-composition';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
@@ -20,7 +20,7 @@ export interface CatalogState {
   readonly products: readonly ProductSummary[];
   readonly brands: readonly CatalogFacet[];
   readonly categories: readonly CatalogFacet[];
-  readonly home: HomeContent | null;
+  readonly home: HomeComposition | null;
   readonly offers: readonly ProductSummary[];
   readonly product: ProductDetail | null;
 }
@@ -80,12 +80,6 @@ export class CatalogStore extends ComponentStore<CatalogState> {
               return of(null);
             }),
           ),
-          offers: this.searchCatalog.execute({ ...emptyCatalogQuery, offersOnly: true }).pipe(
-            catchError((err: unknown) => {
-              remember(err);
-              return of([]);
-            }),
-          ),
           facets: this.listFacets.execute().pipe(
             catchError((err: unknown) => {
               remember(err);
@@ -93,6 +87,19 @@ export class CatalogStore extends ComponentStore<CatalogState> {
             }),
           ),
         }).pipe(
+          switchMap(({ home, facets }) => {
+            const skus = [...new Set(home?.sections.flatMap(section => section.kind.referencesProducts ? section.content.skus ?? [] : []) ?? [])];
+            const products = skus.map(sku => this.getProduct.execute(sku).pipe(
+              switchMap(product => of(product.active && (product.sku === sku || product.variants.some(variant => variant.sku === sku)) ? {
+                sku, name: product.name, price: product.price.effective, originalPrice: null,
+                imageUrl: product.images[0] ?? null, offerRef: product.offerRef,
+              } as ProductSummary : null)),
+              catchError(() => of(null)),
+            ));
+            return (products.length ? forkJoin(products) : of([])).pipe(
+              switchMap(rows => of({ home, facets, offers: rows.filter((row): row is ProductSummary => row !== null) })),
+            );
+          }),
           tapResponse({
             next: ({ home, offers, facets }) =>
               this.patchState({
