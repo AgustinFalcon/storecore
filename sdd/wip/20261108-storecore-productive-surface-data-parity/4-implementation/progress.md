@@ -284,3 +284,8 @@
   PostgreSQL 16.14 gate passes 27/27 tests across commerce HTTP/concurrency,
   Overview, offers, closed catalog state and architecture. Cumulative exact-SHA
   reviews must be repeated; no prior approval is reused.
+- Final cumulative GPT-6.1 Sol code/product and security reviews APPROVED exact
+  code SHA `1a563cdc8c441810c62a77517540019419d82967` against base
+  `e8d2dcd5699f4c578857b2b4013ebe13cbb66d20` with zero P0-P3. PSD-T09 and
+  PSD-T10 are done. The feature is implemented locally; CI, PR integration,
+  deployment and external-provider homologation remain separate release work.
