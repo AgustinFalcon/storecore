@@ -1,9 +1,9 @@
 import { InventoryAvailability } from './inventory-availability';
 
 describe('InventoryAvailability', () => {
-  it('derives availability without subtracting reservations or safety', () => {
+  it('derives saleability after safety without subtracting reservations again', () => {
     expect(InventoryAvailability.fromQuantities(8, 20, 3)).toBe(InventoryAvailability.Normal);
-    expect(InventoryAvailability.fromQuantities(3, 20, 3)).toBe(InventoryAvailability.Low);
+    expect(InventoryAvailability.fromQuantities(3, 20, 3)).toBe(InventoryAvailability.Out);
     expect(InventoryAvailability.fromQuantities(0, 20, 3)).toBe(InventoryAvailability.Out);
   });
 
@@ -16,7 +16,7 @@ describe('InventoryAvailability', () => {
   });
 
   it('translates only exact known values and owns presentation', () => {
-    for (const state of [InventoryAvailability.Normal, InventoryAvailability.Low, InventoryAvailability.Out, InventoryAvailability.Unknown]) {
+    for (const state of [InventoryAvailability.Normal, InventoryAvailability.Unavailable, InventoryAvailability.Out, InventoryAvailability.Unknown]) {
       expect(InventoryAvailability.fromWire(state.wire)).toBe(state);
       expect(state.label.length).toBeGreaterThan(0);
     }

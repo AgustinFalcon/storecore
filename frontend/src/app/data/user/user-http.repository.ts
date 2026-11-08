@@ -1,3 +1,4 @@
+import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
@@ -67,7 +68,7 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapPromo(readApiBody<unknown>(body))));
   }
 
-  listCatalog(): Observable<readonly ProductDetail[]> {
+  listCatalog(): Observable<BoundedRows<ProductDetail>> {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/catalog`)
       .pipe(map((body) => mapProductDetails(readApiBody<unknown>(body))));
@@ -75,7 +76,11 @@ export class UserHttpRepository implements IUserRepository {
 
   saveProduct(product: ProductDetail): Observable<ProductDetail> {
     return this.http
-      .put<unknown>(`${environment.apiBaseUrl}/user/catalog/products/${product.sku}`, product)
+      .put<unknown>(`${environment.apiBaseUrl}/user/catalog/products/${encodeURIComponent(product.sku)}`, {
+        sku: product.sku, name: product.name, description: product.description, brand: product.brand, category: product.category,
+        images: product.images, variants: product.variants.map(variant => ({ id: variant.id, sku: variant.sku, name: variant.name, status: variant.status.wire, attributes: variant.attributes })),
+        price: { base: product.price.base }, status: product.status.wire,
+      })
       .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));
   }
 
@@ -109,7 +114,7 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
   }
 
-  listInventory(): Observable<readonly InventoryRow[]> {
+  listInventory(): Observable<BoundedRows<InventoryRow>> {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/inventory`)
       .pipe(map((body) => mapInventory(readApiBody<unknown>(body))));

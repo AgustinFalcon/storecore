@@ -9,6 +9,7 @@ import { SearchCatalogUseCase } from '../domain/catalog/use-cases/search-catalog
 import { ListCatalogFacetsUseCase } from '../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { CustomerOrderDetailStore } from './orders/customer-order-detail.store';
 import { CatalogStore } from './storefront/catalog.store';
+import { ProductStatus } from '../domain/catalog/catalog-states';
 
 describe('detail reads across route identities', () => {
   it('keeps customer order B when the cancelled A read responds late', () => {
@@ -36,8 +37,8 @@ describe('detail reads across route identities', () => {
     const execute = vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(current);
     const store = new CatalogStore({} as SearchCatalogUseCase, {} as GetHomeUseCase,
       { execute } as unknown as GetProductUseCase, {} as ListCatalogFacetsUseCase);
-    const product: ProductDetail = { sku: 'A', name: 'A', description: '', brand: '', category: '',
-      images: [], variants: [], price: { base: 0, desired: null, observed: null, effective: 0, priceVersion: '1' },
+    const product: ProductDetail = { id: 'p', status: ProductStatus.Active, media: [], sku: 'A', name: 'A', description: '', brand: '', category: '',
+      images: [], variants: [], price: { base: 0, original: 0, offer: null, effective: 0 },
       offerRef: null, active: true };
     store.loadProduct('A');
     old.next(product);

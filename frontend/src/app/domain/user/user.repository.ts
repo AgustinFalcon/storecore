@@ -1,3 +1,4 @@
+import { BoundedRows } from '../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
@@ -19,14 +20,14 @@ export interface IUserRepository {
   readMe(): Observable<UserSessionResult>;
   listPromos(): Observable<readonly ManualPromo[]>;
   savePromo(promo: ManualPromo): Observable<ManualPromo>;
-  listCatalog(): Observable<readonly ProductDetail[]>;
+  listCatalog(): Observable<BoundedRows<ProductDetail>>;
   saveProduct(product: ProductDetail): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
   saveCategory(facet: CatalogFacet): Observable<CatalogFacet>;
   previewProfile(manifest: string): Observable<ProfilePreview>;
   mergeProfile(manifest: string): Observable<ProfilePreview>;
   listCapabilities(): Observable<readonly CapabilityModule[]>;
-  listInventory(): Observable<readonly InventoryRow[]>;
+  listInventory(): Observable<BoundedRows<InventoryRow>>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
   listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]>;
   saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing>;

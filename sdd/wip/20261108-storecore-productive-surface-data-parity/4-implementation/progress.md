@@ -109,4 +109,18 @@
   defines closed policy transitions and server-owned approval. Non-null channel
   observations are historical with unverified freshness, null observations are
   unavailable, and entity update time is not presented as observation time.
+- Completed PSD-T06-B catalog/inventory parity. Product and variant identity,
+  closed status, ordered attributes/media, local offer price and exact inventory
+  facts now round-trip through bounded pages capped at 50. Missing balances stay
+  distinct from known zero; stock formulas and contradictory wire evidence fail
+  closed. V14 preserves variant-attribute display order with a canonical legacy
+  backfill, while reads use a constant four-query page budget.
+- Final T06-B evidence: frontend architecture/lint/build and 149 files with
+  1045 tests PASS; Playwright 7/7 covers axe/reflow inventory and SKU-correct
+  PDP navigation; backend PostgreSQL 16 focal/migration gates PASS. Independent
+  GPT-6.1 Sol code/product and security rereviews approved the same dirty
+  snapshot with zero P0-P3 after remediating max-page, truncated and PDP SKU
+  findings. The full backend suite ran 235 tests: an isolated identity timing
+  rerun passed, while the pre-existing datasource-disabled context test remains
+  outside T06-B and must be repaired as a separate commit.
 

@@ -1,3 +1,4 @@
+import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
@@ -14,7 +15,7 @@ import { mapFacets, mapProductDetail, mapProductSummaries } from '../mappers/htt
 export class CatalogHttpRepository implements ICatalogRepository {
   constructor(private readonly http: HttpClient) {}
 
-  search(query: CatalogQuery): Observable<readonly ProductSummary[]> {
+  search(query: CatalogQuery): Observable<BoundedRows<ProductSummary>> {
     let params = new HttpParams();
     if (query.query) {
       params = params.set('query', query.query);

@@ -1,3 +1,4 @@
+import { BoundedRows } from '../../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import {
   InventoryRow,
@@ -9,7 +10,7 @@ import { IUserRepository } from '../user.repository';
 export class ManageInstallationUseCase {
   constructor(private readonly repo: IUserRepository) {}
 
-  listInventory(): Observable<readonly InventoryRow[]> {
+  listInventory(): Observable<BoundedRows<InventoryRow>> {
     return this.repo.listInventory();
   }
 

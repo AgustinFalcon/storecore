@@ -9,7 +9,7 @@ import java.sql.DriverManager
 
 class CfeBaselineUpgradeMigrationTest {
     @Test
-    fun `published V13 baseline validates as a no-op upgrade and preserves historical rows`() {
+    fun `published V13 baseline upgrades forward and preserves historical rows`() {
         val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
         try {
             postgres.start()
@@ -18,7 +18,9 @@ class CfeBaselineUpgradeMigrationTest {
                 .locations("classpath:db/migration")
                 .load()
 
-            val initial = flyway.migrate()
+            val baseline = Flyway.configure().dataSource(postgres.jdbcUrl, postgres.username, postgres.password)
+                .locations("classpath:db/migration").target("13").load()
+            val initial = baseline.migrate()
             assertEquals("13", initial.targetSchemaVersion.toString())
 
             DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
@@ -31,10 +33,13 @@ class CfeBaselineUpgradeMigrationTest {
             }
 
             val historyBefore = history(postgres)
+            val upgrade = flyway.migrate()
+            assertEquals("14", upgrade.targetSchemaVersion.toString())
+            assertEquals(historyBefore, history(postgres).take(historyBefore.size))
             flyway.validate()
             val noOp = flyway.migrate()
             assertEquals(0, noOp.migrationsExecuted)
-            assertEquals(historyBefore, history(postgres))
+            assertEquals(historyBefore, history(postgres).take(historyBefore.size))
 
             DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
                 connection.createStatement().use { statement ->

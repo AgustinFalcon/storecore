@@ -5,11 +5,12 @@ import { GetProductUseCase } from '../../domain/catalog/use-cases/get-product.us
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { SearchCatalogUseCase } from '../../domain/catalog/use-cases/search-catalog.usecase';
 import { CatalogStore } from './catalog.store';
+import { ProductStatus } from '../../domain/catalog/catalog-states';
 describe('storefront composition references', () => {
   it('fetches exactly configured SKU references independently of catalog search and fails closed when absent', () => {
     const home = {revision: 2, sections: [{key: 'products', kind: Kind.ProductRail, active: true, sortOrder: 0, content: {title: 'Selección', skus: ['A', 'MISSING', 'INACTIVE']}, updatedAt: null}]};
-    const product = {sku: 'A', name: 'Producto real', active: true, variants: [], price: {effective: 42}, images: [], offerRef: null};
-    const read = vi.fn((sku: string) => sku === 'MISSING' ? throwError(() => new Error('404')) : of({...product, sku, active: sku !== 'INACTIVE'}));
+    const product = {sku: 'A', name: 'Producto real', status: ProductStatus.Active, variants: [], price: {effective: 42}, images: [], offerRef: null};
+    const read = vi.fn((sku: string) => sku === 'MISSING' ? throwError(() => new Error('404')) : of({...product, sku, status: sku !== 'INACTIVE' ? ProductStatus.Active : ProductStatus.Draft}));
     const search = vi.fn();
     const store = new CatalogStore({execute: search} as unknown as SearchCatalogUseCase, {execute: () => of(home)} as unknown as GetHomeUseCase, {execute: read} as unknown as GetProductUseCase, {execute: () => of({brands: [], categories: []})} as unknown as ListCatalogFacetsUseCase);
     store.loadStorefront();

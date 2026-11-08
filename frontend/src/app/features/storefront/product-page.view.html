@@ -36,7 +36,7 @@
         <p>{{ product.description }}</p>
         <div class="sc-price-stack">
           @if (hasDiscount) {
-            <p class="sc-price__was">{{ product.price.base }}</p>
+            <p class="sc-price__was">{{ product.price.original }}</p>
           }
           <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</p>
         </div>
@@ -45,24 +45,31 @@
         } @else {
           <span class="sc-badge">sin oferta</span>
         }
-        @if (!product.active) {
-          <span class="sc-badge sc-badge--warn">Inactivo</span>
+        @if (!product.status.isPublic) {
+          <span class="sc-badge sc-badge--warn">{{ product.status.label }}</span>
         }
         <ul class="sc-pdp__variants">
           @for (variant of product.variants; track variant.id) {
-            <li>{{ variant.name }} · disponible {{ variant.availableQuantity }}</li>
+            <li>{{ variant.name }} · {{ variant.availability.label }}
+              @if (variant.inventory.saleable !== null) { · {{ variant.inventory.saleable }} unidades vendibles }
+              <dl>@for (attribute of attributes(variant.attributes); track attribute[0]) { <dt>{{ attribute[0] }}</dt><dd>{{ attribute[1] }}</dd> }</dl>
+            </li>
           }
         </ul>
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
+          <label>Variante<select name="variant" [ngModel]="selectedVariant?.id" (ngModelChange)="selectedVariantId = $event; quantity = 1">
+            @for (variant of product.variants; track variant.id) { <option [value]="variant.id">{{ variant.name }} · {{ variant.availability.label }}</option> }
+          </select></label>
+          @if (!product.variants.length) { <p role="status">Sin variantes disponibles.</p> }
           <label>Cantidad
             <span class="sc-stepper">
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
               <input type="number" name="quantity" min="1" required [(ngModel)]="quantity" />
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" aria-label="Agregar una unidad">+</button>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" [disabled]="!canIncrease" aria-label="Agregar una unidad">+</button>
             </span>
           </label>
           @if (access.canMutate) {
-            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!product.active">Agregar al carrito</button>
+            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPurchase">Agregar al carrito</button>
           } @else if (access.requiresSelection) {
             <p>{{ access.label }}</p>
             <button type="button" class="sc-btn sc-btn--primary sc-btn--block" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>

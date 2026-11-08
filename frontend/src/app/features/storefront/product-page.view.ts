@@ -23,6 +23,7 @@ export class ProductPageViewComponent implements OnChanges {
   @Input() favoriteFeedback = '';
   quantity = 1;
   activeImage = '';
+  selectedVariantId = '';
 
   @Output() readonly add = new EventEmitter<{ sku: string; quantity: number }>();
   @Output() readonly retry = new EventEmitter<void>();
@@ -34,11 +35,28 @@ export class ProductPageViewComponent implements OnChanges {
     if (product && product.previousValue?.sku !== product.currentValue?.sku) {
       this.activeImage = '';
       this.quantity = 1;
+      this.selectedVariantId = '';
     }
   }
 
   get hasDiscount(): boolean {
-    return !!this.product && this.product.price.base > this.product.price.effective;
+    return !!this.product?.price.offer && this.product.price.original !== null && this.product.price.original > this.product.price.effective;
+  }
+
+  get selectedVariant() {
+    return this.product?.variants.find(variant => variant.id === this.selectedVariantId) ??
+      this.product?.variants.find(variant => variant.sku === this.product?.sku) ?? this.product?.variants[0] ?? null;
+  }
+  get canPurchase(): boolean {
+    const variant = this.selectedVariant;
+    return !!this.product?.status.isPublic && !!variant?.status.isPublic && variant.availability.canSell &&
+      Number.isSafeInteger(this.quantity) && this.quantity > 0 && variant.inventory.saleable !== null && this.quantity <= variant.inventory.saleable;
+  }
+  get canIncrease(): boolean {
+    return !!this.selectedVariant?.availability.canSell && this.quantity < (this.selectedVariant.inventory.saleable ?? 0);
+  }
+  attributes(value: Readonly<Record<string, unknown>>): readonly [string, string][] {
+    return Object.entries(value).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]);
   }
 
   changeQty(delta: number): void {
@@ -46,7 +64,7 @@ export class ProductPageViewComponent implements OnChanges {
   }
 
   submit(sku: string): void {
-    if (!this.access.canMutate || !this.product?.active) return;
-    this.add.emit({ sku, quantity: Math.max(1, Number(this.quantity) || 1) });
+    if (!this.access.canMutate || !this.canPurchase) return;
+    this.add.emit({ sku: this.selectedVariant?.sku ?? sku, quantity: this.quantity });
   }
 }

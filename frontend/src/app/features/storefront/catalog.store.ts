@@ -1,3 +1,4 @@
+import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
@@ -17,6 +18,7 @@ export interface CatalogState {
   readonly loading: boolean;
   readonly errorMessage: string;
   readonly query: CatalogQuery;
+  readonly list: ListMetadata | null;
   readonly products: readonly ProductSummary[];
   readonly brands: readonly CatalogFacet[];
   readonly categories: readonly CatalogFacet[];
@@ -29,7 +31,7 @@ const INITIAL: CatalogState = {
   loading: false,
   errorMessage: '',
   query: emptyCatalogQuery,
-  products: [],
+  products: [], list: null,
   brands: [],
   categories: [],
   home: null,
@@ -67,7 +69,7 @@ export class CatalogStore extends ComponentStore<CatalogState> {
 
   readonly loadStorefront = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      tap(() => this.patchState({ loading: true, errorMessage: '', list: null })),
       switchMap(() => {
         let firstError = '';
         const remember = (err: unknown) => {
@@ -90,8 +92,8 @@ export class CatalogStore extends ComponentStore<CatalogState> {
           switchMap(({ home, facets }) => {
             const skus = [...new Set(home?.sections.flatMap(section => section.kind.referencesProducts ? section.content.skus ?? [] : []) ?? [])];
             const products = skus.map(sku => this.getProduct.execute(sku).pipe(
-              switchMap(product => of(product.active && (product.sku === sku || product.variants.some(variant => variant.sku === sku)) ? {
-                sku, name: product.name, price: product.price.effective, originalPrice: null,
+              switchMap(product => of(product.status.isPublic && (product.sku === sku || product.variants.some(variant => variant.sku === sku && variant.status.isPublic)) ? {
+                sku, name: product.name, price: product.price.effective, originalPrice: product.price.offer ? product.price.original : null,
                 imageUrl: product.images[0] ?? null, offerRef: product.offerRef,
               } as ProductSummary : null)),
               catchError(() => of(null)),
@@ -150,8 +152,8 @@ export class CatalogStore extends ComponentStore<CatalogState> {
       switchMap(() =>
         this.searchCatalog.execute(this.snapshot.query).pipe(
           tapResponse({
-            next: (products) => this.patchState({ products, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, products: [], errorMessage: getApiErrorMessage(err) }),
+            next: (products) => this.patchState({ products, list: products.metadata, loading: false }),
+            error: (err: unknown) => this.patchState({ loading: false, products: [], list: null, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
       ),
@@ -164,7 +166,7 @@ export class CatalogStore extends ComponentStore<CatalogState> {
       switchMap((sku) =>
         this.getProduct.execute(sku).pipe(
           tapResponse({
-            next: (product) => this.patchState({ product, loading: false }),
+            next: (product) => this.patchState({ product: product.status.isPublic ? { ...product, variants: product.variants.filter(variant => variant.status.isPublic) } : null, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),

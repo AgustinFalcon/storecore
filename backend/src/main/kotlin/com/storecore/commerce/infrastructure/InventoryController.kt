@@ -14,11 +14,11 @@ import javax.sql.DataSource
 @RestController
 @RequestMapping("/api/v1/user/inventory")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class InventoryController(private val inventory: JdbcInventoryService, private val auth: RequestAuth, private val capabilities: CapabilityDecisionPort) {
+class InventoryController(private val inventory: com.storecore.catalog.infrastructure.JdbcCatalogProjectionReader, private val auth: RequestAuth, private val capabilities: CapabilityDecisionPort) {
     @GetMapping
-    fun list(http: HttpServletRequest): BaseResponse<Any?> {
+    fun list(http: HttpServletRequest, @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") page: Int, @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") size: Int): BaseResponse<Any?> {
         val actor = auth.operatorOrAdmin(http)
         capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
-        return BaseResponse.ok(inventory.list())
+        return BaseResponse.ok(inventory.inventory(page,size))
     }
 }

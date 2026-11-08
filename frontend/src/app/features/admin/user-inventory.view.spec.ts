@@ -4,12 +4,15 @@ import { InventoryFilter } from '../../domain/user/inventory-filter';
 import { InventoryReadState } from './user-inventory-read-state';
 import { UserInventoryState } from './user-inventory.store';
 import { UserInventoryViewComponent } from './user-inventory.view';
+import { InventoryState } from '../../domain/catalog/catalog-states';
+
+const fact = { variantId: 'v', productName: 'Producto', variantLabel: '', onHand: null, saleable: null, updatedAt: null, state: InventoryState.Known };
 
 const rows = [
-  { sku: 'WEB-A', availableQuantity: 8, reservedQuantity: 3, safetyStock: 2, availability: InventoryAvailability.Normal },
-  { sku: 'WEB-B', availableQuantity: 0, reservedQuantity: 2, safetyStock: 1, availability: InventoryAvailability.Out },
+  { ...fact, sku: 'WEB-A', availableQuantity: 8, reservedQuantity: 3, safetyStock: 2, availability: InventoryAvailability.Normal },
+  { ...fact, sku: 'WEB-B', availableQuantity: 0, reservedQuantity: 2, safetyStock: 1, availability: InventoryAvailability.Out },
 ];
-const ready: UserInventoryState = { rows, query: '', filter: InventoryFilter.All, loading: false, hasSnapshot: true, errorMessage: '', readState: InventoryReadState.Ready };
+const ready: UserInventoryState = { rows, list: { total: 100, page: 0, size: 50, truncated: true }, query: '', filter: InventoryFilter.All, loading: false, hasSnapshot: true, errorMessage: '', readState: InventoryReadState.Ready };
 
 describe('User inventory read-only presentation', () => {
   function render(patch: Partial<UserInventoryState> = {}) {
@@ -44,7 +47,7 @@ describe('User inventory read-only presentation', () => {
   });
 
   it('displays unknown quantities honestly and propagates missing totals', () => {
-    const fixture = render({ rows: [{ sku: 'UNKNOWN', availableQuantity: null, reservedQuantity: 2, safetyStock: null, availability: InventoryAvailability.Unknown }] });
+    const fixture = render({ rows: [{ ...fact, sku: 'UNKNOWN', availableQuantity: null, reservedQuantity: 2, safetyStock: null, availability: InventoryAvailability.Unknown }] });
     expect(fixture.componentInstance.availableTotal).toBeNull();
     expect(fixture.componentInstance.safetyTotal).toBeNull();
     expect(fixture.nativeElement.querySelector('tbody').textContent).toContain(InventoryAvailability.Unknown.label);

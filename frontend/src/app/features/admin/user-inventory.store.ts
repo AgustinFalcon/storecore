@@ -1,3 +1,4 @@
+import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
@@ -11,6 +12,7 @@ import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-in
 import { InventoryReadState } from './user-inventory-read-state';
 
 export interface UserInventoryState {
+  readonly list: ListMetadata | null;
   readonly rows: readonly InventoryRow[];
   readonly loading: boolean;
   readonly errorMessage: string;
@@ -21,7 +23,7 @@ export interface UserInventoryState {
 }
 
 function initialState(): UserInventoryState {
-  return { rows: [], loading: false, errorMessage: '', readState: InventoryReadState.Idle,
+  return { list: null, rows: [], loading: false, errorMessage: '', readState: InventoryReadState.Idle,
     hasSnapshot: false, query: '', filter: InventoryFilter.All };
 }
 
@@ -67,13 +69,13 @@ export class UserInventoryStore extends ComponentStore<UserInventoryState> {
       return defer(() => this.ops.listInventory()).pipe(tapResponse({
         next: (rows) => {
           if (generation !== this.generation) return;
-          this.patchState({ rows, loading: false, errorMessage: '', hasSnapshot: true, readState: InventoryReadState.Ready });
+          this.patchState({ rows, list: rows.metadata, loading: false, errorMessage: '', hasSnapshot: true, readState: InventoryReadState.Ready });
         },
         error: (error: unknown) => {
           if (generation !== this.generation) return;
           const denied = error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
           if (denied) {
-            this.patchState({ rows: [], hasSnapshot: false, loading: false, errorMessage: getApiErrorMessage(error), readState: InventoryReadState.AccessDenied });
+            this.patchState({ rows: [], list: null, hasSnapshot: false, loading: false, errorMessage: getApiErrorMessage(error), readState: InventoryReadState.AccessDenied });
           } else {
             this.patchState({ loading: false, errorMessage: getApiErrorMessage(error),
               readState: this.snapshot.hasSnapshot ? InventoryReadState.Stale : InventoryReadState.Error });

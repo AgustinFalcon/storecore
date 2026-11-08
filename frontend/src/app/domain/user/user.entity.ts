@@ -1,3 +1,4 @@
+import { InventoryState } from '../catalog/catalog-states';
 import { UserRole } from './user-role';
 import { InventoryAvailability } from './inventory-availability';
 import { MercadoLibreAccountStatus } from './mercadolibre-account-status';
@@ -40,6 +41,13 @@ export interface CapabilityModule {
 }
 
 export interface InventoryRow {
+  readonly variantId: string;
+  readonly productName: string;
+  readonly variantLabel: string;
+  readonly onHand: number | null;
+  readonly saleable: number | null;
+  readonly updatedAt: string | null;
+  readonly state: InventoryState;
   readonly sku: string;
   readonly availableQuantity: number | null;
   readonly reservedQuantity: number | null;

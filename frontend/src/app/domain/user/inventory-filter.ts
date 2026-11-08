@@ -6,11 +6,11 @@ export class InventoryFilter {
 
   static readonly All = new InventoryFilter('ALL', 'Todos los estados', null);
   static readonly Normal = new InventoryFilter('NORMAL', InventoryAvailability.Normal.label, InventoryAvailability.Normal);
-  static readonly Low = new InventoryFilter('LOW', InventoryAvailability.Low.label, InventoryAvailability.Low);
+  static readonly Unavailable = new InventoryFilter('UNAVAILABLE', InventoryAvailability.Unavailable.label, InventoryAvailability.Unavailable);
   static readonly Out = new InventoryFilter('OUT', InventoryAvailability.Out.label, InventoryAvailability.Out);
   static readonly Unknown = new InventoryFilter('UNKNOWN', InventoryAvailability.Unknown.label, InventoryAvailability.Unknown);
   static readonly values: readonly InventoryFilter[] = Object.freeze([
-    InventoryFilter.All, InventoryFilter.Normal, InventoryFilter.Low, InventoryFilter.Out, InventoryFilter.Unknown,
+    InventoryFilter.All, InventoryFilter.Normal, InventoryFilter.Unavailable, InventoryFilter.Out, InventoryFilter.Unknown,
   ]);
 
   static fromWire(raw: unknown): InventoryFilter {
