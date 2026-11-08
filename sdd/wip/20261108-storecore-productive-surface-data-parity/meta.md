@@ -1,7 +1,7 @@
 # StoreCore productive surface data parity
 
 Feature: `20261108-storecore-productive-surface-data-parity`
-Status: `spec_review`
+Status: `implementation`
 Branch: `codex/storecore-production-data-coverage`
 Owner: StoreCore core maintainers.
 

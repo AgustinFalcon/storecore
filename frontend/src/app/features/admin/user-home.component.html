@@ -1,0 +1,40 @@
+@if (store.vm$ | async; as state) {
+  <section class="overview" aria-labelledby="operations-title">
+    <header class="overview__head">
+      <div><p class="sc-eyebrow">StoreCore · Operaciones</p><h1 id="operations-title">Resumen operativo</h1><p>Datos productivos del comercio. Las cifras no disponibles se identifican y nunca se reemplazan por cero.</p></div>
+      <label class="sc-field" for="overview-period">Período
+        <select id="overview-period" [ngModel]="state.period" (ngModelChange)="changePeriod($event)" [disabled]="state.loading">
+          @for (period of periods; track period.wire) { <option [ngValue]="period">{{ period.label }}</option> }
+        </select>
+      </label>
+    </header>
+    @if (state.loading) { <p class="status" role="status">Actualizando el resumen…</p> }
+    @if (state.errorMessage) { <div class="status status--error" role="alert"><p>{{ state.errorMessage }}</p><button class="status__retry" (click)="store.load(state.period)">Reintentar</button></div> }
+    @if (state.overview; as overview) {
+      <p class="overview__range">{{ overview.period.label }} · {{ range(overview) }} · Zona {{ overview.timezone }}</p>
+      <div class="sc-metrics" aria-label="Indicadores del período">
+        <article class="sc-metric"><span>Ingresos acreditados</span>@if (factValue(overview.accreditedRevenue) !== null) { <strong>{{ factValue(overview.accreditedRevenue) | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong> } @else { <strong class="unavailable">No disponible</strong><small>{{ overview.accreditedRevenue.reason?.label ?? 'El origen no confirmó este dato.' }}</small> }</article>
+        <article class="sc-metric"><span>Pedidos creados</span>@if (factValue(overview.orderCount) !== null) { <strong>{{ factValue(overview.orderCount) }}</strong> } @else { <strong class="unavailable">No disponible</strong><small>{{ overview.orderCount.reason?.label ?? 'El origen no confirmó este dato.' }}</small> }</article>
+        <article class="sc-metric"><span>Clientes activos</span>@if (factValue(overview.activeCustomerCount) !== null) { <strong>{{ factValue(overview.activeCustomerCount) }}</strong> } @else { <strong class="unavailable">No disponible</strong><small>{{ overview.activeCustomerCount.reason?.label ?? 'El origen no confirmó este dato.' }}</small> }</article>
+        <article class="sc-metric"><span>Variantes con riesgo</span>@if (factValue(overview.inventoryAtRiskCount) !== null) { <strong>{{ factValue(overview.inventoryAtRiskCount) }}</strong> } @else { <strong class="unavailable">No disponible</strong><small>{{ overview.inventoryAtRiskCount.reason?.label ?? 'El origen no confirmó este dato.' }}</small> }</article>
+      </div>
+      <div class="overview__queues">
+        <section class="sc-card" aria-labelledby="pending-title"><header><div><p class="sc-eyebrow">Cobros</p><h2 id="pending-title">Pagos que requieren atención</h2></div><a routerLink="/user/orders">Ver pedidos</a></header>
+          @if (!queueAvailable(overview.pendingPayments)) { <p class="unavailable">Cola no disponible. {{ overview.pendingPayments.reason?.label }}</p> }
+          @else { @if (overview.pendingPayments.truncated) { <p class="overview__count">Mostrando {{ overview.pendingPayments.items.length }} de {{ overview.pendingPayments.totalCount }} pagos que requieren atención.</p> } <ul class="overview__list">@for (item of overview.pendingPayments.items; track item.orderId) { <li><div><strong>{{ item.orderNumber }}</strong><span>{{ item.reason.label }} · {{ instant(item.createdAt, overview.timezone) }}</span></div><strong>{{ item.total | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong></li> } @empty { <li class="overview__empty">No hay pagos pendientes en este momento.</li> }</ul> }
+        </section>
+        <section class="sc-card" aria-labelledby="fulfillment-title"><header><div><p class="sc-eyebrow">Despacho</p><h2 id="fulfillment-title">Pedidos pagados por preparar</h2></div><a routerLink="/user/orders">Gestionar</a></header>
+          @if (!queueAvailable(overview.fulfillment)) { <p class="unavailable">Cola no disponible. {{ overview.fulfillment.reason?.label }}</p> }
+          @else { @if (overview.fulfillment.truncated) { <p class="overview__count">Mostrando {{ overview.fulfillment.items.length }} de {{ overview.fulfillment.totalCount }} pedidos por despachar.</p> } <ul class="overview__list">@for (item of overview.fulfillment.items; track item.orderId) { <li><div><strong>{{ item.orderNumber }}</strong><span>{{ item.shipmentState.label }} · pago {{ instant(item.paidAt, overview.timezone) }}</span></div><strong>{{ item.total | currency:'ARS':'symbol-narrow':'1.0-0' }}</strong></li> } @empty { <li class="overview__empty">No hay pedidos pagados esperando despacho.</li> }</ul> }
+        </section>
+        <section class="sc-card overview__stock" aria-labelledby="stock-title"><header><div><p class="sc-eyebrow">Inventario</p><h2 id="stock-title">Stock en nivel de seguridad</h2></div><a routerLink="/user/inventory">Revisar inventario</a></header>
+          @if (!queueAvailable(overview.lowStock)) { <p class="unavailable">Cola no disponible. {{ overview.lowStock.reason?.label }}</p> }
+          @else { @if (overview.lowStock.truncated) { <p class="overview__count">Mostrando {{ overview.lowStock.items.length }} de {{ overview.lowStock.totalCount }} variantes en riesgo.</p> } <ul class="overview__list">@for (item of overview.lowStock.items; track item.variantId) { <li><div><strong>{{ item.productName }} · {{ item.variantLabel }}</strong><span>{{ item.sku }}</span></div><span><strong>{{ item.availableQuantity }}</strong> disponibles · seguridad {{ item.safetyStock }}</span></li> } @empty { <li class="overview__empty">No hay variantes en nivel de seguridad.</li> }</ul> }
+        </section>
+      </div>
+    }
+    <section class="sc-card overview__shortcuts"><header><div><p class="sc-eyebrow">Accesos</p><h2>Tareas disponibles para tu rol</h2></div><a routerLink="/catalog">Ver tienda</a></header>
+      <ul>@for (action of actions(); track action) { <li><a [routerLink]="action.path">{{ action.label }} <span aria-hidden="true">→</span></a></li> } @empty { <li>No hay acciones disponibles para este acceso.</li> }</ul>
+    </section>
+  </section>
+}

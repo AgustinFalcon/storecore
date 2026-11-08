@@ -19,6 +19,8 @@ view consumes labels and rules from those values and never compares literals.
 - `DiscountKind`: `Percent`, `Fixed`, `Unknown`.
 - `CustomerAccountState`: `Active`, `Suspended`, `Unknown`.
 - `OverviewFactState`: `Known`, `Unavailable`, `Unknown`.
+- `OverviewUnavailableReason`: `PaymentFactsIncomplete`,
+  `ShipmentFactsIncomplete`, `InventoryFactsIncomplete`, `Unknown`.
 - `FavoriteAvailability`: `Available`, `Unavailable`, `Unknown`.
 - `FavoriteMutationOutcome`: `Added`, `AlreadyPresent`, `Removed`,
   `AlreadyAbsent`, `LimitReached`, `Unknown`.
@@ -110,6 +112,15 @@ variants at/below safety stock. Accredited revenue includes an order once only
 when its authoritative payment is APPROVED and excludes REFUNDED,
 CHARGED_BACK, CANCELLED and unknown payment states. Missing or contradictory
 facts produce `UNAVAILABLE` with no numeric value, never zero.
+
+Each work queue is a bounded projection, never an unbounded historical load.
+`KNOWN` queues expose `totalCount`, at most 50 `items` in deterministic
+attention order and `truncated = totalCount > items.length`; `UNAVAILABLE`
+queues expose `totalCount = null`, `items = []`, `truncated = false` and a
+non-empty reason. Counts and contradiction checks are derived with SQL
+aggregates, not by loading every candidate or building one bind parameter per
+row. The UI names a truncated result explicitly instead of presenting it as a
+complete queue.
 
 ## Angular routing
 

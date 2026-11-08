@@ -8,13 +8,13 @@
     "SC-SURF-07": "customers", "SC-SURF-08": "customer_addresses", "SC-SURF-09": "customer_favorites+product_variants+products",
     "SC-SURF-10": "carts+cart_items", "SC-SURF-11": "checkout_idempotency_claims+orders+payments",
     "SC-SURF-12": "orders+payments+shipments", "SC-SURF-13": "orders+payments+shipments",
-    "SC-SURF-14": "orders+payments+shipments+returns", "SC-SURF-15": "planned_overview_read_model",
+    "SC-SURF-14": "orders+payments+shipments+returns", "SC-SURF-15": "orders+payments+mp_order_commercial_applications+mp_order_reversal_cases+shipments+customers+inventory_balances",
     "SC-SURF-16": "home_content_sections", "SC-SURF-17": "products+product_variants+product_images+inventory_balances",
     "SC-SURF-18": "offers+offer_products", "SC-SURF-19": "channel_price_policies",
     "SC-SURF-20": "orders+payments+shipments+returns", "SC-SURF-21": "orders+payments+shipments+returns",
     "SC-SURF-22": "inventory_balances", "SC-SURF-23": "channel_accounts+channel_listings",
     "SC-SURF-24": "module_configurations+capability_kill_switches", "SC-SURF-25": "universal_profile_imports",
-    "SC-SURF-26": "planned_customer_service_projection"
+    "SC-SURF-26": "customers+orders+identity_sessions+audit_events"
   },
   "targets": {
     "SC-SURF-01": { "ownerTask": "PSD-T06", "operations": ["richer composition read"], "fields": ["typed blocks", "category merchandising"] },
@@ -50,7 +50,7 @@
     { "id": "SC-SURF-12", "name": "Checkout result", "route": "/checkout/result/:orderId", "state": "REAL", "read": ["GET /api/v1/customer/orders/{id}"], "writes": [], "loaderStage": "PENDING_ORDER", "coverage": "LOCAL_PENDING_COMPLETE" },
     { "id": "SC-SURF-13", "name": "Customer orders", "route": "/customer/orders", "state": "REAL", "read": ["GET /api/v1/customer/orders"], "writes": [], "loaderStage": "PENDING_ORDER", "coverage": "LIMITED" },
     { "id": "SC-SURF-14", "name": "Customer order detail", "route": "/customer/orders/:id", "state": "REAL", "read": ["GET /api/v1/customer/orders/{id}"], "writes": [], "loaderStage": "PENDING_ORDER", "coverage": "LIMITED" },
-    { "id": "SC-SURF-15", "name": "Operator dashboard", "route": "/user/home", "state": "REAL", "read": ["GET /api/v1/internal/me", "GET /api/v1/user/capabilities"], "writes": [], "loaderStage": "ADMIN_AUTHENTICATION", "coverage": "PSD-T05" },
+    { "id": "SC-SURF-15", "name": "Operator dashboard", "route": "/user/home", "state": "REAL", "read": ["GET /api/v1/internal/me", "GET /api/v1/user/overview"], "writes": [], "loaderStage": "ADMIN_AUTHENTICATION", "coverage": "COMPLETE" },
     { "id": "SC-SURF-16", "name": "Content management", "route": "/user/content", "state": "REAL", "read": ["GET /api/v1/user/content/home"], "writes": ["PUT /api/v1/user/content/home"], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LIMITED" },
     { "id": "SC-SURF-17", "name": "Product administration", "route": "/user/catalog", "state": "REAL", "read": ["GET /api/v1/user/catalog"], "writes": ["PUT /api/v1/user/catalog/products/{sku}", "PUT /api/v1/user/catalog/brands/{id}", "PUT /api/v1/user/catalog/categories/{id}"], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LIMITED" },
     { "id": "SC-SURF-18", "name": "Offers", "route": "/user/offers", "state": "REAL", "read": ["GET /api/v1/user/offers"], "writes": ["POST /api/v1/user/offers", "POST /api/v1/user/offers/{id}/state"], "loaderStage": null, "coverage": "COMPLETE" },

@@ -63,4 +63,22 @@
   PASS (5 tests including rollback and lock race); independent GPT-6.1 Sol
   code/product and security re-reviews APPROVED with no P0-P3. Browser/a11y
   remains owned by PSD-T08.
+- Implemented the PSD-T05 Operator Overview read model for ADMIN and OPERATOR.
+  Period metrics use installation-timezone calendar boundaries while payment,
+  fulfillment and low-stock queues remain a current work snapshot independent
+  of the selected period. Revenue is correlated to an authoritative APPROVED
+  payment and contradictory evidence becomes `UNAVAILABLE`, never zero.
+- Added the productive Angular overview with strict HTTP mapping, closed period,
+  fact, payment-reason and shipment-state types, explicit unavailable states,
+  responsive operational queues and role-aware shortcuts. A known numeric zero
+  remains visibly distinct from an unavailable fact.
+- PSD-T05 final local evidence: frontend `npm run verify` PASS (architecture,
+  lint, 142 files/1023 tests and production build); backend PostgreSQL 16/Spring
+  focal gate PASS (6 tests). Review remediations separated period metrics from
+  current work, replaced unbounded materialization with exact SQL aggregates
+  and bounded queues, required durable correlated payment authority, handled
+  reversals/incidents fail-closed, formatted installation-local time, typed
+  unavailable reasons and updated the manifest. Independent GPT-6.1 Sol
+  code/product and security final snapshot reviews APPROVED with no P0-P3.
+  Browser/a11y remains owned by PSD-T08; exact-SHA review follows the commit.
 
