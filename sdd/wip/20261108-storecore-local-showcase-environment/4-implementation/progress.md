@@ -10,3 +10,5 @@
   steps. No external integration is activated.
 - Local API execution remains pending because it requires a disposable running
   StoreCore installation and operator-supplied ADMIN credentials.
+- Local static gates after `npm ci`: showcase unit tests 3/3 PASS, domain
+  boundary tests 7/7 PASS, architecture scan PASS and frontend lint PASS.
