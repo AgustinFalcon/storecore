@@ -1,4 +1,5 @@
 import { Subject } from 'rxjs';
+import { mapCustomerOrder } from '../data/mappers/http-mappers';
 import { CustomerOrder } from '../domain/order/order.entity';
 import { OrderStatus, PaymentStatus, ShipmentStatus } from '../domain/order/commerce-states';
 import { GetMyOrderUseCase } from '../domain/order/use-cases/get-my-order.usecase';
@@ -19,7 +20,7 @@ describe('detail reads across route identities', () => {
     const store = new CustomerOrderDetailStore({ execute } as unknown as GetMyOrderUseCase);
     let displayed: CustomerOrder | null = null;
     const subscription = store.order$.subscribe((value) => { displayed = value; });
-    const order = (id: string): CustomerOrder => ({ id, orderStatus: OrderStatus.Paid,
+    const order = (id: string): CustomerOrder => ({ ...mapCustomerOrder({}), id, orderStatus: OrderStatus.Paid,
       paymentStatus: PaymentStatus.Approved, shipmentStatus: ShipmentStatus.Preparing,
       tracking: null, total: 0, lines: [] });
     store.load('A');

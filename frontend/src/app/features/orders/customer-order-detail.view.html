@@ -13,10 +13,11 @@
       <h1 id="order-detail-title">Orden {{ order.id }}</h1>
       <p>
         <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
-        <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+        <span class="sc-badge sc-badge--info">pago {{ order.payment.value?.label ?? order.payment.state.label }}</span>
         <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
       </p>
     </header>
+    <sc-order-facts [order]="order" />
     <div class="sc-workbench">
       <div class="sc-table-wrap">
         <table class="sc-table">
@@ -43,7 +44,7 @@
       </div>
       <aside class="sc-summary">
         <h2>Entrega</h2>
-        <p class="sc-price__meta">tracking {{ order.tracking || '—' }}</p>
+        <p class="sc-price__meta">Tracking {{ order.tracking || 'No disponible' }}</p>
         <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
         <p class="sc-callout">Lectura solamente. Esta orden no se edita desde acá.</p>
       </aside>

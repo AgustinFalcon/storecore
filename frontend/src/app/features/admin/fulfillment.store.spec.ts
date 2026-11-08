@@ -13,8 +13,8 @@ describe('FulfillmentStore authoritative reload', () => {
   it('reloads after ambiguous transport failure and serializes in-flight mutations', async () => {
     const injector = createEnvironmentInjector([], null as unknown as EnvironmentInjector);
     const response = new Subject<AdminOrder>();
-    const authoritative = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', shipmentStatus: 'PREPARING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'SHIPPED' });
-    const read = vi.fn(() => of([authoritative]));
+    const authoritative = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PREPARING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'SHIPPED' });
+    const read = vi.fn(() => of({ items: [authoritative], page: 0, size: 25, total: 1, truncated: false }));
     const send = vi.fn(() => response);
     const store = runInInjectionContext(injector, () => new FulfillmentStore({ execute: read } as unknown as ListAdminOrdersUseCase, { ship: send } as unknown as AdvanceFulfillmentUseCase));
     try {
@@ -30,11 +30,11 @@ describe('FulfillmentStore authoritative reload', () => {
   });
   it('invalidates an actionable prior snapshot until an authoritative GET succeeds', async () => {
     const injector = createEnvironmentInjector([], null as unknown as EnvironmentInjector);
-    const stale = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', shipmentStatus: 'PENDING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'PACKED' });
+    const stale = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PENDING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'PACKED' });
     const authoritative = { ...stale, shipmentStatus: ShipmentStatus.Preparing, shipmentAction: ShipmentTransition.Shipped };
-    const failedReload = new Subject<readonly AdminOrder[]>();
-    const retryReload = new Subject<readonly AdminOrder[]>();
-    const read = vi.fn().mockReturnValueOnce(of([stale])).mockReturnValueOnce(failedReload).mockReturnValueOnce(retryReload);
+    const failedReload = new Subject<unknown>();
+    const retryReload = new Subject<unknown>();
+    const read = vi.fn().mockReturnValueOnce(of({ items: [stale], page: 0, size: 25, total: 1, truncated: false })).mockReturnValueOnce(failedReload).mockReturnValueOnce(retryReload);
     const store = runInInjectionContext(injector, () => new FulfillmentStore({ execute: read } as unknown as ListAdminOrdersUseCase, { ship: () => throwError(() => new Error('timeout')) } as unknown as AdvanceFulfillmentUseCase));
     try {
       store.load();
@@ -49,7 +49,7 @@ describe('FulfillmentStore authoritative reload', () => {
       store.load();
       expect(await firstValueFrom(store.loading$)).toBe(true);
       expect(await firstValueFrom(store.orders$)).toEqual([]);
-      retryReload.next([authoritative]);
+      retryReload.next({ items: [authoritative], page: 0, size: 25, total: 1, truncated: false });
       expect(await firstValueFrom(store.orders$)).toEqual([authoritative]);
       expect(allowedShipment(authoritative)).toBe(ShipmentTransition.Shipped);
       expect(await firstValueFrom(store.loading$)).toBe(false);

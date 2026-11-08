@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import javax.sql.DataSource
 
@@ -26,12 +27,17 @@ import javax.sql.DataSource
 @RequestMapping("/api/v1")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class OrderController(private val orders: JdbcOrderService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator, private val capabilities: CapabilityDecisionPort) {
-    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest) = BaseResponse.ok(orders.customerOrders(auth.customer(http)).map { it.copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null) })
+    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "25") size: Int,
+        @RequestParam(required = false) orderStatus: String?, @RequestParam(required = false) paymentStatus: String?, @RequestParam(required = false) shipmentStatus: String?): BaseResponse<Any?> {
+        val result = orders.customerPage(auth.customer(http), page, size, orderStatus, paymentStatus, shipmentStatus)
+        return BaseResponse.ok(result.copy(items = result.items.map { it.copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null) }))
+    }
     @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long) = BaseResponse.ok(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null))
-    @GetMapping("/user/orders") fun admin(http: HttpServletRequest): BaseResponse<Any?> {
+    @GetMapping("/user/orders") fun admin(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "25") size: Int,
+        @RequestParam(required = false) orderStatus: String?, @RequestParam(required = false) paymentStatus: String?, @RequestParam(required = false) shipmentStatus: String?): BaseResponse<Any?> {
         val actor = auth.operatorOrAdmin(http)
         capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
-        return BaseResponse.ok(orders.adminOrders())
+        return BaseResponse.ok(orders.adminPage(page, size, orderStatus, paymentStatus, shipmentStatus))
     }
     @GetMapping("/user/orders/{id}") fun adminOne(http: HttpServletRequest, @PathVariable id: Long): BaseResponse<Any?> {
         val actor = auth.operatorOrAdmin(http)

@@ -1,4 +1,5 @@
 import { Subject } from 'rxjs';
+import { mapCustomerOrder } from '../../data/mappers/http-mappers';
 import { AdminOrder } from '../../domain/order/order.entity';
 import {
   FulfillmentEligibility,
@@ -18,7 +19,7 @@ class TestOrderStore extends UserOrderDetailStore {
 }
 
 function order(id: string): AdminOrder {
-  return { id, orderStatus: OrderStatus.Paid, paymentStatus: PaymentStatus.Approved,
+  return { ...mapCustomerOrder({}), id, orderStatus: OrderStatus.Paid, paymentStatus: PaymentStatus.Approved,
     shipmentStatus: ShipmentStatus.Preparing, rmaStatus: RmaStatus.None,
     fulfillmentEligibility: FulfillmentEligibility.Eligible,
     shipmentAction: ShipmentTransition.Shipped, rmaAction: RmaTransition.Received,

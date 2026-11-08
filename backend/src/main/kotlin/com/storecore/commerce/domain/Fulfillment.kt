@@ -2,11 +2,19 @@ package com.storecore.commerce.domain
 
 import java.math.BigDecimal
 
-enum class FulfillmentEligibility { ELIGIBLE, ORDER_NOT_PAID, PAYMENT_NOT_VERIFIED, REVERSAL_OR_INCIDENT, STOCK_NOT_VERIFIED }
+enum class FulfillmentEligibility { ELIGIBLE, ORDER_NOT_PAID, PAYMENT_NOT_VERIFIED, REVERSAL_OR_INCIDENT, STOCK_NOT_VERIFIED;
+    fun withPayment(payment: OrderFact<PaymentStatus>): FulfillmentEligibility = when {
+        this == ORDER_NOT_PAID || this == REVERSAL_OR_INCIDENT -> this
+        payment.state != OrderFactState.KNOWN -> PAYMENT_NOT_VERIFIED
+        payment.value in listOf(PaymentStatus.REFUNDED, PaymentStatus.CHARGED_BACK, PaymentStatus.CANCELLED) -> REVERSAL_OR_INCIDENT
+        payment.value != PaymentStatus.APPROVED -> PAYMENT_NOT_VERIFIED
+        else -> this
+    }
+}
 data class SoldItem(val variantId: Long, val quantity: Int)
 data class StockConsumption(val reservationId: Long?, val variantId: Long, val quantity: Int, val consumedVariantId: Long?, val consumedQuantity: Int?, val reservationConsumed: Boolean, val saleCount: Int)
 data class PaymentAccreditation(val paymentStatus: PaymentStatus, val sameOrder: Boolean, val sameProvider: Boolean, val attemptAccredited: Boolean, val paymentAmount: BigDecimal, val attemptAmount: BigDecimal, val confirmedAmount: BigDecimal, val paymentCurrency: String, val attemptCurrency: String, val confirmedCurrency: String)
-data class FulfillmentSnapshot(val orderStatus: OrderStatus, val total: BigDecimal, val currency: String, val accreditations: List<PaymentAccreditation>, val blockedByReview: Boolean, val items: List<SoldItem>, val consumptions: List<StockConsumption>)
+data class FulfillmentSnapshot(val orderStatus: OrderStatus, val total: BigDecimal, val currency: String, val accreditations: List<PaymentAccreditation>, val blockedByReview: Boolean, val items: List<SoldItem>, val consumptions: List<StockConsumption>, val contradictoryPayment: Boolean = false)
 
 object FulfillmentPolicy {
     fun evaluate(snapshot: FulfillmentSnapshot): FulfillmentEligibility {
@@ -16,6 +24,7 @@ object FulfillmentPolicy {
             listOf(payment.paymentAmount, payment.attemptAmount, payment.confirmedAmount).any { it.compareTo(snapshot.total) != 0 } ||
             listOf(payment.paymentCurrency, payment.attemptCurrency, payment.confirmedCurrency).any { it != snapshot.currency }) return FulfillmentEligibility.PAYMENT_NOT_VERIFIED
         if (snapshot.blockedByReview) return FulfillmentEligibility.REVERSAL_OR_INCIDENT
+        if (snapshot.contradictoryPayment) return FulfillmentEligibility.PAYMENT_NOT_VERIFIED
         if (snapshot.items.isEmpty() || snapshot.items.any { it.quantity <= 0 } || snapshot.items.map { it.variantId }.distinct().size != snapshot.items.size) return FulfillmentEligibility.STOCK_NOT_VERIFIED
         val sales = snapshot.consumptions
         if (sales.size != snapshot.items.size || sales.map { it.reservationId }.distinct().size != sales.size ||

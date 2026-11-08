@@ -248,6 +248,85 @@ class CommerceHttpIntegrationTest(
         jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,safety_stock) SELECT id,?,? FROM product_variants WHERE sku=? ON CONFLICT (variant_id) DO UPDATE SET available_quantity=excluded.available_quantity,safety_stock=excluded.safety_stock,updated_at=now()", available, safety, sku)
     }
 
+    @Test
+    fun `order projections are scoped paged correlated and keep post sale information safe`() {
+        val email = "projection-${UUID.randomUUID()}@example.com"
+        val owner = registerCustomer(email)
+        val ownerId = jdbc.queryForObject("SELECT id FROM customers WHERE email=?", Long::class.java, email)!!
+        val ids = (1..3).map { projectionOrder(ownerId) }
+        jdbc.update("UPDATE orders SET created_at='2026-01-01T00:00:00Z' WHERE customer_id=?", ownerId)
+        fun read(path: String, session: Session = owner) = exchange(path, HttpMethod.GET, null, session.cookie)
+        val page = mapper.readTree(read("/api/v1/customer/orders?size=2").body!!).path("data")
+        assertEquals(3, page.path("total").asInt())
+        assertEquals(true, page.path("truncated").asBoolean())
+        assertEquals(ids.reversed().take(2).map { it.toString() }, page.path("items").map { it.path("id").asText() })
+        val second = mapper.readTree(read("/api/v1/customer/orders?size=2&page=1").body!!).path("data")
+        assertEquals(ids.first().toString(), second.path("items").first().path("id").asText())
+        assertEquals(true, second.path("truncated").asBoolean())
+        assertEquals(401, read("/api/v1/customer/orders", admin).statusCode.value())
+        assertEquals(401, read("/api/v1/user/orders", owner).statusCode.value())
+        assertEquals(404, read("/api/v1/customer/orders/${ids.first()}", customer).statusCode.value())
+        for (query in listOf("size=51", "size=0", "page=-1", "orderStatus=madeup", "paymentStatus=madeup", "shipmentStatus=madeup")) {
+            assertEquals(400, read("/api/v1/customer/orders?$query").statusCode.value(), query)
+        }
+        val id = ids.first()
+        jdbc.update("UPDATE orders SET status='PAID' WHERE id=?", id)
+        val paymentId = jdbc.queryForObject("INSERT INTO payments(order_id,external_reference,status,amount) VALUES (?,?,'APPROVED',100) RETURNING id", Long::class.java, id, UUID.randomUUID().toString())!!
+        fun detail() = mapper.readTree(read("/api/v1/customer/orders/$id").body!!).path("data")
+        assertEquals("UNAVAILABLE", detail().path("payment").path("state").asText())
+        assertEquals("UNKNOWN", detail().path("orderStatus").asText())
+        assertEquals("PAYMENT_NOT_VERIFIED", detail().path("fulfillmentEligibility").asText())
+        val orphanPaidFilter = mapper.readTree(read("/api/v1/customer/orders?orderStatus=PAID").body!!).path("data")
+        assertEquals(0, orphanPaidFilter.path("total").asInt(), "an orphan payment cannot match paid projections")
+        assertEquals("PAYMENT_UNVERIFIED", detail().path("returnEligibility").asText())
+        val attempt = projectionAccredit(id, paymentId)
+        assertEquals("APPROVED", detail().path("payment").path("value").asText())
+        val paidFilter = mapper.readTree(read("/api/v1/customer/orders?orderStatus=PAID").body!!).path("data")
+        assertEquals(1, paidFilter.path("total").asInt())
+        assertEquals("NOT_DELIVERED", detail().path("returnEligibility").asText())
+        jdbc.update("INSERT INTO shipments(order_id,status,shipped_at,delivered_at) VALUES (?,'DELIVERED',now(),now())", id)
+        assertEquals("ELIGIBLE", detail().path("returnEligibility").asText())
+        jdbc.update("INSERT INTO fulfillment_events(shipment_id,event_type,actor,details) SELECT id,'DELIVERED','PRIVATE_ACTOR','{\"secret\":\"private-audit\"}'::jsonb FROM shipments WHERE order_id=?", id)
+        val safe = detail()
+        assertEquals("UNAVAILABLE", safe.path("buyerName").path("state").asText())
+        assertEquals("KNOWN", safe.path("delivery").path("state").asText())
+        assertTrue(!safe.toString().contains("PRIVATE_ACTOR") && !safe.toString().contains("private-audit"))
+        val kinds = safe.path("timeline").path("value").map { it.path("kind").asText() }
+        assertTrue(kinds.contains("PAYMENT_ACCREDITED") && kinds.contains("SHIPMENT_DELIVERED"), safe.toString())
+        jdbc.update("INSERT INTO returns(rma_number,order_id,status) VALUES (?,?,'CLOSED')", UUID.randomUUID().toString(), id)
+        assertEquals("ALREADY_OPEN", detail().path("returnEligibility").asText())
+        assertEquals("NONE", detail().path("rmaStatus").asText())
+        jdbc.update("INSERT INTO returns(rma_number,order_id,status) VALUES (?,?,'REQUESTED')", UUID.randomUUID().toString(), id)
+        assertEquals("ALREADY_OPEN", detail().path("returnEligibility").asText(), "multiple known return rows are definitive persisted returns")
+        val reversal = jdbc.queryForObject("INSERT INTO mp_order_reversal_cases(attempt_id,provider_order_id,kind,review_status,evidence_redacted) SELECT id,provider_order_id,'CHARGEBACK','UNDER_REVIEW','{}' FROM mp_checkout_attempts WHERE id=? RETURNING id", Long::class.java, attempt)!!
+        assertEquals("UNAVAILABLE", detail().path("payment").path("state").asText())
+        assertEquals("PAYMENT_UNVERIFIED", detail().path("returnEligibility").asText())
+        assertEquals("REVERSAL_OR_INCIDENT", detail().path("fulfillmentEligibility").asText())
+        jdbc.update("UPDATE mp_order_reversal_cases SET review_status='REJECTED' WHERE id=?", reversal)
+        assertEquals("APPROVED", detail().path("payment").path("value").asText())
+        jdbc.update("UPDATE mp_order_reversal_cases SET review_status='RESOLVED' WHERE id=?", reversal)
+        assertEquals("CHARGED_BACK", detail().path("payment").path("value").asText())
+        assertEquals("PAYMENT_UNVERIFIED", detail().path("returnEligibility").asText())
+        val filtered = mapper.readTree(read("/api/v1/customer/orders?paymentStatus=CHARGED_BACK&shipmentStatus=DELIVERED").body!!).path("data")
+        assertEquals(1, filtered.path("total").asInt())
+        assertEquals(id.toString(), filtered.path("items").first().path("id").asText())
+    }
+
+    private fun projectionOrder(customerId: Long): Long {
+        val key = UUID.randomUUID()
+        val hash = "a".repeat(64)
+        val claim = jdbc.queryForObject("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot) VALUES (?,?,?,'{}') RETURNING id", Long::class.java, customerId, key, hash)!!
+        return jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total) VALUES (?,?,?,?,?,'PENDING_PAYMENT','{\"street\":\"Main\",\"number\":\"1\",\"city\":\"City\",\"province\":\"Province\",\"postalCode\":\"1000\"}','{}',100,0,100) RETURNING id", Long::class.java, UUID.randomUUID().toString(), claim, key, hash, customerId)!!
+    }
+
+    private fun projectionAccredit(orderId: Long, paymentId: Long): Long {
+        val provider = UUID.randomUUID().toString()
+        val attempt = jdbc.queryForObject("INSERT INTO mp_checkout_attempts(order_id,payment_id,attempt_no,external_reference,idempotency_key,request_hash,amount,currency,snapshot,provider_order_id,state) VALUES (?,?,1,?,?,?,100,'ARS','{}',?,'ACCREDITED') RETURNING id", Long::class.java, orderId, paymentId, UUID.randomUUID().toString(), UUID.randomUUID(), "a".repeat(64), provider)!!
+        val inbox = jdbc.queryForObject("INSERT INTO mp_order_notification_inbox(raw_topic,query_data_id,provider_order_id_candidate,x_request_id,signature_version,signature_result,envelope_redacted,disposition) VALUES ('merchant_order',?,?,?,'v1','ACCEPTED','{}','PROCESSABLE') RETURNING id", Long::class.java, provider, provider, UUID.randomUUID().toString())!!
+        jdbc.update("INSERT INTO mp_order_commercial_applications(inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency) VALUES (?,?,?,?,'PAYMENT_ACCREDITED',100,'ARS')", inbox, attempt, orderId, provider)
+        return attempt
+    }
+
     private fun activate(module: String) {
         val state = jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?", String::class.java, module)
         if (state == "ACTIVE") return

@@ -5,16 +5,25 @@ import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { AdminOrder, CustomerOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { IOrderRepository } from '../../domain/order/order.repository';
-import { mapAdminOrder, mapAdminOrders, mapCustomerOrder, mapCustomerOrders } from '../mappers/http-mappers';
+import { mapAdminOrder, mapCustomerOrder, mapOrderPage } from '../mappers/http-mappers';
+import { firstOrderPage, OrderPage, OrderQuery } from '../../domain/order/order-projection';
 
 @Injectable()
 export class OrderHttpRepository implements IOrderRepository {
   constructor(private readonly http: HttpClient) {}
 
-  listMine(): Observable<readonly CustomerOrder[]> {
+  private params(query: OrderQuery): Record<string, string | number> {
+    const params: Record<string, string | number> = { page: query.page, size: query.size };
+    if (query.orderStatus) params['orderStatus'] = query.orderStatus.wire;
+    if (query.paymentStatus) params['paymentStatus'] = query.paymentStatus.wire;
+    if (query.shipmentStatus) params['shipmentStatus'] = query.shipmentStatus.wire;
+    return params;
+  }
+
+  listMine(query: OrderQuery = firstOrderPage): Observable<OrderPage<CustomerOrder>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/customer/orders`)
-      .pipe(map((body) => mapCustomerOrders(readApiBody<unknown>(body))));
+      .get<unknown>(`${environment.apiBaseUrl}/customer/orders`, { params: this.params(query) })
+      .pipe(map((body) => mapOrderPage(readApiBody<unknown>(body), mapCustomerOrder)));
   }
 
   readMine(orderId: string): Observable<CustomerOrder> {
@@ -23,10 +32,10 @@ export class OrderHttpRepository implements IOrderRepository {
       .pipe(map((body) => mapCustomerOrder(readApiBody<unknown>(body))));
   }
 
-  listAdmin(): Observable<readonly AdminOrder[]> {
+  listAdmin(query: OrderQuery = firstOrderPage): Observable<OrderPage<AdminOrder>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/orders`)
-      .pipe(map((body) => mapAdminOrders(readApiBody<unknown>(body))));
+      .get<unknown>(`${environment.apiBaseUrl}/user/orders`, { params: this.params(query) })
+      .pipe(map((body) => mapOrderPage(readApiBody<unknown>(body), mapAdminOrder)));
   }
 
   readAdmin(orderId: string): Observable<AdminOrder> {

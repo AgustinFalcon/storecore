@@ -42,11 +42,12 @@
         {
           "id": "PSD-T06-C",
           "title": "Enrich order and post-sale projections",
-          "status": "pending",
+          "status": "done",
           "depends_on": ["PSD-T06-B"],
           "requirements": ["PSD-R07"],
           "surfaces": ["SC-SURF-13", "SC-SURF-14", "SC-SURF-20", "SC-SURF-21"],
-          "acceptance_criteria": ["CUSTOMER and USER order reads are realm-isolated, paged and deterministically ordered", "Payment success and reversal behavior use durable correlated evidence and contradictory facts are unavailable", "Informational return eligibility applies payment, shipment and persisted-return precedence without adding a CUSTOMER return command/right/window", "Timeline and return eligibility are closed and customer output contains no internal actor or raw audit payload"]
+          "acceptance_criteria": ["CUSTOMER and USER order reads are realm-isolated, paged and deterministically ordered", "Payment success and reversal behavior use durable correlated evidence and contradictory facts are unavailable", "Informational return eligibility applies payment, shipment and persisted-return precedence without adding a CUSTOMER return command/right/window", "Timeline and return eligibility are closed and customer output contains no internal actor or raw audit payload"],
+          "evidence": "Backend PostgreSQL 16 focal gate PASS: 43 tests across realm-scoped HTTP projection, closed domain, aggregate-lock payment/fulfillment races, orphan and terminal payment contradictions, reversal/incident precedence, fulfillment policy and architecture. Frontend verify PASS after review remediation: architecture, lint, 152 files/1055 tests and production build; focal Playwright 4/4 covers CUSTOMER at 390/768/1440 with axe/reflow plus USER pagination. Independent GPT-6.1 Sol code/product and security rereviews APPROVED the same dirty snapshot with zero P0-P3."
         },
         {
           "id": "PSD-T06-D",
@@ -58,7 +59,7 @@
           "acceptance_criteria": ["Manual price policy responses preserve only persisted scope, window and server-owned approval evidence; unsupported request fields are rejected and not exposed", "Closed transitions, server-time window, overlap and price invariants commit atomically", "Desired channel state remains distinct from historical observations whose freshness is UNVERIFIED or absent observations that are unavailable", "Entity updatedAt is never presented as observedAt and no freshness TTL is claimed", "Channel lists are bounded and no secret, OAuth assertion, competitor fact or external writer is exposed"]
         }
       ],
-      "evidence": "PSD-T06-A home composition and PSD-T06-B catalog/inventory are implemented and independently approved; PSD-T06-C order/post-sale and PSD-T06-D pricing/channel remain pending."
+      "evidence": "PSD-T06-A home composition, PSD-T06-B catalog/inventory and PSD-T06-C order/post-sale are implemented with local gates and independent dirty-snapshot reviews approved; PSD-T06-D pricing/channel remains pending."
     },
     { "id": "PSD-T07", "title": "Extend API-driven showcase loader", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["PSD-T02", "PSD-T03", "PSD-T04", "PSD-T05"], "requirements": ["PSD-R09"], "acceptance_criteria": ["First load and replay pass without overwriting unrelated data", "Favorites/offers/customers/overview readback is verified", "External adapters remain disabled"] },
     { "id": "PSD-T08", "title": "Run real integration and migration gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["PSD-T06", "PSD-T07"], "requirements": ["PSD-R01", "PSD-R09"], "acceptance_criteria": ["Clean V1-V12 and V11 upgrade pass on PostgreSQL 16", "Spring/Angular real browser journeys pass", "Production and Demo builds remain isolated"] },

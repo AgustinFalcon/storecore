@@ -4,6 +4,7 @@
     <h1 id="orders-title">Mis órdenes</h1>
     <p class="sc-page__lede">Sólo las órdenes de esta cuenta customer.</p>
   </header>
+  <sc-order-list-controls [query]="query" [total]="total" [truncated]="truncated" [loading]="loading" (queryChange)="queryChange.emit($event)" />
   <sc-feature-status
     [loading]="loading"
     [error]="error"
@@ -18,9 +19,11 @@
           <p>
             <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
             <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
-            <span class="sc-badge sc-badge--info">pago {{ order.paymentStatus.label }}</span>
+            <span class="sc-badge sc-badge--info">pago {{ order.payment.value?.label ?? order.payment.state.label }}</span>
+            <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
           </p>
-          <p class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ order.total }}</p>
+          <p>{{ order.orderNumber ?? 'Número no disponible' }} · {{ order.createdAt ?? 'Fecha no disponible' }}</p>
+          <p class="sc-price"><span class="sc-price__kind">Total {{ order.currency ?? 'Moneda no disponible' }}</span>{{ order.total }}</p>
           <ul class="sc-order-card__lines">
             @for (line of order.lines; track line.sku) {
               <li>{{ line.name }} × {{ line.quantity }} · {{ line.effectiveUnitPrice }}</li>

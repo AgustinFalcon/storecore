@@ -4,16 +4,22 @@ import { RouterLink } from '@angular/router';
 import { allowedRma, allowedShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+import { firstOrderPage, OrderQuery } from '../../domain/order/order-projection';
+import { OrderListControlsComponent } from '../orders/order-list-controls.component';
 
 @Component({
   selector: 'sc-fulfillment-view',
-  imports: [FormsModule, RouterLink, FeatureStatusComponent],
+  imports: [FormsModule, RouterLink, FeatureStatusComponent, OrderListControlsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './fulfillment.view.html',
 })
 export class FulfillmentViewComponent {
   @Input() orders: readonly AdminOrder[] = [];
   @Input() loading = false;
+  @Input() query: OrderQuery = firstOrderPage;
+  @Input() total = 0;
+  @Input() truncated = false;
+  @Output() readonly queryChange = new EventEmitter<OrderQuery>();
   @Input() error = '';
   readonly tracking: Record<string, string> = {};
 

@@ -4,12 +4,14 @@ import { RouterLink } from '@angular/router';
 import { allowedRma, allowedShipment, rmaLabel, shipmentLabel } from '../../domain/order/fulfillment-transition';
 import { AdminOrder, RmaTransition, ShipmentTransition } from '../../domain/order/order.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+import { OrderFactsComponent } from '../orders/order-facts.component';
 
 @Component({
   selector: 'sc-user-order-detail-view',
-  imports: [FormsModule, RouterLink, FeatureStatusComponent],
+  imports: [FormsModule, RouterLink, FeatureStatusComponent, OrderFactsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-order-detail.view.html',
+  styles: ['.sc-pdp__crumb a { color: var(--sc-color-muted-ink); }'],
 })
 export class UserOrderDetailViewComponent implements OnChanges {
   @Input() order: AdminOrder | null = null;

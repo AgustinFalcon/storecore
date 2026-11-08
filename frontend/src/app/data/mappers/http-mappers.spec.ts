@@ -3,7 +3,7 @@ import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
-import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
+import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus } from '../../domain/order/commerce-states';
 import { InventoryState } from '../../domain/catalog/catalog-states';
 
 const inventoryPage = (items: unknown[]) => ({ items, total: items.length, page: 0, size: 50, truncated: false });
@@ -120,11 +120,11 @@ describe('http-mappers', () => {
     expect(unknown.paymentStatus).toBe(PaymentStatus.Unknown);
     expect(unknown.shipmentStatus).toBe(ShipmentStatus.Unknown);
     expect(unknown.rmaStatus).toBe(RmaStatus.Unknown);
-    expect(unknown.fulfillmentEligibility).toBe(FulfillmentEligibility.Unknown);
+    expect(unknown.fulfillmentEligibility).toBe(FulfillmentEligibility.PaymentNotVerified);
     const absent = mapAdminOrder({ shipmentStatus: 'NOT_CREATED', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'PACKED' });
     expect(absent.shipmentStatus).toBe(ShipmentStatus.NotCreated);
     expect(absent.rmaStatus).toBe(RmaStatus.None);
-    expect(absent.shipmentAction).toBe(ShipmentTransition.Packed);
+    expect(absent.shipmentAction).toBeNull();
   });
 
   it('distinguishes missing inventory from known zero and preserves bounded metadata', () => {

@@ -7,6 +7,8 @@ import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
+import { DeliverySnapshot, OrderFact, OrderFactReason, OrderFactState, OrderPage, OrderTimelineKind } from '../../domain/order/order-projection';
+import { ReturnEligibility } from '../../domain/order/return-eligibility';
 import { UserRole } from '../../domain/user/user-role';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
@@ -163,15 +165,73 @@ export function mapReceipt(value: unknown): CheckoutReceipt {
 
 function mapOrder(value: unknown): CustomerOrder {
   const row = asRecord(value);
+  let payment = mapOrderFact(row['payment'], (raw) => {
+    const status = PaymentStatus.fromWire(raw);
+    return status === PaymentStatus.Unknown ? null : status;
+  });
+  const paymentStatus = PaymentStatus.fromWire(row['paymentStatus']);
+  const orderStatus = OrderStatus.fromWire(row['orderStatus']);
+  const paid = orderStatus === OrderStatus.Paid || orderStatus === OrderStatus.PaidStockReview;
+  if ((payment.state === OrderFactState.Known && payment.value !== paymentStatus) ||
+      (payment.state !== OrderFactState.Known && paymentStatus !== PaymentStatus.Unknown) ||
+      (paid && payment.value !== PaymentStatus.Approved)) payment = contradictoryOrderFact();
+  const verifiedPayment = payment.state === OrderFactState.Known && payment.value === PaymentStatus.Approved;
   return {
+    orderNumber: nullableOrderText(row['orderNumber']),
+    createdAt: orderDate(row['createdAt']),
+    updatedAt: orderDate(row['updatedAt']),
+    currency: nullableOrderText(row['currency']),
+    subtotal: orderAmount(row['subtotal']),
+    shippingCost: orderAmount(row['shippingCost']),
+    buyerName: mapOrderFact(row['buyerName'], nullableOrderText),
+    buyerEmail: mapOrderFact(row['buyerEmail'], nullableOrderText),
+    delivery: mapOrderFact(row['delivery'], (raw) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+      const address = asRecord(raw);
+      if (!['recipient', 'street', 'city', 'province', 'postalCode', 'country'].every((key) => key in address && (address[key] === null || typeof address[key] === 'string'))) return null;
+      return Object.fromEntries(['recipient', 'street', 'city', 'province', 'postalCode', 'country'].map((key) => [key, nullableOrderText(address[key])])) as unknown as DeliverySnapshot;
+    }),
+    payment,
+    timeline: mapOrderFact(row['timeline'], (raw) => Array.isArray(raw) && raw.every((event) => {
+      const entry = asRecord(event);
+      return nullableOrderText(entry['id']) !== null && orderDate(entry['occurredAt']) !== null;
+    }) ? raw.map((event) => {
+      const entry = asRecord(event);
+      return { id: text(entry['id']), kind: OrderTimelineKind.fromWire(entry['kind']), occurredAt: orderDate(entry['occurredAt']) };
+    }) : null),
+    returnEligibility: verifiedPayment ? ReturnEligibility.fromWire(row['returnEligibility']) : ReturnEligibility.PaymentUnverified,
     id: text(row['id']),
-    orderStatus: OrderStatus.fromWire(row['orderStatus']),
-    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
+    orderStatus: paid && !verifiedPayment ? OrderStatus.Unknown : orderStatus,
+    paymentStatus: payment.state === OrderFactState.Known ? payment.value! : PaymentStatus.Unknown,
     shipmentStatus: ShipmentStatus.fromWire(row['shipmentStatus']),
     tracking: text(row['tracking']) || null,
     total: num(row['total']),
     lines: items(row['lines']).map(mapCartLine),
   };
+}
+
+function nullableOrderText(raw: unknown): string | null { return typeof raw === 'string' && raw.trim() ? raw : null; }
+function orderDate(raw: unknown): string | null { return typeof raw === 'string' && Number.isFinite(Date.parse(raw)) ? raw : null; }
+function orderAmount(raw: unknown): number | null { return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null; }
+function mapOrderFact<T>(raw: unknown, translate: (value: unknown) => T | null): OrderFact<T> {
+  const row = asRecord(raw);
+  const state = OrderFactState.fromWire(row['state']);
+  if (state === OrderFactState.Known) {
+    const value = translate(row['value']);
+    return value === null || row['reason'] != null ? contradictoryOrderFact() : { state, value, reason: null };
+  }
+  if (row['value'] != null) return contradictoryOrderFact();
+  const reason = row['reason'] == null ? null : OrderFactReason.fromWire(row['reason']);
+  if (state === OrderFactState.Unavailable && (reason === null || (reason === OrderFactReason.Unknown && row['reason'] !== OrderFactReason.Unknown.wire))) return contradictoryOrderFact();
+  if (state === OrderFactState.Unknown && reason !== null && reason !== OrderFactReason.Unknown) return contradictoryOrderFact();
+  return { state, value: null, reason };
+}
+
+function contradictoryOrderFact<T>(): OrderFact<T> { return { state: OrderFactState.Unavailable, value: null, reason: OrderFactReason.SourceContradictory }; }
+
+export function mapOrderPage<T>(raw: unknown, translate: (value: unknown) => T): OrderPage<T> {
+  const rows = mapBoundedRows(raw, translate);
+  return { items: [...rows], ...rows.metadata };
 }
 
 export function mapCustomerOrder(value: unknown): CustomerOrder {
@@ -184,7 +244,9 @@ export function mapCustomerOrders(value: unknown): readonly CustomerOrder[] {
 
 export function mapAdminOrder(value: unknown): AdminOrder {
   const row = asRecord(value);
-  return { ...mapOrder(value), rmaStatus: RmaStatus.fromWire(row['rmaStatus']), fulfillmentEligibility: FulfillmentEligibility.fromWire(row['fulfillmentEligibility']), shipmentAction: row['shipmentAction'] == null ? null : ShipmentTransition.fromWire(row['shipmentAction']), rmaAction: row['rmaAction'] == null ? null : RmaTransition.fromWire(row['rmaAction']) };
+  const order = mapOrder(value);
+  const verified = order.payment.state === OrderFactState.Known && order.payment.value === PaymentStatus.Approved;
+  return { ...order, rmaStatus: RmaStatus.fromWire(row['rmaStatus']), fulfillmentEligibility: verified ? FulfillmentEligibility.fromWire(row['fulfillmentEligibility']) : FulfillmentEligibility.PaymentNotVerified, shipmentAction: !verified || row['shipmentAction'] == null ? null : ShipmentTransition.fromWire(row['shipmentAction']), rmaAction: !verified || row['rmaAction'] == null ? null : RmaTransition.fromWire(row['rmaAction']) };
 }
 
 export function mapAdminOrders(value: unknown): readonly AdminOrder[] {
