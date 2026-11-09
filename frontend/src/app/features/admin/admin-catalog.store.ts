@@ -1,9 +1,12 @@
+import { BoundedPageRequest, boundedPageNavigation } from '../../domain/catalog/bounded-page';
+import { UserRole } from '../../domain/user/user-role';
+import { UserSessionResult } from '../../domain/user/user.entity';
 import { ProductStatus } from '../../domain/catalog/catalog-states';
 import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { EMPTY, Subject, filter, switchMap, tap, takeUntil, of, throwError } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
@@ -40,6 +43,27 @@ const emptyFacet: CatalogFacet = { id: '', name: '' };
 
 @Injectable()
 export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
+  private actorKey: string | null = null;
+  private generation = 0;
+  private page = BoundedPageRequest.first();
+  private readonly actorChanged = new Subject<void>();
+
+  setActor(principal: UserSessionResult | null): boolean {
+    const roles = principal?.roles.filter(role => role === UserRole.Admin || role === UserRole.Operator) ?? [];
+    const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map(role => role.wire).sort()]) : null;
+    if (actorKey === this.actorKey) return false;
+    this.actorKey = actorKey; this.generation++; this.actorChanged.next(); this.page = BoundedPageRequest.first();
+    this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: emptyProductDraft, brandDraft: emptyFacet, categoryDraft: emptyFacet });
+    return true;
+  }
+
+  goToPage(page: number): void {
+    if (this.snapshot.loading || !this.snapshot.list) return;
+    const navigation = boundedPageNavigation(this.snapshot.list);
+    if (page !== navigation.page - 1 && page !== navigation.page + 1 || page < 0 || page >= navigation.totalPages) return;
+    this.page = BoundedPageRequest.at(page); this.load();
+  }
+
   constructor(
     private readonly catalog: ManageAdminCatalogUseCase,
     private readonly facets: ListCatalogFacetsUseCase,
@@ -71,24 +95,38 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));
 
-  readonly load = this.effect<void>((trigger$) =>
-    trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap(() =>
-        this.catalog.list().pipe(
-          tapResponse({
-            next: (products) => this.patchState({ products, list: products.metadata, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
-          }),
-        ),
-      ),
-    ),
-  );
+  readonly load = this.effect<void>(trigger$ => trigger$.pipe(switchMap(() => {
+    if (!this.actorKey) return EMPTY;
+    const generation = ++this.generation;
+    const requested = this.page;
+    this.patchState({ loading: true, errorMessage: '', products: [] });
+    return this.catalog.list(requested).pipe(
+      switchMap(products => {
+        const recovery = boundedPageNavigation(products.metadata).recoveryPage;
+        if (!products.length && recovery !== null) {
+          this.page = BoundedPageRequest.at(recovery, requested.size);
+          return this.catalog.list(this.page).pipe(
+            switchMap(retried => !retried.length && boundedPageNavigation(retried.metadata).recoveryPage !== null
+              ? throwError(() => new Error('La lista cambió nuevamente. Volvé a intentar.'))
+              : of(retried)),
+          );
+        }
+        return of(products);
+      }),
+      takeUntil(this.actorChanged),
+      tapResponse({
+        next: products => { if (generation === this.generation) this.patchState({ products, list: products.metadata, loading: false }); },
+        error: (error: unknown) => { if (generation === this.generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }); },
+      }),
+    );
+  })));
 
   readonly loadFacets = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => !!this.actorKey),
       switchMap(() =>
         this.facets.execute().pipe(
+          takeUntil(this.actorChanged),
           tapResponse({
             next: (items) => this.patchState({ brands: items.brands, categories: items.categories }),
             error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
@@ -100,6 +138,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
 
   readonly persist = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => !!this.actorKey),
       tap(() => {
         if (!this.snapshot.draft.sku.trim() || !this.snapshot.draft.name.trim()) {
           this.patchState({ loading: false, errorMessage: 'SKU y nombre son obligatorios.' });
@@ -110,6 +149,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.draft.sku.trim() && this.snapshot.draft.name.trim())),
       switchMap(() =>
         this.catalog.save(this.snapshot.draft).pipe(
+          takeUntil(this.actorChanged),
           tapResponse({
             next: () => {
               this.patchState({ draft: emptyProductDraft });
@@ -124,6 +164,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
 
   readonly persistBrand = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => !!this.actorKey),
       tap(() => {
         if (!this.snapshot.brandDraft.id.trim() || !this.snapshot.brandDraft.name.trim()) {
           this.patchState({ errorMessage: 'Id y nombre de marca son obligatorios.' });
@@ -134,6 +175,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.brandDraft.id.trim() && this.snapshot.brandDraft.name.trim())),
       switchMap(() =>
         this.catalog.saveBrand(this.snapshot.brandDraft).pipe(
+          takeUntil(this.actorChanged),
           tapResponse({
             next: () => {
               this.patchState({ brandDraft: emptyFacet });
@@ -148,6 +190,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
 
   readonly persistCategory = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => !!this.actorKey),
       tap(() => {
         if (!this.snapshot.categoryDraft.id.trim() || !this.snapshot.categoryDraft.name.trim()) {
           this.patchState({ errorMessage: 'Id y nombre de categoría son obligatorios.' });
@@ -158,6 +201,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => Boolean(this.snapshot.categoryDraft.id.trim() && this.snapshot.categoryDraft.name.trim())),
       switchMap(() =>
         this.catalog.saveCategory(this.snapshot.categoryDraft).pipe(
+          takeUntil(this.actorChanged),
           tapResponse({
             next: () => {
               this.patchState({ categoryDraft: emptyFacet });

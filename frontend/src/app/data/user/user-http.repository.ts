@@ -1,3 +1,4 @@
+import { BoundedPageRequest } from '../../domain/catalog/bounded-page';
 import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { CreateManualPromo, PolicyTransition } from '../../domain/user/channel-pricing';
 import { mapChannelPage, mapChannelAccount, mapChannelListing, mapPricePolicy } from './channel-pricing.mapper';
@@ -74,9 +75,9 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map(body => mapPricePolicy(readApiBody(body))));
   }
 
-  listCatalog(): Observable<BoundedRows<ProductDetail>> {
+  listCatalog(page = BoundedPageRequest.first()): Observable<BoundedRows<ProductDetail>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/catalog`)
+      .get<unknown>(`${environment.apiBaseUrl}/user/catalog`, { params: { page: page.page, size: page.size } })
       .pipe(map((body) => mapProductDetails(readApiBody<unknown>(body))));
   }
 
@@ -120,9 +121,9 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
   }
 
-  listInventory(): Observable<BoundedRows<InventoryRow>> {
+  listInventory(page = BoundedPageRequest.first()): Observable<BoundedRows<InventoryRow>> {
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/inventory`)
+      .get<unknown>(`${environment.apiBaseUrl}/user/inventory`, { params: { page: page.page, size: page.size } })
       .pipe(map((body) => mapInventory(readApiBody<unknown>(body))));
   }
 

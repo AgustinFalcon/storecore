@@ -40,6 +40,7 @@ describe('persisted pricing and channel boundary', () => {
   });
   it('bounds pages and rejects malformed identities, values and pagination', () => {
     expect(mapChannelPage({ items: [listingWire], page: 0, size: 25, total: 51 }, mapChannelListing).metadata.total).toBe(51);
+    expect(mapChannelPage({ items: [listingWire], page: 2, size: 25, total: 51 }, mapChannelListing).metadata.truncated).toBe(false);
     for (const size of [0, 51, '25']) expect(() => mapChannelPage({ items: [], page: 0, size, total: 0 }, mapChannelListing)).toThrow();
     for (const patch of [{ desiredQuantity: .5 }, { manualInterventionRequired: 'false' }, { sku: '' }, { updatedAt: 'invalid' }]) expect(() => mapChannelListing({ ...listingWire, ...patch })).toThrow();
     for (const patch of [{ desiredPrice: null }, { basePrice: '100' }, { approvedAt: 'invalid' }, { validTo: promoWire.validFrom }, { effectivePromoPrice: 91 }, { approvedBy: 'unpaired' }, { status: PolicyStatus.Active.wire }]) expect(() => mapPricePolicy({ ...promoWire, ...patch })).toThrow();

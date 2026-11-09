@@ -27,7 +27,7 @@ for (const width of [390, 768, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await mockSession(page, width === 768 ? UserRole.Admin : UserRole.Operator);
     const methods: string[] = [];
-    await page.route('**/api/v1/user/inventory', async (route) => {
+    await page.route('**/api/v1/user/inventory?**', async (route) => {
       methods.push(route.request().method());
       return route.fulfill({ json: envelope(inventory) });
     });
@@ -38,7 +38,7 @@ for (const width of [390, 768, 1440]) {
     await expect(page.locator('tbody tr').filter({ hasText: 'WEB-LOW' })).toContainText(InventoryAvailability.Out.label);
     await expect(page.locator('tbody tr').filter({ hasText: 'WEB-ZERO' })).toContainText(InventoryAvailability.Out.label);
     await expect(page.locator('tbody tr').filter({ hasText: 'WEB-UNKNOWN' })).toContainText(InventoryAvailability.Unavailable.label);
-    await expect(page.getByText(/4 de 120 variantes/)).toBeVisible();
+    await expect(page.getByText(/4 en esta página de 120 variantes/)).toBeVisible();
     await expect(page.getByRole('button', { name: /ajustar|conciliar|historial/i })).toHaveCount(0);
     await page.getByLabel('Buscar por SKU').fill('web-kit');
     await expect(page.locator('tbody tr')).toHaveCount(1);
@@ -49,7 +49,7 @@ for (const width of [390, 768, 1440]) {
     await expect(page.locator('tbody')).toContainText('WEB-UNKNOWN');
     await page.getByLabel('Buscar por SKU').fill('does-not-exist');
     await expect(page.getByRole('heading', { name: 'Sin coincidencias' })).toBeVisible();
-    await page.getByRole('button', { name: 'Mostrar todo el inventario' }).click();
+    await page.getByRole('button', { name: 'Mostrar toda la página' }).click();
     await expect(page.locator('tbody tr')).toHaveCount(4);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const results = await new AxeBuilder({ page }).analyze();
@@ -64,7 +64,7 @@ test('inventory distinguishes initial loading and refresh while retaining its sn
   await mockSession(page);
   let release = (): void => { /* assigned by the request gate */ };
   let gate = new Promise<void>((resolve) => { release = resolve; });
-  await page.route('**/api/v1/user/inventory', async (route) => {
+  await page.route('**/api/v1/user/inventory?**', async (route) => {
     await gate;
     await route.fulfill({ json: envelope(inventory) });
   });
@@ -85,7 +85,7 @@ test('inventory distinguishes initial loading and refresh while retaining its sn
 test('inventory retains stale data after failed refresh and clears it on access denial', async ({ page }) => {
   await mockSession(page);
   let status = 200;
-  await page.route('**/api/v1/user/inventory', (route) => route.fulfill({ status, json: status === 200 ? envelope(inventory) : { message: 'Consulta no disponible' } }));
+  await page.route('**/api/v1/user/inventory?**', (route) => route.fulfill({ status, json: status === 200 ? envelope(inventory) : { message: 'Consulta no disponible' } }));
   await page.goto('/user/inventory');
   await expect(page.locator('tbody tr')).toHaveCount(4);
   status = 503;
@@ -102,7 +102,7 @@ test('inventory retains stale data after failed refresh and clears it on access 
 test('first load has contextual recovery and empty inventory is not a filter failure', async ({ page }) => {
   await mockSession(page);
   let fail = true;
-  await page.route('**/api/v1/user/inventory', (route) => route.fulfill({ status: fail ? 503 : 200, json: fail ? {} : envelope({ items: [], total: 0, page: 0, size: 50, truncated: false }) }));
+  await page.route('**/api/v1/user/inventory?**', (route) => route.fulfill({ status: fail ? 503 : 200, json: fail ? {} : envelope({ items: [], total: 0, page: 0, size: 50, truncated: false }) }));
   await page.goto('/user/inventory');
   await expect(page.getByRole('heading', { name: 'No pudimos cargar el inventario' })).toBeVisible();
   fail = false;

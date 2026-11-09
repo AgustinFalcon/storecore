@@ -1,3 +1,4 @@
+import { UserRole } from '../../domain/user/user-role';
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { mapProductDetails } from '../../data/mappers/http-mappers';
@@ -11,6 +12,7 @@ describe('bounded administrative catalog', () => {
     const products = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ARCHIVED', price: { base: 10, original: 10, effective: 10 },
       variants: ['A', 'B'].map(id => ({ id, sku: id, name: id, status: 'INACTIVE', availability: 'UNAVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' }, inventory: { sku: id, state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } })) }], total: 120, page: 0, size: 50, truncated: true });
     const store = new AdminCatalogStore({ list: () => of(products) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor({ id: 'actor', roles: [UserRole.Admin] });
     store.load(); store.setDraft(products[0]);
     expect(store.snapshot.products).toHaveLength(1);
     expect(store.snapshot.list?.total).toBe(120);

@@ -31,7 +31,7 @@ export function mapChannelObservation(value: unknown, quantity = false): Channel
 export function mapChannelPage<T>(value: unknown, translate: (value: unknown) => T): BoundedRows<T> {
   const data = row(value); const { items, total, page, size } = data;
   if (!Array.isArray(items) || typeof total !== 'number' || !Number.isSafeInteger(total) || total < 0 || typeof page !== 'number' || !Number.isSafeInteger(page) || page < 0 || page > 10000 || typeof size !== 'number' || !Number.isSafeInteger(size) || size < 1 || size > 50 || items.length > size || items.length > 0 && page * size + items.length > total) throw new Error('Página de canal inválida.');
-  return Object.assign(items.map(translate), { metadata: { total, page, size, truncated: total > items.length } });
+  return Object.assign(items.map(translate), { metadata: { total, page, size, truncated: page * size + items.length < total } });
 }
 export function mapPricePolicy(value: unknown): ManualPromo {
   const data = row(value);

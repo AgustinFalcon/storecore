@@ -525,7 +525,7 @@ class CommerceHttpIntegrationTest(
         assertEquals(ids.reversed().take(2).map { it.toString() }, page.path("items").map { it.path("id").asText() })
         val second = mapper.readTree(read("/api/v1/customer/orders?size=2&page=1").body!!).path("data")
         assertEquals(ids.first().toString(), second.path("items").first().path("id").asText())
-        assertEquals(true, second.path("truncated").asBoolean())
+        assertEquals(false, second.path("truncated").asBoolean())
         assertEquals(401, read("/api/v1/customer/orders", admin).statusCode.value())
         assertEquals(401, read("/api/v1/user/orders", owner).statusCode.value())
         assertEquals(404, read("/api/v1/customer/orders/${ids.first()}", customer).statusCode.value())

@@ -33,7 +33,7 @@ async function mockSession(page: Page, realm: 'customer' | 'user', reads: URL[],
       if (path.endsWith('/101')) return route.fulfill({ json: envelope(detail) });
       const second = url.searchParams.get('page') === '1';
       const item = second ? { ...detail, id: '102', orderStatus: 'UNKNOWN', paymentStatus: 'UNKNOWN', payment: { state: 'UNAVAILABLE', value: null, reason: 'SOURCE_CONTRADICTORY' } } : detail;
-      return route.fulfill({ json: envelope({ items: [item], page: second ? 1 : 0, size: 25, total: 26, truncated: true }) });
+      return route.fulfill({ json: envelope({ items: [item], page: second ? 1 : 0, size: 25, total: 26, truncated: !second }) });
     }
     return route.fulfill({ status: path.endsWith('/me') ? 401 : 503, json: {} });
   });

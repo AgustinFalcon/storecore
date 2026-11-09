@@ -19,14 +19,14 @@
       </div>
     }
     @if (state.hasSnapshot) {
-      <ul class="inventory__metrics" aria-label="Resumen de todos los SKU cargados">
-        <li><span>SKU cargados</span><strong>{{ state.rows.length }}</strong></li><li><span>Disponible</span><strong>{{ availableTotal ?? 'No informado' }}</strong></li>
+      <ul class="inventory__metrics" aria-label="Resumen de la página actual">
+        <li><span>SKU en esta página</span><strong>{{ state.rows.length }}</strong></li><li><span>Disponible</span><strong>{{ availableTotal ?? 'No informado' }}</strong></li>
         <li><span>Reservado</span><strong>{{ reservedTotal ?? 'No informado' }}</strong></li><li><span>Stock de seguridad</span><strong>{{ safetyTotal ?? 'No informado' }}</strong></li>
       </ul>
-      @if (state.list) { <p role="status">{{ state.rows.length }} de {{ state.list.total }} variantes. @if (state.list.truncated) { Lectura parcial; hay más variantes. }</p> }
+      @if (state.list) { <p role="status">{{ state.rows.length }} en esta página de {{ state.list.total }} variantes. @if (state.list.truncated) { Lectura parcial; hay más variantes. }</p> }
       <p class="inventory__explanation">Disponible ya es neto de reservas. Existencias = disponible + reservado. Vendible = máximo entre disponible menos seguridad y cero. Sin saldo registrado no significa cero.</p>
-      <div class="inventory__filters" role="search" aria-label="Filtrar inventario">
-        <label for="inventory-query">Buscar por SKU<input id="inventory-query" type="search" placeholder="Ingresá un SKU" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label>
+      <div class="inventory__filters" role="search" aria-label="Filtrar la página de inventario">
+        <label for="inventory-query">Buscar por SKU en esta página<input id="inventory-query" type="search" placeholder="Ingresá un SKU" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label>
         <label for="inventory-filter">Disponibilidad<select id="inventory-filter" [ngModel]="state.filter" (ngModelChange)="filterChange.emit($event)">
           @for (filter of filters; track filter) { <option [ngValue]="filter">{{ filter.label }}</option> }
         </select></label>
@@ -36,10 +36,10 @@
       @if (!state.rows.length) {
         <div class="inventory__notice"><h2>Sin inventario para mostrar</h2><p>La consulta no devolvió SKU. Podés volver a actualizar.</p></div>
       } @else if (!visibleRows.length) {
-        <div class="inventory__notice"><h2>Sin coincidencias</h2><p>Probá con otro SKU o limpiá los filtros.</p><button type="button" (click)="clearFilters.emit()">Mostrar todo el inventario</button></div>
+        <div class="inventory__notice"><h2>Sin coincidencias</h2><p>Probá con otro SKU o limpiá los filtros.</p><button type="button" (click)="clearFilters.emit()">Mostrar toda la página</button></div>
       } @else {
         <table class="inventory__table">
-          <caption>Inventario WEB por SKU. Resumen de las variantes cargadas; filtros locales al listado.</caption>
+          <caption>Inventario WEB por SKU. Resumen de las variantes cargadas; filtros locales a esta página.</caption>
           <thead><tr><th scope="col">SKU / Producto</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th><th scope="col">Existencias</th><th scope="col">Vendible</th><th scope="col">Actualizado</th></tr></thead>
           <tbody>@for (row of visibleRows; track row.sku) {
             <tr><th scope="row" class="inventory__sku">{{ row.sku }}<br>{{ row.productName }} · {{ row.variantLabel }}</th>
@@ -52,4 +52,5 @@
       }
     }
   }
+  <sc-bounded-pagination [metadata]="state.list" [loading]="state.loading" (pageChange)="pageChange.emit($event)" />
 </section>

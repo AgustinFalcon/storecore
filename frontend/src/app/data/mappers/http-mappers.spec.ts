@@ -93,10 +93,10 @@ describe('http-mappers', () => {
       expect(() => mapInventory({ ...page, ...patch })).toThrow();
     }
     expect(() => mapInventory(page.items)).toThrow();
-    const last = { ...page, total: 51, page: 1, truncated: true };
-    expect(mapInventory(last).metadata).toMatchObject({ total: 51, page: 1, truncated: true });
-    expect(() => mapInventory({ ...last, truncated: false })).toThrow();
-    expect(mapInventory({ ...last, items: [], page: 2 }).metadata.truncated).toBe(true);
+    const last = { ...page, total: 51, page: 1, truncated: false };
+    expect(mapInventory(last).metadata).toMatchObject({ total: 51, page: 1, truncated: false });
+    expect(() => mapInventory({ ...last, truncated: true })).toThrow();
+    expect(mapInventory({ ...last, items: [], page: 2 }).metadata.truncated).toBe(false);
   });
 
   it('rejects contradictory stock, variant availability and partial offer facts', () => {

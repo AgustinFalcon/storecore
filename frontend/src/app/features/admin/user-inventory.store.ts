@@ -1,9 +1,10 @@
+import { BoundedPageRequest, boundedPageNavigation } from '../../domain/catalog/bounded-page';
 import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { defer, EMPTY, switchMap } from 'rxjs';
+import { defer, EMPTY, of, switchMap, throwError } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { InventoryFilter } from '../../domain/user/inventory-filter';
 import { UserRole } from '../../domain/user/user-role';
@@ -29,6 +30,7 @@ function initialState(): UserInventoryState {
 
 @Injectable()
 export class UserInventoryStore extends ComponentStore<UserInventoryState> {
+  private page = BoundedPageRequest.first();
   private actorKey: string | null = null;
   private generation = 0;
 
@@ -49,9 +51,19 @@ export class UserInventoryStore extends ComponentStore<UserInventoryState> {
     const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map((role) => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
     this.actorKey = actorKey;
+    this.page = BoundedPageRequest.first();
     this.generation += 1;
     this.setState(initialState());
     return true;
+  }
+
+  goToPage(page: number): void {
+    if (this.snapshot.loading || !this.snapshot.list) return;
+    const navigation = boundedPageNavigation(this.snapshot.list);
+    if (page !== navigation.page - 1 && page !== navigation.page + 1 || page < 0 || page >= navigation.totalPages) return;
+    this.page = BoundedPageRequest.at(page);
+    this.patchState({ rows: [], hasSnapshot: false });
+    this.loadInventory();
   }
 
   readonly loadInventory = this.effect<void>((trigger$) => trigger$.pipe(
@@ -66,7 +78,22 @@ export class UserInventoryStore extends ComponentStore<UserInventoryState> {
         errorMessage: '',
         readState: this.snapshot.hasSnapshot ? InventoryReadState.Refreshing : InventoryReadState.Loading,
       });
-      return defer(() => this.ops.listInventory()).pipe(tapResponse({
+      const requested = this.page;
+      return defer(() => this.ops.listInventory(requested)).pipe(
+        switchMap(rows => {
+          if (generation !== this.generation) return EMPTY;
+          const recovery = boundedPageNavigation(rows.metadata).recoveryPage;
+          if (!rows.length && recovery !== null) {
+            this.page = BoundedPageRequest.at(recovery, requested.size);
+            this.patchState({ rows: [], hasSnapshot: false });
+            return this.ops.listInventory(this.page).pipe(
+              switchMap(retried => !retried.length && boundedPageNavigation(retried.metadata).recoveryPage !== null
+                ? throwError(() => new Error('La lista cambió nuevamente. Volvé a intentar.'))
+                : of(retried)),
+            );
+          }
+          return of(rows);
+        }), tapResponse({
         next: (rows) => {
           if (generation !== this.generation) return;
           this.patchState({ rows, list: rows.metadata, loading: false, errorMessage: '', hasSnapshot: true, readState: InventoryReadState.Ready });

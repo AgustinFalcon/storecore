@@ -1,3 +1,4 @@
+import { BoundedPaginationComponent } from '../../shared/bounded-pagination.component';
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { InventoryFilter } from '../../domain/user/inventory-filter';
@@ -7,13 +8,14 @@ import { UserInventoryState } from './user-inventory.store';
 
 @Component({
   selector: 'sc-user-inventory-view',
-  imports: [FormsModule],
+  imports: [BoundedPaginationComponent, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-inventory.view.html',
   styleUrl: './user-inventory.view.scss',
 })
 export class UserInventoryViewComponent {
   @Input({ required: true }) state!: UserInventoryState;
+  @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly queryChange = new EventEmitter<string>();
   @Output() readonly filterChange = new EventEmitter<InventoryFilter>();

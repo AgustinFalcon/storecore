@@ -1,8 +1,9 @@
+import { BoundedPageRequest, boundedPageNavigation } from '../../domain/catalog/bounded-page';
 import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { catchError, forkJoin, of, switchMap, tap } from 'rxjs';
+import { catchError, forkJoin, of, switchMap, tap, throwError } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
@@ -25,6 +26,7 @@ export interface CatalogState {
   readonly home: HomeComposition | null;
   readonly offers: readonly ProductSummary[];
   readonly product: ProductDetail | null;
+  readonly queryDirty: boolean;
 }
 
 const INITIAL: CatalogState = {
@@ -37,10 +39,12 @@ const INITIAL: CatalogState = {
   home: null,
   offers: [],
   product: null,
+  queryDirty: false,
 };
 
 @Injectable()
 export class CatalogStore extends ComponentStore<CatalogState> {
+  private searchGeneration = 0;
   constructor(
     private readonly searchCatalog: SearchCatalogUseCase,
     private readonly getHome: GetHomeUseCase,
@@ -63,9 +67,25 @@ export class CatalogStore extends ComponentStore<CatalogState> {
   readonly offers$ = this.select((s) => s.offers);
   readonly product$ = this.select((s) => s.product);
   readonly query$ = this.select((s) => s.query);
-  readonly emptyProducts$ = this.select((s) => !s.loading && s.products.length === 0);
+  readonly emptyProducts$ = this.select((s) => !s.loading && !s.queryDirty && s.products.length === 0);
 
-  readonly setQuery = this.updater((s, query: CatalogQuery) => ({ ...s, query }));
+  setQuery(query: CatalogQuery): void {
+    const previous = this.snapshot.query;
+    const filtersChanged = previous.query !== query.query || previous.brand !== query.brand
+      || previous.category !== query.category || previous.offersOnly !== query.offersOnly;
+    this.searchGeneration += 1;
+    this.patchState({ query: { ...query, pagination: filtersChanged ? BoundedPageRequest.first(query.pagination.size) : query.pagination },
+      products: [], list: null, loading: false, errorMessage: '', queryDirty: filtersChanged || this.snapshot.queryDirty });
+  }
+
+  goToPage(page: number): void {
+    const state = this.snapshot;
+    if (state.loading || !state.list || !Number.isSafeInteger(page) || page < 0 || page > 10_000) return;
+    const navigation = boundedPageNavigation(state.list);
+    if (page >= navigation.totalPages || page === state.query.pagination.page) return;
+    this.patchState({ query: { ...state.query, pagination: BoundedPageRequest.at(page, state.query.pagination.size) } });
+    this.search();
+  }
 
   readonly loadStorefront = this.effect<void>((trigger$) =>
     trigger$.pipe(
@@ -148,15 +168,36 @@ export class CatalogStore extends ComponentStore<CatalogState> {
 
   readonly search = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap(() =>
-        this.searchCatalog.execute(this.snapshot.query).pipe(
-          tapResponse({
-            next: (products) => this.patchState({ products, list: products.metadata, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, products: [], list: null, errorMessage: getApiErrorMessage(err) }),
+      switchMap(() => {
+        const generation = ++this.searchGeneration;
+        const query = this.snapshot.query;
+        this.patchState({ loading: true, errorMessage: '', products: [], queryDirty: false });
+        return this.searchCatalog.execute(query).pipe(
+          switchMap(products => {
+            if (generation !== this.searchGeneration) return of(null);
+            const recoveryPage = boundedPageNavigation(products.metadata).recoveryPage;
+            if (products.length || recoveryPage === null) return of(products);
+            const recovered = { ...query, pagination: BoundedPageRequest.at(recoveryPage, query.pagination.size) };
+            this.patchState({ query: recovered });
+            // Recover once; a second concurrent shrink must not create a request loop.
+            return this.searchCatalog.execute(recovered).pipe(
+              switchMap(retried => !retried.length && boundedPageNavigation(retried.metadata).recoveryPage !== null
+                ? throwError(() => new Error('La lista cambió nuevamente. Volvé a intentar.'))
+                : of(retried)),
+            );
           }),
-        ),
-      ),
+          tapResponse({
+            next: (products) => {
+              if (generation !== this.searchGeneration || products === null) return;
+              this.patchState({ products, list: products.metadata, loading: false });
+            },
+            error: (err: unknown) => {
+              if (generation !== this.searchGeneration) return;
+              this.patchState({ loading: false, products: [], list: null, errorMessage: getApiErrorMessage(err) });
+            },
+          }),
+        );
+      }),
     ),
   );
 

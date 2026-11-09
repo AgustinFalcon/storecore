@@ -30,5 +30,5 @@ enum class ReturnEligibility {
     }
 }
 data class OrderPage<T>(val items: List<T>, val page: Int, val size: Int, val total: Long) {
-    val truncated: Boolean get() = total > items.size
+    val truncated: Boolean get() = total > page.toLong() * size.toLong() + items.size.toLong()
 }

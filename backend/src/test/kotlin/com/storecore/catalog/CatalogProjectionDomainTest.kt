@@ -6,10 +6,10 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class CatalogProjectionDomainTest {
-    @Test fun `truncation records any authoritative rows outside the returned page`() {
+    @Test fun `truncation records authoritative rows after the returned page`() {
         assertTrue(BoundedPage(listOf("first"),2,0,1).truncated)
-        assertTrue(BoundedPage(listOf("last"),2,1,1).truncated)
-        assertTrue(BoundedPage(emptyList<String>(),2,2,1).truncated)
+        assertFalse(BoundedPage(listOf("last"),2,1,1).truncated)
+        assertFalse(BoundedPage(emptyList<String>(),2,2,1).truncated)
         assertFalse(BoundedPage(listOf("first","last"),2,0,50).truncated)
         assertFalse(BoundedPage(emptyList<String>(),0,0,50).truncated)
         assertFalse(BoundedPage(emptyList<String>(),0,3,50).truncated)

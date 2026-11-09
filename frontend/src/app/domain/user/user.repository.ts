@@ -1,3 +1,4 @@
+import { BoundedPageRequest } from '../catalog/bounded-page';
 import { BoundedRows } from '../catalog/bounded-rows';
 import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
@@ -23,14 +24,14 @@ export interface IUserRepository {
   listPromos(page?: number): Observable<BoundedRows<ManualPromo>>;
   savePromo(promo: CreateManualPromo): Observable<ManualPromo>;
   transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo>;
-  listCatalog(): Observable<BoundedRows<ProductDetail>>;
+  listCatalog(page?: BoundedPageRequest): Observable<BoundedRows<ProductDetail>>;
   saveProduct(product: ProductDetail): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
   saveCategory(facet: CatalogFacet): Observable<CatalogFacet>;
   previewProfile(manifest: string): Observable<ProfilePreview>;
   mergeProfile(manifest: string): Observable<ProfilePreview>;
   listCapabilities(): Observable<readonly CapabilityModule[]>;
-  listInventory(): Observable<BoundedRows<InventoryRow>>;
+  listInventory(page?: BoundedPageRequest): Observable<BoundedRows<InventoryRow>>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
   listMercadoLibreListings(page?: number): Observable<BoundedRows<MercadoLibreListing>>;
   saveMercadoLibreListing(listing: MercadoLibreMapping): Observable<MercadoLibreListing>;

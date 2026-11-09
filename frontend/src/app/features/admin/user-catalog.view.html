@@ -1,4 +1,4 @@
-<section class="sc-page sc-console" aria-labelledby="admin-catalog-title">
+<section class="sc-page sc-console" aria-labelledby="admin-catalog-title" [attr.aria-busy]="state.loading">
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="admin-catalog-title">Catálogo operador</h1>
@@ -15,7 +15,7 @@
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Productos</h2>
-      @if (state.list) { <p role="status">{{ state.products.length }} de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
+      @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
     <table class="sc-table">
       <thead>
@@ -91,4 +91,5 @@
     </form>
   </div>
   </div>
+  <sc-bounded-pagination [metadata]="state.list" [loading]="state.loading" (pageChange)="pageChange.emit($event)" />
 </section>

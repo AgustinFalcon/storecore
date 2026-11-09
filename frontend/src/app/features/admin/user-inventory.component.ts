@@ -12,7 +12,7 @@ import { UserInventoryViewComponent } from './user-inventory.view';
   template: `
     @if (store.vm$ | async; as state) {
       <sc-user-inventory-view [state]="state"
-        (retry)="store.loadInventory()" (queryChange)="store.setQuery($event)"
+        (pageChange)="store.goToPage($event)" (retry)="store.loadInventory()" (queryChange)="store.setQuery($event)"
         (filterChange)="store.setFilter($event)" (clearFilters)="store.clearFilters()" />
     }
   `,
