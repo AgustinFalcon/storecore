@@ -79,7 +79,7 @@ for (const role of [UserRole.Admin, UserRole.Operator]) {
       return route.fulfill({ status: path.endsWith('/me') ? 401 : 503, json: {} });
     });
     await page.goto('/user/home');
-    await expect(page.getByRole('heading', { name: 'Inicio de operaciones' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resumen operativo', exact: true })).toBeVisible();
     if (role === UserRole.Operator) await expect(page.getByRole('link', { name: 'Promos', exact: true })).toHaveCount(0);
     else await expect(page.getByRole('link', { name: 'Promos', exact: true })).toHaveCount(2);
     await checkAxe(page);

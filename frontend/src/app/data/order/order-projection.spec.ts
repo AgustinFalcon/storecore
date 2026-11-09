@@ -5,6 +5,19 @@ import { allowedRma, allowedShipment } from '../../domain/order/fulfillment-tran
 import { ReturnEligibility } from '../../domain/order/return-eligibility';
 
 describe('Order projection HTTP boundary', () => {
+  it('retains pending and incident blockers without exposing fulfillment commands', () => {
+    for (const eligibility of [FulfillmentEligibility.OrderNotPaid, FulfillmentEligibility.ReversalOrIncident]) {
+      for (const payment of [undefined, { state: OrderFactState.Known.wire, value: PaymentStatus.Pending.wire, reason: null }]) {
+        const order = mapAdminOrder({ orderStatus: OrderStatus.PendingPayment.wire, paymentStatus: PaymentStatus.Pending.wire,
+          payment, fulfillmentEligibility: eligibility.wire, shipmentAction: 'PACKED', rmaAction: 'RECEIVED' });
+        expect(order.fulfillmentEligibility).toBe(eligibility);
+        expect(order.shipmentAction).toBeNull();
+        expect(order.rmaAction).toBeNull();
+        expect(allowedShipment(order)).toBeNull();
+        expect(allowedRma(order)).toBeNull();
+      }
+    }
+  });
   it('translates each closed fact, reason and timeline kind exactly', () => {
     for (const type of [OrderFactState, OrderFactReason, OrderTimelineKind]) {
       for (const value of Object.values(type)) {

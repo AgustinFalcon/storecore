@@ -289,3 +289,33 @@
   `e8d2dcd5699f4c578857b2b4013ebe13cbb66d20` with zero P0-P3. PSD-T09 and
   PSD-T10 are done. The feature is implemented locally; CI, PR integration,
   deployment and external-provider homologation remain separate release work.
+
+## 2026-11-08 — PR #231 first CI remediation
+
+- GitHub Actions run `42536381697` passed the backend job and exposed two
+  frontend integration drifts plus two product defects. The operational-home
+  and global-shell assertions still described the superseded pre-parity UI:
+  the productive heading is `Resumen operativo`, and favorites, offers and
+  customer administration are protected productive routes rather than Unknown
+  surfaces. The CFE malformed-state fixture still returned a legacy array
+  instead of the bounded page contract.
+- The pricing form genuinely exceeded its panel at 768 px under Linux/font
+  rounding. Its min-size correction is encapsulated in the pricing view, and a
+  browser assertion now checks every input/select boundary against the form in
+  addition to document reflow. The rule does not alter unrelated panels or
+  checkbox/radio controls.
+- The USER order mapper also collapsed authoritative `ORDER_NOT_PAID` and
+  `REVERSAL_OR_INCIDENT` blockers into `PAYMENT_NOT_VERIFIED`. Resolution now
+  lives on the closed `FulfillmentEligibility` type, preserves those stronger
+  blockers, derives terminal reversal states safely and still suppresses all
+  commands without verified approved payment. Focused domain/projection tests
+  cover pending, incident, terminal, Unknown and command-denial cases.
+- Local evidence after remediation: focused browser gate **24/24**, final
+  pricing browser gate **5/5** at 390/768/1440, focused unit gate **30/30**,
+  full UA/CFE PostgreSQL 16.14 HTTPS browser matrix **17/17**, full frontend
+  verification **154 files / 1063 tests** plus architecture/lint/production
+  build, and full public Playwright suite **57/57**. The existing production
+  bundle warning remains non-failing at 739.60 kB against the 700 kB warning
+  threshold. The disposable PostgreSQL/container harness was removed and its
+  ports were verified free. CI on the remediated SHA and exact-SHA reviews are
+  still pending.

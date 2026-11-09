@@ -1,12 +1,13 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { SurfaceIdentity, SurfaceTarget } from '../src/app/domain/navigation/surface-identity';
+import { ReturnDestination } from '../src/app/domain/access/return-destination';
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 404, data: null, message: 'No encontrado' } }));
 });
 
-for (const path of ['/no-existe', '/customer/no-existe/anidado', '/user/no-existe/anidado', '/catalog/sku/no-existe', '/recover', '/customer/favorites', '/user/offers', '/user/customers']) {
+for (const path of ['/no-existe', '/customer/no-existe/anidado', '/user/no-existe/anidado', '/catalog/sku/no-existe', '/recover']) {
   test(`R8 Real Not Found preserves ${path} without inventing a surface`, async ({ page }, testInfo) => {
     const requested = path + '?source=unknown#requested';
     await page.goto(requested);
@@ -26,6 +27,18 @@ for (const path of ['/no-existe', '/customer/no-existe/anidado', '/user/no-exist
     await page.locator('[data-cta="not-found-home"]').click();
     await expect(page).toHaveURL(new URL('/', testInfo.project.use.baseURL).href);
     await expect(host).toHaveAttribute('data-surface-id', SurfaceIdentity.Home.wire);
+  });
+}
+
+for (const path of ['/customer/favorites', '/user/offers', '/user/customers']) {
+  test(`R8 Real protected surface ${path} requires login`, async ({ page }, testInfo) => {
+    await page.goto(path);
+    const login = new URL('/login', testInfo.project.use.baseURL);
+    login.searchParams.set('returnTo', ReturnDestination.Home.wire);
+    await expect(page).toHaveURL(login.href);
+    await expect(page.getByRole('heading', { name: 'Ingresar', exact: true })).toBeVisible();
+    await expect(page.locator('[data-surface-id]')).toHaveAttribute('data-surface-id', SurfaceIdentity.Login.wire);
+    await expect(page.locator('sc-not-found')).toHaveCount(0);
   });
 }
 

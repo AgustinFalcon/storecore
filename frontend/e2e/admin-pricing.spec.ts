@@ -27,6 +27,14 @@ for (const width of [390, 768, 1440]) {
     await expect(page.getByLabel(/Aprobador|Aprobado|Prioridad|Margen/)).toHaveCount(0);
     await expect(card.getByRole('button', { name: 'Finalizar' })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const form = page.locator('form.sc-panel');
+    const formBounds = await form.boundingBox();
+    expect(formBounds).not.toBeNull();
+    for (const control of await form.locator('input, select').all()) {
+      const bounds = await control.boundingBox();
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(formBounds!.x + formBounds!.width);
+    }
     const result = await new AxeBuilder({ page }).analyze(); expect(result.violations.filter(item => item.impact === 'serious' || item.impact === 'critical')).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath(`pricing-${width}.png`), fullPage: true });
   });

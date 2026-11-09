@@ -243,7 +243,7 @@ export function mapAdminOrder(value: unknown): AdminOrder {
   const row = asRecord(value);
   const order = mapOrder(value);
   const verified = order.payment.state === OrderFactState.Known && order.payment.value === PaymentStatus.Approved;
-  return { ...order, rmaStatus: RmaStatus.fromWire(row['rmaStatus']), fulfillmentEligibility: verified ? FulfillmentEligibility.fromWire(row['fulfillmentEligibility']) : FulfillmentEligibility.PaymentNotVerified, shipmentAction: !verified || row['shipmentAction'] == null ? null : ShipmentTransition.fromWire(row['shipmentAction']), rmaAction: !verified || row['rmaAction'] == null ? null : RmaTransition.fromWire(row['rmaAction']) };
+  return { ...order, rmaStatus: RmaStatus.fromWire(row['rmaStatus']), fulfillmentEligibility: FulfillmentEligibility.fromWire(row['fulfillmentEligibility']).withPaymentStatus(order.paymentStatus), shipmentAction: !verified || row['shipmentAction'] == null ? null : ShipmentTransition.fromWire(row['shipmentAction']), rmaAction: !verified || row['rmaAction'] == null ? null : RmaTransition.fromWire(row['rmaAction']) };
 }
 
 export function mapAdminOrders(value: unknown): readonly AdminOrder[] {

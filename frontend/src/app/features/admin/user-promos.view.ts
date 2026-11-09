@@ -10,6 +10,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
   imports: [FormsModule, FeatureStatusComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-promos.view.html',
+  styleUrl: './user-promos.view.scss',
 })
 export class UserPromosViewComponent {
   @Input({ required: true }) state!: UserState;
