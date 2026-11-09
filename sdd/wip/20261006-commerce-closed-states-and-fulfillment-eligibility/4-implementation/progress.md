@@ -334,3 +334,18 @@ JdbcFulfillmentEvidenceBoundaryTest. Evidencia detallada en
 CFE-T01–T05 pasan a done. CFE-T06 sigue in_progress hasta commit/PR, CI y dos
 reviews independientes del SHA exacto. No se declara homologación externa,
 publicación, activación live, disposición/restock ni ampliación del contrato POS.
+
+## 2026-11-09 — CFE-T06 candidata sobre runtime revalidado
+
+PR #231 head `9108798818b0217dcf5bb4685f59a195d63637ae`, merge
+`eca9db9f0ba51023c8b785831003cb04d8ba0660`. Verify #594 run `42538029894`
+terminó success en frontend, backend y browser real. La evidencia incluye 1061
+tests frontend, 253 backend y 17/17 escenarios browser (4 CFE reales, 1 Unknown
+MockHttp y 12 acceso), PostgreSQL 16,
+clean V1–V14, upgrade V8→V9 y V13→V14, autorización, concurrencia y recuperación
+durable ante pérdida de respuesta. El close-out documental requiere todavía CI
+y dos reviews GPT-6.1 Sol independientes sobre su SHA final; CFE-T06 continúa
+in_progress hasta ese gate.
+
+No se afirma CI push de master ni homologación, release, deploy, credenciales
+live, activación externa o disposición/restock por ítem.

@@ -19,13 +19,13 @@
 
 No se crea tag, release, importación ni publicación hasta completar estos checks y tener aprobación explícita.
 
-El corte CFE fue integrado por PR #171 (head `b3e4b3b`, merge `84f1b025`).
-Verify `37630043935` sobre el head exacto confirmó frontend, backend y
-`unified-access-real-e2e` success, con dos reviews GPT-6.1 Sol APPROVED sin
-P0–P3 y fingerprint `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
-No hubo CI push de master. Browser CFE específico, clean/upgrade y gates no
-acreditados permanecen pendientes; el WIP no se archiva ni autoriza release o
-homologación. Ante un eventual fallo, el rollback no puede
+El corte CFE integrado por PR #171 fue revalidado sobre PR #231 head
+`9108798818b0217dcf5bb4685f59a195d63637ae`, merge
+`eca9db9f0ba51023c8b785831003cb04d8ba0660`. Verify exact-head #594
+(`42538029894`) confirmó frontend, backend y browser: 4 journeys CFE reales,
+1 Unknown MockHttp, acceso 12/12, PostgreSQL 16 y clean/upgrade de migraciones.
+El SDD sólo se archivará tras CI y doble review del SHA documental final. No se afirma CI push de master ni se autoriza release,
+homologación, credenciales live o activación. Ante un eventual fallo, el rollback no puede
 reabrir despacho sin pago: detener escrituras mediante la capability existente,
 con autorización operativa separada. Disposición/restock sigue diferido; no hay
 migración nueva ni homologación externa en este corte.

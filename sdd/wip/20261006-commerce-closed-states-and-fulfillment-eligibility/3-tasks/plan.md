@@ -3,8 +3,8 @@
 GO documental registrado en `sdd/reviews/20261006-commerce-fulfillment-plan-sol.md`.
 Implementación integrada por PR #171. La aceptación local acumulativa del
 2026-11-05 cierra CFE-T01–T05: browser 17/17 y backend/migraciones 37/37 PASS
-sobre PostgreSQL 16. CFE-T06 permanece abierta para CI y reviews independientes
-del SHA documental exacto. No hubo homologación externa.
+sobre PostgreSQL 16. PR #231 y Verify #594 revalidaron el corte acumulativo;
+CFE-T06 cierra con dos reviews independientes del close-out. No hubo homologación externa.
 GO documental no es review de implementación ni aprobación de publicación.
 El estado actual y los bloqueos de ejecución están en tasks.json/progress.md.
 
