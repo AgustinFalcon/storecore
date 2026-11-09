@@ -11,4 +11,5 @@
 - Evidencia local final: arquitectura/lint/build frontend y 1091 tests; 26 integraciones MP/CFE/RMA; 18 journeys navegador→Spring→PostgreSQL, todos verdes.
 - El journey RMA prueba clasificación 1 RESTOCK + 1 DAMAGED, pérdida de respuesta después del commit, recovery GET, refresco padre y un único delta `RMA_RESTOCK +1`.
 - Recursos temporales 8080/4301/4302/5434 y contenedor PostgreSQL eliminados al terminar.
-- Pendiente único del corte: PR y CI exact-head antes de marcar RMA-T07 y TODO-045 como completados y archivar.
+- PR #233 candidato `fc80316`: Verify `42666041072` success en backend, frontend y `unified-access-real-e2e`.
+- RMA-T01–T07 completas; TODO-045 resuelto. Archivo SDD preparado y sujeto a un último Verify sobre el SHA archivado antes del merge.

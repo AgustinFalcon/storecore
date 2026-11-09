@@ -1,7 +1,7 @@
 {
   "feature": "20261109-commerce-rma-item-disposition-and-restock",
-  "status": "implementation",
-  "stats": {"total": 7, "done": 6, "in_progress": 1, "pending": 0, "blocked": 0},
+  "status": "completed",
+  "stats": {"total": 7, "done": 7, "in_progress": 0, "pending": 0, "blocked": 0},
   "tasks": [
     {"id":"RMA-T01","status":"done","title":"Inventario de writers, locks, read models y autoridad","requirements":["RMA-R01","RMA-R07","RMA-R09","RMA-R10"],"evidence":"Auditados CFE, FulfillmentUseCase, JdbcFulfillmentRecords, schema V1/V6, DTOs admin/customer y orden de locks; doble análisis coordinado aprobado."},
     {"id":"RMA-T02","status":"done","title":"Tipos cerrados y políticas puras Kotlin/TypeScript","depends_on":["RMA-T01"],"requirements":["RMA-R02","RMA-R03","RMA-R04"],"evidence":"Tipos cerrados, fromWire/Unknown y pasos editar-revisar-confirmar cubiertos por tests Kotlin y TypeScript."},
@@ -9,6 +9,6 @@
     {"id":"RMA-T04","status":"done","title":"Comando transaccional, locks, ledger y recuperación","depends_on":["RMA-T03"],"requirements":["RMA-R05","RMA-R06","RMA-R07","RMA-R08"],"evidence":"Order lock, autoridad viva, locks de inventario, rollback y carreras/reversión pasan en PostgreSQL real."},
     {"id":"RMA-T05","status":"done","title":"API/read model administrativo y proyección segura","depends_on":["RMA-T04"],"requirements":["RMA-R01","RMA-R06","RMA-R07","RMA-R10"],"evidence":"GET/POST USER no-cache, CSRF/origin/capability y CUSTOMER aislado; replay durable antes de elegibilidad mutable."},
     {"id":"RMA-T06","status":"done","title":"UX USER editar-revisar-confirmar-recuperar con fixtures","depends_on":["RMA-T05"],"requirements":["RMA-R01","RMA-R02","RMA-R03","RMA-R04","RMA-R09"],"evidence":"UX completa, fixtures visuales, recovery sessionStorage y refresco del estado padre cubiertos."},
-    {"id":"RMA-T07","status":"in_progress","title":"Aceptación PostgreSQL/HTTP/browser, reviews y CI exact-head","depends_on":["RMA-T06"],"requirements":["RMA-R01","RMA-R02","RMA-R03","RMA-R04","RMA-R05","RMA-R06","RMA-R07","RMA-R08","RMA-R09","RMA-R10"],"evidence":"Local: frontend 1091/1091, backend focalizado 26/26, browser real 18/18 y doble re-review GPT-6.1 Sol APPROVE. Falta CI exact-head."}
+    {"id":"RMA-T07","status":"done","title":"Aceptación PostgreSQL/HTTP/browser, reviews y CI exact-head","depends_on":["RMA-T06"],"requirements":["RMA-R01","RMA-R02","RMA-R03","RMA-R04","RMA-R05","RMA-R06","RMA-R07","RMA-R08","RMA-R09","RMA-R10"],"evidence":"Local: frontend 1091/1091, backend 268/268, browser real 18/18 y doble re-review GPT-6.1 Sol APPROVE. PR #233 head fc80316 pasó Verify 42666041072 con 3/3 jobs."}
   ]
 }

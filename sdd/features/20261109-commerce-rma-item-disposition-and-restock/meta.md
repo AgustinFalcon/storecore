@@ -1,11 +1,19 @@
 # Commerce RMA item disposition and restock
 
 - Feature: `20261109-commerce-rma-item-disposition-and-restock`
-- Status: `implementation`
+- Status: `completed`
 - Base: `master 1408e18face4204e46cddb2af979da131ce97c0d`
 - Backlog: `TODO-045`
 - Owners: StoreCore core maintainers; aprobación independiente requerida.
 - Spec review: doble GPT-6.1 Sol APPROVE, sin P0–P3.
+- Final review: backend/security y frontend/product GPT-6.1 Sol APPROVE, sin P0–P3.
+- Candidate CI: PR #233, head `fc80316552c5ec3d08e79bac5bdc85d367593810`, Verify `42666041072`, 3/3 jobs success.
+
+## Specs afectadas
+
+- Extiende: `sdd/features/20261006-commerce-closed-states-and-fulfillment-eligibility/`.
+- Resuelve: `TODO-045`.
+- No depreca contratos ni reactiva comandos legacy.
 
 ## Objetivo
 
