@@ -639,6 +639,239 @@ class MpOrdersCheckoutIntegrationTest(
         }
     }
 
+    @Test
+    fun `RMA mixed disposition commits once and replays immutable result after reversal`() {
+        val sku = "SKU-RMA-DISPOSE-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 2)
+        val route = "/api/v1/user/orders/$orderId/return-disposition"
+        val initial = exchange(route, HttpMethod.GET, null, admin.cookie)
+        val tree = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(initial.body!!).path("data")
+        assertEquals(com.storecore.commerce.domain.ReturnDispositionState.EDITABLE.name, tree.path("state").asText())
+        val itemId = tree.path("lines").single().path("returnItemId").asText()
+        val key = UUID.randomUUID()
+        val payload = """{"idempotencyKey":"$key","lines":[{"returnItemId":"$itemId","restockQuantity":1,"damagedQuantity":1,"rejectedQuantity":0,"damageReason":"COSMETIC"}]}"""
+        val balance = available(sku)
+        val first = disposition(orderId, payload)
+        assertEquals(200, first.statusCode.value(), first.body)
+        val confirmed = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(first.body!!).path("data")
+        assertEquals(com.storecore.commerce.domain.ReturnDispositionState.CONFIRMED.name, confirmed.path("state").asText())
+        assertEquals(balance + 1, available(sku))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger l JOIN return_items ri ON ri.adjustment_ledger_id=l.id WHERE ri.id=? AND l.event_type='RMA_RESTOCK' AND l.channel='INTERNAL' AND l.quantity_delta=1", Int::class.java, itemId.toLong()))
+        val replay = disposition(orderId, payload)
+        assertEquals(200, replay.statusCode.value(), replay.body)
+        assertEquals(confirmed, com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(replay.body!!).path("data"))
+        assertEquals(409, disposition(orderId, payload.replace("COSMETIC", "FUNCTIONAL")).statusCode.value())
+        val provider = jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId)!!
+        bindRemote(orderId, provider, "processed", "charged_back")
+        notify(provider, "rma-reversal", "rma-reversal")
+        assertEquals(1, worker.process())
+        assertEquals(200, disposition(orderId, payload).statusCode.value())
+        assertEquals(balance + 1, available(sku))
+        assertEquals(confirmed, com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(exchange(route, HttpMethod.GET, null, admin.cookie).body!!).path("data"))
+        assertEquals(409, disposition(orderId, payload.replace(key.toString(), UUID.randomUUID().toString())).statusCode.value())
+        assertTrue(!exchange("/api/v1/customer/orders/$orderId", HttpMethod.GET, null, customer.cookie).body!!.contains("idempotencyKey"))
+    }
+
+    @Test
+    fun `RMA invalid partitions and legacy history cannot change inventory`() {
+        val sku = "SKU-RMA-INVALID-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 2)
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val balance = available(sku)
+        val base = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":1,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+        assertEquals(409, disposition(orderId, base).statusCode.value())
+        assertEquals(409, disposition(orderId, base.replace("\"restockQuantity\":1", "\"restockQuantity\":-1")).statusCode.value())
+        assertEquals(409, disposition(orderId, base.replace("\"restockQuantity\":1", "\"restockQuantity\":0").replace("\"damagedQuantity\":0", "\"damagedQuantity\":2")).statusCode.value())
+        assertEquals(balance, available(sku))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+        jdbc.update("UPDATE returns SET status='INSPECTED',inspection_result='RESTOCK' WHERE order_id=?", orderId)
+        val historical = exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.GET, null, admin.cookie)
+        assertTrue(historical.body!!.contains(com.storecore.commerce.domain.ReturnDispositionState.HISTORICAL_INCOMPLETE.name))
+        assertEquals(409, disposition(orderId, base.replace("\"restockQuantity\":1", "\"restockQuantity\":2")).statusCode.value())
+        assertEquals(balance, available(sku))
+    }
+
+    @Test
+    fun `RMA no-restock closes without ledger and authority is enforced`() {
+        val sku = "SKU-RMA-DAMAGED-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 2)
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val route = "/api/v1/user/orders/$orderId/return-disposition"
+        val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":0,"damagedQuantity":2,"rejectedQuantity":0,"damageReason":"FUNCTIONAL"}]}"""
+        val before = available(sku)
+        assertEquals(401, exchange(route, HttpMethod.GET, null).statusCode.value())
+        assertEquals(401, exchange(route, HttpMethod.GET, null, customer.cookie).statusCode.value())
+        assertEquals(401, exchange(route, HttpMethod.POST, payload, customer.cookie, customer.csrf).statusCode.value())
+        assertEquals(403, exchange(route, HttpMethod.POST, payload, admin.cookie, "bad-csrf").statusCode.value())
+        assertEquals(403, exchange(route, HttpMethod.POST, payload, admin.cookie, admin.csrf, mapOf(HttpHeaders.ORIGIN to "https://foreign.example.test")).statusCode.value())
+        assertEquals(200, disposition(orderId, payload).statusCode.value())
+        assertEquals(before, available(sku))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM return_items WHERE id=? AND adjustment_ledger_id IS NOT NULL", Int::class.java, itemId))
+    }
+
+    @Test
+    fun `RMA two independent operator sessions can only restock once`() {
+        val sku = "SKU-RMA-RACE-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 2)
+        val firstOperator = admin
+        val secondOperator = provisionAdmin("rma-operator-${UUID.randomUUID()}@example.com")
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":2,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+        val before = available(sku)
+        val pool = Executors.newFixedThreadPool(2)
+        jdbc.dataSource!!.connection.use { barrier ->
+            barrier.autoCommit = false
+            try {
+                val barrierPid = barrier.createStatement().use { it.executeQuery("SELECT pg_backend_pid()").use { rs -> check(rs.next()); rs.getInt(1) } }
+                barrier.prepareStatement("SELECT id FROM orders WHERE id=? FOR UPDATE").use { it.setLong(1, orderId); it.executeQuery().close() }
+                val first = pool.submit<org.springframework.http.ResponseEntity<String>> { exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.POST, payload, firstOperator.cookie, firstOperator.csrf) }
+                val firstPid = awaitOrderLockWaiter(barrierPid)
+                val second = pool.submit<org.springframework.http.ResponseEntity<String>> { exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.POST, payload, secondOperator.cookie, secondOperator.csrf) }
+                assertNotEquals(firstPid, awaitOrderLockWaiter(barrierPid, firstPid, firstPid))
+                // Both sessions are visibly queued on the same aggregate lock.
+                barrier.commit()
+                listOf(first, second).forEach { val response = it.get(20, TimeUnit.SECONDS); assertEquals(200, response.statusCode.value(), response.body) }
+                assertEquals(before + 2, available(sku))
+                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+            } finally { barrier.rollback(); pool.shutdownNow(); assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS)) }
+        }
+    }
+
+    @Test
+    fun `RMA failure after ledger and balance writes rolls back command classification and stock`() {
+        val sku = "SKU-RMA-ROLLBACK-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 2)
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val before = available(sku)
+        val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":2,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+        jdbc.execute("""CREATE FUNCTION fail_rma_fixture() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'} BEGIN IF NEW.id=$itemId AND NEW.disposition_command_id IS NOT NULL THEN RAISE EXCEPTION 'RMA fixture failure'; END IF; RETURN NEW; END; ${'$'}${'$'}""")
+        jdbc.execute("CREATE TRIGGER zz_fail_rma_fixture BEFORE UPDATE ON return_items FOR EACH ROW EXECUTE FUNCTION fail_rma_fixture()")
+        try {
+            assertEquals(500, disposition(orderId, payload).statusCode.value())
+            assertEquals(before, available(sku))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM inventory_ledger l JOIN product_variants v ON v.id=l.variant_id WHERE v.sku=? AND l.event_type='RMA_RESTOCK'", Int::class.java, sku))
+            assertEquals(com.storecore.commerce.domain.RmaStatus.RETURN_RECEIVED.name, jdbc.queryForObject("SELECT status FROM returns WHERE order_id=?", String::class.java, orderId))
+        } finally { jdbc.execute("DROP TRIGGER zz_fail_rma_fixture ON return_items"); jdbc.execute("DROP FUNCTION fail_rma_fixture()") }
+    }
+
+    @Test
+    fun `RMA order lock serializes reversal before or after physical disposition`() {
+        for (ordering in WriterOrdering.entries) {
+            val sku = "SKU-RMA-REVERSE-RACE-${UUID.randomUUID()}"
+            val orderId = receivedOrder(sku, 1)
+            val provider = jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId)!!
+            val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+            val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":1,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+            val before = available(sku)
+            bindRemote(orderId, provider, "processed", "charged_back")
+            notify(provider, "rma-reversal-race", "rma-reversal-race")
+            jdbc.dataSource!!.connection.use { barrier ->
+                val pool = Executors.newFixedThreadPool(2)
+                barrier.autoCommit = false
+                try {
+                    val barrierPid = barrier.createStatement().use { it.executeQuery("SELECT pg_backend_pid()").use { rs -> check(rs.next()); rs.getInt(1) } }
+                    barrier.prepareStatement("SELECT id FROM orders WHERE id=? FOR UPDATE").use { it.setLong(1, orderId); it.executeQuery().close() }
+                    lateinit var reversal: java.util.concurrent.Future<Int>
+                    lateinit var physical: java.util.concurrent.Future<org.springframework.http.ResponseEntity<String>>
+                    val firstPid = if (ordering == WriterOrdering.PAYMENT_FIRST) {
+                        reversal = pool.submit<Int> { worker.process() }
+                        awaitOrderLockWaiter(barrierPid)
+                    } else {
+                        physical = pool.submit<org.springframework.http.ResponseEntity<String>> { disposition(orderId, payload) }
+                        awaitOrderLockWaiter(barrierPid)
+                    }
+                    if (ordering == WriterOrdering.PAYMENT_FIRST) physical = pool.submit<org.springframework.http.ResponseEntity<String>> { disposition(orderId, payload) }
+                    else reversal = pool.submit<Int> { worker.process() }
+                    assertNotEquals(firstPid, awaitOrderLockWaiter(barrierPid, firstPid, firstPid))
+                    barrier.commit()
+                    assertEquals(1, reversal.get(20, TimeUnit.SECONDS))
+                    val response = physical.get(20, TimeUnit.SECONDS)
+                    val physicalFirst = ordering == WriterOrdering.FULFILLMENT_FIRST
+                    assertEquals(if (physicalFirst) 200 else 409, response.statusCode.value(), response.body)
+                    assertEquals(before + if (physicalFirst) 1 else 0, available(sku))
+                    assertEquals(if (physicalFirst) 1 else 0, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+                } finally { barrier.rollback(); pool.shutdownNow(); assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS)) }
+            }
+        }
+    }
+
+    @Test
+    fun `RMA lost role and disabled capability cannot commit physical inspection`() {
+        val sku = "SKU-RMA-AUTHORITY-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 1)
+        val actor = adminUserId()
+        val lostRoleEmail = "admin-rma-lost-${UUID.randomUUID()}@example.com"
+        val other = provisionAdmin(lostRoleEmail)
+        jdbc.update("DELETE FROM user_roles WHERE user_id=(SELECT id FROM users WHERE email=?)", lostRoleEmail)
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val route = "/api/v1/user/orders/$orderId/return-disposition"
+        val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":1,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+        val before = available(sku)
+        assertEquals(401, exchange(route, HttpMethod.POST, payload, other.cookie, other.csrf).statusCode.value())
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.DISABLED.wire, "{}", UUID.randomUUID(), "RMA authority fixture")
+        try {
+            assertEquals(409, disposition(orderId, payload).statusCode.value())
+            assertEquals(before, available(sku))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+        } finally {
+            val disabledVersion = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
+            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", disabledVersion, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, "{}", UUID.randomUUID(), "restore RMA authority fixture")
+        }
+    }
+
+    @Test
+    fun `RMA mutation linearizes before a concurrent role revocation while waiting for the order`() {
+        val sku = "SKU-RMA-ROLE-RACE-${UUID.randomUUID()}"
+        val orderId = receivedOrder(sku, 1)
+        val email = "admin-rma-race-${UUID.randomUUID()}@example.com"
+        val actor = provisionAdmin(email)
+        val actorId = jdbc.queryForObject("SELECT id FROM users WHERE email=?", Long::class.java, email)!!
+        val itemId = jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?", Long::class.java, orderId)!!
+        val payload = """{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$itemId","restockQuantity":1,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+        val before = available(sku)
+        val pool = Executors.newFixedThreadPool(2)
+        jdbc.dataSource!!.connection.use { barrier ->
+            barrier.autoCommit = false
+            try {
+                val barrierPid = barrier.createStatement().use { it.executeQuery("SELECT pg_backend_pid()").use { rs -> check(rs.next()); rs.getInt(1) } }
+                barrier.prepareStatement("SELECT id FROM orders WHERE id=? FOR UPDATE").use { it.setLong(1, orderId); it.executeQuery().close() }
+                val mutation = pool.submit<org.springframework.http.ResponseEntity<String>> {
+                    exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.POST, payload, actor.cookie, actor.csrf)
+                }
+                awaitOrderLockWaiter(barrierPid)
+                val revocation = pool.submit<Int> { jdbc.update("DELETE FROM user_roles WHERE user_id=?", actorId) }
+                Thread.sleep(200)
+                assertTrue(!revocation.isDone, "role removal must wait behind the mutation's live-authority lock")
+                barrier.commit()
+                val response = mutation.get(20, TimeUnit.SECONDS)
+                assertEquals(200, response.statusCode.value(), response.body)
+                assertEquals(1, revocation.get(20, TimeUnit.SECONDS))
+                assertEquals(before + 1, available(sku))
+                assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
+                assertEquals(401, exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.POST, payload, actor.cookie, actor.csrf).statusCode.value())
+            } finally { barrier.rollback(); pool.shutdownNow(); assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS)) }
+        }
+    }
+
+    private fun receivedOrder(sku: String, quantity: Int): Long {
+        val orderId = checkoutWithQuantity(sku, quantity)
+        val provider = "ORD-RMA-${UUID.randomUUID()}"
+        bindRemote(orderId, provider)
+        assertEquals(200, notify(provider, "rma-accredit", "rma-accredit").statusCode.value())
+        assertEquals(1, worker.process())
+        com.storecore.commerce.domain.ShipmentCommand.entries.filter { it != com.storecore.commerce.domain.ShipmentCommand.UNKNOWN }.forEach { assertEquals(200, command(orderId, "shipments", it.name).statusCode.value()) }
+        assertEquals(200, command(orderId, "rma", com.storecore.commerce.domain.RmaCommand.RECEIVED.name).statusCode.value())
+        return orderId
+    }
+    private fun available(sku: String) = jdbc.queryForObject("SELECT b.available_quantity FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=?", Int::class.java, sku)!!
+    private fun disposition(orderId: Long, payload: String): org.springframework.http.ResponseEntity<String> {
+        val response = exchange("/api/v1/user/orders/$orderId/return-disposition", HttpMethod.POST, payload, admin.cookie, admin.csrf)
+        response.headers.getFirst("X-CSRF-Token")?.let { admin = admin.copy(csrf = it) }
+        return response
+    }
+
     private fun awaitOrderLockWaiter(barrierPid: Int, firstWriterPid: Int = 0, excludePid: Int = 0): Int {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
         while (System.nanoTime() < deadline) {

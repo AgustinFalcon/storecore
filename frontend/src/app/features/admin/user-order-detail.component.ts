@@ -5,10 +5,11 @@ import { distinctUntilChanged, map } from 'rxjs';
 import { ActivatedRoute } from '@angular/router';
 import { UserOrderDetailViewComponent } from './user-order-detail.view';
 import { UserOrderDetailStore } from './user-order-detail.store';
+import { ReturnDispositionComponent } from './return-disposition.component';
 
 @Component({
   selector: 'sc-user-order-detail',
-  imports: [AsyncPipe, UserOrderDetailViewComponent],
+  imports: [AsyncPipe, UserOrderDetailViewComponent, ReturnDispositionComponent],
   providers: [UserOrderDetailStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -20,6 +21,7 @@ import { UserOrderDetailStore } from './user-order-detail.store';
       (rma)="store.rma($event)"
       (retry)="reload()"
     />
+    <sc-return-disposition [order]="store.order$ | async" (dispositionConfirmed)="reload()" />
   `,
 })
 export class UserOrderDetailComponent implements OnInit {

@@ -30,6 +30,8 @@ import { CustomerHttpRepository } from './data/customer/customer-http.repository
 import { HealthHttpRepository } from './data/health/health-http.repository';
 import { FavoriteHttpRepository } from './data/favorite/favorite-http.repository';
 import { OrderHttpRepository } from './data/order/order-http.repository';
+import { ReturnDispositionHttpRepository } from './data/order/return-disposition-http.repository';
+import { RETURN_DISPOSITION_REPOSITORY } from './core/tokens/return-disposition.tokens';
 import { OfferHttpRepository } from './data/offer/offer-http.repository';
 import { CustomerAdminHttpRepository } from './data/customer-admin/customer-admin-http.repository';
 import { OverviewHttpRepository } from './data/overview/overview-http.repository';
@@ -57,6 +59,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CUSTOMER_REPOSITORY, useClass: CustomerHttpRepository },
     { provide: CART_REPOSITORY, useClass: CartHttpRepository },
     { provide: ORDER_REPOSITORY, useClass: OrderHttpRepository },
+    { provide: RETURN_DISPOSITION_REPOSITORY, useClass: ReturnDispositionHttpRepository },
     { provide: OFFER_REPOSITORY, useClass: OfferHttpRepository },
     { provide: CUSTOMER_ADMIN_REPOSITORY, useClass: CustomerAdminHttpRepository },
     { provide: OVERVIEW_REPOSITORY, useClass: OverviewHttpRepository },

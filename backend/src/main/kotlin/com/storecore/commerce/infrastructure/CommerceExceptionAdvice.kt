@@ -12,6 +12,7 @@ import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.application.PromoWindowOverlap
 import com.storecore.commerce.application.WebhookPayloadTooLarge
 import com.storecore.commerce.application.WebhookRateLimited
+import com.storecore.commerce.application.ReturnDispositionRejected
 import com.storecore.identity.infrastructure.web.BaseResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class CommerceExceptionAdvice {
+    @ExceptionHandler(ReturnDispositionRejected::class)
+    fun disposition(exception: ReturnDispositionRejected) = error(HttpStatus.CONFLICT, exception.message ?: "RMA_CONFLICT", false)
     @ExceptionHandler(InvalidWebhookSignature::class)
     fun invalidSignature() =
         ResponseEntity.status(HttpStatus.UNAUTHORIZED)

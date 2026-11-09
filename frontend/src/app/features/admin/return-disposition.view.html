@@ -1,0 +1,78 @@
+<section class="sc-panel sc-rma" aria-labelledby="rma-inspection-title" [attr.aria-busy]="state.phase.busy">
+  <header>
+    <p class="sc-kicker">Devolución · inspección física</p>
+    <h2 id="rma-inspection-title">{{ state.phase.label }}</h2>
+    <p>Clasificá las unidades recibidas. Sólo las aptas para reponer aumentan el stock vendible.</p>
+  </header>
+  @if (state.message) { <p role="status" class="sc-callout">{{ state.message }}</p> }
+  @if (state.phase.busy) { <p role="status">{{ state.phase.label }}…</p> }
+  @if (state.model; as model) {
+    <p class="sc-rma__meta">Referencia de devolución {{ model.returnId ?? 'No disponible' }} · {{ model.state.label }}</p>
+    @if (model.confirmedAt) { <p>Confirmada el {{ model.confirmedAt }}</p> }
+    @for (line of model.lines; track line.returnItemId) {
+      <article class="sc-panel sc-rma__line" [attr.aria-label]="'Inspección de ' + line.sku">
+        <h3>{{ line.name }}</h3>
+        <p class="sc-rma__meta">{{ line.sku }} · {{ line.quantity }} unidades recibidas</p>
+        @if (draft(line); as value) {
+          @if (state.phase.canEdit) {
+            <div class="sc-rma__grid">
+              <label>Aptas para reponer
+                <input type="number" min="0" [max]="line.quantity" step="1" [name]="'restock-' + line.returnItemId" [ngModel]="value.restockQuantity" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {restockQuantity: $event}})" />
+              </label>
+              <label>Dañadas
+                <input type="number" min="0" [max]="line.quantity" step="1" [name]="'damaged-' + line.returnItemId" [ngModel]="value.damagedQuantity" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {damagedQuantity: $event}})" />
+              </label>
+              <label>Rechazadas
+                <input type="number" min="0" [max]="line.quantity" step="1" [name]="'rejected-' + line.returnItemId" [ngModel]="value.rejectedQuantity" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {rejectedQuantity: $event}})" />
+              </label>
+            </div>
+            <p>Clasificadas {{ value.restockQuantity + value.damagedQuantity + value.rejectedQuantity }} de {{ line.quantity }}. La suma debe coincidir con lo recibido.</p>
+            <div class="sc-rma__grid">
+              @if (value.damagedQuantity > 0) {
+                <label>Motivo de daño (obligatorio)
+                  <select [name]="'damage-reason-' + line.returnItemId" [ngModel]="value.damageReason" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {damageReason: $event}})">
+                    <option [ngValue]="null">Seleccioná un motivo</option>
+                    @for (reason of damageReasons; track reason.wire) { <option [ngValue]="reason">{{ reason.label }}</option> }
+                  </select>
+                </label>
+              }
+              @if (value.rejectedQuantity > 0) {
+                <label>Motivo de rechazo (obligatorio)
+                  <select [name]="'rejection-reason-' + line.returnItemId" [ngModel]="value.rejectionReason" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {rejectionReason: $event}})">
+                    <option [ngValue]="null">Seleccioná un motivo</option>
+                    @for (reason of rejectionReasons; track reason.wire) { <option [ngValue]="reason">{{ reason.label }}</option> }
+                  </select>
+                </label>
+              }
+            </div>
+            <label>Observación interna (opcional, hasta 500 caracteres)
+              <textarea maxlength="500" [name]="'observation-' + line.returnItemId" [ngModel]="value.observation" (ngModelChange)="lineChange.emit({returnItemId: line.returnItemId, patch: {observation: $event}})"></textarea>
+            </label>
+          } @else {
+            <dl class="sc-rma__grid">
+              <div><dt>Aptas para reponer</dt><dd class="sc-rma__count">+{{ value.restockQuantity }}</dd></div>
+              <div><dt>Dañadas · no vendibles</dt><dd>{{ value.damagedQuantity }} @if (value.damageReason) { · {{ value.damageReason.label }} }</dd></div>
+              <div><dt>Rechazadas · sin reposición</dt><dd>{{ value.rejectedQuantity }} @if (value.rejectionReason) { · {{ value.rejectionReason.label }} }</dd></div>
+            </dl>
+            @if (value.observation) { <p>Observación interna: {{ value.observation }}</p> }
+          }
+        } @else { <p>Sin clasificación por unidad registrada.</p> }
+      </article>
+    }
+    @if (state.phase === phases.Reviewing) {
+      <aside class="sc-callout" aria-label="Resumen de impacto">
+        <h3>Revisá el impacto antes de confirmar</h3>
+        <p><strong>+{{ restockTotal }} unidades vendibles</strong>, {{ damagedTotal }} dañadas y {{ rejectedTotal }} rechazadas.</p>
+        <p>La clasificación quedará registrada y no se podrá editar. Esta acción no genera un reembolso ni una nota de crédito.</p>
+      </aside>
+    }
+  }
+  <div class="sc-rma__actions">
+    @if (state.phase.canEdit) { <button type="button" class="sc-btn sc-btn--primary" (click)="review.emit()">Revisar clasificación</button> }
+    @if (state.phase === phases.Reviewing) {
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="back.emit()">Volver a editar</button>
+      <button type="button" class="sc-btn sc-btn--primary" (click)="confirm.emit()">Confirmar inspección y reposición</button>
+    }
+    @if (state.phase.canRecover) { <button type="button" class="sc-btn sc-btn--primary" (click)="recover.emit()">Consultar resultado</button> }
+  </div>
+</section>
