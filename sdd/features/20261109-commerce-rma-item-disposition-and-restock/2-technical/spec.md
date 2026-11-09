@@ -55,6 +55,6 @@ Fallos posteriores a cualquier write hacen rollback total. Reintentos serializab
 
 - Unitarias de tipos cerrados, traductores y partición.
 - PostgreSQL real para constraints, clean/upgrade V14→nueva versión, locks, idempotencia y rollback, incluido retry después de cierre y después de reversión posterior.
-- HTTP para autoridad, ownership, CSRF/origin/capability y errores cerrados.
-- Browser real para edición→revisión→confirmación, delta vendible, pérdida de respuesta/reload y dos operadores.
+- HTTP sobre PostgreSQL real para autoridad, ownership, CSRF/origin/capability, errores cerrados y carrera de dos operadores con un único ganador.
+- Browser real para edición→revisión→confirmación, delta vendible y pérdida de respuesta/reload con recuperación visual.
 - Regresión completa CFE: pago, SALE, shipment, recepción única y no-restock previo.
