@@ -3,11 +3,11 @@
   "stack_profile": "backend-frontend",
   "project_type": "production",
   "execution_strategy": "incremental-gated",
-  "status": "exact_head_gate_in_progress",
+  "status": "complete",
   "stats": {
     "total": 6,
-    "done": 5,
-    "in_progress": 1,
+    "done": 6,
+    "in_progress": 0,
     "blocked": 0,
     "pending": 0
   },
@@ -65,7 +65,7 @@
         "CFE-R05",
         "CFE-R07"
       ],
-      "evidence": "Tipos/mappers/views/stores integrados. Browser CFE específico 5/5 y acceso unificado 12/12 PASS el 2026-11-05, incluyendo Unknown fail-closed y aislamiento de sesiones."
+      "evidence": "Tipos/mappers/views/stores integrados. Browser CFE específico 4 journeys reales + 1 Unknown MockHttp y acceso unificado 12/12 PASS el 2026-11-05, incluyendo fail-closed y aislamiento de sesiones."
     },
     {
       "id": "CFE-T05",
@@ -85,12 +85,12 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "Corte acumulativo local 2026-11-05 sobre master 8b8ff478: check:ua-real PASS; test:ua-real 17/17 PASS (5 CFE, 12 acceso); backend focalizado y Flyway clean/upgrade 37/37 PASS en PostgreSQL 16.14, incluido baseline V11 no-op con checksums e histórico preservados. Unknown MockHttp permanece contabilizado por separado. Ver evidence/cfe-acceptance-local-20261105.md."
+      "evidence": "Corte acumulativo local 2026-11-05 sobre master 8b8ff478: check:ua-real PASS; test:ua-real 17/17 PASS (4 CFE reales, 1 Unknown MockHttp y 12 acceso); backend focalizado y Flyway clean/upgrade 37/37 PASS en PostgreSQL 16.14, incluido baseline V11 no-op con checksums e histórico preservados. Ver evidence/cfe-acceptance-local-20261105.md."
     },
     {
       "id": "CFE-T06",
       "title": "Exact-head dual Sol review and honest SDD close-out",
-      "status": "in_progress",
+      "status": "done",
       "depends_on": [
         "CFE-T05"
       ],
@@ -104,7 +104,7 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "La aceptación local T05 está cerrada. Pendientes únicamente commit/PR, CI y dos revisiones independientes sobre el SHA documental exacto de este close-out; no archive ni homologación externa."
+      "evidence": "PR #231 head 9108798818b0217dcf5bb4685f59a195d63637ae; Verify #594 run 42538029894 success. Close-out candidato 4debf9b: Verify 42653866473 3/3 success y doble review GPT-6.1 Sol APPROVE. No acredita homologación externa, release ni activación live."
     }
   ]
 }

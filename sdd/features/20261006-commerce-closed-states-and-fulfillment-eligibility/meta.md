@@ -1,7 +1,7 @@
 # Commerce closed states and fulfillment eligibility
 
 Feature: `20261006-commerce-closed-states-and-fulfillment-eligibility`.
-Status: `exact_head_gate_in_progress`; PR #171 MERGED; aceptación local T01–T05 cerrada; CI y reviews del close-out documental pendientes.
+Status: `complete`; implementación PR #171 revalidada en PR #231; CFE-T01–T06 cerradas y feature archivado.
 Branch: `fix/commerce-fulfillment-eligibility`.
 Source baseline: `de6a0d7cce780d3db3785468489b237b322b82d9` on the master-derived checkout.
 Language: Spanish. Owner: StoreCore core maintainers; Sol owns GO/NO-GO.
@@ -28,7 +28,9 @@ PR #171 MERGED: head `b3e4b3baa47f3abdabd4140b3bbcee975e4c3474`, merge
 `unified-access-real-e2e` success. Dos reviews independientes GPT-6.1 Sol
 APPROVED sin P0–P3 sobre ese head y fingerprint
 `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
-La suite browser citada cubre acceso unificado; no acredita por sí sola browser
-CFE específico. Clean/upgrade y los restantes gates no acreditados siguen
-pendientes; no hubo CI push de master. Sin archive, tag, despliegue,
+PR #231 head `9108798818b0217dcf5bb4685f59a195d63637ae`, merge
+`eca9db9f0ba51023c8b785831003cb04d8ba0660`, revalida el corte con Verify #594
+run `42538029894`: 4 journeys CFE browser reales + 1 Unknown MockHttp, acceso 12/12, backend 253/253, PostgreSQL 16
+y migraciones clean/upgrade PASS. El candidato documental `4debf9b` pasó Verify
+run `42653866473` y dos reviews independientes APPROVE. No hubo CI push de master. Sin tag, despliegue,
 homologación, credenciales live ni activación. Disposición/restock sigue diferido.

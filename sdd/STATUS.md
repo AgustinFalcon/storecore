@@ -61,23 +61,27 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
-## Fulfillment comercial — PR #171 integrado, WIP abierto
+## Fulfillment comercial — aceptación cerrada y SDD archivado
 
-`sdd/wip/20261006-commerce-closed-states-and-fulfillment-eligibility/` tiene
-Sol GO documental registrado y PR #171 MERGED: head
-`b3e4b3baa47f3abdabd4140b3bbcee975e4c3474`, merge `84f1b025`.
+`sdd/features/20261006-commerce-closed-states-and-fulfillment-eligibility/`
+conserva el GO documental y la implementación de PR #171, revalidada sobre el
+head final de PR #231 `9108798818b0217dcf5bb4685f59a195d63637ae` (merge
+`eca9db9f0ba51023c8b785831003cb04d8ba0660`).
 Implementa tipos cerrados,
 prueba durable de acreditación/SALE WEB, locks order-first y recepción completa
-sin inspección ni reposición. Verify exact-head `37630043935` terminó success
+sin inspección ni reposición. En el antecedente PR #171, head `b3e4b3b`, Verify
+exact-head `37630043935` terminó success
 en frontend, backend y `unified-access-real-e2e`; dos reviews independientes
 GPT-6.1 Sol APPROVED sin P0–P3 verificaron ese head y el fingerprint
 `459CB299E61B864DB52A5B3E2FB676BC213BA1C94307731BAC5E54F115647572`.
-No hubo CI push de master. El corte acumulativo local del 2026-11-05 sobre
-`8b8ff478` cerró CFE-T01–T05: browser real 17/17 (5 CFE, 12 acceso) y
-backend/migraciones PostgreSQL 16 37/37, con clean V1–V11, upgrade V8→V9 y
-validación no-op del baseline publicado V11 preservando checksums e histórico.
-CFE-T06 permanece abierto para CI y reviews del SHA documental exacto. Sin
-archive, homologación, release ni activación. Progreso/evidencia y límites están en el WIP.
+Verify exact-head #594, run `42538029894`, terminó success en frontend, backend
+y browser: 1061 tests frontend, 253 backend y 17/17 escenarios (4 CFE reales,
+1 Unknown MockHttp y 12 de acceso). La matriz incluye PostgreSQL 16, clean V1–V14, upgrade V8→V9 y
+V13→V14, checksums/histórico, autorización, concurrencia, respuesta perdida y
+recuperación durable. El candidato documental `4debf9b` pasó Verify
+`42653866473` con 3/3 jobs y doble review GPT-6.1 Sol APPROVE; CFE-T06 quedó
+cerrada y el SDD archivado. No se afirma CI push de master. Sin homologación,
+release, credenciales live ni activación. Progreso/evidencia y límites están en el feature.
 Disposición/reposición por ítem se difiere al backlog `TODO-045`.
 
 ## Fiscal externo
