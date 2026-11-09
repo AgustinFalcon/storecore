@@ -24,6 +24,10 @@ Precio base, desired, observed y effective promo son valores distintos. Sólo un
 
 Container → view → ComponentStore → use case → HTTP repository. CUSTOMER y USER no comparten cookie. El browser no guarda Bearer/JWT. UX DS-00…U-10 está en código; axe corre con `npm run test:a11y`.
 
+## Bounded list contracts
+
+La semántica de continuación se calcula con el offset absoluto en ambos lados del wire: `page * size + items.size < total`, con aritmética ancha en backend. Los controles de paginación permanecen montados durante cargas y límites; un estado tipado bloquea activaciones inválidas sin destruir el foco. Stores protegidos atan cada publicación a la generación del actor y limpian el snapshot al cambiar principal o cerrar sesión. Filtros editados pero no aplicados son un estado de presentación propio y nunca se anuncian como resultado vacío del servidor.
+
 ## Unified access without identity merging
 
 Una entrada visual no es un principal compartido. Realm, rol, destino, etapa,

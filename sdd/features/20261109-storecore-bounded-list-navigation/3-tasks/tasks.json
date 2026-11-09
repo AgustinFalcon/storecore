@@ -1,13 +1,13 @@
 {
   "feature": "20261109-storecore-bounded-list-navigation",
-  "status": "implementation",
-  "stats": { "total": 5, "done": 4, "in_progress": 1, "pending": 0 },
+  "status": "completed",
+  "stats": { "total": 5, "done": 5, "in_progress": 0, "pending": 0 },
   "tasks": [
     { "id": "BLN-T01", "title": "Add bounded page domain input, navigation derivation and one-shot shrink recovery", "status": "done", "requirements": ["BLN-R03", "BLN-R07"] },
     { "id": "BLN-T02", "title": "Connect storefront pagination and filter reset", "status": "done", "requirements": ["BLN-R01", "BLN-R04", "BLN-R05"] },
     { "id": "BLN-T03", "title": "Connect actor-bound admin catalog and inventory pagination", "status": "done", "requirements": ["BLN-R02", "BLN-R05", "BLN-R06"] },
     { "id": "BLN-T04", "title": "Run unit, build and real browser gates", "status": "done", "requirements": ["BLN-R01", "BLN-R02", "BLN-R03", "BLN-R08"] },
-    { "id": "BLN-T05", "title": "Independent final reviews, CI, archive and merge", "status": "in_progress", "requirements": ["BLN-R01", "BLN-R08"] }
+    { "id": "BLN-T05", "title": "Independent final reviews, CI, archive and merge", "status": "done", "requirements": ["BLN-R01", "BLN-R08"] }
   ]
 }
 

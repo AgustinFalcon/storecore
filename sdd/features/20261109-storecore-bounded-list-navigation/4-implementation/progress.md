@@ -15,5 +15,14 @@
 - Final frontend gate passed after review fixes: architecture 9/9, lint, 163 test files and 1114 tests, production build.
 - Final backend gate passed: Maven 268/268 tests with PostgreSQL/Testcontainers, including the corrected catalog and order HTTP projection contracts.
 - Final browser/accessibility gate passed: 60/60 Playwright journeys, including keyboard next→previous, focus retention and reflow at 390/768/1440 for buyer/admin/inventory.
-- Product/UX re-review approved with no P0–P3; independent technical re-review, exact-head CI, archive and merge remain in progress.
+- Product/UX, technical and security re-reviews approved with no P0–P3.
+- Exact-head GitHub Verify run `42675235368` passed all three jobs: backend, frontend and unified real E2E.
+- BLN-T01..T05 completed; the SDD is ready for atomic archival before the documentation-only close-out commit and final exact-head gate.
+
+## Learnings per task
+
+- BLN-T01/BLN-T04: bounded metadata must use the absolute offset (`page * size + returned items`) on both sides of the wire; page-zero-only semantics silently break later pages.
+- BLN-T02/BLN-T03: keep pagination controls mounted while loading and guard activation with typed navigation state so keyboard focus survives asynchronous page changes.
+- BLN-T02: edited-but-unapplied filters are a distinct presentation state; they must not masquerade as an empty server result.
+- BLN-T03: protected stores bind response publication to an actor generation and clear snapshots immediately on actor replacement or logout.
 
