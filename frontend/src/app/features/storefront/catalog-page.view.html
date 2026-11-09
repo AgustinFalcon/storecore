@@ -33,11 +33,12 @@
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
-    [empty]="!state.loading && state.products.length === 0"
+    [empty]="!state.loading && !state.queryDirty && state.products.length === 0"
     emptyText="No hay productos activos para estos filtros."
     (retry)="searchSubmit.emit()"
   />
-  @if (state.list) { <p role="status">{{ state.products.length }} de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; ajustá los filtros para encontrar tu producto. }</p> }
+  @if (state.queryDirty) { <p role="status">Aplicá Buscar para consultar estos filtros.</p> }
+  @if (state.list) { <p role="status">{{ state.products.length }} productos en esta página de {{ state.list.total }} en total.</p> }
   <ul class="sc-grid sc-grid--tiles">
     @for (product of state.products; track product.sku) {
       <li>
@@ -45,4 +46,5 @@
       </li>
     }
   </ul>
+  <sc-bounded-pagination [metadata]="state.list" [loading]="state.loading" label="Páginas del catálogo" (pageChange)="pageChange.emit($event)" />
 </section>

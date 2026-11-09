@@ -20,10 +20,10 @@ class OrderProjectionDomainTest {
         assertEquals(ReturnEligibility.ELIGIBLE, ReturnEligibility.evaluate(paid, ShipmentStatus.DELIVERED, RmaStatus.NONE))
     }
 
-    @Test fun `unknown timeline values stay closed and later pages remain visibly partial`() {
+    @Test fun `unknown timeline values stay closed and last pages are complete`() {
         assertEquals(OrderTimelineEventKind.UNKNOWN, OrderTimelineEventKind.fromWire("provider-internal-event"))
         for (kind in OrderTimelineEventKind.entries) assertEquals(kind, OrderTimelineEventKind.fromWire(kind.name))
-        assertEquals(true, OrderPage(listOf(1), 1, 1, 2).truncated)
+        assertEquals(false, OrderPage(listOf(1), 1, 1, 2).truncated)
         assertEquals(false, OrderPage(emptyList<Int>(), 0, 25, 0).truncated)
     }
 

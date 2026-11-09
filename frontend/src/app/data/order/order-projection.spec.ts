@@ -115,9 +115,9 @@ describe('Order projection HTTP boundary', () => {
     expect(allowedRma(valid)).not.toBeNull();
   });
   it('validates exact bounded metadata without inventing empty pages for legacy arrays', () => {
-    const page = { items: [{ id: '1' }], page: 1, size: 25, total: 26, truncated: true };
-    expect(mapOrderPage(page, mapCustomerOrder)).toMatchObject({ page: 1, size: 25, total: 26, truncated: true });
-    for (const raw of [[], {}, { ...page, total: 1 }, { ...page, size: 51 }, { ...page, page: -1 }, { ...page, truncated: false }]) {
+    const page = { items: [{ id: '1' }], page: 1, size: 25, total: 26, truncated: false };
+    expect(mapOrderPage(page, mapCustomerOrder)).toMatchObject({ page: 1, size: 25, total: 26, truncated: false });
+    for (const raw of [[], {}, { ...page, total: 1 }, { ...page, size: 51 }, { ...page, page: -1 }, { ...page, truncated: true }]) {
       expect(() => mapOrderPage(raw, mapCustomerOrder)).toThrow();
     }
   });

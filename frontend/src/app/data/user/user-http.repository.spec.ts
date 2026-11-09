@@ -1,3 +1,4 @@
+import { BoundedPageRequest } from '../../domain/catalog/bounded-page';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -12,6 +13,20 @@ describe('UserHttpRepository capabilities', () => {
   beforeEach(() => TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting(), UserHttpRepository],
   }));
+
+  it('serializes explicit bounded pages for protected catalog and inventory reads', async () => {
+    const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
+    for (const [path, read] of [
+      ['catalog', () => repository.listCatalog(BoundedPageRequest.at(2, 25))],
+      ['inventory', () => repository.listInventory(BoundedPageRequest.at(2, 25))],
+    ] as const) {
+      const pending = firstValueFrom<unknown>(read());
+      const request = http.expectOne(req => req.url === '/api/v1/user/' + path);
+      expect(request.request.params.get('page')).toBe('2'); expect(request.request.params.get('size')).toBe('25');
+      request.flush({ items: [], page: 2, size: 25, total: 0, truncated: false }); await pending;
+    }
+    http.verify();
+  });
 
   it('posts profile manifest text unchanged for preview and merge', async () => {
     const repository = TestBed.inject(UserHttpRepository);

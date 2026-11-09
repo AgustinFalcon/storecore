@@ -16,7 +16,7 @@ export class CatalogHttpRepository implements ICatalogRepository {
   constructor(private readonly http: HttpClient) {}
 
   search(query: CatalogQuery): Observable<BoundedRows<ProductSummary>> {
-    let params = new HttpParams();
+    let params = new HttpParams().set('page', query.pagination.page).set('size', query.pagination.size);
     if (query.query) {
       params = params.set('query', query.query);
     }

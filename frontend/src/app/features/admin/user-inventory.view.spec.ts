@@ -42,7 +42,7 @@ describe('User inventory read-only presentation', () => {
     expect(fixture.nativeElement.textContent).toContain('Sin coincidencias');
     const clear = vi.fn();
     fixture.componentInstance.clearFilters.subscribe(clear);
-    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find((element) => element.textContent?.includes('Mostrar todo'));
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find((element) => element.textContent?.includes('Mostrar toda'));
     button?.click(); expect(clear).toHaveBeenCalledOnce();
   });
 

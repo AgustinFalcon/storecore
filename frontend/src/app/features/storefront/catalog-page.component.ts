@@ -18,6 +18,7 @@ import { CatalogStore } from './catalog.store';
         (categoryChange)="onCategory($event)"
         (offersChange)="onOffers($event)"
         (searchSubmit)="store.search()"
+        (pageChange)="store.goToPage($event)"
       />
     }
   `,

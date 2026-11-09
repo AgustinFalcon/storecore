@@ -1,3 +1,4 @@
+import { BoundedPaginationComponent } from '../../shared/bounded-pagination.component';
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
@@ -8,7 +9,7 @@ import { ProductStatus } from '../../domain/catalog/catalog-states';
 
 @Component({
   selector: 'sc-user-catalog-view',
-  imports: [FormsModule, FeatureStatusComponent],
+  imports: [BoundedPaginationComponent, FormsModule, FeatureStatusComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-catalog.view.html',
 })
@@ -20,6 +21,7 @@ export class UserCatalogViewComponent {
   @Output() readonly saveProduct = new EventEmitter<void>();
   @Output() readonly saveBrand = new EventEmitter<void>();
   @Output() readonly saveCategory = new EventEmitter<void>();
+  @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
 
   get imagesText(): string {

@@ -1,5 +1,6 @@
+import { UserSession } from '../../core/auth/user-session';
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect } from '@angular/core';
 import { AdminCatalogStore } from './admin-catalog.store';
 import { UserCatalogViewComponent } from './user-catalog.view';
 
@@ -19,15 +20,17 @@ import { UserCatalogViewComponent } from './user-catalog.view';
         (saveBrand)="store.persistBrand()"
         (saveCategory)="store.persistCategory()"
         (retry)="reload()"
+        (pageChange)="store.goToPage($event)"
       />
     }
   `,
 })
-export class UserCatalogComponent implements OnInit {
-  constructor(readonly store: AdminCatalogStore) {}
-
-  ngOnInit(): void {
-    this.reload();
+export class UserCatalogComponent  {
+  constructor(readonly store: AdminCatalogStore, session: UserSession) {
+    effect(() => {
+      const changed = store.setActor(session.authenticated() ? session.principal() : null);
+      if (changed) this.reload();
+    });
   }
 
   reload(): void {

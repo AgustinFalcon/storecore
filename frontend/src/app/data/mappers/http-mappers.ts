@@ -99,7 +99,7 @@ export function mapBoundedRows<T>(value: unknown, mapper: (value: unknown) => T)
     typeof page !== 'number' || !Number.isSafeInteger(page) || page < 0 || page > 10000 ||
     typeof size !== 'number' || !Number.isSafeInteger(size) || size < 1 || size > 50 || entries.length > size ||
     (entries.length > 0 && page * size + entries.length > total) ||
-    typeof row['truncated'] !== 'boolean' || row['truncated'] !== (total > entries.length)) throw new Error('Listado no reconocido.');
+    typeof row['truncated'] !== 'boolean' || row['truncated'] !== (page * size + entries.length < total)) throw new Error('Listado no reconocido.');
   return Object.assign(entries.map(mapper), { metadata: { total, page, size, truncated: row['truncated'] } });
 }
 export function mapProductSummary(value: unknown): ProductSummary {

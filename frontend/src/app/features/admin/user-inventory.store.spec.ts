@@ -18,17 +18,17 @@ function createStore(listInventory: () => Observable<readonly InventoryRow[]> = 
 
 describe('UserInventoryStore', () => {
   it('reads only inventory and treats an empty successful response as a snapshot', () => {
-    const { store, listInventory } = createStore(vi.fn(() => of([])));
+    const { store, listInventory } = createStore(vi.fn(() => of(mapInventory({ items: [], total: 0, page: 0, size: 50, truncated: false }))));
     store.loadInventory();
     expect(listInventory).toHaveBeenCalledTimes(1);
     expect(store.snapshot.readState).toBe(InventoryReadState.Ready);
     expect(store.snapshot.hasSnapshot).toBe(true);
-    expect(store.snapshot.rows).toEqual([]);
+    expect(store.snapshot.rows).toHaveLength(0);
     store.ngOnDestroy();
   });
 
   it('preserves the previous snapshot and filters after refresh failure, then recovers', () => {
-    const list = vi.fn().mockReturnValueOnce(of(rows)).mockReturnValueOnce(throwError(() => new Error('offline'))).mockReturnValueOnce(of([]));
+    const list = vi.fn().mockReturnValueOnce(of(rows)).mockReturnValueOnce(throwError(() => new Error('offline'))).mockReturnValueOnce(of(mapInventory({ items: [], total: 0, page: 0, size: 50, truncated: false })));
     const { store } = createStore(list);
     store.loadInventory();
     store.setQuery('SKU');

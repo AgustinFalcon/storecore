@@ -1,3 +1,4 @@
+import { BoundedPageRequest } from '../../catalog/bounded-page';
 import { BoundedRows } from '../../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import {
@@ -11,8 +12,8 @@ import { IUserRepository } from '../user.repository';
 export class ManageInstallationUseCase {
   constructor(private readonly repo: IUserRepository) {}
 
-  listInventory(): Observable<BoundedRows<InventoryRow>> {
-    return this.repo.listInventory();
+  listInventory(page = BoundedPageRequest.first()): Observable<BoundedRows<InventoryRow>> {
+    return this.repo.listInventory(page);
   }
 
   readMercadoLibreAccount(): Observable<MercadoLibreAccount> {

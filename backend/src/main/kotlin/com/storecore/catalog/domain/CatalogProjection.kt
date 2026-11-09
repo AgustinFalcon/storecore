@@ -14,7 +14,7 @@ enum class VariantStatus { ACTIVE, INACTIVE, UNKNOWN;
 enum class InventoryState { KNOWN, MISSING, UNKNOWN }
 enum class VariantAvailability { UNKNOWN, UNAVAILABLE, AVAILABLE, OUT_OF_STOCK }
 data class BoundedPage<T>(val items: List<T>, val total: Long, val page: Int, val size: Int) {
-    val truncated: Boolean get() = total > items.size
+    val truncated: Boolean get() = total > page.toLong() * size.toLong() + items.size.toLong()
 }
 data class InventoryProjection(val variantId: String, val sku: String, val productName: String, val variantLabel: String,
     val available: Long?, val reserved: Long?, val onHand: Long?, val safety: Long?, val saleable: Long?, val updatedAt: Instant?, val state: InventoryState) {

@@ -1,3 +1,4 @@
+import { BoundedPageRequest } from '../../domain/catalog/bounded-page';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -14,9 +15,11 @@ describe('CatalogHttpRepository', () => {
   it('omits empty catalog filters', async () => {
     const repo = TestBed.inject(CatalogHttpRepository);
     const ctrl = TestBed.inject(HttpTestingController);
-    const pending = firstValueFrom(repo.search({ query: '', brand: '', category: '', offersOnly: false }));
-    const req = ctrl.expectOne('/api/v1/catalog');
-    expect(req.request.params.keys().length).toBe(0);
+    const pending = firstValueFrom(repo.search({ pagination: BoundedPageRequest.first(), query: '', brand: '', category: '', offersOnly: false }));
+    const req = ctrl.expectOne(r => r.url === '/api/v1/catalog');
+    expect(req.request.params.keys()).toEqual(['page', 'size']);
+    expect(req.request.params.get('page')).toBe('0');
+    expect(req.request.params.get('size')).toBe('50');
     req.flush({ items: [{ sku: 'SKU-1', name: 'Lámpara', price: { base: 10, effective: 10, original: 10, offer: null } }], total: 400, page: 0, size: 50, truncated: true });
     const result = await pending;
     expect(result[0]).toMatchObject({ sku: 'SKU-1', price: 10, originalPrice: null });
@@ -27,9 +30,11 @@ describe('CatalogHttpRepository', () => {
     const repo = TestBed.inject(CatalogHttpRepository);
     const ctrl = TestBed.inject(HttpTestingController);
     const pending = firstValueFrom(
-      repo.search({ query: 'lamp', brand: 'casa', category: 'luz', offersOnly: true }),
+      repo.search({ pagination: BoundedPageRequest.at(2, 25), query: 'lamp', brand: 'casa', category: 'luz', offersOnly: true }),
     );
     const req = ctrl.expectOne((r) => r.url === '/api/v1/catalog');
+    expect(req.request.params.get('page')).toBe('2');
+    expect(req.request.params.get('size')).toBe('25');
     expect(req.request.params.get('query')).toBe('lamp');
     expect(req.request.params.get('brand')).toBe('casa');
     expect(req.request.params.get('category')).toBe('luz');
