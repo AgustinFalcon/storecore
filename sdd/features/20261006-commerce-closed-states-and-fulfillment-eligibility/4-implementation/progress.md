@@ -347,5 +347,11 @@ durable ante pérdida de respuesta. El close-out documental requiere todavía CI
 y dos reviews GPT-6.1 Sol independientes sobre su SHA final; CFE-T06 continúa
 in_progress hasta ese gate.
 
+El candidato `4debf9bc3d72af18e5b3ad7ee75ec8c69b024f4e` pasó Verify
+`42653866473` con backend, frontend y `unified-access-real-e2e` success. Los dos
+revisores aprobaron después de corregir estadísticas, procedencia histórica y
+la distinción 4 CFE reales + 1 Unknown MockHttp. CFE-T06 pasa a done y el SDD
+se archiva; el SHA archivado debe repetir Verify antes del merge.
+
 No se afirma CI push de master ni homologación, release, deploy, credenciales
 live, activación externa o disposición/restock por ítem.

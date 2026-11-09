@@ -24,7 +24,8 @@ El corte CFE integrado por PR #171 fue revalidado sobre PR #231 head
 `eca9db9f0ba51023c8b785831003cb04d8ba0660`. Verify exact-head #594
 (`42538029894`) confirmó frontend, backend y browser: 4 journeys CFE reales,
 1 Unknown MockHttp, acceso 12/12, PostgreSQL 16 y clean/upgrade de migraciones.
-El SDD sólo se archivará tras CI y doble review del SHA documental final. No se afirma CI push de master ni se autoriza release,
+El candidato documental `4debf9b` pasó Verify `42653866473` y doble review
+GPT-6.1 Sol; el SDD queda archivado. No se afirma CI push de master ni se autoriza release,
 homologación, credenciales live o activación. Ante un eventual fallo, el rollback no puede
 reabrir despacho sin pago: detener escrituras mediante la capability existente,
 con autorización operativa separada. Disposición/restock sigue diferido; no hay

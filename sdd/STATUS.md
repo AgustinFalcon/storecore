@@ -61,9 +61,9 @@ Tramo implementable MP-LIVE-01–04 **cerrado** (fail-closed, dual Grok APPROVED
 - `sdd/wip/20260921-pos-sales-ingestion/` — superseded.
 - `sdd/wip/20260921-blackstore-pos-operations/` — puntero histórico.
 
-## Fulfillment comercial — runtime revalidado, close-out documental en curso
+## Fulfillment comercial — aceptación cerrada y SDD archivado
 
-`sdd/wip/20261006-commerce-closed-states-and-fulfillment-eligibility/`
+`sdd/features/20261006-commerce-closed-states-and-fulfillment-eligibility/`
 conserva el GO documental y la implementación de PR #171, revalidada sobre el
 head final de PR #231 `9108798818b0217dcf5bb4685f59a195d63637ae` (merge
 `eca9db9f0ba51023c8b785831003cb04d8ba0660`).
@@ -78,9 +78,10 @@ Verify exact-head #594, run `42538029894`, terminó success en frontend, backend
 y browser: 1061 tests frontend, 253 backend y 17/17 escenarios (4 CFE reales,
 1 Unknown MockHttp y 12 de acceso). La matriz incluye PostgreSQL 16, clean V1–V14, upgrade V8→V9 y
 V13→V14, checksums/histórico, autorización, concurrencia, respuesta perdida y
-recuperación durable. CFE-T06 permanece abierta hasta CI y doble review del SHA
-documental final; todavía no se archiva. No se afirma CI push de master. Sin
-homologación, release, credenciales live ni activación. Progreso/evidencia y límites están en el WIP.
+recuperación durable. El candidato documental `4debf9b` pasó Verify
+`42653866473` con 3/3 jobs y doble review GPT-6.1 Sol APPROVE; CFE-T06 quedó
+cerrada y el SDD archivado. No se afirma CI push de master. Sin homologación,
+release, credenciales live ni activación. Progreso/evidencia y límites están en el feature.
 Disposición/reposición por ítem se difiere al backlog `TODO-045`.
 
 ## Fiscal externo

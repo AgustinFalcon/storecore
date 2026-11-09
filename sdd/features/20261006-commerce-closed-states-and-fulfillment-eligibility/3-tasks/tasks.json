@@ -3,11 +3,11 @@
   "stack_profile": "backend-frontend",
   "project_type": "production",
   "execution_strategy": "incremental-gated",
-  "status": "exact_head_gate_in_progress",
+  "status": "complete",
   "stats": {
     "total": 6,
-    "done": 5,
-    "in_progress": 1,
+    "done": 6,
+    "in_progress": 0,
     "blocked": 0,
     "pending": 0
   },
@@ -90,7 +90,7 @@
     {
       "id": "CFE-T06",
       "title": "Exact-head dual Sol review and honest SDD close-out",
-      "status": "in_progress",
+      "status": "done",
       "depends_on": [
         "CFE-T05"
       ],
@@ -104,7 +104,7 @@
         "CFE-R07",
         "CFE-R08"
       ],
-      "evidence": "PR #231 head 9108798818b0217dcf5bb4685f59a195d63637ae; Verify #594 run 42538029894 success en frontend/backend/browser. Pendientes CI y doble review del SHA documental final; no acredita homologación externa, release ni activación live."
+      "evidence": "PR #231 head 9108798818b0217dcf5bb4685f59a195d63637ae; Verify #594 run 42538029894 success. Close-out candidato 4debf9b: Verify 42653866473 3/3 success y doble review GPT-6.1 Sol APPROVE. No acredita homologación externa, release ni activación live."
     }
   ]
 }
