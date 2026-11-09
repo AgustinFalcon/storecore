@@ -10,7 +10,7 @@
 ## Features diferidos (no ejecutables en core 1.0.0)
 
 - TODO-044 [high] [done] `commerce-closed-states-and-fulfillment-eligibility`: implementación de PR #171 revalidada sobre PR #231 head `9108798`, merge `eca9db9`; Verify #594 y close-out candidato `4debf9b`/run `42653866473` success. CFE 4 journeys reales + 1 Unknown MockHttp, acceso 12/12, backend 253/253, PostgreSQL 16 y migraciones clean/upgrade PASS. Archivado con doble review final; no acredita CI push master, homologación, release, credenciales live ni activación.
-- TODO-045 [high] [deferred] `commerce-rma-item-disposition-and-restock`: outcomes/cantidades por ítem, inspección auditada, separación dañado/rechazado, idempotencia de ledger y carreras/reversión. Requiere feature y Sol GO propios; no tarea ejecutable aquí. Recepción CFE no habilita INSPECTED/ADJUSTED ni RESTOCK.
+- TODO-045 [high] [done] `commerce-rma-item-disposition-and-restock`: clasificación por ítem, reposición RESTOCK-only, auditoría, idempotencia, recuperación y carreras cerradas en `sdd/features/20261109-commerce-rma-item-disposition-and-restock/`. PR #233 candidato `fc80316`, Verify `42666041072` 3/3; comandos legacy INSPECTED/ADJUSTED permanecen rechazados.
 
 - TODO-020 [high] [blocked] `external-fiscal-adapter`: biblioteca/repositorio externo conforme y auditable; D-01..D-07, titular/contador y Sol GO. Sin DDL/tarea fiscal StoreCore y nunca ventas ocultas/evasión.
 - TODO-030 [medium] [deferred] `ml-competition-insights`: sólo señales oficiales/licenciadas read-only, fuente/fecha/confianza. Rechaza premisa top-5 y scraping.

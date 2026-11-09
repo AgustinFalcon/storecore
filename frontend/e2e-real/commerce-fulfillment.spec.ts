@@ -2,11 +2,15 @@ import { createHmac, randomUUID } from 'node:crypto';
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { mapAdminOrder } from '../src/app/data/mappers/http-mappers';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../src/app/domain/order/commerce-states';
+import { DamageReason, ReturnDispositionState } from '../src/app/domain/order/return-disposition';
+import { mapReturnDisposition } from '../src/app/data/order/return-disposition.mapper';
 import { AccessContext, RealmFixture, apiLogin, assertRealm, database, origin, password, uiLogin } from './support/fixtures';
 
 enum FixtureModule { Storefront = 'STOREFRONT', Catalog = 'CATALOG', Payments = 'PAYMENTS_MP', Fulfillment = 'MANUAL_FULFILLMENT', Profile = 'PROFILE_CONTENT' }
 enum FixtureCapabilityState { Active = 'ACTIVE' }
+enum FixtureLedgerEvent { RmaRestock = 'RMA_RESTOCK' }
 const cfeAdminEmail = 'cfe-user-admin@example.test';
+const rmaAdminEmail = 'cfe-rma-admin@example.test';
 
 async function mutate(page: Page, realm: RealmFixture, path: string, data: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<APIResponse> {
   const csrf = await page.request.get(`/api/v1/${realm.path}/auth/csrf`);
@@ -14,12 +18,12 @@ async function mutate(page: Page, realm: RealmFixture, path: string, data: unkno
   return page.request.fetch(path, { method, headers: { Origin: origin, 'X-CSRF-Token': csrf.headers()['x-csrf-token']! }, data });
 }
 
-async function checkout(page: Page): Promise<string> {
-  await apiLogin(page, cfeAdminEmail);
+async function checkout(page: Page, userEmail = cfeAdminEmail): Promise<string> {
+  await apiLogin(page, userEmail);
   for (const module of Object.values(FixtureModule)) {
     database(`SELECT capability_session_change_configuration(u.id,s.id,'${module}',m.config_version,'${FixtureCapabilityState.Active}','{}'::jsonb,'${randomUUID()}'::uuid,'CFE browser fixture')
       FROM users u JOIN identity_sessions s ON s.user_id=u.id AND s.subject_kind='USER' AND s.revoked_at IS NULL
-      CROSS JOIN module_configurations m WHERE u.email='${cfeAdminEmail}' AND m.module_code='${module}'
+      CROSS JOIN module_configurations m WHERE u.email='${userEmail}' AND m.module_code='${module}'
         AND (m.state<>'${FixtureCapabilityState.Active}' OR m.config<>'{}'::jsonb)
       ORDER BY s.issued_at DESC LIMIT 1;`);
   }
@@ -158,6 +162,60 @@ test('CFE E07: reception is durable once and deferred inspection never changes s
   }
   expect(database(`SELECT count(*) FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=${id} AND ri.quantity=2 AND ri.adjustment_ledger_id IS NULL;`)).toBe('1');
   expect(footprint(id)).toBe(before);
+});
+
+test('RMA: real mixed inspection commits once and a lost response recovers through GET and reload', async ({ page }) => {
+  test.setTimeout(90_000);
+  const id = await checkout(page, rmaAdminEmail);
+  await delivered(page, id);
+  const row = await open(page, id);
+  const reception = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === `/api/v1/user/orders/${id}/rma`);
+  await row.getByRole('button', { name: RmaTransition.Received.label, exact: true }).click();
+  expect((await reception).status()).toBe(200);
+  const balance = () => Number(database(`SELECT b.available_quantity FROM inventory_balances b JOIN order_items oi ON oi.variant_id=b.variant_id WHERE oi.order_id=${id};`));
+  const before = balance();
+  const path = `/api/v1/user/orders/${id}/return-disposition`;
+  await page.goto(`/user/orders/${id}`);
+  const inspection = page.locator('sc-return-disposition-view');
+  await expect(inspection.getByRole('heading', { name: 'Clasificar unidades', exact: true })).toBeVisible();
+  await inspection.getByRole('spinbutton', { name: 'Aptas para reponer', exact: true }).fill('1');
+  await inspection.getByRole('spinbutton', { name: 'Dañadas', exact: true }).fill('1');
+  await inspection.getByRole('combobox', { name: 'Motivo de daño (obligatorio)', exact: true }).selectOption({ label: DamageReason.Cosmetic.label });
+  await inspection.getByRole('button', { name: 'Revisar clasificación', exact: true }).click();
+  await expect(inspection.getByRole('heading', { name: 'Revisar antes de confirmar', exact: true })).toBeVisible();
+  await expect(inspection.getByLabel('Resumen de impacto')).toContainText('+1 unidades vendibles');
+  // Forward the actual command and discard only its response after commit.
+  // All positive reads and writes still reach Spring/PostgreSQL.
+  await page.route(`**${path}`, async route => {
+    if (route.request().method() !== 'POST') { await route.continue(); return; }
+    const committed = await route.fetch();
+    expect(committed.status()).toBe(200);
+    expect(mapReturnDisposition((await committed.json()).data).state).toBe(ReturnDispositionState.Confirmed);
+    await route.abort('failed');
+  });
+  await inspection.getByRole('button', { name: 'Confirmar inspección y reposición', exact: true }).click();
+  await expect(inspection.getByRole('heading', { name: 'Resultado pendiente de comprobar', exact: true })).toBeVisible();
+  expect(balance()).toBe(before + 1);
+  const recovery = page.waitForResponse(candidate => candidate.request().method() === 'GET' && new URL(candidate.url()).pathname === path);
+  await inspection.getByRole('button', { name: 'Consultar resultado', exact: true }).click();
+  expect((await recovery).status()).toBe(200);
+  await expect(inspection.getByRole('heading', { name: 'Inspección confirmada', exact: true })).toBeVisible();
+  await expect(page.getByText(`rma ${RmaStatus.Closed.label}`, { exact: true })).toBeVisible();
+  await expect(inspection.getByRole('spinbutton')).toHaveCount(0);
+  await page.unroute(`**${path}`);
+  await page.reload();
+  await expect(inspection.getByRole('heading', { name: 'Inspección confirmada', exact: true })).toBeVisible();
+  expect((await read(page, id)).rmaStatus).toBe(RmaStatus.Closed);
+  const response = await page.request.get(path);
+  expect(response.status()).toBe(200);
+  const result = mapReturnDisposition((await response.json()).data);
+  expect(result.state).toBe(ReturnDispositionState.Confirmed);
+  expect(result.lines[0].classification?.restockQuantity).toBe(1);
+  expect(result.lines[0].classification?.damagedQuantity).toBe(1);
+  expect(result.lines[0].classification?.damageReason).toBe(DamageReason.Cosmetic);
+  expect(balance()).toBe(before + 1);
+  expect(database(`SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=${id};`)).toBe('1');
+  expect(database(`SELECT count(*) FROM inventory_ledger l JOIN return_items ri ON ri.adjustment_ledger_id=l.id JOIN returns r ON r.id=ri.return_id WHERE r.order_id=${id} AND l.event_type='${FixtureLedgerEvent.RmaRestock}' AND l.quantity_delta=1;`)).toBe('1');
 });
 
 test('CFE E06/E08: committed response loss recovers by authoritative GET and session controls remain isolated', async ({ page }) => {

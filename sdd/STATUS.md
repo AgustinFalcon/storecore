@@ -82,7 +82,12 @@ recuperación durable. El candidato documental `4debf9b` pasó Verify
 `42653866473` con 3/3 jobs y doble review GPT-6.1 Sol APPROVE; CFE-T06 quedó
 cerrada y el SDD archivado. No se afirma CI push de master. Sin homologación,
 release, credenciales live ni activación. Progreso/evidencia y límites están en el feature.
-Disposición/reposición por ítem se difiere al backlog `TODO-045`.
+La disposición/reposición por ítem quedó cerrada en
+`sdd/features/20261109-commerce-rma-item-disposition-and-restock/`: sólo
+RESTOCK aumenta stock vendible; dañado/rechazado, idempotencia, auditoría,
+recovery y carreras están cubiertos. PR #233 candidato `fc80316`, Verify
+`42666041072` 3/3 y doble review GPT-6.1 Sol APPROVE. Sin homologación,
+release, credenciales live ni deploy.
 
 ## Fiscal externo
 

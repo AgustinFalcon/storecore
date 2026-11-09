@@ -12,7 +12,7 @@
 | stock WEB | TASK-007 | reserve/consume/release y ledger append-only |
 | ML autorizado | TASK-008 + TODO-041 | contrato oficial, cuenta autorizada, inbox durable→ACK; refetch/apply via port (CI fake) |
 | admin catálogo/contenido/promo manual | TASK-009 | roles, auditoría, margen y único writer |
-| fulfillment manual/returns | TASK-010 histórico + WIP `20261006-commerce-closed-states-and-fulfillment-eligibility` | código local exige pago/stock verificados; sólo recepción sin stock; inspección/restock diferidos TODO-045. Runtime/review del corte abiertos |
+| fulfillment manual/returns | TASK-010 + `20261006-commerce-closed-states-and-fulfillment-eligibility` + `20261109-commerce-rma-item-disposition-and-restock` | pago/stock verificables; recepción separada de inspección; clasificación RESTOCK/DAMAGED/REJECTED, sólo RESTOCK repone; PostgreSQL/HTTP/browser, concurrencia, recovery y reviews cerrados en PR #233 |
 | profile/fixture prototype/fleet docs | TASK-012 | no mezcla de prototype con producción |
 | quality/release | TASK-013..015 | dependencias completas + Sol GO/NO-GO |
 | frontend UX Stitch | `sdd/wip/20260923-storecore-frontend-ux-system-v1/` + `docs/agent/frontend/` | Views DS-00…U-10 en código; SDD visual + HTML archivado; Stitch `6473866243657965808`; axe `npm run test:a11y` |
@@ -30,8 +30,13 @@
 | acceso visual unificado, identidades separadas | `sdd/features/20261003-unified-access-entry/` — UA-001..008 | PRs #165–#169; `/login`, challenge 120 s one-use, home USER por rol, logout aislado; Verify #169 `37526296154` 12/12 + dual GPT-6.1 Sol. HTTP legacy soportado; retiro diferido `TODO-043` |
 
 CFE-R01–R08 → CFE-T01–T06: inventario, targets reales, evidencia local y
-escenarios E01–E09 en el WIP. Ninguna tarea cerrada; pruebas unit locales no
-sustituyen PostgreSQL/HTTPS/clean/upgrade ni reviews del head exacto.
+escenarios E01–E09 cerrados en
+`sdd/features/20261109-commerce-fulfillment-acceptance-evidence/`. La evidencia
+incluye PostgreSQL/HTTP, instalaciones clean/upgrade, navegador real, CI del
+head exacto y doble review. La disposición posterior por ítem se cierra en
+`sdd/features/20261109-commerce-rma-item-disposition-and-restock/` mediante
+RMA-T01–T07, manteniendo recepción e inspección como responsabilidades
+separadas.
 
 CFE aceptación local 2026-10-07: R02/R03/R06/R08 → E01/E03/E04/E05/E08 →
 CommerceHttpIntegrationTest y MpOrdersCheckoutIntegrationTest ampliados;
