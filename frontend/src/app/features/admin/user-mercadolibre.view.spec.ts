@@ -1,3 +1,4 @@
+import { channelAccountFixture, channelListingFixture } from '../../data/user/channel-pricing.spec-fixtures';
 import { TestBed } from '@angular/core/testing';
 import { MercadoLibreAccountStatus } from '../../domain/user/mercadolibre-account-status';
 import { MercadoLibreReadPhase } from './mercadolibre-read-phase';
@@ -5,9 +6,9 @@ import { UserMercadoLibreState } from './user-mercadolibre.store';
 import { UserMercadoLibreViewComponent } from './user-mercadolibre.view';
 
 const ready: UserMercadoLibreState = {
-  actor: { id: 'operator', roles: [] }, account: { authorized: true, accountRef: 'ML-STORE-01', status: MercadoLibreAccountStatus.Active },
-  listings: [{ listingId: 'MLA-100', variationId: 'VAR-1', sku: 'WEB-KIT' }, { listingId: 'MLA-200', variationId: '', sku: 'WEB-LAMP' }],
-  loading: false, errorMessage: '', readPhase: MercadoLibreReadPhase.Ready, hasSnapshot: true, query: '',
+  actor: { id: 'operator', roles: [] }, account: channelAccountFixture({ accountRef: 'ML-STORE-01' }),
+  listings: [channelListingFixture({ listingId: 'MLA-100', variationId: 'VAR-1', sku: 'WEB-KIT' }), channelListingFixture({ listingId: 'MLA-200', variationId: '', sku: 'WEB-LAMP' })],
+  loading: false, errorMessage: '', readPhase: MercadoLibreReadPhase.Ready, hasSnapshot: true, query: '', page: 0, total: 2,
 };
 
 describe('User Mercado Libre read-only presentation', () => {
@@ -37,7 +38,7 @@ describe('User Mercado Libre read-only presentation', () => {
   });
 
   it('keeps stale data visible and identifies unknown provider state honestly', () => {
-    const fixture = render({ account: { authorized: true, accountRef: 'ML-STORE-01', status: MercadoLibreAccountStatus.Unknown }, readPhase: MercadoLibreReadPhase.Stale, errorMessage: 'Servicio no disponible' });
+    const fixture = render({ account: channelAccountFixture({ accountRef: 'ML-STORE-01', status: 'FUTURE' }), readPhase: MercadoLibreReadPhase.Stale, errorMessage: 'Servicio no disponible' });
     expect(fixture.nativeElement.querySelector('[role=alert]').textContent).toContain('última consulta');
     expect(fixture.nativeElement.textContent).toContain(MercadoLibreAccountStatus.Unknown.label);
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(2);

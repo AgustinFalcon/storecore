@@ -7,6 +7,7 @@ import {
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
+  MercadoLibreMapping,
 } from '../../domain/user/user.entity';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
 
@@ -16,10 +17,10 @@ export interface InstallationState {
   readonly inventory: readonly InventoryRow[];
   readonly mlAccount: MercadoLibreAccount | null;
   readonly listings: readonly MercadoLibreListing[];
-  readonly listingDraft: MercadoLibreListing;
+  readonly listingDraft: MercadoLibreMapping;
 }
 
-const emptyListing: MercadoLibreListing = { listingId: '', variationId: '', sku: '' };
+const emptyListing: MercadoLibreMapping = { listingId: '', variationId: '', sku: '' };
 
 @Injectable()
 export class InstallationStore extends ComponentStore<InstallationState> {
@@ -45,7 +46,7 @@ export class InstallationStore extends ComponentStore<InstallationState> {
   readonly listings$ = this.select((s) => s.listings);
   readonly emptyInventory$ = this.select((s) => !s.loading && s.inventory.length === 0);
 
-  readonly setListingDraft = this.updater((s, listingDraft: MercadoLibreListing) => ({ ...s, listingDraft }));
+  readonly setListingDraft = this.updater((s, listingDraft: MercadoLibreMapping) => ({ ...s, listingDraft }));
 
   readonly loadInventory = this.effect<void>((trigger$) =>
     trigger$.pipe(

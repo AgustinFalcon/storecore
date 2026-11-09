@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Consola</p>
     <h1 id="admin-catalog-title">Catálogo operador</h1>
-    <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra efectivo. Base, desired y observed no se mezclan.</p>
+    <p class="sc-page__lede">SKU, marcas, categorías, imágenes y variantes. El storefront muestra efectivo. Los precios y la disponibilidad provienen de la lectura local.</p>
   </header>
   <sc-feature-status
     [loading]="state.loading"
@@ -15,6 +15,7 @@
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Productos</h2>
+      @if (state.list) { <p role="status">{{ state.products.length }} de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
     <table class="sc-table">
       <thead>
@@ -33,11 +34,7 @@
             </td>
             <td>{{ product.name }}</td>
             <td>
-              @if (product.active) {
-                <span class="sc-badge sc-badge--ok">activo</span>
-              } @else {
-                <span class="sc-badge sc-badge--warn">inactivo</span>
-              }
+              <span class="sc-badge">{{ product.status.label }}</span>
             </td>
             <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
           </tr>
@@ -54,20 +51,15 @@
     <label>Imágenes
       <textarea name="images" [ngModel]="imagesText" (ngModelChange)="setImages($event)"></textarea>
     </label>
-    <label>Variantes (id|sku|nombre|qty)
-      <textarea name="variants" [ngModel]="variantsText" (ngModelChange)="setVariants($event)"></textarea>
-    </label>
+    <ul>@for (variant of state.draft.variants; track variant.id) { <li>{{ variant.sku }} · {{ variant.name }} · {{ variant.status.label }} · {{ variant.availability.label }}
+      <dl>@for (attribute of attributes(variant.attributes); track attribute[0]) { <dt>{{ attribute[0] }}</dt><dd>{{ attribute[1] }}</dd> }</dl>
+    </li> }</ul>
     <label>Precio base
       <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
     </label>
-    <label>Desired
-      <input type="number" name="desired" [ngModel]="state.draft.price.desired" (ngModelChange)="patchPrice({ desired: $event === '' ? null : +$event })" />
-    </label>
-    <p class="sc-price__meta">Observed {{ state.draft.price.observed ?? '—' }} · Efectivo {{ state.draft.price.effective }}</p>
-    <label>Price version <input name="priceVersion" [ngModel]="state.draft.price.priceVersion" (ngModelChange)="patchPrice({ priceVersion: $event })" /></label>
-    <label>Oferta <input name="offerRef" [ngModel]="state.draft.offerRef" (ngModelChange)="patch({ offerRef: $event || null })" /></label>
+    <p>Original {{ state.draft.price.original }} · Efectivo {{ state.draft.price.effective }}</p>
     <label>
-      <input type="checkbox" name="active" [ngModel]="state.draft.active" (ngModelChange)="patch({ active: $event })" />
+      <input type="checkbox" name="active" [ngModel]="state.draft.status.isPublic" (ngModelChange)="setActive($event)" />
       Activo
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Guardar producto</button>

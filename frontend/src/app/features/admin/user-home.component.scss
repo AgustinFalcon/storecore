@@ -1,0 +1,20 @@
+:host { display: block; }
+.overview { display: grid; gap: var(--sc-space-5); }
+.overview__head { display: flex; align-items: end; justify-content: space-between; gap: var(--sc-space-5); }
+.overview__head p { margin-bottom: 0; max-width: 45rem; }
+.overview__head .sc-field { min-width: 12rem; }
+.overview__range { margin: 0; font-size: var(--sc-text-sm); color: var(--sc-color-muted-ink); }
+.overview__queues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sc-space-5); }
+.overview__queues .sc-card { margin: 0; }
+.overview__stock { grid-column: 1 / -1; }
+.overview__list { list-style: none; padding: 0; margin: 0; display: grid; }
+.overview__list li { display: flex; justify-content: space-between; align-items: center; gap: var(--sc-space-4); padding: var(--sc-space-3) 0; border-top: 1px solid var(--sc-color-line); }
+.overview__list li div { display: grid; gap: var(--sc-space-1); }
+.overview__list span { color: var(--sc-color-faint-ink); font-size: var(--sc-text-sm); }
+.overview__empty { color: var(--sc-color-muted-ink); }
+.overview__count { margin: 0 0 var(--sc-space-3); padding: var(--sc-space-2) var(--sc-space-3); border-radius: var(--sc-radius-sm); background: var(--sc-color-info-soft); color: var(--sc-color-info); font-size: var(--sc-text-sm); }
+.unavailable { color: var(--sc-color-warning); font-size: var(--sc-text-sm) !important; }
+.overview__shortcuts { margin: 0; }
+.overview__shortcuts ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--sc-space-3); }
+.overview__shortcuts li a { display: flex; justify-content: space-between; padding: var(--sc-space-3); border: 1px solid var(--sc-color-line); border-radius: var(--sc-radius-sm); text-decoration: none; background: var(--sc-color-canvas); }
+@media (max-width: 48rem) { .overview__head { align-items: stretch; flex-direction: column; } .overview__queues { grid-template-columns: 1fr; } .overview__stock { grid-column: auto; } .overview__list li { align-items: flex-start; flex-direction: column; } }

@@ -39,6 +39,7 @@ frontend/.angular/
 frontend/playwright-report/
 frontend/test-results/
 frontend/ua-real-results/
+frontend/psd-real-results/
 !/docs/testing/
 !/docs/testing/**
 frontend/demo-playwright-report/

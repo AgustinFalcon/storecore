@@ -275,6 +275,40 @@ class MpOrdersCheckoutIntegrationTest(
     }
 
     @Test
+    fun `orphan successful or reversed payment blocks direct shipment and return commands under aggregate lock`() {
+        val orderId = checkoutWithQuantity("SKU-ORPHAN-WRITER-${UUID.randomUUID()}", 2)
+        val provider = "ORD-ORPHAN-WRITER-${UUID.randomUUID()}"
+        bindRemote(orderId, provider)
+        assertEquals(200, notify(provider, "orphan-writer", "orphan-writer").statusCode.value())
+        assertEquals(1, worker.process())
+        val orphan = jdbc.queryForObject("INSERT INTO payments(order_id,external_reference,status,amount) SELECT id,?,'APPROVED',total FROM orders WHERE id=? RETURNING id", Long::class.java, UUID.randomUUID().toString(), orderId)!!
+        val ledger = jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN order_items oi ON oi.variant_id=l.variant_id WHERE oi.order_id=? ORDER BY l.id", orderId)
+        val shipmentBefore = jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId)
+        val eventsBefore = jdbc.queryForList("SELECT e.* FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=? ORDER BY e.id", orderId)
+        for (status in listOf("APPROVED", "REFUNDED", "CHARGED_BACK")) {
+            jdbc.update("UPDATE payments SET status=? WHERE id=?", status, orphan)
+            assertClosedFulfillmentRejection(command(orderId, "shipments", "PACKED"))
+            assertEquals(shipmentBefore, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
+            assertEquals(eventsBefore, jdbc.queryForList("SELECT e.* FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id=? ORDER BY e.id", orderId))
+            val read = exchange("/api/v1/user/orders/$orderId", HttpMethod.GET, null, admin.cookie)
+            val data = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(read.body!!).path("data")
+            assertEquals("UNAVAILABLE", data.path("payment").path("state").asText(), status)
+            assertEquals("PAYMENT_NOT_VERIFIED", data.path("fulfillmentEligibility").asText(), status)
+            assertTrue(data.path("shipmentAction").isNull, status)
+            assertEquals(ledger, jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN order_items oi ON oi.variant_id=l.variant_id WHERE oi.order_id=? ORDER BY l.id", orderId))
+        }
+        jdbc.update("UPDATE payments SET status='PENDING' WHERE id=?", orphan)
+        for (wire in listOf("PACKED", "SHIPPED", "DELIVERED")) assertEquals(200, command(orderId, "shipments", wire).statusCode.value())
+        val returnsBefore = jdbc.queryForList("SELECT * FROM returns WHERE order_id=?", orderId)
+        for (status in listOf("APPROVED", "REFUNDED", "CHARGED_BACK")) {
+            jdbc.update("UPDATE payments SET status=? WHERE id=?", status, orphan)
+            assertClosedFulfillmentRejection(command(orderId, "rma", "RECEIVED"))
+            assertEquals(returnsBefore, jdbc.queryForList("SELECT * FROM returns WHERE order_id=?", orderId))
+        }
+        assertEquals(ledger, jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN order_items oi ON oi.variant_id=l.variant_id WHERE oi.order_id=? ORDER BY l.id", orderId))
+    }
+
+    @Test
     fun `re-reservation accreditation qualifies but reversed or unproved paid orders do not`() {
         val orderId = checkout("SKU-RERESERVE-${UUID.randomUUID()}")
         jdbc.update("UPDATE inventory_reservations SET created_at=now()-interval '2 minutes',expires_at=now()-interval '1 minute' WHERE reservation_saga_key=(SELECT (checkout_snapshot->>'reservationSagaKey')::uuid FROM orders WHERE id=?)", orderId)

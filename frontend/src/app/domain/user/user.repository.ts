@@ -1,13 +1,15 @@
+import { BoundedRows } from '../catalog/bounded-rows';
+import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
 import {
   CapabilityModule,
-  HomeContentDraft,
   InventoryRow,
   ManualPromo,
   MercadoLibreAccount,
   MercadoLibreListing,
+  MercadoLibreMapping,
   ProfilePreview,
   UserCredentials,
   UserSessionResult,
@@ -18,19 +20,18 @@ export interface IUserRepository {
   logout(): Observable<void>;
   readCsrf(): Observable<void>;
   readMe(): Observable<UserSessionResult>;
-  readHome(): Observable<HomeContentDraft>;
-  saveHome(draft: HomeContentDraft): Observable<HomeContentDraft>;
-  listPromos(): Observable<readonly ManualPromo[]>;
-  savePromo(promo: ManualPromo): Observable<ManualPromo>;
-  listCatalog(): Observable<readonly ProductDetail[]>;
+  listPromos(page?: number): Observable<BoundedRows<ManualPromo>>;
+  savePromo(promo: CreateManualPromo): Observable<ManualPromo>;
+  transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo>;
+  listCatalog(): Observable<BoundedRows<ProductDetail>>;
   saveProduct(product: ProductDetail): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
   saveCategory(facet: CatalogFacet): Observable<CatalogFacet>;
   previewProfile(manifest: string): Observable<ProfilePreview>;
   mergeProfile(manifest: string): Observable<ProfilePreview>;
   listCapabilities(): Observable<readonly CapabilityModule[]>;
-  listInventory(): Observable<readonly InventoryRow[]>;
+  listInventory(): Observable<BoundedRows<InventoryRow>>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
-  listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]>;
-  saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing>;
+  listMercadoLibreListings(page?: number): Observable<BoundedRows<MercadoLibreListing>>;
+  saveMercadoLibreListing(listing: MercadoLibreMapping): Observable<MercadoLibreListing>;
 }

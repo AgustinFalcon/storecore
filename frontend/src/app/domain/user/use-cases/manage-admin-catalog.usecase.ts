@@ -1,3 +1,4 @@
+import { BoundedRows } from '../../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../../catalog/catalog-facet.entity';
 import { ProductDetail } from '../../catalog/product-detail.entity';
@@ -6,7 +7,7 @@ import { IUserRepository } from '../user.repository';
 export class ManageAdminCatalogUseCase {
   constructor(private readonly repo: IUserRepository) {}
 
-  list(): Observable<readonly ProductDetail[]> {
+  list(): Observable<BoundedRows<ProductDetail>> {
     return this.repo.listCatalog();
   }
 

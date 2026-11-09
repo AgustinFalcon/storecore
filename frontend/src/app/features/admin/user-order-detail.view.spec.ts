@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { mapCustomerOrder } from '../../data/mappers/http-mappers';
+import { OrderFactState } from '../../domain/order/order-projection';
 import { provideRouter } from '@angular/router';
 import {
   FulfillmentEligibility,
@@ -14,6 +16,8 @@ import { UserOrderDetailViewComponent } from './user-order-detail.view';
 
 function order(id: string): AdminOrder {
   return {
+    ...mapCustomerOrder({}),
+    payment: { state: OrderFactState.Known, value: PaymentStatus.Approved, reason: null },
     id,
     orderStatus: OrderStatus.Paid,
     paymentStatus: PaymentStatus.Approved,

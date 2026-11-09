@@ -1,9 +1,10 @@
+import { channelListingFixture } from '../../data/user/channel-pricing.spec-fixtures';
 import { maskMercadoLibreAccountRef, presentMercadoLibreListings } from './user-mercadolibre.presenter';
 
 const listings = [
-  { listingId: 'MLA-1', variationId: '', sku: 'TALADRO-01' },
-  { listingId: 'MLA-2', variationId: 'AZUL', sku: 'TALADRO-01' },
-  { listingId: 'MLA-3', variationId: 'ÚNICA', sku: 'SIERRA-02' },
+  channelListingFixture({ listingId: 'MLA-1', variationId: '', sku: 'TALADRO-01' }),
+  channelListingFixture({ listingId: 'MLA-2', variationId: 'AZUL', sku: 'TALADRO-01' }),
+  channelListingFixture({ listingId: 'MLA-3', variationId: 'ÚNICA', sku: 'SIERRA-02' }),
 ];
 
 describe('presentMercadoLibreListings', () => {

@@ -6,11 +6,10 @@ import { SearchCatalogUseCase } from './search-catalog.usecase';
 describe('SearchCatalogUseCase', () => {
   it('delegates search to the HTTP catalog port', async () => {
     const repo: ICatalogRepository = {
-      search: (query) => of([{ sku: query.query || 'x', name: query.query, price: 0, originalPrice: null, imageUrl: null, offerRef: null }]),
+      search: (query) => of(Object.assign([{ sku: query.query || 'x', name: query.query, price: 0, originalPrice: null, imageUrl: null, offerRef: null }], { metadata: { total: 1, page: 0, size: 50, truncated: false } })),
       readProduct: () => of() as never,
       listBrands: () => of([]),
       listCategories: () => of([]),
-      readHome: () => of() as never,
     };
     const useCase = new SearchCatalogUseCase(repo);
     const items = await firstValueFrom(useCase.execute({ ...emptyCatalogQuery, query: 'sku-1' }));

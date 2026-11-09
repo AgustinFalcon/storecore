@@ -38,6 +38,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sc-color-fo
 .ml__table thead { background: var(--sc-color-muted); font-size: .875rem; }
 .ml__mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .ml__sku { font-weight: 700; }
+.ml__table p { margin: .35rem 0; }
 @media (max-width: 840px) {
   .ml__head, .ml__account, .ml__list-head { align-items: stretch; flex-direction: column; }
   .ml__account-state { justify-items: start; text-align: left; }
@@ -53,6 +54,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sc-color-fo
   .ml__table td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
   .ml__table td::before { content: attr(data-label); flex: 0 0 auto; color: var(--sc-color-muted-ink); font-family: inherit; font-size: .82rem; white-space: nowrap; }
   .ml__table td:last-child { border-bottom: 0; }
+  .ml__table td:nth-last-child(-n+2) { display: block; }
 }
 @media (max-width: 520px) {
   .ml__metrics { grid-template-columns: 1fr; }

@@ -30,7 +30,7 @@ for (const role of [UserRole.Admin, UserRole.Operator]) {
     const email = role === UserRole.Admin ? 'ua-user-admin@example.test' : 'ua-user-operator@example.test';
     await uiLogin(page, email);
     await expect(page).toHaveURL(/\/user\/home$/);
-    await expect(page.getByRole('heading', { name: 'Inicio de operaciones' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resumen operativo', exact: true })).toBeVisible();
     const me = await page.request.get('/api/v1/internal/me');
     expect(me.status()).toBe(200);
     const roles = (await me.json()).data.roles.map(UserRole.fromWire);
@@ -38,7 +38,7 @@ for (const role of [UserRole.Admin, UserRole.Operator]) {
     await assertRealm(page, RealmFixture.Customer, 401);
     await secureCookies(context, [RealmFixture.User]);
     expect((await context.cookies()).some((cookie) => cookie.name === RealmFixture.Customer.cookie)).toBe(false);
-    const actions = page.locator('section[aria-labelledby="operations-title"] ul a');
+    const actions = page.locator('section.overview__shortcuts ul a');
     const permitted = UserAction.forRoles([role]);
     await expect(actions).toHaveCount(permitted.length);
     for (const action of permitted) await expect(actions.filter({ hasText: action.label })).toHaveAttribute('href', action.path);
@@ -142,12 +142,12 @@ for (const realm of [RealmFixture.Customer, RealmFixture.User]) {
 test('live USER role loss denies its route and keeps CUSTOMER authority', async ({ page }) => {
   await establishBoth(page, 'ua-role-loss@example.test');
   await chooseExisting(page, RealmFixture.User);
-  await expect(page.getByRole('heading', { name: 'Inicio de operaciones' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resumen operativo', exact: true })).toBeVisible();
   loseRoles('ua-role-loss@example.test');
   await assertRealm(page, RealmFixture.User, 401);
   await page.reload();
   await expect(page).not.toHaveURL(/\/user\/home$/);
-  await expect(page.getByRole('heading', { name: 'Inicio de operaciones' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Resumen operativo', exact: true })).toHaveCount(0);
   await assertRealm(page, RealmFixture.Customer);
   await page.goto('/customer/profile');
   await expect(page).toHaveURL(/\/customer\/profile$/);

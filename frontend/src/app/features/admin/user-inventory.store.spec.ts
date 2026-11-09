@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable, of, Subject, throwError } from 'rxjs';
-import { InventoryAvailability } from '../../domain/user/inventory-availability';
+import { mapInventory } from '../../data/mappers/http-mappers';
 import { InventoryFilter } from '../../domain/user/inventory-filter';
 import { UserRole } from '../../domain/user/user-role';
 import { InventoryRow } from '../../domain/user/user.entity';
@@ -8,7 +8,7 @@ import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-in
 import { InventoryReadState } from './user-inventory-read-state';
 import { UserInventoryStore } from './user-inventory.store';
 
-const rows: readonly InventoryRow[] = [{ sku: 'SKU', availableQuantity: 8, reservedQuantity: 3, safetyStock: 1, availability: InventoryAvailability.Normal }];
+const rows = mapInventory({ items: [{ sku: 'SKU', state: 'KNOWN', available: 8, reserved: 3, safety: 1, onHand: 11, saleable: 7 }], total: 101, page: 0, size: 50, truncated: true });
 
 function createStore(listInventory: () => Observable<readonly InventoryRow[]> = vi.fn(() => of(rows))) {
   const store = new UserInventoryStore({ listInventory } as unknown as ManageInstallationUseCase);
@@ -32,13 +32,13 @@ describe('UserInventoryStore', () => {
     const { store } = createStore(list);
     store.loadInventory();
     store.setQuery('SKU');
-    store.setFilter(InventoryFilter.Low);
+    store.setFilter(InventoryFilter.Unavailable);
     store.loadInventory();
     expect(store.snapshot.rows).toEqual(rows);
     expect(store.snapshot.readState).toBe(InventoryReadState.Stale);
     expect(store.snapshot.errorMessage).toBe('offline');
     expect(store.snapshot.query).toBe('SKU');
-    expect(store.snapshot.filter).toBe(InventoryFilter.Low);
+    expect(store.snapshot.filter).toBe(InventoryFilter.Unavailable);
     store.loadInventory();
     expect(store.snapshot.readState).toBe(InventoryReadState.Ready);
     expect(store.snapshot.errorMessage).toBe('');

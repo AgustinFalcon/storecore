@@ -1,0 +1,9 @@
+.sc-panel > * {
+  min-width: 0;
+}
+
+.sc-panel input,
+.sc-panel select {
+  min-width: 0;
+  width: 100%;
+}

@@ -13,12 +13,14 @@ import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.ResponseEntity
+import org.springframework.http.CacheControl
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import javax.sql.DataSource
 
@@ -26,18 +28,26 @@ import javax.sql.DataSource
 @RequestMapping("/api/v1")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class OrderController(private val orders: JdbcOrderService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator, private val capabilities: CapabilityDecisionPort) {
-    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest) = BaseResponse.ok(orders.customerOrders(auth.customer(http)).map { it.copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null) })
-    @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long) = BaseResponse.ok(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null))
-    @GetMapping("/user/orders") fun admin(http: HttpServletRequest): BaseResponse<Any?> {
+    @GetMapping("/customer/orders") fun mine(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "25") size: Int,
+        @RequestParam(required = false) orderStatus: String?, @RequestParam(required = false) paymentStatus: String?, @RequestParam(required = false) shipmentStatus: String?): ResponseEntity<BaseResponse<Any?>> {
+        val result = orders.customerPage(auth.customer(http), page, size, orderStatus, paymentStatus, shipmentStatus)
+        return privateRead(result.copy(items = result.items.map { it.copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null) }))
+    }
+    @GetMapping("/customer/orders/{id}") fun mineOne(http: HttpServletRequest, @PathVariable id: Long): ResponseEntity<BaseResponse<Any?>> = privateRead(orders.customerOrder(auth.customer(http), id).copy(rmaStatus = RmaStatus.NONE, shipmentAction = null, rmaAction = null))
+    @GetMapping("/user/orders") fun admin(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "25") size: Int,
+        @RequestParam(required = false) orderStatus: String?, @RequestParam(required = false) paymentStatus: String?, @RequestParam(required = false) shipmentStatus: String?): ResponseEntity<BaseResponse<Any?>> {
         val actor = auth.operatorOrAdmin(http)
         capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
-        return BaseResponse.ok(orders.adminOrders())
+        return privateRead(orders.adminPage(page, size, orderStatus, paymentStatus, shipmentStatus))
     }
-    @GetMapping("/user/orders/{id}") fun adminOne(http: HttpServletRequest, @PathVariable id: Long): BaseResponse<Any?> {
+    @GetMapping("/user/orders/{id}") fun adminOne(http: HttpServletRequest, @PathVariable id: Long): ResponseEntity<BaseResponse<Any?>> {
         val actor = auth.operatorOrAdmin(http)
         capabilities.decide("MANUAL_FULFILLMENT", "READ", CapabilityActor.Internal(actor))
-        return BaseResponse.ok(orders.adminOrder(id))
+        return privateRead(orders.adminOrder(id))
     }
+
+    private fun privateRead(value: Any?): ResponseEntity<BaseResponse<Any?>> =
+        ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(BaseResponse.ok(value))
 
     @PostMapping("/user/orders/{id}/shipments")
     fun ship(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @Valid @RequestBody request: ShipmentRequest): ResponseEntity<BaseResponse<Any?>> {

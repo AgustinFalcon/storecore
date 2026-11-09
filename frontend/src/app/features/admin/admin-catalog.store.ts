@@ -1,3 +1,5 @@
+import { ProductStatus } from '../../domain/catalog/catalog-states';
+import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
@@ -11,6 +13,7 @@ import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-ad
 export interface AdminCatalogState {
   readonly loading: boolean;
   readonly errorMessage: string;
+  readonly list: ListMetadata | null;
   readonly products: readonly ProductDetail[];
   readonly brands: readonly CatalogFacet[];
   readonly categories: readonly CatalogFacet[];
@@ -20,6 +23,7 @@ export interface AdminCatalogState {
 }
 
 export const emptyProductDraft: ProductDetail = {
+  id: '', status: ProductStatus.Draft, media: [],
   sku: '',
   name: '',
   description: '',
@@ -27,7 +31,7 @@ export const emptyProductDraft: ProductDetail = {
   category: '',
   images: [],
   variants: [],
-  price: { base: 0, desired: null, observed: null, effective: 0, priceVersion: '' },
+  price: { base: 0, original: 0, effective: 0, offer: null },
   offerRef: null,
   active: true,
 };
@@ -43,7 +47,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     super({
       loading: false,
       errorMessage: '',
-      products: [],
+      products: [], list: null,
       brands: [],
       categories: [],
       draft: emptyProductDraft,
@@ -73,7 +77,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       switchMap(() =>
         this.catalog.list().pipe(
           tapResponse({
-            next: (products) => this.patchState({ products, loading: false }),
+            next: (products) => this.patchState({ products, list: products.metadata, loading: false }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),

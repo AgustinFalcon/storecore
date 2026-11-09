@@ -22,12 +22,12 @@ import javax.sql.DataSource
 @RestController
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class MercadoLibreController(private val mercadoLibre: JdbcMercadoLibreService, private val auth: RequestAuth, private val mutations: IdentityMutationCoordinator) {
-    @GetMapping("/api/v1/user/mercadolibre/account") fun account(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.account(auth.operatorOrAdmin(http)))
-    @GetMapping("/api/v1/user/mercadolibre/listings") fun listings(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.listings(auth.operatorOrAdmin(http)))
+    @GetMapping("/api/v1/user/mercadolibre/account") fun account(http: HttpServletRequest) = BaseResponse.ok(mercadoLibre.account(auth.admin(http)))
+    @GetMapping("/api/v1/user/mercadolibre/listings") fun listings(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "25") size: Int) = BaseResponse.ok(mercadoLibre.listings(auth.admin(http), page, size))
 
     @PutMapping("/api/v1/user/mercadolibre/listings/{listingId}")
     fun save(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable listingId: String, @Valid @RequestBody request: ListingRequest): ResponseEntity<BaseResponse<Any?>> {
-        auth.requireSameOrigin(http); val actor = auth.operatorOrAdmin(http)
+        auth.requireSameOrigin(http); val actor = auth.admin(http)
         return csrfOk(mutations.execute(actor, csrf) { mercadoLibre.saveListing(actor, listingId, request.variationId, request.sku) })
     }
 

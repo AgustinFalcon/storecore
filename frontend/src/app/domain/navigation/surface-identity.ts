@@ -19,7 +19,7 @@ export class SurfaceIdentity {
   static readonly Registration = new SurfaceIdentity('SC-SURF-06', 'customer/register');
   static readonly Profile = new SurfaceIdentity('SC-SURF-07', 'customer/profile');
   static readonly Addresses = new SurfaceIdentity('SC-SURF-08', 'customer/addresses');
-  static readonly Favorites = new SurfaceIdentity('SC-SURF-09', 'customer/favorites', false);
+  static readonly Favorites = new SurfaceIdentity('SC-SURF-09', 'customer/favorites');
   static readonly Cart = new SurfaceIdentity('SC-SURF-10', 'cart');
   static readonly Checkout = new SurfaceIdentity('SC-SURF-11', 'checkout');
   static readonly Result = new SurfaceIdentity('SC-SURF-12', 'checkout/result/:orderId');
@@ -28,7 +28,7 @@ export class SurfaceIdentity {
   static readonly Overview = new SurfaceIdentity('SC-SURF-15', 'user/home');
   static readonly Content = new SurfaceIdentity('SC-SURF-16', 'user/content');
   static readonly AdminCatalog = new SurfaceIdentity('SC-SURF-17', 'user/catalog');
-  static readonly Offers = new SurfaceIdentity('SC-SURF-18', 'user/offers', false);
+  static readonly Offers = new SurfaceIdentity('SC-SURF-18', 'user/offers');
   static readonly Campaigns = new SurfaceIdentity('SC-SURF-19', 'user/promos');
   static readonly AdminOrders = new SurfaceIdentity('SC-SURF-20', 'user/orders');
   static readonly AdminOrder = new SurfaceIdentity('SC-SURF-21', 'user/orders/:id');
@@ -36,7 +36,7 @@ export class SurfaceIdentity {
   static readonly MercadoLibre = new SurfaceIdentity('SC-SURF-23', 'user/mercadolibre');
   static readonly Capabilities = new SurfaceIdentity('SC-SURF-24', 'user/capabilities');
   static readonly Configuration = new SurfaceIdentity('SC-SURF-25', 'user/profile-import');
-  static readonly Customers = new SurfaceIdentity('SC-SURF-26', 'user/customers', false);
+  static readonly Customers = new SurfaceIdentity('SC-SURF-26', 'user/customers');
   static readonly Unknown = new SurfaceIdentity('NOT-FOUND', '**', false);
   static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers];
   static fromWire(raw: unknown): SurfaceIdentity { return this.all.find(surface => surface.wire === raw) ?? this.Unknown; }

@@ -1,7 +1,21 @@
 import { OrderStatus, PaymentStatus, ShipmentStatus, RmaStatus, FulfillmentEligibility, ShipmentTransition, RmaTransition } from './commerce-states';
+import { DeliverySnapshot, OrderFact, OrderTimelineEvent } from './order-projection';
+import { ReturnEligibility } from './return-eligibility';
 export { ShipmentTransition, RmaTransition } from './commerce-states';
 
 export interface CustomerOrder {
+  readonly orderNumber: string | null;
+  readonly createdAt: string | null;
+  readonly updatedAt: string | null;
+  readonly currency: string | null;
+  readonly subtotal: number | null;
+  readonly shippingCost: number | null;
+  readonly buyerName: OrderFact<string>;
+  readonly buyerEmail: OrderFact<string>;
+  readonly delivery: OrderFact<DeliverySnapshot>;
+  readonly payment: OrderFact<PaymentStatus>;
+  readonly timeline: OrderFact<readonly OrderTimelineEvent[]>;
+  readonly returnEligibility: ReturnEligibility;
   readonly id: string;
   readonly orderStatus: OrderStatus;
   readonly paymentStatus: PaymentStatus;

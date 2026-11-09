@@ -1,5 +1,6 @@
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from './commerce-states';
 import { AdminOrder } from './order.entity';
+import { OrderFactState } from './order-projection';
 
 export function nextShipment(status: ShipmentStatus): ShipmentTransition | null {
   if (status === ShipmentStatus.NotCreated || status === ShipmentStatus.Pending) return ShipmentTransition.Packed;
@@ -13,7 +14,7 @@ export function nextRma(status: RmaStatus): RmaTransition | null {
 }
 
 function eligible(order: AdminOrder): boolean {
-  return order.fulfillmentEligibility === FulfillmentEligibility.Eligible && order.orderStatus === OrderStatus.Paid && order.paymentStatus === PaymentStatus.Approved && order.rmaStatus !== RmaStatus.Unknown;
+  return order.payment.state === OrderFactState.Known && order.payment.value === PaymentStatus.Approved && order.payment.reason === null && order.fulfillmentEligibility === FulfillmentEligibility.Eligible && order.orderStatus === OrderStatus.Paid && order.paymentStatus === PaymentStatus.Approved && order.rmaStatus !== RmaStatus.Unknown;
 }
 
 export function allowedShipment(order: AdminOrder): ShipmentTransition | null {

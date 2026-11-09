@@ -22,6 +22,15 @@ class CatalogStockIntegrityTest @Autowired constructor(
     private val catalog: JdbcCatalogService,
     private val inventory: JdbcInventoryService,
 ) {
+    companion object {
+        private val postgres = org.testcontainers.containers.PostgreSQLContainer<Nothing>("postgres:16-alpine").apply { start() }
+        @JvmStatic @org.springframework.test.context.DynamicPropertySource
+        fun database(registry: org.springframework.test.context.DynamicPropertyRegistry) {
+            registry.add("spring.datasource.url", postgres::getJdbcUrl)
+            registry.add("spring.datasource.username", postgres::getUsername)
+            registry.add("spring.datasource.password", postgres::getPassword)
+        }
+    }
     @Test
     fun `catalog stock edit appends ledger and reason audit while preserving reservations`() {
         val sku = createProduct(8)
@@ -57,8 +66,8 @@ class CatalogStockIntegrityTest @Autowired constructor(
         val variantId = variantId(sku)
         jdbc.update("UPDATE inventory_balances SET safety_stock=3 WHERE variant_id=?", variantId)
 
-        assertEquals(5, catalog.product(sku)!!.variants.single()["availableQuantity"])
-        assertEquals(8, catalog.product(sku, admin = true)!!.variants.single()["availableQuantity"])
+        assertEquals(5L, catalog.product(sku)!!.variants.single().availableQuantity)
+        assertEquals(8L, catalog.product(sku, admin = true)!!.variants.single().availableQuantity)
     }
 
     @Test

@@ -16,6 +16,7 @@ import com.storecore.configuration.domain.InstallationCapabilityModule
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
+import com.storecore.identity.domain.CustomerPrincipal
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
@@ -148,8 +149,11 @@ class CapabilityTask003Test {
         jdbc.update("ALTER TABLE capability_kill_switches ENABLE TRIGGER trg_enforce_kill_switch_lifecycle")
         setState("PROFILE_CONTENT", CapabilityState.ACTIVE)
         capabilities.decide("PROFILE_CONTENT", "READ", CapabilityActor.Internal(admin()))
-        assertThrows(CapabilityConfigInvalid::class.java) { capabilities.changeState(admin(), "FAVORITES", CapabilityState.ACTIVE, jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='FAVORITES'", Int::class.java), "nope", UUID.randomUUID()) }
-        assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='FAVORITES'", String::class.java))
+        setState("FAVORITES", CapabilityState.ACTIVE)
+        val customer = CapabilityActor.Customer(CustomerPrincipal(UUID.randomUUID(), 1))
+        capabilities.decide("FAVORITES", "READ", customer)
+        capabilities.decide("FAVORITES", "MANAGE", customer)
+        assertThrows(CapabilityActorNotAuthorized::class.java) { capabilities.decide("CATALOG", "MANAGE", customer) }
     }
 
     private fun activate(module: String) = setState(module, CapabilityState.ACTIVE)

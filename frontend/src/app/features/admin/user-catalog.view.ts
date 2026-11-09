@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { ProductDetail, ProductVariant } from '../../domain/catalog/product-detail.entity';
+import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+import { ProductStatus } from '../../domain/catalog/catalog-states';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -25,14 +26,13 @@ export class UserCatalogViewComponent {
     return this.state.draft.images.join('\n');
   }
 
-  get variantsText(): string {
-    return this.state.draft.variants
-      .map((variant) => `${variant.id}|${variant.sku}|${variant.name}|${variant.availableQuantity}`)
-      .join('\n');
-  }
-
   patch(partial: Partial<ProductDetail>): void {
     this.draftChange.emit({ ...this.state.draft, ...partial });
+  }
+
+  setActive(active: boolean): void { this.patch({ status: active ? ProductStatus.Active : ProductStatus.Draft, active }); }
+  attributes(value: Readonly<Record<string, unknown>>): readonly [string, string][] {
+    return Object.entries(value).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]);
   }
 
   patchPrice(partial: Partial<ProductDetail['price']>): void {
@@ -49,15 +49,4 @@ export class UserCatalogViewComponent {
     });
   }
 
-  setVariants(value: string): void {
-    const variants: ProductVariant[] = value
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => {
-        const [id, sku, name, qty] = line.split('|');
-        return { id: id ?? '', sku: sku ?? '', name: name ?? '', availableQuantity: Number(qty) || 0 };
-      });
-    this.patch({ variants });
-  }
 }

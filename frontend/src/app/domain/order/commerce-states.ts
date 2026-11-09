@@ -100,6 +100,11 @@ export class FulfillmentEligibility {
   static readonly ReversalOrIncident = new FulfillmentEligibility('REVERSAL_OR_INCIDENT', 'Pago en revisión');
   static readonly StockNotVerified = new FulfillmentEligibility('STOCK_NOT_VERIFIED', 'Consumo de stock sin evidencia');
   static readonly Unknown = new FulfillmentEligibility('UNKNOWN', 'Estado desconocido');
+  withPaymentStatus(payment: PaymentStatus): FulfillmentEligibility {
+    if (this === FulfillmentEligibility.OrderNotPaid || this === FulfillmentEligibility.ReversalOrIncident) return this;
+    if ([PaymentStatus.Refunded, PaymentStatus.ChargedBack, PaymentStatus.Cancelled].includes(payment)) return FulfillmentEligibility.ReversalOrIncident;
+    return payment === PaymentStatus.Approved ? this : FulfillmentEligibility.PaymentNotVerified;
+  }
   private static readonly cases = [FulfillmentEligibility.Eligible, FulfillmentEligibility.OrderNotPaid, FulfillmentEligibility.PaymentNotVerified, FulfillmentEligibility.ReversalOrIncident, FulfillmentEligibility.StockNotVerified, FulfillmentEligibility.Unknown];
   static fromWire(value: unknown): FulfillmentEligibility {
     return FulfillmentEligibility.cases.find((state) => state.wire === value) ?? FulfillmentEligibility.Unknown;

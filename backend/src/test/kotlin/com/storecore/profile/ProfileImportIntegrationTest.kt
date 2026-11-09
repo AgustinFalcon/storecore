@@ -5,6 +5,9 @@ import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.infrastructure.JdbcProfileService
 import com.storecore.configuration.domain.CapabilityState
 import com.storecore.configuration.infrastructure.JdbcCapabilityService
+import com.storecore.content.application.HomeContentValidator
+import com.storecore.content.infrastructure.HomeContentWireMapper
+import com.storecore.content.infrastructure.JdbcHomeContentRepository
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
@@ -27,17 +30,17 @@ class ProfileImportIntegrationTest {
     fun `preview diffs against installed content and rejects incompatible profile versions`() {
         val key = uniqueKey("hero")
         jdbc.update("INSERT INTO home_content_sections(section_key,content,active,sort_order) VALUES (?,?::jsonb,true,0)", key, """{"title":"Current"}""")
-        val manifest = manifest(key, """{"title":"Incoming"}""")
+        val manifest = manifest(key, hero("Incoming"))
         val preview = service.preview(actor, manifest)
         assertTrue(preview.compatible)
         assertTrue(preview.diff.contains("\"operation\":\"UPDATE\""))
         assertTrue(preview.diff.contains("\"title\":\"Current\""))
         assertTrue(preview.diff.contains("\"title\":\"Incoming\""))
 
-        val incompatible = service.preview(actor, manifest(key, """{"title":"Incoming"}""", profileVersion = "2.0.0"))
+        val incompatible = service.preview(actor, manifest(key, hero("Incoming"), profileVersion = "2.0.0"))
         assertFalse(incompatible.compatible)
         assertThrows(ProfileRejected::class.java) {
-            service.merge(actor, manifest(key, """{"title":"Incoming"}""", profileVersion = "2.0.0", selection = true))
+            service.merge(actor, manifest(key, hero("Incoming"), profileVersion = "2.0.0", selection = true))
         }
     }
 
@@ -47,7 +50,7 @@ class ProfileImportIntegrationTest {
         val untouched = uniqueKey("untouched")
         jdbc.update("INSERT INTO home_content_sections(section_key,content,active,sort_order) VALUES (?,?::jsonb,true,0)", selected, """{"title":"Before"}""")
         jdbc.update("INSERT INTO home_content_sections(section_key,content,active,sort_order) VALUES (?,?::jsonb,true,1)", untouched, """{"title":"Keep"}""")
-        val input = """{"profile_name":"universal-tools-profile","profile_version":"1.0.0","coreCompatibility":"1.x","content":{"homeSections":[{"sectionKey":"$selected","content":{"title":"After"},"active":false,"sortOrder":2},{"sectionKey":"$untouched","content":{"title":"Must not apply"},"active":true,"sortOrder":3}]}}"""
+        val input = """{"profile_name":"universal-tools-profile","profile_version":"1.0.0","coreCompatibility":"1.x","content":{"homeSections":[{"sectionKey":"$selected","content":${hero("After")},"active":false,"sortOrder":2},{"sectionKey":"$untouched","content":${hero("Must not apply")},"active":true,"sortOrder":3}]}}"""
         assertThrows(ProfileRejected::class.java) { service.merge(actor, input) }
 
         val beforeImports = jdbc.queryForObject("SELECT COUNT(*) FROM universal_profile_imports", Int::class.java)!!
@@ -81,7 +84,7 @@ class ProfileImportIntegrationTest {
     @Test
     fun `failed audit rolls back content and import record together`() {
         val key = uniqueKey("rollback")
-        val input = withSelection(manifest(key, """{"title":"Must rollback"}"""), listOf(key))
+        val input = withSelection(manifest(key, hero("Must rollback")), listOf(key))
         val beforeImports = jdbc.queryForObject("SELECT COUNT(*) FROM universal_profile_imports", Int::class.java)!!
         jdbc.execute("ALTER TABLE audit_events ADD CONSTRAINT ck_test_reject_profile_merge CHECK (event_type <> 'PROFILE_MERGED') NOT VALID")
         try {
@@ -105,6 +108,7 @@ class ProfileImportIntegrationTest {
     }
 
     private fun uniqueKey(prefix: String) = "${prefix}-${UUID.randomUUID().toString().replace("-", "").take(12)}"
+    private fun hero(title: String) = """{"kind":"HERO","title":"$title","body":""}"""
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
@@ -136,7 +140,10 @@ class ProfileImportIntegrationTest {
             val capabilities = JdbcCapabilityService(jdbc)
             val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='PROFILE_CONTENT'", Int::class.java)!!
             capabilities.changeState(actor, "PROFILE_CONTENT", CapabilityState.ACTIVE, version, "profile import test", UUID.randomUUID())
-            service = JdbcProfileService(jdbc, mapper, capabilities)
+            val homeValidator = HomeContentValidator()
+            val homeWire = HomeContentWireMapper(mapper, homeValidator)
+            val homeRepository = JdbcHomeContentRepository(jdbc, mapper, homeWire, homeValidator)
+            service = JdbcProfileService(jdbc, mapper, capabilities, homeWire, homeValidator, homeRepository)
         }
 
         @JvmStatic

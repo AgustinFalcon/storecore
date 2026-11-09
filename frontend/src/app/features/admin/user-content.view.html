@@ -1,37 +1,68 @@
 <section class="sc-page sc-console" aria-labelledby="content-title">
   <header class="sc-page-head">
-    <p class="sc-kicker">Consola</p>
-    <h1 id="content-title">Contenido del home</h1>
-    <p class="sc-page__lede">Editá el título y el texto de la portada. Publicar actualiza el contenido visible en tu tienda.</p>
+    <p class="sc-kicker">Tienda · Contenido</p><h1 id="content-title">Diseñá tu inicio</h1>
+    <p class="sc-page__lede">Ordená tus bloques y prepará una portada que acompañe tu catálogo. Los cambios se publican juntos.</p>
   </header>
   <p role="status" aria-live="polite">{{ state.phase.label }}</p>
-  <sc-feature-status [loading]="state.phase.busy" [error]="state.errorMessage" (retry)="retryOperation()" />
+  @if (state.phase.busy || state.errorMessage) { <sc-feature-status [loading]="state.phase.busy" [error]="state.errorMessage" (retry)="retryOperation()" /> }
   @if (state.published !== null) {
-  <form class="sc-panel" (submit)="$event.preventDefault(); save.emit()" aria-describedby="content-publish-help">
-    <fieldset [disabled]="state.phase.busy">
-    <legend>Editar portada de la tienda</legend>
-    <label>Título
-      <input required name="homeTitle" [ngModel]="state.home.title" (ngModelChange)="patch({ title: $event })" [attr.aria-invalid]="state.phase === Phase.Invalid" />
-    </label>
-    <label>Cuerpo
-      <textarea name="homeBody" [ngModel]="state.home.body" (ngModelChange)="patch({ body: $event })"></textarea>
-    </label>
-    <p id="content-publish-help">La vista previa muestra el título y el cuerpo antes de publicarlos. Las categorías y ofertas conservan su configuración actual.</p>
-    <div class="content-actions">
-      <button type="submit" class="sc-btn sc-btn--primary" [disabled]="!dirty">Publicar cambios</button>
-      <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!dirty" (click)="discard.emit()">Descartar cambios</button>
+    <div class="content-toolbar sc-panel">
+      <div><strong>{{ state.home.sections.length }} bloques</strong><p>Versión publicada {{ state.published.revision }} · {{ dirty ? 'Cambios sin publicar' : 'Todo actualizado' }}</p></div>
+      <div class="content-actions">
+        <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!dirty || state.phase.busy" (click)="discard.emit()">Descartar cambios</button>
+        @if (state.conflict) {
+          <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.phase.busy" (click)="retry.emit()">Cargar versión y conservar borrador</button>
+        } @else {
+          <button type="button" class="sc-btn sc-btn--primary" [disabled]="!dirty || state.phase.busy" (click)="save.emit()">Publicar cambios</button>
+        }
+      </div>
     </div>
-    </fieldset>
-  </form>
-  <section class="sc-panel content-preview" aria-labelledby="content-preview-title">
-    <h2 id="content-preview-title">Vista previa de la portada</h2>
-    <p>{{ dirty ? 'Previsualización local de tus cambios. Todavía no se publicaron.' : 'Vista del contenido confirmado por la tienda.' }}</p>
-    <article class="sc-carousel__slide">
-      <p class="sc-carousel__kicker">En esta tienda</p>
-      <h3>{{ state.home.title || 'Título de la portada' }}</h3>
-      <p class="content-preview-body">{{ state.home.body || 'El texto de la portada aparecerá aquí.' }}</p>
-      <span class="sc-btn sc-btn--primary" aria-hidden="true">Ir al catálogo</span>
-    </article>
-  </section>
+    <div class="composition-layout">
+      <section aria-label="Composición de inicio" class="composition-editor">
+        <div class="sc-panel add-block"><h2>Agregar un bloque</h2><p>Elegí el contenido que querés mostrar.</p>
+          <div class="content-actions">@for (kind of kinds; track kind.wire) { <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.phase.busy" (click)="add(kind)">+ {{ kind.label }}</button> }</div>
+        </div>
+        @if (!state.home.sections.length) { <p class="sc-panel">Todavía no hay bloques. Agregá uno para empezar o publicá una composición vacía.</p> }
+        @for (block of state.home.sections; track block.key; let i = $index) {
+          <article class="sc-panel block-editor" [attr.aria-label]="block.kind.label + ' ' + (i + 1)">
+            <header class="block-heading"><div><p class="sc-kicker">Bloque {{ i + 1 }}</p><h2>{{ block.kind.label }}</h2><small>{{ block.key }}</small></div>
+              <div class="content-actions">
+                <button type="button" class="sc-btn sc-btn--ghost" [attr.aria-label]="'Subir bloque ' + (i + 1)" [disabled]="i === 0 || state.phase.busy || !block.kind.known" (click)="move(i, -1)">↑</button>
+                <button type="button" class="sc-btn sc-btn--ghost" [attr.aria-label]="'Bajar bloque ' + (i + 1)" [disabled]="i === state.home.sections.length - 1 || state.phase.busy || !block.kind.known" (click)="move(i, 1)">↓</button>
+                <button type="button" class="sc-btn sc-btn--ghost" [attr.aria-label]="'Quitar bloque ' + (i + 1)" [disabled]="state.phase.busy" (click)="remove(i)">Quitar</button>
+              </div>
+            </header>
+            @if (!block.kind.known) { <p role="note">Este bloque heredado o inválido no es compatible y no aparece en la tienda. No se puede editar. Quitalo para publicar una composición válida.</p> }
+            <fieldset [disabled]="state.phase.busy || !block.kind.known">
+              <legend class="sr-only">Campos del bloque {{ i + 1 }}</legend>
+              <label class="active-toggle"><input type="checkbox" [ngModel]="block.active" (ngModelChange)="activate(i, $event)" /> Visible en la tienda</label>
+              <label>Título <input required maxlength="120" [ngModel]="block.content.title" (ngModelChange)="patch(i, {title: $event})" /></label>
+              @if (block.kind.bodyLimit !== null) {
+                <label>Texto <textarea [maxlength]="block.kind.bodyLimit" [ngModel]="block.content.body" (ngModelChange)="patch(i, {body: $event})"></textarea></label>
+                <div class="cta-fields"><label>Texto del enlace <input maxlength="80" [ngModel]="block.content.ctaLabel" (ngModelChange)="patch(i, {ctaLabel: $event || undefined})" /></label>
+                <label>Ruta del enlace <input placeholder="/catalog" [ngModel]="block.content.ctaPath" (ngModelChange)="patch(i, {ctaPath: $event || undefined})" /></label></div>
+                <p class="field-help">Usá una ruta interna, por ejemplo /catalog. El enlace aparece cuando tiene texto y ruta.</p>
+              }
+              @if (block.kind.referencesCategories) {
+                <label>Identificadores de categorías <input required [ngModel]="block.content.categoryIds?.join(', ')" (ngModelChange)="references(i, $event)" /></label>
+                <p class="field-help">Entre 1 y 12 categorías existentes, separadas por comas, sin repetir.</p>
+              }
+              @if (block.kind.referencesProducts) {
+                <label>SKU de variantes <input required [ngModel]="block.content.skus?.join(', ')" (ngModelChange)="references(i, $event)" /></label>
+                <p class="field-help">Entre 1 y 20 SKU existentes, separados por comas, sin repetir.</p>
+              }
+              @if (block.kind.known && !block.kind.validate(block.content)) { <p class="field-error" role="status">Completá el título y revisá los campos de este bloque.</p> }
+            </fieldset>
+          </article>
+        }
+      </section>
+      <aside class="sc-panel content-preview" aria-labelledby="content-preview-title">
+        <p class="sc-kicker">Antes de publicar</p><h2 id="content-preview-title">Vista previa</h2>
+        <p>{{ dirty ? 'Tus cambios todavía no se publicaron.' : 'Composición confirmada por la tienda.' }} Sólo se muestran los bloques visibles y compatibles.</p>
+        <p class="field-help">Las referencias de catálogo se verifican al publicar. Los productos o categorías sin datos se indican como no disponibles.</p>
+        @if (state.conflict) { <p role="note">Cargá la versión actual para conservar tu borrador sobre ella. Revisalo antes de publicar: la publicación reemplaza toda la composición.</p> }
+        <sc-home-blocks [sections]="state.home.sections" />
+      </aside>
+    </div>
   }
 </section>

@@ -1,0 +1,68 @@
+@if (store.viewState$ | async; as state) {
+<section class="sc-page sc-console" aria-labelledby="offers-title">
+  <header class="sc-page-head">
+    <p class="sc-kicker">COMERCIAL · CANAL WEB</p>
+    <h1 id="offers-title">Ofertas locales</h1>
+    <p class="sc-page__lede">Creá y administrá descuentos de StoreCore. La mayor prioridad y, ante empate, el menor ID determinan la oferta ganadora. Esta pantalla no modifica Mercado Libre.</p>
+  </header>
+  @if (state.errorMessage) { <div class="sc-callout sc-callout--error" role="alert"><strong>No pudimos completar la operación.</strong><p>{{ state.errorMessage }}</p><button type="button" class="sc-btn" (click)="store.load()">Reintentar</button></div> }
+  @if (state.feedback) { <p class="sc-callout" role="status">{{ state.feedback }}</p> }
+
+  <div class="sc-workbench">
+    <div class="sc-workbench__main">
+      <div class="sc-page-head sc-page-head--compact">
+        <div><h2>Reglas registradas</h2><p>Los estados desconocidos quedan bloqueados para revisión.</p></div>
+        <span class="sc-badge sc-badge--info">{{ state.offers.length }} ofertas</span>
+      </div>
+      <div class="sc-fields-2">
+        <label>Buscar <input type="search" aria-label="Buscar ofertas" placeholder="Nombre o SKU" [ngModel]="query()" (ngModelChange)="query.set($event)" /></label>
+        <label>Estado <select aria-label="Filtrar por estado" [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)"><option [ngValue]="null">Todos</option>@for (status of statuses; track status.wire) { <option [ngValue]="status">{{ status.label }}</option> }</select></label>
+      </div>
+      @if (state.loading) { <p class="sc-callout" role="status">Cargando ofertas…</p> }
+      @if (!state.loading && !state.offers.length) { <div class="sc-empty"><h3>Todavía no hay ofertas</h3><p>Creá el primer borrador. El precio público no cambia hasta que lo actives.</p></div> }
+      <div class="sc-card-grid">
+        @for (offer of state.offers; track offer.id) { @if (visible(offer)) {
+          <article class="sc-card">
+            <header><div><span class="sc-badge" [class.sc-badge--ok]="offer.status === statuses[1]">{{ offer.status.label }}</span><h3>{{ offer.name }}</h3></div><strong>#{{ offer.id }}</strong></header>
+            <dl class="sc-facts">
+              <div><dt>Descuento</dt><dd>{{ offer.discountValue | number:'1.0-2' }} {{ offer.discountKind.suffix }}</dd></div>
+              <div><dt>Prioridad</dt><dd>{{ offer.priority }}</dd></div>
+              <div><dt>Vigencia</dt><dd>{{ offer.startsAt | date:'short' }} – {{ offer.endsAt | date:'short' }}</dd></div>
+              <div><dt>Productos</dt><dd>{{ offer.skus.join(', ') }}</dd></div>
+              <div><dt>Margen mínimo</dt><dd>{{ offer.minMarginPercent | number:'1.0-2' }} %</dd></div>
+            </dl>
+            @if (offer.status === unknownStatus || offer.discountKind === unknownKind) { <p class="sc-callout sc-callout--error">La oferta contiene un valor no reconocido. No se habilitan acciones.</p> }
+            <footer class="sc-actions">@for (transition of transitions(offer); track transition.wire) { <button type="button" class="sc-btn" [disabled]="state.mutatingId !== 0" (click)="requestTransition(offer, transition, $event)">{{ transition.label }}</button> }</footer>
+          </article>
+        } }
+      </div>
+    </div>
+
+    <form class="sc-panel" (submit)="$event.preventDefault(); submit()">
+      <p class="sc-kicker">NUEVA REGLA</p><h2>Crear borrador</h2>
+      <label>Nombre <input required maxlength="160" name="name" [ngModel]="draft().name" (ngModelChange)="patch({ name: $event })" /></label>
+      <label>SKU de referencia <textarea required name="skus" rows="3" placeholder="SKU-001, SKU-002" [ngModel]="draft().skus" (ngModelChange)="patch({ skus: $event })"></textarea><small>Separalos con coma, punto y coma o espacio. Cada SKU identifica un producto: la oferta alcanzará todas sus variantes actuales y futuras.</small></label>
+      <div class="sc-fields-2">
+        <label>Desde <input required type="datetime-local" name="startsAt" [ngModel]="draft().startsAt" (ngModelChange)="patch({ startsAt: $event })" /></label>
+        <label>Hasta <input required type="datetime-local" name="endsAt" [ngModel]="draft().endsAt" (ngModelChange)="patch({ endsAt: $event })" /></label>
+      </div>
+      <div class="sc-fields-2">
+        <label>Tipo <select name="kind" [ngModel]="draft().discountKind" (ngModelChange)="patch({ discountKind: $event })">@for (kind of kinds; track kind.wire) { <option [ngValue]="kind">{{ kind.label }}</option> }</select></label>
+        <label>Descuento <input required min="0.01" step="0.01" type="number" name="value" [ngModel]="draft().discountValue" (ngModelChange)="patch({ discountValue: +$event })" /></label>
+      </div>
+      <div class="sc-fields-2"><label>Prioridad <input min="0" step="1" type="number" name="priority" [ngModel]="draft().priority" (ngModelChange)="patch({ priority: +$event })" /></label><label>Margen mínimo <input type="number" name="margin" value="0" disabled /><small>No disponible hasta incorporar costo autoritativo.</small></label></div>
+      <p class="sc-callout">Se guarda como borrador. Activar requiere una acción posterior y aprobación del backend.</p>
+      @if (formError()) { <p class="sc-callout sc-callout--error" role="alert">{{ formError() }}</p> }
+      <button type="submit" class="sc-btn sc-btn--primary" [disabled]="state.creating">{{ state.creating ? 'Creando…' : 'Crear borrador' }}</button>
+    </form>
+  </div>
+  <dialog #transitionDialog class="sc-panel sc-modal" aria-labelledby="offer-transition-title" (cancel)="$event.preventDefault(); cancelTransition()">
+    @if (pendingTransition(); as pending) {
+        <h2 id="offer-transition-title">Confirmar {{ pending.transition.label.toLocaleLowerCase() }}</h2>
+        <p>Vas a {{ pending.transition.label.toLocaleLowerCase() }} <strong>{{ pending.offer.name }}</strong>. El alcance corresponde a los productos asociados e incluye todas sus variantes actuales y futuras. El backend volverá a validar estado, vigencia y precios de forma atómica.</p>
+        <p><strong>Variantes actuales:</strong> {{ pending.offer.skus.join(', ') }}</p>
+        <div class="sc-actions"><button type="button" class="sc-btn" (click)="cancelTransition()">Cancelar</button><button data-confirm-transition type="button" class="sc-btn sc-btn--primary" (click)="confirmTransition()">Confirmar</button></div>
+    }
+  </dialog>
+</section>
+}

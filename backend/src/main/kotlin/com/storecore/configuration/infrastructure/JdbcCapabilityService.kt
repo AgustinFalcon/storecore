@@ -65,7 +65,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         }
         val state = CapabilityState.fromWire(config["state"]?.toString())
         val actionRow = jdbc.queryForList(
-            "SELECT action_kind, allows_write, allowed_when_paused FROM capability_actions WHERE module_code=? AND action_code=? FOR SHARE",
+            "SELECT action_kind, allows_write, allowed_when_paused, customer_allowed FROM capability_actions WHERE module_code=? AND action_code=? FOR SHARE",
             module, action,
         ).singleOrNull() ?: throw CapabilityActionNotAllowed()
         val kind = CapabilityActionKind.valueOf(actionRow["action_kind"].toString())
@@ -85,6 +85,10 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
                 if (kind in setOf(CapabilityActionKind.WRITE, CapabilityActionKind.PUBLISH) &&
                     actor.principal.roles.none { it == InternalRole.ADMIN || it == InternalRole.OPERATOR }
                 ) throw CapabilityActorNotAuthorized()
+            }
+            is CapabilityActor.Customer -> {
+                val allowed = actionRow["customer_allowed"] as? Boolean ?: false
+                if (!allowed) throw CapabilityActorNotAuthorized()
             }
         }
     }

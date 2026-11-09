@@ -37,6 +37,7 @@
     emptyText="No hay productos activos para estos filtros."
     (retry)="searchSubmit.emit()"
   />
+  @if (state.list) { <p role="status">{{ state.products.length }} de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; ajustá los filtros para encontrar tu producto. }</p> }
   <ul class="sc-grid sc-grid--tiles">
     @for (product of state.products; track product.sku) {
       <li>

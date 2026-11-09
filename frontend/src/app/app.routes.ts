@@ -13,6 +13,8 @@ import { UserInventoryComponent } from './features/admin/user-inventory.componen
 import { UserLayoutComponent } from './features/admin/user-layout.component';
 import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
 import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
+import { UserOffersComponent } from './features/admin/user-offers.component';
+import { UserCustomersComponent } from './features/admin/user-customers.component';
 import { UserPromosComponent } from './features/admin/user-promos.component';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
@@ -20,6 +22,7 @@ import { CheckoutResultComponent } from './features/cart/checkout-result.compone
 import { CustomerAddressesComponent } from './features/identity/customer-addresses.component';
 import { CustomerLayoutComponent } from './features/identity/customer-layout.component';
 import { CustomerProfileComponent } from './features/identity/customer-profile.component';
+import { CustomerFavoritesComponent } from './features/identity/customer-favorites.component';
 import { CustomerRegisterComponent } from './features/identity/customer-register.component';
 import { CustomerOrderDetailComponent } from './features/orders/customer-order-detail.component';
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
@@ -55,6 +58,7 @@ export const routes: Routes = [
           { path: 'register', component: CustomerRegisterComponent, title: 'Registro' },
           { path: 'profile', component: CustomerProfileComponent, title: 'Perfil', canActivate: [customerGuard] },
           { path: 'addresses', component: CustomerAddressesComponent, title: 'Direcciones', canActivate: [customerGuard] },
+          { path: 'favorites', component: CustomerFavoritesComponent, title: 'Favoritos', canActivate: [customerGuard] },
           { path: 'orders', component: CustomerOrdersComponent, title: 'Órdenes', canActivate: [customerGuard] },
           { path: 'orders/:id', component: CustomerOrderDetailComponent, title: 'Orden', canActivate: [customerGuard] },
           { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },
@@ -69,6 +73,8 @@ export const routes: Routes = [
           { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
           { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard], canDeactivate: [userContentLeaveGuard] },
           { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
+          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard] },
+          { path: 'customers', component: UserCustomersComponent, title: 'Clientes', canActivate: [userGuard] },
           { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
           { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
           { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard] },

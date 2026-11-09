@@ -11,6 +11,10 @@ import { FulfillmentStore } from './fulfillment.store';
   template: `
     <sc-fulfillment-view
       [orders]="(store.orders$ | async) ?? []"
+      [query]="(store.query$ | async)!"
+      [total]="(store.total$ | async) ?? 0"
+      [truncated]="(store.truncated$ | async) ?? false"
+      (queryChange)="store.changeQuery($event)"
       [loading]="(store.loading$ | async) ?? false"
       [error]="(store.errorMessage$ | async) ?? ''"
       (ship)="store.ship($event)"

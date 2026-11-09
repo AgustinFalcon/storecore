@@ -23,7 +23,8 @@
         <li><span>SKU cargados</span><strong>{{ state.rows.length }}</strong></li><li><span>Disponible</span><strong>{{ availableTotal ?? 'No informado' }}</strong></li>
         <li><span>Reservado</span><strong>{{ reservedTotal ?? 'No informado' }}</strong></li><li><span>Stock de seguridad</span><strong>{{ safetyTotal ?? 'No informado' }}</strong></li>
       </ul>
-      <p class="inventory__explanation">Disponible es el saldo neto informado por el sistema. Las reservas no se descuentan nuevamente. El stock de seguridad se muestra por separado.</p>
+      @if (state.list) { <p role="status">{{ state.rows.length }} de {{ state.list.total }} variantes. @if (state.list.truncated) { Lectura parcial; hay más variantes. }</p> }
+      <p class="inventory__explanation">Disponible ya es neto de reservas. Existencias = disponible + reservado. Vendible = máximo entre disponible menos seguridad y cero. Sin saldo registrado no significa cero.</p>
       <div class="inventory__filters" role="search" aria-label="Filtrar inventario">
         <label for="inventory-query">Buscar por SKU<input id="inventory-query" type="search" placeholder="Ingresá un SKU" [ngModel]="state.query" (ngModelChange)="queryChange.emit($event)" /></label>
         <label for="inventory-filter">Disponibilidad<select id="inventory-filter" [ngModel]="state.filter" (ngModelChange)="filterChange.emit($event)">
@@ -38,12 +39,13 @@
         <div class="inventory__notice"><h2>Sin coincidencias</h2><p>Probá con otro SKU o limpiá los filtros.</p><button type="button" (click)="clearFilters.emit()">Mostrar todo el inventario</button></div>
       } @else {
         <table class="inventory__table">
-          <caption>Inventario WEB por SKU. Resumen de la consulta completa; filtros aplicados sólo al listado.</caption>
-          <thead><tr><th scope="col">SKU</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th></tr></thead>
+          <caption>Inventario WEB por SKU. Resumen de las variantes cargadas; filtros locales al listado.</caption>
+          <thead><tr><th scope="col">SKU / Producto</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th><th scope="col">Existencias</th><th scope="col">Vendible</th><th scope="col">Actualizado</th></tr></thead>
           <tbody>@for (row of visibleRows; track row.sku) {
-            <tr><th scope="row" class="inventory__sku">{{ row.sku }}</th>
+            <tr><th scope="row" class="inventory__sku">{{ row.sku }}<br>{{ row.productName }} · {{ row.variantLabel }}</th>
               <td data-label="Disponibilidad"><span class="inventory__badge" [attr.data-tone]="row.availability.tone">{{ row.availability.label }}</span></td>
               <td data-label="Disponible">{{ row.availableQuantity ?? 'No informado' }}</td><td data-label="Reservado">{{ row.reservedQuantity ?? 'No informado' }}</td><td data-label="Stock de seguridad">{{ row.safetyStock ?? 'No informado' }}</td>
+              <td data-label="Existencias">{{ row.onHand ?? 'No informado' }}</td><td data-label="Vendible">{{ row.saleable ?? 'No informado' }}</td><td data-label="Actualizado">{{ row.updatedAt ?? 'No informado' }}</td>
             </tr>
           }</tbody>
         </table>

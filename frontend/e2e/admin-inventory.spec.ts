@@ -4,12 +4,12 @@ import { InventoryAvailability } from '../src/app/domain/user/inventory-availabi
 import { UserRole } from '../src/app/domain/user/user-role';
 
 const envelope = (data: unknown) => ({ code: 200, data, message: null, errorCode: null, retryable: null, traceId: null });
-const inventory = [
-  { sku: 'WEB-KIT', availableQuantity: 8, reservedQuantity: 3, safetyStock: 2 },
-  { sku: 'WEB-LOW', availableQuantity: 1, reservedQuantity: 4, safetyStock: 2 },
-  { sku: 'WEB-ZERO', availableQuantity: 0, reservedQuantity: 2, safetyStock: 0 },
-  { sku: 'WEB-UNKNOWN', availableQuantity: null, reservedQuantity: 1, safetyStock: 0 },
-];
+const inventory = { items: [
+  { variantId: 'v1', sku: 'WEB-KIT', productName: 'Kit', variantLabel: 'Grande', state: 'KNOWN', available: 8, reserved: 3, safety: 2, onHand: 11, saleable: 6 },
+  { variantId: 'v2', sku: 'WEB-LOW', productName: 'Kit', variantLabel: 'Chico', state: 'KNOWN', available: 1, reserved: 4, safety: 2, onHand: 5, saleable: 0 },
+  { variantId: 'v3', sku: 'WEB-ZERO', state: 'KNOWN', available: 0, reserved: 2, safety: 0, onHand: 2, saleable: 0 },
+  { variantId: 'v4', sku: 'WEB-UNKNOWN', state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null },
+], total: 120, page: 0, size: 50, truncated: true };
 
 async function mockSession(page: Page, role = UserRole.Operator): Promise<void> {
   await page.route('**/api/v1/**', async (route) => {
@@ -35,17 +35,18 @@ for (const width of [390, 768, 1440]) {
     await expect(page.getByRole('heading', { name: 'Inventario WEB', exact: true })).toBeVisible();
     await expect(page.locator('tbody tr')).toHaveCount(4);
     await expect(page.locator('tbody tr').filter({ hasText: 'WEB-KIT' })).toContainText('8');
-    await expect(page.locator('tbody tr').filter({ hasText: 'WEB-LOW' })).toContainText(InventoryAvailability.Low.label);
+    await expect(page.locator('tbody tr').filter({ hasText: 'WEB-LOW' })).toContainText(InventoryAvailability.Out.label);
     await expect(page.locator('tbody tr').filter({ hasText: 'WEB-ZERO' })).toContainText(InventoryAvailability.Out.label);
-    await expect(page.locator('tbody tr').filter({ hasText: 'WEB-UNKNOWN' })).toContainText(InventoryAvailability.Unknown.label);
+    await expect(page.locator('tbody tr').filter({ hasText: 'WEB-UNKNOWN' })).toContainText(InventoryAvailability.Unavailable.label);
+    await expect(page.getByText(/4 de 120 variantes/)).toBeVisible();
     await expect(page.getByRole('button', { name: /ajustar|conciliar|historial/i })).toHaveCount(0);
     await page.getByLabel('Buscar por SKU').fill('web-kit');
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
     await expect(page.locator('#inventory-filter')).toBeVisible();
-    await page.locator('#inventory-filter').selectOption({ label: InventoryAvailability.Low.label });
+    await page.locator('#inventory-filter').selectOption({ label: InventoryAvailability.Unavailable.label });
     await expect(page.locator('tbody tr')).toHaveCount(1);
-    await expect(page.locator('tbody')).toContainText('WEB-LOW');
+    await expect(page.locator('tbody')).toContainText('WEB-UNKNOWN');
     await page.getByLabel('Buscar por SKU').fill('does-not-exist');
     await expect(page.getByRole('heading', { name: 'Sin coincidencias' })).toBeVisible();
     await page.getByRole('button', { name: 'Mostrar todo el inventario' }).click();
@@ -101,7 +102,7 @@ test('inventory retains stale data after failed refresh and clears it on access 
 test('first load has contextual recovery and empty inventory is not a filter failure', async ({ page }) => {
   await mockSession(page);
   let fail = true;
-  await page.route('**/api/v1/user/inventory', (route) => route.fulfill({ status: fail ? 503 : 200, json: fail ? {} : envelope([]) }));
+  await page.route('**/api/v1/user/inventory', (route) => route.fulfill({ status: fail ? 503 : 200, json: fail ? {} : envelope({ items: [], total: 0, page: 0, size: 50, truncated: false }) }));
   await page.goto('/user/inventory');
   await expect(page.getByRole('heading', { name: 'No pudimos cargar el inventario' })).toBeVisible();
   fail = false;

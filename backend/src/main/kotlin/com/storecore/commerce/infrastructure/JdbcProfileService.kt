@@ -7,6 +7,12 @@ import com.storecore.commerce.application.ProfileRejected
 import com.storecore.commerce.domain.ProfilePreview
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
+import com.storecore.content.application.HomeContentInvalid
+import com.storecore.content.application.HomeContentProfileMergePort
+import com.storecore.content.application.HomeContentReferenceNotFound
+import com.storecore.content.application.HomeContentValidator
+import com.storecore.content.domain.HomeSectionDraft
+import com.storecore.content.infrastructure.HomeContentWireMapper
 import com.storecore.identity.domain.InternalUserPrincipal
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
@@ -20,6 +26,9 @@ class JdbcProfileService(
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
     private val capabilities: CapabilityDecisionPort,
+    private val homeWire: HomeContentWireMapper,
+    private val homeValidator: HomeContentValidator,
+    private val homeMerge: HomeContentProfileMergePort,
 ) {
     fun preview(actor: InternalUserPrincipal, manifest: String): ProfilePreview {
         capabilities.decide("PROFILE_CONTENT", "READ", CapabilityActor.Internal(actor))
@@ -38,16 +47,9 @@ class JdbcProfileService(
         val tx = TransactionTemplate(DataSourceTransactionManager(jdbc.dataSource!!))
         return tx.execute {
             val changes = mapper.valueToTree<com.fasterxml.jackson.databind.node.ArrayNode>(diff(selected))
-            selected.forEach { section ->
-                jdbc.update(
-                    """INSERT INTO home_content_sections(section_key,content,active,sort_order,updated_by)
-                       VALUES (?,?::jsonb,?,?,?)
-                       ON CONFLICT(section_key) DO UPDATE
-                       SET content=excluded.content, active=excluded.active, sort_order=excluded.sort_order,
-                           updated_by=excluded.updated_by, updated_at=now()""",
-                    section.key, mapper.writeValueAsString(section.content), section.active, section.sortOrder, actor.userId,
-                )
-            }
+            try { homeMerge.mergeSelected(actor, selected.map { it.draft }) }
+            catch (_: HomeContentReferenceNotFound) { throw ProfileRejected("PROFILE_CONTENT_INVALID") }
+            catch (_: HomeContentInvalid) { throw ProfileRejected("PROFILE_CONTENT_INVALID") }
             val snapshot = mapper.createObjectNode().set<JsonNode>("changes", changes)
             val selectionJson = mapper.createObjectNode()
                 .set<JsonNode>("homeSections", mapper.valueToTree(selection.sorted()))
@@ -100,7 +102,13 @@ class JdbcProfileService(
             if (!key.matches(KEY_PATTERN) || !seen.add(key) || json == null || !json.isObject || order < 0 ||
                 mapper.writeValueAsBytes(json).size > MAX_CONTENT_BYTES) throw ProfileRejected("PROFILE_CONTENT_INVALID")
             rejectSecrets(json)
-            Section(key, json.deepCopy(), active, order)
+            val draft = try { homeWire.profileRequest(key, active, order, json) }
+                catch (_: HomeContentInvalid) { throw ProfileRejected("PROFILE_CONTENT_INVALID") }
+            Section(key, json.deepCopy(), active, order, draft)
+        }
+        .also { sections ->
+            try { homeValidator.validate(null, sections.map { it.draft }) }
+            catch (_: HomeContentInvalid) { throw ProfileRejected("PROFILE_CONTENT_INVALID") }
         }
     }
 
@@ -152,14 +160,14 @@ class JdbcProfileService(
     }
 
     private data class ParsedProfile(val root: JsonNode, val version: String, val coreCompatibility: String, val compatible: Boolean, val sections: List<Section>)
-    private data class Section(val key: String, val content: ObjectNode, val active: Boolean, val sortOrder: Int)
+    private data class Section(val key: String, val content: ObjectNode, val active: Boolean, val sortOrder: Int, val draft: HomeSectionDraft)
     private data class Existing(val content: JsonNode, val active: Boolean, val order: Int)
 
     companion object {
         private const val PROFILE_NAME = "universal-tools-profile"
         private const val PROFILE_VERSION = "1.0.0"
         private const val CORE_COMPATIBILITY = "1.x"
-        private const val MAX_SECTIONS = 100
+        private const val MAX_SECTIONS = HomeContentValidator.MAX_SECTIONS
         private const val MAX_CONTENT_BYTES = 20_000
         private val KEY_PATTERN = Regex("[a-z0-9][a-z0-9_-]{0,79}")
         private val SECRET_PATTERN = Regex("secret|password|token|credential|oauth|merchant|legal_identity", RegexOption.IGNORE_CASE)

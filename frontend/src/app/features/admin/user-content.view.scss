@@ -1,7 +1,32 @@
 :host { display: block; min-width: 0; }
+.sc-page { gap: 1.5rem; }
+.sc-page > [role=status] { margin: 0; }
+.sc-panel { width: 100%; gap: 1rem; align-content: start; }
+.sc-panel > p { margin: 0; }
 fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
 legend { font-weight: 700; margin-bottom: 1rem; }
-.content-actions { display: flex; flex-wrap: wrap; gap: 1rem; }
-.content-preview { margin-top: 1.5rem; overflow-wrap: anywhere; }
+.content-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.content-toolbar, .block-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+.content-toolbar { margin-bottom: 1.5rem; }
+.content-toolbar p { margin-bottom: 0; }
+.composition-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.composition-editor { display: grid; gap: 1rem; min-width: 0; }
+.block-editor { min-width: 0; }
+.block-heading { margin-bottom: 1rem; }
+.block-heading h2 { margin: .25rem 0; }
+.block-heading small { overflow-wrap: anywhere; color: #475569; }
+.block-editor fieldset { display: grid; gap: .9rem; }
+.block-editor label { display: grid; gap: .35rem; min-width: 0; }
+.block-editor input, .block-editor textarea { width: 100%; min-width: 0; }
+.active-toggle { display: flex !important; align-items: center; }
+.active-toggle input { width: auto; }
+.cta-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.field-help { font-size: .875rem; color: #475569; margin: 0; }
+.field-error { color: #9f1239; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); }
+.content-preview { position: sticky; top: 1rem; overflow-wrap: anywhere; min-width: 0; }
+.content-preview sc-home-blocks { display: block; margin-top: 1.5rem; }
 .content-preview .sc-carousel__kicker { opacity: 1; color: #475569; }
 .content-preview-body { white-space: pre-wrap; }
+@media (max-width: 900px) { .composition-layout { grid-template-columns: minmax(0, 1fr); } .content-preview { position: static; } }
+@media (max-width: 480px) { .cta-fields { grid-template-columns: minmax(0, 1fr); } .content-toolbar .content-actions { width: 100%; } }

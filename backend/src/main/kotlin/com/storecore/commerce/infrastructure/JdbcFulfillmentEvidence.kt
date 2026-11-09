@@ -26,8 +26,8 @@ class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate) : FulfillmentEvide
             { rs, _ -> PaymentAccreditation(PaymentStatus.fromWire(rs.getString("status")), rs.getBoolean("same_order"), rs.getBoolean("same_provider"), CheckoutAttemptState.fromWire(rs.getString("state")) == CheckoutAttemptState.ACCREDITED, rs.getBigDecimal("payment_amount") ?: java.math.BigDecimal.valueOf(-1), rs.getBigDecimal("attempt_amount") ?: java.math.BigDecimal.valueOf(-1), rs.getBigDecimal("confirmed_amount"), rs.getString("payment_currency") ?: "", rs.getString("attempt_currency") ?: "", rs.getString("confirmed_currency")) }, orderId,
         )
         val blocked = jdbc.queryForObject(
-            """SELECT EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts a ON a.id=r.attempt_id WHERE a.order_id=?)
-                 OR EXISTS(SELECT 1 FROM mp_order_incidents WHERE order_id=? AND review_status <> 'RESOLVED')""", Boolean::class.java, orderId, orderId,
+            """SELECT EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts a ON a.id=r.attempt_id WHERE a.order_id=? AND r.review_status <> 'REJECTED')
+                 OR EXISTS(SELECT 1 FROM mp_order_incidents WHERE order_id=? AND review_status NOT IN ('RESOLVED','REJECTED'))""", Boolean::class.java, orderId, orderId,
         ) ?: true
         val items = jdbc.query("SELECT variant_id,quantity FROM order_items WHERE order_id=? ORDER BY id", { rs, _ -> SoldItem(rs.getLong("variant_id"), rs.getInt("quantity")) }, orderId)
         val sales = jdbc.query(
@@ -37,7 +37,13 @@ class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate) : FulfillmentEvide
                WHERE l.actor=? AND l.event_type='SALE' AND l.channel='WEB' ORDER BY l.id""",
             { rs, _ -> StockConsumption(rs.getObject("reservation_id")?.let { rs.getLong("reservation_id") }, rs.getLong("variant_id"), rs.getInt("quantity"), rs.getObject("consumed_variant")?.let { rs.getLong("consumed_variant") }, rs.getObject("consumed_quantity")?.let { rs.getInt("consumed_quantity") }, ReservationStatus.fromWire(rs.getString("status")) == ReservationStatus.CONSUMED, rs.getInt("sale_count")) }, "MP_ORDERS:$orderId",
         )
-        return FulfillmentSnapshot(header.first, header.second, header.third, payments, blocked, items, sales)
+        val contradictoryPayment = jdbc.queryForObject(
+            """SELECT EXISTS(SELECT 1 FROM payments p WHERE p.order_id=? AND p.status IN ('APPROVED','REFUNDED','CHARGED_BACK')
+                AND NOT EXISTS(SELECT 1 FROM mp_order_commercial_applications c JOIN mp_checkout_attempts a ON a.id=c.attempt_id
+                  WHERE c.order_id=p.order_id AND c.transition='PAYMENT_ACCREDITED' AND a.payment_id=p.id
+                    AND a.order_id=c.order_id AND a.provider_order_id=c.provider_order_id))""", Boolean::class.java, orderId,
+        ) ?: true
+        return FulfillmentSnapshot(header.first, header.second, header.third, payments, blocked, items, sales, contradictoryPayment)
     }
 
     fun paymentStatus(orderId: Long, snapshot: FulfillmentSnapshot): PaymentStatus {

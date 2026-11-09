@@ -13,6 +13,7 @@ import { UserMercadoLibreState } from './user-mercadolibre.store';
 })
 export class UserMercadoLibreViewComponent {
   @Input({ required: true }) state!: UserMercadoLibreState;
+  @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly refresh = new EventEmitter<void>();
   @Output() readonly queryChange = new EventEmitter<string>();
   @Output() readonly clearQuery = new EventEmitter<void>();

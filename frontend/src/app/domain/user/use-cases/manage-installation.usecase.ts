@@ -1,15 +1,17 @@
+import { BoundedRows } from '../../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import {
   InventoryRow,
   MercadoLibreAccount,
   MercadoLibreListing,
+  MercadoLibreMapping,
 } from '../user.entity';
 import { IUserRepository } from '../user.repository';
 
 export class ManageInstallationUseCase {
   constructor(private readonly repo: IUserRepository) {}
 
-  listInventory(): Observable<readonly InventoryRow[]> {
+  listInventory(): Observable<BoundedRows<InventoryRow>> {
     return this.repo.listInventory();
   }
 
@@ -17,11 +19,11 @@ export class ManageInstallationUseCase {
     return this.repo.readMercadoLibreAccount();
   }
 
-  listMercadoLibreListings(): Observable<readonly MercadoLibreListing[]> {
-    return this.repo.listMercadoLibreListings();
+  listMercadoLibreListings(page = 0): Observable<BoundedRows<MercadoLibreListing>> {
+    return this.repo.listMercadoLibreListings(page);
   }
 
-  saveMercadoLibreListing(listing: MercadoLibreListing): Observable<MercadoLibreListing> {
+  saveMercadoLibreListing(listing: MercadoLibreMapping): Observable<MercadoLibreListing> {
     return this.repo.saveMercadoLibreListing(listing);
   }
 }

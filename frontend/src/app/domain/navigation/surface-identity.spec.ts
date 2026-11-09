@@ -1,7 +1,7 @@
 import { NotFoundRecovery, SurfaceIdentity, SurfaceTarget } from './surface-identity';
 
 describe('canonical surface identity', () => {
-  it('round trips every closed surface and excludes the four Demo-only Real routes', () => {
+  it('round trips every closed surface and excludes the remaining Demo-only Real routes', () => {
     expect(SurfaceIdentity.all).toHaveLength(26);
     expect(new Set(SurfaceIdentity.all.map(surface => surface.wire)).size).toBe(26);
     for (const surface of SurfaceIdentity.all) {
@@ -9,7 +9,7 @@ describe('canonical surface identity', () => {
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Demo)).toBe(surface);
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Real)).toBe(surface.real ? surface : SurfaceIdentity.Unknown);
     }
-    expect(SurfaceIdentity.all.filter(surface => !surface.real)).toEqual([SurfaceIdentity.Recovery, SurfaceIdentity.Favorites, SurfaceIdentity.Offers, SurfaceIdentity.Customers]);
+    expect(SurfaceIdentity.all.filter(surface => !surface.real)).toEqual([SurfaceIdentity.Recovery]);
   });
   it('fails closed for unknown wires, targets and nested route patterns', () => {
     for (const raw of [null, undefined, 'SC-SURF-27', '<script>', {}, 1]) expect(SurfaceIdentity.fromWire(raw)).toBe(SurfaceIdentity.Unknown);

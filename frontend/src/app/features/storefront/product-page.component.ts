@@ -6,21 +6,26 @@ import { ActivatedRoute } from '@angular/router';
 import { CartStore } from '../cart/cart.store';
 import { CatalogStore } from './catalog.store';
 import { ProductPageViewComponent } from './product-page.view';
+import { CustomerFavoritesStore } from '../identity/customer-favorites.store';
 
 @Component({
   selector: 'sc-product-page',
   imports: [AsyncPipe, ProductPageViewComponent],
-  providers: [CatalogStore],
+  providers: [CatalogStore, CustomerFavoritesStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <sc-product-page-view
       [product]="store.product$ | async"
       [cart]="cart.cart$ | async"
       [loading]="(store.loading$ | async) ?? false"
-      [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || ''"
+      [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || (favorites.errorMessage$ | async) || ''"
       [access]="cart.authority()"
+      [favorite]="favorites.isFavorite((store.product$ | async)?.sku || '')"
+      [favoriteBusy]="((favorites.viewState$ | async)?.mutationSku || '') === ((store.product$ | async)?.sku || '')"
+      [favoriteFeedback]="(favorites.feedback$ | async) || ''"
       (selectCustomer)="cart.selectCustomer()"
       (add)="cart.add($event)"
+      (toggleFavorite)="toggleFavorite($event)"
       (retry)="reload()"
     />
   `,
@@ -30,6 +35,7 @@ export class ProductPageComponent implements OnInit {
   constructor(
     readonly store: CatalogStore,
     readonly cart: CartStore,
+    readonly favorites: CustomerFavoritesStore,
     private readonly route: ActivatedRoute,
   ) {}
 
@@ -49,6 +55,13 @@ export class ProductPageComponent implements OnInit {
     this.store.loadProduct(sku);
     if (this.cart.authority().canMutate) {
       this.cart.load();
+      this.favorites.load();
     }
+  }
+
+  toggleFavorite(sku: string): void {
+    if (!this.cart.authority().canMutate) return;
+    if (this.favorites.isFavorite(sku)) this.favorites.remove(sku);
+    else this.favorites.add(sku);
   }
 }
