@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { Health } from '../../domain/health/health.entity';
+import { HealthStatus } from '../../domain/health/health-status';
 import { GetHealthUseCase } from '../../domain/health/use-cases/get-health.usecase';
 
 export interface ShellState {
@@ -13,7 +14,7 @@ export interface ShellState {
   readonly ready: boolean;
   readonly empty: boolean;
   readonly errorMessage: string;
-  readonly apiStatus: string;
+  readonly apiStatus: HealthStatus;
   readonly categories: readonly CatalogFacet[];
 }
 
@@ -22,7 +23,7 @@ const INITIAL_STATE: ShellState = {
   ready: false,
   empty: true,
   errorMessage: '',
-  apiStatus: '',
+  apiStatus: HealthStatus.Unknown,
   categories: [],
 };
 
@@ -59,9 +60,9 @@ export class ShellStore extends ComponentStore<ShellState> {
             next: (health: Health) =>
               this.patchState({
                 loading: false,
-                ready: true,
+                ready: health.status.ready,
                 empty: true,
-                errorMessage: '',
+                errorMessage: health.status === HealthStatus.Unknown ? HealthStatus.Unknown.label : '',
                 apiStatus: health.status,
               }),
             error: (err: unknown) =>
@@ -70,7 +71,7 @@ export class ShellStore extends ComponentStore<ShellState> {
                 ready: false,
                 empty: true,
                 errorMessage: getApiErrorMessage(err),
-                apiStatus: '',
+                apiStatus: HealthStatus.Unknown,
               }),
           }),
         ),
