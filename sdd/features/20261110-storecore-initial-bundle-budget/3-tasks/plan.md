@@ -7,4 +7,4 @@
 5. Add focused route-boundary tests.
 6. Run local quality gates and compare production bundle output.
 7. Run independent final bug/product and security reviews; resolve all P0–P3 findings.
-8. Create the PR and pass candidate CI; archive the completed SDD, rerun exact-head CI for that archive commit, merge only on green, and verify master CI.
+8. Create the PR, pass candidate CI and archive the completed SDD. Delivery then reruns exact-head CI for the archive commit, merges only on green and verifies master CI.

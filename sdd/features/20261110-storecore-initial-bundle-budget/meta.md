@@ -1,7 +1,7 @@
 # StoreCore initial bundle budget
 
 - Feature: `20261110-storecore-initial-bundle-budget`
-- Status: `implementation`
+- Status: `completed`
 - Project mode: `brownfield`
 - Branch: `codex/storecore-initial-bundle-budget`
 - Scope: StoreCore frontend route composition and production bundle only.
@@ -34,3 +34,5 @@
 - Local unit tests: `167` files, `1129` tests passing.
 - Candidate production initial bundle: `572.76 kB`, under the unchanged `700 kB` warning budget.
 - Independent Bugbot and Security reviews: `APPROVE`, no P0-P3 findings.
+- Candidate commit: `48c7e2c969db85eb65d9d777a9687d799a731ce3`.
+- Candidate GitHub Verify: `42755261209`; backend, frontend and unified-access-real-e2e passed.

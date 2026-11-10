@@ -13,7 +13,12 @@
 - T04 completed: focused tests resolve all 12 loaders and assert route guard metadata.
 - T05 completed: architecture, lint, full unit suite and production build passed.
 - T06 completed: independent Bugbot and Security reviews returned `APPROVE`, no P0-P3.
-- T07 in progress: PR and hosted-CI lifecycle.
+- T07 completed: PR #236 candidate run `42755261209` passed backend, frontend and unified-access-real-e2e; SDD prepared for archive.
+
+## Delivery follow-up
+
+- The archive commit must pass exact-head GitHub Verify before merge.
+- The resulting `master` commit must pass post-merge GitHub Verify.
 
 ## Candidate measurement
 

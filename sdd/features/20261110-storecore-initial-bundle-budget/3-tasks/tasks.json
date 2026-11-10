@@ -1,6 +1,6 @@
 {
   "feature": "20261110-storecore-initial-bundle-budget",
-  "status": "in_progress",
+  "status": "completed",
   "tasks": [
     {"id": "T01", "title": "Measure production baseline", "status": "completed", "evidence": "774.07 kB initial; 700 kB warning budget"},
     {"id": "T02", "title": "Approve functional and technical specifications", "status": "completed", "depends_on": ["T01"], "evidence": "Independent functional and technical reviews APPROVE; no P0-P3"},
@@ -8,6 +8,6 @@
     {"id": "T04", "title": "Add focused route-boundary tests", "status": "completed", "depends_on": ["T03"], "evidence": "2 focused tests pass and resolve all 12 dynamic loaders"},
     {"id": "T05", "title": "Run local build, tests, architecture and bundle gates", "status": "completed", "depends_on": ["T04"], "evidence": "Architecture 9/9, lint pass, 167 test files and 1129 tests pass, production initial bundle 572.76 kB"},
     {"id": "T06", "title": "Complete independent bug/product and security reviews", "status": "completed", "depends_on": ["T05"], "evidence": "Independent Bugbot and Security reviews APPROVE; no P0-P3"},
-    {"id": "T07", "title": "Archive SDD, ship PR, pass exact-head and master CI", "status": "in_progress", "depends_on": ["T06"]}
+    {"id": "T07", "title": "Ship PR, pass candidate CI and archive SDD", "status": "completed", "depends_on": ["T06"], "evidence": "PR #236 candidate run 42755261209 passed backend, frontend and unified-access-real-e2e; feature documentation prepared for archive"}
   ]
 }
