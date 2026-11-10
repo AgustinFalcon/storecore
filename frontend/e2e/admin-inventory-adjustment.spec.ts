@@ -2,15 +2,18 @@ import { expect, Page, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { CapabilityModuleId } from '../src/app/domain/user/capability-module-id';
 import { CapabilityModuleState } from '../src/app/domain/user/capability-module-state';
+import { InventoryAdjustmentLookup, InventoryAdjustmentOutcome } from '../src/app/domain/user/inventory-adjustment';
+import { InventoryState } from '../src/app/domain/catalog/catalog-states';
+import { HealthStatus } from '../src/app/domain/health/health-status';
 import { UserRole } from '../src/app/domain/user/user-role';
 const envelope = (data: unknown) => ({ code: 200, data, message: null, errorCode: null, retryable: null, traceId: null });
-const inventory = { items: [{ variantId: '42', sku: 'WEB-KIT', productName: 'Kit', variantLabel: 'Grande', state: 'KNOWN', available: 8, reserved: 3, safety: 2, onHand: 11, saleable: 6 }], total: 1, page: 0, size: 50, truncated: false };
+const inventory = { items: [{ variantId: '42', sku: 'WEB-KIT', productName: 'Kit', variantLabel: 'Grande', state: InventoryState.Known.wire, available: 8, reserved: 3, safety: 2, onHand: 11, saleable: 6 }], total: 1, page: 0, size: 50, truncated: false };
 async function setup(page: Page): Promise<void> {
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/internal/me')) return route.fulfill({ json: envelope({ id: 'inventory-user', roles: [UserRole.Operator.wire] }) });
     if (path.endsWith('/internal/auth/csrf')) return route.fulfill({ json: envelope({}), headers: { 'X-CSRF-Token': 'inventory-csrf' } });
-    if (path.endsWith('/health')) return route.fulfill({ json: envelope({ status: 'UP' }) });
+    if (path.endsWith('/health')) return route.fulfill({ json: envelope({ status: HealthStatus.Up.wire }) });
     if (path.endsWith('/catalog/categories')) return route.fulfill({ json: envelope([]) });
     if (path.endsWith('/user/capabilities')) return route.fulfill({ json: envelope([{ module: CapabilityModuleId.ManualFulfillment.wire, state: CapabilityModuleState.Active.wire, configVersion: 1 }]) });
     if (path.endsWith('/user/inventory')) return route.fulfill({ json: envelope(inventory) });
@@ -30,7 +33,7 @@ for (const width of [320, 390, 768, 1440]) {
     let posts = 0;
     await page.route('**/user/inventory/42/adjustments', async route => {
       posts++; const body = route.request().postDataJSON();
-      await route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
+      await route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: InventoryAdjustmentOutcome.Applied.wire, reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
     });
     await page.goto('/user/inventory'); await review(page);
     await expect(page.getByRole('heading', { name: 'Revisar ajuste', exact: true })).toBeFocused();
@@ -43,14 +46,40 @@ for (const width of [320, 390, 768, 1440]) {
     expect(posts).toBe(1); await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).not.toBeVisible(); await expect(page.getByRole('button', { name: 'Ajustar disponible de WEB-KIT', exact: true })).toBeFocused();
   });
 }
+test('successful adjustment keeps its opener focusable while inventory refresh is pending', async ({ page }) => {
+  await setup(page); let posts = 0;
+  await page.route('**/user/inventory/42/adjustments', async route => {
+    posts++; const body = route.request().postDataJSON();
+    await route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: InventoryAdjustmentOutcome.Applied.wire, reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
+  });
+  await page.goto('/user/inventory'); await review(page);
+  let releaseRefresh!: () => void; let markStarted!: () => void;
+  const refreshGate = new Promise<void>(resolve => { releaseRefresh = resolve; });
+  const refreshStarted = new Promise<void>(resolve => { markStarted = resolve; });
+  await page.route(/\/api\/v1\/user\/inventory(?:\?.*)?$/, async route => { markStarted(); await refreshGate; await route.fulfill({ json: envelope(inventory) }); });
+  await page.getByRole('button', { name: 'Confirmar ajuste', exact: true }).click();
+  await refreshStarted;
+  await expect(page.getByRole('heading', { name: 'Ajuste registrado', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  const opener = page.getByRole('button', { name: 'Ajustar disponible de WEB-KIT', exact: true });
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(opener).toBeFocused();
+  await expect(opener).toHaveAttribute('aria-disabled', 'true');
+  await opener.dispatchEvent('click');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  expect(posts).toBe(1);
+  releaseRefresh();
+  await expect(opener).toHaveAttribute('aria-disabled', 'false');
+  await expect(opener).toBeFocused();
+});
 test('lost response survives closing and reload, NOT_FOUND keeps uncertainty, replay retains exact command', async ({ page }) => {
   await setup(page); const bodies: unknown[] = [];
   await page.route('**/user/inventory/42/adjustments', async route => {
     const body = route.request().postDataJSON(); bodies.push(body);
     if (bodies.length === 1) return route.abort('failed');
-    return route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
+    return route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: InventoryAdjustmentOutcome.Applied.wire, reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
   });
-  await page.route('**/user/inventory/42/adjustments/*', route => route.fulfill({ json: envelope({ lookup: 'NOT_FOUND', receipt: null }) }));
+  await page.route('**/user/inventory/42/adjustments/*', route => route.fulfill({ json: envelope({ lookup: InventoryAdjustmentLookup.NotFound.wire, receipt: null }) }));
   await page.goto('/user/inventory'); await review(page); await page.getByRole('button', { name: 'Confirmar ajuste', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Resultado pendiente de comprobar', exact: true })).toBeVisible(); await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Ajustar disponible de WEB-KIT', exact: true })).toBeDisabled(); await page.reload();

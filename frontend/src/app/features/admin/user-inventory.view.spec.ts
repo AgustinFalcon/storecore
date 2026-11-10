@@ -66,6 +66,24 @@ describe('User inventory read-only presentation', () => {
     button?.click(); expect(retry).toHaveBeenCalledOnce();
   });
 
+  it('keeps the adjustment opener focusable but blocks activation during a transient refresh', () => {
+    const fixture = render();
+    fixture.componentRef.setInput('adjustmentAvailable', true);
+    fixture.detectChanges();
+    const adjust = vi.fn(); fixture.componentInstance.adjust.subscribe(adjust);
+    const opener = fixture.nativeElement.querySelector('[aria-label="Ajustar disponible de WEB-A"]') as HTMLButtonElement;
+    opener.focus();
+    fixture.componentRef.setInput('state', { ...ready, loading: true, readState: InventoryReadState.Loading });
+    fixture.detectChanges();
+    expect(document.activeElement).toBe(opener);
+    expect(opener.getAttribute('aria-disabled')).toBe('true');
+    opener.click(); expect(adjust).not.toHaveBeenCalled();
+    fixture.componentRef.setInput('state', ready); fixture.detectChanges();
+    expect(document.activeElement).toBe(opener);
+    expect(opener.getAttribute('aria-disabled')).toBe('false');
+    opener.click(); expect(adjust).toHaveBeenCalledOnce();
+  });
+
   for (const readState of [InventoryReadState.AccessDenied, InventoryReadState.Unknown]) {
     it(`hides a previous snapshot for ${readState.label}`, () => {
       const fixture = render({ readState });

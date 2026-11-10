@@ -95,3 +95,4 @@
   non-failing 774.07 kB warning remains). Two independent GPT-6.1 Sol medium reviews
   approved the harness change with no P0–P3. A new exact-head hosted Verify remains
   mandatory before merge.
+- 2026-11-10 — Post-merge Verify `42895514198` revealed the same lifecycle invariant at the shell boundary: a guarded `/user/*` navigation had already accepted realm authority, but `ShellComponent.ngOnInit` unconditionally called `rehydrate()` and could rotate USER CSRF a second time while fulfillment remained actionable. The shell now calls `navigationState()`, which probes on an indeterminate fresh boot and reuses an already accepted closed state. A focused shell regression proves initialization cannot invoke the destructive second hydration. Local frontend architecture/lint/build PASS, 174 files / 1,167 tests PASS and Playwright 66/66 PASS; the real PostgreSQL/Spring/browser follow-up gate remains pending.

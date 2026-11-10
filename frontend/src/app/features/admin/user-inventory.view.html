@@ -46,7 +46,7 @@
               <td data-label="Disponibilidad"><span class="inventory__badge" [attr.data-tone]="row.availability.tone">{{ row.availability.label }}</span></td>
               <td data-label="Disponible">{{ row.availableQuantity ?? 'No informado' }}</td><td data-label="Reservado">{{ row.reservedQuantity ?? 'No informado' }}</td><td data-label="Stock de seguridad">{{ row.safetyStock ?? 'No informado' }}</td>
               <td data-label="Existencias">{{ row.onHand ?? 'No informado' }}</td><td data-label="Vendible">{{ row.saleable ?? 'No informado' }}</td><td data-label="Actualizado">{{ row.updatedAt ?? 'No informado' }}</td>
-              @if (adjustmentAvailable || adjustmentPending) { <td data-label="Acciones"><button type="button" [disabled]="!canAdjust(row)" [attr.aria-label]="'Ajustar disponible de ' + row.sku" (click)="adjust.emit(row)">Ajustar disponible</button></td> }
+              @if (adjustmentAvailable || adjustmentPending) { <td data-label="Acciones"><button type="button" [attr.aria-disabled]="!canAdjust(row)" [attr.aria-label]="'Ajustar disponible de ' + row.sku" (click)="requestAdjustment(row)">Ajustar disponible</button></td> }
             </tr>
           }</tbody>
         </table>
