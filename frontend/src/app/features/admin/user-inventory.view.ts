@@ -25,6 +25,7 @@ export class UserInventoryViewComponent {
   @Output() readonly clearFilters = new EventEmitter<void>();
   readonly filters = InventoryFilter.values;
   canAdjust(row: InventoryRow): boolean { return this.adjustmentAvailable && !this.adjustmentPending && this.state.readState.isReady && !!row.variantId.trim() && row.availableQuantity !== null && row.reservedQuantity !== null && row.safetyStock !== null; }
+  requestAdjustment(row: InventoryRow): void { if (this.canAdjust(row)) this.adjust.emit(row); }
   get unknownReadState(): boolean { return this.state.readState === InventoryReadState.Unknown; }
 
   get visibleRows(): readonly InventoryRow[] {

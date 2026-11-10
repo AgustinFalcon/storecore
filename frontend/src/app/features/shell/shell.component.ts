@@ -45,7 +45,7 @@ export class ShellComponent implements OnInit {
     this.theme.apply();
     this.store.loadHealth();
     this.store.loadFacets();
-    this.access.rehydrate().subscribe({
+    this.access.navigationState().subscribe({
       next: (state) => {
         if (state.permits(AccessContext.Customer)) this.cart.load();
         if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login') && matchedSurface(this.router.routerState.snapshot.root, SurfaceTarget.Real) !== SurfaceIdentity.Unknown) {

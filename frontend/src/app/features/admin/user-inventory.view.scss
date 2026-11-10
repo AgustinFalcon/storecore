@@ -4,6 +4,7 @@
 button, input, select { font: inherit; }
 button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-theme); cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
+button[aria-disabled=true] { cursor: not-allowed; opacity: .65; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--sc-color-focus); outline-offset: 3px; }
 .inventory__refresh { flex-shrink: 0; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-theme); }
 .inventory__notice { background: var(--sc-color-info-soft); border: 1px solid var(--sc-color-info); border-radius: var(--sc-radius-lg); padding: 1.25rem; margin-block: 1rem; }
