@@ -1,7 +1,7 @@
 # StoreCore local commerce boundary hardening
 
 - Feature: `20261109-storecore-local-commerce-boundary-hardening`
-- Status: `building`
+- Status: `complete`
 - Project mode: `brownfield`
 - Proposed backlog: `TODO-047`
 - Base: `64116491a5356fe15b091fe9553e30f0840fba24`
@@ -25,5 +25,7 @@ or merge.
 Specification GO: exact head `1b8236eaaba8806185d32754f9d286cbcd18d407`
 received two independent GPT-6.1 Sol medium `APPROVE` reviews with no P0–P3.
 
-Implementation T02–T06 is locally complete and awaiting exact-head code/security/UX
-reviews and hosted CI. T07 remains open; no archive or merge is claimed.
+Implementation T01–T07 is complete. Candidate
+`fd040275806b01999a79836d0cfc5fd80e061f41` passed hosted Verify `42738829321` and
+two independent final GPT-6.1 Sol reviews. The documentation archive head still
+requires its own Verify before merge; deploy and homologation remain excluded.

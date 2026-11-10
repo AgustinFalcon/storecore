@@ -79,3 +79,9 @@
   `42738460008` was cancelled. Corrected gates: architecture 9/9, lint,
   **1127/1127**, production build PASS; the non-failing bundle warning is 774.07 kB
   against the 700 kB warning budget. Exact-head CI and both reviews must repeat.
+- 2026-11-09 — Candidate `fd040275806b01999a79836d0cfc5fd80e061f41`
+  received two independent GPT-6.1 Sol medium `APPROVE` reviews with no P0–P3.
+  GitHub Verify `42738829321` passed backend, frontend and unified-access-real-e2e;
+  the previously failing logout cases pass and CI stopped its containers. T07 is
+  complete. The WIP is archived with evidence; the documentation-only archive head
+  must repeat Verify before merge.

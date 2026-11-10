@@ -9,9 +9,11 @@
 
 ## Features diferidos (no ejecutables en core 1.0.0)
 
-- TODO-047 [high] [building] `storecore-local-commerce-boundary-hardening`: checkout
-  sellability/removal, strict cart/receipt wire, role-aligned navigation and local
-  presentation integrity. Spec GO at `1b8236e`; no external activation.
+- TODO-047 [high] [done] `storecore-local-commerce-boundary-hardening`: checkout
+  sellability/removal, strict cart/receipt wire, role-aligned navigation, local
+  presentation integrity and CSRF navigation race closure. PR #235 candidate
+  `fd04027`, Verify `42738829321` 3/3 and dual final review APPROVE; no external
+  activation, deploy or homologation.
 
 - TODO-044 [high] [done] `commerce-closed-states-and-fulfillment-eligibility`: implementación de PR #171 revalidada sobre PR #231 head `9108798`, merge `eca9db9`; Verify #594 y close-out candidato `4debf9b`/run `42653866473` success. CFE 4 journeys reales + 1 Unknown MockHttp, acceso 12/12, backend 253/253, PostgreSQL 16 y migraciones clean/upgrade PASS. Archivado con doble review final; no acredita CI push master, homologación, release, credenciales live ni activación.
 - TODO-045 [high] [done] `commerce-rma-item-disposition-and-restock`: clasificación por ítem, reposición RESTOCK-only, auditoría, idempotencia, recuperación y carreras cerradas en `sdd/features/20261109-commerce-rma-item-disposition-and-restock/`. PR #233 candidato `fc80316`, Verify `42666041072` 3/3; comandos legacy INSPECTED/ADJUSTED permanecen rechazados.
