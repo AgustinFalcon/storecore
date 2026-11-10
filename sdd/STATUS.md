@@ -26,7 +26,7 @@ Desde 2026-10-03, el gate de revisión para PRs nuevos es **dos revisiones indep
 
 - `sdd/wip/20260923-storecore-frontend-ux-system-v1/` conserva la procedencia visual Stitch; su inventario de 22 rutas es histórico.
 - La aceptación ejecutable de las 26 superficies Demo está en `sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/frontend-phase1-client-presentation-closure-20261106.md`; no acredita paridad backend ni proveedores reales.
-- El manifiesto PSD registra 25 superficies con ruta productiva y recovery bloqueado por contrato de email. PSD y Showcase mantienen cierre documental pendiente de sus registros finales propios.
+- El manifiesto PSD registra 25 superficies con ruta productiva y recovery bloqueado por contrato de email. PSD quedó archivado en `sdd/features/20261108-storecore-productive-surface-data-parity/`; Showcase quedó archivado en `sdd/features/20261108-storecore-local-showcase-environment/` como completado mediante hardening sucesor. Ninguno acredita proveedores live ni homologación.
 - La navegación paginada local está cerrada en `sdd/features/20261109-storecore-bounded-list-navigation/` (PR #234, candidato `4e99400`, Verify `42675235368`).
 
 ## Gate actual

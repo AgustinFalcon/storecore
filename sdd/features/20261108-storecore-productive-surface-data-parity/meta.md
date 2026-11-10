@@ -1,7 +1,7 @@
 # StoreCore productive surface data parity
 
 Feature: `20261108-storecore-productive-surface-data-parity`
-Status: `implemented_local_closeout_pending`
+Status: `completed`
 Branch: `codex/storecore-production-data-coverage`
 Owner: StoreCore core maintainers.
 
@@ -24,6 +24,8 @@ fixture when an API read fails.
   `Unknown` case. Views do not compare wire strings.
 
 
-## Documentary close-out residual — 2026-11-09
+## Documentary close-out — 2026-11-10
 
-All task entries record local implementation evidence. This WIP remains unarchived: its final PR candidate review records (provider/model/effort, base/head, scope, checks and limits) must be reconciled in this feature before archive. A green later master or CFE run does not substitute for feature-specific acceptance. Historical pending/failed entries remain preserved.
+PR #231 final head `9108798818b0217dcf5bb4685f59a195d63637ae` passed Verify `42538029894` (backend, frontend and unified-access-real-e2e) and merged as `eca9db9f0ba51023c8b785831003cb04d8ba0660`.
+
+Independent retrospective GPT-6.1 Sol medium code/product and security reviews on 2026-11-10 inspected the exact diff from `e8d2dcd` to `9108798` and returned `APPROVE` with no P0-P3 findings for the implemented local scope. They do not claim live Mercado Libre, payments, ARCA, carriers, BlackStore activation, deployment or homologation.

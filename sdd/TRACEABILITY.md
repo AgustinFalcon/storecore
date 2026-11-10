@@ -22,7 +22,7 @@
 | `web-cross-sell-discounts` | TODO-033 deferred | relation/eligibility/stacking/priority/margin/snapshot/reversal |
 | `commercial-calendar` | TODO-034 deferred | events/campaigns configurables, timezone/preflight/kill/rollback |
 | ML virtual kits | TODO-035 deferred | feature separada, sin inferencia en catálogo core |
-| favorites | TODO-036 done; PSD-T02 + PSD-T08 | HTTP/UI CUSTOMER, V12, add/remove/reload local; cierre documental global PSD pendiente |
+| favorites | TODO-036 done; PSD-T02 + PSD-T08 | HTTP/UI CUSTOMER, V12, add/remove/reload local; PSD archivado en `sdd/features/20261108-storecore-productive-surface-data-parity/` |
 | loyalty/carriers | TODO-037..038 deferred | sin DDL/tarea core |
 | navegación paginada pública/admin/inventario | TODO-046; `sdd/features/20261109-storecore-bounded-list-navigation/` | PR #234, candidato `4e99400`, Verify `42675235368`; sin nuevo write API ni proveedor |
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |

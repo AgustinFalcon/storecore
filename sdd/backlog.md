@@ -26,7 +26,7 @@
 - TODO-033 [medium] [deferred] `web-cross-sell-discounts`: relación de productos, elegibilidad, descuento, stacking/prioridad/margen, snapshots/reversal. ML virtual kits separado.
 - TODO-034 [medium] [deferred] `commercial-calendar`: eventos/campañas definidos por merchant, timezone/preflight/activación/kill switch/rollback; Black Friday configurable, nunca autónomo/hardcodeado.
 - TODO-035 [medium] [deferred] ML virtual kits.
-- TODO-036 [low] [done] Favorites: PSD-T02 implementó HTTP CUSTOMER, UI productiva y V12; PSD-T08 registra add/remove/reload real local. Evidencia en `sdd/wip/20261108-storecore-productive-surface-data-parity/`; cierre documental global PSD pendiente de sus registros finales propios.
+- TODO-036 [low] [done] Favorites: PSD-T02 implementó HTTP CUSTOMER, UI productiva y V12; PSD-T08 registra add/remove/reload real local. Evidencia archivada en `sdd/features/20261108-storecore-productive-surface-data-parity/`.
 - TODO-037 [medium] [deferred] Loyalty ledger.
 - TODO-038 [medium] [deferred] Integraciones reales de carrier.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.

@@ -86,3 +86,11 @@
 ## 2026-11-09 — documentary reconciliation
 
 Local implementation is recorded as done in tasks.json. Earlier pending-review/CI statements are historical; this reconciliation has not established a feature-specific final close-out record. Preserve the own final candidate, reviews with provider/model/effort/base/head/scope/checks and CI evidence before declaring archive. Later CFE, RMA or bounded-navigation acceptance does not automatically close this WIP. No new test execution, provider activation or homologation is claimed here.
+
+## 2026-11-10 — retrospective close-out via successor hardening
+
+- PR #230 head `0b3e30adb7db5b38c55090ca431be97045cb9ea1` passed Verify `42455936812` 3/3 and merged as `e8d2dcd`.
+- Two independent GPT-6.1 Sol medium retrospective reviews found two P2 defects: inactive products could be rediscovered as absent and have fixture stock restored, and CI action pins were relaxed from immutable SHAs to `@v4`.
+- PSD head `9108798818b0217dcf5bb4685f59a195d63637ae` replaced public existence lookup with ADMIN detail and preservation assertions. CI commits `57cca3f` and `5bd8fcd` restored immutable action pins.
+- Current master `1b1063946e3486f9ef4c2ca61aad66f14260199a` contains both fixes and passed Verify `42756672557`. Showcase closes through integrated successors, not by rewriting the verdict of `0b3e30a`.
+- External providers, homologation and deployment remain excluded.

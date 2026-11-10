@@ -1,6 +1,6 @@
 {
   "feature": "20261108-storecore-productive-surface-data-parity",
-  "status": "implemented_local",
+  "status": "completed",
   "execution_strategy": "sequential_vertical_slices",
   "stats": { "total": 10, "done": 10, "in_progress": 0, "pending": 0 },
   "tasks": [
