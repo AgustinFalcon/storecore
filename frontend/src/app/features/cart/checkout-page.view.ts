@@ -35,4 +35,12 @@ export class CheckoutPageViewComponent {
       && this.state.addresses.some((address) => address.id === this.state.addressId)
       && this.state.currency.length > 0;
   }
+
+  get readError(): string {
+    return this.state.failureKind === CartFailureKind.Load ? this.state.errorMessage : '';
+  }
+
+  get correctiveError(): string {
+    return this.state.failureKind === CartFailureKind.Load ? '' : this.state.errorMessage;
+  }
 }

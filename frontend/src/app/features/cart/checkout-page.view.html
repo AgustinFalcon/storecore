@@ -12,7 +12,10 @@
       <a routerLink="/login">Entrar como cliente</a>
     }
   }
-  <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="retry.emit()" />
+  <sc-feature-status [loading]="state.loading" [error]="readError" (retry)="retry.emit()" />
+  @if (correctiveError) {
+    <p class="status status--error" role="alert">{{ correctiveError }}</p>
+  }
   <div class="sc-checkout__layout">
     <form class="sc-panel" (submit)="$event.preventDefault(); canPay && pay.emit()">
       <h2>Entrega</h2>

@@ -61,3 +61,12 @@
   773.58 kB against the 700 kB warning budget. The real E2E cannot run locally
   because `psql` is absent, so the corrected exact head must prove it in hosted CI
   and repeat both independent reviews before T07 can close.
+- 2026-11-09 — The final coordinated review of `8d2d1a5c081f5879d11e9cc8279c6237d029107a`
+  approved security but found one P3 product ambiguity: checkout rendered the generic
+  read retry beside the closed recovery action. `CartFailureKind.Load` now owns the
+  generic read retry; checkout replay and unavailable-product correction render only
+  their one specific CTA. Two render tests cover both branches. The superseded hosted
+  run `42737660240` was cancelled to release resources. Corrected frontend gates:
+  architecture 9/9, lint, **1127/1127**, production build PASS; the non-failing bundle
+  warning is 773.93 kB against the 700 kB warning budget. A new exact-head CI and two
+  fresh independent reviews remain mandatory.
