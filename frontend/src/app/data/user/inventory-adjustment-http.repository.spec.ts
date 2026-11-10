@@ -12,7 +12,7 @@ describe('InventoryAdjustmentHttpRepository', () => {
     let outcome = InventoryAdjustmentOutcome.Unknown; repository.submit(command).subscribe(value => outcome = value.outcome);
     const request = http.expectOne(`${environment.apiBaseUrl}/user/inventory/42/adjustments`);
     expect(request.request.body).toEqual({ commandId: command.commandId, quantityDelta: -2, expected: command.expected, reason: 'Conteo' });
-    request.flush({ code: 409, data: { commandId: command.commandId, variantId: '42', state: 'REJECTED', reason: 'BALANCE_CHANGED', recordedAt: '2026-11-10T00:00:00Z' } }, { status: 409, statusText: 'Conflict' });
+    request.flush({ code: 409, data: { commandId: command.commandId, variantId: '42', state: 'REJECTED', reason: 'BALANCE_CHANGED', before: command.expected, after: null, ledgerId: null, recordedAt: '2026-11-10T00:00:00Z' } }, { status: 409, statusText: 'Conflict' });
     expect(outcome).toBe(InventoryAdjustmentOutcome.Rejected); http.verify();
   });
 });
