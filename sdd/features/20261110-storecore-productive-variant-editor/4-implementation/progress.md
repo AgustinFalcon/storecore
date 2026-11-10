@@ -7,7 +7,7 @@
 - [x] Identity/SKU preservation and Unknown rejection covered by focused tests.
 - [x] Complete frontend gates.
 - [x] Two independent exact-head code reviews on `06432e374718a23d1467157dc42cd848a6715e85`.
-- [ ] Candidate CI and SDD archive.
+- [x] Candidate CI and SDD archive.
 - [ ] Merge and master CI.
 
 ## Initial evidence
@@ -28,3 +28,10 @@
 - Bug/product: `APPROVE`, no pending P0–P3; focused Angular 2 files / 5 tests passing independently.
 - Security/architecture: `APPROVE`, no pending P0–P3; architecture 9/9 and data-preservation assertions passing independently.
 - Reports: `4-implementation/reviews/bug-product.md` and `4-implementation/reviews/security.md`.
+
+## Candidate CI
+
+- Pull request: `#238`.
+- Exact candidate: `a863a8d05aa70c302b468ed8ee175821dac7f78e`.
+- GitHub Verify run `42833927010`: `backend`, `frontend` and `unified-access-real-e2e` successful (3/3).
+- The browser matrix completed against real PostgreSQL, Spring and Angular HTTPS. This evidence does not authorize external providers, production deployment or homologation.

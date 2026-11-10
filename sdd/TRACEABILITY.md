@@ -25,6 +25,7 @@
 | favorites | TODO-036 done; PSD-T02 + PSD-T08 | HTTP/UI CUSTOMER, V12, add/remove/reload local; PSD archivado en `sdd/features/20261108-storecore-productive-surface-data-parity/` |
 | loyalty/carriers | TODO-037..038 deferred | sin DDL/tarea core |
 | navegación paginada pública/admin/inventario | TODO-046; `sdd/features/20261109-storecore-bounded-list-navigation/` | PR #234, candidato `4e99400`, Verify `42675235368`; sin nuevo write API ni proveedor |
+| edición productiva de variantes existentes | TODO-048; `sdd/features/20261110-storecore-productive-variant-editor/` | PR #238, candidato `a863a8d`, Verify `42833927010` 3/3; nombre/estado/atributos únicamente, identidad/SKU/stock/precio/proveedores excluidos |
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
 | Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`. PIC-001..010 y L3 locales done: HTTP 200/304/409/410/429 en Testcontainers, V7 deja `future_optional=false` y el módulo `DISABLED`, outbox local PIC-009. Companion live, fiscal y `/sdd.finish` NO-GO |
