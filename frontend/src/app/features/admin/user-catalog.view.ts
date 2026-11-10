@@ -2,10 +2,10 @@ import { BoundedPaginationComponent } from '../../shared/bounded-pagination.comp
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { ProductDetail } from '../../domain/catalog/product-detail.entity';
+import { ProductDetail, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
-import { ProductStatus } from '../../domain/catalog/catalog-states';
+import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -14,6 +14,7 @@ import { ProductStatus } from '../../domain/catalog/catalog-states';
   templateUrl: './user-catalog.view.html',
 })
 export class UserCatalogViewComponent {
+  readonly variantStatuses = VariantStatus.selectable;
   @Input({ required: true }) state!: AdminCatalogState;
   @Output() readonly draftChange = new EventEmitter<ProductDetail>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
@@ -23,6 +24,7 @@ export class UserCatalogViewComponent {
   @Output() readonly saveCategory = new EventEmitter<void>();
   @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
+  @Output() readonly editError = new EventEmitter<string>();
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');
@@ -33,8 +35,59 @@ export class UserCatalogViewComponent {
   }
 
   setActive(active: boolean): void { this.patch({ status: active ? ProductStatus.Active : ProductStatus.Draft, active }); }
-  attributes(value: Readonly<Record<string, unknown>>): readonly [string, string][] {
-    return Object.entries(value).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]);
+  attributes(value: Readonly<Record<string, unknown>>): readonly { key: string; displayValue: string }[] {
+    return Object.entries(value).map(([key, rawValue]) => ({
+      key,
+      displayValue: typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue) ?? '',
+    }));
+  }
+
+  patchVariant(index: number, partial: Partial<ProductVariant>): void {
+    const variants = this.state.draft.variants.map((variant, current) => current === index ? { ...variant, ...partial } : variant);
+    this.patch({ variants });
+  }
+
+  setVariantStatus(index: number, raw: unknown): void {
+    this.patchVariant(index, { status: VariantStatus.fromWire(raw) });
+  }
+
+  patchAttributeKey(variantIndex: number, attributeIndex: number, key: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    const entries = Object.entries(variant.attributes);
+    const current = entries[attributeIndex];
+    if (!current) return;
+    if (key !== current[0] && Object.hasOwn(variant.attributes, key)) {
+      this.editError.emit(`El atributo “${key}” ya existe en esta variante.`);
+      return;
+    }
+    entries[attributeIndex] = [key, current[1]];
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(entries) });
+  }
+
+  patchAttributeValue(variantIndex: number, attributeIndex: number, value: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    const entries = Object.entries(variant.attributes);
+    const current = entries[attributeIndex];
+    if (!current) return;
+    entries[attributeIndex] = [current[0], value];
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(entries) });
+  }
+
+  addAttribute(variantIndex: number): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    let suffix = 1;
+    let key = 'Característica';
+    while (Object.hasOwn(variant.attributes, key)) key = `Característica ${++suffix}`;
+    this.patchVariant(variantIndex, { attributes: { ...variant.attributes, [key]: '' } });
+  }
+
+  removeAttribute(variantIndex: number, key: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(Object.entries(variant.attributes).filter(([name]) => name !== key)) });
   }
 
   patchPrice(partial: Partial<ProductDetail['price']>): void {

@@ -51,9 +51,42 @@
     <label>Imágenes
       <textarea name="images" [ngModel]="imagesText" (ngModelChange)="setImages($event)"></textarea>
     </label>
-    <ul>@for (variant of state.draft.variants; track variant.id) { <li>{{ variant.sku }} · {{ variant.name }} · {{ variant.status.label }} · {{ variant.availability.label }}
-      <dl>@for (attribute of attributes(variant.attributes); track attribute[0]) { <dt>{{ attribute[0] }}</dt><dd>{{ attribute[1] }}</dd> }</dl>
-    </li> }</ul>
+    <section class="sc-panel" aria-labelledby="variant-editor-title">
+      <h3 id="variant-editor-title">Variantes</h3>
+      <p>La identidad y el SKU se preservan. Podés editar la presentación, su publicación y sus atributos.</p>
+      @if (!state.draft.variants.length) { <p role="status">Este producto todavía no tiene variantes.</p> }
+      @for (variant of state.draft.variants; track variant.id; let variantIndex = $index) {
+        <fieldset class="sc-panel">
+          <legend>{{ variant.sku || variant.id }}</legend>
+          <label>SKU <input [name]="'variantSku-' + variantIndex" [value]="variant.sku" readonly /></label>
+          <label>Nombre
+            <input required [name]="'variantName-' + variantIndex" [ngModel]="variant.name" (ngModelChange)="patchVariant(variantIndex, { name: $event })" />
+          </label>
+          <label>Estado
+            <select [name]="'variantStatus-' + variantIndex" [ngModel]="variant.status.wire" (ngModelChange)="setVariantStatus(variantIndex, $event)">
+              @if (!variant.status.canPersist) { <option [value]="variant.status.wire" disabled>{{ variant.status.label }}</option> }
+              @for (status of variantStatuses; track status.wire) { <option [value]="status.wire">{{ status.label }}</option> }
+            </select>
+          </label>
+          <p>{{ variant.availability.label }}</p>
+          <div>
+            <h4>Atributos</h4>
+            @for (attribute of attributes(variant.attributes); track $index; let attributeIndex = $index) {
+              <div class="sc-panel sc-panel--grid">
+                <label>Nombre
+                  <input required [name]="'attributeKey-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute.key" (ngModelChange)="patchAttributeKey(variantIndex, attributeIndex, $event)" />
+                </label>
+                <label>Valor
+                  <input [name]="'attributeValue-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute.displayValue" (ngModelChange)="patchAttributeValue(variantIndex, attributeIndex, $event)" />
+                </label>
+                <button type="button" class="sc-btn sc-btn--ghost" (click)="removeAttribute(variantIndex, attribute.key)">Quitar atributo</button>
+              </div>
+            }
+            <button type="button" class="sc-btn sc-btn--ghost" (click)="addAttribute(variantIndex)">Agregar atributo</button>
+          </div>
+        </fieldset>
+      }
+    </section>
     <label>Precio base
       <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
     </label>
