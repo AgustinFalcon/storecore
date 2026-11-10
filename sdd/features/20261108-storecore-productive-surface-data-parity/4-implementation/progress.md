@@ -323,3 +323,10 @@
 ## 2026-11-09 — documentary reconciliation
 
 Local implementation is recorded as done in tasks.json. Earlier pending-review/CI statements are historical; this reconciliation has not established a feature-specific final close-out record. Preserve the own final candidate, reviews with provider/model/effort/base/head/scope/checks and CI evidence before declaring archive. Later CFE, RMA or bounded-navigation acceptance does not automatically close this WIP. No new test execution, provider activation or homologation is claimed here.
+
+## 2026-11-10 — final documentary close-out
+
+- PR #231 final head `9108798818b0217dcf5bb4685f59a195d63637ae` passed Verify `42538029894` 3/3 and merged as `eca9db9f`.
+- Two independent retrospective GPT-6.1 Sol medium reviews inspected exact diff `e8d2dcd..9108798`: code/product `APPROVE`, security `APPROVE`, no P0-P3.
+- Review limits remain explicit: local phase-1 authority only; no live provider, deployment, release or homologation. Offer history remains an array contract and external channel observations remain unavailable or unverified by design.
+- The surface manifest distinguishes complete local authority from two external residuals: recovery/email security and live Mercado Libre synchronization.

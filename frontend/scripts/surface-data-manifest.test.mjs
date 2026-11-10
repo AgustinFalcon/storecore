@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const frontendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = resolve(frontendRoot, '..');
-const manifestPath = resolve(repoRoot, 'sdd/wip/20261108-storecore-productive-surface-data-parity/1-functional/surface-data-manifest.json');
+const manifestPath = resolve(repoRoot, 'sdd/features/20261108-storecore-productive-surface-data-parity/1-functional/surface-data-manifest.json');
 const identityPath = resolve(frontendRoot, 'src/app/domain/navigation/surface-identity.ts');
 const routesPath = resolve(frontendRoot, 'src/app/app.routes.ts');
 const loaderPath = resolve(frontendRoot, 'scripts/showcase/load-storecore-showcase.mjs');
