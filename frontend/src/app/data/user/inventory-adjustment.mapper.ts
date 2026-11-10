@@ -13,9 +13,16 @@ export function mapInventoryAdjustmentReceipt(raw: unknown): InventoryAdjustment
   const variantId = typeof value['variantId'] === 'string' ? value['variantId'] : '';
   const recordedAt = typeof value['recordedAt'] === 'string' ? value['recordedAt'] : '';
   const ledgerId = typeof value['ledgerId'] === 'string' && value['ledgerId'].trim() ? value['ledgerId'] : null;
-  if (!isCommandId(commandId) || !variantId.trim() || !recordedAt || !Number.isFinite(Date.parse(recordedAt))) outcome = InventoryAdjustmentOutcome.Unknown;
-  if (outcome === InventoryAdjustmentOutcome.Applied && (!before || !after || !ledgerId || before.reserved !== after.reserved || before.safety !== after.safety)) outcome = InventoryAdjustmentOutcome.Unknown;
-  if (outcome === InventoryAdjustmentOutcome.Rejected && rejection === InventoryAdjustmentRejection.Unknown) outcome = InventoryAdjustmentOutcome.Unknown;
+  const positiveId = (candidate: string | null): boolean => candidate !== null && /^[1-9]\d*$/.test(candidate);
+  if (!isCommandId(commandId) || !positiveId(variantId) || !recordedAt || !Number.isFinite(Date.parse(recordedAt))) outcome = InventoryAdjustmentOutcome.Unknown;
+  if (outcome === InventoryAdjustmentOutcome.Applied && (
+    value['reason'] !== null || !before || !after || !positiveId(ledgerId)
+    || before.reserved !== after.reserved || before.safety !== after.safety
+  )) outcome = InventoryAdjustmentOutcome.Unknown;
+  if (outcome === InventoryAdjustmentOutcome.Rejected && (
+    rejection === InventoryAdjustmentRejection.Unknown || value['after'] !== null || value['ledgerId'] !== null
+    || (rejection === InventoryAdjustmentRejection.BalanceMissing ? value['before'] !== null : !before)
+  )) outcome = InventoryAdjustmentOutcome.Unknown;
   return { commandId, variantId, outcome, rejection, before, after, ledgerId, recordedAt };
 }
 export function mapInventoryAdjustmentLookup(raw: unknown): InventoryAdjustmentResult {

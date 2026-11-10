@@ -12,7 +12,7 @@ import { ReadCapabilitiesUseCase } from '../../domain/user/use-cases/read-capabi
 import { InventoryAdjustmentAttemptJournal } from './inventory-adjustment-attempt';
 import { InventoryAdjustmentStore } from './inventory-adjustment.store';
 const row = mapInventoryRow({ variantId: '42', sku: 'SKU', state: 'KNOWN', available: 8, reserved: 3, safety: 2, onHand: 11, saleable: 6 });
-const receipt = (command: AdjustAvailableStockCommand): InventoryAdjustmentReceipt => mapInventoryAdjustmentReceipt({ commandId: command.commandId, variantId: command.variantId, state: 'APPLIED', before: command.expected, after: { ...command.expected, available: command.expected.available + command.quantityDelta }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' });
+const receipt = (command: AdjustAvailableStockCommand): InventoryAdjustmentReceipt => mapInventoryAdjustmentReceipt({ commandId: command.commandId, variantId: command.variantId, state: 'APPLIED', reason: null, before: command.expected, after: { ...command.expected, available: command.expected.available + command.quantityDelta }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' });
 function setup() {
   sessionStorage.clear();
   const repository = {
@@ -50,6 +50,16 @@ describe('InventoryAdjustmentStore', () => {
     review(store); store.confirm(); expect(store.snapshot.phase).toBe(InventoryAdjustmentPhase.OutcomeUnknown); expect(store.snapshot.pending).toBe(true);
     expect(journal.read('operator', session.authenticationEpoch())).not.toBeNull();
   });
+  it('retains the journal when a matching receipt is malformed', () => {
+    const { store, repository, journal, session } = setup();
+    repository.submit.mockImplementation(command => of(mapInventoryAdjustmentReceipt({
+      commandId: command.commandId, variantId: command.variantId, state: 'REJECTED', reason: 'BALANCE_CHANGED',
+      before: null, after: null, ledgerId: null, recordedAt: '2026-11-10T00:00:00Z',
+    })));
+    review(store); store.confirm();
+    expect(store.snapshot.phase).toBe(InventoryAdjustmentPhase.OutcomeUnknown); expect(store.snapshot.pending).toBe(true);
+    expect(journal.read('operator', session.authenticationEpoch())).not.toBeNull();
+  });
   it('does not POST when journal persistence fails', () => {
     const { store, repository, journal } = setup(); vi.spyOn(journal, 'remember').mockReturnValue(false);
     review(store); store.confirm(); expect(repository.submit).not.toHaveBeenCalled(); expect(store.snapshot.message).toContain('no enviamos');
@@ -66,7 +76,7 @@ describe('InventoryAdjustmentStore', () => {
     expect(store.snapshot.phase).toBe(InventoryAdjustmentPhase.Closed); expect(store.snapshot.receipt).toBeNull(); expect(store.snapshot.row).toBeNull();
   });
   it('preserves delta/reason after a durable conflict and requires another review', () => {
-    const { store, repository } = setup(); repository.submit.mockImplementation(command => of(mapInventoryAdjustmentReceipt({ commandId: command.commandId, variantId: command.variantId, state: 'REJECTED', reason: 'BALANCE_CHANGED', before: { available: 7, reserved: 4, safety: 2 }, recordedAt: '2026-11-10T00:00:00Z' })));
+    const { store, repository } = setup(); repository.submit.mockImplementation(command => of(mapInventoryAdjustmentReceipt({ commandId: command.commandId, variantId: command.variantId, state: 'REJECTED', reason: 'BALANCE_CHANGED', before: { available: 7, reserved: 4, safety: 2 }, after: null, ledgerId: null, recordedAt: '2026-11-10T00:00:00Z' })));
     review(store); store.confirm(); expect(store.snapshot.phase).toBe(InventoryAdjustmentPhase.Conflict); store.confirm(); expect(repository.submit).toHaveBeenCalledTimes(1);
     store.reviewConflict({ ...row, availableQuantity: 7, reservedQuantity: 4 }, true);
     expect(store.snapshot.delta).toBe('-2'); expect(store.snapshot.reason).toBe('Conteo'); expect(store.snapshot.phase).toBe(InventoryAdjustmentPhase.Editing);

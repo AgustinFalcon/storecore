@@ -30,7 +30,7 @@ for (const width of [320, 390, 768, 1440]) {
     let posts = 0;
     await page.route('**/user/inventory/42/adjustments', async route => {
       posts++; const body = route.request().postDataJSON();
-      await route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
+      await route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
     });
     await page.goto('/user/inventory'); await review(page);
     await expect(page.getByRole('heading', { name: 'Revisar ajuste', exact: true })).toBeFocused();
@@ -48,7 +48,7 @@ test('lost response survives closing and reload, NOT_FOUND keeps uncertainty, re
   await page.route('**/user/inventory/42/adjustments', async route => {
     const body = route.request().postDataJSON(); bodies.push(body);
     if (bodies.length === 1) return route.abort('failed');
-    return route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
+    return route.fulfill({ json: envelope({ commandId: body.commandId, variantId: '42', state: 'APPLIED', reason: null, before: body.expected, after: { available: 6, reserved: 3, safety: 2 }, ledgerId: '9', recordedAt: '2026-11-10T00:00:00Z' }) });
   });
   await page.route('**/user/inventory/42/adjustments/*', route => route.fulfill({ json: envelope({ lookup: 'NOT_FOUND', receipt: null }) }));
   await page.goto('/user/inventory'); await review(page); await page.getByRole('button', { name: 'Confirmar ajuste', exact: true }).click();
