@@ -6,7 +6,7 @@
 - [x] Existing variant name/status/attribute editor implemented.
 - [x] Identity/SKU preservation and Unknown rejection covered by focused tests.
 - [x] Complete frontend gates.
-- [ ] Two independent exact-head reviews.
+- [x] Two independent exact-head code reviews on `06432e374718a23d1467157dc42cd848a6715e85`.
 - [ ] Candidate CI and SDD archive.
 - [ ] Merge and master CI.
 
@@ -22,3 +22,9 @@
 - Candidate `b5ece03c9088588585897deac773c39fe931ef0f` received two independent GPT-6.1 Sol medium `REQUEST_CHANGES` reviews.
 - Both reproduced two P2 defects: duplicate-key rename could collapse data, and editing one attribute stringified untouched JSON values.
 - The candidate was not pushed or opened as a PR. The implementation now updates original entries, preserves untouched raw values and rejects collisions with visible feedback; regression tests cover both findings.
+
+## Review iteration 2
+
+- Bug/product: `APPROVE`, no pending P0–P3; focused Angular 2 files / 5 tests passing independently.
+- Security/architecture: `APPROVE`, no pending P0–P3; architecture 9/9 and data-preservation assertions passing independently.
+- Reports: `4-implementation/reviews/bug-product.md` and `4-implementation/reviews/security.md`.
