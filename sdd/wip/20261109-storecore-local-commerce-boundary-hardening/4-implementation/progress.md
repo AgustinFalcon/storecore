@@ -37,3 +37,14 @@
   PASS; browser/axe **60/60 PASS**. The non-failing bundle warning is 773.28 kB against
   the 700 kB warning budget. A new exact-head candidate, hosted Verify and two fresh
   independent reviews are still required.
+- 2026-11-09 — Two fresh independent GPT-6.1 Sol medium reviews of `db4f74c926e14d5802e819587e4929347221206f`
+  both requested changes for the same two P2 gaps: multi-unit retired lines lacked an
+  explicit remove-all UI command, and manual promotion creation still used a joined
+  variant/product lock. The cart now exposes an accessible quantity-zero removal and
+  `JdbcPromoService` follows product → variant explicitly; PostgreSQL coverage proves
+  a promotion waiting on its product has not already locked the variant. A corrected
+  head must repeat both independent reviews. Corrected local gates are green: backend
+  Maven **275/275 PASS** (PostgreSQL 16/Testcontainers, 03:55); focused commerce
+  integration **19/19 PASS**; frontend architecture 9/9, lint, **1124/1124**, production
+  build PASS; focused cart/checkout **17/17 PASS**; browser/axe **60/60 PASS**. The
+  non-failing bundle warning is 773.48 kB against the 700 kB warning budget.

@@ -386,6 +386,49 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `manual promotion waits on product before locking its variant`() {
+        val sku = "SKU-PROMO-LOCK-${UUID.randomUUID()}"
+        putProduct(sku, "Ordered promotion lock")
+        val productId = jdbc.queryForObject("SELECT product_id FROM product_variants WHERE sku=?", Long::class.java, sku)!!
+        val from = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
+        val to = from.plusSeconds(3600)
+        val body = """{"listingSku":"$sku","currency":"ARS","priceScope":"DEFAULT","desiredPrice":90,"validFrom":"$from","validTo":"$to"}"""
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            jdbc.dataSource!!.connection.use { blocker ->
+                blocker.autoCommit = false
+                val pid = blocker.createStatement().use { statement -> statement.executeQuery("SELECT pg_backend_pid()").use { rs -> rs.next(); rs.getInt(1) } }
+                blocker.prepareStatement("SELECT id FROM products WHERE id=? FOR UPDATE").use { statement ->
+                    statement.setLong(1, productId)
+                    statement.executeQuery().close()
+                }
+                val pending = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    exchange("/api/v1/user/promos", HttpMethod.POST, body, admin.cookie, admin.csrf)
+                }
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                var waiting = false
+                while (!waiting && System.nanoTime() < deadline) {
+                    waiting = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) AND query LIKE '%FROM products WHERE id=%FOR NO KEY UPDATE%')", Boolean::class.java, pid) == true
+                    if (!waiting) Thread.sleep(20)
+                }
+                assertTrue(waiting, "promotion must wait on the product before taking the variant lock")
+                jdbc.dataSource!!.connection.use { observer ->
+                    observer.prepareStatement("SELECT id FROM product_variants WHERE sku=? FOR UPDATE NOWAIT").use { statement ->
+                        statement.setString(1, sku)
+                        statement.executeQuery().close()
+                    }
+                }
+                blocker.commit()
+                val created = pending.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(200, created.statusCode.value(), created.body)
+                admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `ml local mapping enforces admin capability same origin csrf and atomic audit`() {
         val sku = "SKU-MAPPING-${UUID.randomUUID()}"
         putProduct(sku, "Local mapping")
