@@ -9,6 +9,10 @@
 
 ## Features diferidos (no ejecutables en core 1.0.0)
 
+- TODO-047 [high] [building] `storecore-local-commerce-boundary-hardening`: checkout
+  sellability/removal, strict cart/receipt wire, role-aligned navigation and local
+  presentation integrity. Spec GO at `1b8236e`; no external activation.
+
 - TODO-044 [high] [done] `commerce-closed-states-and-fulfillment-eligibility`: implementación de PR #171 revalidada sobre PR #231 head `9108798`, merge `eca9db9`; Verify #594 y close-out candidato `4debf9b`/run `42653866473` success. CFE 4 journeys reales + 1 Unknown MockHttp, acceso 12/12, backend 253/253, PostgreSQL 16 y migraciones clean/upgrade PASS. Archivado con doble review final; no acredita CI push master, homologación, release, credenciales live ni activación.
 - TODO-045 [high] [done] `commerce-rma-item-disposition-and-restock`: clasificación por ítem, reposición RESTOCK-only, auditoría, idempotencia, recuperación y carreras cerradas en `sdd/features/20261109-commerce-rma-item-disposition-and-restock/`. PR #233 candidato `fc80316`, Verify `42666041072` 3/3; comandos legacy INSPECTED/ADJUSTED permanecen rechazados.
 - TODO-046 [high] [done] `storecore-bounded-list-navigation`: paginación completa y accesible del catálogo público/admin e inventario sobre los reads HTTP existentes; contrato absoluto de `truncated`, recuperación acotada, actor binding y foco preservado. PR #234 candidato `4e99400`, Verify `42675235368` 3/3; sin DDL ni proveedores.
@@ -20,7 +24,7 @@
 - TODO-033 [medium] [deferred] `web-cross-sell-discounts`: relación de productos, elegibilidad, descuento, stacking/prioridad/margen, snapshots/reversal. ML virtual kits separado.
 - TODO-034 [medium] [deferred] `commercial-calendar`: eventos/campañas definidos por merchant, timezone/preflight/activación/kill switch/rollback; Black Friday configurable, nunca autónomo/hardcodeado.
 - TODO-035 [medium] [deferred] ML virtual kits.
-- TODO-036 [low] [deferred] Favorites.
+- TODO-036 [low] [done] Favorites: PSD-T02 implementó HTTP CUSTOMER, UI productiva y V12; PSD-T08 registra add/remove/reload real local. Evidencia en `sdd/wip/20261108-storecore-productive-surface-data-parity/`; cierre documental global PSD pendiente de sus registros finales propios.
 - TODO-037 [medium] [deferred] Loyalty ledger.
 - TODO-038 [medium] [deferred] Integraciones reales de carrier.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.

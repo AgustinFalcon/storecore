@@ -47,10 +47,16 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         } else {
             productId = existing.first; variantId = existing.second
             jdbc.update("UPDATE products SET brand_id=?,category_id=?,name=?,description=?,base_price=?,status=?,updated_at=now() WHERE id=?", brandId, categoryId, name, description, base, productStatus.name, productId)
-            if (primaryEntry == null) jdbc.update("UPDATE product_variants SET label=?,active=?,updated_at=now() WHERE id=?", name, active ?: true, variantId)
         }
+        // The product UPDATE above owns the parent lock. Lock every existing child
+        // before changing variants, then acquire inventory balances only afterwards.
+        jdbc.query("SELECT id FROM product_variants WHERE product_id=? ORDER BY id", { rs, _ -> rs.getLong(1) }, productId).forEach { id ->
+            jdbc.query("SELECT id FROM product_variants WHERE id=? FOR NO KEY UPDATE", { rs, _ -> rs.getLong(1) }, id)
+        }
+        if (existing != null && primaryEntry == null) jdbc.update("UPDATE product_variants SET label=?,active=?,updated_at=now() WHERE id=?", name, active ?: true, variantId)
         jdbc.update("DELETE FROM product_images WHERE product_id=?", productId)
         images.filter { it.startsWith("https://") }.forEachIndexed { index, url -> jdbc.update("INSERT INTO product_images(product_id,url,sort_order,is_primary) VALUES (?,?,?,?)", productId, url, index, index == 0) }
+        val stockChanges = mutableListOf<Triple<Long, Int, String?>>()
         variants.forEachIndexed { index, variant ->
             val variantActive = variantStates[index].active
             val variantSku = variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if (index == 0) sku else return@forEachIndexed
@@ -76,8 +82,11 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
             if (rawQuantity != null) {
                 val quantity = number(rawQuantity)?.intValueExact() ?: throw CommerceValidation("CATALOG_AVAILABLE_QUANTITY_INVALID")
                 val reason = variant["stockAdjustmentReason"]?.toString() ?: if (createdVariant) "INITIAL_CATALOG_STOCK" else null
-                inventory.setAvailableQuantity(targetVariantId, quantity, "USER:$actor", reason)
+                stockChanges += Triple(targetVariantId, quantity, reason)
             }
+        }
+        stockChanges.sortedBy { it.first }.forEach { (id, quantity, reason) ->
+            inventory.setAvailableQuantity(id, quantity, "USER:$actor", reason)
         }
         audit(actor, "CATALOG_PRODUCT_SAVED", "products", sku)
         return product(sku, admin = true)!!

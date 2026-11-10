@@ -38,6 +38,27 @@ function items(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
 
+function requiredRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Respuesta comercial no reconocida.');
+  return value as Record<string, unknown>;
+}
+
+function requiredText(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) throw new Error('Identidad o campo comercial no informado.');
+  return value;
+}
+
+function optionalText(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new Error('Campo comercial no reconocido.');
+  return value.trim() ? value : null;
+}
+
+function money(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error('Importe comercial no informado o inválido.');
+  return value;
+}
+
 export function mapCustomerSession(value: unknown): CustomerSessionResult {
   const row = asRecord(value);
   return {
@@ -132,31 +153,42 @@ export function mapProductDetail(value: unknown): ProductDetail {
 export function mapProductDetails(value: unknown): BoundedRows<ProductDetail> { return mapBoundedRows(value, mapProductDetail); }
 
 function mapCartLine(value: unknown): CartLine {
-  const row = asRecord(value);
+  const row = requiredRecord(value);
+  const quantity = row['quantity'];
+  if (typeof quantity !== 'number' || !Number.isSafeInteger(quantity) || quantity <= 0) throw new Error('Cantidad comercial no informada o inválida.');
+  const originalUnitPrice = money(row['originalUnitPrice']);
+  const discountAmount = money(row['discountAmount']);
+  const effectiveUnitPrice = money(row['effectiveUnitPrice']);
+  // Decimal JSON amounts may differ by floating-point rounding after subtraction.
+  const tolerance = Number.EPSILON * Math.max(originalUnitPrice, effectiveUnitPrice) * 4;
+  if (discountAmount > originalUnitPrice || Math.abs(originalUnitPrice - discountAmount - effectiveUnitPrice) > tolerance) {
+    throw new Error('Importes comerciales contradictorios.');
+  }
   return {
-    sku: text(row['sku']),
-    name: text(row['name']),
-    quantity: num(row['quantity']),
-    originalUnitPrice: num(row['originalUnitPrice']),
-    discountAmount: num(row['discountAmount']),
-    offerRef: text(row['offerRef']) || null,
-    campaignRef: text(row['campaignRef']) || null,
-    effectiveUnitPrice: num(row['effectiveUnitPrice']),
+    sku: requiredText(row['sku']),
+    name: requiredText(row['name']),
+    quantity,
+    originalUnitPrice,
+    discountAmount,
+    offerRef: optionalText(row['offerRef']),
+    campaignRef: optionalText(row['campaignRef']),
+    effectiveUnitPrice,
   };
 }
 
 export function mapCart(value: unknown): Cart {
-  const row = asRecord(value);
-  return { lines: items(row['lines']).map(mapCartLine), currency: text(row['currency']) };
+  const row = requiredRecord(value);
+  if (!Array.isArray(row['lines'])) throw new Error('Líneas del carrito no informadas.');
+  return { lines: row['lines'].map(mapCartLine), currency: requiredText(row['currency']) };
 }
 
 export function mapReceipt(value: unknown): CheckoutReceipt {
-  const row = asRecord(value);
+  const row = requiredRecord(value);
   return {
-    orderId: text(row['orderId']),
-    paymentStatus: PaymentStatus.fromWire(row['paymentStatus']),
-    orderStatus: OrderStatus.fromWire(row['orderStatus']),
-    checkoutUrl: text(row['checkoutUrl']) || null,
+    orderId: requiredText(row['orderId']),
+    paymentStatus: PaymentStatus.fromWire(requiredText(row['paymentStatus'])),
+    orderStatus: OrderStatus.fromWire(requiredText(row['orderStatus'])),
+    checkoutUrl: optionalText(row['checkoutUrl']),
   };
 }
 

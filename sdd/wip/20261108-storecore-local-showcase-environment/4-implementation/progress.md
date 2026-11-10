@@ -82,3 +82,7 @@
   `pendingOrderCreated=false`, and preserved taladro inventory at
   `11 available + 1 reserved = 12 total`. Backend, database and temporary
   container were stopped and removed; ports 8080 and 5434 were closed.
+
+## 2026-11-09 — documentary reconciliation
+
+Local implementation is recorded as done in tasks.json. Earlier pending-review/CI statements are historical; this reconciliation has not established a feature-specific final close-out record. Preserve the own final candidate, reviews with provider/model/effort/base/head/scope/checks and CI evidence before declaring archive. Later CFE, RMA or bounded-navigation acceptance does not automatically close this WIP. No new test execution, provider activation or homologation is claimed here.

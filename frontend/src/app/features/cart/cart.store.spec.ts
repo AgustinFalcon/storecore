@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, of, Subject } from 'rxjs';
+import { BehaviorSubject, map, of, Subject } from 'rxjs';
+import { mapReceipt } from '../../data/mappers/http-mappers';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
@@ -132,6 +133,23 @@ describe('CartStore actor isolation', () => {
     session.commit({ ...actorA }, 'refreshed');
     expect(store.snapshot.addressId).toBe('address-a');
     expect(store.snapshot.idempotencyKey).toBe(key);
+  });
+  it('preserves the attempt and route when receipt translation fails, then reuses the key on retry', () => {
+    store.loadAddresses();
+    const key = store.snapshot.idempotencyKey;
+    checkout.execute.mockReturnValue(of({ orderId: 'order-a', paymentStatus: null, orderStatus: OrderStatus.Created.wire }).pipe(map(mapReceipt)));
+    store.submitCheckout();
+    expect(store.snapshot.idempotencyKey).toBe(key);
+    expect(store.snapshot.receipt).toBeNull();
+    expect(store.snapshot.loading).toBe(false);
+    expect(store.snapshot.errorMessage).toBeTruthy();
+    expect(navigate).not.toHaveBeenCalled();
+    checkout.execute.mockReturnValue(of(receipt));
+    store.submitCheckout();
+    expect(checkout.execute.mock.calls.map(([command]) => command.idempotencyKey)).toEqual([key, key]);
+    expect(store.snapshot.receipt).toEqual(receipt);
+    expect(store.snapshot.idempotencyKey).not.toBe(key);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(['/checkout/result', receipt.orderId]);
   });
   it('shares the closed CUSTOMER authority with controls and explicitly selects it from dual USER context', () => {
     contexts.next(AccessState.resolve(SessionProbe.authenticated(actorA, 'csrf-a'),

@@ -133,8 +133,41 @@ describe('http-mappers', () => {
     expect(product.active).toBe(false);
   });
 
-  it('maps a cart with no lines as empty', () => {
-    expect(mapCart({})).toEqual({ lines: [], currency: '' });
+  it('accepts an explicit empty cart and rejects malformed collections and currency', () => {
+    expect(mapCart({ lines: [], currency: 'ARS' })).toEqual({ lines: [], currency: 'ARS' });
+    for (const invalid of [undefined, null, [], {}, true, 0, 'cart', { lines: null, currency: 'ARS' }, { lines: {}, currency: 'ARS' }]) {
+      expect(() => mapCart(invalid)).toThrow();
+    }
+    for (const currency of [undefined, null, '', '  ', 1, {}, [], false]) expect(() => mapCart({ lines: [], currency })).toThrow();
+  });
+
+  it('requires complete line identities, safe positive quantities and coherent money without coercion', () => {
+    const line = { sku: 'SKU', name: 'Producto', quantity: 2, originalUnitPrice: 10, discountAmount: 2, effectiveUnitPrice: 8 };
+    const cart = (value: unknown) => mapCart({ lines: [value], currency: 'ARS' });
+    expect(cart(line).lines[0]).toEqual({ ...line, offerRef: null, campaignRef: null });
+    for (const invalid of [null, [], {}, false, 0, 'line']) expect(() => cart(invalid)).toThrow();
+    for (const field of ['sku', 'name']) {
+      for (const invalid of [undefined, null, '', ' ', 1, {}, [], false]) expect(() => cart({ ...line, [field]: invalid })).toThrow();
+    }
+    for (const quantity of [undefined, null, '2', false, 0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) expect(() => cart({ ...line, quantity })).toThrow();
+    for (const field of ['originalUnitPrice', 'discountAmount', 'effectiveUnitPrice']) {
+      for (const invalid of [undefined, null, '', '2', false, -1, NaN, Infinity, {}, []]) expect(() => cart({ ...line, [field]: invalid })).toThrow();
+    }
+    for (const patch of [{ discountAmount: 11 }, { effectiveUnitPrice: 9 }, { originalUnitPrice: 11 }, { offerRef: {} }, { campaignRef: 2 }]) expect(() => cart({ ...line, ...patch })).toThrow();
+    expect(cart({ ...line, originalUnitPrice: 0, discountAmount: 0, effectiveUnitPrice: 0 }).lines[0].effectiveUnitPrice).toBe(0);
+    expect(() => cart({ ...line, originalUnitPrice: 0, discountAmount: 0, effectiveUnitPrice: 1e-18 })).toThrow();
+    expect(cart({ ...line, originalUnitPrice: 0.3, discountAmount: 0.2, effectiveUnitPrice: 0.1 }).lines[0].effectiveUnitPrice).toBe(0.1);
+  });
+
+  it('distinguishes future receipt statuses from malformed structures and identities', () => {
+    const receipt = { orderId: 'order-1', paymentStatus: PaymentStatus.Pending.wire, orderStatus: OrderStatus.PendingPayment.wire };
+    for (const invalid of [undefined, null, [], {}, false, 0, 'receipt']) expect(() => mapReceipt(invalid)).toThrow();
+    for (const field of ['orderId', 'paymentStatus', 'orderStatus']) {
+      for (const invalid of [undefined, null, '', ' ', 1, {}, [], false]) expect(() => mapReceipt({ ...receipt, [field]: invalid })).toThrow();
+    }
+    for (const checkoutUrl of [1, false, {}, []]) expect(() => mapReceipt({ ...receipt, checkoutUrl })).toThrow();
+    expect(mapReceipt({ ...receipt, checkoutUrl: null }).checkoutUrl).toBeNull();
+    expect(mapReceipt({ ...receipt, paymentStatus: 'FUTURE_PAYMENT', orderStatus: 'FUTURE_ORDER' })).toMatchObject({ paymentStatus: PaymentStatus.Unknown, orderStatus: OrderStatus.Unknown });
   });
 
   it('keeps storefront cards on the effective price and uses only API media', () => {

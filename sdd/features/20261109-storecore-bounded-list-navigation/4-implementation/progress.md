@@ -26,3 +26,7 @@
 - BLN-T02: edited-but-unapplied filters are a distinct presentation state; they must not masquerade as an empty server result.
 - BLN-T03: protected stores bind response publication to an actor generation and clear snapshots immediately on actor replacement or logout.
 
+
+## 2026-11-09 — archival reconciliation
+
+The archival step announced above is complete: this feature resides in `sdd/features/`, meta records `completed`, and TODO-046 is done. Candidate `4e9940007fcf99ef286961a88b9673e282161791` and Verify `42675235368` remain the cited evidence; this note claims no additional execution.

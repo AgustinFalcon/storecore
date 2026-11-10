@@ -7,3 +7,24 @@
   bounded navigation and master Verify `42678381720` is green.
 - Implementation has not started. External providers, deploy and homologation remain
   NO-GO.
+- 2026-11-09 — Specification freeze `1b8236eaaba8806185d32754f9d286cbcd18d407`
+  (base `64116491a5356fe15b091fe9553e30f0840fba24`) received two independent
+  OpenAI GPT-6.1 Sol medium APPROVE reviews with no P0–P3. LCBH-T01 is done and
+  implementation GO is limited to LCBH-T02–T06.
+- 2026-11-09 — LCBH-T02/T03 implemented: checkout locks products ascending,
+  variants ascending and balances ascending before any new claim; catalog writers use
+  the compatible order; retired lines reject without effects and remain removable;
+  completed replay and price snapshots remain stable. Local offer discounts delegate
+  to the closed `DiscountKind` and reject Unknown.
+- 2026-11-09 — LCBH-T04/T05 implemented: cart/receipt structures fail closed,
+  malformed checkout keeps key/route, future status strings alone become Unknown,
+  navigation matches backend roles, overview rows deep-link and filtered offers have
+  an announced clearable empty state.
+- 2026-11-09 — LCBH-T06 reconciles surface operations and canonical records without
+  claiming PSD/Showcase archive. Local gates on the integrated dirty snapshot: backend
+  Maven **274/274 PASS** (PostgreSQL 16/Testcontainers, 05:25); frontend architecture
+  9/9, lint, **1120/1120**, production build PASS; browser/axe **60/60 PASS**; manifest
+  validator **2/2 PASS**. Build retains the pre-existing non-failing initial-bundle
+  warning (771.69 kB against 700 kB warning budget).
+- T07 remains pending: exact-head implementation reviews, hosted Verify, archive and
+  merge have not occurred.

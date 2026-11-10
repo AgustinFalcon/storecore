@@ -319,3 +319,7 @@
   threshold. The disposable PostgreSQL/container harness was removed and its
   ports were verified free. CI on the remediated SHA and exact-SHA reviews are
   still pending.
+
+## 2026-11-09 — documentary reconciliation
+
+Local implementation is recorded as done in tasks.json. Earlier pending-review/CI statements are historical; this reconciliation has not established a feature-specific final close-out record. Preserve the own final candidate, reviews with provider/model/effort/base/head/scope/checks and CI evidence before declaring archive. Later CFE, RMA or bounded-navigation acceptance does not automatically close this WIP. No new test execution, provider activation or homologation is claimed here.
