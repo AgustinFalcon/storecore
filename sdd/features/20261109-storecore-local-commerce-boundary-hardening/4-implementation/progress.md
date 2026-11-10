@@ -85,3 +85,13 @@
   the previously failing logout cases pass and CI stopped its containers. T07 is
   complete. The WIP is archived with evidence; the documentation-only archive head
   must repeat Verify before merge.
+- 2026-11-09 — Archive-head Verify `42740161730` failed two attempts in different
+  focus-sensitive specs. The first lost Offers authority; the second rendered no
+  authorized Aftercare heading. Both were caused by Angular 22 Vitest's default
+  `isolate: false`, which let spec files share DOM, storage and static writer state.
+  The unit-test target now sets `isolate: true`; no production component or assertion
+  was relaxed. Two complete local suites passed **166 files / 1127 tests**; the
+  second full gate also passed architecture 9/9, lint and production build (the known
+  non-failing 774.07 kB warning remains). Two independent GPT-6.1 Sol medium reviews
+  approved the harness change with no P0–P3. A new exact-head hosted Verify remains
+  mandatory before merge.

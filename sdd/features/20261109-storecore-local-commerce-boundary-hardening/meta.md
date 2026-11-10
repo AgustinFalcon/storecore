@@ -27,5 +27,8 @@ received two independent GPT-6.1 Sol medium `APPROVE` reviews with no P0–P3.
 
 Implementation T01–T07 is complete. Candidate
 `fd040275806b01999a79836d0cfc5fd80e061f41` passed hosted Verify `42738829321` and
-two independent final GPT-6.1 Sol reviews. The documentation archive head still
-requires its own Verify before merge; deploy and homologation remain excluded.
+two independent final GPT-6.1 Sol reviews. The archive-head reruns exposed shared
+Vitest state rather than a product defect; the test target now isolates spec files
+and passed two complete local suites plus two additional GPT-6.1 Sol reviews. The
+new exact head still requires hosted Verify before merge; deploy and homologation
+remain excluded.
