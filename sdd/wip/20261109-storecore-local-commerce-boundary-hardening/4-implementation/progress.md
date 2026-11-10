@@ -70,3 +70,12 @@
   architecture 9/9, lint, **1127/1127**, production build PASS; the non-failing bundle
   warning is 773.93 kB against the 700 kB warning budget. A new exact-head CI and two
   fresh independent reviews remain mandatory.
+- 2026-11-09 — Review of `d70f94cce65bb9d092bca2ae5c2513d3f23f7bda`
+  found one remaining P3: the initial `Pagar` command remained available beside the
+  closed recovery action. `canPay` and the template now admit initial payment only in
+  `CartFailureKind.None`; retryable replay and unavailable-product correction each
+  expose exactly one operational command. Render coverage asserts the competing
+  command is absent and exactly one enabled button/link remains. Superseded Verify
+  `42738460008` was cancelled. Corrected gates: architecture 9/9, lint,
+  **1127/1127**, production build PASS; the non-failing bundle warning is 774.07 kB
+  against the 700 kB warning budget. Exact-head CI and both reviews must repeat.

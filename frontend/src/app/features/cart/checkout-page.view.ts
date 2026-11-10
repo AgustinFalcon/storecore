@@ -25,7 +25,8 @@ export class CheckoutPageViewComponent {
   amount(value:number):string{return new Intl.NumberFormat('es-AR',{style:'currency',currency:this.state.cart.currency||'ARS'}).format(value);}
 
   get canPay(): boolean {
-    return this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
+    return this.state.failureKind === CartFailureKind.None
+      && this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
       && this.state.addresses.some((address) => address.id === this.state.addressId) && this.state.currency.length > 0;
   }
 

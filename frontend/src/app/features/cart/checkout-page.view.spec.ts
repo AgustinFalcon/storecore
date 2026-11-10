@@ -33,6 +33,8 @@ describe('Real checkout commercial summary',()=>{
   const text=(fixture.nativeElement as HTMLElement).textContent ?? '';
   expect(text).toContain(expected);
   expect(text).not.toContain(absent);
+  expect(text).not.toContain('Pagar');
   expect(text).not.toMatch(/\bReintentar\b(?! el mismo pago)/);
+  expect(fixture.nativeElement.querySelectorAll('form button:not([disabled]), form a.sc-btn')).toHaveLength(1);
  });
 });
