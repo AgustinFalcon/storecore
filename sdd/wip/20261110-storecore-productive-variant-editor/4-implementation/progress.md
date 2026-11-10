@@ -13,6 +13,12 @@
 ## Initial evidence
 
 - Focused Angular tests: 2 files, 4 tests passing.
-- Complete frontend verify: architecture 9/9, lint passing, 167 files / 1131 tests passing, production build passing.
+- Complete frontend verify after review fixes: architecture 9/9, lint passing, 167 files / 1132 tests passing, production build passing.
 - Production initial bundle: 572.85 kB, below the unchanged 700 kB warning budget.
 - No backend, database or external-provider change.
+
+## Review iteration 1
+
+- Candidate `b5ece03c9088588585897deac773c39fe931ef0f` received two independent GPT-6.1 Sol medium `REQUEST_CHANGES` reviews.
+- Both reproduced two P2 defects: duplicate-key rename could collapse data, and editing one attribute stringified untouched JSON values.
+- The candidate was not pushed or opened as a PR. The implementation now updates original entries, preserves untouched raw values and rejects collisions with visible feedback; regression tests cover both findings.

@@ -24,6 +24,7 @@ export class UserCatalogViewComponent {
   @Output() readonly saveCategory = new EventEmitter<void>();
   @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
+  @Output() readonly editError = new EventEmitter<string>();
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');
@@ -34,8 +35,11 @@ export class UserCatalogViewComponent {
   }
 
   setActive(active: boolean): void { this.patch({ status: active ? ProductStatus.Active : ProductStatus.Draft, active }); }
-  attributes(value: Readonly<Record<string, unknown>>): readonly [string, string][] {
-    return Object.entries(value).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]);
+  attributes(value: Readonly<Record<string, unknown>>): readonly { key: string; displayValue: string }[] {
+    return Object.entries(value).map(([key, rawValue]) => ({
+      key,
+      displayValue: typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue) ?? '',
+    }));
   }
 
   patchVariant(index: number, partial: Partial<ProductVariant>): void {
@@ -47,10 +51,28 @@ export class UserCatalogViewComponent {
     this.patchVariant(index, { status: VariantStatus.fromWire(raw) });
   }
 
-  patchAttribute(variantIndex: number, attributeIndex: number, key: string, value: string): void {
-    const entries = this.attributes(this.state.draft.variants[variantIndex]?.attributes ?? {});
-    const next = entries.map((entry, current) => current === attributeIndex ? [key, value] as const : entry);
-    this.patchVariant(variantIndex, { attributes: Object.fromEntries(next) });
+  patchAttributeKey(variantIndex: number, attributeIndex: number, key: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    const entries = Object.entries(variant.attributes);
+    const current = entries[attributeIndex];
+    if (!current) return;
+    if (key !== current[0] && Object.hasOwn(variant.attributes, key)) {
+      this.editError.emit(`El atributo “${key}” ya existe en esta variante.`);
+      return;
+    }
+    entries[attributeIndex] = [key, current[1]];
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(entries) });
+  }
+
+  patchAttributeValue(variantIndex: number, attributeIndex: number, value: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    const entries = Object.entries(variant.attributes);
+    const current = entries[attributeIndex];
+    if (!current) return;
+    entries[attributeIndex] = [current[0], value];
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(entries) });
   }
 
   addAttribute(variantIndex: number): void {

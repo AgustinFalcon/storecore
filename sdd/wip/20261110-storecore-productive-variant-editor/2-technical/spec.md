@@ -13,6 +13,8 @@
 
 Attribute keys and values are merchant data, not finite states; they remain open strings. Variant identity and SKU remain immutable in the view.
 
+The editor projects non-string JSON values only for display. Updating one value uses the original attribute map and preserves every untouched raw value. Renaming a key to another key already present is rejected before rebuilding the map and surfaces an operator-facing error; no duplicate-key collapse is allowed.
+
 ## Responsibilities
 
 - Domain state owns supported status cases and the Unknown rule.
@@ -25,5 +27,6 @@ Attribute keys and values are merchant data, not finite states; they remain open
 - Closed status round-trip/selectability/Unknown persistence rule.
 - View preserves identity and SKU while editing name and attributes.
 - Store rejects Unknown before repository invocation.
+- Attribute edits preserve untouched number, boolean, object and null values; duplicate-key renames are rejected without emitting a draft mutation.
 - Architecture, lint, complete unit suite and production build.
 - Two independent GPT-6.1 Sol medium reviews on the exact candidate head.

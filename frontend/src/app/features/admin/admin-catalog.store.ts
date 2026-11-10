@@ -92,6 +92,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly empty$ = this.select((s) => !s.loading && s.products.length === 0);
 
   readonly setDraft = this.updater((s, draft: ProductDetail) => ({ ...s, draft }));
+  readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));
 

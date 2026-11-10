@@ -74,12 +74,12 @@
             @for (attribute of attributes(variant.attributes); track $index; let attributeIndex = $index) {
               <div class="sc-panel sc-panel--grid">
                 <label>Nombre
-                  <input required [name]="'attributeKey-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute[0]" (ngModelChange)="patchAttribute(variantIndex, attributeIndex, $event, attribute[1])" />
+                  <input required [name]="'attributeKey-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute.key" (ngModelChange)="patchAttributeKey(variantIndex, attributeIndex, $event)" />
                 </label>
                 <label>Valor
-                  <input [name]="'attributeValue-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute[1]" (ngModelChange)="patchAttribute(variantIndex, attributeIndex, attribute[0], $event)" />
+                  <input [name]="'attributeValue-' + variantIndex + '-' + attributeIndex" [ngModel]="attribute.displayValue" (ngModelChange)="patchAttributeValue(variantIndex, attributeIndex, $event)" />
                 </label>
-                <button type="button" class="sc-btn sc-btn--ghost" (click)="removeAttribute(variantIndex, attribute[0])">Quitar atributo</button>
+                <button type="button" class="sc-btn sc-btn--ghost" (click)="removeAttribute(variantIndex, attribute.key)">Quitar atributo</button>
               </div>
             }
             <button type="button" class="sc-btn sc-btn--ghost" (click)="addAttribute(variantIndex)">Agregar atributo</button>

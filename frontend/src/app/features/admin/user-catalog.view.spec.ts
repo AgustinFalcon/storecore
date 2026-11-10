@@ -41,10 +41,34 @@ describe('bounded administrative catalog', () => {
     expect(renamed.variants[0]).toEqual(expect.objectContaining({ id: 'variant-id', sku: 'VAR-1', name: 'Renombrada' }));
 
     fixture.componentRef.setInput('state', { ...fixture.componentInstance.state, draft: renamed });
-    const attributeEvent = firstValueFrom(fixture.componentInstance.draftChange);
-    fixture.componentInstance.patchAttribute(0, 0, 'Tono', 'Grafito');
-    const attributed = await attributeEvent;
+    const keyEvent = firstValueFrom(fixture.componentInstance.draftChange);
+    fixture.componentInstance.patchAttributeKey(0, 0, 'Tono');
+    const renamedAttribute = await keyEvent;
+    fixture.componentRef.setInput('state', { ...fixture.componentInstance.state, draft: renamedAttribute });
+    const valueEvent = firstValueFrom(fixture.componentInstance.draftChange);
+    fixture.componentInstance.patchAttributeValue(0, 0, 'Grafito');
+    const attributed = await valueEvent;
     expect(attributed.variants[0].attributes).toEqual({ Tono: 'Grafito' });
+  });
+
+  it('preserves untouched JSON attribute types and rejects duplicate key collisions', async () => {
+    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', price: { base: 10, original: 10, effective: 10 },
+      variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Weight: 2, Enabled: true, Nested: { a: 1 }, Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
+    TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
+    const fixture = TestBed.createComponent(UserCatalogViewComponent);
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: product, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+
+    const valueEvent = firstValueFrom(fixture.componentInstance.draftChange);
+    fixture.componentInstance.patchAttributeValue(0, 3, 'Azul');
+    const changed = await valueEvent;
+    expect(changed.variants[0].attributes).toEqual({ Weight: 2, Enabled: true, Nested: { a: 1 }, Color: 'Azul' });
+
+    fixture.componentRef.setInput('state', { ...fixture.componentInstance.state, draft: changed });
+    const draftEmit = vi.spyOn(fixture.componentInstance.draftChange, 'emit');
+    const errorEvent = firstValueFrom(fixture.componentInstance.editError);
+    fixture.componentInstance.patchAttributeKey(0, 0, 'Color');
+    expect(await errorEvent).toContain('ya existe');
+    expect(draftEmit).not.toHaveBeenCalled();
   });
 
   it('blocks persistence when a variant arrives with an unknown closed status', () => {
