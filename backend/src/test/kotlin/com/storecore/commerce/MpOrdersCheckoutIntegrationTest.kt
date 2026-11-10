@@ -855,6 +855,61 @@ class MpOrdersCheckoutIntegrationTest(
         }
     }
 
+    private enum class StockWriterOrdering { ADJUSTMENT_FIRST, RESTOCK_FIRST }
+
+    @Test
+    fun `stock adjustment and RMA restock serialize on balance in either order`() {
+        for (ordering in StockWriterOrdering.entries) {
+            val sku="SKU-ADJUST-RMA-${UUID.randomUUID()}"
+            val orderId=receivedOrder(sku,2)
+            val adjustmentActor=provisionAdmin("stock-rma-${UUID.randomUUID()}@example.com")
+            val variant=jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?",Long::class.java,sku)!!
+            val item=jdbc.queryForObject("SELECT ri.id FROM return_items ri JOIN returns r ON r.id=ri.return_id WHERE r.order_id=?",Long::class.java,orderId)!!
+            val before=available(sku)
+            val adjustPayload="""{"commandId":"${UUID.randomUUID()}","quantityDelta":-1,"expected":{"available":$before,"reserved":0,"safety":0},"reason":"Count"}"""
+            val rmaPayload="""{"idempotencyKey":"${UUID.randomUUID()}","lines":[{"returnItemId":"$item","restockQuantity":2,"damagedQuantity":0,"rejectedQuantity":0}]}"""
+            val pool=Executors.newFixedThreadPool(2)
+            jdbc.dataSource!!.connection.use { barrier ->
+                barrier.autoCommit=false
+                try {
+                    val pid=barrier.createStatement().use { it.executeQuery("SELECT pg_backend_pid()").use { rs -> check(rs.next());rs.getInt(1) } }
+                    barrier.prepareStatement("SELECT variant_id FROM inventory_balances WHERE variant_id=? FOR UPDATE").use { it.setLong(1,variant);it.executeQuery().close() }
+                    fun awaitBalanceWaiter(exclude:Int=0):Int {
+                        val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10)
+                        while(System.nanoTime()<deadline) {
+                            val waiting=jdbc.query("SELECT pid FROM pg_stat_activity WHERE pid<>? AND wait_event_type='Lock' AND (?=ANY(pg_blocking_pids(pid))) AND query LIKE '%inventory_balances%FOR UPDATE%'",{rs,_->rs.getInt(1)},exclude,pid).firstOrNull()
+                            if(waiting!=null)return waiting
+                            Thread.sleep(20)
+                        }
+                        throw AssertionError("stock writer did not queue on balance lock")
+                    }
+                    fun adjustment()=exchange("/api/v1/user/inventory/$variant/adjustments",HttpMethod.POST,adjustPayload,adjustmentActor.cookie,adjustmentActor.csrf)
+                    fun restock()=exchange("/api/v1/user/orders/$orderId/return-disposition",HttpMethod.POST,rmaPayload,admin.cookie,admin.csrf)
+                    val first=pool.submit<org.springframework.http.ResponseEntity<String>> { if(ordering==StockWriterOrdering.ADJUSTMENT_FIRST)adjustment() else restock() }
+                    val firstPid=awaitBalanceWaiter()
+                    val second=pool.submit<org.springframework.http.ResponseEntity<String>> { if(ordering==StockWriterOrdering.ADJUSTMENT_FIRST)restock() else adjustment() }
+                    // The second may queue behind the first row waiter rather than directly behind the barrier.
+                    val deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10)
+                    var queued=false
+                    while(!queued && System.nanoTime()<deadline) {
+                        queued=jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid<>? AND wait_event_type='Lock' AND (?=ANY(pg_blocking_pids(pid)) OR ?=ANY(pg_blocking_pids(pid))) AND query LIKE '%inventory_balances%FOR UPDATE%')",Boolean::class.java,firstPid,pid,firstPid)==true
+                        if(!queued)Thread.sleep(20)
+                    }
+                    assertTrue(queued,"both writers must queue on the reviewed balance")
+                    barrier.commit()
+                    val firstResponse=first.get(20,TimeUnit.SECONDS)
+                    assertEquals(200,firstResponse.statusCode.value(),firstResponse.body)
+                    val secondResponse=second.get(20,TimeUnit.SECONDS)
+                    assertEquals(if(ordering==StockWriterOrdering.ADJUSTMENT_FIRST)200 else 409,secondResponse.statusCode.value(),secondResponse.body)
+                    val restockResponse=if(ordering==StockWriterOrdering.RESTOCK_FIRST)firstResponse else secondResponse
+                    admin=admin.copy(csrf=restockResponse.headers.getFirst("X-CSRF-Token")!!)
+                    assertEquals(before+if(ordering==StockWriterOrdering.ADJUSTMENT_FIRST)1 else 2,available(sku))
+                    assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM inventory_ledger WHERE variant_id=? AND event_type='RMA_RESTOCK'",Int::class.java,variant))
+                } finally { barrier.rollback();pool.shutdownNow();assertTrue(pool.awaitTermination(5,TimeUnit.SECONDS)) }
+            }
+        }
+    }
+
     private fun receivedOrder(sku: String, quantity: Int): Long {
         val orderId = checkoutWithQuantity(sku, quantity)
         val provider = "ORD-RMA-${UUID.randomUUID()}"

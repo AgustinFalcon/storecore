@@ -30,7 +30,7 @@ class ReturnDispositionMigrationTest {
             val item = jdbc.queryForObject("INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,2) RETURNING id", Long::class.java, returned, sold)!!
             val history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
             val legacy = jdbc.queryForList("SELECT id,return_id,order_item_id,quantity,adjustment_ledger_id FROM return_items")
-            assertEquals("15", flyway().migrate().targetSchemaVersion.toString())
+            assertEquals("15", flyway("15").migrate().targetSchemaVersion.toString())
             assertEquals(history, jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=14 ORDER BY installed_rank"))
             assertEquals(legacy, jdbc.queryForList("SELECT id,return_id,order_item_id,quantity,adjustment_ledger_id FROM return_items"))
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM return_items WHERE disposition_command_id IS NOT NULL OR restock_quantity IS NOT NULL", Int::class.java))
@@ -43,8 +43,8 @@ class ReturnDispositionMigrationTest {
             rejectsSql("P0001") { jdbc.update("UPDATE return_items SET damage_reason='OTHER' WHERE id=?", item) }
             rejectsSql("P0001") { jdbc.update("UPDATE rma_disposition_commands SET result='{}' WHERE id=?", command) }
             rejectsSql("23505") { jdbc.update("INSERT INTO rma_disposition_commands(return_id,idempotency_key,request_hash,actor_id,confirmed_at,result) VALUES (?,?,?,?,now(),'{}')", returned, UUID.randomUUID(), hash, actor) }
-            flyway().validate()
-            assertEquals(0, flyway().migrate().migrationsExecuted)
+            flyway("15").validate()
+            assertEquals(0, flyway("15").migrate().migrationsExecuted)
         } finally { postgres.stop() }
     }
     private fun rejectsSql(state: String, mutation: () -> Unit) {

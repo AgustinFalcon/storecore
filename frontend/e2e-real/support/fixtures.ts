@@ -25,7 +25,16 @@ export class RealmFixture {
 export function database(sql: string): string {
   if (process.env['PGDATABASE'] !== 'storecore_ua_e2e') throw new Error('Use test:ua-real with a dedicated database');
   if (!['127.0.0.1', 'localhost'].includes(process.env['PGHOST'] ?? '')) throw new Error('UA database must be on loopback');
-  return execFileSync(process.env['STORECORE_UA_PSQL'] ?? 'psql', ['-X', '-v', 'ON_ERROR_STOP=1', '-A', '-t'],
+  const psqlArgs = ['-X', '-v', 'ON_ERROR_STOP=1', '-A', '-t'];
+  const container = process.env['STORECORE_UA_POSTGRES_CONTAINER'];
+  if (container !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(container)) {
+    throw new Error('Invalid UA PostgreSQL container name');
+  }
+  const command = container === undefined ? (process.env['STORECORE_UA_PSQL'] ?? 'psql') : 'docker';
+  const args = container === undefined
+    ? psqlArgs
+    : ['exec', '-i', container, 'psql', '-U', process.env['PGUSER']!, '-d', process.env['PGDATABASE']!, ...psqlArgs];
+  return execFileSync(command, args,
     { env: process.env, input: sql, encoding: 'utf8', timeout: 30_000 }).trim();
 }
 export function loseRoles(email: string): void {

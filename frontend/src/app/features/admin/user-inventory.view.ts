@@ -15,12 +15,16 @@ import { UserInventoryState } from './user-inventory.store';
 })
 export class UserInventoryViewComponent {
   @Input({ required: true }) state!: UserInventoryState;
+  @Input() adjustmentAvailable = false;
+  @Input() adjustmentPending = false;
+  @Output() readonly adjust = new EventEmitter<InventoryRow>();
   @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly queryChange = new EventEmitter<string>();
   @Output() readonly filterChange = new EventEmitter<InventoryFilter>();
   @Output() readonly clearFilters = new EventEmitter<void>();
   readonly filters = InventoryFilter.values;
+  canAdjust(row: InventoryRow): boolean { return this.adjustmentAvailable && !this.adjustmentPending && this.state.readState.isReady && !!row.variantId.trim() && row.availableQuantity !== null && row.reservedQuantity !== null && row.safetyStock !== null; }
   get unknownReadState(): boolean { return this.state.readState === InventoryReadState.Unknown; }
 
   get visibleRows(): readonly InventoryRow[] {

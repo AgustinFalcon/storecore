@@ -1,4 +1,6 @@
 import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
+import { INVENTORY_ADJUSTMENT_REPOSITORY } from './core/tokens/inventory-adjustment.tokens';
+import { InventoryAdjustmentHttpRepository } from './data/user/inventory-adjustment-http.repository';
 import { CONTENT_REPOSITORY } from './core/tokens/content.tokens';
 import { ContentHttpRepository } from './data/content/content-http.repository';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -64,6 +66,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CUSTOMER_ADMIN_REPOSITORY, useClass: CustomerAdminHttpRepository },
     { provide: OVERVIEW_REPOSITORY, useClass: OverviewHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
+    { provide: INVENTORY_ADJUSTMENT_REPOSITORY, useClass: InventoryAdjustmentHttpRepository },
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],

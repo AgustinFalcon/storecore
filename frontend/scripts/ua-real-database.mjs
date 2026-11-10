@@ -14,8 +14,18 @@ export function databaseEnvironment(source = process.env) {
 }
 
 export function query(sql) {
-  const result = spawnSync(process.env.STORECORE_UA_PSQL ?? 'psql', ['-X', '-v', 'ON_ERROR_STOP=1', '-A', '-t'], {
-    env: databaseEnvironment(), input: sql, encoding: 'utf8', timeout: 30_000,
+  const env = databaseEnvironment();
+  const psqlArgs = ['-X', '-v', 'ON_ERROR_STOP=1', '-A', '-t'];
+  const container = process.env.STORECORE_UA_POSTGRES_CONTAINER;
+  if (container !== undefined && !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(container)) {
+    throw new Error('Invalid UA PostgreSQL container name');
+  }
+  const command = container === undefined ? (process.env.STORECORE_UA_PSQL ?? 'psql') : 'docker';
+  const args = container === undefined
+    ? psqlArgs
+    : ['exec', '-i', container, 'psql', '-U', env.PGUSER, '-d', env.PGDATABASE, ...psqlArgs];
+  const result = spawnSync(command, args, {
+    env, input: sql, encoding: 'utf8', timeout: 30_000,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`UA fixture SQL failed: ${result.stderr}`);

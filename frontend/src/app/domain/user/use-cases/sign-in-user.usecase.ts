@@ -16,6 +16,7 @@ export class SignInUserUseCase {
         this.session.clear();
         throw new Error('Sesión interna sin rol reconocido.');
       }
+      this.session.beginAuthenticationEpoch?.();
       this.session.markAuthenticated(profile);
     }));
   }
