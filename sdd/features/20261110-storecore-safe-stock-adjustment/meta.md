@@ -1,7 +1,7 @@
 # StoreCore safe stock adjustment
 
 - Feature: `20261110-storecore-safe-stock-adjustment`
-- Status: `specified`
+- Status: `completed`
 - Project mode: `brownfield`
 - Branch: `codex/storecore-safe-stock-adjustment`
 - Base: `2e9452eb31c96a8c81a38ef0a98f2ee5d216c631`
@@ -21,3 +21,11 @@ Add a dedicated, idempotent and concurrency-safe available-stock adjustment comm
 ## Supersession
 
 This feature supersedes only the Real inventory read-only clauses in the commercial UX hardening SDD. Demo physical/not-sellable inventory semantics remain separate and unchanged.
+
+## Closure evidence
+
+- Pull request: `#240`.
+- Candidate: `614c027df2a25709996b23fa99b02178e6ff8b27`.
+- GitHub Verify: run `42879363994`, 3/3 jobs successful (`backend`, `frontend`, `unified-access-real-e2e`).
+- Local validation: backend 290 tests, frontend 1,165 tests and build, browser Real E2E 22/22.
+- Reviews: coordinated GPT-6.1 Sol Bug/Product and Security approvals with no pending P0-P3 findings.

@@ -15,3 +15,6 @@
 - A coordinated Bug/Product and Security review found one P2: a contradictory durable receipt could release the recovery journal. The mapper now enforces complete per-state invariants and the store regression proves the journal remains blocked on malformed data.
 - Final frontend gate after the fix: architecture and lint PASS, 173 files / 1,165 tests PASS and production build PASS.
 - Independent coordinated GPT-6.1 Sol Bug/Product and Security reviews both APPROVE exact product SHA `d388f1412b5c64f3445aa057c9168403d3ed1714` with no P0-P3 remaining.
+- Pull request `#240` was created from `codex/storecore-safe-stock-adjustment` into `master`.
+- Candidate SHA `614c027df2a25709996b23fa99b02178e6ff8b27` passed GitHub Verify run `42879363994`: backend, frontend and unified-access-real-e2e all successful.
+- SSA-013 completed and the feature was finalized through the SDD-kit archival workflow.

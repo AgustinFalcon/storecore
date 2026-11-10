@@ -12,7 +12,7 @@
 - [x] SSA-010 Add backend PostgreSQL/HTTP concurrency, replay, rollback, authorization and migration tests.
 - [x] SSA-011 Add frontend unit/HTTP/browser/axe tests and Real E2E evidence.
 - [x] SSA-012 Run complete local gates and obtain two independent exact-head GPT-6.1 Sol reviews.
-- [ ] SSA-013 Create PR, pass candidate CI and archive the completed feature.
+- [x] SSA-013 Create PR #240, pass candidate CI run 42879363994 (3/3) and archive the completed feature.
 
 ## Post-merge release evidence
 
