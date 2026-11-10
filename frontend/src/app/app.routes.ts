@@ -1,21 +1,10 @@
 import { RedirectFunction, Routes } from '@angular/router';
 import { ReturnDestination } from './domain/access/return-destination';
 import { LoginComponent } from './features/access/login.component';
-import { UserHomeComponent } from './features/admin/user-home.component';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
-import { FulfillmentComponent } from './features/admin/fulfillment.component';
-import { ProfileImportComponent } from './features/admin/profile-import.component';
-import { UserCapabilitiesComponent } from './features/admin/user-capabilities.component';
-import { UserCatalogComponent } from './features/admin/user-catalog.component';
-import { UserContentComponent, userContentLeaveGuard } from './features/admin/user-content.component';
-import { UserInventoryComponent } from './features/admin/user-inventory.component';
+import { userContentLeaveGuard } from './features/admin/user-content-leave.guard';
 import { UserLayoutComponent } from './features/admin/user-layout.component';
-import { UserMercadoLibreComponent } from './features/admin/user-mercadolibre.component';
-import { UserOrderDetailComponent } from './features/admin/user-order-detail.component';
-import { UserOffersComponent } from './features/admin/user-offers.component';
-import { UserCustomersComponent } from './features/admin/user-customers.component';
-import { UserPromosComponent } from './features/admin/user-promos.component';
 import { CartPageComponent } from './features/cart/cart-page.component';
 import { CheckoutPageComponent } from './features/cart/checkout-page.component';
 import { CheckoutResultComponent } from './features/cart/checkout-result.component';
@@ -70,18 +59,79 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'home' },
           { path: 'session', redirectTo: legacyLoginRedirect },
-          { path: 'home', component: UserHomeComponent, title: 'Operaciones', canActivate: [userGuard] },
-          { path: 'content', component: UserContentComponent, title: 'Contenido', canActivate: [userGuard], canDeactivate: [userContentLeaveGuard] },
-          { path: 'catalog', component: UserCatalogComponent, title: 'Catálogo admin', canActivate: [userGuard] },
-          { path: 'offers', component: UserOffersComponent, title: 'Ofertas', canActivate: [userGuard] },
-          { path: 'customers', component: UserCustomersComponent, title: 'Clientes', canActivate: [userGuard] },
-          { path: 'promos', component: UserPromosComponent, title: 'Promos', canActivate: [userGuard] },
-          { path: 'orders', component: FulfillmentComponent, title: 'Fulfillment', canActivate: [userGuard] },
-          { path: 'orders/:id', component: UserOrderDetailComponent, title: 'Fulfillment', canActivate: [userGuard] },
-          { path: 'inventory', component: UserInventoryComponent, title: 'Inventario', canActivate: [userGuard] },
-          { path: 'mercadolibre', component: UserMercadoLibreComponent, title: 'Mercado Libre', canActivate: [userGuard] },
-          { path: 'capabilities', component: UserCapabilitiesComponent, title: 'Capabilities', canActivate: [userGuard] },
-          { path: 'profile-import', component: ProfileImportComponent, title: 'Perfil', canActivate: [userGuard] },
+          {
+            path: 'home',
+            loadComponent: () => import('./features/admin/user-home.component').then((module) => module.UserHomeComponent),
+            title: 'Operaciones',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'content',
+            loadComponent: () => import('./features/admin/user-content.component').then((module) => module.UserContentComponent),
+            title: 'Contenido',
+            canActivate: [userGuard],
+            canDeactivate: [userContentLeaveGuard],
+          },
+          {
+            path: 'catalog',
+            loadComponent: () => import('./features/admin/user-catalog.component').then((module) => module.UserCatalogComponent),
+            title: 'Catálogo admin',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'offers',
+            loadComponent: () => import('./features/admin/user-offers.component').then((module) => module.UserOffersComponent),
+            title: 'Ofertas',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'customers',
+            loadComponent: () => import('./features/admin/user-customers.component').then((module) => module.UserCustomersComponent),
+            title: 'Clientes',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'promos',
+            loadComponent: () => import('./features/admin/user-promos.component').then((module) => module.UserPromosComponent),
+            title: 'Promos',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'orders',
+            loadComponent: () => import('./features/admin/fulfillment.component').then((module) => module.FulfillmentComponent),
+            title: 'Fulfillment',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'orders/:id',
+            loadComponent: () => import('./features/admin/user-order-detail.component').then((module) => module.UserOrderDetailComponent),
+            title: 'Fulfillment',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'inventory',
+            loadComponent: () => import('./features/admin/user-inventory.component').then((module) => module.UserInventoryComponent),
+            title: 'Inventario',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'mercadolibre',
+            loadComponent: () => import('./features/admin/user-mercadolibre.component').then((module) => module.UserMercadoLibreComponent),
+            title: 'Mercado Libre',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'capabilities',
+            loadComponent: () => import('./features/admin/user-capabilities.component').then((module) => module.UserCapabilitiesComponent),
+            title: 'Capabilities',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'profile-import',
+            loadComponent: () => import('./features/admin/profile-import.component').then((module) => module.ProfileImportComponent),
+            title: 'Perfil',
+            canActivate: [userGuard],
+          },
           { path: '**', component: NotFoundComponent, title: 'Página no encontrada' },
         ],
       },
