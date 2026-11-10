@@ -1,6 +1,5 @@
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, effect, HostListener } from '@angular/core';
-import { CanDeactivateFn } from '@angular/router';
 import { HomeContentPhase } from '../../domain/user/home-content-phase';
 import { UserSession } from '../../core/auth/user-session';
 import { UserContentViewComponent } from './user-content.view';
@@ -52,5 +51,3 @@ export class UserContentComponent {
     }
   }
 }
-
-export const userContentLeaveGuard: CanDeactivateFn<UserContentComponent> = (component) => component.canDeactivate();
