@@ -24,7 +24,7 @@
 
 ## Validation
 
-- Backend full suite: 290 passing.
+- Backend full suite: 291 passing.
 - Frontend full suite: 173 files / 1,165 passing plus production build.
 - Mock browser: 5/5 responsive/accessibility scenarios.
 - Real browser: 22/22 with PostgreSQL 16, including replay, response loss, conflicts and authority loss.
