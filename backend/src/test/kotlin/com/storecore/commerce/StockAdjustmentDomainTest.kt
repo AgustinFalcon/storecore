@@ -53,4 +53,22 @@ class StockAdjustmentDomainTest {
             assertEquals(StockAdjustmentState.UNKNOWN,codec.decode(raw,receipt.commandId,1,Instant.EPOCH).state)
         }
     }
+
+    @Test fun `malformed rejected null fields remain unknown`() {
+        val commandId = UUID.randomUUID()
+        val codec = StockAdjustmentReceiptCodec(mapper)
+        fun rejected(reason: String, before: String, after: String = "null", ledger: String = "null") =
+            """{"commandId":"$commandId","variantId":"1","state":"REJECTED","reason":"$reason","before":$before,"after":$after,"ledgerId":$ledger,"recordedAt":"1970-01-01T00:00:00Z"}"""
+
+        assertEquals(StockAdjustmentState.REJECTED, codec.decode(rejected("BALANCE_CHANGED", "{\"available\":8,\"reserved\":3,\"safety\":1}"), commandId, 1, Instant.EPOCH).state)
+        assertEquals(StockAdjustmentState.REJECTED, codec.decode(rejected("BALANCE_MISSING", "null"), commandId, 1, Instant.EPOCH).state)
+
+        listOf("{}", "[]", "\"invalid\"", "{\"available\":-1,\"reserved\":3,\"safety\":1}").forEach { malformed ->
+            assertEquals(StockAdjustmentState.UNKNOWN, codec.decode(rejected("BALANCE_CHANGED", "{\"available\":8,\"reserved\":3,\"safety\":1}", after = malformed), commandId, 1, Instant.EPOCH).state, "after=$malformed")
+            assertEquals(StockAdjustmentState.UNKNOWN, codec.decode(rejected("BALANCE_MISSING", malformed), commandId, 1, Instant.EPOCH).state, "before=$malformed")
+        }
+        listOf("{}", "[]", "\"invalid\"", "1").forEach { malformed ->
+            assertEquals(StockAdjustmentState.UNKNOWN, codec.decode(rejected("BALANCE_CHANGED", "{\"available\":8,\"reserved\":3,\"safety\":1}", ledger = malformed), commandId, 1, Instant.EPOCH).state, "ledger=$malformed")
+        }
+    }
 }

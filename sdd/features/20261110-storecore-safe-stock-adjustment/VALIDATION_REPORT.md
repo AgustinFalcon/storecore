@@ -11,7 +11,7 @@
 - `backend`: success.
 - `frontend`: success.
 - `unified-access-real-e2e`: success.
-- Local backend: 290 tests, zero failures/errors.
+- Local backend: 291 tests, zero failures/errors after the persistence-boundary regression and timing-fixture hardening.
 - Local frontend: architecture and lint pass; 1,165 tests pass; production build pass.
 - Local browser against packaged backend and fresh PostgreSQL 16: 22/22 pass.
 
@@ -19,6 +19,7 @@
 
 - Bug/Product: approved after remediating malformed contradictory receipts.
 - Security: approved after the same fail-closed remediation.
+- Final archive review exposed a second normalization edge at the persistence boundary; literal-null validation and focused regressions remediate it before merge.
 - Remaining P0-P3 findings: none.
 
 ## Resource hygiene

@@ -7,6 +7,7 @@
 - Transactional full-snapshot CAS around available, reserved and safety quantities.
 - Atomic available-balance update, deterministic ledger event, audit event and receipt.
 - Exact replay and non-disclosing idempotency conflict behavior.
+- Literal-null validation prevents malformed persisted snapshot fields from normalizing into terminal rejection receipts.
 
 ## HTTP and authorization
 

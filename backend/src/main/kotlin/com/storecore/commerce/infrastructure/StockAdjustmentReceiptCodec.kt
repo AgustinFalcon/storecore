@@ -25,8 +25,10 @@ internal class StockAdjustmentReceiptCodec(private val mapper: ObjectMapper) {
             StockAdjustmentState.APPLIED -> if (reason == null && before != null && after != null && ledger != null &&
                 before.available != after.available && before.reserved == after.reserved && before.safety == after.safety)
                 StockAdjustmentReceipt(commandId, variantId.toString(), state, null, before, after, ledger, recordedAt) else unknown
-            StockAdjustmentState.REJECTED -> if (reason != null && reason != StockAdjustmentRejection.UNKNOWN && ledger == null && after == null &&
-                ((reason == StockAdjustmentRejection.BALANCE_MISSING && before == null) || (reason != StockAdjustmentRejection.BALANCE_MISSING && before != null)))
+            StockAdjustmentState.REJECTED -> if (reason != null && reason != StockAdjustmentRejection.UNKNOWN &&
+                node.path("ledgerId").isNull && ledger == null && node.path("after").isNull && after == null &&
+                ((reason == StockAdjustmentRejection.BALANCE_MISSING && node.path("before").isNull && before == null) ||
+                    (reason != StockAdjustmentRejection.BALANCE_MISSING && before != null)))
                 StockAdjustmentReceipt(commandId, variantId.toString(), state, reason, before, null, null, recordedAt) else unknown
             StockAdjustmentState.UNKNOWN -> unknown
         }

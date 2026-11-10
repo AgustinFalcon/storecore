@@ -18,3 +18,7 @@
 - Pull request `#240` was created from `codex/storecore-safe-stock-adjustment` into `master`.
 - Candidate SHA `614c027df2a25709996b23fa99b02178e6ff8b27` passed GitHub Verify run `42879363994`: backend, frontend and unified-access-real-e2e all successful.
 - SSA-013 completed and the feature was finalized through the SDD-kit archival workflow.
+- Final coordinated review of archived SHA `a12013b83d981567d03dac520c7db5df01315acf` found a P2 in the persisted receipt boundary: malformed JSON objects in fields that must be literal null could normalize to null and become terminal rejection receipts.
+- The codec now requires the original `before`, `after` and `ledgerId` nodes to be literal JSON null where the closed rejection invariant requires absence. Focused domain regressions cover objects, arrays, strings, invalid snapshots and malformed ledger values (4/4 tests PASS).
+- The first two full-suite reruns exposed a pre-existing challenge-expiry lock test with only 500 ms of scheduling margin; the isolated test passed. Its fixture now leaves a deterministic two-second post-expiry margin while preserving the same production behavior under test.
+- Final backend rerun after both remediations: 291 tests PASS with no failures, errors or skips.

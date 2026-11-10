@@ -9,7 +9,7 @@ The Angular flow models phases and wire outcomes as closed domain types, persist
 - PR: `#240`.
 - Candidate: `614c027df2a25709996b23fa99b02178e6ff8b27`.
 - GitHub Verify run `42879363994`: 3/3 successful.
-- Backend: 290 tests successful.
+- Backend: 291 tests successful.
 - Frontend: architecture, lint, 1,165 tests and production build successful.
 - Real browser: 22/22 against the packaged backend and fresh PostgreSQL 16.
 - Independent Bug/Product and Security reviews: approved with no open P0-P3 findings.
