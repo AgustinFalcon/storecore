@@ -3,7 +3,7 @@ import { Injectable, signal } from '@angular/core';
 import { BehaviorSubject, catchError, defer, finalize, forkJoin, map, Observable, of, ReplaySubject, share, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
-import { AccessState, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
+import { AccessState, AccessStateKind, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
 import { CustomerProfile } from '../../domain/customer/customer.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { UserSessionResult } from '../../domain/user/user.entity';
@@ -90,6 +90,17 @@ export class AccessCoordinator {
     );
     this.flight = flight;
     return flight;
+  }
+
+  /**
+   * Route guards reuse an already accepted in-memory decision. A fresh browser
+   * boot remains indeterminate and therefore performs the authoritative probe.
+   * This also prevents navigation from rotating CSRF a second time while the
+   * first accepted token is about to authorize a user action such as logout.
+   */
+  navigationState(): Observable<AccessState> {
+    const current = this.state();
+    return current.kind === AccessStateKind.Indeterminate ? this.rehydrate() : of(current);
   }
 
   /** Call when a login starts, before its response may supersede a reload flight. */

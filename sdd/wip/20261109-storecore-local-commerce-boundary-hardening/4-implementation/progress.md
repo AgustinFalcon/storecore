@@ -48,3 +48,16 @@
   integration **19/19 PASS**; frontend architecture 9/9, lint, **1124/1124**, production
   build PASS; focused cart/checkout **17/17 PASS**; browser/axe **60/60 PASS**. The
   non-failing bundle warning is 773.48 kB against the 700 kB warning budget.
+- 2026-11-09 — Both independent exact-head reviews approved
+  `e4560a99c907d8eb20c985ccf724f793aa20f955` with no P0–P3, but hosted Verify
+  `42735473447` exposed a real navigation/logout race: a route guard started a
+  second CSRF rotation after login, and an immediate logout could send the first
+  token after the second response was aborted by navigation. `navigationState()`
+  now reuses a closed, already accepted `AccessState` for same-runtime route guards;
+  a fresh browser boot remains `Indeterminate` and performs authoritative probes.
+  The regression proves navigation emits no second realm/CSRF probe and logout uses
+  the accepted realm token. Frontend architecture 9/9, lint, **1125/1125**, and
+  production build pass locally; the pre-existing non-failing bundle warning is
+  773.58 kB against the 700 kB warning budget. The real E2E cannot run locally
+  because `psql` is absent, so the corrected exact head must prove it in hosted CI
+  and repeat both independent reviews before T07 can close.
