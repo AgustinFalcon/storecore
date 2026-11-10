@@ -79,6 +79,9 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
                 jdbc.update("UPDATE product_variants SET attributes=?::jsonb,attribute_order=ARRAY(SELECT jsonb_array_elements_text(?::jsonb)) WHERE id=?", mapper.writeValueAsString(attributes), mapper.writeValueAsString(attributes.keys), targetVariantId)
             }
             val rawQuantity = variant["availableQuantity"]
+            if (!createdVariant && (variant.containsKey("availableQuantity") || variant.containsKey("stockAdjustmentReason"))) {
+                throw CommerceValidation("CATALOG_STOCK_REQUIRES_ADJUSTMENT_COMMAND")
+            }
             if (rawQuantity != null) {
                 val quantity = number(rawQuantity)?.intValueExact() ?: throw CommerceValidation("CATALOG_AVAILABLE_QUANTITY_INVALID")
                 val reason = variant["stockAdjustmentReason"]?.toString() ?: if (createdVariant) "INITIAL_CATALOG_STOCK" else null

@@ -15,6 +15,13 @@ describe('authInterceptor', () => {
       providers: [provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting()],
     });
   });
+  it.each([409, 422])('accepts committed inventory rejection CSRF rotation on %s', async status => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old'); const epoch = session.authenticationEpoch();
+    const http = TestBed.inject(HttpClient); const ctrl = TestBed.inject(HttpTestingController);
+    const result = firstValueFrom(http.post('/api/v1/user/inventory/42/adjustments', {})).catch(error => error);
+    ctrl.expectOne('/api/v1/user/inventory/42/adjustments').flush({ code: status, data: {} }, { status, statusText: 'Rejected', headers: { [CSRF_HEADER]: 'next' } }); await result;
+    expect(session.csrf()).toBe('next'); expect(session.authenticationEpoch()).toBe(epoch); ctrl.verify();
+  });
   it('blocks legacy same-realm login and registration before sending a request during revoke', async () => {
     const fence = TestBed.inject(AccessMutationFence);
     fence.beginRevocation(AccessContext.Customer);

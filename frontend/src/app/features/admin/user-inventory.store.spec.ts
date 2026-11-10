@@ -17,6 +17,11 @@ function createStore(listInventory: () => Observable<readonly InventoryRow[]> = 
 }
 
 describe('UserInventoryStore', () => {
+  it('invalidates a snapshot on a fresh authentication epoch for the same actor', () => {
+    const { store } = createStore(); store.loadInventory(); expect(store.snapshot.hasSnapshot).toBe(true);
+    expect(store.setActor({ id: 'actor-a', roles: [UserRole.Operator] }, 'new-epoch')).toBe(true);
+    expect(store.snapshot.hasSnapshot).toBe(false); expect(store.snapshot.rows).toEqual([]); store.ngOnDestroy();
+  });
   it('reads only inventory and treats an empty successful response as a snapshot', () => {
     const { store, listInventory } = createStore(vi.fn(() => of(mapInventory({ items: [], total: 0, page: 0, size: 50, truncated: false }))));
     store.loadInventory();

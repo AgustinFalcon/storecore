@@ -1,6 +1,6 @@
 <section class="sc-page sc-console inventory" aria-labelledby="inv-title" [attr.aria-busy]="state.loading">
   <header class="sc-page-head inventory__head">
-    <div><p class="sc-kicker">Operaciones · Sólo lectura</p><h1 id="inv-title">Inventario WEB</h1><p class="sc-page__lede">Consultá la disponibilidad de cada SKU y sus reservas.</p></div>
+    <div><p class="sc-kicker">Operaciones WEB</p><h1 id="inv-title" tabindex="-1">Inventario WEB</h1><p class="sc-page__lede">Consultá la disponibilidad de cada SKU y sus reservas.</p></div>
     @if (!state.readState.isAccessDenied) {
       <button type="button" class="inventory__refresh" [disabled]="state.loading" (click)="retry.emit()">{{ state.loading && state.hasSnapshot ? 'Actualizando…' : 'Actualizar inventario' }}</button>
     }
@@ -40,12 +40,13 @@
       } @else {
         <table class="inventory__table">
           <caption>Inventario WEB por SKU. Resumen de las variantes cargadas; filtros locales a esta página.</caption>
-          <thead><tr><th scope="col">SKU / Producto</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th><th scope="col">Existencias</th><th scope="col">Vendible</th><th scope="col">Actualizado</th></tr></thead>
+          <thead><tr><th scope="col">SKU / Producto</th><th scope="col">Disponibilidad</th><th scope="col">Disponible</th><th scope="col">Reservado</th><th scope="col">Stock de seguridad</th><th scope="col">Existencias</th><th scope="col">Vendible</th><th scope="col">Actualizado</th>@if (adjustmentAvailable || adjustmentPending) { <th scope="col">Acciones</th> }</tr></thead>
           <tbody>@for (row of visibleRows; track row.sku) {
             <tr><th scope="row" class="inventory__sku">{{ row.sku }}<br>{{ row.productName }} · {{ row.variantLabel }}</th>
               <td data-label="Disponibilidad"><span class="inventory__badge" [attr.data-tone]="row.availability.tone">{{ row.availability.label }}</span></td>
               <td data-label="Disponible">{{ row.availableQuantity ?? 'No informado' }}</td><td data-label="Reservado">{{ row.reservedQuantity ?? 'No informado' }}</td><td data-label="Stock de seguridad">{{ row.safetyStock ?? 'No informado' }}</td>
               <td data-label="Existencias">{{ row.onHand ?? 'No informado' }}</td><td data-label="Vendible">{{ row.saleable ?? 'No informado' }}</td><td data-label="Actualizado">{{ row.updatedAt ?? 'No informado' }}</td>
+              @if (adjustmentAvailable || adjustmentPending) { <td data-label="Acciones"><button type="button" [disabled]="!canAdjust(row)" [attr.aria-label]="'Ajustar disponible de ' + row.sku" (click)="adjust.emit(row)">Ajustar disponible</button></td> }
             </tr>
           }</tbody>
         </table>

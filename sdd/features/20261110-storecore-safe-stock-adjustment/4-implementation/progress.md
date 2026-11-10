@@ -1,0 +1,24 @@
+# Implementation progress
+
+- Baseline: `2e9452eb31c96a8c81a38ef0a98f2ee5d216c631` with master Verify `42842643611` 3/3 PASS.
+- Existing inventory UI is read-only and the catalog PUT carries an unsafe absolute stock mutation path.
+- Coordinated GPT-6.1 Sol medium backend and UX analyses converged on delta-only commands, full-snapshot comparison, immutable receipts and explicit unknown-outcome recovery.
+- Backend implementation completed with closed command/outcome/rejection types, strict wire translation, V16 immutable receipts, transactional stock/ledger/audit effects and POST/GET endpoints.
+- Existing-variant catalog PUT no longer accepts stock mutation; initial stock creation remains a separate bounded path.
+- Frontend implementation completed with a dedicated repository/use case/store, persisted authentication epoch, write-ahead recovery journal and an accessible responsive adjustment dialog.
+- Focused backend evidence: 20 tests PASS, including PostgreSQL concurrency with reservation, consumption, expiry and RMA in both lock orders.
+- Full frontend evidence: architecture and lint PASS, 173 files / 1,163 tests PASS, production build PASS.
+- Real browser evidence: `check:ua-real` discovers 22 tests and `test:ua-real` passes 22/22 against the packaged backend and a fresh PostgreSQL 16 database, including exact replay, lost response recovery, global blocking, durable conflict and authority denial.
+- Migration compatibility fixes validated: `CatalogAttributeOrderMigrationTest` and `CfeBaselineUpgradeMigrationTest` now expect V16; their focused rerun passes 2/2.
+- Temporary PostgreSQL and runner processes were stopped and removed after evidence capture.
+- Full backend gate: 290 tests PASS with no failures or errors.
+- A coordinated Bug/Product and Security review found one P2: a contradictory durable receipt could release the recovery journal. The mapper now enforces complete per-state invariants and the store regression proves the journal remains blocked on malformed data.
+- Final frontend gate after the fix: architecture and lint PASS, 173 files / 1,165 tests PASS and production build PASS.
+- Independent coordinated GPT-6.1 Sol Bug/Product and Security reviews both APPROVE exact product SHA `d388f1412b5c64f3445aa057c9168403d3ed1714` with no P0-P3 remaining.
+- Pull request `#240` was created from `codex/storecore-safe-stock-adjustment` into `master`.
+- Candidate SHA `614c027df2a25709996b23fa99b02178e6ff8b27` passed GitHub Verify run `42879363994`: backend, frontend and unified-access-real-e2e all successful.
+- SSA-013 completed and the feature was finalized through the SDD-kit archival workflow.
+- Final coordinated review of archived SHA `a12013b83d981567d03dac520c7db5df01315acf` found a P2 in the persisted receipt boundary: malformed JSON objects in fields that must be literal null could normalize to null and become terminal rejection receipts.
+- The codec now requires the original `before`, `after` and `ledgerId` nodes to be literal JSON null where the closed rejection invariant requires absence. Focused domain regressions cover objects, arrays, strings, invalid snapshots and malformed ledger values (4/4 tests PASS).
+- The first two full-suite reruns exposed a pre-existing challenge-expiry lock test with only 500 ms of scheduling margin; the isolated test passed. Its fixture now leaves a deterministic two-second post-expiry margin while preserving the same production behavior under test.
+- Final backend rerun after both remediations: 291 tests PASS with no failures, errors or skips.

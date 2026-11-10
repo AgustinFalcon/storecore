@@ -92,6 +92,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     }),
     catchError((err: unknown) => {
       if (err instanceof HttpErrorResponse) {
+        // Committed stock business rejections rotate CSRF despite a 409/422 response.
+        if ((err.status === 409 || err.status === 422) && path.includes('/user/inventory/') && path.endsWith('/adjustments')
+          && context === AccessContext.User && fence.accepts(context, generation)) {
+          const token = err.headers.get(CSRF_HEADER);
+          if (token) user.setCsrf(token);
+        }
         if (err.status === 401 && context.isKnown && fence.accepts(context, generation)) {
           if (context === AccessContext.Customer) {
             customer.clear();

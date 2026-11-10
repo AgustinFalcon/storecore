@@ -46,9 +46,9 @@ export class UserInventoryStore extends ComponentStore<UserInventoryState> {
   readonly setFilter = this.updater((state, filter: InventoryFilter) => ({ ...state, filter }));
   readonly clearFilters = (): void => this.patchState({ query: '', filter: InventoryFilter.All });
 
-  setActor(principal: UserSessionResult | null): boolean {
+  setActor(principal: UserSessionResult | null, authenticationEpoch = ''): boolean {
     const roles = principal?.roles.filter((role) => role === UserRole.Admin || role === UserRole.Operator) ?? [];
-    const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map((role) => role.wire).sort()]) : null;
+    const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map((role) => role.wire).sort(), authenticationEpoch]) : null;
     if (actorKey === this.actorKey) return false;
     this.actorKey = actorKey;
     this.page = BoundedPageRequest.first();

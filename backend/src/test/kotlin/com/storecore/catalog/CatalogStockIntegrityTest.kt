@@ -32,22 +32,20 @@ class CatalogStockIntegrityTest @Autowired constructor(
         }
     }
     @Test
-    fun `catalog stock edit appends ledger and reason audit while preserving reservations`() {
+    fun `catalog rejects stale absolute stock even with reason and preserves reservations`() {
         val sku = createProduct(8)
         val variantId = variantId(sku)
         val saga = UUID.randomUUID()
         val line = UUID.randomUUID()
         inventory.reserve(saga, line, variantId, 2, "WEB")
 
-        saveProduct(sku, 5, "Damaged during count")
+        val failure = assertThrows(CommerceValidation::class.java) { saveProduct(sku, 8, "Damaged during count") }
+        assertEquals("CATALOG_STOCK_REQUIRES_ADJUSTMENT_COMMAND", failure.message)
 
-        assertEquals(5, scalar("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", variantId))
+        assertEquals(6, scalar("SELECT available_quantity FROM inventory_balances WHERE variant_id=?", variantId))
         assertEquals(2, scalar("SELECT reserved_quantity FROM inventory_balances WHERE variant_id=?", variantId))
-        assertEquals(-1, scalar("SELECT quantity_delta FROM inventory_ledger WHERE variant_id=? AND event_type='ADJUSTMENT' ORDER BY id DESC LIMIT 1", variantId))
-        val audit = jdbc.queryForObject("SELECT payload_redacted::text FROM audit_events WHERE event_type='INVENTORY_ADJUSTED' AND aggregate_id=? ORDER BY id DESC LIMIT 1", String::class.java, variantId)
-        assertNotNull(audit)
-        assertEquals(true, audit!!.contains("Damaged during count"))
-        assertEquals(true, jdbc.queryForObject("SELECT actor_type || ':' || actor_id FROM audit_events WHERE event_type='INVENTORY_ADJUSTED' AND aggregate_id=? ORDER BY id DESC LIMIT 1", String::class.java, variantId)!!.startsWith("USER:1"))
+        assertEquals(1, scalar("SELECT COUNT(*) FROM inventory_ledger WHERE variant_id=? AND event_type='ADJUSTMENT'", variantId))
+        assertThrows(CommerceValidation::class.java) { catalog.saveProduct(sku,sku,"","","",emptyList(),listOf(mapOf("sku" to sku,"stockAdjustmentReason" to "reason only")),mapOf("base" to 10),true,1) }
     }
 
     @Test

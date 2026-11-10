@@ -466,7 +466,7 @@ class IdentityHttpIntegrationTest(
         val tokenFactory = com.storecore.identity.infrastructure.security.OpaqueTokenFactory()
         val challengeHash = tokenFactory.sha256(rawChallenge)
         jdbc.update(
-            """WITH issued AS (SELECT clock_timestamp()-interval '118 seconds' value)
+            """WITH issued AS (SELECT clock_timestamp()-interval '119 seconds' value)
                INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
                SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds' FROM issued""",
             java.util.UUID.randomUUID(), challengeHash, tokenFactory.sha256(rawNonce), "http://localhost:4200", customerEmail, userEmail,
@@ -488,7 +488,8 @@ class IdentityHttpIntegrationTest(
                         "__Host-storecore_access_challenge=$rawNonce",
                     ).statusCode.value()
                 }
-                Thread.sleep(2_500)
+                // Keep a two-second expiry margin so a loaded full suite cannot turn this lock test into a timing race.
+                Thread.sleep(3_000)
                 blocker.commit()
                 assertEquals(401, future.get(10, java.util.concurrent.TimeUnit.SECONDS))
             }
