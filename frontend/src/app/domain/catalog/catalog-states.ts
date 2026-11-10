@@ -9,10 +9,16 @@ export class ProductStatus {
 }
 
 export class VariantStatus {
-  private constructor(readonly wire: string, readonly label: string, readonly isPublic: boolean = false) {}
+  private constructor(
+    readonly wire: string,
+    readonly label: string,
+    readonly isPublic: boolean = false,
+    readonly canPersist: boolean = true,
+  ) {}
   static readonly Active = new VariantStatus('ACTIVE', 'Activa', true);
   static readonly Inactive = new VariantStatus('INACTIVE', 'Inactiva');
-  static readonly Unknown = new VariantStatus('UNKNOWN', 'Estado no informado');
+  static readonly Unknown = new VariantStatus('UNKNOWN', 'Estado no informado', false, false);
+  static readonly selectable = [VariantStatus.Active, VariantStatus.Inactive];
   static readonly values = [VariantStatus.Active, VariantStatus.Inactive, VariantStatus.Unknown];
   static fromWire(raw: unknown): VariantStatus { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }

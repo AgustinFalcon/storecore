@@ -2,10 +2,10 @@ import { BoundedPaginationComponent } from '../../shared/bounded-pagination.comp
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { ProductDetail } from '../../domain/catalog/product-detail.entity';
+import { ProductDetail, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
-import { ProductStatus } from '../../domain/catalog/catalog-states';
+import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -14,6 +14,7 @@ import { ProductStatus } from '../../domain/catalog/catalog-states';
   templateUrl: './user-catalog.view.html',
 })
 export class UserCatalogViewComponent {
+  readonly variantStatuses = VariantStatus.selectable;
   @Input({ required: true }) state!: AdminCatalogState;
   @Output() readonly draftChange = new EventEmitter<ProductDetail>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
@@ -35,6 +36,36 @@ export class UserCatalogViewComponent {
   setActive(active: boolean): void { this.patch({ status: active ? ProductStatus.Active : ProductStatus.Draft, active }); }
   attributes(value: Readonly<Record<string, unknown>>): readonly [string, string][] {
     return Object.entries(value).map(([key, value]) => [key, typeof value === 'string' ? value : JSON.stringify(value)]);
+  }
+
+  patchVariant(index: number, partial: Partial<ProductVariant>): void {
+    const variants = this.state.draft.variants.map((variant, current) => current === index ? { ...variant, ...partial } : variant);
+    this.patch({ variants });
+  }
+
+  setVariantStatus(index: number, raw: unknown): void {
+    this.patchVariant(index, { status: VariantStatus.fromWire(raw) });
+  }
+
+  patchAttribute(variantIndex: number, attributeIndex: number, key: string, value: string): void {
+    const entries = this.attributes(this.state.draft.variants[variantIndex]?.attributes ?? {});
+    const next = entries.map((entry, current) => current === attributeIndex ? [key, value] as const : entry);
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(next) });
+  }
+
+  addAttribute(variantIndex: number): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    let suffix = 1;
+    let key = 'Característica';
+    while (Object.hasOwn(variant.attributes, key)) key = `Característica ${++suffix}`;
+    this.patchVariant(variantIndex, { attributes: { ...variant.attributes, [key]: '' } });
+  }
+
+  removeAttribute(variantIndex: number, key: string): void {
+    const variant = this.state.draft.variants[variantIndex];
+    if (!variant) return;
+    this.patchVariant(variantIndex, { attributes: Object.fromEntries(Object.entries(variant.attributes).filter(([name]) => name !== key)) });
   }
 
   patchPrice(partial: Partial<ProductDetail['price']>): void {

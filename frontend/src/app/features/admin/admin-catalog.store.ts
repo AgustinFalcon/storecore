@@ -140,13 +140,26 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     trigger$.pipe(
       filter(() => !!this.actorKey),
       tap(() => {
-        if (!this.snapshot.draft.sku.trim() || !this.snapshot.draft.name.trim()) {
-          this.patchState({ loading: false, errorMessage: 'SKU y nombre son obligatorios.' });
+        const draft = this.snapshot.draft;
+        const invalidVariant = draft.variants.some(variant =>
+          !variant.id.trim() || !variant.sku.trim() || !variant.name.trim() || !variant.status.canPersist ||
+          Object.keys(variant.attributes).some(key => !key.trim()),
+        );
+        if (!draft.sku.trim() || !draft.name.trim() || invalidVariant) {
+          this.patchState({ loading: false, errorMessage: invalidVariant
+            ? 'Cada variante debe conservar identidad, SKU, nombre, estado conocido y atributos con nombre.'
+            : 'SKU y nombre son obligatorios.' });
           return;
         }
         this.patchState({ loading: true, errorMessage: '' });
       }),
-      filter(() => Boolean(this.snapshot.draft.sku.trim() && this.snapshot.draft.name.trim())),
+      filter(() => {
+        const draft = this.snapshot.draft;
+        return Boolean(draft.sku.trim() && draft.name.trim() && draft.variants.every(variant =>
+          variant.id.trim() && variant.sku.trim() && variant.name.trim() && variant.status.canPersist &&
+          Object.keys(variant.attributes).every(key => key.trim()),
+        ));
+      }),
       switchMap(() =>
         this.catalog.save(this.snapshot.draft).pipe(
           takeUntil(this.actorChanged),

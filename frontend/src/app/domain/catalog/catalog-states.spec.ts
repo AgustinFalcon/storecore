@@ -11,5 +11,7 @@ describe('closed catalog states', () => {
     }
     expect(ProductStatus.Unknown.isPublic).toBe(false);
     expect(VariantStatus.Unknown.isPublic).toBe(false);
+    expect(VariantStatus.selectable).toEqual([VariantStatus.Active, VariantStatus.Inactive]);
+    expect(VariantStatus.Unknown.canPersist).toBe(false);
   });
 });
