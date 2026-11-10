@@ -16,7 +16,7 @@ import { ListCustomerAddressesUseCase } from '../../domain/customer/use-cases/li
 import { OrderStatus, PaymentStatus } from '../../domain/order/commerce-states';
 import { UserRole } from '../../domain/user/user-role';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
-import { CartStore } from './cart.store';
+import { CartFailureKind, CartStore } from './cart.store';
 
 const actorA: CustomerProfile = { id: 'actor-a', email: 'a@example.test', firstName: 'A', lastName: 'A', phone: '' };
 const actorB: CustomerProfile = { ...actorA, id: 'actor-b', email: 'b@example.test' };
@@ -60,7 +60,7 @@ describe('CartStore actor isolation', () => {
     const key = store.snapshot.idempotencyKey;
     expect(store.snapshot.receipt).toEqual(receipt);
     session.commit(actorB, 'csrf-b');
-    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: '' }, addresses: [], addressId: '', currency: 'ARS', idempotencyKey: store.snapshot.idempotencyKey, receipt: null });
+    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: '' }, addresses: [], addressId: '', currency: 'ARS', idempotencyKey: store.snapshot.idempotencyKey, receipt: null, failureKind: CartFailureKind.None });
     expect(store.snapshot.idempotencyKey).not.toBe(key);
   });
   it('cancels all four in-flight effects and ignores late actor-A results and navigation', () => {
@@ -143,6 +143,7 @@ describe('CartStore actor isolation', () => {
     expect(store.snapshot.receipt).toBeNull();
     expect(store.snapshot.loading).toBe(false);
     expect(store.snapshot.errorMessage).toBeTruthy();
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.CheckoutRetryable);
     expect(navigate).not.toHaveBeenCalled();
     checkout.execute.mockReturnValue(of(receipt));
     store.submitCheckout();
