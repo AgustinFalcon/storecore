@@ -11,7 +11,7 @@
 - [x] SSA-009 Build the complete responsive and accessible inventory adjustment experience.
 - [x] SSA-010 Add backend PostgreSQL/HTTP concurrency, replay, rollback, authorization and migration tests.
 - [x] SSA-011 Add frontend unit/HTTP/browser/axe tests and Real E2E evidence.
-- [ ] SSA-012 Run complete local gates and obtain two independent exact-head GPT-6.1 Sol reviews.
+- [x] SSA-012 Run complete local gates and obtain two independent exact-head GPT-6.1 Sol reviews.
 - [ ] SSA-013 Create PR, pass candidate CI and archive the completed feature.
 
 ## Post-merge release evidence

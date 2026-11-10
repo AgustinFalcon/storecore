@@ -11,3 +11,7 @@
 - Real browser evidence: `check:ua-real` discovers 22 tests and `test:ua-real` passes 22/22 against the packaged backend and a fresh PostgreSQL 16 database, including exact replay, lost response recovery, global blocking, durable conflict and authority denial.
 - Migration compatibility fixes validated: `CatalogAttributeOrderMigrationTest` and `CfeBaselineUpgradeMigrationTest` now expect V16; their focused rerun passes 2/2.
 - Temporary PostgreSQL and runner processes were stopped and removed after evidence capture.
+- Full backend gate: 290 tests PASS with no failures or errors.
+- A coordinated Bug/Product and Security review found one P2: a contradictory durable receipt could release the recovery journal. The mapper now enforces complete per-state invariants and the store regression proves the journal remains blocked on malformed data.
+- Final frontend gate after the fix: architecture and lint PASS, 173 files / 1,165 tests PASS and production build PASS.
+- Independent coordinated GPT-6.1 Sol Bug/Product and Security reviews both APPROVE exact product SHA `d388f1412b5c64f3445aa057c9168403d3ed1714` with no P0-P3 remaining.
