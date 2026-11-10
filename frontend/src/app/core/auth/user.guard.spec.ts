@@ -10,7 +10,7 @@ import { userGuard } from './user.guard';
 
 describe('userGuard', () => {
   function run(access: AccessState, url: string): Promise<unknown> {
-    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AccessCoordinator, useValue: { rehydrate: () => of(access) } }] });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AccessCoordinator, useValue: { navigationState: () => of(access) } }] });
     return firstValueFrom(TestBed.runInInjectionContext(() => userGuard({} as never, { url } as never)) as Observable<unknown>);
   }
   it('redirects to unified login with a closed return destination', async () => {

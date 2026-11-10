@@ -5,11 +5,13 @@
 | Artefacto | Qué es | Estado |
 |---|---|---|
 | `sdd-v1.0.0` | baseline SDD/documentación | draft, sin tag |
-| `storecore-core-v1.0.0` | core merchant-agnostic de producción | ready for Sol review |
+| `storecore-core-v1.0.0` | core merchant-agnostic de producción | archivado en `sdd/features/20260921-single-tenant-installation-baseline/`; sin tag ni autorización de deploy |
 | `universal-tools-profile@1.0.0` | perfil importable de config/fixtures compatible con core 1.x | contrato, sin importación productiva |
 | `storecore-pos-integration-contract-v1` | OpenAPI companion BlackStore `/blackstore-integration/v1` | **WIP** `ready_for_sol_review`, no approved; D-TTL/D-CURSOR/D-RATE/D-PATH cerrados |
 
-## Gate antes de cualquier Git/release
+## Checklist histórico de baseline y gate de release
+
+El GO core está registrado en `sdd/reviews/20260922-sol-go-core.md` y su feature archivado. Los checks siguientes conservan la checklist original; no invalidan ese cierre ni autorizan release operativo.
 
 - [ ] Sol aprueba specs, modelo, ADRs y las 14 tareas core.
 - [ ] Evidencia de las 11 tareas L1 y los 3 gates L3.
@@ -28,8 +30,12 @@ El candidato documental `4debf9b` pasó Verify `42653866473` y doble review
 GPT-6.1 Sol; el SDD queda archivado. No se afirma CI push de master ni se autoriza release,
 homologación, credenciales live o activación. Ante un eventual fallo, el rollback no puede
 reabrir despacho sin pago: detener escrituras mediante la capability existente,
-con autorización operativa separada. Disposición/restock sigue diferido; no hay
-migración nueva ni homologación externa en este corte.
+con autorización operativa separada. El corte posterior #233 cerró disposición
+por ítem y reposición RESTOCK-only en
+`sdd/features/20261109-commerce-rma-item-disposition-and-restock/`
+(candidato `fc80316`, Verify `42666041072`, doble review Sol). Siguen excluidos
+RMA parcial/múltiple, compensación posterior, reembolso, nota fiscal y carrier.
+No se infiere homologación externa de ninguno de estos cortes.
 
 ## Gate `release/1.0` de integración BlackStore
 

@@ -6,6 +6,7 @@ import { UserAction } from './user-action';
 import { UserHomeComponent } from './user-home.component';
 import { ReadOverviewUseCase } from '../../domain/overview/use-cases/read-overview.usecase';
 import { OverviewFactState, OverviewPeriod, OverviewUnavailableReason, PendingPaymentReason } from '../../domain/overview/overview';
+import { ShipmentStatus } from '../../domain/order/commerce-states';
 import { of } from 'rxjs';
 
 const overview = {
@@ -23,10 +24,18 @@ describe('UserHomeComponent', () => {
     const fixture = TestBed.createComponent(UserHomeComponent);
     fixture.detectChanges();
     expect(fixture.componentInstance.actions()).toContain(UserAction.Promos);
+    expect(fixture.componentInstance.actions()).toContain(UserAction.Content);
+    expect(fixture.componentInstance.actions()).toContain(UserAction.MercadoLibre);
     session.commit({ id: 'user-1', roles: [UserRole.Operator] }, 'csrf');
     fixture.detectChanges();
     expect(fixture.componentInstance.actions()).not.toContain(UserAction.Promos);
     expect(fixture.nativeElement.textContent).not.toContain(UserAction.Promos.label);
+    expect(fixture.nativeElement.querySelector('a[href="/user/content"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/user/mercadolibre"]')).toBeNull();
+    session.commit({ id: 'user-2', roles: [UserRole.Operator] }, 'csrf-new');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.actions()).not.toContain(UserAction.Content);
+    expect(fixture.componentInstance.actions()).not.toContain(UserAction.MercadoLibre);
     session.clear(); fixture.detectChanges();
     expect(fixture.componentInstance.actions()).toEqual([]);
     expect(fixture.nativeElement.textContent).toContain('No hay acciones disponibles');
@@ -53,5 +62,15 @@ describe('UserHomeComponent', () => {
     TestBed.configureTestingModule({ imports: [UserHomeComponent], providers: [provideRouter([]), { provide: ReadOverviewUseCase, useValue: { execute: vi.fn(() => of(bounded)) } }] });
     const fixture = TestBed.createComponent(UserHomeComponent); fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Mostrando 1 de 2 pagos');
+  });
+  it('links each payment and fulfillment queue row to its own exact order', () => {
+    const queues = { ...overview,
+      pendingPayments: { ...overview.pendingPayments, items: [{ orderId: 17, orderNumber: 'SC-17', total: 100, createdAt: '2026-11-08T12:00:00Z', reason: PendingPaymentReason.Pending }], totalCount: 1 },
+      fulfillment: { ...overview.fulfillment, items: [{ orderId: 29, orderNumber: 'SC-29', total: 200, paidAt: '2026-11-08T12:00:00Z', shipmentState: ShipmentStatus.NotCreated }], totalCount: 1 },
+    };
+    TestBed.configureTestingModule({ imports: [UserHomeComponent], providers: [provideRouter([]), { provide: ReadOverviewUseCase, useValue: { execute: vi.fn(() => of(queues)) } }] });
+    const fixture = TestBed.createComponent(UserHomeComponent); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('a[href="/user/orders/17"]').textContent).toContain('SC-17');
+    expect(fixture.nativeElement.querySelector('a[href="/user/orders/29"]').textContent).toContain('SC-29');
   });
 });

@@ -122,6 +122,149 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `retired checkout rejects without effects and retired removal is idempotent`() {
+        for (retireProduct in listOf(true, false)) {
+            customer = addAddress(registerCustomer("boundary-${UUID.randomUUID()}@example.com"))
+            val good = "GOOD-${UUID.randomUUID()}"
+            val retired = "RETIRED-${UUID.randomUUID()}"
+            putProduct(good, "Sellable")
+            putProduct(retired, "Retired")
+            for (sku in listOf(good, retired)) {
+                val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+                assertEquals(200, added.statusCode.value(), added.body)
+                customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+            }
+            if (retireProduct) jdbc.update("UPDATE products SET status='ARCHIVED' WHERE id=(SELECT product_id FROM product_variants WHERE sku=?)", retired)
+            else jdbc.update("UPDATE product_variants SET active=false WHERE sku=?", retired)
+            val cartBefore = exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie).body
+            fun effects() = listOf("checkout_idempotency_claims", "orders", "order_items", "payments", "shipments", "inventory_reservations", "inventory_ledger").associateWith {
+                jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java)
+            }
+            val before = effects()
+            val balances = jdbc.queryForList("SELECT b.* FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku IN (?,?) ORDER BY b.variant_id", good, retired)
+            val body = """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}"""
+            val denied = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+            assertEquals(400, denied.statusCode.value(), denied.body)
+            assertTrue(denied.body!!.contains("PRODUCT_NOT_SELLABLE"), denied.body)
+            assertEquals(before, effects())
+            assertEquals(balances, jdbc.queryForList("SELECT b.* FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku IN (?,?) ORDER BY b.variant_id", good, retired))
+            assertEquals(cartBefore, exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie).body)
+            repeat(2) {
+                val removed = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$retired","quantity":0}""", customer.cookie, customer.csrf)
+                assertEquals(200, removed.statusCode.value(), removed.body)
+                customer = customer.copy(csrf = removed.headers.getFirst("X-CSRF-Token")!!)
+                assertTrue(!removed.body!!.contains(retired))
+            }
+            assertEquals(200, exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf).statusCode.value())
+        }
+    }
+
+    @Test
+    fun `completed checkout replays after catalog retirement`() {
+        val sku = "REPLAY-${UUID.randomUUID()}"
+        putProduct(sku, "Historical")
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val body = """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}"""
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        customer = customer.copy(csrf = first.headers.getFirst("X-CSRF-Token")!!)
+        jdbc.update("UPDATE products SET status='ARCHIVED' WHERE id=(SELECT product_id FROM product_variants WHERE sku=?)", sku)
+        jdbc.update("UPDATE product_variants SET active=false WHERE sku=?", sku)
+        val replay = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(200, replay.statusCode.value(), replay.body)
+        assertEquals(mapper.readTree(first.body).path("data"), mapper.readTree(replay.body).path("data"))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM inventory_reservations WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+    }
+
+    @Test
+    fun `checkout waits for retiring catalog writer and then rejects without reserving`() {
+        val sku = "RACE-${UUID.randomUUID()}"
+        putProduct(sku, "Retiring")
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val key = UUID.randomUUID()
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            jdbc.dataSource!!.connection.use { writer ->
+                writer.autoCommit = false
+                val pid = writer.createStatement().use { statement -> statement.executeQuery("SELECT pg_backend_pid()").use { rs -> rs.next(); rs.getInt(1) } }
+                writer.prepareStatement("UPDATE products SET status='ARCHIVED' WHERE id=(SELECT product_id FROM product_variants WHERE sku=?)").use { statement -> statement.setString(1, sku); statement.executeUpdate() }
+                val pending = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+                }
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                var waiting = false
+                while (!waiting && System.nanoTime() < deadline) {
+                    waiting = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) AND query LIKE '%FROM products WHERE id=%FOR%UPDATE%')", Boolean::class.java, pid) == true
+                    if (!waiting) Thread.sleep(20)
+                }
+                assertTrue(waiting, "checkout must wait for the writer before deciding sellability")
+                writer.commit()
+                val denied = pending.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(400, denied.statusCode.value(), denied.body)
+                assertTrue(denied.body!!.contains("PRODUCT_NOT_SELLABLE"), denied.body)
+            }
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM inventory_reservations WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+        } finally { executor.shutdownNow() }
+    }
+
+    @Test
+    fun `crossed multi product carts serialize without deadlock`() {
+        val a1 = "A1-${UUID.randomUUID()}"
+        val b1 = "B1-${UUID.randomUUID()}"
+        val b2 = "B2-${UUID.randomUUID()}"
+        val a2 = "A2-${UUID.randomUUID()}"
+        putProduct(a1, "First parent", available = 20)
+        putProduct(b1, "Second parent", available = 20)
+        val firstProduct = jdbc.queryForObject("SELECT product_id FROM product_variants WHERE sku=?", Long::class.java, a1)!!
+        val secondProduct = jdbc.queryForObject("SELECT product_id FROM product_variants WHERE sku=?", Long::class.java, b1)!!
+        // Deliberately interleave variant ids across parents: A1 < B1 < B2 < A2.
+        for ((sku, productId) in listOf(b2 to secondProduct, a2 to firstProduct)) {
+            val id = jdbc.queryForObject("INSERT INTO product_variants(product_id,sku,label) VALUES (?,?,?) RETURNING id", Long::class.java, productId, sku, sku)!!
+            jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity) VALUES (?,20)", id)
+        }
+        fun owner(skus: List<String>): Session {
+            var session = addAddress(registerCustomer("crossed-${UUID.randomUUID()}@example.com"))
+            for (sku in skus) {
+                val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", session.cookie, session.csrf)
+                assertEquals(200, added.statusCode.value(), added.body)
+                session = session.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+            }
+            return session
+        }
+        val owners = listOf(owner(listOf(a1, b2)), owner(listOf(b1, a2)))
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            jdbc.dataSource!!.connection.use { blocker ->
+                blocker.autoCommit = false
+                val pid = blocker.createStatement().use { statement -> statement.executeQuery("SELECT pg_backend_pid()").use { rs -> rs.next(); rs.getInt(1) } }
+                blocker.prepareStatement("SELECT id FROM products WHERE id=? FOR UPDATE").use { statement -> statement.setLong(1, firstProduct); statement.executeQuery().close() }
+                val pending = owners.map { session -> executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${session.addressId}","currency":"ARS"}""", session.cookie, session.csrf)
+                } }
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                var waiting = 0
+                while (waiting < 2 && System.nanoTime() < deadline) {
+                    // A queued row-lock waiter can be blocked by the preceding waiter,
+                    // rather than directly by our transaction's pid.
+                    waiting = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE pid<>? AND wait_event_type='Lock' AND query LIKE '%FROM products WHERE id=%FOR%UPDATE%'", Int::class.java, pid)!!
+                    if (waiting < 2) Thread.sleep(20)
+                }
+                assertEquals(2, waiting, "both checkouts must wait on the first parent, rather than hold crossed parents")
+                blocker.commit()
+                pending.forEach { future ->
+                    val response = future.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                    assertEquals(200, response.statusCode.value(), response.body)
+                }
+            }
+        } finally { executor.shutdownNow() }
+    }
+
+    @Test
     fun `legacy payment webhook is retired without inbox`() {
         val first = exchange("/api/v1/payments/mercadopago/notifications?topic=payment&id=mp-88", HttpMethod.POST, """{"type":"payment","data":{"id":"mp-88"}}""")
         assertEquals(410, first.statusCode.value())
@@ -240,6 +383,49 @@ class CommerceHttpIntegrationTest(
         // A failed transaction preserves the losing session's CSRF token.
         val retry = exchange("/api/v1/user/promos/${ids[loser]}/state", HttpMethod.POST, """{"transition":"ACTIVATE"}""", sessions[loser].cookie, sessions[loser].csrf)
         assertEquals(409, retry.statusCode.value(), retry.body)
+    }
+
+    @Test
+    fun `manual promotion waits on product before locking its variant`() {
+        val sku = "SKU-PROMO-LOCK-${UUID.randomUUID()}"
+        putProduct(sku, "Ordered promotion lock")
+        val productId = jdbc.queryForObject("SELECT product_id FROM product_variants WHERE sku=?", Long::class.java, sku)!!
+        val from = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.SECONDS)
+        val to = from.plusSeconds(3600)
+        val body = """{"listingSku":"$sku","currency":"ARS","priceScope":"DEFAULT","desiredPrice":90,"validFrom":"$from","validTo":"$to"}"""
+        val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            jdbc.dataSource!!.connection.use { blocker ->
+                blocker.autoCommit = false
+                val pid = blocker.createStatement().use { statement -> statement.executeQuery("SELECT pg_backend_pid()").use { rs -> rs.next(); rs.getInt(1) } }
+                blocker.prepareStatement("SELECT id FROM products WHERE id=? FOR UPDATE").use { statement ->
+                    statement.setLong(1, productId)
+                    statement.executeQuery().close()
+                }
+                val pending = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    exchange("/api/v1/user/promos", HttpMethod.POST, body, admin.cookie, admin.csrf)
+                }
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                var waiting = false
+                while (!waiting && System.nanoTime() < deadline) {
+                    waiting = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid)) AND query LIKE '%FROM products WHERE id=%FOR NO KEY UPDATE%')", Boolean::class.java, pid) == true
+                    if (!waiting) Thread.sleep(20)
+                }
+                assertTrue(waiting, "promotion must wait on the product before taking the variant lock")
+                jdbc.dataSource!!.connection.use { observer ->
+                    observer.prepareStatement("SELECT id FROM product_variants WHERE sku=? FOR UPDATE NOWAIT").use { statement ->
+                        statement.setString(1, sku)
+                        statement.executeQuery().close()
+                    }
+                }
+                blocker.commit()
+                val created = pending.get(10, java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(200, created.statusCode.value(), created.body)
+                admin = admin.copy(csrf = created.headers.getFirst("X-CSRF-Token")!!)
+            }
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test

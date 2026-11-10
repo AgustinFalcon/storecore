@@ -22,7 +22,9 @@
 | `web-cross-sell-discounts` | TODO-033 deferred | relation/eligibility/stacking/priority/margin/snapshot/reversal |
 | `commercial-calendar` | TODO-034 deferred | events/campaigns configurables, timezone/preflight/kill/rollback |
 | ML virtual kits | TODO-035 deferred | feature separada, sin inferencia en catálogo core |
-| favorites/loyalty/carriers | TODO-036..038 deferred | sin DDL/tarea core |
+| favorites | TODO-036 done; PSD-T02 + PSD-T08 | HTTP/UI CUSTOMER, V12, add/remove/reload local; cierre documental global PSD pendiente |
+| loyalty/carriers | TODO-037..038 deferred | sin DDL/tarea core |
+| navegación paginada pública/admin/inventario | TODO-046; `sdd/features/20261109-storecore-bounded-list-navigation/` | PR #234, candidato `4e99400`, Verify `42675235368`; sin nuevo write API ni proveedor |
 | fiscal externo | TODO-020 deferred; `20260921-arca-fiscal-discovery`; `20260921-arca-storecore-adapter-contract` | D-01..D-07 + SC-01..SC-07 + Sol GO; sin DDL/tarea StoreCore |
 | POS ingest inventario | `20260921-pos-sales-ingestion` | **superseded** para companion; no GO |
 | Contrato POS v1 | `20260921-storecore-pos-integration-contract-v1` | OpenAPI canónico `/blackstore-integration/v1`. PIC-001..010 y L3 locales done: HTTP 200/304/409/410/429 en Testcontainers, V7 deja `future_optional=false` y el módulo `DISABLED`, outbox local PIC-009. Companion live, fiscal y `/sdd.finish` NO-GO |
@@ -31,13 +33,14 @@
 
 CFE-R01–R08 → CFE-T01–T06: inventario, targets reales, evidencia local y
 escenarios E01–E09 cerrados en
-`sdd/features/20261109-commerce-fulfillment-acceptance-evidence/`. La evidencia
+`sdd/features/20261006-commerce-closed-states-and-fulfillment-eligibility/`. La evidencia
 incluye PostgreSQL/HTTP, instalaciones clean/upgrade, navegador real, CI del
 head exacto y doble review. La disposición posterior por ítem se cierra en
 `sdd/features/20261109-commerce-rma-item-disposition-and-restock/` mediante
 RMA-T01–T07, manteniendo recepción e inspección como responsabilidades
 separadas.
 
+Antecedente histórico, superado por el cierre CFE indicado arriba; no describe el gate vigente:
 CFE aceptación local 2026-10-07: R02/R03/R06/R08 → E01/E03/E04/E05/E08 →
 CommerceHttpIntegrationTest y MpOrdersCheckoutIntegrationTest ampliados;
 compilación PASS, HTTP/DB NOT_RUN. R01/R02 → E02 → nuevo

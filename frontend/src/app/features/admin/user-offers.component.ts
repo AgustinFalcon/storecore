@@ -70,6 +70,8 @@ export class UserOffersComponent implements OnInit {
     return (this.statusFilter() === null || offer.status === this.statusFilter())
       && (!query || offer.name.toLocaleLowerCase().includes(query) || offer.skus.some((sku) => sku.toLocaleLowerCase().includes(query)));
   }
+  visibleOffers(offers: readonly Offer[]): readonly Offer[] { return offers.filter((offer) => this.visible(offer)); }
+  clearFilters(): void { this.query.set(''); this.statusFilter.set(null); }
   submit(): void {
     this.formError.set('');
     const draft = this.draft();

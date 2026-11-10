@@ -1,0 +1,14 @@
+{
+  "feature": "20261109-storecore-local-commerce-boundary-hardening",
+  "status": "complete",
+  "stats": { "total": 7, "done": 7, "in_progress": 0, "pending": 0 },
+  "tasks": [
+    { "id": "LCBH-T01", "title": "Approve functional and technical boundary contract", "status": "done", "depends_on": [], "requirements": ["LCBH-R01", "LCBH-R10"], "acceptance": ["Two independent GPT-6.1 Sol spec reviews report no P0-P2", "GO and exact reviewed base are recorded"] },
+    { "id": "LCBH-T02", "title": "Enforce atomic checkout sellability and retired-line removal", "status": "done", "depends_on": ["LCBH-T01"], "requirements": ["LCBH-R01", "LCBH-R02", "LCBH-R03", "LCBH-R04"], "acceptance": ["PostgreSQL proves no effects on retirement", "Product-then-variant-then-balance order survives crossed carts", "Historical replay remains stable"] },
+    { "id": "LCBH-T03", "title": "Delegate discounts to the closed DiscountKind domain", "status": "done", "depends_on": ["LCBH-T01"], "requirements": ["LCBH-R05"], "acceptance": ["No commerce infrastructure string switch remains", "Unknown kind rejects"] },
+    { "id": "LCBH-T04", "title": "Fail closed on malformed cart and receipt HTTP structures", "status": "done", "depends_on": ["LCBH-T01"], "requirements": ["LCBH-R06", "LCBH-R07"], "acceptance": ["Structural corruption fails translation", "Future nonblank state strings alone become Unknown", "Failed receipt preserves key and route"] },
+    { "id": "LCBH-T05", "title": "Align role actions and complete local presentation states", "status": "done", "depends_on": ["LCBH-T01"], "requirements": ["LCBH-R08", "LCBH-R09"], "acceptance": ["ADMIN/OPERATOR/Unknown navigation matches backend", "Overview rows deep-link", "Filtered offers have an explicit clearable empty state"] },
+    { "id": "LCBH-T06", "title": "Reconcile surface manifest and canonical SDD close-out records", "status": "done", "depends_on": ["LCBH-T01"], "requirements": ["LCBH-R10"], "acceptance": ["Manifest lists only UI-reachable operations", "STATUS, Favorites, CFE link and RMA release text use existing evidence", "PSD/Showcase are not marked archived without their own exact-head provider/model/effort/scope/check records; missing evidence stays explicit"] },
+    { "id": "LCBH-T07", "title": "Run full gates, candidate PR, exact-head reviews and close-out", "status": "done", "depends_on": ["LCBH-T02", "LCBH-T03", "LCBH-T04", "LCBH-T05", "LCBH-T06"], "requirements": ["LCBH-R01", "LCBH-R10"], "acceptance": ["Local gates pass", "Candidate PR exact-head Verify passes", "Two exact-head reviews approve", "Close-out commit is reverified before archive and merge"] }
+  ]
+}

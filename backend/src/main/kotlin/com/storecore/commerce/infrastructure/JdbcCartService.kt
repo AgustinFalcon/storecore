@@ -1,8 +1,12 @@
 package com.storecore.commerce.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.catalog.domain.ProductStatus
+import com.storecore.catalog.domain.VariantStatus
+import com.storecore.offers.domain.DiscountKind
 import com.storecore.commerce.application.CheckoutConflict
 import com.storecore.commerce.application.CommerceValidation
+import com.storecore.commerce.application.LocalOfferDiscount
 import com.storecore.commerce.domain.CartLineView
 import com.storecore.commerce.domain.CartView
 import com.storecore.commerce.domain.CheckoutReceipt
@@ -34,9 +38,12 @@ class JdbcCartService(
 
     fun putItem(customer: CustomerPrincipal, sku: String, quantity: Int): CartView {
         val cartId = ensureCart(customer.customerId)
-        val priced = price(sku)
-        if (quantity <= 0) jdbc.update("DELETE FROM cart_items WHERE cart_id=? AND variant_id=?", cartId, priced.variantId)
-        else jdbc.update("INSERT INTO cart_items(cart_id,variant_id,quantity,original_unit_price,discount_amount,offer_id,campaign_reference,effective_unit_price) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (cart_id,variant_id) DO UPDATE SET quantity=excluded.quantity,original_unit_price=excluded.original_unit_price,discount_amount=excluded.discount_amount,offer_id=excluded.offer_id,campaign_reference=excluded.campaign_reference,effective_unit_price=excluded.effective_unit_price", cartId, priced.variantId, quantity, priced.original, priced.discount, priced.offerId, priced.campaign, priced.effective)
+        if (quantity <= 0) {
+            jdbc.update("DELETE FROM cart_items WHERE cart_id=? AND variant_id IN (SELECT id FROM product_variants WHERE sku=?)", cartId, sku)
+        } else {
+            val priced = price(sku)
+            jdbc.update("INSERT INTO cart_items(cart_id,variant_id,quantity,original_unit_price,discount_amount,offer_id,campaign_reference,effective_unit_price) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (cart_id,variant_id) DO UPDATE SET quantity=excluded.quantity,original_unit_price=excluded.original_unit_price,discount_amount=excluded.discount_amount,offer_id=excluded.offer_id,campaign_reference=excluded.campaign_reference,effective_unit_price=excluded.effective_unit_price", cartId, priced.variantId, quantity, priced.original, priced.discount, priced.offerId, priced.campaign, priced.effective)
+        }
         return snapshot(cartId)
     }
 
@@ -56,6 +63,7 @@ class JdbcCartService(
         }
         val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
         if (cart.lines.isEmpty()) throw CommerceValidation("CART_EMPTY")
+        val identities = lockSellableIdentities(cart)
         val saga = UUID.randomUUID()
         val lineKeys = cart.lines.associate { it.sku to UUID.randomUUID() }
         val payload = mapper.createObjectNode().put("addressId", addressId).put("currency", currency).put("reservationSagaKey", saga.toString()).set<com.fasterxml.jackson.databind.node.ObjectNode>("address", mapper.valueToTree(address)).set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
@@ -68,15 +76,15 @@ class JdbcCartService(
             val replayed = replayReceipt(raced.first)
             return replayed?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
         }
-        cart.lines.forEach { line ->
-            val variantId = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, line.sku)!!
+        cart.lines.sortedBy { identities.getValue(it.sku) }.forEach { line ->
+            val variantId = identities.getValue(line.sku)
             inventory.reserve(saga, lineKeys.getValue(line.sku), variantId, line.quantity, "CUSTOMER:${customer.customerId}")
         }
         val subtotal = cart.lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
         val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("addressId", addressId).put("street", address["street"]).put("number", address["number"]).put("city", address["city"]).put("province", address["province"]).put("postalCode", address["postalCode"])
         val orderId = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT',?::jsonb,?::jsonb,?,0,?,?) RETURNING id", Long::class.java, "SC-$claimId", claimId, idempotencyKey, hash, customer.customerId, buyer.toString(), payload.toString(), subtotal, subtotal, "ARS")!!
         cart.lines.forEach { line ->
-            val variantId = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, line.sku)!!
+            val variantId = identities.getValue(line.sku)
             val offerId = line.offerRef?.toLongOrNull()
             val snapshot = mapper.createObjectNode().put("sku", line.sku).put("name", line.name).toString()
             jdbc.update("INSERT INTO order_items(order_id,variant_id,offer_id,campaign_reference,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal) VALUES (?,?,?,?,?::jsonb,?,?,?,?,?)", orderId, variantId, offerId, line.campaignRef, snapshot, line.quantity, line.originalUnitPrice, line.discountAmount, line.effectiveUnitPrice, line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)))
@@ -114,11 +122,32 @@ class JdbcCartService(
         val row = jdbc.query("SELECT v.id,p.id product_id,p.base_price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=? AND p.status='ACTIVE' AND v.active", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("product_id"), rs.getBigDecimal("base_price")) }, sku).firstOrNull() ?: throw ResourceNotFound()
         val offer = jdbc.query("SELECT o.id,o.name,o.discount_type,o.discount_value FROM offers o JOIN offer_products op ON op.offer_id=o.id WHERE op.product_id=? AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at ORDER BY o.priority DESC,o.id LIMIT 1", { rs, _ -> mapOf("id" to rs.getLong("id"), "name" to rs.getString("name"), "type" to rs.getString("discount_type"), "value" to rs.getBigDecimal("discount_value")) }, row.second).firstOrNull()
         val original = row.third
-        val discount = when (offer?.get("type")) {
-            "PERCENT" -> original.multiply(offer["value"] as BigDecimal).divide(BigDecimal(100), 2, java.math.RoundingMode.HALF_UP).min(original)
-            "FIXED" -> (offer["value"] as BigDecimal).min(original)
-            else -> BigDecimal.ZERO
-        }
+        val discount = if (offer == null) BigDecimal.ZERO else
+            LocalOfferDiscount(DiscountKind.fromWire(offer["type"] as? String), offer["value"] as BigDecimal).applyTo(original)
         return Priced(row.first, original, discount, original.subtract(discount), offer?.get("id") as Long?, offer?.get("name") as String?)
+    }
+
+    /** Products precede variants, which precede balances, across every cart line. */
+    private fun lockSellableIdentities(cart: CartView): Map<String, Long> {
+        val identities = cart.lines.associate { line ->
+            line.sku to (jdbc.query("SELECT id,product_id FROM product_variants WHERE sku=?",
+                { rs, _ -> rs.getLong("id") to rs.getLong("product_id") }, line.sku).singleOrNull()
+                ?: throw CommerceValidation("PRODUCT_NOT_SELLABLE"))
+        }
+        identities.values.map { it.second }.distinct().sorted().forEach { productId ->
+            val status = jdbc.query("SELECT status FROM products WHERE id=? FOR NO KEY UPDATE",
+                { rs, _ -> ProductStatus.fromWire(rs.getString("status")) }, productId).singleOrNull()
+            if (status != ProductStatus.ACTIVE) throw CommerceValidation("PRODUCT_NOT_SELLABLE")
+        }
+        identities.values.sortedBy { it.first }.forEach { (variantId, productId) ->
+            val active = jdbc.query("SELECT product_id,active FROM product_variants WHERE id=? FOR NO KEY UPDATE",
+                { rs, _ -> rs.getLong("product_id") to VariantStatus.fromWire(rs.getObject("active")) }, variantId).singleOrNull()
+            if (active == null || active.first != productId || active.second != VariantStatus.ACTIVE)
+                throw CommerceValidation("PRODUCT_NOT_SELLABLE")
+        }
+        identities.values.map { it.first }.sorted().forEach { variantId ->
+            jdbc.query("SELECT variant_id FROM inventory_balances WHERE variant_id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, variantId)
+        }
+        return identities.mapValues { it.value.first }
     }
 }

@@ -22,13 +22,16 @@ Desde 2026-10-03, el gate de revisión para PRs nuevos es **dos revisiones indep
 3. `docs/agent/` es espejo; Company Brain canónico vive en `Novastra/company brain`.
 4. `20260819-store-tenancy-and-profiles` y `sdd/specs/*` son históricos/superseded.
 
-## WIP frontend UX (doc + Stitch + volcado de tokens)
+## Frontend vigente y procedencia visual
 
-- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` — sistema visual canónico. Stitch `projects/6473866243657965808`. UX-ANG aplicado en las 22 rutas existentes (tokens navy/canvas/accent). No había HTML Stitch archivado para P-01/P-02/P-03; esas tres se alinearon al DS y a las views previas. No es pixel-complete ni archive. Sin SDK MP.
+- `sdd/wip/20260923-storecore-frontend-ux-system-v1/` conserva la procedencia visual Stitch; su inventario de 22 rutas es histórico.
+- La aceptación ejecutable de las 26 superficies Demo está en `sdd/wip/20261014-storecore-commercial-ux-hardening/4-implementation/evidence/frontend-phase1-client-presentation-closure-20261106.md`; no acredita paridad backend ni proveedores reales.
+- El manifiesto PSD registra 25 superficies con ruta productiva y recovery bloqueado por contrato de email. PSD y Showcase mantienen cierre documental pendiente de sus registros finales propios.
+- La navegación paginada local está cerrada en `sdd/features/20261109-storecore-bounded-list-navigation/` (PR #234, candidato `4e99400`, Verify `42675235368`).
 
 ## Gate actual
 
-UX-ANG está aplicado en las 22 rutas existentes. No es pixel-complete. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
+El inventario vigente distingue Demo, operaciones productivas locales y bloqueos externos; un conteo de rutas no acredita completitud operativa. Una `checkoutUrl` HTTPS allowlisted es redirección UX, no prueba de cobro. No autoriza release, fiscal/ARCA, tenancy SaaS, DEMO-as-production ni deploy.
 
 ### Estrategia de ramas para homologación
 

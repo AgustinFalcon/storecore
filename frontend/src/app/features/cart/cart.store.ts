@@ -7,7 +7,8 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
-import { getApiErrorMessage } from '../../core/api/http-error.util';
+import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.util';
+import { ApiErrorCode } from '../../core/api/api-error-code';
 import { environment } from '../../../environments/environment';
 import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
@@ -25,6 +26,14 @@ export interface CartState {
   readonly currency: string;
   readonly idempotencyKey: string;
   readonly receipt: CheckoutReceipt | null;
+  readonly failureKind: CartFailureKind;
+}
+
+export enum CartFailureKind {
+  None = 'NONE',
+  Load = 'LOAD',
+  CheckoutRetryable = 'CHECKOUT_RETRYABLE',
+  CheckoutProductUnavailable = 'CHECKOUT_PRODUCT_UNAVAILABLE',
 }
 
 const initialState = (): CartState => ({
@@ -36,6 +45,7 @@ const initialState = (): CartState => ({
   currency: 'ARS',
   idempotencyKey: crypto.randomUUID(),
   receipt: null,
+  failureKind: CartFailureKind.None,
 });
 
 @Injectable({ providedIn: 'root' })
@@ -80,7 +90,7 @@ export class CartStore extends ComponentStore<CartState> {
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      tap(() => this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None })),
       switchMap(() =>
         this.getCart.execute().pipe(
           takeUntil(this.cancelActorWork),
@@ -91,7 +101,7 @@ export class CartStore extends ComponentStore<CartState> {
                 currency: 'ARS',
                 loading: false,
               }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
           }),
         ),
       ),
@@ -110,7 +120,7 @@ export class CartStore extends ComponentStore<CartState> {
                 addresses,
                 addressId: addresses.some((address) => address.id === this.snapshot.addressId) ? this.snapshot.addressId : addresses[0]?.id ?? '',
               }),
-            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
           }),
         ),
       ),
@@ -120,13 +130,13 @@ export class CartStore extends ComponentStore<CartState> {
   readonly add = this.effect<{ sku: string; quantity: number }>((line$) =>
     line$.pipe(
       filter(() => this.actor !== null),
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
+      tap(() => this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None })),
       switchMap((line) =>
         this.addLine.execute(line.sku, line.quantity).pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
             next: (cart) => this.patchState({ cart, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
           }),
         ),
       ),
@@ -138,10 +148,10 @@ export class CartStore extends ComponentStore<CartState> {
       filter(() => this.actor !== null),
       tap(() => {
         if (!this.hasCurrentAddress() || !this.snapshot.currency) {
-          this.patchState({ errorMessage: 'Elegí entrega y moneda antes de pagar.' });
+          this.patchState({ errorMessage: 'Elegí entrega y moneda antes de pagar.', failureKind: CartFailureKind.None });
           return;
         }
-        this.patchState({ loading: true, errorMessage: '' });
+        this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None });
       }),
       filter(() => Boolean(this.hasCurrentAddress() && this.snapshot.currency)),
       switchMap(() =>
@@ -155,7 +165,7 @@ export class CartStore extends ComponentStore<CartState> {
             takeUntil(this.cancelActorWork),
             tapResponse({
               next: (receipt) => {
-                this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS' });
+                this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS', failureKind: CartFailureKind.None });
                 const checkoutUrl = receipt.checkoutUrl ?? null;
                 if (this.isAllowlistedCheckoutUrl(checkoutUrl)) {
                   window.location.assign(checkoutUrl);
@@ -163,7 +173,13 @@ export class CartStore extends ComponentStore<CartState> {
                 }
                 void this.router.navigate(['/checkout/result', receipt.orderId]);
               },
-              error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+              error: (err: unknown) => this.patchState({
+                loading: false,
+                errorMessage: getApiErrorMessage(err),
+                failureKind: getApiErrorCode(err) === ApiErrorCode.ProductNotSellable
+                  ? CartFailureKind.CheckoutProductUnavailable
+                  : CartFailureKind.CheckoutRetryable,
+              }),
             }),
           ),
       ),

@@ -181,6 +181,24 @@ describe('AccessCoordinator', () => {
     expect(hint).toBe(AccessContext.User);
     http.expectNone(url('auth/context-selection'));
   });
+  it('reuses the accepted navigation state without rotating CSRF before logout', async () => {
+    const result = firstValueFrom(access.rehydrate());
+    flushCustomer(); flushUser(); await result;
+    access.selectContext(AccessContext.User);
+
+    const navigation = await firstValueFrom(access.navigationState());
+    expect(navigation.activeContext).toBe(AccessContext.User);
+    http.expectNone(url('customer/me'));
+    http.expectNone(url('internal/me'));
+    http.expectNone(url('customer/auth/csrf'));
+    http.expectNone(url('internal/auth/csrf'));
+
+    const logout = firstValueFrom(access.logout());
+    const request = http.expectOne(url('internal/auth/logout'));
+    expect(request.request.headers.get(CSRF_HEADER)).toBe('user-csrf');
+    request.flush({});
+    await logout;
+  });
   it('logs out only the selected realm and preserves the other principal and CSRF', async () => {
     const result = firstValueFrom(access.rehydrate());
     flushCustomer(); flushUser(); await result;

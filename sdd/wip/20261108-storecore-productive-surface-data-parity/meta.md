@@ -1,7 +1,7 @@
 # StoreCore productive surface data parity
 
 Feature: `20261108-storecore-productive-surface-data-parity`
-Status: `implementation`
+Status: `implemented_local_closeout_pending`
 Branch: `codex/storecore-production-data-coverage`
 Owner: StoreCore core maintainers.
 
@@ -23,3 +23,7 @@ fixture when an API read fails.
 - Every finite state is a closed domain type with one wire translator and an
   `Unknown` case. Views do not compare wire strings.
 
+
+## Documentary close-out residual — 2026-11-09
+
+All task entries record local implementation evidence. This WIP remains unarchived: its final PR candidate review records (provider/model/effort, base/head, scope, checks and limits) must be reconciled in this feature before archive. A green later master or CFE run does not substitute for feature-specific acceptance. Historical pending/failed entries remain preserved.

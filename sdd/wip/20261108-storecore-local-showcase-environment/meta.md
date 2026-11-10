@@ -1,7 +1,7 @@
 # StoreCore local showcase environment
 
 Feature: `20261108-storecore-local-showcase-environment`
-Status: `implementation_in_progress`
+Status: `implemented_local_closeout_pending`
 Branch: `codex/storecore-showcase-backend`
 Owner: StoreCore core maintainers.
 
@@ -21,3 +21,7 @@ This slice does not enable or simulate external providers.
   live StoreCore/BlackStore connection remain disabled and out of scope.
 - A checkout created by this environment remains honestly
   `PENDING_PAYMENT`; no payment, invoice or shipment is fabricated.
+
+## Documentary close-out residual — 2026-11-09
+
+All task entries record local implementation evidence. This WIP remains unarchived: its final PR candidate review records (provider/model/effort, base/head, scope, checks and limits) must be reconciled in this feature before archive. A green later master or CFE run does not substitute for feature-specific acceptance. Historical pending/failed entries remain preserved.

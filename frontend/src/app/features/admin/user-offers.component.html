@@ -20,8 +20,10 @@
       </div>
       @if (state.loading) { <p class="sc-callout" role="status">Cargando ofertas…</p> }
       @if (!state.loading && !state.offers.length) { <div class="sc-empty"><h3>Todavía no hay ofertas</h3><p>Creá el primer borrador. El precio público no cambia hasta que lo actives.</p></div> }
+      @let visible = visibleOffers(state.offers);
+      @if (!state.loading && state.offers.length && !visible.length) { <div class="sc-empty" role="status"><h3>Sin coincidencias</h3><p>Probá con otro texto o estado.</p><button type="button" class="sc-btn" (click)="clearFilters()">Limpiar filtros</button></div> }
       <div class="sc-card-grid">
-        @for (offer of state.offers; track offer.id) { @if (visible(offer)) {
+        @for (offer of visible; track offer.id) {
           <article class="sc-card">
             <header><div><span class="sc-badge" [class.sc-badge--ok]="offer.status === statuses[1]">{{ offer.status.label }}</span><h3>{{ offer.name }}</h3></div><strong>#{{ offer.id }}</strong></header>
             <dl class="sc-facts">
@@ -34,7 +36,7 @@
             @if (offer.status === unknownStatus || offer.discountKind === unknownKind) { <p class="sc-callout sc-callout--error">La oferta contiene un valor no reconocido. No se habilitan acciones.</p> }
             <footer class="sc-actions">@for (transition of transitions(offer); track transition.wire) { <button type="button" class="sc-btn" [disabled]="state.mutatingId !== 0" (click)="requestTransition(offer, transition, $event)">{{ transition.label }}</button> }</footer>
           </article>
-        } }
+        }
       </div>
     </div>
 

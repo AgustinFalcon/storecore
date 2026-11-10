@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
-import { CartState } from './cart.store';
+import { CartFailureKind, CartState } from './cart.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
 @Component({
@@ -12,6 +12,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
   templateUrl: './checkout-page.view.html',
 })
 export class CheckoutPageViewComponent {
+  protected readonly FailureKind = CartFailureKind;
   @Input({ required: true }) state!: CartState;
   @Input() access = CustomerCartAccess.Unknown;
   @Output() readonly selectCustomer = new EventEmitter<void>();
@@ -24,7 +25,23 @@ export class CheckoutPageViewComponent {
   amount(value:number):string{return new Intl.NumberFormat('es-AR',{style:'currency',currency:this.state.cart.currency||'ARS'}).format(value);}
 
   get canPay(): boolean {
-    return this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
+    return this.state.failureKind === CartFailureKind.None
+      && this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
       && this.state.addresses.some((address) => address.id === this.state.addressId) && this.state.currency.length > 0;
+  }
+
+  get canRetryCheckout(): boolean {
+    return this.access.canMutate && !this.state.loading
+      && this.state.failureKind === CartFailureKind.CheckoutRetryable
+      && this.state.addresses.some((address) => address.id === this.state.addressId)
+      && this.state.currency.length > 0;
+  }
+
+  get readError(): string {
+    return this.state.failureKind === CartFailureKind.Load ? this.state.errorMessage : '';
+  }
+
+  get correctiveError(): string {
+    return this.state.failureKind === CartFailureKind.Load ? '' : this.state.errorMessage;
   }
 }

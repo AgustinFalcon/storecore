@@ -99,7 +99,13 @@ test('manifest current routes agree with productive SurfaceIdentity ownership', 
       assert.ok(target.fields.length > 0, `${identity.id} needs target fields`);
     }
     if (surface.loaderStage !== null) assert.ok(loaderStages.has(surface.loaderStage), `${identity.id} has unknown loader stage`);
-    for (const contract of [...surface.read, ...surface.writes]) {
+    const backendOnlyWrites = surface.backendOnlyWrites ?? [];
+    assert.ok(Array.isArray(backendOnlyWrites), `${identity.id} backend-only commands must be an array`);
+    for (const contract of backendOnlyWrites) {
+      assert.ok(!surface.writes.includes(contract), `${identity.id} command cannot be both UI-reachable and backend-only`);
+      assert.match(contract, /^(POST|PUT|DELETE|PATCH) /, `${identity.id} backend-only write needs a mutation method`);
+    }
+    for (const contract of [...surface.read, ...surface.writes, ...backendOnlyWrites]) {
       assert.match(contract, /^(GET|POST|PUT|DELETE|PATCH) \/api\/v1\//, `${identity.id} has invalid contract ${contract}`);
       assert.ok(controllers.has(normalizedContract(...contract.split(' ', 2))), `${identity.id} contract missing in controllers: ${contract}`);
     }

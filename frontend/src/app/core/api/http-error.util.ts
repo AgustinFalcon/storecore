@@ -1,11 +1,17 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { ApiErrorCode } from './api-error-code';
+
+export function getApiErrorCode(err: unknown): ApiErrorCode {
+  if (!(err instanceof HttpErrorResponse)) return ApiErrorCode.Unknown;
+  const body = err.error as { errorCode?: unknown } | null;
+  return ApiErrorCode.fromWire(body?.errorCode);
+}
 
 export function getApiErrorMessage(err: unknown): string {
   if (err instanceof HttpErrorResponse) {
     const body = err.error as { message?: string; errorCode?: string } | null;
-    if (body?.errorCode === 'CSRF_INVALID') {
-      return 'La clave de seguridad venció. Reintentá la acción.';
-    }
+    const errorCode = getApiErrorCode(err);
+    if (errorCode !== ApiErrorCode.Unknown) return errorCode.label;
     if (body?.message) {
       return body.message;
     }

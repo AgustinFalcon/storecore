@@ -33,8 +33,15 @@ class JdbcPromoService(private val jdbc: JdbcTemplate, private val capabilities:
     fun save(actor: InternalUserPrincipal, listingSku: String, currency: PriceCurrency, scope: PriceScope, desiredPrice: BigDecimal,
         effectivePromoPrice: BigDecimal?, validFrom: Instant, validTo: Instant, writer: PriceWriter): PromoView = transactions.execute {
         capabilities.decide("MANUAL_PROMOTIONS", "WRITE_PRICE", CapabilityActor.Internal(actor))
-        val variant = jdbc.query("SELECT v.id,p.base_price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=? FOR UPDATE OF v,p",
-            { rs, _ -> rs.getLong("id") to rs.getBigDecimal("base_price") }, listingSku).firstOrNull() ?: throw ResourceNotFound()
+        // Keep every catalog/commerce writer on the same global order: product, then
+        // variant, then inventory balance. A joined FOR UPDATE can acquire v before p.
+        val productId = jdbc.query("SELECT product_id FROM product_variants WHERE sku=?",
+            { rs, _ -> rs.getLong("product_id") }, listingSku).firstOrNull() ?: throw ResourceNotFound()
+        val basePrice = jdbc.query("SELECT base_price FROM products WHERE id=? FOR NO KEY UPDATE",
+            { rs, _ -> rs.getBigDecimal("base_price") }, productId).firstOrNull() ?: throw ResourceNotFound()
+        val variantId = jdbc.query("SELECT id FROM product_variants WHERE sku=? AND product_id=? FOR NO KEY UPDATE",
+            { rs, _ -> rs.getLong("id") }, listingSku, productId).firstOrNull() ?: throw ResourceNotFound()
+        val variant = variantId to basePrice
         val policy = ManualPricePolicy(currency, scope, writer, variant.second, desiredPrice, null, effectivePromoPrice, validFrom, validTo)
         if (!policy.valid()) throw CommerceValidation("PRICE_POLICY_INVALID")
         val accountId = jdbc.queryForObject("""INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state)

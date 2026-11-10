@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, of, Subject } from 'rxjs';
+import { BehaviorSubject, map, of, Subject } from 'rxjs';
+import { mapReceipt } from '../../data/mappers/http-mappers';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
@@ -15,7 +16,7 @@ import { ListCustomerAddressesUseCase } from '../../domain/customer/use-cases/li
 import { OrderStatus, PaymentStatus } from '../../domain/order/commerce-states';
 import { UserRole } from '../../domain/user/user-role';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
-import { CartStore } from './cart.store';
+import { CartFailureKind, CartStore } from './cart.store';
 
 const actorA: CustomerProfile = { id: 'actor-a', email: 'a@example.test', firstName: 'A', lastName: 'A', phone: '' };
 const actorB: CustomerProfile = { ...actorA, id: 'actor-b', email: 'b@example.test' };
@@ -59,7 +60,7 @@ describe('CartStore actor isolation', () => {
     const key = store.snapshot.idempotencyKey;
     expect(store.snapshot.receipt).toEqual(receipt);
     session.commit(actorB, 'csrf-b');
-    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: '' }, addresses: [], addressId: '', currency: 'ARS', idempotencyKey: store.snapshot.idempotencyKey, receipt: null });
+    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: '' }, addresses: [], addressId: '', currency: 'ARS', idempotencyKey: store.snapshot.idempotencyKey, receipt: null, failureKind: CartFailureKind.None });
     expect(store.snapshot.idempotencyKey).not.toBe(key);
   });
   it('cancels all four in-flight effects and ignores late actor-A results and navigation', () => {
@@ -132,6 +133,24 @@ describe('CartStore actor isolation', () => {
     session.commit({ ...actorA }, 'refreshed');
     expect(store.snapshot.addressId).toBe('address-a');
     expect(store.snapshot.idempotencyKey).toBe(key);
+  });
+  it('preserves the attempt and route when receipt translation fails, then reuses the key on retry', () => {
+    store.loadAddresses();
+    const key = store.snapshot.idempotencyKey;
+    checkout.execute.mockReturnValue(of({ orderId: 'order-a', paymentStatus: null, orderStatus: OrderStatus.Created.wire }).pipe(map(mapReceipt)));
+    store.submitCheckout();
+    expect(store.snapshot.idempotencyKey).toBe(key);
+    expect(store.snapshot.receipt).toBeNull();
+    expect(store.snapshot.loading).toBe(false);
+    expect(store.snapshot.errorMessage).toBeTruthy();
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.CheckoutRetryable);
+    expect(navigate).not.toHaveBeenCalled();
+    checkout.execute.mockReturnValue(of(receipt));
+    store.submitCheckout();
+    expect(checkout.execute.mock.calls.map(([command]) => command.idempotencyKey)).toEqual([key, key]);
+    expect(store.snapshot.receipt).toEqual(receipt);
+    expect(store.snapshot.idempotencyKey).not.toBe(key);
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(['/checkout/result', receipt.orderId]);
   });
   it('shares the closed CUSTOMER authority with controls and explicitly selects it from dual USER context', () => {
     contexts.next(AccessState.resolve(SessionProbe.authenticated(actorA, 'csrf-a'),

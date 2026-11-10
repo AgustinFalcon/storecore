@@ -49,6 +49,7 @@
                     <span>{{ line.quantity }}</span>
                     <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: line.quantity + 1 })" [attr.aria-label]="'Agregar una unidad de ' + line.name">+</button>
                   </div>
+                  <button type="button" class="sc-btn sc-btn--ghost" (click)="quantityChange.emit({ sku: line.sku, quantity: 0 })" [attr.aria-label]="'Eliminar ' + line.name + ' del carrito'">Eliminar</button>
                 </td>
                 <td>{{ line.originalUnitPrice }}</td>
                 <td>{{ line.discountAmount }}</td>
