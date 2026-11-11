@@ -9,7 +9,9 @@
    hosted checks before any integration.
 
 RDI-001–003 are implemented on current master. RDI-004 has local runtime,
-TypeScript, lint, architecture and production-build evidence. RDI-005 remains
-open for exact-head re-review, hosted CI and integration.
-User implementation authorization recorded in meta.md; no unexecuted approval
-is represented as a completed gate.
+TypeScript, lint, architecture and production-build evidence. RDI-005 closed on
+2026-11-11 with two independent GPT-6.1 Sol approvals and hosted Verify
+`43086417458` 3/3 on candidate `4c560f5`. The documentation-only head that
+records that result still requires its own exact-head reviews and hosted Verify
+before integration. User implementation authorization is recorded in meta.md;
+no unexecuted approval is represented as a completed gate.
