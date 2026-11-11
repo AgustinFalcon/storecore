@@ -40,3 +40,26 @@ settles. SDD P3 evidence inconsistencies were also reconciled.
 
 Exact-head re-review, hosted CI, PR and merge remain pending. No
 homologation, deploy, provider activation or backend contract is claimed.
+
+## Current-master close-out candidate — 2026-11-11
+
+The implementation and its runtime tests are present in the exact tree of
+StoreCore `master` `72fc4f406ec65999687d0568daa2967010b15c51`. The
+close-out worktree was created directly from that SHA; no source file under
+`frontend/src` was changed.
+
+Fresh local evidence from `frontend/npm run verify`:
+
+- architecture and surface-manifest tests: 9/9 PASS;
+- ESLint: PASS;
+- Angular: 174 files, 1167/1167 tests PASS;
+- production build: PASS, 581.12 kB initial raw / 141.71 kB estimated transfer.
+
+The first sandboxed attempt failed while Angular traversed paths denied by the
+local sandbox. The same command, rerun with filesystem access, completed PASS;
+the denied traversal is environment evidence, not a product failure.
+
+RDI-005 is `in_review`. Two independent GPT-6.1 Sol exact-head reviews and a
+hosted Verify of the final documentation head are still required. Until those
+gates finish, this WIP remains unarchived and no release, provider or production
+claim is made.
