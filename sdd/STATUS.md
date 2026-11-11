@@ -50,7 +50,7 @@ Desde 2026-10-03, el gate de revisión para PRs nuevos es **dos revisiones indep
 - La navegación paginada local está cerrada en `sdd/features/20261109-storecore-bounded-list-navigation/` (PR #234, candidato `4e99400`, Verify `42675235368`).
 - El editor productivo de variantes existentes está cerrado en `sdd/features/20261110-storecore-productive-variant-editor/` (PR #238, candidato `a863a8d`, Verify `42833927010` 3/3 y doble review GPT-6.1 Sol APPROVE). Nombre, estado cerrado y atributos son editables; identidad/SKU, stock, precio y proveedores permanecen fuera de alcance.
 - El estado de health del frontend está cerrado en `sdd/features/20261110-storecore-closed-health-status/` (PR #239, candidato `35ae0c3`, Verify `42839213825` intento #2 3/3 y doble review GPT-6.1 Sol APPROVE). El wire se traduce una sola vez; valores futuros o malformados quedan `Unknown` fail-closed y nunca marcan la instalación lista.
-- La identidad reactiva de las rutas de detalle ya está presente en el árbol de `master`; su WIP `20261001-reactive-detail-route-identity` está en close-out documental con gate local completo PASS sobre `72fc4f4`. Review exact-head y Verify hospedado del cierre siguen pendientes; no es un faltante funcional del frontend.
+- La identidad reactiva de las rutas de detalle ya está presente en el árbol de `master`; su WIP `20261001-reactive-detail-route-identity` cerró RDI-001..005 sobre candidato `4c560f5`, doble review GPT-6.1 Sol APPROVE y Verify `43086417458` 3/3. Permanece sin archivar sólo por toolchain `sdd.finish` no disponible; no es un faltante funcional del frontend.
 
 ## Gate actual
 

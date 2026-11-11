@@ -59,7 +59,17 @@ The first sandboxed attempt failed while Angular traversed paths denied by the
 local sandbox. The same command, rerun with filesystem access, completed PASS;
 the denied traversal is environment evidence, not a product failure.
 
-RDI-005 is `in_review`. Two independent GPT-6.1 Sol exact-head reviews and a
-hosted Verify of the final documentation head are still required. Until those
-gates finish, this WIP remains unarchived and no release, provider or production
-claim is made.
+## Review and hosted evidence
+
+- Candidate: `4c560f5049dfdaf68cf5c0f3f694dfdd2ff8c221`.
+- GPT-6.1 Sol medium Bug/Product/SDD: APPROVE, zero P0-P3; focused suite
+  28/28 PASS and `git diff --check` PASS.
+- GPT-6.1 Sol medium Security/Architecture: APPROVE, zero P0-P3; focused suite
+  28/28 PASS and `git diff --check` PASS.
+- PR #243 hosted Verify `43086417458`: backend PASS (3m41s), frontend PASS
+  (4m20s), `unified-access-real-e2e` PASS (5m18s).
+
+RDI-005 is done. The final documentation-only head must still receive identity
+review and hosted Verify before PR integration. The WIP stays unarchived only
+because the configured `sdd.finish` validators are unavailable; no release,
+provider, homologation or production claim is made.
