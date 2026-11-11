@@ -1,5 +1,25 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente y cierre de gates posteriores a stock — 2026-11-11
+
+`master 970dc69ed439d98175bc1219134756ec29dc09f2` integra PR #240 y el
+follow-up PR #241. El ajuste manual de stock conserva autoridad, idempotencia,
+auditoría y estados cerrados; el follow-up elimina dos carreras observadas por
+el primer Verify de `master`: pérdida de foco durante el refresh autoritativo y
+una segunda rotación USER CSRF desde `ShellComponent`.
+
+PR #241 fue revisado sobre el head exacto
+`651a8333b07bd17ba78c3e91a35d55a19a52e178` por dos gates GPT-6.1 Sol
+independientes (Bug/Producto y Seguridad), ambos `APPROVE` sin P0–P3. Verify de
+PR `42905934287` y Verify post-merge de `master` `42907008862` terminaron 3/3
+verdes: backend, frontend y `unified-access-real-e2e` con PostgreSQL, Spring,
+Angular HTTPS y navegador real.
+
+Este cierre acredita el core local homologable del corte actual. No acredita
+credenciales live, Mercado Pago real, ARCA, Correo Argentino, StoreCore↔BlackStore
+activo, deploy ni `release/1.0`; esos límites permanecen bloqueados por sus WIP
+y homologaciones específicas.
+
 ## Política de revisión vigente
 
 Desde 2026-10-03, el gate de revisión para PRs nuevos es **dos revisiones independientes GPT-6.1 Sol en paralelo**, con proveedor, modelo, esfuerzo, SHA base/head, checks y límites registrados. Las referencias a Grok en documentos históricos describen evidencia de cortes anteriores y no son un requisito vigente para nuevos PRs.
