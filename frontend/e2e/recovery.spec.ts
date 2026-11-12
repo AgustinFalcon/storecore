@@ -75,6 +75,39 @@ test('completion clears passwords, provides a recovered-realm login intent and n
   await expect(page.getByRole('heading', { name: 'Ingresar', exact: true })).toBeVisible();
 });
 
+test('fragment cleanup preserves delayed READY and reopens the same link on the reused route', async ({ page }) => {
+  await publicBoundary(page);
+  let inspections = 0;
+  await page.route('**/auth/recovery/inspect', async route => {
+    inspections++;
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await route.fulfill({ json: body(Outcome.Ready.wire, 200, { expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+  });
+  await page.goto('/reset-password');
+  await expect(page.getByText(Outcome.Invalid.label, { exact: true })).toBeVisible();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.evaluate(fragment => { location.hash = fragment; }, `realm=customer&token=${secret}`);
+    await expect(page).toHaveURL(/\/reset-password$/);
+    await expect(page.locator('#new-password')).toBeEnabled();
+    await expect(page.getByText(Outcome.Invalid.label, { exact: true })).toHaveCount(0);
+    expect(inspections).toBe(attempt + 1);
+  }
+});
+
+test('a direct initial token load keeps its component alive while READY arrives after URL cleanup', async ({ page }) => {
+  await publicBoundary(page);
+  await page.route('**/auth/recovery/inspect', async route => {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await route.fulfill({ json: body(Outcome.Ready.wire, 200, { expiresAt: new Date(Date.now() + 60_000).toISOString() }) });
+  });
+  await page.goto(`/reset-password#realm=customer&token=${secret}`);
+  await page.locator('sc-password-reset').evaluate(element => { element.setAttribute('data-instance-marker', 'initial'); });
+  await expect(page).toHaveURL(/\/reset-password$/);
+  await expect(page.locator('#new-password')).toBeEnabled();
+  await expect(page.locator('sc-password-reset')).toHaveAttribute('data-instance-marker', 'initial');
+  await expect(page.getByText(Outcome.Invalid.label, { exact: true })).toHaveCount(0);
+});
+
 for (const recovered of RecoveryRealm.all) for (const result of [Outcome.Completed, Outcome.Uncertain]) test(`same-email dual-session ${recovered.wire} reset ${result.wire} retains other access and accepts the recovered credential`, async ({ page }) => {
   const active = new Set(RecoveryRealm.all);
   const mutations: string[] = [];
