@@ -3,12 +3,16 @@ package com.storecore.identity
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.StoreCoreApplication
+import com.storecore.identity.domain.IdentityRealm
 import com.storecore.identity.domain.RecoveryRealm
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
+import com.storecore.identity.infrastructure.security.OpaqueTokenFactory
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.jdbc.core.JdbcTemplate
 import java.io.Reader
 import java.nio.file.Path
+import java.util.UUID
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -54,10 +58,10 @@ sealed interface RecoveryBrowserCommand {
 }
 
 enum class BrowserRecoveryPhase {
-    START, SESSION_SETUP, REQUEST, CAPTURE, INSPECT, INSPECT_RESPONSE, INSPECT_FORM, INSPECT_FRAGMENT, INSPECT_STORAGE, COMPLETE, PRESERVATION, LOGIN, REPLAY;
+    START, SESSION_SETUP, REQUEST, REQUEST_RESPONSE, CAPTURE, INSPECT, INSPECT_RESPONSE, INSPECT_FORM, INSPECT_FRAGMENT, INSPECT_STORAGE, COMPLETE, PRESERVATION, LOGIN, REPLAY;
     companion object { fun fromWire(raw: String?): BrowserRecoveryPhase? = entries.find { it.name == raw } }
 }
-enum class BrowserRecoveryFinding { READY, INVALID, EXPIRED, UNKNOWN, UNAVAILABLE, LOADING, NO_MATCH }
+enum class BrowserRecoveryFinding { READY, INVALID, EXPIRED, UNKNOWN, UNAVAILABLE, RATE_LIMITED, FORBIDDEN, LOADING, NO_MATCH }
 enum class BrowserRecoveryRoute { LOGIN, RESET, HOME, CUSTOMER_PROFILE, USER_HOME, OTHER }
 enum class BrowserRecoveryExpiry { ISO_FUTURE, ISO_PAST, NUMBER, ABSENT, UNKNOWN }
 
@@ -79,9 +83,11 @@ object RecoveryBrowserHarness {
         val hash = Argon2PasswordHasher().hash("ar016-original-password-2026".toCharArray())
         provision.update("INSERT INTO installation_settings(installation_id,business_name,allowed_host) VALUES(1,'Recovery browser fixture','localhost')")
         BrowserRecoveryFixture.entries.forEach { fixture ->
-            provision.update("INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Browser','Customer')", fixture.email, hash)
-            val id = provision.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Browser','User') RETURNING id", Long::class.java, fixture.email, hash)!!
-            provision.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code='ADMIN'", id)
+            val customer = provision.queryForObject("INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Browser','Customer') RETURNING id", Long::class.java, fixture.email, hash)!!
+            val user = provision.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Browser','User') RETURNING id", Long::class.java, fixture.email, hash)!!
+            provision.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code='ADMIN'", user)
+            verifyEmail(provision, IdentityRealm.CUSTOMER, customer, fixture.email)
+            verifyEmail(provision, IdentityRealm.USER, user, fixture.email)
         }
         val context = SpringApplicationBuilder(StoreCoreApplication::class.java, RecoveryCaptureConfiguration::class.java)
             .run("--server.address=127.0.0.1", "--server.port=8080", "--storecore.installation-guard.enabled=true",
@@ -128,7 +134,13 @@ object RecoveryBrowserHarness {
                     }
                     finished
                 }
-                check(protocol.get(180, TimeUnit.SECONDS))
+                try {
+                    check(protocol.get(180, TimeUnit.SECONDS))
+                } catch (failure: ExecutionException) {
+                    val cause = failure.cause
+                    System.err.println("RECOVERY_BROWSER_PROTOCOL_FAILED type=" + (cause?.javaClass?.simpleName ?: "Unknown"))
+                    throw failure
+                }
                 check(child.waitFor(10, TimeUnit.SECONDS) && child.exitValue() == 0)
                 drain.get(5, TimeUnit.SECONDS)
                 BrowserRecoveryFixture.entries.forEach { fixture ->
@@ -154,6 +166,32 @@ object RecoveryBrowserHarness {
         if (!child.waitFor(5, TimeUnit.SECONDS)) child.destroyForcibly()
         descendants.filter { it.isAlive }.forEach { it.destroyForcibly() }
         child.waitFor(5, TimeUnit.SECONDS)
+    }
+
+    private fun verifyEmail(jdbc: JdbcTemplate, realm: IdentityRealm, subjectId: Long, email: String) {
+        val tokenId = UUID.randomUUID()
+        val correlation = UUID.randomUUID()
+        val tokens = OpaqueTokenFactory()
+        val column = if (realm == IdentityRealm.USER) "user_id" else "customer_id"
+        val table = if (realm == IdentityRealm.USER) "users" else "customers"
+        val version = jdbc.queryForObject("SELECT email_version FROM $table WHERE id=?", Long::class.java, subjectId)!!
+        jdbc.update(
+            """WITH issued AS (SELECT clock_timestamp() value)
+               INSERT INTO identity_email_verification_tokens(id,realm,$column,token_hash,email_version,email_digest,issued_at,expires_at,correlation_id)
+               SELECT ?,?,?,?,?,?,value,value+interval '30 minutes',? FROM issued""",
+            tokenId, realm.name, subjectId, tokens.sha256(UUID.randomUUID().toString()), version, tokens.sha256(email), correlation,
+        )
+        jdbc.update(
+            """UPDATE identity_email_verification_tokens SET state='CONSUMED',terminal_at=clock_timestamp(),terminal_correlation_id=?
+               WHERE id=? AND state='PENDING'""",
+            correlation, tokenId,
+        )
+        jdbc.update(
+            """INSERT INTO identity_email_verification_evidence(id,verification_token_id,realm,$column,email_version,email_digest,verified_at,correlation_id)
+               SELECT ?,id,realm,$column,email_version,email_digest,terminal_at,terminal_correlation_id
+               FROM identity_email_verification_tokens WHERE id=?""",
+            UUID.randomUUID(), tokenId,
+        )
     }
 
     private fun readFrame(reader: Reader): String? {
