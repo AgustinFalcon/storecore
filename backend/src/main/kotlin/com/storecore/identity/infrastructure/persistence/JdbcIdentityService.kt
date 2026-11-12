@@ -38,6 +38,7 @@ open class JdbcIdentityService(
     private val tokens: OpaqueTokenFactory,
     private val loginRateLimiter: LoginRateLimiter,
     private val loginAttemptBudget: LoginAttemptBudget,
+    private val mutationLocks: IdentityMutationLocks,
 ) : IdentityUseCases, CandidateAuthenticationPort, RealmSessionIssuer {
     @Transactional
     override fun registerCustomer(email: String, password: String, firstName: String, lastName: String): IssuedCredentials {
@@ -75,8 +76,8 @@ open class JdbcIdentityService(
 
     override fun verify(realm: IdentityRealm, canonicalEmail: CanonicalEmail, password: String): VerifiedAccessCandidate? {
         val row = when (realm) {
-            IdentityRealm.CUSTOMER -> jdbc.queryForList("SELECT id, password_hash, active FROM customers WHERE email=?", canonicalEmail.value).singleOrNull()
-            IdentityRealm.USER -> jdbc.queryForList("SELECT id, password_hash, active FROM users WHERE email=?", canonicalEmail.value).singleOrNull()
+            IdentityRealm.CUSTOMER -> jdbc.queryForList("SELECT id, password_hash, active, credential_version FROM customers WHERE email=?", canonicalEmail.value).singleOrNull()
+            IdentityRealm.USER -> jdbc.queryForList("SELECT id, password_hash, active, credential_version FROM users WHERE email=?", canonicalEmail.value).singleOrNull()
         }
         if (!isPasswordLengthValid(password) || row == null) {
             passwords.dummyVerify(password.toCharArray())
@@ -85,13 +86,19 @@ open class JdbcIdentityService(
         if (!passwords.verify(row.requiredString("password_hash"), password.toCharArray()) || !row.isActive()) return null
         val subjectId = row.requiredLong("id")
         return when (realm) {
-            IdentityRealm.CUSTOMER -> VerifiedAccessCandidate.Customer(subjectId)
-            IdentityRealm.USER -> VerifiedAccessCandidate.User(subjectId, loadRoles(subjectId)).takeIf { it.eligible }
+            IdentityRealm.CUSTOMER -> VerifiedAccessCandidate.Customer(subjectId, row.requiredLong("credential_version"))
+            IdentityRealm.USER -> VerifiedAccessCandidate.User(subjectId, loadRoles(subjectId), row.requiredLong("credential_version")).takeIf { it.eligible }
         }
     }
 
     @Transactional
-    override fun issue(candidate: VerifiedAccessCandidate): IssuedCredentials = when (candidate) {
+    override fun issue(candidate: VerifiedAccessCandidate): IssuedCredentials {
+        val realm = candidate.context.realm ?: throw AuthenticationFailed()
+        mutationLocks.acquire(com.storecore.identity.domain.IdentityMutationScope.Own(com.storecore.identity.domain.IdentitySubject(realm, candidate.subjectId)))
+        val table = when (realm) { IdentityRealm.CUSTOMER -> "customers"; IdentityRealm.USER -> "users" }
+        val currentVersion = jdbc.queryForObject("SELECT credential_version FROM $table WHERE id=?", Long::class.java, candidate.subjectId)
+        if (candidate.credentialVersion <= 0 || currentVersion != candidate.credentialVersion) throw AuthenticationFailed()
+        return when (candidate) {
         is VerifiedAccessCandidate.Customer -> {
             val active = jdbc.queryForObject("SELECT active FROM customers WHERE id=? FOR SHARE", Boolean::class.java, candidate.subjectId) == true
             if (!active) throw AuthenticationFailed()
@@ -102,6 +109,7 @@ open class JdbcIdentityService(
             val roles = loadRolesForIssuance(candidate.subjectId)
             if (!active || !InternalRole.hasKnownRole(roles)) throw AuthenticationFailed()
             issueSession(IdentityRealm.USER, candidate.subjectId)
+        }
         }
     }
     @Transactional
@@ -132,6 +140,7 @@ open class JdbcIdentityService(
 
     @Transactional
     override fun rotateCsrf(principal: AuthenticatedPrincipal): String {
+        mutationLocks.acquire(mutationLocks.own(principal))
         // Lock the live session first so renewal works after CSRF expiry and concurrent rotations serialize.
         jdbc.queryForList(
             """SELECT id FROM identity_sessions
@@ -154,6 +163,7 @@ open class JdbcIdentityService(
 
     @Transactional
     override fun verifyCsrf(principal: AuthenticatedPrincipal, rawCsrf: String) {
+        mutationLocks.acquire(mutationLocks.own(principal))
         val row = jdbc.queryForList(
             """SELECT t.token_hash FROM identity_session_csrf_tokens t
                JOIN identity_sessions s ON s.id=t.session_id
@@ -167,6 +177,7 @@ open class JdbcIdentityService(
 
     @Transactional
     override fun logout(principal: AuthenticatedPrincipal) {
+        mutationLocks.acquire(mutationLocks.own(principal))
         val correlation = UUID.randomUUID()
         val updated = when (principal) {
             is CustomerPrincipal -> jdbc.queryForList(
@@ -190,6 +201,10 @@ open class JdbcIdentityService(
     @Transactional
     override fun revokeAsAdmin(actor: InternalUserPrincipal, targetSession: UUID, reason: String, correlation: UUID) {
         if (InternalRole.ADMIN !in actor.roles || reason.isBlank()) throw AuthorizationDenied()
+        val scope = mutationLocks.sessionTarget(actor, targetSession)
+        mutationLocks.acquire(scope)
+        mutationLocks.lockSessions(scope)
+        mutationLocks.revalidateActor(actor)
         val target = jdbc.queryForList(
             """UPDATE identity_sessions SET revoked_at=clock_timestamp(), revocation_kind='ADMIN',
                revoked_by_user_id=?, revocation_correlation_id=?, revoked_reason=?
@@ -203,6 +218,7 @@ open class JdbcIdentityService(
     @Transactional
     override fun revokeAsSystem(targetSession: UUID, reason: String, correlation: UUID) {
         if (reason.isBlank()) throw AuthorizationDenied()
+        mutationLocks.acquire(mutationLocks.sessionOwner(targetSession))
         val target = jdbc.queryForList(
             """UPDATE identity_sessions SET revoked_at=clock_timestamp(), revocation_kind='SYSTEM',
                revocation_correlation_id=?, revoked_reason=?
@@ -226,8 +242,9 @@ open class JdbcIdentityService(
 
     @Transactional
     override fun updateCustomerProfile(principal: CustomerPrincipal, email: String, firstName: String, lastName: String, phone: String?): CustomerProfile {
+        mutationLocks.acquire(mutationLocks.own(principal))
         val row = try {
-            jdbc.queryForList("UPDATE customers SET email=?,first_name=?,last_name=?,phone=?,updated_at=clock_timestamp() WHERE id=? AND active=TRUE RETURNING id,email,first_name,last_name,phone", canonicalEmail(email).value, firstName.trim(), lastName.trim(), phone?.trim(), principal.customerId).singleOrNull()
+            jdbc.queryForList("UPDATE customers SET credential_version=credential_version + CASE WHEN email<>? THEN 1 ELSE 0 END,email=?,first_name=?,last_name=?,phone=?,updated_at=clock_timestamp() WHERE id=? AND active=TRUE RETURNING id,email,first_name,last_name,phone", canonicalEmail(email).value, canonicalEmail(email).value, firstName.trim(), lastName.trim(), phone?.trim(), principal.customerId).singleOrNull()
         } catch (exception: DataIntegrityViolationException) { throw RegistrationRejected() } ?: throw AuthenticationFailed()
         return CustomerProfile(row.requiredLong("id"), row.requiredString("email"), row.requiredString("first_name"), row.requiredString("last_name"), row["phone"]?.toString())
     }

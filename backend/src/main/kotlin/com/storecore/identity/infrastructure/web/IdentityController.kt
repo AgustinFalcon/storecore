@@ -112,7 +112,7 @@ class IdentityController(
     fun revokeSession(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable sessionId: UUID, @Valid @RequestBody request: RevokeRequest): ResponseEntity<BaseResponse<Unit>> {
         auth.requireSameOrigin(http)
         val principal = auth.admin(http)
-        val mutation = mutations.execute(principal, csrf) { identity.revokeAsAdmin(principal, sessionId, request.reason, request.correlationId) }
+        val mutation = mutations.executeForSession(principal, csrf, sessionId) { identity.revokeAsAdmin(principal, sessionId, request.reason, request.correlationId) }
         return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(Unit))
     }
 

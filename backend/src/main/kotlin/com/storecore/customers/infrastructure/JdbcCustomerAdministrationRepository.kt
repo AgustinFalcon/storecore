@@ -15,7 +15,10 @@ import java.util.UUID
 
 @Repository
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-open class JdbcCustomerAdministrationRepository(private val jdbc: JdbcTemplate) : CustomerAdministrationRepository {
+open class JdbcCustomerAdministrationRepository(
+    private val jdbc: JdbcTemplate,
+    private val identityLocks: com.storecore.identity.infrastructure.persistence.IdentityMutationLocks,
+) : CustomerAdministrationRepository {
     override fun search(criteria: CustomerSearch): CustomerPage {
         val clauses = mutableListOf<String>()
         val arguments = mutableListOf<Any>()
@@ -44,6 +47,10 @@ open class JdbcCustomerAdministrationRepository(private val jdbc: JdbcTemplate) 
 
     @Transactional
     override fun changeState(actor: InternalUserPrincipal, id: Long, target: CustomerAccountState): CustomerSummary {
+        val scope = identityLocks.customerTarget(actor, id)
+        identityLocks.acquire(scope)
+        identityLocks.lockSessions(scope)
+        identityLocks.revalidateActor(actor)
         val current = jdbc.query(
             "SELECT active FROM customers WHERE id=? FOR UPDATE",
             { rs, _ -> rs.getBoolean("active") }, id,

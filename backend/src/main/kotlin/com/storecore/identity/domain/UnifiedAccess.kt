@@ -95,19 +95,20 @@ enum class ReturnDestination(private val context: AccessContext?) {
 /** These objects are created only after password and activity verification by a port. */
 sealed interface VerifiedAccessCandidate {
     val subjectId: Long
+    val credentialVersion: Long
     val context: AccessContext
     val eligible: Boolean
 
-    data class Customer(override val subjectId: Long) : VerifiedAccessCandidate {
+    data class Customer(override val subjectId: Long, override val credentialVersion: Long) : VerifiedAccessCandidate {
         override val context = AccessContext.CUSTOMER
-        override val eligible: Boolean get() = subjectId > 0
+        override val eligible: Boolean get() = subjectId > 0 && credentialVersion > 0
     }
 
-    class User(override val subjectId: Long, roles: Set<InternalRole>) : VerifiedAccessCandidate {
+    class User(override val subjectId: Long, roles: Set<InternalRole>, override val credentialVersion: Long) : VerifiedAccessCandidate {
         private val verifiedRoles = roles.toSet()
         val roles: Set<InternalRole> get() = verifiedRoles.toSet()
         override val context = AccessContext.USER
-        override val eligible: Boolean get() = subjectId > 0 && InternalRole.hasKnownRole(verifiedRoles)
+        override val eligible: Boolean get() = subjectId > 0 && credentialVersion > 0 && InternalRole.hasKnownRole(verifiedRoles)
     }
 }
 

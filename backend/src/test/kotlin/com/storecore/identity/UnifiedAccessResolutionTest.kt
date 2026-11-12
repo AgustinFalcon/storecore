@@ -9,14 +9,14 @@ import java.util.UUID
 
 class UnifiedAccessResolutionTest {
     private val resolver = UnifiedAccessResolver()
-    private val customer = VerifiedAccessCandidate.Customer(12)
-    private val user = VerifiedAccessCandidate.User(34, setOf(InternalRole.OPERATOR))
+    private val customer = VerifiedAccessCandidate.Customer(12, 1)
+    private val user = VerifiedAccessCandidate.User(34, setOf(InternalRole.OPERATOR), 1)
 
     @Test
     fun `zero eligible candidates reject without an effect`() {
         assertEquals(CandidateResolution.Rejected, resolver.resolve(emptyList(), ReturnDestination.HOME))
-        assertEquals(CandidateResolution.Rejected, resolver.resolve(listOf(VerifiedAccessCandidate.User(34, setOf(InternalRole.Unknown))), ReturnDestination.HOME))
-        assertEquals(CandidateResolution.Rejected, resolver.resolve(listOf(VerifiedAccessCandidate.Customer(0)), ReturnDestination.HOME))
+        assertEquals(CandidateResolution.Rejected, resolver.resolve(listOf(VerifiedAccessCandidate.User(34, setOf(InternalRole.Unknown), 1)), ReturnDestination.HOME))
+        assertEquals(CandidateResolution.Rejected, resolver.resolve(listOf(VerifiedAccessCandidate.Customer(0, 1)), ReturnDestination.HOME))
     }
 
     @Test
@@ -31,7 +31,7 @@ class UnifiedAccessResolutionTest {
 
     @Test
     fun `roleless user does not prevent valid customer login`() {
-        val roleless = VerifiedAccessCandidate.User(34, emptySet())
+        val roleless = VerifiedAccessCandidate.User(34, emptySet(), 1)
         assertSame(customer, assertIs<CandidateResolution.Single>(resolver.resolve(listOf(customer, roleless), ReturnDestination.HOME)).candidate)
     }
 
@@ -54,7 +54,7 @@ class UnifiedAccessResolutionTest {
     @Test
     fun `candidate role snapshot cannot be changed by the caller`() {
         val roles = mutableSetOf(InternalRole.OPERATOR)
-        val candidate = VerifiedAccessCandidate.User(34, roles)
+        val candidate = VerifiedAccessCandidate.User(34, roles, 1)
         roles.clear()
         assertTrue(candidate.eligible)
         assertEquals(setOf(InternalRole.OPERATOR), candidate.roles)
