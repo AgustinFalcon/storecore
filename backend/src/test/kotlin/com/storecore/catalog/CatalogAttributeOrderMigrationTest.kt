@@ -18,7 +18,7 @@ class CatalogAttributeOrderMigrationTest {
             val before=jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
             jdbc.update("INSERT INTO products(name,slug,base_price,status) VALUES ('Legacy','legacy',100,'ACTIVE')")
             jdbc.update("INSERT INTO product_variants(product_id,sku,label,attributes) SELECT id,'legacy','Legacy','{\"zz\":1,\"a\":2,\"middle\":3}'::jsonb FROM products WHERE slug='legacy'")
-            val result=flyway().migrate();assertEquals("18",result.targetSchemaVersion.toString())
+            val result=flyway().migrate();assertEquals("19",result.targetSchemaVersion.toString())
             assertEquals(before,jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE success AND version::int<=11 ORDER BY installed_rank"))
             assertEquals("a,middle,zz",jdbc.queryForObject("SELECT array_to_string(attribute_order,',') FROM product_variants WHERE sku='legacy'",String::class.java))
             flyway().validate();assertEquals(0,flyway().migrate().migrationsExecuted)

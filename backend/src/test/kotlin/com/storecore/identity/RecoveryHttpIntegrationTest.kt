@@ -273,8 +273,8 @@ class RecoveryHttpIntegrationTest(
     }
 
     @Test fun `V17 upgrade preserves history and recovery privileges constraints and immutable evidence`() {
-        assertEquals(baselineHistory, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version<>'18' ORDER BY installed_rank"))
-        assertEquals("18", jdbc.queryForObject("SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1", String::class.java))
+        assertEquals(baselineHistory, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version NOT IN ('18','19') ORDER BY installed_rank"))
+        assertEquals("19", jdbc.queryForObject("SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1", String::class.java))
         assertEquals(true, jdbc.queryForObject("SELECT has_table_privilege('storecore_runtime','identity_recovery_tokens','SELECT,INSERT,UPDATE')", Boolean::class.java))
         assertEquals(false, jdbc.queryForObject("SELECT has_table_privilege('storecore_runtime','identity_recovery_tokens','DELETE')", Boolean::class.java))
         val token = token(fixture())

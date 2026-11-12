@@ -3,11 +3,11 @@
 ## Diseño y persistencia
 
 - [x] RD-001 Revisar y aprobar specs funcional/técnico y threat model.
-- [ ] RD-002 V19 `email_version`, evidencia append-only, tokens, outbox con FKs
+- [x] RD-002 V19 `email_version`, evidencia append-only, tokens, outbox con FKs
       exclusivas, payload secreto crypto-shreddable y delivery con `UNCERTAIN`.
-- [ ] RD-003 Tipos cerrados, keyring AES-GCM y mappers fail-closed.
-- [ ] RD-003A Constraints/FKs exclusivas y grafos CAS de token/delivery.
-- [ ] RD-003B Constraint trigger diferible token/outbox realm+sujeto.
+- [x] RD-003 Tipos cerrados, keyring AES-GCM y mappers fail-closed.
+- [x] RD-003A Constraints/FKs exclusivas y grafos CAS de token/delivery.
+- [x] RD-003B Constraint trigger diferible token/outbox realm+sujeto.
 
 ## Backend
 

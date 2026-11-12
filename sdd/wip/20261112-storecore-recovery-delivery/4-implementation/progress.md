@@ -17,3 +17,11 @@
   constraint trigger diferible y frontera pre-DATA/aceptación incierta. R4 pendiente.
 - R4 coordinada GPT-6.1 Sol arquitectura/seguridad + producto/UX: `APPROVE`, sin
   P0-P2. RD-001 cerrado; se autoriza iniciar RD-002/003 sin activar SMTP.
+- RD-002/003/003A/003B implementados sin activar SMTP: migración V19 con
+  `email_version`, evidencia append-only, tokens, outbox/secret/delivery,
+  constraint triggers diferibles, grafos terminales y crypto-shredding; tipos
+  cerrados fail-closed y envelope encryption AES-256-GCM con keyring rotatable.
+- Regresión combinada verde: 9 pruebas de dominio/cifrado, 9 pruebas focales de
+  migración PostgreSQL 16 y `RecoveryHttpIntegrationTest`; Flyway termina en
+  V19 y el histórico previo se conserva. El error de auditoría que aparece en
+  logs es un fallo inyectado y esperado por el test de atomicidad.
