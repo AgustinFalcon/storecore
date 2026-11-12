@@ -9,6 +9,7 @@ import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
+import { CatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 import {
   CapabilityModule,
   InventoryRow,
@@ -81,11 +82,14 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map((body) => mapProductDetails(readApiBody<unknown>(body))));
   }
 
-  saveProduct(product: ProductDetail): Observable<ProductDetail> {
+  saveProduct(product: CatalogProductDraft): Observable<ProductDetail> {
     return this.http
       .put<unknown>(`${environment.apiBaseUrl}/user/catalog/products/${encodeURIComponent(product.sku)}`, {
         sku: product.sku, name: product.name, description: product.description, brand: product.brand, category: product.category,
-        images: product.images, variants: product.variants.map(variant => ({ id: variant.id, sku: variant.sku, name: variant.name, status: variant.status.wire, attributes: variant.attributes })),
+        images: product.images, variants: product.variants.map(variant => ({
+          id: variant.id, sku: variant.sku, name: variant.name, status: variant.status.wire, attributes: variant.attributes,
+          ...(variant.id ? {} : { availableQuantity: variant.initialAvailableQuantity }),
+        })),
         price: { base: product.price.base }, status: product.status.wire,
       })
       .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));

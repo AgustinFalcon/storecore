@@ -3,6 +3,7 @@ import { BoundedRows } from '../../catalog/bounded-rows';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../../catalog/catalog-facet.entity';
 import { ProductDetail } from '../../catalog/product-detail.entity';
+import { CatalogProductDraft } from '../../catalog/catalog-product-draft';
 import { IUserRepository } from '../user.repository';
 
 export class ManageAdminCatalogUseCase {
@@ -12,7 +13,7 @@ export class ManageAdminCatalogUseCase {
     return this.repo.listCatalog(page);
   }
 
-  save(product: ProductDetail): Observable<ProductDetail> {
+  save(product: CatalogProductDraft): Observable<ProductDetail> {
     return this.repo.saveProduct(product);
   }
 

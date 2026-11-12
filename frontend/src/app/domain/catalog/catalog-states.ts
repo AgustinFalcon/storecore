@@ -4,6 +4,7 @@ export class ProductStatus {
   static readonly Active = new ProductStatus('ACTIVE', 'Activo', true);
   static readonly Archived = new ProductStatus('ARCHIVED', 'Archivado');
   static readonly Unknown = new ProductStatus('UNKNOWN', 'Estado no informado');
+  static readonly selectable = [ProductStatus.Draft, ProductStatus.Active, ProductStatus.Archived];
   static readonly values = [ProductStatus.Draft, ProductStatus.Active, ProductStatus.Archived, ProductStatus.Unknown];
   static fromWire(raw: unknown): ProductStatus { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }

@@ -4,6 +4,7 @@ import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
 import { ProductDetail } from '../catalog/product-detail.entity';
+import { CatalogProductDraft } from '../catalog/catalog-product-draft';
 import {
   CapabilityModule,
   InventoryRow,
@@ -25,7 +26,7 @@ export interface IUserRepository {
   savePromo(promo: CreateManualPromo): Observable<ManualPromo>;
   transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo>;
   listCatalog(page?: BoundedPageRequest): Observable<BoundedRows<ProductDetail>>;
-  saveProduct(product: ProductDetail): Observable<ProductDetail>;
+  saveProduct(product: CatalogProductDraft): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
   saveCategory(facet: CatalogFacet): Observable<CatalogFacet>;
   previewProfile(manifest: string): Observable<ProfilePreview>;
