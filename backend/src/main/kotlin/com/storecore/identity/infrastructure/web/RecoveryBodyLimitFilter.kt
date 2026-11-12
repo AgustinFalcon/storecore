@@ -21,13 +21,16 @@ import java.io.InputStreamReader
 class RecoveryBodyLimitFilter : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean {
         val path = request.requestURI.removePrefix(request.contextPath)
-        return !path.startsWith("/api/v1/customer/auth/recovery/") && !path.startsWith("/api/v1/internal/auth/recovery/")
+        return listOf("customer", "internal").none { realm ->
+            path.startsWith("/api/v1/$realm/auth/recovery/") ||
+                path == "/api/v1/$realm/auth/email-verification" || path.startsWith("/api/v1/$realm/auth/email-verification/")
+        }
     }
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         response.setHeader("Cache-Control", "no-store")
-        if (request.contentLengthLong > LIMIT) { reject(response); return }
+        if (request.contentLengthLong > LIMIT) { reject(request, response); return }
         val body = request.inputStream.readNBytes(LIMIT + 1)
-        if (body.size > LIMIT) { reject(response); return }
+        if (body.size > LIMIT) { reject(request, response); return }
         val input = object : ServletInputStream() {
             private val delegate = ByteArrayInputStream(body)
             override fun read(): Int = delegate.read()
@@ -51,10 +54,11 @@ class RecoveryBodyLimitFilter : OncePerRequestFilter() {
             override fun getReader(): BufferedReader = BufferedReader(InputStreamReader(input, Charsets.UTF_8))
         }, noStore)
     }
-    private fun reject(response: HttpServletResponse) {
+    private fun reject(request: HttpServletRequest, response: HttpServletResponse) {
         response.status = 413
         response.contentType = "application/json"
-        response.writer.write("""{"code":413,"data":null,"message":"Request rejected","errorCode":"RECOVERY_REQUEST_TOO_LARGE","retryable":false,"traceId":null}""")
+        val code = if (request.requestURI.contains("/auth/email-verification")) "EMAIL_VERIFICATION_REQUEST_TOO_LARGE" else "RECOVERY_REQUEST_TOO_LARGE"
+        response.writer.write("""{"code":413,"data":null,"message":"Request rejected","errorCode":"$code","retryable":false,"traceId":null}""")
     }
     companion object { private const val LIMIT = 4096 }
 }

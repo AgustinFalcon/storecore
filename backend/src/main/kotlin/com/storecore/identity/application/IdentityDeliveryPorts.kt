@@ -20,6 +20,8 @@ enum class IdentityDeliveryEligibility { READY, INVALIDATED, EXPIRED, LEASE_LOST
 enum class IdentityDeliveryRun { IDLE, SETTLED, LEASE_LOST }
 
 interface IdentityDeliveryQueue {
+    /** Cancels/reclaims expired work and crypto-shreds terminal payloads without performing network I/O. */
+    fun reapExpired(now: Instant): Int = 0
     /**
      * Short transaction, SKIP LOCKED, increment attempt; reclaim must never resend a begun handoff.
      * Expired leases use IdentityDeliveryPolicy.recoverExpiredLease and terminal outcomes erase secrets.
