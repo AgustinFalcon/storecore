@@ -188,10 +188,24 @@ class IdentityHttpIntegrationTest(
         assertEquals(200, login.statusCode.value(), login.body)
         val cookie = login.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';')
         val csrf = login.headers.getFirst("X-CSRF-Token")
-        val sessionId = jdbc.queryForObject("SELECT id::text FROM identity_sessions WHERE subject_kind='USER' AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1", String::class.java)
+        val sessionId = jdbc.queryForObject(
+            """SELECT s.id::text FROM identity_sessions s
+               JOIN users u ON u.id=s.user_id
+               WHERE s.subject_kind='USER' AND s.revoked_at IS NULL AND u.email=?
+               ORDER BY s.issued_at DESC LIMIT 1""",
+            String::class.java,
+            "revoke-admin@example.com",
+        )
         val customer = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"revoked-target@example.com","password":"a-very-long-password","firstName":"Revoked","lastName":"Target"}""")
         val targetCookie = customer.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';')
-        val targetSession = jdbc.queryForObject("SELECT id::text FROM identity_sessions WHERE subject_kind='CUSTOMER' AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1", String::class.java)
+        val targetSession = jdbc.queryForObject(
+            """SELECT s.id::text FROM identity_sessions s
+               JOIN customers c ON c.id=s.customer_id
+               WHERE s.subject_kind='CUSTOMER' AND s.revoked_at IS NULL AND c.email=?
+               ORDER BY s.issued_at DESC LIMIT 1""",
+            String::class.java,
+            "revoked-target@example.com",
+        )
         val revoked = exchange("/api/v1/internal/admin/sessions/$targetSession/revoke", HttpMethod.POST, """{"reason":"security-review","correlationId":"11111111-1111-4111-8111-111111111111"}""", cookie, csrf)
         assertEquals(200, revoked.statusCode.value())
         val afterRevoke = exchange("/api/v1/customer/me", HttpMethod.GET, null, targetCookie)
@@ -529,7 +543,7 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
-    fun corsRejectsDisallowedUnifiedOriginBeforeControllerHandling() {
+    fun disallowedUnifiedOriginExpiresOnlyTheChallengeCookie() {
         val response = exchange(
             "/api/v1/auth/login",
             HttpMethod.POST,
@@ -538,7 +552,15 @@ class IdentityHttpIntegrationTest(
         )
         assertEquals(403, response.statusCode.value())
         assertEquals(null, response.headers.getFirst(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN))
-        assertEquals(0, response.headers.getValuesAsList(HttpHeaders.SET_COOKIE).size)
+        assertEquals("no-store", response.headers.cacheControl)
+        val setCookies = response.headers[HttpHeaders.SET_COOKIE].orEmpty()
+        assertEquals(1, setCookies.size, response.headers.toString())
+        assertEquals(
+            true,
+            setCookies.single().contains("__Host-storecore_access_challenge=") &&
+                setCookies.single().contains("Max-Age=0"),
+        )
+        assertEquals(false, setCookies.any { it.contains("__Host-storecore-customer=") || it.contains("__Host-storecore-user=") })
     }
 
     private fun provisionAdmin(email: String) {
