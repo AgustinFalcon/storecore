@@ -249,8 +249,9 @@ class CredentialCoherenceIntegrationTest {
                 legacy += raw to consumed
             }
             val history = jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history ORDER BY installed_rank")
-            flyway().migrate()
+            flyway("17").migrate()
             assertEquals(history, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version<>'17' ORDER BY installed_rank"))
+            flyway().migrate()
             locks = IdentityMutationLocks(jdbc)
             identity = JdbcIdentityService(jdbc, passwords, tokens, LoginRateLimiter(), LoginAttemptBudget(), locks)
             challenges = JdbcAccessChallengeStore(jdbc, tokens, locks)

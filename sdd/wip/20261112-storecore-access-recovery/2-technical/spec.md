@@ -26,7 +26,8 @@ el body:
 
 Request configurado devuelve `202 data.kind=ACCEPTED` de forma neutral. Inspect
 devuelve HTTP 200 con `READY`, `INVALID_LINK`, `EXPIRED_LINK`, `USED_LINK` o
-`SUPERSEDED_LINK`. Complete devuelve HTTP 200 con `COMPLETED` o el resultado
+`SUPERSEDED_LINK`. Sólo `READY` incluye `expiresAt` RFC 3339 UTC tomado del reloj
+DB; ausencia o formato inválido mapea a `Unknown`. Complete devuelve HTTP 200 con `COMPLETED` o el resultado
 terminal cerrado; una contraseña que no cumple política devuelve 422 con
 `PASSWORD_POLICY_VIOLATION`. Presupuesto agotado devuelve 429 con `Retry-After`;
 adapter global no configurado devuelve 503 `RECOVERY_UNAVAILABLE`. Body o

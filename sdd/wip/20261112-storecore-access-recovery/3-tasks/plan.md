@@ -15,14 +15,14 @@
 
 ## Corte B — core recovery local fail-closed
 
-- [ ] AR-005 Tipos cerrados, política de contraseña compartida y puertos.
-- [ ] AR-006 V18: persistencia hash-only, TTL, estados terminales y locks.
-- [ ] AR-007 Request neutral + delivery `UNCONFIGURED` + capturador sólo test.
-- [ ] AR-008 Inspect no mutante y complete atómico/single-use.
-- [ ] AR-009 Revocación SYSTEM del realm, auditoría y supersesión de tokens hermanos.
-- [ ] AR-010 Budgets atómicos IP+instancia previos al lookup, presupuestos por
+- [x] AR-005 Tipos cerrados, política de contraseña compartida y puertos.
+- [x] AR-006 V18: persistencia hash-only, TTL, estados terminales y locks.
+- [x] AR-007 Request neutral + delivery `UNCONFIGURED` + capturador sólo test.
+- [x] AR-008 Inspect no mutante y complete atómico/single-use.
+- [x] AR-009 Revocación SYSTEM del realm, auditoría y supersesión de tokens hermanos.
+- [x] AR-010 Budgets atómicos IP+instancia previos al lookup, presupuestos por
       destino/hash, saturación de cardinalidad y límites de tokens vivos.
-- [ ] AR-011 HTTP, migración, concurrencia, rollback y seguridad PostgreSQL 16.
+- [x] AR-011 HTTP, migración, concurrencia, rollback y seguridad PostgreSQL 16.
 
 ## Corte C — frontend y evidencia de punta a punta
 

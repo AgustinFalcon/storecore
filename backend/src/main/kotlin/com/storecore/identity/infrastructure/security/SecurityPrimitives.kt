@@ -8,13 +8,13 @@ import java.security.SecureRandom
 import java.util.Base64
 
 @Component
-class Argon2PasswordHasher {
+class Argon2PasswordHasher : com.storecore.identity.application.RecoveryPasswordHasher {
     private val argon2 = Argon2Factory.create(Argon2Factory.Argon2Types.ARGON2id)
     private val iterations = 2
     private val memoryKiB = 19_456
     private val parallelism = 1
 
-    fun hash(password: CharArray): String = try {
+    override fun hash(password: CharArray): String = try {
         argon2.hash(iterations, memoryKiB, parallelism, password)
     } finally {
         password.fill('\u0000')
@@ -83,16 +83,16 @@ class Argon2PasswordHasher {
 }
 
 @Component
-class OpaqueTokenFactory {
+class OpaqueTokenFactory : com.storecore.identity.application.RecoveryTokenPort {
     private val random = SecureRandom()
 
-    fun nextRawToken(): String {
+    override fun nextRawToken(): String {
         val bytes = ByteArray(32)
         random.nextBytes(bytes)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
-    fun sha256(raw: String): String = MessageDigest.getInstance("SHA-256")
+    override fun sha256(raw: String): String = MessageDigest.getInstance("SHA-256")
         .digest(raw.toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 

@@ -359,7 +359,7 @@ open class JdbcIdentityService(
     }
 
     private fun isPasswordLengthValid(password: String): Boolean =
-        password.codePointCount(0, password.length) in 12..128
+        com.storecore.identity.domain.PasswordPolicy.accepts(password)
     private fun Map<String, Any?>.requiredString(key: String): String = this[key]?.toString() ?: error("missing database column $key")
     private fun Map<String, Any?>.requiredLong(key: String): Long = (this[key] as? Number)?.toLong() ?: requiredString(key).toLong()
     private fun Map<String, Any?>.isActive(): Boolean = when (val value = this["active"]) {

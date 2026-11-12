@@ -12,3 +12,9 @@
   0 errors, 0 skipped; log `backend/target/corte-a-full-final-test.log`.
 - Reviews estáticas Bugbot y Security Review con GPT-6.1 Sol medium: sin P0-P3.
   Review exact-head, PR, CI, merge y Corte B/C: pendientes.
+- 2026-11-12: Corte B AR-005..011 implementado con V18, token hash-only,
+  delivery productivo `UNCONFIGURED`, capturador exclusivo de tests, budgets
+  compuestos, inspect no mutante y complete transaccional por realm.
+- Gate backend Corte B: Maven exit 0, 326 tests, 0 failures, 0 errors, 0 skipped;
+  log `backend/target/corte-b-full-test.log`. Dos reviews estáticas sin P0-P3.
+- Proveedor real, outbox, secretos y homologación siguen explícitamente NO-GO.
