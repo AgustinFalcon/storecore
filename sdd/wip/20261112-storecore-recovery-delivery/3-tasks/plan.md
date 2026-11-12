@@ -14,18 +14,18 @@
 - [x] RD-004 Emisión, inspect no mutante y confirmación explícita con locks,
       budgets cuantificados y protección contra scanners.
 - [x] RD-005 Enqueue recovery transaccional sólo para email verificado.
-- [ ] RD-006 Worker SMTP TLS con lease, retry, uncertain terminal, revalidación,
+- [x] RD-006 Worker SMTP TLS con lease, retry, uncertain terminal, revalidación,
       rotación, crypto-erasure y métricas sin PII.
 - [x] RD-006A Frontera SMTP pre-DATA retry vs aceptación ambigua uncertain.
-- [ ] RD-007 HTTP, CSRF, auditoría redacted y configuración deny-by-default.
-- [ ] RD-007A Readiness independiente para verificación y recovery en cada modo.
+- [x] RD-007 HTTP, CSRF, auditoría redacted y configuración deny-by-default.
+- [x] RD-007A Readiness independiente para verificación y recovery en cada modo.
 
 ## Frontend y evidencia
 
-- [ ] RD-008 Ownership/request separados en `/customer/profile`, nueva
+- [x] RD-008 Ownership/request separados en `/customer/profile`, nueva
       `/user/account` y `/verify-email` accesible.
-- [ ] RD-009 Unit, arquitectura, PG16, SMTP fake y browser real CUSTOMER/USER.
-- [ ] RD-010 Reviews GPT-6.1 Sol Bugbot/Security/Producto exact-head.
+- [x] RD-009 Unit, arquitectura, PG16, SMTP fake y browser real CUSTOMER/USER.
+- [x] RD-010 Reviews GPT-6.1 Sol Bugbot/Security/Producto exact-head.
 - [ ] RD-011 PR, CI, merge autorizado y CI post-merge verde.
 
 ## Gate externo diferido

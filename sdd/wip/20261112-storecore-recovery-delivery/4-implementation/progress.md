@@ -37,3 +37,21 @@
   verificación/recovery PostgreSQL 16 y HTTP). Los fixtures antiguos ahora
   generan evidencia de verificación real y el cambio de email exige verificar
   la nueva versión antes de volver a emitir recovery.
+- RD-006/007/007A cerrados: cola JDBC con leases/CAS y reaper por tandas,
+  transporte SMTP TLS con timeout y frontera pre-DATA, keyring rotatable,
+  métricas agregadas sin PII, HTTP con límites/CSRF y defaults productivos
+  `UNCONFIGURED`/worker apagado. No se agregaron credenciales reales.
+- RD-008 cerrado para CUSTOMER/USER: ownership, disponibilidad de lectura y
+  solicitud son tipos cerrados separados; `/verify-email` limpia el fragmento
+  antes de red, exige confirmación explícita y conserva el realm en sus CTA.
+- RD-009 cerrado con evidencia local: backend 80 suites/399 tests, cero fallos;
+  frontend arquitectura+lint+186 archivos/1225 tests y build productivo;
+  Playwright Chromium 4/4 para ambos realms, Axe, secret cleanup y sesión del
+  realm opuesto. Testcontainers y servidores temporales quedaron detenidos.
+- RD-010 cerrado sobre `50b4794048bd64d20af47c30a9e971b9dea61bc2`:
+  GPT-6.1 Sol Bugbot, Security y Producto/UX aprobaron sin P0-P2 ni P3 nuevos.
+  Los P2 previos (IDNA y navegación cross-realm) y P3 (backlog del reaper y
+  lectura unavailable) quedaron corregidos y cubiertos por pruebas.
+- RD-011 permanece abierto hasta crear PR, ejecutar CI remoto, obtener
+  autorización de merge y comprobar CI post-merge. RD-EXT-01/02/03 siguen
+  diferidos a homologación externa; no se los considera completados.
