@@ -25,3 +25,15 @@
   migración PostgreSQL 16 y `RecoveryHttpIntegrationTest`; Flyway termina en
   V19 y el histórico previo se conserva. El error de auditoría que aparece en
   logs es un fallo inyectado y esperado por el test de atomicidad.
+- RD-004/005 y la frontera RD-006A implementados: verificación hash-only con
+  inspect no mutante y confirmación explícita single-use; recovery sólo crea
+  autorización/outbox/secreto cifrado para evidencia de ownership vigente;
+  worker aislado con handoff durable, retry exclusivamente pre-DATA y estado
+  terminal `UNCERTAIN` ante aceptación ambigua o crash posterior al marcador.
+- Se extendió V19 antes de publicación con `handoff_started_at` y categorías de
+  error cerradas. Un retry probado pre-DATA limpia el marcador mediante CAS;
+  un lease abandonado con marcador jamás autoriza reenvío automático.
+- Matriz integrada verde: 61 pruebas (dominio, budgets, crypto, worker,
+  verificación/recovery PostgreSQL 16 y HTTP). Los fixtures antiguos ahora
+  generan evidencia de verificación real y el cambio de email exige verificar
+  la nueva versión antes de volver a emitir recovery.

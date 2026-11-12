@@ -71,6 +71,12 @@ class RecoveryDeliveryMigrationTest {
         assertEquals(0, jdbc.update("UPDATE identity_message_delivery SET state='RETRY',lease_owner=NULL,lease_until=NULL WHERE event_id=? AND lease_owner=?", event, UUID.randomUUID()))
         jdbc.update("UPDATE identity_message_delivery SET state='RETRY',lease_owner=NULL,lease_until=NULL,last_error='TRANSIENT',updated_at=clock_timestamp() WHERE event_id=? AND lease_owner=?", event, lease)
         jdbc.update("UPDATE identity_message_delivery SET state='LEASED',attempts=attempts+1,lease_owner=?,lease_until=clock_timestamp()+interval '60 seconds',updated_at=clock_timestamp() WHERE event_id=?", lease, event)
+        reject { jdbc.update("UPDATE identity_message_delivery SET state='UNCERTAIN',lease_owner=NULL,lease_until=NULL,last_error='AMBIGUOUS',terminal_at=clock_timestamp(),updated_at=clock_timestamp() WHERE event_id=? AND lease_owner=?", event, lease) }
+        jdbc.update("UPDATE identity_message_delivery SET handoff_started_at=clock_timestamp(),updated_at=clock_timestamp() WHERE event_id=? AND state='LEASED' AND lease_owner=? AND handoff_started_at IS NULL", event, lease)
+        reject { jdbc.update("UPDATE identity_message_delivery SET state='RETRY',lease_owner=NULL,lease_until=NULL,last_error='TRANSIENT',updated_at=clock_timestamp() WHERE event_id=? AND lease_owner=?", event, lease) }
+        jdbc.update("UPDATE identity_message_delivery SET state='RETRY',lease_owner=NULL,lease_until=NULL,handoff_started_at=NULL,last_error='TRANSIENT',updated_at=clock_timestamp() WHERE event_id=? AND lease_owner=?", event, lease)
+        jdbc.update("UPDATE identity_message_delivery SET state='LEASED',attempts=attempts+1,lease_owner=?,lease_until=clock_timestamp()+interval '60 seconds',updated_at=clock_timestamp() WHERE event_id=?", lease, event)
+        jdbc.update("UPDATE identity_message_delivery SET handoff_started_at=clock_timestamp(),updated_at=clock_timestamp() WHERE event_id=? AND state='LEASED' AND lease_owner=? AND handoff_started_at IS NULL", event, lease)
         jdbc.update("UPDATE identity_message_delivery SET state='UNCERTAIN',lease_owner=NULL,lease_until=NULL,last_error='AMBIGUOUS',terminal_at=clock_timestamp(),updated_at=clock_timestamp() WHERE event_id=? AND lease_owner=?", event, lease)
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM identity_message_secret", Int::class.java))
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM identity_message_outbox", Int::class.java))

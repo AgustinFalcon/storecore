@@ -171,6 +171,9 @@ class RecoveryHttpIntegrationTest(
         assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM identity_recovery_tokens WHERE customer_id=? AND state='SUPERSEDED' AND terminal_reason='EMAIL_CHANGED'", Int::class.java, account.customer))
         assertEquals("SUPERSEDED_LINK", kind(inspect(RecoveryRealm.CUSTOMER, old.secret.value)))
         request(RecoveryRealm.CUSTOMER, nextEmail)
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM identity_recovery_tokens WHERE customer_id=? AND state='PENDING'", Int::class.java, account.customer))
+        verifyEmail(IdentityRealm.CUSTOMER, account.customer, nextEmail)
+        request(RecoveryRealm.CUSTOMER, nextEmail)
         assertEquals("READY", kind(inspect(RecoveryRealm.CUSTOMER, capture.latest(RecoveryRealm.CUSTOMER, nextEmail).secret.value)))
     }
 
@@ -289,7 +292,35 @@ class RecoveryHttpIntegrationTest(
         val customer = jdbc.queryForObject("INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Recovery','Customer') RETURNING id", Long::class.java, email, hash)!!
         val user = jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Recovery','User') RETURNING id", Long::class.java, email, hash)!!
         jdbc.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code='ADMIN'", user)
+        verifyEmail(IdentityRealm.CUSTOMER, customer, email)
+        verifyEmail(IdentityRealm.USER, user, email)
         return Account(email, customer, user)
+    }
+
+    private fun verifyEmail(realm: IdentityRealm, subjectId: Long, email: String) {
+        val tokenId = UUID.randomUUID()
+        val correlation = UUID.randomUUID()
+        val opaque = com.storecore.identity.infrastructure.security.OpaqueTokenFactory()
+        val column = if (realm == IdentityRealm.USER) "user_id" else "customer_id"
+        val table = if (realm == IdentityRealm.USER) "users" else "customers"
+        val version = jdbc.queryForObject("SELECT email_version FROM $table WHERE id=?", Long::class.java, subjectId)!!
+        jdbc.update(
+            """WITH issued AS (SELECT clock_timestamp() value)
+               INSERT INTO identity_email_verification_tokens(id,realm,$column,token_hash,email_version,email_digest,issued_at,expires_at,correlation_id)
+               SELECT ?,?,?,?, ?,?,value,value+interval '30 minutes',? FROM issued""",
+            tokenId, realm.name, subjectId, opaque.sha256(UUID.randomUUID().toString()), version, opaque.sha256(email), correlation,
+        )
+        jdbc.update(
+            """UPDATE identity_email_verification_tokens SET state='CONSUMED',terminal_at=clock_timestamp(),terminal_correlation_id=?
+               WHERE id=? AND state='PENDING'""",
+            correlation, tokenId,
+        )
+        jdbc.update(
+            """INSERT INTO identity_email_verification_evidence(id,verification_token_id,realm,$column,email_version,email_digest,verified_at,correlation_id)
+               SELECT ?,id,realm,$column,email_version,email_digest,terminal_at,terminal_correlation_id
+               FROM identity_email_verification_tokens WHERE id=?""",
+            UUID.randomUUID(), tokenId,
+        )
     }
     private fun token(account: Account, realm: RecoveryRealm = RecoveryRealm.CUSTOMER): RecoveryDispatch {
         assertEquals(202, request(realm, account.email).statusCode.value())

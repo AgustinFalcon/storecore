@@ -22,6 +22,7 @@ open class JdbcRecoveryRepository(
         locks.acquire(IdentityMutationScope.Own(subject))
         val current = subject(subject)
         if (!snapshot(subject, current).eligibility.permitsRecovery || current["email"] != email.value) return null
+        if (!ownership(subject, current).permitsRecovery) return null
         val count = jdbc.queryForObject(
             """SELECT count(*) FROM identity_recovery_tokens WHERE realm=? AND ${subjectColumn(identityRealm)}=?
                AND state=? AND expires_at>clock_timestamp() AND credential_version=? AND email_digest=?""",
@@ -96,7 +97,18 @@ open class JdbcRecoveryRepository(
         jdbc.queryForList("SELECT * FROM identity_recovery_tokens WHERE realm=? AND token_hash=?" + if (lock) " FOR UPDATE" else "", realm.name, tokens.sha256(secret.value)).singleOrNull()
 
     private fun subject(subject: IdentitySubject): Map<String, Any?> =
-        jdbc.queryForList("SELECT email,active,credential_version FROM ${table(subject.realm)} WHERE id=?", subject.id).singleOrNull() ?: emptyMap()
+        jdbc.queryForList("SELECT email,active,credential_version,email_version FROM ${table(subject.realm)} WHERE id=?", subject.id).singleOrNull() ?: emptyMap()
+
+    /** Evidence must match the realm, subject and current email version under the subject lock. */
+    private fun ownership(subject: IdentitySubject, current: Map<String, Any?>): EmailOwnershipState {
+        val verified = jdbc.queryForObject(
+            """SELECT EXISTS(SELECT 1 FROM identity_email_verification_evidence
+               WHERE realm=? AND ${subjectColumn(subject.realm)}=? AND email_version=? AND email_digest=?)""",
+            Boolean::class.java, subject.realm.name, subject.id, current.number("email_version"),
+            tokens.sha256(current["email"] as? String ?: ""),
+        ) == true
+        return if (verified) EmailOwnershipState.VERIFIED else EmailOwnershipState.Unknown
+    }
 
     private fun snapshot(subject: IdentitySubject, current: Map<String, Any?>): RecoveryAccountSnapshot {
         val roles = when (subject.realm) {

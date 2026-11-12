@@ -107,10 +107,13 @@ CREATE TABLE identity_message_delivery (
  state VARCHAR(16) NOT NULL DEFAULT 'PENDING' CHECK(state IN ('PENDING','LEASED','RETRY','SENT','UNCERTAIN','DEAD','CANCELLED')),
  attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts BETWEEN 0 AND 5),
  available_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), lease_owner UUID, lease_until TIMESTAMPTZ,
- last_error VARCHAR(32) CHECK(last_error IN ('TRANSIENT','AUTHENTICATION','CONFIGURATION','EXPIRED','OBSOLETE','AMBIGUOUS','ATTEMPTS_EXHAUSTED')),
+ handoff_started_at TIMESTAMPTZ,
+ last_error VARCHAR(32) CHECK(last_error IN ('TRANSIENT','AUTHENTICATION','CONFIGURATION','REJECTED','EXPIRED','OBSOLETE','AMBIGUOUS','PAYLOAD_INVALID','ATTEMPTS_EXHAUSTED')),
  created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(), terminal_at TIMESTAMPTZ,
  CHECK((state='LEASED' AND lease_owner IS NOT NULL AND lease_until IS NOT NULL AND attempts>0) OR (state<>'LEASED' AND lease_owner IS NULL AND lease_until IS NULL)),
  CHECK((state IN ('SENT','UNCERTAIN','DEAD','CANCELLED') AND terminal_at IS NOT NULL) OR (state IN ('PENDING','LEASED','RETRY') AND terminal_at IS NULL)),
+ CHECK((state IN ('PENDING','RETRY') AND handoff_started_at IS NULL) OR state NOT IN ('PENDING','RETRY')),
+ CHECK(state NOT IN ('SENT','UNCERTAIN') OR handoff_started_at IS NOT NULL),
  CHECK(updated_at>=created_at AND (terminal_at IS NULL OR terminal_at>=created_at)),
  CHECK(state<>'UNCERTAIN' OR last_error IS NOT DISTINCT FROM 'AMBIGUOUS')
 );
@@ -140,9 +143,15 @@ BEGIN
  IF TG_OP='DELETE' OR NEW.event_id IS DISTINCT FROM OLD.event_id OR NEW.created_at IS DISTINCT FROM OLD.created_at
  OR OLD.state IN ('SENT','UNCERTAIN','DEAD','CANCELLED') OR NEW.updated_at<OLD.updated_at
  OR NOT ((OLD.state IN ('PENDING','RETRY') AND NEW.state IN ('LEASED','CANCELLED'))
-      OR (OLD.state='LEASED' AND NEW.state IN ('SENT','RETRY','UNCERTAIN','DEAD','CANCELLED')))
- OR (NEW.state='LEASED' AND (NEW.attempts<>OLD.attempts+1 OR NEW.lease_until<=clock_timestamp()))
+      OR (OLD.state='LEASED' AND NEW.state IN ('SENT','RETRY','UNCERTAIN','DEAD','CANCELLED'))
+      OR (OLD.state='LEASED' AND NEW.state='LEASED' AND OLD.handoff_started_at IS NULL AND NEW.handoff_started_at IS NOT NULL))
+ OR (OLD.state IN ('PENDING','RETRY') AND NEW.state='LEASED' AND (NEW.attempts<>OLD.attempts+1 OR NEW.lease_until<=clock_timestamp() OR NEW.handoff_started_at IS NOT NULL))
+ OR (OLD.state='LEASED' AND NEW.state='LEASED' AND (NEW.attempts<>OLD.attempts OR NEW.lease_owner IS DISTINCT FROM OLD.lease_owner OR NEW.lease_until IS DISTINCT FROM OLD.lease_until OR NEW.handoff_started_at<statement_timestamp() OR NEW.handoff_started_at>clock_timestamp()))
  OR (NEW.state<>'LEASED' AND NEW.attempts<>OLD.attempts)
+ OR (OLD.state='LEASED' AND NEW.state IN ('SENT','UNCERTAIN') AND OLD.handoff_started_at IS NULL)
+ OR (NEW.handoff_started_at IS DISTINCT FROM OLD.handoff_started_at
+     AND NOT (OLD.state='LEASED' AND NEW.state='LEASED')
+     AND NOT (OLD.state='LEASED' AND NEW.state='RETRY' AND NEW.handoff_started_at IS NULL))
  THEN RAISE EXCEPTION 'invalid delivery transition' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END; $_$;

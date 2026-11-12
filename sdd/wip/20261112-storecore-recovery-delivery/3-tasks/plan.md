@@ -11,12 +11,12 @@
 
 ## Backend
 
-- [ ] RD-004 Emisión, inspect no mutante y confirmación explícita con locks,
+- [x] RD-004 Emisión, inspect no mutante y confirmación explícita con locks,
       budgets cuantificados y protección contra scanners.
-- [ ] RD-005 Enqueue recovery transaccional sólo para email verificado.
+- [x] RD-005 Enqueue recovery transaccional sólo para email verificado.
 - [ ] RD-006 Worker SMTP TLS con lease, retry, uncertain terminal, revalidación,
       rotación, crypto-erasure y métricas sin PII.
-- [ ] RD-006A Frontera SMTP pre-DATA retry vs aceptación ambigua uncertain.
+- [x] RD-006A Frontera SMTP pre-DATA retry vs aceptación ambigua uncertain.
 - [ ] RD-007 HTTP, CSRF, auditoría redacted y configuración deny-by-default.
 - [ ] RD-007A Readiness independiente para verificación y recovery en cada modo.
 
