@@ -125,11 +125,12 @@ test('SSA real: stale review rejects durably and a fresh review uses a new comma
     const other = await competingContext.newPage(); await apiLogin(other, email);
     expect((await mutate(other, path(a), competing)).status()).toBe(200);
   } finally { await competingContext.close(); }
-  const rejected = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === path(a));
+  const rejected = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === path(a))
+    .then(async response => ({ response, payload: await response.json() }));
   await page.getByRole('button', { name: 'Confirmar ajuste', exact: true }).click();
-  const conflict = await rejected; expect(conflict.status()).toBe(409);
+  const { response: conflict, payload } = await rejected; expect(conflict.status()).toBe(409);
   const frozen = conflict.request().postDataJSON() as FrozenBody;
-  expect(mapInventoryAdjustmentReceipt((await conflict.json()).data).rejection).toBe(InventoryAdjustmentRejection.BalanceChanged);
+  expect(mapInventoryAdjustmentReceipt(payload.data).rejection).toBe(InventoryAdjustmentRejection.BalanceChanged);
   await expect(page.getByRole('heading', { name: InventoryAdjustmentPhase.Conflict.label, exact: true })).toBeVisible();
   expect(effects(a)).toEqual({ available: 9, reserved: 0, safety: 1, commands: 2, ledger: 2, audit: 2 });
   const replay = await mutate(page, path(a), frozen); expect(replay.status()).toBe(409);
