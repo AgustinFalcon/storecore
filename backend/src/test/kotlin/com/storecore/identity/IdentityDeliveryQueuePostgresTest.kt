@@ -152,13 +152,15 @@ class IdentityDeliveryQueuePostgresTest {
         assertEquals(IdentityDeliveryEligibility.LEASE_LOST, queue.revalidate(lease, Instant.now()))
         assertEquals(0, secretCount(jdbc, id))
         val pending = event(jdbc, tx)
-        assertEquals(1, queue.reapExpired(Instant.now().plusSeconds(1801)))
+        val pendingDeadline = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant().plusSeconds(1801)
+        assertEquals(1, queue.reapExpired(pendingDeadline))
         assertEquals(IdentityOutboxState.CANCELLED, state(jdbc, pending))
         assertEquals(0, secretCount(jdbc, pending))
         val active = event(jdbc, tx)
         val activeLease = queue.acquire(UUID.randomUUID(), Instant.now(), Duration.ofHours(1))!!
         assertEquals(active, activeLease.eventId)
-        assertEquals(1, queue.reapExpired(Instant.now().plusSeconds(1801)))
+        val activeDeadline = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant().plusSeconds(1801)
+        assertEquals(1, queue.reapExpired(activeDeadline))
         assertEquals(IdentityOutboxState.CANCELLED, state(jdbc, active))
         assertEquals(0, secretCount(jdbc, active))
     }
@@ -190,8 +192,9 @@ class IdentityDeliveryQueuePostgresTest {
     }
 
     @Test fun `startup shreds expired old key payload but refuses a key required by live work`() = database { jdbc, tx, _ ->
-        val expired = eventAt(jdbc, tx, Instant.now().plusSeconds(2), "retired-key")
-        Thread.sleep(2_250)
+        val databaseNow = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
+        val expired = eventAt(jdbc, tx, databaseNow.plusSeconds(2), "retired-key")
+        Thread.sleep(2_500)
         val settings = IdentityDeliverySettings(
             EmailDeliveryMode.VERIFICATION_ONLY, true, "smtp.example.test", 465, IdentitySmtpTls.IMPLICIT,
             "fixture", "fixture-secret", "sender@example.test", "https://store.example.test", "queue-test",
@@ -201,7 +204,8 @@ class IdentityDeliveryQueuePostgresTest {
         assertEquals(IdentityOutboxState.CANCELLED, state(jdbc, expired))
         assertEquals(0, secretCount(jdbc, expired))
 
-        val live = eventAt(jdbc, tx, Instant.now().plusSeconds(1800), "retired-key")
+        val liveNow = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
+        val live = eventAt(jdbc, tx, liveNow.plusSeconds(1800), "retired-key")
         val failure = assertThrows(IllegalStateException::class.java) {
             ConfiguredIdentityDeliveryBeans().identityMessageKeyring(settings, jdbc)
         }

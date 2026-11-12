@@ -24,7 +24,8 @@ describe('verification fragment cleanup and accessible explicit confirmation', (
     const host = fixture.nativeElement as HTMLElement;
     expect(repository.inspect).toHaveBeenCalledExactlyOnceWith(RecoveryRealm.User, 'a'.repeat(43)); expect(repository.complete).not.toHaveBeenCalled();
     expect(host.querySelector('[role="status"]')?.getAttribute('aria-live')).toBe('polite'); expect(document.activeElement?.id).toBe('verify-title');
-    expect(host.querySelector('a[href="/user/account"]')).toBeTruthy();
+    const account = host.querySelector('a[href*="USER_ACCOUNT"]') as HTMLAnchorElement;
+    expect(account).toBeTruthy(); expect(account.href).toContain('recoveredRealm=user');
     const login = host.querySelector('a[href*="USER_ACCOUNT"]') as HTMLAnchorElement;
     expect(login).toBeTruthy(); expect(login.href).toContain('recoveredRealm=user');
     fragment.next('stale-router-token'); events.next(new NavigationEnd(1, '/verify-email', '/verify-email')); expect(repository.inspect).toHaveBeenCalledTimes(1);
@@ -33,7 +34,7 @@ describe('verification fragment cleanup and accessible explicit confirmation', (
     completion.next({ outcome: Outcome.Verified }); fixture.detectChanges(); expect(host.querySelector('[role="status"]')?.textContent).toContain(Outcome.Verified.label); expect(document.activeElement?.id).toBe('verify-title');
     history.replaceState(null, '', `/verify-email#realm=unknown&token=${'a'.repeat(43)}`);
     events.next(new NavigationSkipped(2, '/verify-email', 'same route')); fixture.detectChanges();
-    expect(document.location.hash).toBe(''); expect(repository.inspect).toHaveBeenCalledTimes(1); expect(host.querySelector('a[href="/user/account"]')).toBeNull();
+    expect(document.location.hash).toBe(''); expect(repository.inspect).toHaveBeenCalledTimes(1); expect(host.querySelector('a[href*="USER_ACCOUNT"]')).toBeNull();
     history.replaceState(null, '', `/verify-email#realm=user&token=${'a'.repeat(43)}`);
     events.next(new NavigationSkipped(3, '/verify-email', 'same route')); fixture.detectChanges(); expect(repository.inspect).toHaveBeenCalledTimes(2);
     fixture.destroy(); replaceState.mockRestore(); history.replaceState(null, '', '/');

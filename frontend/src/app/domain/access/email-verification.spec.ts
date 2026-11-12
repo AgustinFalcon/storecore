@@ -1,4 +1,4 @@
-import { CaptureVerificationLinkStep, EmailOwnership, VerificationFragmentState, VerificationOutcome, VerificationRequestState, VerificationStage } from './email-verification';
+import { CaptureVerificationLinkStep, EmailOwnership, EmailOwnershipReadState, VerificationFragmentState, VerificationOutcome, VerificationRequestState, VerificationStage } from './email-verification';
 import { RecoveryRealm } from './recovery';
 
 describe('email verification closed boundary', () => {
@@ -15,6 +15,8 @@ describe('email verification closed boundary', () => {
     for (const state of [VerificationRequestState.Idle, VerificationRequestState.Submitting, VerificationRequestState.Accepted, VerificationRequestState.RateLimited, VerificationRequestState.Unavailable]) expect(VerificationRequestState.fromWire(state.wire)).toBe(state);
     for (const outcome of [VerificationOutcome.Ready, VerificationOutcome.Verified, VerificationOutcome.Invalid, VerificationOutcome.Expired, VerificationOutcome.Used, VerificationOutcome.Superseded, VerificationOutcome.RateLimited, VerificationOutcome.Unavailable]) expect(VerificationOutcome.fromWire(outcome.wire)).toBe(outcome);
     for (const stage of [VerificationStage.Inspecting, VerificationStage.Ready, VerificationStage.Submitting, VerificationStage.Result]) expect(VerificationStage.fromWire(stage.wire)).toBe(stage);
+    for (const state of [EmailOwnershipReadState.Idle, EmailOwnershipReadState.Loading, EmailOwnershipReadState.Ready, EmailOwnershipReadState.Unavailable]) expect(EmailOwnershipReadState.fromWire(state.wire)).toBe(state);
+    expect(EmailOwnershipReadState.fromWire('FUTURE')).toBe(EmailOwnershipReadState.Unknown);
   });
   it('captures only exact realm and canonical 43-character base64url fragments', () => {
     const capture = new CaptureVerificationLinkStep(), token = 'a'.repeat(43);

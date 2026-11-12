@@ -3,17 +3,17 @@ import { ComponentStore } from '@ngrx/component-store';
 import { Subscription } from 'rxjs';
 import { AccessMutationFence } from '../../core/auth/access-mutation-fence';
 import { EMAIL_VERIFICATION_REPOSITORY } from '../../core/tokens/email-verification.tokens';
-import { EmailOwnership, IEmailVerificationRepository, ReadEmailOwnershipStep, RequestEmailVerificationStep, VerificationRequestState as RequestState } from '../../domain/access/email-verification';
+import { EmailOwnership, EmailOwnershipReadState as ReadState, IEmailVerificationRepository, ReadEmailOwnershipStep, RequestEmailVerificationStep, VerificationRequestState as RequestState } from '../../domain/access/email-verification';
 import { RecoveryRealm } from '../../domain/access/recovery';
 
 export interface EmailOwnershipViewState {
   readonly ownership: EmailOwnership;
+  readonly read: ReadState;
   readonly request: RequestState;
-  readonly loading: boolean;
   readonly retrySeconds: number;
   readonly canRequest: boolean;
 }
-const INITIAL: EmailOwnershipViewState = { ownership: EmailOwnership.Unknown, request: RequestState.Idle, loading: false, retrySeconds: 0, canRequest: false };
+const INITIAL: EmailOwnershipViewState = { ownership: EmailOwnership.Unknown, read: ReadState.Idle, request: RequestState.Idle, retrySeconds: 0, canRequest: false };
 
 @Injectable()
 export class EmailOwnershipStore extends ComponentStore<EmailOwnershipViewState> {
@@ -40,17 +40,17 @@ export class EmailOwnershipStore extends ComponentStore<EmailOwnershipViewState>
     this.refresh(true);
   }
   refresh(force = false): void {
-    if (!this.actor || this.realm === RecoveryRealm.Unknown || (this.snapshot.loading && !force)) return;
+    if (!this.actor || this.realm === RecoveryRealm.Unknown || (this.snapshot.read.busy && !force)) return;
     this.readFlight?.unsubscribe();
     const generation = this.generation, read = ++this.readGeneration;
-    this.patchState({ ownership: EmailOwnership.Unknown, loading: true });
+    this.patchState({ ownership: EmailOwnership.Unknown, read: ReadState.Loading });
     this.readFlight = this.readStep.execute(this.realm).subscribe({
-      next: ownership => { if (generation === this.generation && read === this.readGeneration) this.patchState({ ownership, loading: false }); },
-      error: () => { if (generation === this.generation && read === this.readGeneration) this.patchState({ ownership: EmailOwnership.Unknown, loading: false }); },
+      next: ownership => { if (generation === this.generation && read === this.readGeneration) this.patchState({ ownership, read: ReadState.Ready }); },
+      error: () => { if (generation === this.generation && read === this.readGeneration) this.patchState({ ownership: EmailOwnership.Unknown, read: ReadState.Unavailable }); },
     });
   }
   request(): void {
-    if (!this.snapshot.canRequest || this.snapshot.loading || this.snapshot.request.busy || this.snapshot.retrySeconds > 0 || this.snapshot.ownership === EmailOwnership.Verified) return;
+    if (!this.snapshot.canRequest || this.snapshot.read.busy || this.snapshot.request.busy || this.snapshot.retrySeconds > 0 || this.snapshot.ownership === EmailOwnership.Verified) return;
     const generation = this.generation;
     this.patchState({ request: RequestState.Submitting });
     this.requestFlight = this.requestStep.execute(this.realm).subscribe({

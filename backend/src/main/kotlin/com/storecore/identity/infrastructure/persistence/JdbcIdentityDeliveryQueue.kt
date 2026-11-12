@@ -118,7 +118,7 @@ class JdbcIdentityDeliveryQueue(
                WHERE (d.state IN ('PENDING','RETRY') AND o.expires_at<=GREATEST(clock_timestamp(),?::timestamptz))
                OR (d.state='LEASED' AND (d.lease_until<=GREATEST(clock_timestamp(),?::timestamptz)
                    OR o.expires_at<=GREATEST(clock_timestamp(),?::timestamptz)))
-               ORDER BY d.event_id LIMIT 100 FOR UPDATE OF d SKIP LOCKED""", Timestamp.from(now), Timestamp.from(now), Timestamp.from(now),
+               ORDER BY d.event_id LIMIT ${IdentityDeliveryQueue.REAPER_BATCH_SIZE} FOR UPDATE OF d SKIP LOCKED""", Timestamp.from(now), Timestamp.from(now), Timestamp.from(now),
         )
         rows.forEach { row ->
             val state = IdentityOutboxState.fromWire(row["state"] as? String)

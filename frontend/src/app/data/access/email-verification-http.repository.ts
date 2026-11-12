@@ -41,7 +41,7 @@ export class EmailVerificationHttpRepository implements IEmailVerificationReposi
   ownership(realm: RecoveryRealm): Observable<EmailOwnership> {
     if (realm === RecoveryRealm.Unknown) return of(EmailOwnership.Unknown);
     return this.http.get<unknown>(this.url(realm), { observe: 'response', withCredentials: true }).pipe(timeout(15_000),
-      map(response => EmailOwnership.fromWire(response.status === 200 ? data(response.body, 200)?.['ownership'] : null)), catchError(() => of(EmailOwnership.Unknown)));
+      map(response => EmailOwnership.fromWire(response.status === 200 ? data(response.body, 200)?.['ownership'] : null)));
   }
   request(realm: RecoveryRealm): Observable<VerificationRequestResult> {
     if (realm === RecoveryRealm.Unknown) return of({ state: RequestState.Unknown });

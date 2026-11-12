@@ -20,6 +20,7 @@ enum class IdentityDeliveryEligibility { READY, INVALIDATED, EXPIRED, LEASE_LOST
 enum class IdentityDeliveryRun { IDLE, SETTLED, LEASE_LOST }
 
 interface IdentityDeliveryQueue {
+    companion object { const val REAPER_BATCH_SIZE = 100 }
     /** Cancels/reclaims expired work and crypto-shreds terminal payloads without performing network I/O. */
     fun reapExpired(now: Instant): Int = 0
     /**

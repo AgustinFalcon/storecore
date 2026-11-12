@@ -115,7 +115,12 @@ class IdentityDeliveryReaper(
     @Scheduled(fixedDelay = 60_000, initialDelay = 60_000)
     fun reap() {
         try {
-            operations.reaperSucceeded(queue.reapExpired(clock.instant()))
+            var total = 0
+            do {
+                val settled = queue.reapExpired(clock.instant())
+                total = Math.addExact(total, settled)
+            } while (settled == IdentityDeliveryQueue.REAPER_BATCH_SIZE)
+            operations.reaperSucceeded(total)
         } catch (_: Exception) {
             operations.reaperFailed()
         }

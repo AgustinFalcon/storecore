@@ -72,8 +72,10 @@ class IdentityDeliverySettings(
             val domain = value.substringAfter('@', "")
             return value.length <= 254 && local.length in 1..64 && !local.startsWith('.') && !local.endsWith('.') && ".." !in local &&
                 local.matches(Regex("[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]+")) && validHost(domain) &&
-                domain.substringAfterLast('.').matches(Regex("[A-Za-z]{2,63}")) && '.' in domain
+                validTopLevel(domain.substringAfterLast('.')) && '.' in domain
         }
+        private fun validTopLevel(value: String) = value.matches(Regex("[A-Za-z]{2,63}")) ||
+            value.matches(Regex("xn--[A-Za-z0-9](?:[A-Za-z0-9-]{0,57}[A-Za-z0-9])?", RegexOption.IGNORE_CASE))
         private fun validHost(value: String) = value.length in 1..253 && value.split('.').all { label ->
             label.length in 1..63 && label.matches(Regex("[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"))
         }

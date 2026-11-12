@@ -13,6 +13,8 @@ class IdentitySmtpTransportTest {
         username = "fixture-user", password = "fixture-password", sender = "sender@example.test")
     private fun message() = RenderedIdentityMessage("<identity-fixed@example.test>", "Confirmar mi correo",
         "recipient@example.test".toCharArray(), "fixture-link".toCharArray(), "<p>fixture-link</p>".toCharArray())
+    private fun idnaMessage() = RenderedIdentityMessage("<identity-idna@example.test>", "Confirmar mi correo",
+        "usuario@example.xn--p1ai".toCharArray(), "fixture-link".toCharArray(), "<p>fixture-link</p>".toCharArray())
 
     private class Connection(private val responses: MutableList<Int>, private val failOn: String? = null) : IdentitySmtpConnection {
         val commands = mutableListOf<String>()
@@ -43,6 +45,11 @@ class IdentitySmtpTransportTest {
         assertContains(body, "multipart/alternative")
         assertContains(body, "Content-Transfer-Encoding: base64")
         assertTrue(connection.bodyWritten)
+    }
+    @Test fun `ASCII IDNA recipient crosses validation and reaches SMTP RCPT`() {
+        val connection = Connection(successResponses())
+        idnaMessage().use { assertEquals(SmtpDeliveryResult.ACCEPTED, SmtpIdentityTransport(settings()) { connection }.deliver(it)) }
+        assertTrue(connection.commands.any { it.startsWith("RCPT TO:<usuario@example.xn--p1ai>") })
     }
     @Test fun `explicit transient recipient refusal before DATA can retry`() {
         val connection = Connection(mutableListOf(220, 250, 220, 250, 235, 250, 450))

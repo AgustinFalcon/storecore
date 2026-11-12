@@ -11,7 +11,7 @@ import { EmailVerificationViewState } from './email-verification.store';
       <button type="button" class="sc-btn sc-btn--primary" [attr.aria-disabled]="state.stage !== ready" (click)="confirm.emit()">Confirmar mi correo</button>
     }
     <p>Esta confirmación no inicia sesión.</p>
-    @if (state.profilePath) { <a class="sc-btn" [routerLink]="state.profilePath">Volver a mi cuenta</a> }
+    @if (state.profilePath) { <a class="sc-btn" routerLink="/login" [queryParams]="{ returnTo: state.loginDestination.wire, recoveredRealm: state.realm.wire }">Volver a mi cuenta</a> }
     <a class="sc-btn" routerLink="/login" [queryParams]="{ returnTo: state.loginDestination.wire, recoveredRealm: state.realm.wire }">Ingresar</a>
   </div></section>` })
 export class EmailVerificationViewComponent implements AfterViewInit, OnChanges {

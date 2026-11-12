@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Subject, of } from 'rxjs';
 import { AccessMutationFence } from '../../core/auth/access-mutation-fence';
 import { EMAIL_VERIFICATION_REPOSITORY } from '../../core/tokens/email-verification.tokens';
-import { EmailOwnership, VerificationRequestResult, VerificationRequestState as RequestState } from '../../domain/access/email-verification';
+import { EmailOwnership, EmailOwnershipReadState as ReadState, VerificationRequestResult, VerificationRequestState as RequestState } from '../../domain/access/email-verification';
 import { RecoveryRealm } from '../../domain/access/recovery';
 import { EmailOwnershipStore } from './email-ownership.store';
 
@@ -27,8 +27,8 @@ describe('separate email ownership and request state', () => {
   });
   it('refreshes authoritative ownership after profile save and resets stale verified evidence first', () => {
     repository.ownership.mockReturnValueOnce(of(EmailOwnership.Verified)); store.bind(RecoveryRealm.Customer, 'one'); store.request(); expect(repository.request).not.toHaveBeenCalled();
-    const pending = new Subject<EmailOwnership>(); repository.ownership.mockReturnValue(pending); store.refresh(); expect(store.snapshot.ownership).toBe(EmailOwnership.Unknown); expect(store.snapshot.loading).toBe(true);
-    pending.next(EmailOwnership.Unknown); expect(store.snapshot.loading).toBe(false); store.request(); expect(repository.request).toHaveBeenCalledTimes(1);
+    const pending = new Subject<EmailOwnership>(); repository.ownership.mockReturnValue(pending); store.refresh(); expect(store.snapshot.ownership).toBe(EmailOwnership.Unknown); expect(store.snapshot.read).toBe(ReadState.Loading);
+    pending.next(EmailOwnership.Unknown); expect(store.snapshot.read).toBe(ReadState.Ready); store.request(); expect(repository.request).toHaveBeenCalledTimes(1);
   });
   it('does not restart a pending manual refresh but permits an authoritative forced refresh', () => {
     const first = new Subject<EmailOwnership>(), forced = new Subject<EmailOwnership>();
@@ -42,6 +42,13 @@ describe('separate email ownership and request state', () => {
     expect(store.snapshot.ownership).toBe(EmailOwnership.Unknown);
     forced.next(EmailOwnership.Verified);
     expect(store.snapshot.ownership).toBe(EmailOwnership.Verified);
+  });
+  it('separates an unavailable read from authoritative unknown ownership', () => {
+    const pending = new Subject<EmailOwnership>(); repository.ownership.mockReturnValue(pending);
+    store.bind(RecoveryRealm.Customer, 'one'); pending.error(new Error('fixture'));
+    expect(store.snapshot.ownership).toBe(EmailOwnership.Unknown);
+    expect(store.snapshot.read).toBe(ReadState.Unavailable);
+    expect(store.snapshot.read.label).not.toBe(EmailOwnership.Unknown.label);
   });
   it('rejects obsolete reads/requests after actor replacement and logout fence', () => {
     const oldRead = new Subject<EmailOwnership>(), oldRequest = new Subject<VerificationRequestResult>();

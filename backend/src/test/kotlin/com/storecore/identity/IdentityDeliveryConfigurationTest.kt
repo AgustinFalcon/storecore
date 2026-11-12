@@ -11,6 +11,11 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import com.storecore.identity.application.IdentityDeliveryQueue
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.times
 
 class IdentityDeliveryConfigurationTest {
     private fun configured(mode: EmailDeliveryMode = EmailDeliveryMode.VERIFICATION_ONLY, enabled: Boolean = true,
@@ -100,5 +105,16 @@ class IdentityDeliveryConfigurationTest {
                 assertNull(context.startupFailure)
                 assertEquals(1, context.getBeansOfType(IdentityDeliveryScheduler::class.java).size)
             }
+    }
+    @Test fun `IDNA mailboxes are deliverable and the reaper drains every full batch`() {
+        assertTrue(IdentityDeliverySettings.validMailbox("usuario@example.xn--p1ai"))
+        assertFalse(IdentityDeliverySettings.validMailbox("usuario@example.xn--"))
+        val queue = mock(IdentityDeliveryQueue::class.java)
+        val now = Instant.parse("2026-11-12T12:00:00Z")
+        `when`(queue.reapExpired(now)).thenReturn(IdentityDeliveryQueue.REAPER_BATCH_SIZE, IdentityDeliveryQueue.REAPER_BATCH_SIZE, 7)
+        val registry = SimpleMeterRegistry()
+        IdentityDeliveryReaper(queue, Clock.fixed(now, ZoneOffset.UTC), IdentityDeliveryOperationalMetrics(null, registry)).reap()
+        verify(queue, times(3)).reapExpired(now)
+        assertEquals(207.0, registry.get("storecore.identity.delivery.reaper.settlements").counter().count())
     }
 }

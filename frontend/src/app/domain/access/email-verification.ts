@@ -8,6 +8,16 @@ export class EmailOwnership {
   static fromWire(raw: unknown): EmailOwnership { return raw === this.Verified.wire ? this.Verified : this.Unknown; }
 }
 
+export class EmailOwnershipReadState {
+  private constructor(readonly wire: string, readonly label: string, readonly busy = false) {}
+  static readonly Idle = new EmailOwnershipReadState('IDLE', 'Estado del correo pendiente de consulta.');
+  static readonly Loading = new EmailOwnershipReadState('LOADING', 'Consultando el estado del correo…', true);
+  static readonly Ready = new EmailOwnershipReadState('READY', 'Estado del correo disponible.');
+  static readonly Unavailable = new EmailOwnershipReadState('UNAVAILABLE', 'No pudimos consultar el estado del correo. Volvé a intentarlo.');
+  static readonly Unknown = new EmailOwnershipReadState('', 'No pudimos interpretar la disponibilidad del estado.');
+  static fromWire(raw: unknown): EmailOwnershipReadState { return [this.Idle, this.Loading, this.Ready, this.Unavailable].find(value => value.wire === raw) ?? this.Unknown; }
+}
+
 export class VerificationRequestState {
   private constructor(readonly wire: string, readonly label: string, readonly busy = false) {}
   static readonly Idle = new VerificationRequestState('IDLE', 'Podés solicitar un enlace para confirmar tu correo actual.');

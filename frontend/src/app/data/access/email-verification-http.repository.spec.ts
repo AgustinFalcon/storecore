@@ -29,6 +29,9 @@ describe('email verification HTTP boundary', () => {
     }
     const malformed = firstValueFrom(repository.ownership(RecoveryRealm.Customer)); ctrl.expectOne(url(RecoveryRealm.Customer)).flush({ ownership: 'VERIFIED' });
     expect(await malformed).toBe(EmailOwnership.Unknown);
+    const unavailable = firstValueFrom(repository.ownership(RecoveryRealm.Customer));
+    ctrl.expectOne(url(RecoveryRealm.Customer)).flush({ code: 503 }, { status: 503, statusText: 'Unavailable' });
+    await expect(unavailable).rejects.toMatchObject({ status: 503 });
   });
   it('sends only the empty authenticated request with matching CSRF and rotates only that realm', async () => {
     for (const realm of RecoveryRealm.all) {
