@@ -1,15 +1,15 @@
 import { BoundedPageRequest, boundedPageNavigation } from '../../domain/catalog/bounded-page';
 import { UserRole } from '../../domain/user/user-role';
 import { UserSessionResult } from '../../domain/user/user.entity';
-import { ProductStatus } from '../../domain/catalog/catalog-states';
 import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { EMPTY, Subject, filter, switchMap, tap, takeUntil, of, throwError } from 'rxjs';
+import { EMPTY, Subject, filter, switchMap, tap, takeUntil, of, throwError, map } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
+import { CatalogProductDraft, catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 
@@ -20,24 +20,10 @@ export interface AdminCatalogState {
   readonly products: readonly ProductDetail[];
   readonly brands: readonly CatalogFacet[];
   readonly categories: readonly CatalogFacet[];
-  readonly draft: ProductDetail;
+  readonly draft: CatalogProductDraft;
   readonly brandDraft: CatalogFacet;
   readonly categoryDraft: CatalogFacet;
 }
-
-export const emptyProductDraft: ProductDetail = {
-  id: '', status: ProductStatus.Draft, media: [],
-  sku: '',
-  name: '',
-  description: '',
-  brand: '',
-  category: '',
-  images: [],
-  variants: [],
-  price: { base: 0, original: 0, effective: 0, offer: null },
-  offerRef: null,
-  active: true,
-};
 
 const emptyFacet: CatalogFacet = { id: '', name: '' };
 
@@ -53,7 +39,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map(role => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
     this.actorKey = actorKey; this.generation++; this.actorChanged.next(); this.page = BoundedPageRequest.first();
-    this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: emptyProductDraft, brandDraft: emptyFacet, categoryDraft: emptyFacet });
+    this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: newCatalogProductDraft(), brandDraft: emptyFacet, categoryDraft: emptyFacet });
     return true;
   }
 
@@ -74,7 +60,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       products: [], list: null,
       brands: [],
       categories: [],
-      draft: emptyProductDraft,
+      draft: newCatalogProductDraft(),
       brandDraft: emptyFacet,
       categoryDraft: emptyFacet,
     });
@@ -91,7 +77,9 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly categories$ = this.select((s) => s.categories);
   readonly empty$ = this.select((s) => !s.loading && s.products.length === 0);
 
-  readonly setDraft = this.updater((s, draft: ProductDetail) => ({ ...s, draft }));
+  readonly setDraft = this.updater((s, draft: CatalogProductDraft) => s.loading ? s : ({ ...s, draft }));
+  readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
+  readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
   readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));
@@ -139,16 +127,17 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
 
   readonly persist = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      filter(() => !!this.actorKey),
+      filter(() => !!this.actorKey && !this.snapshot.loading),
       tap(() => {
         const draft = this.snapshot.draft;
         const invalidVariant = draft.variants.some(variant =>
-          !variant.id.trim() || !variant.sku.trim() || !variant.name.trim() || !variant.status.canPersist ||
+          !variant.sku.trim() || !variant.name.trim() || !variant.status.canPersist ||
+          (!variant.id && (variant.initialAvailableQuantity === null || !Number.isSafeInteger(variant.initialAvailableQuantity) || variant.initialAvailableQuantity < 0)) ||
           Object.keys(variant.attributes).some(key => !key.trim()),
         );
         if (!draft.sku.trim() || !draft.name.trim() || invalidVariant) {
           this.patchState({ loading: false, errorMessage: invalidVariant
-            ? 'Cada variante debe conservar identidad, SKU, nombre, estado conocido y atributos con nombre.'
+            ? 'Cada variante necesita SKU, nombre, estado conocido, atributos válidos y stock inicial entero no negativo cuando es nueva.'
             : 'SKU y nombre son obligatorios.' });
           return;
         }
@@ -157,16 +146,18 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       filter(() => {
         const draft = this.snapshot.draft;
         return Boolean(draft.sku.trim() && draft.name.trim() && draft.variants.every(variant =>
-          variant.id.trim() && variant.sku.trim() && variant.name.trim() && variant.status.canPersist &&
+          variant.sku.trim() && variant.name.trim() && variant.status.canPersist &&
+          (variant.id.trim() || variant.initialAvailableQuantity !== null && Number.isSafeInteger(variant.initialAvailableQuantity) && variant.initialAvailableQuantity >= 0) &&
           Object.keys(variant.attributes).every(key => key.trim()),
         ));
       }),
-      switchMap(() =>
-        this.catalog.save(this.snapshot.draft).pipe(
+      map(() => this.snapshot.draft),
+      switchMap(submittedDraft =>
+        this.catalog.save(submittedDraft).pipe(
           takeUntil(this.actorChanged),
           tapResponse({
             next: () => {
-              this.patchState({ draft: emptyProductDraft });
+              if (this.snapshot.draft === submittedDraft) this.patchState({ draft: newCatalogProductDraft() });
               this.load();
             },
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),

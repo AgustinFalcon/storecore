@@ -15,6 +15,7 @@
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Productos</h2>
+      <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.loading" (click)="createProduct.emit()">Nuevo producto</button>
       @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
     <table class="sc-table">
@@ -30,7 +31,7 @@
         @for (product of state.products; track product.sku) {
           <tr>
             <td>
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="draftChange.emit(product)">{{ product.sku }}</button>
+              <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.loading" (click)="editProduct.emit(product)">{{ product.sku }}</button>
             </td>
             <td>{{ product.name }}</td>
             <td>
@@ -43,7 +44,9 @@
     </table>
   }
   <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
-    <label>SKU <input required name="sku" [ngModel]="state.draft.sku" (ngModelChange)="patch({ sku: $event })" /></label>
+    <fieldset class="sc-form-lock" [disabled]="state.loading">
+    <h2>{{ state.draft.mode.label }}</h2>
+    <label>SKU <input required name="sku" [ngModel]="state.draft.sku" [readonly]="!state.draft.mode.canCreate" (ngModelChange)="patchSku($event)" /></label>
     <label>Nombre <input required name="name" [ngModel]="state.draft.name" (ngModelChange)="patch({ name: $event })" /></label>
     <label>Descripción <textarea name="description" [ngModel]="state.draft.description" (ngModelChange)="patch({ description: $event })"></textarea></label>
     <label>Marca <input name="brand" [ngModel]="state.draft.brand" (ngModelChange)="patch({ brand: $event })" /></label>
@@ -53,12 +56,11 @@
     </label>
     <section class="sc-panel" aria-labelledby="variant-editor-title">
       <h3 id="variant-editor-title">Variantes</h3>
-      <p>La identidad y el SKU se preservan. Podés editar la presentación, su publicación y sus atributos.</p>
-      @if (!state.draft.variants.length) { <p role="status">Este producto todavía no tiene variantes.</p> }
-      @for (variant of state.draft.variants; track variant.id; let variantIndex = $index) {
+      <p>Las variantes nuevas aceptan stock inicial. En variantes existentes, el stock se modifica únicamente desde Inventario.</p>
+      @for (variant of state.draft.variants; track $index; let variantIndex = $index) {
         <fieldset class="sc-panel">
           <legend>{{ variant.sku || variant.id }}</legend>
-          <label>SKU <input [name]="'variantSku-' + variantIndex" [value]="variant.sku" readonly /></label>
+          <label>SKU <input required [name]="'variantSku-' + variantIndex" [ngModel]="variant.sku" [readonly]="!!variant.id || variantIndex === 0" (ngModelChange)="patchVariant(variantIndex, { sku: $event })" /></label>
           <label>Nombre
             <input required [name]="'variantName-' + variantIndex" [ngModel]="variant.name" (ngModelChange)="patchVariant(variantIndex, { name: $event })" />
           </label>
@@ -69,6 +71,12 @@
             </select>
           </label>
           <p>{{ variant.availability.label }}</p>
+          @if (!variant.id) {
+            <label>Stock inicial
+              <input type="number" min="0" step="1" required [name]="'variantStock-' + variantIndex" [ngModel]="variant.initialAvailableQuantity" (ngModelChange)="patchVariant(variantIndex, { initialAvailableQuantity: +$event })" />
+            </label>
+            @if (variantIndex > 0) { <button type="button" class="sc-btn sc-btn--ghost" (click)="removeNewVariant(variantIndex)">Quitar variante nueva</button> }
+          }
           <div>
             <h4>Atributos</h4>
             @for (attribute of attributes(variant.attributes); track $index; let attributeIndex = $index) {
@@ -86,16 +94,20 @@
           </div>
         </fieldset>
       }
+      <button type="button" class="sc-btn sc-btn--ghost" (click)="addVariant()">Agregar variante</button>
     </section>
     <label>Precio base
       <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
     </label>
     <p>Original {{ state.draft.price.original }} · Efectivo {{ state.draft.price.effective }}</p>
-    <label>
-      <input type="checkbox" name="active" [ngModel]="state.draft.status.isPublic" (ngModelChange)="setActive($event)" />
-      Activo
+    <label>Estado del producto
+      <select name="productStatus" [ngModel]="state.draft.status.wire" (ngModelChange)="setProductStatus($event)">
+        @if (state.draft.status === unknownProductStatus) { <option [value]="state.draft.status.wire" disabled>{{ state.draft.status.label }}</option> }
+        @for (status of productStatuses; track status.wire) { <option [value]="status.wire">{{ status.label }}</option> }
+      </select>
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Guardar producto</button>
+    </fieldset>
   </form>
     </div>
 

@@ -1150,6 +1150,14 @@ pre {
   text-decoration: none;
 }
 
+.sc-form-lock {
+  display: contents;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .sc-legend {
   display: flex;
   flex-wrap: wrap;

@@ -8,6 +8,7 @@ import { CapabilityModuleState } from '../../domain/user/capability-module-state
 import { UserHttpRepository } from './user-http.repository';
 import { mapProductDetail } from '../mappers/http-mappers';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
+import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 
 describe('UserHttpRepository capabilities', () => {
   beforeEach(() => TestBed.configureTestingModule({
@@ -60,7 +61,7 @@ describe('UserHttpRepository capabilities', () => {
     const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
     const wire = { id: 'p', sku: 'SKU', name: 'Producto', status: ProductStatus.Archived.wire, price: { base: 25, original: 25, effective: 25, offer: null },
       variants: [{ id: 'v', sku: 'VAR', name: 'Variante', status: VariantStatus.Inactive.wire, availability: 'UNAVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' }, inventory: { sku: 'VAR', state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] };
-    const pending = firstValueFrom(repository.saveProduct(mapProductDetail(wire)));
+    const pending = firstValueFrom(repository.saveProduct(catalogProductDraftFromDetail(mapProductDetail(wire))));
     const request = http.expectOne('/api/v1/user/catalog/products/SKU');
     expect(request.request.body.status).toBe(ProductStatus.Archived.wire);
     expect(request.request.body.variants[0]).toEqual({ id: 'v', sku: 'VAR', name: 'Variante', status: VariantStatus.Inactive.wire, attributes: wire.variants[0].attributes });
@@ -69,5 +70,15 @@ describe('UserHttpRepository capabilities', () => {
     expect(request.request.body.price).toEqual({ base: 25 });
     expect(request.request.body.variants[0]).not.toHaveProperty('availableQuantity');
     request.flush(wire); expect((await pending).status).toBe(ProductStatus.Archived); http.verify();
+  });
+
+  it('sends initial stock only for a new catalog variant', async () => {
+    const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
+    const draft = newCatalogProductDraft();
+    const pending = firstValueFrom(repository.saveProduct({ ...draft, sku: 'NEW-1', name: 'Nuevo', variants: [{ ...draft.variants[0], sku: 'NEW-1', name: 'Principal', initialAvailableQuantity: 7 }] }));
+    const request = http.expectOne('/api/v1/user/catalog/products/NEW-1');
+    expect(request.request.body.variants[0]).toEqual(expect.objectContaining({ sku: 'NEW-1', availableQuantity: 7 }));
+    request.flush({ id: 'p', sku: 'NEW-1', name: 'Nuevo', status: 'DRAFT', price: { base: 0, original: 0, effective: 0, offer: null }, variants: [{ id: 'v', sku: 'NEW-1', name: 'Principal', status: 'ACTIVE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'NEW-1', state: 'KNOWN', available: 7, reserved: 0, safety: 0, onHand: 7, saleable: 7 } }] });
+    await pending; http.verify();
   });
 });

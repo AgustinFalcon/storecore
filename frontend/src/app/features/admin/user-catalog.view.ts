@@ -2,7 +2,8 @@ import { BoundedPaginationComponent } from '../../shared/bounded-pagination.comp
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
-import { ProductDetail, ProductVariant } from '../../domain/catalog/product-detail.entity';
+import { ProductDetail } from '../../domain/catalog/product-detail.entity';
+import { CatalogProductDraft, CatalogVariantDraft, newCatalogVariant } from '../../domain/catalog/catalog-product-draft';
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
@@ -14,9 +15,13 @@ import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-state
   templateUrl: './user-catalog.view.html',
 })
 export class UserCatalogViewComponent {
+  readonly productStatuses = ProductStatus.selectable;
+  readonly unknownProductStatus = ProductStatus.Unknown;
   readonly variantStatuses = VariantStatus.selectable;
   @Input({ required: true }) state!: AdminCatalogState;
-  @Output() readonly draftChange = new EventEmitter<ProductDetail>();
+  @Output() readonly draftChange = new EventEmitter<CatalogProductDraft>();
+  @Output() readonly createProduct = new EventEmitter<void>();
+  @Output() readonly editProduct = new EventEmitter<ProductDetail>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly categoryDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly saveProduct = new EventEmitter<void>();
@@ -30,11 +35,17 @@ export class UserCatalogViewComponent {
     return this.state.draft.images.join('\n');
   }
 
-  patch(partial: Partial<ProductDetail>): void {
+  patch(partial: Partial<CatalogProductDraft>): void {
     this.draftChange.emit({ ...this.state.draft, ...partial });
   }
 
-  setActive(active: boolean): void { this.patch({ status: active ? ProductStatus.Active : ProductStatus.Draft, active }); }
+  patchSku(sku: string): void {
+    const previous = this.state.draft.sku;
+    const variants = this.state.draft.variants.map((variant, index) => index === 0 && !variant.id && (!variant.sku || variant.sku === previous) ? { ...variant, sku } : variant);
+    this.patch({ sku, variants });
+  }
+
+  setProductStatus(raw: unknown): void { this.patch({ status: ProductStatus.fromWire(raw) }); }
   attributes(value: Readonly<Record<string, unknown>>): readonly { key: string; displayValue: string }[] {
     return Object.entries(value).map(([key, rawValue]) => ({
       key,
@@ -42,9 +53,16 @@ export class UserCatalogViewComponent {
     }));
   }
 
-  patchVariant(index: number, partial: Partial<ProductVariant>): void {
+  patchVariant(index: number, partial: Partial<CatalogVariantDraft>): void {
     const variants = this.state.draft.variants.map((variant, current) => current === index ? { ...variant, ...partial } : variant);
     this.patch({ variants });
+  }
+
+  addVariant(): void { this.patch({ variants: [...this.state.draft.variants, newCatalogVariant()] }); }
+  removeNewVariant(index: number): void {
+    const variant = this.state.draft.variants[index];
+    if (!variant || variant.id || index === 0) return;
+    this.patch({ variants: this.state.draft.variants.filter((_, current) => current !== index) });
   }
 
   setVariantStatus(index: number, raw: unknown): void {
@@ -90,7 +108,7 @@ export class UserCatalogViewComponent {
     this.patchVariant(variantIndex, { attributes: Object.fromEntries(Object.entries(variant.attributes).filter(([name]) => name !== key)) });
   }
 
-  patchPrice(partial: Partial<ProductDetail['price']>): void {
+  patchPrice(partial: Partial<CatalogProductDraft['price']>): void {
     const draft = this.state.draft;
     this.draftChange.emit({ ...draft, price: { ...draft.price, ...partial } });
   }

@@ -14,6 +14,8 @@ import { UserCatalogViewComponent } from './user-catalog.view';
       <sc-user-catalog-view
         [state]="state"
         (draftChange)="store.setDraft($event)"
+        (createProduct)="store.beginCreate()"
+        (editProduct)="store.beginEdit($event)"
         (editError)="store.setEditError($event)"
         (brandDraftChange)="store.setBrandDraft($event)"
         (categoryDraftChange)="store.setCategoryDraft($event)"

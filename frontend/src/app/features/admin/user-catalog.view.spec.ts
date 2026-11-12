@@ -1,11 +1,12 @@
 import { UserRole } from '../../domain/user/user-role';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import { mapProductDetails } from '../../data/mappers/http-mappers';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { AdminCatalogStore } from './admin-catalog.store';
 import { UserCatalogViewComponent } from './user-catalog.view';
+import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 
 describe('bounded administrative catalog', () => {
   it('keeps one product with multiple variants, closed statuses and exact partial totals', async () => {
@@ -13,12 +14,12 @@ describe('bounded administrative catalog', () => {
       variants: ['A', 'B'].map(id => ({ id, sku: id, name: id, status: 'INACTIVE', availability: 'UNAVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' }, inventory: { sku: id, state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } })) }], total: 120, page: 0, size: 50, truncated: true });
     const store = new AdminCatalogStore({ list: () => of(products) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor({ id: 'actor', roles: [UserRole.Admin] });
-    store.load(); store.setDraft(products[0]);
+    store.load(); store.beginEdit(products[0]);
     expect(store.snapshot.products).toHaveLength(1);
     expect(store.snapshot.list?.total).toBe(120);
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { ...store.snapshot, draft: products[0] }); fixture.detectChanges();
+    fixture.componentRef.setInput('state', { ...store.snapshot, draft: catalogProductDraftFromDetail(products[0]) }); fixture.detectChanges();
     await fixture.whenStable(); fixture.detectChanges();
     expect(fixture.nativeElement.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(fixture.nativeElement.textContent).toContain('Archivado');
@@ -33,7 +34,7 @@ describe('bounded administrative catalog', () => {
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: product, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
 
     const renamedEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.patchVariant(0, { name: 'Renombrada' });
@@ -56,7 +57,7 @@ describe('bounded administrative catalog', () => {
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Weight: 2, Enabled: true, Nested: { a: 1 }, Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: product, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
 
     const valueEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.patchAttributeValue(0, 3, 'Azul');
@@ -71,16 +72,53 @@ describe('bounded administrative catalog', () => {
     expect(draftEmit).not.toHaveBeenCalled();
   });
 
+  it('uses the closed product status to archive without deleting commercial history', async () => {
+    const draft = newCatalogProductDraft();
+    TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
+    const fixture = TestBed.createComponent(UserCatalogViewComponent);
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    const statusEvent = firstValueFrom(fixture.componentInstance.draftChange);
+    fixture.componentInstance.setProductStatus('ARCHIVED');
+    expect((await statusEvent).status.label).toBe('Archivado');
+  });
+
   it('blocks persistence when a variant arrives with an unknown closed status', () => {
     const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', price: { base: 10, original: 10, effective: 10 },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'FUTURE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     const save = vi.fn(() => of(product));
     const store = new AdminCatalogStore({ save } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor({ id: 'actor', roles: [UserRole.Admin] });
-    store.setDraft(product);
+    store.beginEdit(product);
     store.persist();
     expect(save).not.toHaveBeenCalled();
     expect(store.snapshot.errorMessage).toContain('estado conocido');
+    store.ngOnDestroy();
+  });
+
+  it('creates a product draft with one primary variant and non-negative initial stock', () => {
+    const result = mapProductDetails({ items: [{ id: 'p', sku: 'NEW-1', name: 'Nuevo', status: 'DRAFT', price: { base: 0, original: 0, effective: 0 }, variants: [{ id: 'v', sku: 'NEW-1', name: 'Principal', status: 'ACTIVE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'NEW-1', state: 'KNOWN', available: 4, reserved: 0, safety: 0, onHand: 4, saleable: 4 } }] }], total: 1, page: 0, size: 50, truncated: false });
+    const save = vi.fn(() => of(result[0]));
+    const store = new AdminCatalogStore({ save, list: () => of(result) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor({ id: 'actor', roles: [UserRole.Admin] });
+    const draft = newCatalogProductDraft();
+    store.setDraft({ ...draft, sku: 'NEW-1', name: 'Nuevo', variants: [{ ...draft.variants[0], sku: 'NEW-1', name: 'Principal', initialAvailableQuantity: 4 }] });
+    store.persist();
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ sku: 'NEW-1', variants: [expect.objectContaining({ initialAvailableQuantity: 4 })] }));
+    store.ngOnDestroy();
+  });
+
+  it('locks the submitted draft until its write resolves', () => {
+    const result = mapProductDetails({ items: [{ id: 'p', sku: 'A', name: 'Producto A', status: 'DRAFT', price: { base: 1, original: 1, effective: 1 }, variants: [{ id: 'v', sku: 'A', name: 'Principal', status: 'ACTIVE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'A', state: 'KNOWN', available: 1, reserved: 0, safety: 0, onHand: 1, saleable: 1 } }] }], total: 1, page: 0, size: 50, truncated: false });
+    const pending = new Subject<(typeof result)[number]>(); const save = vi.fn(() => pending);
+    const store = new AdminCatalogStore({ save, list: () => of(result) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor({ id: 'actor', roles: [UserRole.Admin] });
+    const draft = newCatalogProductDraft(); const submitted = { ...draft, sku: 'A', name: 'Producto A', variants: [{ ...draft.variants[0], sku: 'A', name: 'Principal', initialAvailableQuantity: 1 }] };
+    store.setDraft(submitted); store.persist();
+    expect(store.snapshot.loading).toBe(true); expect(save).toHaveBeenCalledTimes(1);
+    store.beginCreate(); store.setDraft({ ...submitted, sku: 'B', name: 'Producto B' }); store.persist();
+    expect(store.snapshot.draft).toBe(submitted); expect(save).toHaveBeenCalledTimes(1);
+    pending.next(result[0]); pending.complete();
+    expect(store.snapshot.draft.sku).toBe('');
     store.ngOnDestroy();
   });
 });
