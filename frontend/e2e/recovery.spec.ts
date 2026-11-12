@@ -58,7 +58,9 @@ test('fragment is removed before inspect and never published or persisted; unkno
   expect(inspections).toBe(0); await expect(page).toHaveURL(/\/reset-password$/);
   await page.goto(`/reset-password#realm=customer&token=${secret}`);
   await expect(page.getByText(Outcome.Invalid.label, { exact: true })).toBeFocused();
-  expect(inspections).toBe(1);
+  await expect.poll(() => inspections, {
+    message: 'the valid closed realm must trigger exactly one recovery inspection'
+  }).toBe(1);
   expect(await page.locator('sc-root').getAttribute('data-surface-url')).toBe('/reset-password');
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage, history: history.state }))).not.toContain(secret);
 });
