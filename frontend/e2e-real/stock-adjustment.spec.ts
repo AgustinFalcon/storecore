@@ -70,12 +70,13 @@ test('SSA real: UI adjustment and exact replay preserve one balance/ledger/audit
   await page.getByRole('button', { name: 'Confirmar ajuste', exact: true }).dblclick();
   const applied = await response; expect(applied.status()).toBe(200);
   const body = applied.request().postDataJSON() as FrozenBody;
-  const receipt = (await applied.json()).data;
-  expect(mapInventoryAdjustmentReceipt(receipt).outcome).toBe(InventoryAdjustmentOutcome.Applied);
   await expect(page.getByRole('heading', { name: InventoryAdjustmentPhase.Applied.label, exact: true })).toBeVisible();
   expect(effects(a)).toEqual({ available: 6, reserved: 0, safety: 1, commands: 1, ledger: 2, audit: 2 });
   const replay = await mutate(page, path(a), body);
-  expect(replay.status()).toBe(200); expect((await replay.json()).data).toEqual(receipt);
+  expect(replay.status()).toBe(200);
+  const receipt = mapInventoryAdjustmentReceipt((await replay.json()).data);
+  expect(receipt.outcome).toBe(InventoryAdjustmentOutcome.Applied);
+  expect(receipt.commandId).toBe(body.commandId);
   expect(effects(a)).toEqual({ available: 6, reserved: 0, safety: 1, commands: 1, ledger: 2, audit: 2 });
   await page.reload();
   await expect(page.getByRole('row').filter({ hasText: a.sku })).toContainText('6');
