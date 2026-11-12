@@ -10,7 +10,7 @@ export class SurfaceTarget {
 
 /** Identity belongs to the matched route host, never to a heading or requested URL. */
 export class SurfaceIdentity {
-  private constructor(readonly wire: string, readonly path: string, readonly real = true) {}
+  private constructor(readonly wire: string, readonly path: string, readonly real = true, readonly demo = true, readonly secretLink = false) {}
   static readonly Home = new SurfaceIdentity('SC-SURF-01', '');
   static readonly Login = new SurfaceIdentity('SC-SURF-02', 'login');
   static readonly Recovery = new SurfaceIdentity('SC-SURF-03', 'recover');
@@ -37,10 +37,14 @@ export class SurfaceIdentity {
   static readonly Capabilities = new SurfaceIdentity('SC-SURF-24', 'user/capabilities');
   static readonly Configuration = new SurfaceIdentity('SC-SURF-25', 'user/profile-import');
   static readonly Customers = new SurfaceIdentity('SC-SURF-26', 'user/customers');
+  // RD owns these productive surfaces; the archived PSD census remains historical.
+  static readonly EmailVerification = new SurfaceIdentity('RD-VERIFY-EMAIL', 'verify-email', true, false, true);
+  static readonly UserAccount = new SurfaceIdentity('RD-USER-ACCOUNT', 'user/account', true, false);
   static readonly Unknown = new SurfaceIdentity('NOT-FOUND', '**', false);
-  static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers];
+  static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers, this.EmailVerification, this.UserAccount];
   static fromWire(raw: unknown): SurfaceIdentity { return this.all.find(surface => surface.wire === raw) ?? this.Unknown; }
-  availableOn(target: SurfaceTarget): boolean { return this !== SurfaceIdentity.Unknown && (target === SurfaceTarget.Demo || target === SurfaceTarget.Real && this.real); }
+  availableOn(target: SurfaceTarget): boolean { return this !== SurfaceIdentity.Unknown && (target === SurfaceTarget.Demo && this.demo || target === SurfaceTarget.Real && this.real); }
+  observableUrl(url: string): string { return this === SurfaceIdentity.Recovery || this.secretLink ? url.split(/[?#]/, 1)[0] : url; }
   static fromMatchedPath(path: string, target: SurfaceTarget): SurfaceIdentity {
     if (path === 'reset-password' && target === SurfaceTarget.Real) return this.Recovery;
     return this.all.find(surface => surface.path === path && surface.availableOn(target)) ?? this.Unknown;

@@ -25,6 +25,7 @@ export interface CustomerState {
   readonly password: string;
   readonly profile: CustomerProfile;
   readonly saved: boolean;
+  readonly profileRevision: number;
   readonly addresses: readonly CustomerAddress[];
   readonly addressDraft: CustomerAddress;
 }
@@ -50,6 +51,7 @@ const INITIAL: CustomerState = {
   password: '',
   profile: emptyProfile,
   saved: false,
+  profileRevision: 0,
   addresses: [],
   addressDraft: emptyAddress,
 };
@@ -150,7 +152,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       switchMap(() =>
         this.getProfile.execute().pipe(
           tapResponse({
-            next: (profile) => this.patchState({ profile, loading: false, saved: false }),
+            next: (profile) => this.patchState({ profile, loading: false, saved: false, profileRevision: this.snapshot.profileRevision + 1 }),
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
           }),
         ),
@@ -173,8 +175,10 @@ export class CustomerStore extends ComponentStore<CustomerState> {
       switchMap(() =>
         this.saveProfile.execute(this.snapshot.profile).pipe(
           tapResponse({
-            next: (profile) => this.patchState({ profile, loading: false, saved: true, errorMessage: '' }),
-            error: (err: unknown) => this.patchState({ loading: false, saved: false, errorMessage: getApiErrorMessage(err) }),
+            next: (profile) => this.patchState({ profile, loading: false, saved: true, errorMessage: '', profileRevision: this.snapshot.profileRevision + 1 }),
+            // A lost response can follow a committed email change. Re-read
+            // ownership even when saving could not be confirmed locally.
+            error: (err: unknown) => this.patchState({ loading: false, saved: false, errorMessage: getApiErrorMessage(err), profileRevision: this.snapshot.profileRevision + 1 }),
           }),
         ),
       ),

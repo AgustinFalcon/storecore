@@ -3,9 +3,9 @@ import { createInterface } from 'node:readline';
 
 enum Realm { Customer = 'customer', User = 'user' }
 enum Fixture { Customer = 'CUSTOMER_CASE', User = 'USER_CASE' }
-enum Phase { Start = 'START', Sessions = 'SESSION_SETUP', Request = 'REQUEST', Capture = 'CAPTURE', Inspect = 'INSPECT', InspectResponse = 'INSPECT_RESPONSE', InspectForm = 'INSPECT_FORM', InspectFragment = 'INSPECT_FRAGMENT', InspectStorage = 'INSPECT_STORAGE', Complete = 'COMPLETE', Preservation = 'PRESERVATION', Login = 'LOGIN', Replay = 'REPLAY' }
+enum Phase { Start = 'START', Sessions = 'SESSION_SETUP', Request = 'REQUEST', RequestResponse = 'REQUEST_RESPONSE', Capture = 'CAPTURE', Inspect = 'INSPECT', InspectResponse = 'INSPECT_RESPONSE', InspectForm = 'INSPECT_FORM', InspectFragment = 'INSPECT_FRAGMENT', InspectStorage = 'INSPECT_STORAGE', Complete = 'COMPLETE', Preservation = 'PRESERVATION', Login = 'LOGIN', Replay = 'REPLAY' }
 let phase = Phase.Start;
-enum Finding { Ready = 'READY', Invalid = 'INVALID', Expired = 'EXPIRED', Unknown = 'UNKNOWN', Unavailable = 'UNAVAILABLE', Loading = 'LOADING', NoMatch = 'NO_MATCH' }
+enum Finding { Ready = 'READY', Invalid = 'INVALID', Expired = 'EXPIRED', Unknown = 'UNKNOWN', Unavailable = 'UNAVAILABLE', RateLimited = 'RATE_LIMITED', Forbidden = 'FORBIDDEN', Loading = 'LOADING', NoMatch = 'NO_MATCH' }
 enum RouteFinding { Login = 'LOGIN', Reset = 'RESET', Home = 'HOME', CustomerProfile = 'CUSTOMER_PROFILE', UserHome = 'USER_HOME', Other = 'OTHER' }
 enum ExpiryFinding { Future = 'ISO_FUTURE', Past = 'ISO_PAST', Number = 'NUMBER', Absent = 'ABSENT', Unknown = 'UNKNOWN' }
 let finding = Finding.NoMatch, routeFinding = RouteFinding.Other, expiryFinding = ExpiryFinding.Unknown;
@@ -25,15 +25,6 @@ class RecoveryCase {
   static readonly Customer = new RecoveryCase(Fixture.Customer, Realm.Customer, 'ar016-customer@example.test', 'customer', 'internal', '__Host-storecore-customer', '__Host-storecore-internal');
   static readonly User = new RecoveryCase(Fixture.User, Realm.User, 'ar016-user@example.test', 'internal', 'customer', '__Host-storecore-internal', '__Host-storecore-customer');
   static readonly all = [this.Customer, this.User];
-}
-class Outcome {
-  private constructor(readonly wire: string) {}
-  static readonly Accepted = new Outcome('ACCEPTED');
-  static readonly Ready = new Outcome('READY');
-  static readonly Completed = new Outcome('COMPLETED');
-  static readonly Used = new Outcome('USED_LINK');
-  static readonly Unknown = new Outcome('');
-  static fromWire(raw: unknown): Outcome { return [this.Accepted, this.Ready, this.Completed, this.Used].find(value => value.wire === raw) ?? this.Unknown; }
 }
 const origin = 'https://localhost:4301';
 const original = 'ar016-original-password-2026';
@@ -56,12 +47,6 @@ async function capture(fixture: Fixture): Promise<string> {
     });
     process.stdout.write(JSON.stringify({ kind: 'CAPTURE', requestId, fixture }) + '\n');
   });
-}
-async function outcome(response: Response): Promise<Outcome> {
-  const raw: unknown = await response.json();
-  if (!raw || typeof raw !== 'object') return Outcome.Unknown;
-  const data = (raw as Record<string, unknown>)['data'];
-  return data && typeof data === 'object' ? Outcome.fromWire((data as Record<string, unknown>)['kind']) : Outcome.Unknown;
 }
 function responseFor(page: Page, path: string): Promise<Response> {
   return page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === 'POST');
@@ -91,7 +76,12 @@ async function scenario(page: Page, context: BrowserContext, value: RecoveryCase
   const requested = responseFor(page, '/api/v1/' + value.path + '/auth/recovery/requests');
   await page.getByRole('button', { name: 'Solicitar enlace', exact: true }).click();
   const accepted = await requested;
-  check(accepted.status() === 202 && await outcome(accepted) === Outcome.Accepted);
+  phase = Phase.RequestResponse;
+  const requestStatus = accepted.status();
+  finding = requestStatus === 202 ? Finding.Ready : requestStatus === 400 ? Finding.Invalid : requestStatus === 403 ? Finding.Forbidden
+    : requestStatus === 429 ? Finding.RateLimited : requestStatus === 503 ? Finding.Unavailable : Finding.Unknown;
+  check(requestStatus === 202 && finding === Finding.Ready);
+  await page.getByText('Si corresponde, vas a recibir instrucciones. Revisá también el correo no deseado.', { exact: true }).waitFor();
   phase = Phase.Capture;
   const token = await capture(value.fixture);
   phase = Phase.Inspect;

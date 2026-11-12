@@ -9,6 +9,14 @@ import { provideSurfaceIdentity } from './surface-host';
 @Component({ imports: [RouterOutlet], template: '<main><router-outlet/></main>' }) class RootStub {}
 
 describe('route host identity and Not Found', () => {
+  it('never publishes email verification tokens or query values on the observable host', async () => {
+    TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'verify-email', component: SurfaceStub }]), ...provideSurfaceIdentity(SurfaceTarget.Real, () => () => 'public')] });
+    const fixture = TestBed.createComponent(RootStub);
+    for (const listener of TestBed.inject(APP_BOOTSTRAP_LISTENER)) listener(fixture.componentRef);
+    await TestBed.inject(Router).navigateByUrl('/verify-email?private=value#realm=user&token=secret'); fixture.detectChanges();
+    expect(fixture.nativeElement.getAttribute('data-surface-id')).toBe(SurfaceIdentity.EmailVerification.wire);
+    expect(fixture.nativeElement.getAttribute('data-surface-url')).toBe('/verify-email');
+  });
   it('never publishes the password recovery fragment or query on the observable host', async () => {
     TestBed.configureTestingModule({ providers: [provideRouter([{ path: 'reset-password', component: SurfaceStub }]), ...provideSurfaceIdentity(SurfaceTarget.Real, () => () => 'public')] });
     const fixture = TestBed.createComponent(RootStub);

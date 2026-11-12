@@ -13,7 +13,8 @@ export class UserAction {
   static readonly MercadoLibre = new UserAction('/user/mercadolibre', 'Mercado Libre', [UserRole.Admin]);
   static readonly Capabilities = new UserAction('/user/capabilities', 'Capabilities', [UserRole.Admin, UserRole.Operator]);
   static readonly ProfileImport = new UserAction('/user/profile-import', 'Importar perfil', [UserRole.Admin]);
+  static readonly Account = new UserAction('/user/account', 'Mi cuenta', [UserRole.Admin, UserRole.Operator]);
   permits(roles: readonly UserRole[]): boolean { return this.roles.some((role) => roles.includes(role)); }
   static forRoles(roles: readonly UserRole[]): readonly UserAction[] { return ACTIONS.filter((action) => action.permits(roles)); }
 }
-const ACTIONS = [UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Customers, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];
+const ACTIONS = [UserAction.Account, UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Customers, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];

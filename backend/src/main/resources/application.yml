@@ -17,6 +17,9 @@ management:
 storecore:
   identity:
     trusted-proxies: ${STORECORE_TRUSTED_PROXIES:}
+    delivery:
+      mode: ${STORECORE_IDENTITY_DELIVERY_MODE:UNCONFIGURED}
+      worker-enabled: ${STORECORE_IDENTITY_DELIVERY_WORKER_ENABLED:false}
   installation:
     origin: ${STORECORE_INSTALLATION_ORIGIN:http://localhost:4200}
   integrations:

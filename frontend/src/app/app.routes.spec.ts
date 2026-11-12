@@ -4,6 +4,7 @@ import { userGuard } from './core/auth/user.guard';
 import { userContentLeaveGuard } from './features/admin/user-content-leave.guard';
 
 const expectedUserLeaves = new Map<string, string>([
+  ['account', 'Mi cuenta'],
   ['home', 'Operaciones'],
   ['content', 'Contenido'],
   ['catalog', 'Catálogo admin'],

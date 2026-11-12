@@ -2,11 +2,11 @@ import { NotFoundRecovery, SurfaceIdentity, SurfaceTarget } from './surface-iden
 
 describe('canonical surface identity', () => {
   it('round trips every closed surface and excludes the remaining Demo-only Real routes', () => {
-    expect(SurfaceIdentity.all).toHaveLength(26);
-    expect(new Set(SurfaceIdentity.all.map(surface => surface.wire)).size).toBe(26);
+    expect(SurfaceIdentity.all).toHaveLength(28);
+    expect(new Set(SurfaceIdentity.all.map(surface => surface.wire)).size).toBe(28);
     for (const surface of SurfaceIdentity.all) {
       expect(SurfaceIdentity.fromWire(surface.wire)).toBe(surface);
-      expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Demo)).toBe(surface);
+      expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Demo)).toBe(surface.demo ? surface : SurfaceIdentity.Unknown);
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Real)).toBe(surface.real ? surface : SurfaceIdentity.Unknown);
     }
     expect(SurfaceIdentity.all.filter(surface => !surface.real)).toEqual([]);
@@ -25,5 +25,11 @@ describe('canonical surface identity', () => {
     expect(NotFoundRecovery.fromWire(NotFoundRecovery.Customer.wire)).toBe(NotFoundRecovery.Customer);
     expect(NotFoundRecovery.fromWire(NotFoundRecovery.User.wire)).toBe(NotFoundRecovery.User);
     for (const raw of ['https://external.invalid', '//external.invalid', 'future', null]) expect(NotFoundRecovery.fromWire(raw)).toBe(NotFoundRecovery.Unknown);
+  });
+  it('keeps recovery delivery surfaces productive only and hides secrets from observability', () => {
+    expect(SurfaceIdentity.fromMatchedPath('verify-email', SurfaceTarget.Real)).toBe(SurfaceIdentity.EmailVerification);
+    expect(SurfaceIdentity.fromMatchedPath('user/account', SurfaceTarget.Real)).toBe(SurfaceIdentity.UserAccount);
+    expect(SurfaceIdentity.EmailVerification.observableUrl('/verify-email?source=private#realm=user&token=secret')).toBe('/verify-email');
+    expect(SurfaceIdentity.UserAccount.observableUrl('/user/account')).toBe('/user/account');
   });
 });
