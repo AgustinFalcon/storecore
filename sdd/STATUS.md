@@ -2,8 +2,8 @@
 
 ## Master vigente y cierre de gates posteriores a stock — 2026-11-11
 
-`master 970dc69ed439d98175bc1219134756ec29dc09f2` integra PR #240 y el
-follow-up PR #241. El ajuste manual de stock conserva autoridad, idempotencia,
+`master 7300b81674a2f7097825dbedbac4914f07278d20` integra PR #240, el
+follow-up PR #241 y el cierre documental RDI PR #243. El ajuste manual de stock conserva autoridad, idempotencia,
 auditoría y estados cerrados; el follow-up elimina dos carreras observadas por
 el primer Verify de `master`: pérdida de foco durante el refresh autoritativo y
 una segunda rotación USER CSRF desde `ShellComponent`.
@@ -118,6 +118,16 @@ release, credenciales live ni deploy.
 ## Fiscal externo
 
 - `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Addendum 2026-09-22 de pago/fiscal es propuesta Open. Sin código, DDL, worker ni secretos.
+
+## Correo Argentino
+
+- `sdd/wip/20261111-correo-argentino-carrier-discovery/`:
+  `documented_deferred`. Las fuentes oficiales públicas distinguen MiCorreo
+  2025 (cotización/import/tracking) de PAQ.AR API 2.0 2023
+  (alta/cancelación/rótulo/tracking/sucursales). No se mezclan contratos ni se
+  infieren webhook, GPS o idempotencia remota. Adapter, DDL, credenciales y
+  homologación permanecen NO-GO hasta CA-D01..D10, CA-SC01..SC10, onboarding
+  comercial, credenciales QA por referencia y doble review Sol.
 
 ## Mercado Pago Checkout Pro (WIP separado)
 

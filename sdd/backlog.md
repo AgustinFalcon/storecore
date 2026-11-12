@@ -32,7 +32,11 @@
 - TODO-035 [medium] [deferred] ML virtual kits.
 - TODO-036 [low] [done] Favorites: PSD-T02 implementó HTTP CUSTOMER, UI productiva y V12; PSD-T08 registra add/remove/reload real local. Evidencia archivada en `sdd/features/20261108-storecore-productive-surface-data-parity/`.
 - TODO-037 [medium] [deferred] Loyalty ledger.
-- TODO-038 [medium] [deferred] Integraciones reales de carrier.
+- TODO-038 [high] [blocked] `correo-argentino-carrier-discovery`: discovery y
+  contrato documentados en
+  `sdd/wip/20261111-correo-argentino-carrier-discovery/`. Implementación NO-GO
+  hasta seleccionar API/producto, cerrar CA-D01..D10/CA-SC01..SC10, obtener
+  credenciales QA por referencia y doble review Sol.
 - TODO-039 [high] [superseded] `pos-sales-ingestion`: ISSUE/REVERSAL superseded. Ver TODO-040.
 - TODO-040 [high] [blocked] `storecore-pos-integration-contract-v1`: PIC-001..010 + L3 locales done; módulo vuelve a DISABLED. Companion live y activación siguen NO-GO. BlackStore ADP-001..010 + L3 locales done; dual Grok APPROVED; release disabled. No altera las 14 tasks de core 1.0.0.
 - TODO-042 [high] [blocked] `storecore-mp-live-checkout-v1`: 01/02/02A/03/04 in-repo fail-closed. 05 y pagos reales NO-GO hasta cuenta sandbox + Sol GO de activación.
