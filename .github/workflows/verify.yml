@@ -101,6 +101,9 @@ jobs:
       - name: Package real backend
         working-directory: backend
         run: mvn -B -DskipTests package
+      - name: Prepare recovery test-only JVM classpath
+        working-directory: backend
+        run: mvn -B dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=target/recovery-e2e-classpath.txt
       - name: Install browser dependencies
         working-directory: frontend
         run: |
@@ -111,11 +114,15 @@ jobs:
         run: |
           npm run check:ua-real
           npm run test:ua-real
+          npm run check:recovery-success-real
+          npm run test:recovery-success-real
       - name: Save browser and server evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unified-access-real-e2e-${{ github.sha }}
-          path: frontend/ua-real-results/
+          path: |
+            frontend/ua-real-results/
+            frontend/recovery-real-results/
           if-no-files-found: ignore
           retention-days: 7

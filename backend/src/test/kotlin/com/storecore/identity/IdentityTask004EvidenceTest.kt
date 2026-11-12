@@ -86,8 +86,8 @@ class IdentityTask004EvidenceTest {
     fun `logout revocation is auditable and idempotent`() {
         val issued = identity.registerCustomer("revocation-${System.nanoTime()}@example.com", "a-very-long-password", "Revoked", "User")
         val principal = issued.principal as CustomerPrincipal
-        identity.logout(principal)
-        identity.logout(principal)
+        TransactionTemplate(transactionManager).executeWithoutResult { identity.logout(principal) }
+        TransactionTemplate(transactionManager).executeWithoutResult { identity.logout(principal) }
 
         assertThrows(AuthenticationFailed::class.java) {
             identity.authenticate(IdentityRealm.CUSTOMER, issued.sessionToken)
@@ -101,7 +101,9 @@ class IdentityTask004EvidenceTest {
     fun `system revoke and expired sessions cannot be revived`() {
         val issued = identity.registerCustomer("system-${System.nanoTime()}@example.com", "a-very-long-password", "System", "Revoke")
         val principal = issued.principal as CustomerPrincipal
-        identity.revokeAsSystem(principal.sessionId, "idle-expired", java.util.UUID.fromString("22222222-2222-4222-8222-222222222222"))
+        TransactionTemplate(transactionManager).executeWithoutResult {
+            identity.revokeAsSystem(principal.sessionId, "idle-expired", java.util.UUID.fromString("22222222-2222-4222-8222-222222222222"))
+        }
         assertThrows(AuthenticationFailed::class.java) { identity.authenticate(IdentityRealm.CUSTOMER, issued.sessionToken) }
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE event_type='IDENTITY_SESSION_REVOKED' AND reason_code='SYSTEM_REVOKED' AND aggregate_reference=?", Int::class.java, principal.sessionId))
         assertEquals("SYSTEM", jdbc.queryForObject("SELECT actor_type FROM audit_events WHERE event_type='IDENTITY_SESSION_REVOKED' AND aggregate_reference=?", String::class.java, principal.sessionId))
@@ -201,7 +203,7 @@ class IdentityTask004EvidenceTest {
             jdbc = JdbcTemplate(dataSource)
             passwords = Argon2PasswordHasher()
             transactionManager = DataSourceTransactionManager(dataSource)
-            identity = JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter(), com.storecore.identity.infrastructure.security.LoginAttemptBudget())
+            identity = JdbcIdentityService(jdbc, passwords, OpaqueTokenFactory(), LoginRateLimiter(), com.storecore.identity.infrastructure.security.LoginAttemptBudget(), com.storecore.identity.infrastructure.persistence.IdentityMutationLocks(jdbc))
         }
 
         @JvmStatic

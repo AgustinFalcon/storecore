@@ -185,10 +185,10 @@ class CoreSchemaMigrationTest {
                 statement.executeUpdate("INSERT INTO users(email,password_hash,first_name,last_name) VALUES ('v11-user@example.com','\$argon2id\$fixture','V11','User') ON CONFLICT(email) DO NOTHING")
                 statement.executeUpdate(
                     """WITH issued AS (SELECT clock_timestamp() value)
-                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
                        SELECT '00000000-0000-0000-0000-000000000111',repeat('a',64),repeat('b',64),'http://localhost:4200',
                               (SELECT id FROM customers WHERE email='v11-customer@example.com'),
-                              (SELECT id FROM users WHERE email='v11-user@example.com'),'HOME',value,value+interval '120 seconds' FROM issued""",
+                              (SELECT id FROM users WHERE email='v11-user@example.com'),'HOME',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
                 )
                 assertThrows(PSQLException::class.java) { statement.executeUpdate("UPDATE unified_access_challenges SET challenge_hash=repeat('c',64) WHERE id='00000000-0000-0000-0000-000000000111'") }
                 assertEquals(1, statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=clock_timestamp() WHERE id='00000000-0000-0000-0000-000000000111'"))
@@ -196,10 +196,10 @@ class CoreSchemaMigrationTest {
                 assertThrows(PSQLException::class.java) { statement.executeUpdate("DELETE FROM unified_access_challenges WHERE id='00000000-0000-0000-0000-000000000111'") }
                 statement.executeUpdate(
                     """WITH issued AS (SELECT clock_timestamp()-interval '180 seconds' value)
-                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
+                       INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
                        SELECT '00000000-0000-0000-0000-000000000112',repeat('c',64),repeat('d',64),'http://localhost:4200',
                               (SELECT id FROM customers WHERE email='v11-customer@example.com'),
-                              (SELECT id FROM users WHERE email='v11-user@example.com'),'HOME',value,value+interval '120 seconds' FROM issued""",
+                              (SELECT id FROM users WHERE email='v11-user@example.com'),'HOME',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
                 )
                 statement.execute("SET ROLE storecore_runtime")
                 try {

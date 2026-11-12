@@ -145,6 +145,19 @@ export class AccessCoordinator {
     return next;
   }
 
+  /** Confirmed password recovery revokes exactly one realm on the server. */
+  acceptRecovered(context: AccessContext): void {
+    if (!context.isKnown) return;
+    this.supersedeProbes(context);
+    this.staging.clear(context);
+    this.realmRevisions.set(context, this.revision(context) + 1);
+    this.apply(context, SessionProbe.Anonymous);
+    if (context === AccessContext.Customer) this.customerProbe = SessionProbe.Anonymous;
+    else this.userProbe = SessionProbe.Anonymous;
+    if (this.hint.read() === context) this.hint.write(AccessContext.Unknown);
+    this.publish();
+  }
+
   logout(context: AccessContext = this.state().activeContext): Observable<void> {
     if (!context.isKnown) return of(undefined);
     const existing = this.revocations.get(context);

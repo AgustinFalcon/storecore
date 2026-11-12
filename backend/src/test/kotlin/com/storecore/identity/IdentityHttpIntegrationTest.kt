@@ -440,8 +440,8 @@ class IdentityHttpIntegrationTest(
         val tokenFactory = com.storecore.identity.infrastructure.security.OpaqueTokenFactory()
         jdbc.update(
             """WITH issued AS (SELECT clock_timestamp()-interval '180 seconds' value)
-               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
-               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds' FROM issued""",
+               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
+               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
             java.util.UUID.randomUUID(), tokenFactory.sha256(rawChallenge), tokenFactory.sha256(rawNonce), "http://localhost:4200", customerEmail, userEmail,
         )
         val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!
@@ -467,8 +467,8 @@ class IdentityHttpIntegrationTest(
         val challengeHash = tokenFactory.sha256(rawChallenge)
         jdbc.update(
             """WITH issued AS (SELECT clock_timestamp()-interval '119 seconds' value)
-               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at)
-               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds' FROM issued""",
+               INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
+               SELECT ?,?,?,?,(SELECT id FROM customers WHERE email=?),(SELECT id FROM users WHERE email=?),'HOME',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
             java.util.UUID.randomUUID(), challengeHash, tokenFactory.sha256(rawNonce), "http://localhost:4200", customerEmail, userEmail,
         )
         val sessionsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM identity_sessions", Int::class.java)!!

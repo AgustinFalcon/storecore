@@ -1,0 +1,35 @@
+<section class="sc-page sc-auth" aria-labelledby="recovery-title" [attr.aria-busy]="state.stage.busy"><div class="sc-auth__card">
+  <p class="sc-eyebrow">StoreCore</p>
+  <h1 id="recovery-title">{{ reset ? 'Nueva contraseña' : 'Recuperar acceso' }}</h1>
+  @if (!reset) { <p>Elegí qué acceso querés recuperar. Si corresponde, vas a recibir instrucciones por email.</p> }
+  @if (!reset || !state.outcome?.terminal) {
+    <form class="sc-auth__form" novalidate (ngSubmit)="submitForm.emit()">
+      @if (!reset) {
+        <div class="sc-field"><label for="recovery-realm">Acceso</label>
+          <select id="recovery-realm" name="realm" [ngModel]="state.realm.wire" (ngModelChange)="realmChange.emit($event)" [disabled]="!state.stage.editable" [attr.aria-invalid]="state.error ? true : null" [attr.aria-describedby]="state.error ? 'recovery-error' : null">
+            <option value="">Elegí un acceso</option>@for (realm of realms; track realm) { <option [value]="realm.wire">{{ realm.label }}</option> }
+          </select>
+        </div>
+        <div class="sc-field"><label for="recovery-email">Email</label><input id="recovery-email" name="email" type="email" autocomplete="email" maxlength="320" required [ngModel]="state.email" (ngModelChange)="emailChange.emit($event)" [disabled]="!state.stage.editable" [attr.aria-invalid]="state.error ? true : null" [attr.aria-describedby]="state.error ? 'recovery-error' : null" /></div>
+      } @else {
+        <p>{{ state.realm.label }}</p>
+        <div class="sc-field"><label for="new-password">Nueva contraseña</label><input id="new-password" name="password" type="password" autocomplete="new-password" maxlength="256" required [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" [disabled]="!state.stage.editable" [attr.aria-invalid]="state.error ? true : null" [attr.aria-describedby]="state.error ? 'password-policy recovery-error' : 'password-policy'" /></div>
+        <p id="password-policy">Entre 12 y 128 caracteres Unicode. Los espacios forman parte de la contraseña.</p>
+        <div class="sc-field"><label for="confirm-password">Confirmar contraseña</label><input id="confirm-password" name="confirmation" type="password" autocomplete="new-password" maxlength="256" required [ngModel]="state.confirmation" (ngModelChange)="confirmationChange.emit($event)" [disabled]="!state.stage.editable" [attr.aria-invalid]="state.error ? true : null" [attr.aria-describedby]="state.error ? 'recovery-error' : null" /></div>
+      }
+      @if (state.error) { <p #errorSummary id="recovery-error" tabindex="-1" class="sc-notice sc-notice--error">{{ state.error }}</p> }
+      <button class="sc-btn sc-btn--primary" type="submit" [disabled]="!state.stage.editable">{{ state.stage.busy ? state.stage.label : reset ? 'Actualizar contraseña' : 'Solicitar enlace' }}</button>
+    </form>
+  }
+  <div role="status" aria-live="polite" aria-atomic="true">
+    @if (state.stage.busy) { <p>{{ state.stage.label }}</p> }
+    @if (state.outcome && !state.error) { <p #resultHeading tabindex="-1">{{ state.outcome.label }}</p> }
+  </div>
+  @if (state.stage === stages.Cooldown || state.canRetry) {
+    @if (state.retrySeconds > 0) { <p>Podés reintentar en {{ state.retrySeconds }} segundos.</p> }
+    <p role="status">{{ state.canRetry && state.stage === stages.Cooldown ? 'Ya podés volver a intentar.' : '' }}</p>
+    <button class="sc-btn" type="button" [disabled]="!state.canRetry" (click)="retryRequest.emit()">{{ reset ? 'Volver a comprobar enlace' : 'Corregir email o solicitar de nuevo' }}</button>
+  }
+  @if (reset && state.outcome?.terminal && state.outcome !== outcomes.Completed) { <p><a routerLink="/recover" [queryParams]="{ returnTo: destination.wire }">Solicitar un nuevo enlace</a></p> }
+  <p><a routerLink="/login" [queryParams]="loginQuery">Volver a ingresar</a></p>
+</div></section>

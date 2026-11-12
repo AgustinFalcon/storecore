@@ -53,7 +53,7 @@ class CustomerAdministrationController(
         auth.requireSameOrigin(http)
         val actor = auth.admin(http)
         val target = CustomerAccountState.fromWire(request.state)
-        val mutation = mutations.execute(actor, csrf) { customers.changeState(actor, id, target) }
+        val mutation = mutations.executeForCustomer(actor, csrf, id) { customers.changeState(actor, id, target) }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header(RequestAuth.CSRF_HEADER, mutation.nextCsrf)
             .body(BaseResponse.ok<Any?>(mutation.value))
     }

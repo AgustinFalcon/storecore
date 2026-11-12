@@ -56,6 +56,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const backend = inject(HttpBackend);
   const fence = inject(AccessMutationFence);
   const path = requestPath(req.url);
+  // Recovery is public and uses its own origin/token boundary, never session CSRF.
+  if (/\/(?:customer|internal)\/auth\/recovery\/(?:requests|inspect|complete)$/.test(path)) {
+    return next(req.clone({ withCredentials: true }));
+  }
   const context = path.includes('/customer/') ? AccessContext.Customer
     : path.includes('/internal/') || path.includes('/user/') ? AccessContext.User : AccessContext.Unknown;
   const generation = context.isKnown ? fence.snapshot(context) : -1;

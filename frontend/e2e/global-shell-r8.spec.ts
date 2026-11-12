@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/**', route => route.fulfill({ status: 404, json: { code: 404, data: null, message: 'No encontrado' } }));
 });
 
-for (const path of ['/no-existe', '/customer/no-existe/anidado', '/user/no-existe/anidado', '/catalog/sku/no-existe', '/recover']) {
+for (const path of ['/no-existe', '/customer/no-existe/anidado', '/user/no-existe/anidado', '/catalog/sku/no-existe', '/recover/no-existe']) {
   test(`R8 Real Not Found preserves ${path} without inventing a surface`, async ({ page }, testInfo) => {
     const requested = path + '?source=unknown#requested';
     await page.goto(requested);

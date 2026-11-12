@@ -8,6 +8,7 @@ import { AccessHome } from '../../domain/access/access-home';
 import { LoginResult } from '../../domain/access/login-resolution';
 import { LoginStage } from '../../domain/access/login-stage';
 import { ReturnDestination } from '../../domain/access/return-destination';
+import { AuthenticateRecoveredRealm, RecoveryRealm } from '../../domain/access/recovery';
 import { AccessState, SessionProbe } from '../../domain/access/session-probe';
 import { UserRole } from '../../domain/user/user-role';
 import { LoginStore } from './login.store';
@@ -79,6 +80,16 @@ describe('LoginStore', () => {
     expect(repository.selectContext).not.toHaveBeenCalled();
     expect(coordinator.selectContext).toHaveBeenCalledWith(AccessContext.User);
     expect(router.navigateByUrl).toHaveBeenCalledWith('/user/orders');
+  });
+  it('keeps recovered-realm credentials available despite an accepted other-realm session', () => {
+    for (const realm of RecoveryRealm.all) {
+      coordinator.rehydrate.mockReturnValue(of(realm === RecoveryRealm.Customer ? AccessState.resolve(SessionProbe.Anonymous, userProbe, AccessContext.User) : selectedCustomer));
+      store.setRecoveryIntent(AuthenticateRecoveredRealm.forRealm(realm));
+      store.initialize(ReturnDestination.Home);
+      expect(store.snapshot.stage).toBe(LoginStage.CollectCredentials);
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(coordinator.selectContext).not.toHaveBeenCalled();
+    }
   });
   it('cannot select an unverified context or navigate after failed acceptance', () => {
     submit(); response.next(challenge()); response.complete();
