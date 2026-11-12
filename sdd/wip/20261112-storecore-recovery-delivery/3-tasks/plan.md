@@ -26,7 +26,7 @@
       `/user/account` y `/verify-email` accesible.
 - [x] RD-009 Unit, arquitectura, PG16, SMTP fake y browser real CUSTOMER/USER.
 - [x] RD-010 Reviews GPT-6.1 Sol Bugbot/Security/Producto exact-head.
-- [ ] RD-011 PR, CI, merge autorizado y CI post-merge verde.
+- [x] RD-011 PR, CI, merge autorizado y CI post-merge verde.
 
 ## Gate externo diferido
 

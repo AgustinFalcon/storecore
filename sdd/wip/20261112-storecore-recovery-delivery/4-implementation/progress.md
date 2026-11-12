@@ -52,6 +52,13 @@
   GPT-6.1 Sol Bugbot, Security y Producto/UX aprobaron sin P0-P2 ni P3 nuevos.
   Los P2 previos (IDNA y navegación cross-realm) y P3 (backlog del reaper y
   lectura unavailable) quedaron corregidos y cubiertos por pruebas.
-- RD-011 permanece abierto hasta crear PR, ejecutar CI remoto, obtener
-  autorización de merge y comprobar CI post-merge. RD-EXT-01/02/03 siguen
-  diferidos a homologación externa; no se los considera completados.
+- RD-011 cerrado: PR #250 fusionado con merge commit
+  `5ba014f61387cdfed094fd4584d45a113ed605f8`. El CI exact-head
+  `43231073607` quedó verde (backend, frontend/accesibilidad y matriz real) y
+  las revisiones GPT-6.1 Sol Bugbot, Security y Producto/UX aprobaron
+  `a9661689374acfdff607e5fa5efe419a0d3bd400` sin P0-P3.
+- CI post-merge `43232058866` verde sobre `master@5ba014f`: backend 3m40s,
+  frontend 3m44s y PostgreSQL/Spring/Angular HTTPS/browser real 6m05s. Los
+  recursos temporales locales y contenedores fueron eliminados al finalizar.
+- RD-EXT-01/02/03 siguen diferidos a homologación externa; no se los considera
+  completados y los defaults productivos permanecen sin credenciales reales.
