@@ -3,6 +3,7 @@ import { ReturnDestination } from './domain/access/return-destination';
 import { LoginComponent } from './features/access/login.component';
 import { RecoveryComponent } from './features/access/recovery.component';
 import { PasswordResetComponent } from './features/access/password-reset.component';
+import { EmailVerificationComponent } from './features/access/email-verification.component';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
 import { userContentLeaveGuard } from './features/admin/user-content-leave.guard';
@@ -37,6 +38,7 @@ export const routes: Routes = [
       { path: 'login', component: LoginComponent, title: 'Ingresar' },
       { path: 'recover', component: RecoveryComponent, title: 'Recuperar acceso' },
       { path: 'reset-password', component: PasswordResetComponent, title: 'Nueva contraseña' },
+      { path: 'verify-email', component: EmailVerificationComponent, title: 'Verificar correo' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },
@@ -63,6 +65,7 @@ export const routes: Routes = [
         children: [
           { path: '', pathMatch: 'full', redirectTo: 'home' },
           { path: 'session', redirectTo: legacyLoginRedirect },
+          { path: 'account', loadComponent: () => import('./features/identity/user-account.component').then(module => module.UserAccountComponent), title: 'Mi cuenta', canActivate: [userGuard] },
           {
             path: 'home',
             loadComponent: () => import('./features/admin/user-home.component').then((module) => module.UserHomeComponent),

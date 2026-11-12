@@ -36,7 +36,7 @@ export function provideSurfaceIdentity(target: SurfaceTarget, actorFactory: () =
           const host = component.location.nativeElement;
           renderer.setAttribute(host, 'data-surface-id', surface.wire);
           renderer.setAttribute(host, 'data-surface-target', target.wire);
-          renderer.setAttribute(host, 'data-surface-url', surface === SurfaceIdentity.Recovery ? router.url.split(/[?#]/, 1)[0] : router.url);
+          renderer.setAttribute(host, 'data-surface-url', surface.observableUrl(router.url));
           renderer.setAttribute(host, 'data-surface-actor', actor());
           renderer.setAttribute(host, 'data-surface-data', target.data);
         }, { injector });

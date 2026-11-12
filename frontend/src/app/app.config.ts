@@ -28,6 +28,8 @@ import { ACCESS_REPOSITORY } from './core/tokens/access.tokens';
 import { AccessHttpRepository } from './data/access/access-http.repository';
 import { RecoveryHttpRepository } from './data/access/recovery-http.repository';
 import { RECOVERY_REPOSITORY } from './core/tokens/recovery.tokens';
+import { EMAIL_VERIFICATION_REPOSITORY } from './core/tokens/email-verification.tokens';
+import { EmailVerificationHttpRepository } from './data/access/email-verification-http.repository';
 import { CartHttpRepository } from './data/cart/cart-http.repository';
 import { CatalogHttpRepository } from './data/catalog/catalog-http.repository';
 import { CustomerHttpRepository } from './data/customer/customer-http.repository';
@@ -71,6 +73,7 @@ export const appConfig: ApplicationConfig = {
     { provide: INVENTORY_ADJUSTMENT_REPOSITORY, useClass: InventoryAdjustmentHttpRepository },
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     { provide: RECOVERY_REPOSITORY, useClass: RecoveryHttpRepository },
+    { provide: EMAIL_VERIFICATION_REPOSITORY, useClass: EmailVerificationHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],
 };
