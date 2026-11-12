@@ -15,7 +15,7 @@
   <div class="sc-workbench">
     <div class="sc-workbench__main">
       <h2>Productos</h2>
-      <button type="button" class="sc-btn sc-btn--primary" (click)="createProduct.emit()">Nuevo producto</button>
+      <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.loading" (click)="createProduct.emit()">Nuevo producto</button>
       @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
     <table class="sc-table">
@@ -31,7 +31,7 @@
         @for (product of state.products; track product.sku) {
           <tr>
             <td>
-              <button type="button" class="sc-btn sc-btn--ghost" (click)="editProduct.emit(product)">{{ product.sku }}</button>
+              <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.loading" (click)="editProduct.emit(product)">{{ product.sku }}</button>
             </td>
             <td>{{ product.name }}</td>
             <td>
@@ -44,6 +44,7 @@
     </table>
   }
   <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
+    <fieldset class="sc-form-lock" [disabled]="state.loading">
     <h2>{{ state.draft.mode.label }}</h2>
     <label>SKU <input required name="sku" [ngModel]="state.draft.sku" [readonly]="!state.draft.mode.canCreate" (ngModelChange)="patchSku($event)" /></label>
     <label>Nombre <input required name="name" [ngModel]="state.draft.name" (ngModelChange)="patch({ name: $event })" /></label>
@@ -106,6 +107,7 @@
       </select>
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Guardar producto</button>
+    </fieldset>
   </form>
     </div>
 

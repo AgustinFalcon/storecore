@@ -5,7 +5,7 @@ import { ListMetadata } from '../../domain/catalog/bounded-rows';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { EMPTY, Subject, filter, switchMap, tap, takeUntil, of, throwError } from 'rxjs';
+import { EMPTY, Subject, filter, switchMap, tap, takeUntil, of, throwError, map } from 'rxjs';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
@@ -77,9 +77,9 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly categories$ = this.select((s) => s.categories);
   readonly empty$ = this.select((s) => !s.loading && s.products.length === 0);
 
-  readonly setDraft = this.updater((s, draft: CatalogProductDraft) => ({ ...s, draft }));
-  readonly beginCreate = this.updater((s) => ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
-  readonly beginEdit = this.updater((s, product: ProductDetail) => ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
+  readonly setDraft = this.updater((s, draft: CatalogProductDraft) => s.loading ? s : ({ ...s, draft }));
+  readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
+  readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
   readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));
@@ -127,7 +127,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
 
   readonly persist = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      filter(() => !!this.actorKey),
+      filter(() => !!this.actorKey && !this.snapshot.loading),
       tap(() => {
         const draft = this.snapshot.draft;
         const invalidVariant = draft.variants.some(variant =>
@@ -151,12 +151,13 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
           Object.keys(variant.attributes).every(key => key.trim()),
         ));
       }),
-      switchMap(() =>
-        this.catalog.save(this.snapshot.draft).pipe(
+      map(() => this.snapshot.draft),
+      switchMap(submittedDraft =>
+        this.catalog.save(submittedDraft).pipe(
           takeUntil(this.actorChanged),
           tapResponse({
             next: () => {
-              this.patchState({ draft: newCatalogProductDraft() });
+              if (this.snapshot.draft === submittedDraft) this.patchState({ draft: newCatalogProductDraft() });
               this.load();
             },
             error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),

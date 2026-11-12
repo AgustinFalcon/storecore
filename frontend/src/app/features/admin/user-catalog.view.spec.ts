@@ -1,6 +1,6 @@
 import { UserRole } from '../../domain/user/user-role';
 import { TestBed } from '@angular/core/testing';
-import { firstValueFrom, of } from 'rxjs';
+import { firstValueFrom, of, Subject } from 'rxjs';
 import { mapProductDetails } from '../../data/mappers/http-mappers';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
@@ -104,6 +104,21 @@ describe('bounded administrative catalog', () => {
     store.setDraft({ ...draft, sku: 'NEW-1', name: 'Nuevo', variants: [{ ...draft.variants[0], sku: 'NEW-1', name: 'Principal', initialAvailableQuantity: 4 }] });
     store.persist();
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ sku: 'NEW-1', variants: [expect.objectContaining({ initialAvailableQuantity: 4 })] }));
+    store.ngOnDestroy();
+  });
+
+  it('locks the submitted draft until its write resolves', () => {
+    const result = mapProductDetails({ items: [{ id: 'p', sku: 'A', name: 'Producto A', status: 'DRAFT', price: { base: 1, original: 1, effective: 1 }, variants: [{ id: 'v', sku: 'A', name: 'Principal', status: 'ACTIVE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'A', state: 'KNOWN', available: 1, reserved: 0, safety: 0, onHand: 1, saleable: 1 } }] }], total: 1, page: 0, size: 50, truncated: false });
+    const pending = new Subject<(typeof result)[number]>(); const save = vi.fn(() => pending);
+    const store = new AdminCatalogStore({ save, list: () => of(result) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor({ id: 'actor', roles: [UserRole.Admin] });
+    const draft = newCatalogProductDraft(); const submitted = { ...draft, sku: 'A', name: 'Producto A', variants: [{ ...draft.variants[0], sku: 'A', name: 'Principal', initialAvailableQuantity: 1 }] };
+    store.setDraft(submitted); store.persist();
+    expect(store.snapshot.loading).toBe(true); expect(save).toHaveBeenCalledTimes(1);
+    store.beginCreate(); store.setDraft({ ...submitted, sku: 'B', name: 'Producto B' }); store.persist();
+    expect(store.snapshot.draft).toBe(submitted); expect(save).toHaveBeenCalledTimes(1);
+    pending.next(result[0]); pending.complete();
+    expect(store.snapshot.draft.sku).toBe('');
     store.ngOnDestroy();
   });
 });

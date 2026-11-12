@@ -10,7 +10,7 @@ fuera de este corte y se mantienen fail-closed.
 
 Evidencia local:
 
-- `npm run verify`: arquitectura, lint, 175 archivos / 1172 tests y build verdes.
+- `npm run verify`: arquitectura, lint, 175 archivos / 1173 tests y build verdes.
 - `npm run test:a11y`: 67 flujos Playwright verdes.
 - `CatalogStockIntegrityTest`: 4 tests con PostgreSQL real verdes.
 
