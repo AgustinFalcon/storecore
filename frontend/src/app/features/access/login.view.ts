@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AccessContext } from '../../domain/access/access-context';
 import { LoginStage } from '../../domain/access/login-stage';
+import { ReturnDestination } from '../../domain/access/return-destination';
 import type { LoginViewState } from './login.store';
 
 @Component({
@@ -13,6 +14,7 @@ import type { LoginViewState } from './login.store';
 })
 export class LoginViewComponent implements AfterViewChecked {
   @Input({ required: true }) state!: LoginViewState;
+  @Input() destination = ReturnDestination.Home;
   @Output() emailChange = new EventEmitter<string>();
   @Output() passwordChange = new EventEmitter<string>();
   @Output() submitCredentials = new EventEmitter<void>();

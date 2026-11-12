@@ -9,7 +9,8 @@ describe('canonical surface identity', () => {
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Demo)).toBe(surface);
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Real)).toBe(surface.real ? surface : SurfaceIdentity.Unknown);
     }
-    expect(SurfaceIdentity.all.filter(surface => !surface.real)).toEqual([SurfaceIdentity.Recovery]);
+    expect(SurfaceIdentity.all.filter(surface => !surface.real)).toEqual([]);
+    expect(SurfaceIdentity.fromMatchedPath('reset-password', SurfaceTarget.Real)).toBe(SurfaceIdentity.Recovery);
   });
   it('fails closed for unknown wires, targets and nested route patterns', () => {
     for (const raw of [null, undefined, 'SC-SURF-27', '<script>', {}, 1]) expect(SurfaceIdentity.fromWire(raw)).toBe(SurfaceIdentity.Unknown);

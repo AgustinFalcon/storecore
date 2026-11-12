@@ -5,6 +5,7 @@ import { EMPTY, Observable, catchError, exhaustMap, finalize, switchMap, tap } f
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { ACCESS_REPOSITORY } from '../../core/tokens/access.tokens';
 import { AccessContext } from '../../domain/access/access-context';
+import { AuthenticateRecoveredRealm } from '../../domain/access/recovery';
 import { AccessHome } from '../../domain/access/access-home';
 import { IAccessRepository } from '../../domain/access/access.repository';
 import { LoginResolution, LoginResult } from '../../domain/access/login-resolution';
@@ -31,6 +32,8 @@ export class LoginStore extends ComponentStore<LoginViewState> {
   private readonly completion: CompletionStep;
   private challenge: LoginResult | null = null;
   private destination = ReturnDestination.Home;
+  private recoveryIntent = AuthenticateRecoveredRealm.None;
+  setRecoveryIntent(intent: AuthenticateRecoveredRealm): void { this.recoveryIntent = intent; }
 
   constructor(@Inject(ACCESS_REPOSITORY) repository: IAccessRepository, private readonly coordinator: AccessCoordinator, private readonly router: Router) {
     super(INITIAL_STATE);
@@ -45,6 +48,10 @@ export class LoginStore extends ComponentStore<LoginViewState> {
   readonly initialize = this.effect<ReturnDestination>((destinations$) => destinations$.pipe(exhaustMap((destination) => {
     this.destination = destination === ReturnDestination.Unknown ? ReturnDestination.Home : destination;
     return this.coordinator.rehydrate().pipe(tap((state) => {
+      if (this.recoveryIntent.active) {
+        this.patchState({ stage: LoginStage.CollectCredentials, contexts: [], message: '' });
+        return;
+      }
       if (state.kind === AccessStateKind.SelectionRequired) this.patchState({ stage: LoginStage.SelectContext, contexts: state.contexts });
       else if (state.kind === AccessStateKind.Selected) {
         const route = this.destination.routeFor(state.activeContext) ?? AccessHome.forContext(state.activeContext).route;

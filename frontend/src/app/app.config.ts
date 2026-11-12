@@ -26,6 +26,8 @@ import { OVERVIEW_REPOSITORY } from './core/tokens/overview.tokens';
 import { USER_REPOSITORY } from './core/tokens/user.tokens';
 import { ACCESS_REPOSITORY } from './core/tokens/access.tokens';
 import { AccessHttpRepository } from './data/access/access-http.repository';
+import { RecoveryHttpRepository } from './data/access/recovery-http.repository';
+import { RECOVERY_REPOSITORY } from './core/tokens/recovery.tokens';
 import { CartHttpRepository } from './data/cart/cart-http.repository';
 import { CatalogHttpRepository } from './data/catalog/catalog-http.repository';
 import { CustomerHttpRepository } from './data/customer/customer-http.repository';
@@ -68,6 +70,7 @@ export const appConfig: ApplicationConfig = {
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
     { provide: INVENTORY_ADJUSTMENT_REPOSITORY, useClass: InventoryAdjustmentHttpRepository },
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
+    { provide: RECOVERY_REPOSITORY, useClass: RecoveryHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],
 };

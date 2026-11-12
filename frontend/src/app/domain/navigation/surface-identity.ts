@@ -13,7 +13,7 @@ export class SurfaceIdentity {
   private constructor(readonly wire: string, readonly path: string, readonly real = true) {}
   static readonly Home = new SurfaceIdentity('SC-SURF-01', '');
   static readonly Login = new SurfaceIdentity('SC-SURF-02', 'login');
-  static readonly Recovery = new SurfaceIdentity('SC-SURF-03', 'recover', false);
+  static readonly Recovery = new SurfaceIdentity('SC-SURF-03', 'recover');
   static readonly Catalog = new SurfaceIdentity('SC-SURF-04', 'catalog');
   static readonly Product = new SurfaceIdentity('SC-SURF-05', 'catalog/:sku');
   static readonly Registration = new SurfaceIdentity('SC-SURF-06', 'customer/register');
@@ -42,6 +42,7 @@ export class SurfaceIdentity {
   static fromWire(raw: unknown): SurfaceIdentity { return this.all.find(surface => surface.wire === raw) ?? this.Unknown; }
   availableOn(target: SurfaceTarget): boolean { return this !== SurfaceIdentity.Unknown && (target === SurfaceTarget.Demo || target === SurfaceTarget.Real && this.real); }
   static fromMatchedPath(path: string, target: SurfaceTarget): SurfaceIdentity {
+    if (path === 'reset-password' && target === SurfaceTarget.Real) return this.Recovery;
     return this.all.find(surface => surface.path === path && surface.availableOn(target)) ?? this.Unknown;
   }
 }

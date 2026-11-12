@@ -1,6 +1,8 @@
 import { RedirectFunction, Routes } from '@angular/router';
 import { ReturnDestination } from './domain/access/return-destination';
 import { LoginComponent } from './features/access/login.component';
+import { RecoveryComponent } from './features/access/recovery.component';
+import { PasswordResetComponent } from './features/access/password-reset.component';
 import { customerGuard } from './core/auth/customer.guard';
 import { userGuard } from './core/auth/user.guard';
 import { userContentLeaveGuard } from './features/admin/user-content-leave.guard';
@@ -33,6 +35,8 @@ export const routes: Routes = [
     children: [
       { path: '', component: StorefrontHomeComponent, title: 'StoreCore' },
       { path: 'login', component: LoginComponent, title: 'Ingresar' },
+      { path: 'recover', component: RecoveryComponent, title: 'Recuperar acceso' },
+      { path: 'reset-password', component: PasswordResetComponent, title: 'Nueva contraseña' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
       { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },

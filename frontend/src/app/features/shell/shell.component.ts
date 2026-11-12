@@ -48,7 +48,7 @@ export class ShellComponent implements OnInit {
     this.access.navigationState().subscribe({
       next: (state) => {
         if (state.permits(AccessContext.Customer)) this.cart.load();
-        if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login') && matchedSurface(this.router.routerState.snapshot.root, SurfaceTarget.Real) !== SurfaceIdentity.Unknown) {
+        if (state.kind === AccessStateKind.SelectionRequired && !this.router.url.startsWith('/login') && matchedSurface(this.router.routerState.snapshot.root, SurfaceTarget.Real) !== SurfaceIdentity.Recovery && matchedSurface(this.router.routerState.snapshot.root, SurfaceTarget.Real) !== SurfaceIdentity.Unknown) {
           const path = this.router.url.split(/[?#]/, 1)[0];
           const destination = ReturnDestination.fromPath(path);
           void this.router.navigate(['/login'], {

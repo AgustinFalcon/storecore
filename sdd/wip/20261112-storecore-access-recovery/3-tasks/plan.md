@@ -26,14 +26,18 @@
 
 ## Corte C — frontend y evidencia de punta a punta
 
-- [ ] AR-012 Dominio TS cerrado, repository, mapper y use cases.
-- [ ] AR-013 `/recover`, enlace desde login y experiencia neutral accesible.
-- [ ] AR-014 `/reset-password`, fragmento realm+token, secreto en memoria, inspect,
+- [x] AR-012 Dominio TS cerrado, repository, mapper y use cases.
+- [x] AR-013 `/recover`, enlace desde login y experiencia neutral accesible.
+- [x] AR-014 `/reset-password`, fragmento realm+token, secreto en memoria, inspect,
       complete e intención `AuthenticateRecoveredRealm` sin cerrar el otro realm.
-- [ ] AR-015 Unit, mapper, store, focus/ARIA/axe/teclado, Unknown sin probes,
+- [x] AR-015 Unit, mapper, store, focus/ARIA/axe/teclado, Unknown sin probes,
       cooldown, expiración y regresiones de ruta/doble submit/respuesta perdida.
 - [ ] AR-016 E2E real con PostgreSQL/Spring/Angular HTTPS y capturador fake.
-- [ ] AR-017 Actualizar PSD SC-SURF-03 como core local completo/email externo bloqueado.
+      Pendiente harness privado JVM/browser: el capturador no se expone por HTTP,
+      archivos ni stdout. La prueba real UNCONFIGURED/503 ya está ejecutada;
+      no sustituye el journey de reset exitoso con capturador de tests.
+- [x] AR-017 Actualizar PSD SC-SURF-03 como core local/email externo bloqueado,
+      con cobertura browser de éxito real explícitamente pendiente.
 
 ## Gates de entrega
 

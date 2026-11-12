@@ -18,3 +18,16 @@
 - Gate backend Corte B: Maven exit 0, 326 tests, 0 failures, 0 errors, 0 skipped;
   log `backend/target/corte-b-full-test.log`. Dos reviews estáticas sin P0-P3.
 - Proveedor real, outbox, secretos y homologación siguen explícitamente NO-GO.
+- 2026-11-12: Corte C AR-012..015/017 implementado sin commit. Dominio/pasos TS,
+  HTTP estricto, `/recover`, `/reset-password`, limpieza de fragmento, accesibilidad,
+  expiración/cooldown/incertidumbre e intención de login del realm recuperado.
+- Gates frontend: `npm run verify` PASS (178 archivos/1190 tests), arquitectura,
+  lint y build; `test:a11y` 79/79; recovery HTTP-boundary 12/12; check runner real PASS.
+- Browser real UNCONFIGURED con PostgreSQL 16 efímero/Spring productivo/Angular
+  HTTPS PASS 1/1 y SQL cero tokens. No capturador, provider ni debug HTTP.
+- AR-016 permanece pendiente del journey browser exitoso con capturador privado
+  exclusivamente de tests. Evidencia y límites en `corte-c-frontend-evidence.md`.
+- Follow-up UX: intención login también ante incertidumbre/usado con otro realm
+  vivo, expiración visible después de error de formulario y reinicio Unknown.
+  Verify posterior PASS (178 archivos/1192 tests, arquitectura/lint/build) y
+  recovery browser 16/16. Sin commit/push; AR-016 permanece pendiente.

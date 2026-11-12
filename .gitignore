@@ -40,6 +40,7 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/ua-real-results/
 frontend/psd-real-results/
+frontend/recovery-real-results/
 !/docs/testing/
 !/docs/testing/**
 frontend/demo-playwright-report/

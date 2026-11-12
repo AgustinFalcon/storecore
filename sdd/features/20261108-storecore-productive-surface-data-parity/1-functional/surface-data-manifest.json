@@ -4,7 +4,7 @@
   "states": ["REAL", "DEMO_ONLY", "EXTERNAL_BLOCKED", "NOT_APPLICABLE"],
   "authorities": {
     "SC-SURF-01": "home_content_sections", "SC-SURF-02": "identity_sessions+unified_access_challenges",
-    "SC-SURF-03": "none_until_recovery_contract", "SC-SURF-04": "products+product_variants+inventory_balances",
+    "SC-SURF-03": "identity_recovery_tokens+users+customers+identity_sessions", "SC-SURF-04": "products+product_variants+inventory_balances",
     "SC-SURF-05": "products+product_variants+product_images+inventory_balances", "SC-SURF-06": "customers+identity_sessions",
     "SC-SURF-07": "customers", "SC-SURF-08": "customer_addresses", "SC-SURF-09": "customer_favorites+product_variants+products",
     "SC-SURF-10": "carts+cart_items", "SC-SURF-11": "checkout_idempotency_claims+orders+payments",
@@ -18,13 +18,13 @@
     "SC-SURF-26": "customers+orders+identity_sessions+audit_events"
   },
   "targets": {
-    "SC-SURF-03": { "ownerTask": "EXTERNAL", "operations": ["recovery request", "credential reset"], "fields": ["opaque recovery result"] },
+    "SC-SURF-03": { "ownerTask": "EXTERNAL", "operations": ["real email provider and delivery homologation", "verified email policy"], "fields": ["delivery result"] },
     "SC-SURF-23": { "ownerTask": "EXTERNAL", "operations": ["live observation", "provider synchronization"], "fields": ["verified freshness", "provider result"] }
   },
   "surfaces": [
     { "id": "SC-SURF-01", "name": "Home", "route": "/", "state": "REAL", "read": ["GET /api/v1/content/home"], "writes": [], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-02", "name": "Unified login", "route": "/login", "state": "REAL", "read": ["GET /api/v1/customer/me", "GET /api/v1/internal/me"], "writes": ["POST /api/v1/auth/login", "POST /api/v1/auth/context-selection"], "loaderStage": "CUSTOMER_IDENTITY", "coverage": "COMPLETE" },
-    { "id": "SC-SURF-03", "name": "Recovery", "route": null, "state": "EXTERNAL_BLOCKED", "read": [], "writes": [], "loaderStage": null, "coverage": "BLOCKED_EMAIL_SECURITY_CONTRACT" },
+    { "id": "SC-SURF-03", "name": "Recovery", "route": "/recover", "state": "REAL", "read": [], "writes": ["POST /api/v1/customer/auth/recovery/requests", "POST /api/v1/internal/auth/recovery/requests", "POST /api/v1/customer/auth/recovery/inspect", "POST /api/v1/internal/auth/recovery/inspect", "POST /api/v1/customer/auth/recovery/complete", "POST /api/v1/internal/auth/recovery/complete"], "loaderStage": null, "coverage": "LOCAL_CORE_EMAIL_EXTERNAL_BLOCKED_BROWSER_SUCCESS_PENDING" },
     { "id": "SC-SURF-04", "name": "Catalog", "route": "/catalog", "state": "REAL", "read": ["GET /api/v1/catalog", "GET /api/v1/catalog/brands", "GET /api/v1/catalog/categories"], "writes": [], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LOCAL_BOUNDED_COMPLETE" },
     { "id": "SC-SURF-05", "name": "Product detail", "route": "/catalog/:sku", "state": "REAL", "read": ["GET /api/v1/catalog/products/{sku}"], "writes": ["PUT /api/v1/customer/cart/items", "PUT /api/v1/customer/favorites/{sku}", "DELETE /api/v1/customer/favorites/{sku}"], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-06", "name": "Registration", "route": "/customer/register", "state": "REAL", "read": [], "writes": ["POST /api/v1/customer/auth/register"], "loaderStage": "CUSTOMER_IDENTITY", "coverage": "COMPLETE" },

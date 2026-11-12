@@ -62,6 +62,17 @@ describe('AccessCoordinator', () => {
   }
   function absent(path: string): void { http.expectOne(url(path)).flush({}, { status: 401, statusText: 'Unauthorized' }); }
 
+  it('accepts recovery by clearing only the recovered realm and fencing its stale probes', async () => {
+    for (const realm of [AccessContext.Customer, AccessContext.User]) {
+      const pending = firstValueFrom(access.rehydrate()); flushCustomer(); flushUser(); await pending;
+      access.acceptRecovered(realm);
+      expect(customerSession.authenticated()).toBe(realm !== AccessContext.Customer);
+      expect(userSession.authenticated()).toBe(realm !== AccessContext.User);
+      expect(realm === AccessContext.Customer ? userSession.csrf() : customerSession.csrf()).toBe(realm === AccessContext.Customer ? 'user-csrf' : 'customer-csrf');
+      expect(access.state().permits(realm)).toBe(false);
+    }
+  });
+
   it('deduplicates a reload flight and publishes principal plus CSRF atomically', async () => {
     const flight = access.rehydrate();
     expect(access.rehydrate()).toBe(flight);
