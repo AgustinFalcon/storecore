@@ -9,4 +9,4 @@
 | CAC-003B | Abrir intento nuevo ante mutación exitosa/cambio válido de dirección; bloquear cambios durante Pending. | Done |
 | CAC-004 | Cubrir vacío, retorno, wires inválidos y órdenes cruzados. | Done — unit/integration/browser |
 | CAC-005 | Ejecutar gates y doble review de código. | Done — APPROVE sin P0–P3 |
-| CAC-006 | PR, CI, merge y verificación post-merge. | In progress — PR #261, CI pre-merge verde |
+| CAC-006 | PR, CI, merge y verificación post-merge. | Done — PR #261, master verde |
