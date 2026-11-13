@@ -1,5 +1,13 @@
 # StoreCore documentation baseline 1.0.0
 
+## Master vigente — 2026-11-13
+
+`master 376790d` contiene PR #244–#252. Verify post-merge #659
+(`43313975226`) quedó verde en backend, frontend y navegador real. Recovery
+delivery permanece integrado con defaults sin credenciales y el hardening de
+Origin no altera los contratos publicados. Este estado no crea tag, deploy,
+publicación ni homologación; `release/1.0` sigue diferido a los gates externos.
+
 **Estado:** DRAFT / `ready_for_sol_review`. `sdd-v1.0.0` identifica exclusivamente la baseline documental; `storecore-core-v1.0.0` nombra el contrato de capacidades de producción, no un tag creado.
 
 | Artefacto | Qué es | Estado |
