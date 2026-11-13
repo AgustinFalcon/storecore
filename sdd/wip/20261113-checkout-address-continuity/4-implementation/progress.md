@@ -39,4 +39,11 @@ canales independientes, fence por actor y retorno cerrado/reactivo.
 - `git diff --check`: PASS.
 - Doble review final GPT-6.1 Sol: APPROVE, sin findings P0–P3.
 
-Pendiente exclusivo: PR, CI alojado, merge y verificación post-merge.
+## Evidencia alojada
+
+- PR: `#261`.
+- Commit funcional: `f4b63cb`.
+- GitHub Actions pre-merge: run `43495650447`.
+- Jobs `backend`, `frontend` y `unified-access-real-e2e`: PASS.
+
+Pendiente exclusivo: merge y verificación post-merge de `master`.
