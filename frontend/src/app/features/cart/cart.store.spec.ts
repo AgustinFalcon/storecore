@@ -2,6 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { BehaviorSubject, map, of, Subject } from 'rxjs';
+import { throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { mapReceipt } from '../../data/mappers/http-mappers';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
@@ -17,11 +19,12 @@ import { OrderStatus, PaymentStatus } from '../../domain/order/commerce-states';
 import { UserRole } from '../../domain/user/user-role';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { CartFailureKind, CartStore } from './cart.store';
+import { CartCurrency } from '../../domain/cart/cart-currency';
 
 const actorA: CustomerProfile = { id: 'actor-a', email: 'a@example.test', firstName: 'A', lastName: 'A', phone: '' };
 const actorB: CustomerProfile = { ...actorA, id: 'actor-b', email: 'b@example.test' };
 const address = (id: string): CustomerAddress => ({ id, street: 'S', number: '1', city: 'C', province: 'P', postalCode: '1', isDefault: true });
-const cart: Cart = { lines: [], currency: 'ARS' };
+const cart: Cart = { lines: [], currency: CartCurrency.Ars };
 const receipt: CheckoutReceipt = { orderId: 'order-a', paymentStatus: PaymentStatus.Pending, orderStatus: OrderStatus.Created };
 
 describe('CartStore actor isolation', () => {
@@ -55,12 +58,13 @@ describe('CartStore actor isolation', () => {
   });
   it('clears every actor-owned field and rotates the key synchronously on A → B', () => {
     store.loadAddresses();
+    store.load();
     store.submitCheckout();
-    store.patchState({ errorMessage: 'actor-a error', loading: true, currency: 'ARS' });
+    store.patchState({ errorMessage: 'actor-a error', loading: true });
     const key = store.snapshot.idempotencyKey;
     expect(store.snapshot.receipt).toEqual(receipt);
     session.commit(actorB, 'csrf-b');
-    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: '' }, addresses: [], addressId: '', currency: 'ARS', idempotencyKey: store.snapshot.idempotencyKey, receipt: null, failureKind: CartFailureKind.None });
+    expect(store.snapshot).toEqual({ loading: false, errorMessage: '', cart: { lines: [], currency: CartCurrency.Unknown }, addresses: [], addressId: '', idempotencyKey: store.snapshot.idempotencyKey, receipt: null, failureKind: CartFailureKind.None });
     expect(store.snapshot.idempotencyKey).not.toBe(key);
   });
   it('cancels all four in-flight effects and ignores late actor-A results and navigation', () => {
@@ -69,6 +73,7 @@ describe('CartStore actor isolation', () => {
     const pendingAddresses = new Subject<readonly CustomerAddress[]>();
     const pendingCheckout = new Subject<CheckoutReceipt>();
     store.loadAddresses();
+    store.load();
     get.execute.mockReturnValue(pendingGet);
     add.execute.mockReturnValue(pendingAdd);
     addresses.execute.mockReturnValue(pendingAddresses);
@@ -78,14 +83,14 @@ describe('CartStore actor isolation', () => {
     session.commit(actorB, 'csrf-b');
     expect([pendingGet.observed, pendingAdd.observed, pendingAddresses.observed, pendingCheckout.observed]).toEqual([false, false, false, false]);
     pendingGet.next(cart); pendingAdd.error(new Error('late')); pendingAddresses.next([address('late-a')]); pendingCheckout.next(receipt);
-    expect(store.snapshot.cart.currency).toBe('');
+    expect(store.snapshot.cart.currency).toBe(CartCurrency.Unknown);
     expect(store.snapshot.addresses).toEqual([]);
     expect(store.snapshot.receipt).toBeNull();
     expect(store.snapshot.errorMessage).toBe('');
     expect(navigate).not.toHaveBeenCalled();
-    get.execute.mockReturnValue(of({ ...cart, currency: 'actor-b' }));
+    get.execute.mockReturnValue(of({ ...cart, currency: CartCurrency.Ars }));
     store.load();
-    expect(store.snapshot.cart.currency).toBe('actor-b');
+    expect(store.snapshot.cart.currency).toBe(CartCurrency.Ars);
   });
   it('resets on session clear and refuses work without a customer actor', () => {
     store.loadAddresses();
@@ -129,6 +134,7 @@ describe('CartStore actor isolation', () => {
   });
   it('keeps actor state across a same-actor CSRF refresh', () => {
     store.loadAddresses();
+    store.load();
     const key = store.snapshot.idempotencyKey;
     session.commit({ ...actorA }, 'refreshed');
     expect(store.snapshot.addressId).toBe('address-a');
@@ -136,6 +142,7 @@ describe('CartStore actor isolation', () => {
   });
   it('preserves the attempt and route when receipt translation fails, then reuses the key on retry', () => {
     store.loadAddresses();
+    store.load();
     const key = store.snapshot.idempotencyKey;
     checkout.execute.mockReturnValue(of({ orderId: 'order-a', paymentStatus: null, orderStatus: OrderStatus.Created.wire }).pipe(map(mapReceipt)));
     store.submitCheckout();
@@ -151,6 +158,50 @@ describe('CartStore actor isolation', () => {
     expect(store.snapshot.receipt).toEqual(receipt);
     expect(store.snapshot.idempotencyKey).not.toBe(key);
     expect(navigate).toHaveBeenCalledExactlyOnceWith(['/checkout/result', receipt.orderId]);
+  });
+  it('revokes stale currency after backend rejection, preserves the attempt and blocks further submits until reload', () => {
+    store.load();
+    store.loadAddresses();
+    const key = store.snapshot.idempotencyKey;
+    const staleLoad = new Subject<Cart>();
+    const staleCart = new Subject<Cart>();
+    get.execute.mockReturnValue(staleLoad);
+    add.execute.mockReturnValue(staleCart);
+    store.load();
+    store.add({ sku: 'sku-stale', quantity: 1 });
+    checkout.execute.mockReturnValue(throwError(() => new HttpErrorResponse({
+      status: 400,
+      error: { errorCode: 'UNSUPPORTED_CURRENCY', message: 'raw wire text' },
+    })));
+
+    store.submitCheckout();
+
+    expect(store.snapshot.cart.currency).toBe(CartCurrency.Unknown);
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.CurrencyUnavailable);
+    expect(store.snapshot.idempotencyKey).toBe(key);
+    expect(store.snapshot.errorMessage).toBe('La moneda de esta instalación no está disponible. Actualizá el carrito antes de continuar.');
+    staleLoad.next(cart);
+    staleCart.next({ ...cart, lines: [{ sku: 'sku-stale', name: 'Stale', quantity: 1, originalUnitPrice: 1, discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 1 }] });
+    expect(store.snapshot.cart.currency).toBe(CartCurrency.Unknown);
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.CurrencyUnavailable);
+    store.submitCheckout();
+    expect(checkout.execute).toHaveBeenCalledTimes(1);
+
+    get.execute.mockReturnValue(throwError(() => new Error('reload failed')));
+    store.load();
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.Load);
+    add.execute.mockReturnValue(of(cart));
+    store.add({ sku: 'sku-after-failed-reload', quantity: 1 });
+    expect(store.snapshot.cart.currency).toBe(CartCurrency.Unknown);
+    expect(store.snapshot.failureKind).toBe(CartFailureKind.CurrencyUnavailable);
+    store.submitCheckout();
+    expect(checkout.execute).toHaveBeenCalledTimes(1);
+
+    get.execute.mockReturnValue(of(cart));
+    store.load();
+    checkout.execute.mockReturnValue(of(receipt));
+    store.submitCheckout();
+    expect(checkout.execute.mock.calls.at(-1)?.[0]).toMatchObject({ idempotencyKey: key, currency: CartCurrency.Ars });
   });
   it('shares the closed CUSTOMER authority with controls and explicitly selects it from dual USER context', () => {
     contexts.next(AccessState.resolve(SessionProbe.authenticated(actorA, 'csrf-a'),

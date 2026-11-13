@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { CartFailureKind, type CartState } from './cart.store';
+import { CartCurrency } from '../../domain/cart/cart-currency';
 import { CartPageViewComponent } from './cart-page.view';
 
 describe('CartPageViewComponent', () => {
@@ -11,10 +12,9 @@ describe('CartPageViewComponent', () => {
     const state: CartState = {
       loading: false,
       errorMessage: '',
-      cart: { currency: 'ARS', lines: [{ sku: 'RETIRED', name: 'Taladro', quantity: 3, originalUnitPrice: 100, discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 100 }] },
+      cart: { currency: CartCurrency.Ars, lines: [{ sku: 'RETIRED', name: 'Taladro', quantity: 3, originalUnitPrice: 100, discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 100 }] },
       addresses: [],
       addressId: '',
-      currency: 'ARS',
       idempotencyKey: 'attempt',
       receipt: null,
       failureKind: CartFailureKind.None,

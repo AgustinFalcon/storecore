@@ -17,24 +17,27 @@ export class CheckoutPageViewComponent {
   @Input() access = CustomerCartAccess.Unknown;
   @Output() readonly selectCustomer = new EventEmitter<void>();
   @Output() readonly addressChange = new EventEmitter<string>();
-  @Output() readonly currencyChange = new EventEmitter<string>();
   @Output() readonly pay = new EventEmitter<void>();
   @Output() readonly retry = new EventEmitter<void>();
 
   get merchandiseTotal():number{return this.state.cart.lines.reduce((total,line)=>total+line.effectiveUnitPrice*line.quantity,0);}
-  amount(value:number):string{return new Intl.NumberFormat('es-AR',{style:'currency',currency:this.state.cart.currency||'ARS'}).format(value);}
+  amount(value: number): string {
+    if (!this.state.cart.currency.canCheckout) return 'Importe no disponible';
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: this.state.cart.currency.wire }).format(value);
+  }
 
   get canPay(): boolean {
     return this.state.failureKind === CartFailureKind.None
       && this.access.canMutate && !this.state.loading && this.state.cart.lines.length > 0
-      && this.state.addresses.some((address) => address.id === this.state.addressId) && this.state.currency.length > 0;
+      && this.state.addresses.some((address) => address.id === this.state.addressId)
+      && this.state.cart.currency.canCheckout;
   }
 
   get canRetryCheckout(): boolean {
     return this.access.canMutate && !this.state.loading
       && this.state.failureKind === CartFailureKind.CheckoutRetryable
       && this.state.addresses.some((address) => address.id === this.state.addressId)
-      && this.state.currency.length > 0;
+      && this.state.cart.currency.canCheckout;
   }
 
   get readError(): string {

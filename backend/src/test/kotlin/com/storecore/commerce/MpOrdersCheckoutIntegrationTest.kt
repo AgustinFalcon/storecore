@@ -70,6 +70,7 @@ class MpOrdersCheckoutIntegrationTest(
 
     @BeforeEach
     fun seed() {
+        jdbc.update("INSERT INTO installation_settings(installation_id,business_name,allowed_host,currency) VALUES (1,'Test','localhost','ARS') ON CONFLICT (installation_id) DO UPDATE SET currency='ARS'")
         Fakes.orders.clear()
         Fakes.createResult.set(null)
         Fakes.searchResult.set(OfficialOrderSearchResult(emptyList(), 1, true))

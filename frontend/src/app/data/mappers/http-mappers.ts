@@ -1,6 +1,7 @@
 import { ProductStatus, VariantStatus, InventoryState } from '../../domain/catalog/catalog-states';
 import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { CartCurrency } from '../../domain/cart/cart-currency';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary } from '../../domain/catalog/product-summary.entity';
@@ -179,7 +180,7 @@ function mapCartLine(value: unknown): CartLine {
 export function mapCart(value: unknown): Cart {
   const row = requiredRecord(value);
   if (!Array.isArray(row['lines'])) throw new Error('Líneas del carrito no informadas.');
-  return { lines: row['lines'].map(mapCartLine), currency: requiredText(row['currency']) };
+  return { lines: row['lines'].map(mapCartLine), currency: CartCurrency.fromWire(row['currency']) };
 }
 
 export function mapReceipt(value: unknown): CheckoutReceipt {

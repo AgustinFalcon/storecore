@@ -1,3 +1,6 @@
+import { CartCurrency } from './cart-currency';
+import { OrderStatus, PaymentStatus } from '../order/commerce-states';
+
 export interface CartLine {
   readonly sku: string;
   readonly name: string;
@@ -11,13 +14,13 @@ export interface CartLine {
 
 export interface Cart {
   readonly lines: readonly CartLine[];
-  readonly currency: string;
+  readonly currency: CartCurrency;
 }
 
 export interface CheckoutCommand {
   readonly idempotencyKey: string;
   readonly addressId: string;
-  readonly currency: string;
+  readonly currency: CartCurrency;
 }
 
 export interface CheckoutReceipt {
@@ -26,4 +29,3 @@ export interface CheckoutReceipt {
   readonly orderStatus: OrderStatus;
   readonly checkoutUrl?: string | null;
 }
-import { OrderStatus, PaymentStatus } from '../order/commerce-states';

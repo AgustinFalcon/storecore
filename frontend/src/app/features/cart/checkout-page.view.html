@@ -28,18 +28,19 @@
         </select>
       </label>
       <h2>Cobro</h2>
-      <label>Moneda
-        <input required name="currency" [disabled]="!access.canMutate" [ngModel]="state.currency" (ngModelChange)="currencyChange.emit($event)" />
-      </label>
+      <p><strong>Moneda</strong><br>{{ state.cart.currency.label }}</p>
       <p class="sc-callout sc-callout--info">Al continuar vas a revisar el pago de tu pedido. Si necesitás reintentar, conservamos el mismo intento de compra.</p>
       @if (state.failureKind === FailureKind.None) {
-        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay" [attr.title]="canPay ? null : 'Falta dirección, moneda o el carrito está vacío'">Pagar</button>
+        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay" [attr.title]="canPay ? null : 'Falta dirección, la moneda no está disponible o el carrito está vacío'">Pagar</button>
       }
       @if (state.failureKind === FailureKind.CheckoutRetryable) {
         <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" [disabled]="!canRetryCheckout" (click)="canRetryCheckout && pay.emit()">Reintentar el mismo pago</button>
       }
       @if (state.failureKind === FailureKind.CheckoutProductUnavailable) {
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Corregir carrito</a>
+      }
+      @if (state.failureKind === FailureKind.CurrencyUnavailable) {
+        <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" [disabled]="state.loading" (click)="retry.emit()">Actualizar carrito y moneda</button>
       }
     </form>
     <aside class="sc-summary">

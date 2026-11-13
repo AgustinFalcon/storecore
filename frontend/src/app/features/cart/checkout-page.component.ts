@@ -14,7 +14,6 @@ import { CartFailureKind, CartStore } from './cart.store';
         [access]="store.authority()"
         (selectCustomer)="store.selectCustomer()"
         (addressChange)="store.setAddressId($event)"
-        (currencyChange)="store.setCurrency($event)"
         (pay)="store.submitCheckout()"
         (retry)="retry()"
       />
