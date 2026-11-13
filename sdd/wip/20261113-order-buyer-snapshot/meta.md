@@ -1,10 +1,12 @@
 # Metadata — identidad histórica del comprador
 
-- Estado: `SPEC_REVIEW`
+- Estado: `DELIVERED`
 - Fecha: 2026-11-13
 - Modo: brownfield, StoreCore backend y contrato de pedidos existente
 - Issue origen: auditoría de paridad operativa posterior al cierre de checkout/direcciones
 - Autoridad: rama `fix/order-buyer-snapshot` creada desde `master` en `fc99b68d7733bdb55437cecc9eb2731a81824e1a`
+- Entrega: PR #263, merge `332cd52421323728907a80a2eebc8fad88ea275e`
+- Evidencia final: CI del PR `43506125028` y CI post-merge `43507158447`, ambos verdes
 
 ## Alcance
 

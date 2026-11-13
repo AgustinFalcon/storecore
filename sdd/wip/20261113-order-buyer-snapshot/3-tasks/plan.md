@@ -7,5 +7,5 @@
 - [x] T5. Cubrir checkout, replay, edición posterior, orden nueva y legacy.
 - [x] T6. Ejecutar tests focales y gates locales completos.
 - [x] T7. Ejecutar reviews funcional/código/seguridad y corregir hasta aprobación.
-- [ ] T8. Crear PR con evidencia, pasar CI, fusionar y validar post-merge.
-- [ ] T9. Cerrar SDD con evidencia final.
+- [x] T8. Crear PR con evidencia, pasar CI, fusionar y validar post-merge.
+- [x] T9. Cerrar SDD con evidencia final.
