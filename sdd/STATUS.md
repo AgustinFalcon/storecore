@@ -140,7 +140,18 @@ release, credenciales live ni deploy.
 
 ## Fiscal externo
 
-- `20260921-arca-fiscal-discovery` y `20260921-arca-storecore-adapter-contract`: `documented_deferred`. Addendum 2026-09-22 de pago/fiscal es propuesta Open. Sin código, DDL, worker ni secretos.
+- La biblioteca externa alcanzó el candidato `0.1.0-RC.4` en
+  `AgustinFalcon/arca-facturacion` `master 8efeace`: estados cerrados,
+  conciliación fail-closed, referencia JDBC/worker, 78 pruebas, cobertura
+  89,03 %, SBOM, smoke consumidor y CI post-merge Verify/Security verde. No hay
+  tag ni paquete remoto acreditado.
+- `20260921-arca-fiscal-discovery` y
+  `20260921-arca-storecore-adapter-contract` permanecen
+  `documented_deferred` para el consumidor StoreCore. El corte
+  `20261113-storecore-arca-library-readiness` reconcilia la nueva baseline sin
+  habilitar adapter, DDL, scheduler, worker, secretos, homologación ni emisión.
+  Matriz fiscal, emisor/PV, trigger, correlaciones, ownership inbox/outbox y
+  distribución versionada siguen pendientes de sus dueños.
 
 ## Correo Argentino
 
