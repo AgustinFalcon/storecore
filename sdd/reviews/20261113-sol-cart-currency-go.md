@@ -38,4 +38,8 @@ producción.
 - Doble revisión GPT-6.1 Sol: GO coincidente sin P0–P3.
 - `git diff --check`: limpio.
 
-El merge requiere todavía CI remoto verde y verificación post-merge de `master`.
+## Cierre remoto
+
+- PR `#259` fusionado como `653b5ebc96fa6f9bebd32d969177bc3e5c621f2e`.
+- CI del PR: backend, frontend y E2E real verdes.
+- CI post-merge `43481720083`: los tres jobs verdes sobre el SHA de merge.
