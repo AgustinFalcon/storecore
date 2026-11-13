@@ -1,10 +1,11 @@
 # Metadata — continuidad de acceso para carrito y checkout
 
-- Estado: `SPEC_REVIEW`
+- Estado: `completed`
 - Fecha: 2026-11-13
 - Modo: brownfield, StoreCore frontend/backend y acceso unificado existente
 - Prioridad: P2 funcional de experiencia comprador
-- Autoridad: rama `feat/purchase-access-continuity` desde `master@332cd52421323728907a80a2eebc8fad88ea275e`
+- Autoridad: PR #265, merge `bfabff52bd1bd23ad4d5b9bba4510f1be0a6eec1`
+- Validación: Verify PR `43514077477` y post-merge `43515110984`, 3/3 verdes
 
 ## Alcance
 

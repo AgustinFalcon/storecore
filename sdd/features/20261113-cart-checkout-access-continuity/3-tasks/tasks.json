@@ -1,0 +1,17 @@
+{
+  "feature": "20261113-cart-checkout-access-continuity",
+  "status": "completed",
+  "stats": { "total": 10, "done": 10, "in_progress": 0, "pending": 0 },
+  "tasks": [
+    { "id": "CAC-001", "title": "Auditar continuidad de acceso", "status": "done", "evidence": "Auditoría funcional/técnica coordinada" },
+    { "id": "CAC-002", "title": "Separar destinos fijos de selección parametrizada", "status": "done", "evidence": "Specs funcional y técnico" },
+    { "id": "CAC-003", "title": "Aprobar specs", "status": "done", "evidence": "Dos reviews GPT-6.1 Sol" },
+    { "id": "CAC-004", "title": "Extender tipos cerrados y esquema", "status": "done", "evidence": "ReturnDestination y V20" },
+    { "id": "CAC-005", "title": "Propagar destino por acceso", "status": "done", "evidence": "Guards, CTA, login y registro" },
+    { "id": "CAC-006", "title": "Modelar pasos de registro", "status": "done", "evidence": "Pasos y etapas cerradas" },
+    { "id": "CAC-007", "title": "Ejecutar gates locales", "status": "done", "evidence": "Frontend 1323; backend 413" },
+    { "id": "CAC-008", "title": "Cerrar reviews de código y seguridad", "status": "done", "evidence": "APPROVE funcional y técnico/seguridad" },
+    { "id": "CAC-009", "title": "Entregar por PR y verificar master", "status": "done", "evidence": "PR #265; runs 43514077477 y 43515110984" },
+    { "id": "CAC-010", "title": "Archivar SDD", "status": "done", "evidence": "Documentación final generada" }
+  ]
+}
