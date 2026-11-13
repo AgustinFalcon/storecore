@@ -10,7 +10,7 @@ backend-less fixtures. No live integration credentials are needed.
 
 ## Prerequisites and commands
 
-Use Java 17, Maven, Node >=22.12, psql, OpenSSL and a fresh PostgreSQL 16 database
+Use Java 21, Maven, Node >=22.12, psql, OpenSSL and a fresh PostgreSQL 16 database
 named **storecore_ua_e2e**. The fixture account must be able to execute Flyway's
 existing role/ownership migrations. The CI PostgreSQL container user has that
 authority; it is not a production runtime account. Ports 5434, 8080 and 4301 must
