@@ -1,0 +1,12 @@
+{
+  "feature": "20261113-storecore-canonical-state-reconciliation",
+  "status": "completed",
+  "stats": { "total": 5, "done": 5, "in_progress": 0, "pending": 0 },
+  "tasks": [
+    { "id": "SCMR-001", "title": "Verify canonical master, pull requests and workflows", "status": "done", "evidence": "origin/master 376790d; PR #244-#252; Verify #654-#659" },
+    { "id": "SCMR-002", "title": "Define documentary scope and external boundaries", "status": "done", "evidence": "Functional and technical specs approved" },
+    { "id": "SCMR-003", "title": "Reconcile STATUS, RELEASE and backlog", "status": "done", "evidence": "Candidate 1d2b3a9" },
+    { "id": "SCMR-004", "title": "Run exact-head reviews and diff validation", "status": "done", "evidence": "ccc4053 approved by two GPT-6.1 Sol medium reviews; diff-check PASS" },
+    { "id": "SCMR-005", "title": "Deliver through PR, CI, merge and post-merge verification", "status": "done", "evidence": "PR #253; Verify #660 and #661 3/3; merge 33fca34" }
+  ]
+}

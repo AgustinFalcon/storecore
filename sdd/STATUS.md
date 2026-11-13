@@ -2,7 +2,7 @@
 
 ## Master vigente y cierre de recovery/Origin — 2026-11-13
 
-`master 376790ddc184091551832ff9b2d5b776747794b7` integra PR #244–#252. El
+`master 33fca347031ff8b812ed7bb6d4024318812ef82e` integra PR #244–#253. El
 tramo local posterior a `7300b8` agrega discovery honesto de Correo Argentino,
 creación real de producto e inventario, recovery CUSTOMER/USER con entrega
 verificada y el hardening de la frontera Origin unificada. PR #250 quedó en
@@ -12,6 +12,11 @@ Verify #654–#659 registran los gates de PR y post-merge; en particular PR #252
 pasó `43312967237` y `master 376790d` pasó `43313975226` con backend, frontend y
 `unified-access-real-e2e` verdes. La evidencia focal de PR #252 incluye 36 tests
 PostgreSQL 16/Testcontainers sin fallos y `git diff --check` limpio.
+
+PR #253 reconcilió exclusivamente esta documentación: candidato `ccc40537`,
+Verify #660 (`43355075159`) y Verify post-merge #661 (`43355855948`) pasaron
+backend, frontend y `unified-access-real-e2e`. `376790d` sigue siendo el último
+snapshot funcional; `33fca34` sólo agrega el cierre documental canónico.
 
 Este bloque prevalece sobre cabeceras históricas que declaren `7300b8` o un SHA
 anterior como vigente. No acredita SMTP productivo, credenciales live,

@@ -19,7 +19,7 @@
 
 - TODO-049 [medium] [done] `storecore-closed-health-status`: reemplaza el string libre de health por `HealthStatus` cerrado con único traductor wire y `Unknown` fail-closed. PR #239 candidato `35ae0c3`, Verify `42839213825` intento #2 3/3 y doble review GPT-6.1 Sol APPROVE. Sin cambios backend, base, proveedor, deploy ni homologación.
 
-- SCMR [done] `storecore-canonical-state-reconciliation`: estado canónico reconciliado con `master 376790d`, PR #244–#252 y Verify #654–#659. No cambia código ni habilita proveedores, deploy o homologación.
+- SCMR [done] `storecore-canonical-state-reconciliation`: estado funcional reconciliado con `376790d`, entregado por PR #253 y cerrado en `master 33fca34`; Verify #660 y post-merge #661 pasaron 3/3. No cambia código ni habilita proveedores, deploy o homologación.
 
 - TODO-044 [high] [done] `commerce-closed-states-and-fulfillment-eligibility`: implementación de PR #171 revalidada sobre PR #231 head `9108798`, merge `eca9db9`; Verify #594 y close-out candidato `4debf9b`/run `42653866473` success. CFE 4 journeys reales + 1 Unknown MockHttp, acceso 12/12, backend 253/253, PostgreSQL 16 y migraciones clean/upgrade PASS. Archivado con doble review final; no acredita CI push master, homologación, release, credenciales live ni activación.
 - TODO-045 [high] [done] `commerce-rma-item-disposition-and-restock`: clasificación por ítem, reposición RESTOCK-only, auditoría, idempotencia, recuperación y carreras cerradas en `sdd/features/20261109-commerce-rma-item-disposition-and-restock/`. PR #233 candidato `fc80316`, Verify `42666041072` 3/3; comandos legacy INSPECTED/ADJUSTED permanecen rechazados.
