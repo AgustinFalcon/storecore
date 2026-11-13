@@ -11,6 +11,7 @@ import { SignInCustomerUseCase } from '../../domain/customer/use-cases/sign-in-c
 import { SignOutCustomerUseCase } from '../../domain/customer/use-cases/sign-out-customer.usecase';
 import { CustomerStore } from './customer.store';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { ContinueCustomerPurchaseIntentPolicy } from '../../core/auth/continue-customer-purchase-intent.policy';
 import { AccessState } from '../../domain/access/session-probe';
 
 describe('profile mutations invalidate displayed email ownership', () => {
@@ -18,6 +19,7 @@ describe('profile mutations invalidate displayed email ownership', () => {
     const profile = { email: 'new@example.test', firstName: 'Persona', lastName: 'Uno', phone: '' };
     const save = { execute: vi.fn(() => of(profile)) };
     TestBed.configureTestingModule({ providers: [CustomerStore, provideRouter([]),
+      { provide: ContinueCustomerPurchaseIntentPolicy, useValue: {} },
       { provide: AccessCoordinator, useValue: { reconcileRegisteredCustomer: () => of(AccessState.Indeterminate) } },
       { provide: SaveCustomerProfileUseCase, useValue: save }, { provide: GetCustomerProfileUseCase, useValue: { execute: () => of(profile) } },
       ...[DeleteCustomerAddressUseCase, ListCustomerAddressesUseCase, RegisterCustomerUseCase, SaveCustomerAddressUseCase, SignInCustomerUseCase, SignOutCustomerUseCase].map(provide => ({ provide, useValue: {} })),

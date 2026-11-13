@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { Observable, of, Subject } from 'rxjs';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { PurchaseIntentCoordinator } from '../../core/purchase-intent/purchase-intent-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
 import { ReturnDestination } from '../../domain/access/return-destination';
@@ -47,6 +48,8 @@ describe('CustomerStore registration authority', () => {
     };
     const router = { navigateByUrl: vi.fn() };
     TestBed.configureTestingModule({ providers: [CustomerStore,
+      { provide: PurchaseIntentCoordinator, useValue: { validatedResumeReference: (raw: unknown) => raw === 'opaque-flow' ? raw : null,
+        continuationForCustomer: (raw: unknown) => raw === 'opaque-flow' ? { productSku: 'product-2', flowId: raw } : null } },
       { provide: RegisterCustomerUseCase, useValue: register }, { provide: AccessCoordinator, useValue: access },
       { provide: Router, useValue: router }, CustomerSession,
       ...[DeleteCustomerAddressUseCase, GetCustomerProfileUseCase, ListCustomerAddressesUseCase, SaveCustomerAddressUseCase,
@@ -65,6 +68,26 @@ describe('CustomerStore registration authority', () => {
     expect(f.access.reconcileRegisteredCustomer).toHaveBeenCalledTimes(1);
     expect(f.router.navigateByUrl).toHaveBeenCalledWith('/checkout');
     expect(f.store.snapshot.registrationStage).toBe(CustomerRegistrationStage.Complete);
+  });
+
+  it('keeps the opaque reference through failed reconciliation without repeating registration', () => {
+    const f = setup([AccessState.Indeterminate, customerState]);
+    f.store.setReturnDestination(ReturnDestination.Catalog);
+    f.store.setResumeReference('opaque-flow');
+    f.store.submitRegister();
+    expect(f.router.navigateByUrl).not.toHaveBeenCalled();
+    f.store.submitRegister();
+    expect(f.register.execute).toHaveBeenCalledTimes(1);
+    expect(f.router.navigateByUrl).toHaveBeenCalledWith('/catalog/product-2?resume=opaque-flow');
+  });
+
+  it('continues an already accepted CUSTOMER directly to the validated PDP', () => {
+    const f = setup([customerState], undefined, ContextAuthorityInspection.Accepted);
+    f.store.setReturnDestination(ReturnDestination.Catalog);
+    f.store.setResumeReference('opaque-flow');
+    f.store.initializeRegistration();
+    expect(f.register.execute).not.toHaveBeenCalled();
+    expect(f.router.navigateByUrl).toHaveBeenCalledWith('/catalog/product-2?resume=opaque-flow');
   });
 
   it('recognizes an already accepted CUSTOMER and never exposes a second registration', () => {

@@ -14,6 +14,7 @@ import { SignInCustomerUseCase } from '../../domain/customer/use-cases/sign-in-c
 import { SignOutCustomerUseCase } from '../../domain/customer/use-cases/sign-out-customer.usecase';
 import { CustomerStore } from './customer.store';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { ContinueCustomerPurchaseIntentPolicy } from '../../core/auth/continue-customer-purchase-intent.policy';
 import { AccessState } from '../../domain/access/session-probe';
 
 const address: CustomerAddress = { id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
@@ -23,6 +24,7 @@ function setup() {
   const save = { execute: vi.fn(() => of(address)) };
   const remove = { execute: vi.fn(() => of(undefined)) };
   TestBed.configureTestingModule({ providers: [CustomerStore, provideRouter([]),
+    { provide: ContinueCustomerPurchaseIntentPolicy, useValue: {} },
     { provide: ListCustomerAddressesUseCase, useValue: list }, { provide: SaveCustomerAddressUseCase, useValue: save },
     { provide: DeleteCustomerAddressUseCase, useValue: remove },
     { provide: AccessCoordinator, useValue: { reconcileRegisteredCustomer: () => of(AccessState.Indeterminate) } },

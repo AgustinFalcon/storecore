@@ -30,7 +30,7 @@
         </label>
         <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="state.loading">Registrarme</button>
       </form>
-      <p>¿Ya tenés cuenta? <a routerLink="/login" [queryParams]="{ returnTo: loginDestination.wire }">Ya tengo cuenta</a></p>
+      <p>¿Ya tenés cuenta? <a routerLink="/login" [queryParams]="{ returnTo: loginDestination.wire, resume: resume }">Ya tengo cuenta</a></p>
     } @else {
       <p role="status">{{ state.registrationStage.label }}</p>
     }

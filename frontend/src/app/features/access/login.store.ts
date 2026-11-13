@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { EMPTY, Observable, catchError, exhaustMap, finalize, switchMap, tap } from 'rxjs';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { ContinueCustomerPurchaseIntentPolicy } from '../../core/auth/continue-customer-purchase-intent.policy';
 import { ACCESS_REPOSITORY } from '../../core/tokens/access.tokens';
 import { AccessContext } from '../../domain/access/access-context';
 import { AuthenticateRecoveredRealm } from '../../domain/access/recovery';
@@ -33,9 +34,11 @@ export class LoginStore extends ComponentStore<LoginViewState> {
   private challenge: LoginResult | null = null;
   private destination = ReturnDestination.Home;
   private recoveryIntent = AuthenticateRecoveredRealm.None;
+  private resume: string | null = null;
+  setResumeReference(raw: unknown): string | null { return this.resume = this.continuation.reference(raw); }
   setRecoveryIntent(intent: AuthenticateRecoveredRealm): void { this.recoveryIntent = intent; }
 
-  constructor(@Inject(ACCESS_REPOSITORY) repository: IAccessRepository, private readonly coordinator: AccessCoordinator, private readonly router: Router) {
+  constructor(@Inject(ACCESS_REPOSITORY) repository: IAccessRepository, private readonly coordinator: AccessCoordinator, private readonly router: Router, private readonly continuation: ContinueCustomerPurchaseIntentPolicy) {
     super(INITIAL_STATE);
     this.authentication = new AuthenticationStep(repository);
     this.selection = new ChallengeSelectionStep(repository);
@@ -55,7 +58,7 @@ export class LoginStore extends ComponentStore<LoginViewState> {
       if (state.kind === AccessStateKind.SelectionRequired) this.patchState({ stage: LoginStage.SelectContext, contexts: state.contexts });
       else if (state.kind === AccessStateKind.Selected) {
         const route = this.destination.routeFor(state.activeContext) ?? AccessHome.forContext(state.activeContext).route;
-        if (route) void this.router.navigateByUrl(route);
+        if (route) void this.router.navigateByUrl(this.continuation.route(state.activeContext, this.destination, route, this.resume));
       } else if (state.kind === AccessStateKind.Indeterminate) this.patchState({ message: 'No se pudo comprobar la sesión. Podés intentar ingresar.' });
     }), finalize(() => this.patchState({ busy: false })));
   })));
@@ -68,7 +71,7 @@ export class LoginStore extends ComponentStore<LoginViewState> {
       if (!this.challenge) {
         const state = this.coordinator.selectContext(context);
         const route = this.destination.routeFor(context) ?? AccessHome.forContext(context).route;
-        if (state.activeContext === context && route) void this.router.navigateByUrl(route);
+        if (state.activeContext === context && state.permits(context) && route) void this.router.navigateByUrl(this.continuation.route(context, this.destination, route, this.resume));
         this.patchState({ password: '' });
         return EMPTY;
       }
@@ -97,7 +100,7 @@ export class LoginStore extends ComponentStore<LoginViewState> {
       if (result.resolution === LoginResolution.Authenticated) return this.completion.execute(result).pipe(tap((route) => {
         if (route) {
           this.patchState({ stage: LoginStage.CompleteAccess, email: '', contexts: [] });
-          void this.router.navigateByUrl(route);
+          void this.router.navigateByUrl(this.continuation.route(result.context, result.destination, route, this.resume));
         } else this.reject(LoginResolution.Unavailable);
       }));
       this.reject(result.resolution);

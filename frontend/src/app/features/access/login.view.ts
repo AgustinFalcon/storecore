@@ -15,6 +15,7 @@ import type { LoginViewState } from './login.store';
 export class LoginViewComponent implements AfterViewChecked {
   @Input({ required: true }) state!: LoginViewState;
   @Input() destination = ReturnDestination.Home;
+  @Input() resume: string | null = null;
   @Output() emailChange = new EventEmitter<string>();
   @Output() passwordChange = new EventEmitter<string>();
   @Output() submitCredentials = new EventEmitter<void>();

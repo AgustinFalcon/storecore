@@ -67,6 +67,7 @@ export class CatalogStore extends ComponentStore<CatalogState> {
   readonly offers$ = this.select((s) => s.offers);
   readonly product$ = this.select((s) => s.product);
   readonly query$ = this.select((s) => s.query);
+  readonly viewState$ = this.select((s) => s);
   readonly emptyProducts$ = this.select((s) => !s.loading && !s.queryDirty && s.products.length === 0);
 
   setQuery(query: CatalogQuery): void {
@@ -203,7 +204,11 @@ export class CatalogStore extends ComponentStore<CatalogState> {
 
   readonly loadProduct = this.effect<string>((sku$) =>
     sku$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '', product: null })),
+      tap((sku) => {
+        const current = this.snapshot.product;
+        const sameProduct = current && (current.sku === sku || current.variants.some((variant) => variant.sku === sku));
+        this.patchState({ loading: true, errorMessage: '', product: sameProduct ? current : null });
+      }),
       switchMap((sku) =>
         this.getProduct.execute(sku).pipe(
           tapResponse({

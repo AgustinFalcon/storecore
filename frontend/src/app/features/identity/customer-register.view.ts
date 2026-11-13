@@ -16,6 +16,7 @@ export class CustomerRegisterViewComponent {
   protected readonly stages = CustomerRegistrationStage;
   @Input({ required: true }) state!: CustomerState;
   @Input() loginDestination = ReturnDestination.Unknown;
+  @Input() resume: string | null = null;
   @Input() authenticatedRoute = '/customer/profile';
   @Output() readonly firstNameChange = new EventEmitter<string>();
   @Output() readonly lastNameChange = new EventEmitter<string>();

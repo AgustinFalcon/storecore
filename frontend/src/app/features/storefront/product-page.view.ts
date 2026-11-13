@@ -6,6 +6,12 @@ import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 
+export interface ProductPurchaseSelection {
+  readonly variantSku: string;
+  readonly quantity: number;
+  readonly revision: number;
+}
+
 @Component({
   selector: 'sc-product-page-view',
   imports: [FormsModule, RouterLink, FeatureStatusComponent],
@@ -21,6 +27,11 @@ export class ProductPageViewComponent implements OnChanges {
   @Input() favorite = false;
   @Input() favoriteBusy = false;
   @Input() favoriteFeedback = '';
+  @Input() restoredSelection: ProductPurchaseSelection | null = null;
+  @Input() intentMessage = '';
+  @Input() intentCanConfirm = false;
+  @Input() intentBusy = false;
+  @Input() currentCartQuantity = 0;
   quantity = 1;
   activeImage = '';
   selectedVariantId = '';
@@ -29,13 +40,26 @@ export class ProductPageViewComponent implements OnChanges {
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly selectCustomer = new EventEmitter<void>();
   @Output() readonly toggleFavorite = new EventEmitter<string>();
+  @Output() readonly requestAccess = new EventEmitter<{ sku: string; quantity: number }>();
+  @Output() readonly reviseIntent = new EventEmitter<{ sku: string; quantity: number }>();
+  @Output() readonly cancelIntent = new EventEmitter<void>();
 
   ngOnChanges(changes: SimpleChanges): void {
     const product = changes['product'];
     if (product && product.previousValue?.sku !== product.currentValue?.sku) {
       this.activeImage = '';
       this.quantity = 1;
-      this.selectedVariantId = '';
+      this.selectedVariantId = this.defaultVariantId();
+    }
+    const restored = changes['restoredSelection'];
+    const selectionChanged = restored && this.restoredSelection && (!restored.previousValue
+      || restored.previousValue.revision !== this.restoredSelection.revision
+      || restored.previousValue.variantSku !== this.restoredSelection.variantSku
+      || restored.previousValue.quantity !== this.restoredSelection.quantity);
+    if (selectionChanged && this.restoredSelection) {
+      const exact = this.product?.variants.find((variant) => variant.sku === this.restoredSelection?.variantSku);
+      this.selectedVariantId = exact?.id ?? '';
+      this.quantity = this.restoredSelection.quantity;
     }
   }
 
@@ -44,8 +68,7 @@ export class ProductPageViewComponent implements OnChanges {
   }
 
   get selectedVariant() {
-    return this.product?.variants.find(variant => variant.id === this.selectedVariantId) ??
-      this.product?.variants.find(variant => variant.sku === this.product?.sku) ?? this.product?.variants[0] ?? null;
+    return this.product?.variants.find(variant => variant.id === this.selectedVariantId) ?? null;
   }
   get canPurchase(): boolean {
     const variant = this.selectedVariant;
@@ -61,10 +84,38 @@ export class ProductPageViewComponent implements OnChanges {
 
   changeQty(delta: number): void {
     this.quantity = Math.max(1, Number(this.quantity) + delta);
+    this.reportRevision();
   }
 
   submit(sku: string): void {
-    if (!this.access.canMutate || !this.canPurchase) return;
-    this.add.emit({ sku: this.selectedVariant?.sku ?? sku, quantity: this.quantity });
+    if (!this.canPurchase) return;
+    const selectedSku = this.selectedVariant?.sku ?? sku;
+    if (!this.access.canMutate) {
+      this.requestAccess.emit({ sku: selectedSku, quantity: this.quantity });
+      return;
+    }
+    this.add.emit({ sku: selectedSku, quantity: this.quantity });
+  }
+
+  selectVariant(id: string): void {
+    this.selectedVariantId = id;
+    this.quantity = 1;
+    this.reportRevision();
+  }
+
+  setQuantity(value: unknown): void {
+    this.quantity = Number(value);
+  }
+
+  commitQuantityRevision(): void { this.reportRevision(); }
+
+  private reportRevision(): void {
+    const variant = this.selectedVariant;
+    if (this.restoredSelection && variant) this.reviseIntent.emit({ sku: variant.sku, quantity: this.quantity });
+  }
+
+  private defaultVariantId(): string {
+    return this.product?.variants.find((variant) => variant.sku === this.product?.sku)?.id
+      ?? this.product?.variants[0]?.id ?? '';
   }
 }
