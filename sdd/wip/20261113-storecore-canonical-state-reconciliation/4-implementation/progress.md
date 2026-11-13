@@ -15,3 +15,11 @@ funcional local nuevo en Fase 1. Los módulos externos conservan sus gates.
 Se agregó la cabecera vigente a `STATUS` y `RELEASE`, se registró SCMR en el
 backlog y se preservaron todas las secciones históricas y bloqueos externos.
 El cambio es exclusivamente documental.
+
+## Reviews exact-head
+
+La primera ronda detectó un P3 de líneas vacías adicionales al EOF en los cinco
+archivos nuevos; se corrigió antes de congelar el head. GPT-6.1 Sol
+Consistencia/Producto y Seguridad/Arquitectura aprobaron de forma independiente
+base `376790d` y head `1d2b3a9` sin P0–P3. `git diff --check base..head` pasó y
+el árbol quedó limpio. PR, CI, merge y Verify post-merge siguen como gate.
