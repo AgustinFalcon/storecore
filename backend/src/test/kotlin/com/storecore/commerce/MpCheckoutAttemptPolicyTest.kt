@@ -168,7 +168,7 @@ class MpCheckoutAttemptPolicyTest {
             candidate().copy(merchantId = "other-merchant"),
             candidate().copy(applicationId = "other-app"),
             candidate().copy(amount = BigDecimal("100.01")),
-            candidate().copy(currency = "USD"),
+            candidate().copy(currency = PaymentCurrency.UNKNOWN),
         )
         for (mismatch in mismatches) {
             assertEquals(
@@ -176,6 +176,26 @@ class MpCheckoutAttemptPolicyTest {
                 MpCheckoutAttemptPolicy.evaluateSearch(search(listOf(mismatch))),
             )
         }
+    }
+
+    @Test
+    fun `search rejects every currency pair except ARS against ARS`() {
+        val rejectedPairs = listOf(
+            PaymentCurrency.ARS to PaymentCurrency.UNKNOWN,
+            PaymentCurrency.UNKNOWN to PaymentCurrency.ARS,
+            PaymentCurrency.UNKNOWN to PaymentCurrency.UNKNOWN,
+        )
+        rejectedPairs.forEach { (candidateCurrency, expectedCurrency) ->
+            val input = search(listOf(candidate().copy(currency = candidateCurrency))).copy(
+                expected = expected.copy(currency = expectedCurrency),
+            )
+            assertEquals(
+                SearchDecision.Recovery(RecoveryReason.CANDIDATE_MISMATCH),
+                MpCheckoutAttemptPolicy.evaluateSearch(input),
+                "$candidateCurrency/$expectedCurrency",
+            )
+        }
+        assertEquals(SearchDecision.Bind("ORD-1"), MpCheckoutAttemptPolicy.evaluateSearch(search(listOf(candidate()))))
     }
 
     @Test
@@ -198,10 +218,10 @@ class MpCheckoutAttemptPolicyTest {
 
     private val createdAt = Instant.parse("2026-09-22T12:00:00Z")
     private val queriedAt = createdAt.plusSeconds(60)
-    private val expected = ExpectedOrderIdentity("SC-$orderId-1", "merchant-1", "application-1", BigDecimal("100.00"), "ARS")
+    private val expected = ExpectedOrderIdentity("SC-$orderId-1", "merchant-1", "application-1", BigDecimal("100.00"), PaymentCurrency.ARS)
 
     private fun candidate() = RemoteOrderCandidate(
-        "ORD-1", expected.externalReference, expected.merchantId, expected.applicationId, BigDecimal("100.00"), "ARS",
+        "ORD-1", expected.externalReference, expected.merchantId, expected.applicationId, BigDecimal("100.00"), PaymentCurrency.ARS,
     )
 
     private fun search(

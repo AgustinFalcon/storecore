@@ -6,6 +6,7 @@ import com.storecore.commerce.application.port.output.OfficialOrderQueryPort
 import com.storecore.commerce.domain.CommercialEffect
 import com.storecore.commerce.domain.OrderStatus
 import com.storecore.commerce.domain.PaymentStatus
+import com.storecore.commerce.domain.PaymentCurrency
 import com.storecore.commerce.domain.CheckoutAttemptState
 import com.storecore.commerce.domain.ReservationStatus
 import com.storecore.commerce.domain.MpOrderCommercialPolicy
@@ -97,7 +98,7 @@ class MpOrderApplicationWorker(
                 AttemptRow(
                     rs.getLong("id"), rs.getLong("order_id"), rs.getLong("payment_id"),
                     rs.getString("external_reference"), rs.getBigDecimal("amount"),
-                    rs.getString("currency"), CheckoutAttemptState.fromWire(rs.getString("state")),
+                    PaymentCurrency.fromWire(rs.getString("currency")), CheckoutAttemptState.fromWire(rs.getString("state")),
                 )
             },
             official.providerOrderId,
@@ -110,7 +111,7 @@ class MpOrderApplicationWorker(
             official.merchantId != properties.expectedUserId ||
             official.applicationId != properties.expectedApplicationId ||
             official.totalAmount.compareTo(attempt.amount) != 0 ||
-            !official.currency.equals(attempt.currency, ignoreCase = true)
+            !official.currency.matchesVerified(attempt.currency)
         ) {
             quarantine(inboxId, "OFFICIAL_ORDER_MISMATCH")
             return false
@@ -176,9 +177,9 @@ class MpOrderApplicationWorker(
             jdbc.queryForObject(
                 """INSERT INTO mp_order_commercial_applications(
                      inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency
-                   ) VALUES (?,?,?,?,'PAYMENT_ACCREDITED',?,'ARS') RETURNING id""",
+                   ) VALUES (?,?,?,?,'PAYMENT_ACCREDITED',?,?) RETURNING id""",
                 Long::class.java,
-                inboxId, attempt.id, attempt.orderId, official.providerOrderId, official.paidAmount,
+                inboxId, attempt.id, attempt.orderId, official.providerOrderId, official.paidAmount, official.currency.name,
             )
         } catch (_: DataIntegrityViolationException) {
             recordDuplicate(attempt, official)
@@ -258,10 +259,10 @@ class MpOrderApplicationWorker(
         val applicationId = jdbc.query(
             """INSERT INTO mp_order_commercial_applications(
                  inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency
-               ) VALUES (?,?,?,?,?,?, 'ARS')
+               ) VALUES (?,?,?,?,?,?,?)
                ON CONFLICT (provider_order_id,transition) DO NOTHING RETURNING id""",
             { rs, _ -> rs.getLong(1) },
-            inboxId, attempt.id, attempt.orderId, official.providerOrderId, "PAYMENT_$paymentStatus", official.paidAmount,
+            inboxId, attempt.id, attempt.orderId, official.providerOrderId, "PAYMENT_$paymentStatus", official.paidAmount, official.currency.name,
         ).firstOrNull()
         if (applicationId != null) emitVerified(applicationId, official, "PAYMENT_$paymentStatus")
         markProcessed(inboxId)
@@ -361,7 +362,7 @@ class MpOrderApplicationWorker(
         val paymentId: Long,
         val externalReference: String,
         val amount: BigDecimal,
-        val currency: String,
+        val currency: PaymentCurrency,
         val state: CheckoutAttemptState,
     )
 

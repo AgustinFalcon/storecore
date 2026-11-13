@@ -101,7 +101,7 @@ object MpCheckoutAttemptPolicy {
             candidate.merchantId != expected.merchantId ||
             candidate.applicationId != expected.applicationId ||
             candidate.amount.compareTo(expected.amount) != 0 ||
-            !candidate.currency.equals(expected.currency, ignoreCase = true) ||
+            !candidate.currency.matchesVerified(expected.currency) ||
             candidate.providerOrderId.isBlank()
         ) return SearchDecision.Recovery(RecoveryReason.CANDIDATE_MISMATCH)
         return SearchDecision.Bind(candidate.providerOrderId)
@@ -188,7 +188,7 @@ data class ExpectedOrderIdentity(
     val merchantId: String,
     val applicationId: String,
     val amount: BigDecimal,
-    val currency: String,
+    val currency: PaymentCurrency,
 )
 data class RemoteOrderCandidate(
     val providerOrderId: String,
@@ -196,7 +196,7 @@ data class RemoteOrderCandidate(
     val merchantId: String,
     val applicationId: String,
     val amount: BigDecimal,
-    val currency: String,
+    val currency: PaymentCurrency,
 )
 data class SearchEvaluationInput(
     val attemptCreatedAt: Instant,

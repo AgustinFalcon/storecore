@@ -51,7 +51,7 @@ data class OfficialOrderResource(
     val applicationId: String,
     val totalAmount: BigDecimal,
     val paidAmount: BigDecimal,
-    val currency: String,
+    val currency: PaymentCurrency,
     val status: String,
     val statusDetail: String,
     val transactions: List<OfficialOrderTransaction> = emptyList(),

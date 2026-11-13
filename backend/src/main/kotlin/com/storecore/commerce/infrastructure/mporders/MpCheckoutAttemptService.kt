@@ -10,6 +10,7 @@ import com.storecore.commerce.domain.CheckoutAttemptSnapshot
 import com.storecore.commerce.domain.CheckoutAttemptState
 import com.storecore.commerce.domain.OrderStatus
 import com.storecore.commerce.domain.PaymentStatus
+import com.storecore.commerce.domain.PaymentCurrency
 import com.storecore.commerce.domain.CreationDecision
 import com.storecore.commerce.domain.ExpectedOrderIdentity
 import com.storecore.commerce.domain.MpCheckoutAttemptPolicy
@@ -151,7 +152,7 @@ class MpCheckoutAttemptService(
                 candidates = result.candidates,
                 expected = ExpectedOrderIdentity(
                     attempt.externalReference, properties.expectedUserId, properties.expectedApplicationId,
-                    attempt.amount, attempt.currency,
+                    attempt.amount, PaymentCurrency.fromWire(attempt.currency),
                 ),
             ),
         )

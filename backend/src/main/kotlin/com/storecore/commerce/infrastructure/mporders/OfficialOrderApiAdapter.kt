@@ -8,14 +8,12 @@ import com.storecore.commerce.application.port.output.OfficialOrderSearchQuery
 import com.storecore.commerce.application.port.output.OfficialOrderSearchResult
 import com.storecore.commerce.domain.CreationObservation
 import com.storecore.commerce.domain.OfficialOrderResource
-import com.storecore.commerce.domain.OfficialOrderTransaction
 import com.storecore.commerce.domain.RemoteOrderCandidate
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientResponseException
-import java.math.BigDecimal
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
@@ -32,7 +30,7 @@ class OfficialOrderApiAdapter(
             val node = client().get()
                 .uri("/v1/orders/{id}", providerOrderId)
                 .retrieve().body(JsonNode::class.java) ?: return null
-            toResource(node)
+            OfficialOrderWireMapper.toResource(node)
         }.getOrNull()
     }
 
@@ -84,7 +82,7 @@ class OfficialOrderApiAdapter(
                         page,
                     )
                     .retrieve().body(JsonNode::class.java) ?: break
-                node.path("results").forEach { item -> toCandidate(item)?.let(candidates::add) }
+                node.path("results").forEach { item -> OfficialOrderWireMapper.toCandidate(item)?.let(candidates::add) }
                 val totalPages = node.path("paging").path("total_pages").asInt(1)
                 exhausted = page >= totalPages
                 if (exhausted) break
@@ -102,47 +100,6 @@ class OfficialOrderApiAdapter(
             .baseUrl(properties.apiBaseUrl.trimEnd('/'))
             .defaultHeader("Authorization", "Bearer $token")
             .build()
-    }
-
-    private fun toResource(node: JsonNode): OfficialOrderResource {
-        val transactions = node.path("transactions").path("payments").mapNotNull { payment ->
-            val id = payment.path("id").asText()
-            if (id.isBlank()) null
-            else OfficialOrderTransaction(
-                providerPaymentId = id,
-                status = payment.path("status").asText(),
-                statusDetail = payment.path("status_detail").asText(null),
-                amount = payment.path("amount").decimalValue() ?: BigDecimal.ZERO,
-                paymentType = payment.path("payment_method").path("type").asText(null),
-            )
-        }
-        return OfficialOrderResource(
-            providerOrderId = node.path("id").asText(),
-            externalReference = node.path("external_reference").asText(),
-            merchantId = node.path("user_id").asText(),
-            applicationId = node.path("integration_data").path("application_id").asText(),
-            totalAmount = node.path("total_amount").decimalValue() ?: BigDecimal.ZERO,
-            paidAmount = node.path("paid_amount").decimalValue()
-                ?: node.path("total_paid_amount").decimalValue()
-                ?: BigDecimal.ZERO,
-            currency = node.path("currency").asText("ARS"),
-            status = node.path("status").asText(),
-            statusDetail = node.path("status_detail").asText(""),
-            transactions = transactions,
-        )
-    }
-
-    private fun toCandidate(node: JsonNode): RemoteOrderCandidate? {
-        val id = node.path("id").asText()
-        if (id.isBlank()) return null
-        return RemoteOrderCandidate(
-            providerOrderId = id,
-            externalReference = node.path("external_reference").asText(),
-            merchantId = node.path("user_id").asText(),
-            applicationId = node.path("integration_data").path("application_id").asText(),
-            amount = node.path("total_amount").decimalValue() ?: BigDecimal.ZERO,
-            currency = node.path("currency").asText("ARS"),
-        )
     }
 
     private fun errorCode(error: RestClientResponseException): String? =
