@@ -1,6 +1,24 @@
 # Estado canónico del SDD — StoreCore
 
-## Master vigente y cierre de gates posteriores a stock — 2026-11-11
+## Master vigente y cierre de recovery/Origin — 2026-11-13
+
+`master 376790ddc184091551832ff9b2d5b776747794b7` integra PR #244–#252. El
+tramo local posterior a `7300b8` agrega discovery honesto de Correo Argentino,
+creación real de producto e inventario, recovery CUSTOMER/USER con entrega
+verificada y el hardening de la frontera Origin unificada. PR #250 quedó en
+`5ba014f`, su cierre documental PR #251 en `99ac6b2` y PR #252 en `376790d`.
+
+Verify #654–#659 registran los gates de PR y post-merge; en particular PR #252
+pasó `43312967237` y `master 376790d` pasó `43313975226` con backend, frontend y
+`unified-access-real-e2e` verdes. La evidencia focal de PR #252 incluye 36 tests
+PostgreSQL 16/Testcontainers sin fallos y `git diff --check` limpio.
+
+Este bloque prevalece sobre cabeceras históricas que declaren `7300b8` o un SHA
+anterior como vigente. No acredita SMTP productivo, credenciales live,
+Mercado Pago real, ARCA, Correo Argentino, StoreCore↔BlackStore activo, deploy
+ni `release/1.0`; cada uno conserva su SDD y gate de homologación.
+
+## Histórico — cierre de gates posteriores a stock — 2026-11-11
 
 `master 7300b81674a2f7097825dbedbac4914f07278d20` integra PR #240, el
 follow-up PR #241 y el cierre documental RDI PR #243. El ajuste manual de stock conserva autoridad, idempotencia,
