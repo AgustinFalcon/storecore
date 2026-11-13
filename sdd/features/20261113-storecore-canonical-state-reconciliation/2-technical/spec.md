@@ -10,7 +10,7 @@
 
 ## Invariantes
 
-- El cambio es exclusivamente Markdown.
+- El cambio es exclusivamente documental: Markdown y manifiesto JSON de tareas.
 - Los estados de backlog existentes no se reinterpretan.
 - Un proveedor externo sólo puede pasar de blocked/deferred mediante su propio
   SDD, credenciales por referencia, aceptación y homologación.

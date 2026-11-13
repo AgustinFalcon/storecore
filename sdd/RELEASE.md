@@ -2,8 +2,10 @@
 
 ## Master vigente — 2026-11-13
 
-`master 376790d` contiene PR #244–#252. Verify post-merge #659
-(`43313975226`) quedó verde en backend, frontend y navegador real. Recovery
+`master 33fca34` contiene PR #244–#253. `376790d` es el último snapshot
+funcional y PR #253 agrega sólo reconciliación documental. Verify #660
+(`43355075159`) y post-merge #661 (`43355855948`) quedaron verdes en backend,
+frontend y navegador real. Recovery
 delivery permanece integrado con defaults sin credenciales y el hardening de
 Origin no altera los contratos publicados. Este estado no crea tag, deploy,
 publicación ni homologación; `release/1.0` sigue diferido a los gates externos.
