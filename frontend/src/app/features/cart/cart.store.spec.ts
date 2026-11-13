@@ -22,6 +22,7 @@ import { CartFailureKind, CartStore } from './cart.store';
 import { CartCurrency } from '../../domain/cart/cart-currency';
 import { CheckoutAttemptState } from '../../domain/cart/checkout-attempt-state';
 import { AddressReadState } from '../../domain/customer/address-read-state';
+import { CartLineMutationOutcome } from '../../domain/cart/cart-line-mutation-outcome';
 
 const actorA: CustomerProfile = { id: 'actor-a', email: 'a@example.test', firstName: 'A', lastName: 'A', phone: '' };
 const actorB: CustomerProfile = { ...actorA, id: 'actor-b', email: 'b@example.test' };
@@ -364,12 +365,30 @@ describe('CartStore actor isolation', () => {
     const key = store.snapshot.idempotencyKey;
     const pendingAdd = new Subject<Cart>();
     add.execute.mockReturnValue(pendingAdd);
-    store.add({ sku: 'sku', quantity: 2 });
+    const report = vi.fn();
+    store.add({ sku: 'sku', quantity: 2, report });
     store.load();
     pendingAdd.next({ ...cart, lines: [] });
     expect(store.snapshot.checkoutAttemptState).toBe(CheckoutAttemptState.Succeeded);
     expect(store.snapshot.idempotencyKey).toBe(key);
     expect(store.snapshot.receipt).toEqual(receipt);
     expect(store.snapshot.cart).toEqual(cart);
+    expect(report).toHaveBeenCalledExactlyOnceWith(CartLineMutationOutcome.Accepted);
+  });
+
+  it('reports accepted, rejected and ambiguous SET outcomes without retrying', () => {
+    const report = vi.fn();
+    store.add({ sku: 'sku', quantity: 2, report });
+    expect(report).toHaveBeenLastCalledWith(CartLineMutationOutcome.Accepted);
+    add.execute.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
+    store.add({ sku: 'sku', quantity: 2, report });
+    expect(report).toHaveBeenLastCalledWith(CartLineMutationOutcome.Rejected);
+    add.execute.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 0 })));
+    store.add({ sku: 'sku', quantity: 2, report });
+    expect(report).toHaveBeenLastCalledWith(CartLineMutationOutcome.OutcomeUnknown);
+    add.execute.mockReturnValue(throwError(() => new Error('mapper failed after HTTP success')));
+    store.add({ sku: 'sku', quantity: 2, report });
+    expect(report).toHaveBeenLastCalledWith(CartLineMutationOutcome.OutcomeUnknown);
+    expect(add.execute).toHaveBeenCalledTimes(4);
   });
 });

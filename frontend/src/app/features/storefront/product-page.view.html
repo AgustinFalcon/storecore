@@ -57,24 +57,36 @@
           }
         </ul>
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
-          <label>Variante<select name="variant" [ngModel]="selectedVariant?.id" (ngModelChange)="selectedVariantId = $event; quantity = 1">
+          <label>Variante<select name="variant" [ngModel]="selectedVariant?.id" (ngModelChange)="selectVariant($event)">
             @for (variant of product.variants; track variant.id) { <option [value]="variant.id">{{ variant.name }} · {{ variant.availability.label }}</option> }
           </select></label>
           @if (!product.variants.length) { <p role="status">Sin variantes disponibles.</p> }
           <label>Cantidad
             <span class="sc-stepper">
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
-              <input type="number" name="quantity" min="1" required [(ngModel)]="quantity" />
+              <input type="number" name="quantity" min="1" required [ngModel]="quantity" (ngModelChange)="setQuantity($event)" (change)="commitQuantityRevision()" />
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" [disabled]="!canIncrease" aria-label="Agregar una unidad">+</button>
             </span>
           </label>
+          @if (intentMessage) {
+            <div class="sc-notice" aria-live="polite" aria-atomic="true">
+              <p>{{ intentMessage }}</p>
+              @if (intentCanConfirm) {
+                <p>Actualmente tenés {{ currentCartQuantity }}. Al confirmar, el carrito quedará en {{ quantity }}.</p>
+              }
+              <button type="button" class="sc-btn sc-btn--ghost" [disabled]="intentBusy" (click)="cancelIntent.emit()">Cancelar recuperación</button>
+            </div>
+          }
           @if (access.canMutate) {
-            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPurchase">Agregar al carrito</button>
+            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPurchase || intentBusy">
+              {{ intentCanConfirm ? 'Confirmar cantidad final' : 'Agregar al carrito' }}
+            </button>
           } @else if (access.requiresSelection) {
             <p>{{ access.label }}</p>
-            <button type="button" class="sc-btn sc-btn--primary sc-btn--block" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>
+            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPurchase">Seleccionar contexto cliente</button>
           } @else {
-            <p>{{ access.label }} <a routerLink="/login">Entrar para agregar</a></p>
+            <p>{{ access.label }}</p>
+            <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPurchase">Entrar para agregar</button>
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>

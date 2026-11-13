@@ -26,7 +26,7 @@ describe('ProductPage closed cart controls', () => {
     expect(fixture.componentInstance.quantity).toBe(1);
     fixture.componentInstance.submit('A'); expect(add).toHaveBeenLastCalledWith({ sku: 'A', quantity: 1 });
     fixture.componentInstance.selectedVariantId = 'stale';
-    expect(fixture.componentInstance.selectedVariant?.sku).toBe('A');
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
   });
   it('resets product-local gallery and quantity state when the reused route changes SKU', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
@@ -49,20 +49,54 @@ describe('ProductPage closed cart controls', () => {
     fixture.componentRef.setInput('product', productFixture('sku'));
     fixture.componentRef.setInput('access', CustomerCartAccess.SelectCustomer);
     fixture.detectChanges();
-    const add = vi.fn(); const select = vi.fn();
+    const add = vi.fn(); const requestAccess = vi.fn();
     fixture.componentInstance.add.subscribe(add);
-    fixture.componentInstance.selectCustomer.subscribe(select);
+    fixture.componentInstance.requestAccess.subscribe(requestAccess);
     expect(fixture.nativeElement.textContent).toContain(CustomerCartAccess.SelectCustomer.label);
-    expect(fixture.nativeElement.querySelector('button[type=submit]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('button[type=submit]')).not.toBeNull();
     fixture.componentInstance.submit('sku');
     expect(add).not.toHaveBeenCalled();
-    const button = Array.from(fixture.nativeElement.querySelectorAll('button') as NodeListOf<HTMLButtonElement>).find((element) => element.textContent?.includes('Seleccionar contexto cliente'));
-    button?.click(); expect(select).toHaveBeenCalledTimes(1);
+    expect(requestAccess).toHaveBeenCalledWith({ sku: 'sku', quantity: 1 });
     fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(false);
     fixture.componentInstance.submit('sku');
     expect(add).toHaveBeenCalledWith({ sku: 'sku', quantity: 1 });
+  });
+
+  it('restores only the exact variant and reports explicit corrections', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
+    fixture.componentRef.setInput('product', { ...productFixture('A'), variants });
+    fixture.componentRef.setInput('restoredSelection', { variantSku: 'B', quantity: 2, revision: 1 });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant?.sku).toBe('B');
+    expect(fixture.componentInstance.quantity).toBe(2);
+    const revise = vi.fn(); fixture.componentInstance.reviseIntent.subscribe(revise);
+    fixture.componentInstance.selectVariant('A');
+    expect(revise).toHaveBeenCalledWith({ sku: 'A', quantity: 1 });
+    fixture.componentRef.setInput('restoredSelection', { variantSku: 'missing', quantity: 2, revision: 2 });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+  });
+
+  it('keeps focus while typing a multi-digit restored quantity and commits once', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    fixture.componentRef.setInput('product', productFixture('sku'));
+    fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
+    fixture.componentRef.setInput('restoredSelection', { variantSku: 'sku', quantity: 2, revision: 1 });
+    const revise = vi.fn(); fixture.componentInstance.reviseIntent.subscribe(revise);
+    fixture.detectChanges(); await fixture.whenStable();
+    const input = fixture.nativeElement.querySelector('input[name=quantity]') as HTMLInputElement;
+    input.focus(); input.value = '12'; input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(document.activeElement).toBe(input);
+    expect(fixture.componentInstance.quantity).toBe(12);
+    expect(revise).not.toHaveBeenCalled();
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(revise).toHaveBeenCalledExactlyOnceWith({ sku: 'sku', quantity: 12 });
   });
 
   it('preserves attribute order and blocks missing stock and quantities above saleable', async () => {

@@ -19,6 +19,7 @@ class DetailStore {
   readonly product$ = this.order$;
   readonly loading$ = of(false);
   readonly errorMessage$ = of('');
+  readonly viewState$ = of({ product: null, loading: false, errorMessage: '' });
   readonly load = vi.fn((id: string) => this.order$.next({ id }));
   readonly loadProduct = this.load;
 }
@@ -36,14 +37,17 @@ for (const entry of cases) {
       const store = new DetailStore();
       const key = entry.path.slice(entry.path.lastIndexOf(':') + 1);
       const params = new BehaviorSubject(convertToParamMap({ [key]: 'A' }));
+      const queryParams = new BehaviorSubject(convertToParamMap({}));
       TestBed.overrideComponent(entry.component, {
         set: { providers: [{ provide: entry.store, useValue: store }], template: '' },
       });
       await TestBed.configureTestingModule({
         imports: [entry.component],
         providers: [
-          { provide: ActivatedRoute, useValue: { paramMap: params.asObservable() } },
-          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
+          provideRouter([]),
+          { provide: ActivatedRoute, useValue: { paramMap: params.asObservable(), queryParamMap: queryParams.asObservable() } },
+          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
+            cart$: of({ lines: [] }), loading$: of(false), viewState$: of({ cart: { lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { lines: [] } } } },
           { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
@@ -66,7 +70,8 @@ for (const entry of cases) {
       await TestBed.configureTestingModule({
         providers: [
           provideRouter([{ path: entry.path, component: entry.component }]),
-          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn } },
+          { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
+            cart$: of({ lines: [] }), loading$: of(false), viewState$: of({ cart: { lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { lines: [] } } } },
           { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();

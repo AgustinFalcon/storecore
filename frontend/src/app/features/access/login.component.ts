@@ -12,15 +12,17 @@ import { LoginViewComponent } from './login.view';
   providers: [LoginStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `@if (store.state$ | async; as state) {
-    <sc-login-view [state]="state" [destination]="destination" (emailChange)="store.setEmail($event)" (passwordChange)="store.setPassword($event)" (submitCredentials)="store.submit()" (selectContext)="store.submit($event)" />
+    <sc-login-view [state]="state" [destination]="destination" [resume]="resume" (emailChange)="store.setEmail($event)" (passwordChange)="store.setPassword($event)" (submitCredentials)="store.submit()" (selectContext)="store.submit($event)" />
   }`,
 })
 export class LoginComponent implements OnInit {
   destination = ReturnDestination.Home;
+  resume: string | null = null;
   constructor(readonly store: LoginStore, private readonly route: ActivatedRoute) {}
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
     this.destination = ReturnDestination.fromWire(params.get('returnTo'));
+    this.resume = this.store.setResumeReference(params.get('resume'));
     this.store.setRecoveryIntent(AuthenticateRecoveredRealm.fromWire(params.get('recoveredRealm')));
     this.store.initialize(this.destination);
   }

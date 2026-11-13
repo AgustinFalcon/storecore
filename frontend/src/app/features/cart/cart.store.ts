@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { computed, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
@@ -15,6 +16,7 @@ import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.u
 import { ApiErrorCode } from '../../core/api/api-error-code';
 import { environment } from '../../../environments/environment';
 import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { CartLineMutationOutcome, SetCartLineCommand } from '../../domain/cart/cart-line-mutation-outcome';
 import { CartCurrency } from '../../domain/cart/cart-currency';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.usecase';
@@ -93,6 +95,7 @@ export class CartStore extends ComponentStore<CartState> {
   readonly receipt$ = this.select((s) => s.receipt);
   readonly empty$ = this.select((s) => !s.loading && s.cart.lines.length === 0);
   readonly canPay$ = this.select((s) => s.checkoutAttemptState === CheckoutAttemptState.Idle && s.failureKind === CartFailureKind.None && !s.loading && s.cart.lines.length > 0 && s.addressReadState === AddressReadState.Ready && s.addresses.some((address) => address.id === s.addressId) && s.cart.currency.canCheckout);
+  readonly viewState$ = this.select((s) => s);
 
   readonly setAddressId = this.updater((s, addressId: string) => {
     if (s.checkoutAttemptState.inFlight) return s;
@@ -153,10 +156,10 @@ export class CartStore extends ComponentStore<CartState> {
     ),
   );
 
-  readonly add = this.effect<{ sku: string; quantity: number }>((line$) =>
+  readonly add = this.effect<SetCartLineCommand>((line$) =>
     line$.pipe(
       filter(() => this.actor !== null && !this.snapshot.checkoutAttemptState.inFlight),
-      map((line) => ({ line, request: this.beginCartRequest(false) })),
+      map((line) => ({ line, actor: this.actor, request: this.beginCartRequest(false) })),
       tap(() => this.patchState({
         loading: true,
         errorMessage: '',
@@ -164,15 +167,22 @@ export class CartStore extends ComponentStore<CartState> {
           ? CartFailureKind.CurrencyUnavailable
           : CartFailureKind.None,
       })),
-      switchMap(({ line, request }) =>
+      switchMap(({ line, actor, request }) =>
         this.addLine.execute(line.sku, line.quantity).pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
             next: (cart) => {
               const accepted = this.acceptCartResponse(request, cart);
-              if (accepted && !this.snapshot.checkoutAttemptState.inFlight) this.patchState(this.newCheckoutAttempt());
+              if (actor === this.actor) {
+                line.report?.(CartLineMutationOutcome.Accepted);
+                if (accepted && !this.snapshot.checkoutAttemptState.inFlight) this.patchState(this.newCheckoutAttempt());
+              }
             },
-            error: (err: unknown) => this.acceptCartError(request.generation, err),
+            error: (err: unknown) => {
+              this.acceptCartError(request.generation, err);
+              if (actor === this.actor) line.report?.(err instanceof HttpErrorResponse && err.status >= 400 && err.status < 500
+                ? CartLineMutationOutcome.Rejected : CartLineMutationOutcome.OutcomeUnknown);
+            },
           }),
         ),
       ),

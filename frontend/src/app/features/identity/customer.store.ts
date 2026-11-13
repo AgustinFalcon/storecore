@@ -7,6 +7,8 @@ import { AddressReadState } from '../../domain/customer/address-read-state';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { ContinueCustomerPurchaseIntentPolicy } from '../../core/auth/continue-customer-purchase-intent.policy';
+import { AccessContext } from '../../domain/access/access-context';
 import { ReturnDestination } from '../../domain/access/return-destination';
 import { ContextAuthorityInspection } from '../../domain/access/session-probe';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
@@ -75,6 +77,8 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   private readonly inspectRegistration: InspectRegisteredCustomerStep;
   private readonly completeRegistration = new CompleteCustomerRegistrationStep();
   private returnDestination = ReturnDestination.Unknown;
+  private resume: string | null = null;
+  setResumeReference(raw: unknown): string | null { return this.resume = this.continuation.reference(raw); }
   constructor(
     private readonly register: RegisterCustomerUseCase,
     private readonly signIn: SignInCustomerUseCase,
@@ -87,6 +91,7 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly session: CustomerSession,
     access: AccessCoordinator,
     private readonly router: Router,
+    private readonly continuation: ContinueCustomerPurchaseIntentPolicy,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
     this.reconcileRegistration = new ReconcileRegisteredCustomerStep(access);
@@ -117,10 +122,13 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   private inspectExistingRegistration() {
     this.patchState({ loading: true, errorMessage: '', registrationStage: CustomerRegistrationStage.Inspecting });
     return this.inspectRegistration.execute().pipe(tapResponse({
-      next: (inspection) => this.patchState({ loading: false, registrationStage: inspection === ContextAuthorityInspection.Accepted
+      next: (inspection) => {
+        this.patchState({ loading: false, registrationStage: inspection === ContextAuthorityInspection.Accepted
         ? CustomerRegistrationStage.Complete : inspection === ContextAuthorityInspection.Absent
           ? CustomerRegistrationStage.Capture : CustomerRegistrationStage.InspectionRequired,
-        errorMessage: inspection === ContextAuthorityInspection.Unavailable ? 'No pudimos comprobar la sesión actual. Reintentá antes de crear otra cuenta.' : '' }),
+        errorMessage: inspection === ContextAuthorityInspection.Unavailable ? 'No pudimos comprobar la sesión actual. Reintentá antes de crear otra cuenta.' : '' });
+        if (inspection === ContextAuthorityInspection.Accepted && this.resume) this.navigateAfterRegistration();
+      },
       error: () => this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.InspectionRequired,
         errorMessage: 'No pudimos comprobar la sesión actual. Reintentá antes de crear otra cuenta.' }),
     }));
@@ -174,12 +182,17 @@ export class CustomerStore extends ComponentStore<CustomerState> {
             return;
           }
           this.patchState({ loading: false, authenticated: this.session.authenticated(), registrationStage: CustomerRegistrationStage.Complete });
-          void this.router.navigateByUrl(this.completeRegistration.route(this.returnDestination));
+          this.navigateAfterRegistration();
         },
         error: () => this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.ReconcileRequired,
           errorMessage: 'La cuenta fue creada, pero no pudimos confirmar la sesión. Reintentá sin volver a registrarte.' }),
       }),
     );
+  }
+
+  private navigateAfterRegistration(): void {
+    const route = this.completeRegistration.route(this.returnDestination);
+    void this.router.navigateByUrl(this.continuation.route(AccessContext.Customer, this.returnDestination, route, this.resume));
   }
 
   /* Legacy sign-in remains separate from unified access while callers migrate. */

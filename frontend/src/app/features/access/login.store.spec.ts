@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { PurchaseIntentCoordinator } from '../../core/purchase-intent/purchase-intent-coordinator';
 import { ACCESS_REPOSITORY } from '../../core/tokens/access.tokens';
 import { AccessContext } from '../../domain/access/access-context';
 import { AccessHome } from '../../domain/access/access-home';
@@ -26,16 +27,63 @@ describe('LoginStore', () => {
   let repository: { signIn: ReturnType<typeof vi.fn>; selectContext: ReturnType<typeof vi.fn> };
   let coordinator: { rehydrate: ReturnType<typeof vi.fn>; supersedeProbes: ReturnType<typeof vi.fn>; acceptAuthenticated: ReturnType<typeof vi.fn>; selectContext: ReturnType<typeof vi.fn> };
   let router: { navigateByUrl: ReturnType<typeof vi.fn> };
+  let intents: { validatedResumeReference: ReturnType<typeof vi.fn>; continuationForCustomer: ReturnType<typeof vi.fn> };
   beforeEach(() => {
     response = new Subject<LoginResult>();
     repository = { signIn: vi.fn(() => response), selectContext: vi.fn(() => response) };
     coordinator = { rehydrate: vi.fn(() => of(AccessState.Anonymous)), supersedeProbes: vi.fn(), acceptAuthenticated: vi.fn(() => of(selectedCustomer)), selectContext: vi.fn((context: AccessContext) => dualSessions.select(context)) };
     router = { navigateByUrl: vi.fn() };
-    TestBed.configureTestingModule({ providers: [LoginStore, { provide: ACCESS_REPOSITORY, useValue: repository }, { provide: AccessCoordinator, useValue: coordinator }, { provide: Router, useValue: router }] });
+    intents = { validatedResumeReference: vi.fn((raw: unknown) => raw === 'opaque-flow' ? raw : null), continuationForCustomer: vi.fn((raw: unknown) => raw === 'opaque-flow' ? { productSku: 'product-2', flowId: raw } : null) };
+    TestBed.configureTestingModule({ providers: [LoginStore, { provide: PurchaseIntentCoordinator, useValue: intents }, { provide: ACCESS_REPOSITORY, useValue: repository }, { provide: AccessCoordinator, useValue: coordinator }, { provide: Router, useValue: router }] });
     store = TestBed.inject(LoginStore);
     store.initialize(ReturnDestination.Home);
   });
   function submit(): void { store.setEmail('buyer@example.test'); store.setPassword('password-long-enough'); store.submit(); }
+
+  it('resumes accepted CUSTOMER rehydration and local selection through the common policy', () => {
+    store.setResumeReference('opaque-flow');
+    coordinator.rehydrate.mockReturnValue(of(selectedCustomer));
+    store.initialize(ReturnDestination.Catalog);
+    expect(router.navigateByUrl).toHaveBeenLastCalledWith('/catalog/product-2?resume=opaque-flow');
+    router.navigateByUrl.mockClear();
+    coordinator.rehydrate.mockReturnValue(of(dualSessions));
+    store.initialize(ReturnDestination.Catalog);
+    store.submit(AccessContext.Customer);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/catalog/product-2?resume=opaque-flow');
+  });
+
+  it('resumes direct login only after CUSTOMER acceptance', () => {
+    store.setResumeReference('opaque-flow');
+    submit();
+    response.next(LoginResult.authenticated(AccessContext.Customer, AccessHome.Storefront, ReturnDestination.Catalog)); response.complete();
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/catalog/product-2?resume=opaque-flow');
+  });
+
+  it('resumes dual challenge CUSTOMER while preserving USER and closed cart destinations', () => {
+    store.setResumeReference('opaque-flow');
+    submit(); response.next(challenge()); response.complete();
+    response = new Subject<LoginResult>(); repository.selectContext.mockReturnValue(response);
+    store.submit(AccessContext.Customer);
+    response.next(LoginResult.authenticated(AccessContext.Customer, AccessHome.Storefront, ReturnDestination.Home)); response.complete();
+    expect(router.navigateByUrl).toHaveBeenLastCalledWith('/catalog/product-2?resume=opaque-flow');
+    coordinator.rehydrate.mockReturnValue(of(dualSessions));
+    store.initialize(ReturnDestination.Catalog); store.submit(AccessContext.User);
+    expect(router.navigateByUrl).toHaveBeenLastCalledWith('/catalog');
+    coordinator.rehydrate.mockReturnValue(of(selectedCustomer));
+    for (const destination of [ReturnDestination.Cart, ReturnDestination.Checkout]) {
+      store.initialize(destination);
+      expect(router.navigateByUrl).toHaveBeenLastCalledWith(destination.routeFor(AccessContext.Customer));
+    }
+  });
+
+  it('ordinary login and invalid references never revive stored purchase intent', () => {
+    coordinator.rehydrate.mockReturnValue(of(selectedCustomer));
+    for (const raw of [null, '', '%2F', 'x'.repeat(1000)]) {
+      expect(store.setResumeReference(raw)).toBeNull();
+      store.initialize(ReturnDestination.Home);
+      expect(router.navigateByUrl).toHaveBeenLastCalledWith('/');
+    }
+  });
 
   it('exhausts duplicate submissions and clears the captured password before awaiting the response', () => {
     submit(); store.submit();

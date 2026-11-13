@@ -17,6 +17,7 @@ import { CustomerStore } from './customer.store';
       <sc-customer-register-view
         [state]="state"
         [loginDestination]="destination"
+        [resume]="resume"
         [authenticatedRoute]="authenticatedRoute"
         (firstNameChange)="store.setFirstName($event)"
         (lastNameChange)="store.setLastName($event)"
@@ -30,6 +31,7 @@ import { CustomerStore } from './customer.store';
 export class CustomerRegisterComponent implements OnInit {
   private readonly captureDestination = new CaptureReturnDestinationStep();
   destination = ReturnDestination.Unknown;
+  resume: string | null = null;
   authenticatedRoute = '/customer/profile';
   constructor(
     readonly store: CustomerStore,
@@ -37,6 +39,7 @@ export class CustomerRegisterComponent implements OnInit {
   ) {}
   ngOnInit(): void {
     this.destination = this.captureDestination.capture(this.route.snapshot.queryParamMap.get('returnTo'));
+    this.resume = this.store.setResumeReference(this.route.snapshot.queryParamMap.get('resume'));
     this.authenticatedRoute = this.destination.routeFor(AccessContext.Customer) ?? '/customer/profile';
     this.store.setReturnDestination(this.destination);
     this.store.initializeRegistration();
