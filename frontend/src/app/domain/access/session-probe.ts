@@ -10,6 +10,13 @@ export class ProbeOutcome {
   static readonly Unknown = new ProbeOutcome();
 }
 
+export class ContextAuthorityInspection {
+  private constructor() {}
+  static readonly Accepted = new ContextAuthorityInspection();
+  static readonly Absent = new ContextAuthorityInspection();
+  static readonly Unavailable = new ContextAuthorityInspection();
+}
+
 export class SessionProbe {
   private constructor(readonly outcome: ProbeOutcome, readonly principal: CustomerProfile | UserSessionResult | null, readonly csrf: string) {}
   static authenticated(principal: CustomerProfile | UserSessionResult, csrf: string): SessionProbe {

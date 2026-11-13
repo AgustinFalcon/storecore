@@ -12,8 +12,12 @@ describe('customerGuard', () => {
     TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: AccessCoordinator, useValue: { navigationState: () => of(access) } }] });
     return firstValueFrom(TestBed.runInInjectionContext(() => customerGuard({} as never, { url } as never)) as Observable<unknown>);
   }
-  it('redirects to unified login with a closed return destination', async () => {
-    expect(String(await run(AccessState.Anonymous, '/customer/orders'))).toBe('/login?returnTo=' + ReturnDestination.CustomerOrders.wire);
+  it.each([
+    ['/customer/orders', ReturnDestination.CustomerOrders],
+    ['/cart', ReturnDestination.Cart],
+    ['/checkout', ReturnDestination.Checkout],
+  ] as const)('redirects %s to unified login with a closed return destination', async (path, destination) => {
+    expect(String(await run(AccessState.Anonymous, path))).toBe('/login?returnTo=' + destination.wire);
   });
   it('does not replay arbitrary protected URLs', async () => {
     expect(String(await run(AccessState.Indeterminate, '/customer/details/secret?context=USER'))).toBe('/login?returnTo=' + ReturnDestination.Home.wire);

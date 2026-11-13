@@ -326,6 +326,22 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    fun unifiedLoginPreservesClosedCommerceDestinationsForCustomerOnly() {
+        val email = "unified-commerce-${System.nanoTime()}@example.com"
+        exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Commerce","lastName":"Customer"}""")
+
+        listOf("/cart" to "CART", "/checkout" to "CHECKOUT").forEach { (path, wire) ->
+            val response = exchange(
+                "/api/v1/auth/login",
+                HttpMethod.POST,
+                """{"email":"$email","password":"a-very-long-password","returnPath":"$path"}""",
+            )
+            assertEquals(200, response.statusCode.value(), response.body)
+            assertEquals(true, response.body!!.contains(wire), response.body)
+        }
+    }
+
+    @Test
     fun unifiedLoginRequiresOneUseContextSelectionForDualRealmCredentials() {
         val email = "unified-dual-${System.nanoTime()}@example.com"
         exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Dual","lastName":"Customer"}""")

@@ -13,6 +13,8 @@ import { SaveCustomerProfileUseCase } from '../../domain/customer/use-cases/save
 import { SignInCustomerUseCase } from '../../domain/customer/use-cases/sign-in-customer.usecase';
 import { SignOutCustomerUseCase } from '../../domain/customer/use-cases/sign-out-customer.usecase';
 import { CustomerStore } from './customer.store';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { AccessState } from '../../domain/access/session-probe';
 
 const address: CustomerAddress = { id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
 
@@ -23,6 +25,7 @@ function setup() {
   TestBed.configureTestingModule({ providers: [CustomerStore, provideRouter([]),
     { provide: ListCustomerAddressesUseCase, useValue: list }, { provide: SaveCustomerAddressUseCase, useValue: save },
     { provide: DeleteCustomerAddressUseCase, useValue: remove },
+    { provide: AccessCoordinator, useValue: { reconcileRegisteredCustomer: () => of(AccessState.Indeterminate) } },
     ...[GetCustomerProfileUseCase, RegisterCustomerUseCase, SaveCustomerProfileUseCase, SignInCustomerUseCase, SignOutCustomerUseCase].map(provide => ({ provide, useValue: {} })),
   ] });
   const session = TestBed.inject(CustomerSession);

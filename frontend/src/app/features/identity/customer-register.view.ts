@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { CustomerState } from './customer.store';
+import { ReturnDestination } from '../../domain/access/return-destination';
+import { CustomerRegistrationStage } from './customer-registration-steps';
 
 @Component({
   selector: 'sc-customer-register-view',
@@ -11,8 +13,10 @@ import { CustomerState } from './customer.store';
   templateUrl: './customer-register.view.html',
 })
 export class CustomerRegisterViewComponent {
+  protected readonly stages = CustomerRegistrationStage;
   @Input({ required: true }) state!: CustomerState;
-  @Input() authenticated = false;
+  @Input() loginDestination = ReturnDestination.Unknown;
+  @Input() authenticatedRoute = '/customer/profile';
   @Output() readonly firstNameChange = new EventEmitter<string>();
   @Output() readonly lastNameChange = new EventEmitter<string>();
   @Output() readonly emailChange = new EventEmitter<string>();

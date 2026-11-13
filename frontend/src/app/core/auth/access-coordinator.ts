@@ -1,9 +1,9 @@
 import { HttpBackend, HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
-import { BehaviorSubject, catchError, defer, finalize, forkJoin, map, Observable, of, ReplaySubject, share, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
+import { BehaviorSubject, catchError, defaultIfEmpty, defer, finalize, forkJoin, map, Observable, of, ReplaySubject, share, shareReplay, Subject, switchMap, takeUntil, tap, timeout } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
-import { AccessState, AccessStateKind, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
+import { AccessState, AccessStateKind, ContextAuthorityInspection, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
 import { CustomerProfile } from '../../domain/customer/customer.entity';
 import { UserRole } from '../../domain/user/user-role';
 import { UserSessionResult } from '../../domain/user/user.entity';
@@ -134,6 +134,52 @@ export class AccessCoordinator {
       if (result.outcome === ProbeOutcome.Authenticated) this.hint.write(context);
       return this.publish();
     }));
+  }
+
+  /** A legacy CUSTOMER registration becomes authority only after fresh realm and CSRF probes. */
+  reconcileRegisteredCustomer(): Observable<AccessState> {
+    this.supersedeProbes(AccessContext.Customer);
+    this.accepted.set(AccessState.Indeterminate);
+    this.stateChanges.next(AccessState.Indeterminate);
+    return this.rehydrate().pipe(map((state) => state.permits(AccessContext.Customer)
+      ? this.selectContext(AccessContext.Customer) : state));
+  }
+
+  /** Distinguishes verified absence from an unavailable CUSTOMER authority probe. */
+  inspectCustomerAccess(): Observable<ContextAuthorityInspection> {
+    if (this.pendingRevocations.has(AccessContext.Customer)
+      || !this.mutationFence.permitsAuthentication(AccessContext.Customer)) {
+      return of(ContextAuthorityInspection.Unavailable);
+    }
+    if (this.state().permits(AccessContext.Customer)) {
+      this.selectContext(AccessContext.Customer);
+      return of(ContextAuthorityInspection.Accepted);
+    }
+    this.supersedeProbes(AccessContext.Customer);
+    const generation = this.generation;
+    const revision = this.revision(AccessContext.Customer);
+    const fenceGeneration = this.mutationFence.snapshot(AccessContext.Customer);
+    return this.probe(AccessContext.Customer).pipe(map((result) => {
+      if (generation !== this.generation || revision !== this.revision(AccessContext.Customer)
+        || !this.mutationFence.permitsAuthentication(AccessContext.Customer)
+        || !this.mutationFence.accepts(AccessContext.Customer, fenceGeneration)) {
+        return ContextAuthorityInspection.Unavailable;
+      }
+      if (result.outcome === ProbeOutcome.Authenticated) {
+        this.apply(AccessContext.Customer, result);
+        this.customerProbe = result;
+        this.publish();
+        this.selectContext(AccessContext.Customer);
+        return ContextAuthorityInspection.Accepted;
+      }
+      if (result.outcome === ProbeOutcome.Anonymous) {
+        this.apply(AccessContext.Customer, result);
+        this.customerProbe = result;
+        this.publish();
+        return ContextAuthorityInspection.Absent;
+      }
+      return ContextAuthorityInspection.Unavailable;
+    }), defaultIfEmpty(ContextAuthorityInspection.Unavailable));
   }
 
   /** Choosing between already accepted sessions is local; no challenge POST. */

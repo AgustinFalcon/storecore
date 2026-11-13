@@ -4,6 +4,8 @@ export class ReturnDestination {
   private constructor(readonly wire: string, private readonly path: string | null, private readonly context: AccessContext | null) {}
   static readonly Home = new ReturnDestination('HOME', null, null);
   static readonly Catalog = new ReturnDestination('CATALOG', '/catalog', null);
+  static readonly Cart = new ReturnDestination('CART', '/cart', AccessContext.Customer);
+  static readonly Checkout = new ReturnDestination('CHECKOUT', '/checkout', AccessContext.Customer);
   static readonly CustomerProfile = new ReturnDestination('CUSTOMER_PROFILE', '/customer/profile', AccessContext.Customer);
   static readonly CustomerOrders = new ReturnDestination('CUSTOMER_ORDERS', '/customer/orders', AccessContext.Customer);
   static readonly UserOrders = new ReturnDestination('USER_ORDERS', '/user/orders', AccessContext.User);
@@ -20,11 +22,13 @@ export class ReturnDestination {
     return this.path ?? AccessHome.forContext(context).route;
   }
 }
-const KNOWN = [ReturnDestination.Home, ReturnDestination.Catalog, ReturnDestination.CustomerProfile, ReturnDestination.CustomerOrders, ReturnDestination.UserOrders, ReturnDestination.UserAccount];
+const KNOWN = [ReturnDestination.Home, ReturnDestination.Catalog, ReturnDestination.Cart, ReturnDestination.Checkout,
+  ReturnDestination.CustomerProfile, ReturnDestination.CustomerOrders, ReturnDestination.UserOrders, ReturnDestination.UserAccount];
 const DESTINATIONS = new Map<unknown, ReturnDestination>(KNOWN.map((destination) => [destination.wire, destination]));
 const PATHS = new Map<unknown, ReturnDestination>([
   ['/', ReturnDestination.Home], ['/user', ReturnDestination.Home], ['/user/home', ReturnDestination.Home],
-  ['/catalog', ReturnDestination.Catalog], ['/customer/profile', ReturnDestination.CustomerProfile],
+  ['/catalog', ReturnDestination.Catalog], ['/cart', ReturnDestination.Cart], ['/checkout', ReturnDestination.Checkout],
+  ['/customer/profile', ReturnDestination.CustomerProfile],
   ['/customer/orders', ReturnDestination.CustomerOrders], ['/user/orders', ReturnDestination.UserOrders],
   ['/user/account', ReturnDestination.UserAccount],
 ]);

@@ -9,7 +9,7 @@
     @if (access.requiresSelection) {
       <button type="button" class="sc-btn sc-btn--primary" (click)="selectCustomer.emit()">Seleccionar contexto cliente</button>
     } @else {
-      <a routerLink="/login">Entrar como cliente</a>
+      <a routerLink="/login" [queryParams]="{ returnTo: loginDestination.wire }">Entrar como cliente</a>
     }
   }
   <sc-feature-status [loading]="state.loading" [error]="readError" (retry)="readRetry.emit()" />

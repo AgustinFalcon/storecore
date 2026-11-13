@@ -7,6 +7,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { AddressReadState } from '../../domain/customer/address-read-state';
 import { AddressReturnTarget } from '../../domain/customer/address-return-target';
 import { CheckoutAttemptState } from '../../domain/cart/checkout-attempt-state';
+import { ReturnDestination } from '../../domain/access/return-destination';
 
 @Component({
   selector: 'sc-checkout-page-view',
@@ -19,6 +20,7 @@ export class CheckoutPageViewComponent {
   protected readonly AddressState = AddressReadState;
   protected readonly AttemptState = CheckoutAttemptState;
   protected readonly checkoutReturn = AddressReturnTarget.Checkout;
+  protected readonly loginDestination = ReturnDestination.Checkout;
   @Input({ required: true }) state!: CartState;
   @Input() access = CustomerCartAccess.Unknown;
   @Output() readonly selectCustomer = new EventEmitter<void>();

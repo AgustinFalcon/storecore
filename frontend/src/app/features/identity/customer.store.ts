@@ -2,10 +2,13 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, Subject, switchMap, takeUntil, tap } from 'rxjs';
+import { exhaustMap, filter, Subject, switchMap, takeUntil, tap } from 'rxjs';
 import { AddressReadState } from '../../domain/customer/address-read-state';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
+import { AccessCoordinator } from '../../core/auth/access-coordinator';
+import { ReturnDestination } from '../../domain/access/return-destination';
+import { ContextAuthorityInspection } from '../../domain/access/session-probe';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
 import { DeleteCustomerAddressUseCase } from '../../domain/customer/use-cases/delete-customer-address.usecase';
 import { GetCustomerProfileUseCase } from '../../domain/customer/use-cases/get-customer-profile.usecase';
@@ -15,6 +18,7 @@ import { SaveCustomerAddressUseCase } from '../../domain/customer/use-cases/save
 import { SaveCustomerProfileUseCase } from '../../domain/customer/use-cases/save-customer-profile.usecase';
 import { SignInCustomerUseCase } from '../../domain/customer/use-cases/sign-in-customer.usecase';
 import { SignOutCustomerUseCase } from '../../domain/customer/use-cases/sign-out-customer.usecase';
+import { CompleteCustomerRegistrationStep, CustomerRegistrationStage, InspectRegisteredCustomerStep, ReconcileRegisteredCustomerStep } from './customer-registration-steps';
 
 export interface CustomerState {
   readonly loading: boolean;
@@ -31,6 +35,7 @@ export interface CustomerState {
   readonly addressDraft: CustomerAddress;
   readonly addressReadState: AddressReadState;
   readonly addressMutationPending: boolean;
+  readonly registrationStage: CustomerRegistrationStage;
 }
 
 const emptyProfile: CustomerProfile = { email: '', firstName: '', lastName: '', phone: '' };
@@ -59,12 +64,17 @@ const INITIAL: CustomerState = {
   addressDraft: emptyAddress,
   addressReadState: AddressReadState.Idle,
   addressMutationPending: false,
+  registrationStage: CustomerRegistrationStage.Capture,
 };
 
 @Injectable()
 export class CustomerStore extends ComponentStore<CustomerState> {
   private addressGeneration = 0;
   private readonly addressCanceled = new Subject<void>();
+  private readonly reconcileRegistration: ReconcileRegisteredCustomerStep;
+  private readonly inspectRegistration: InspectRegisteredCustomerStep;
+  private readonly completeRegistration = new CompleteCustomerRegistrationStep();
+  private returnDestination = ReturnDestination.Unknown;
   constructor(
     private readonly register: RegisterCustomerUseCase,
     private readonly signIn: SignInCustomerUseCase,
@@ -75,9 +85,12 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly saveAddress: SaveCustomerAddressUseCase,
     private readonly deleteAddress: DeleteCustomerAddressUseCase,
     private readonly session: CustomerSession,
+    access: AccessCoordinator,
     private readonly router: Router,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
+    this.reconcileRegistration = new ReconcileRegisteredCustomerStep(access);
+    this.inspectRegistration = new InspectRegisteredCustomerStep(access);
     this.effect<string | null>((actors$) => actors$.pipe(tap(() => {
       this.invalidateAddresses();
       this.patchState({ addresses: [], addressDraft: emptyAddress, addressReadState: AddressReadState.Idle,
@@ -99,41 +112,77 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   readonly setFirstName = this.updater((s, firstName: string) => ({ ...s, firstName }));
   readonly setLastName = this.updater((s, lastName: string) => ({ ...s, lastName }));
   readonly setPassword = this.updater((s, password: string) => ({ ...s, password }));
+  setReturnDestination(destination: ReturnDestination): void { this.returnDestination = destination; }
+  readonly initializeRegistration = this.effect<void>((trigger$) => trigger$.pipe(exhaustMap(() => this.inspectExistingRegistration())));
+  private inspectExistingRegistration() {
+    this.patchState({ loading: true, errorMessage: '', registrationStage: CustomerRegistrationStage.Inspecting });
+    return this.inspectRegistration.execute().pipe(tapResponse({
+      next: (inspection) => this.patchState({ loading: false, registrationStage: inspection === ContextAuthorityInspection.Accepted
+        ? CustomerRegistrationStage.Complete : inspection === ContextAuthorityInspection.Absent
+          ? CustomerRegistrationStage.Capture : CustomerRegistrationStage.InspectionRequired,
+        errorMessage: inspection === ContextAuthorityInspection.Unavailable ? 'No pudimos comprobar la sesión actual. Reintentá antes de crear otra cuenta.' : '' }),
+      error: () => this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.InspectionRequired,
+        errorMessage: 'No pudimos comprobar la sesión actual. Reintentá antes de crear otra cuenta.' }),
+    }));
+  }
   readonly setProfile = this.updater((s, profile: CustomerProfile) => ({ ...s, profile, saved: false }));
   readonly setAddressDraft = this.updater((s, addressDraft: CustomerAddress) => ({ ...s, addressDraft }));
   readonly clearAddressDraft = this.updater((s) => ({ ...s, addressDraft: emptyAddress }));
 
   readonly submitRegister = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => {
-        if (!this.snapshot.email || !this.snapshot.password || !this.snapshot.firstName || !this.snapshot.lastName) {
-          this.patchState({ loading: false, errorMessage: 'Nombre, apellido, email y contraseña son obligatorios.' });
-          return;
-        }
-        this.patchState({ loading: true, errorMessage: '' });
+      exhaustMap(() => {
+        if (this.snapshot.registrationStage === CustomerRegistrationStage.InspectionRequired) return this.inspectExistingRegistration();
+        if (this.snapshot.registrationStage === CustomerRegistrationStage.ReconcileRequired) return this.finishRegistration();
+        return this.createRegistration();
       }),
-      filter(() => Boolean(this.snapshot.email && this.snapshot.password && this.snapshot.firstName && this.snapshot.lastName)),
-      switchMap(() =>
-        this.register
-          .execute({
-            email: this.snapshot.email,
-            password: this.snapshot.password,
-            firstName: this.snapshot.firstName,
-            lastName: this.snapshot.lastName,
-          })
-          .pipe(
-            tapResponse({
-              next: () => {
-                this.patchState({ loading: false, authenticated: this.session.authenticated(), password: '' });
-                void this.router.navigateByUrl('/customer/profile');
-              },
-              error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
-            }),
-          ),
-      ),
     ),
   );
 
+  private createRegistration() {
+    const valid = Boolean(this.snapshot.email && this.snapshot.password && this.snapshot.firstName && this.snapshot.lastName);
+    if (!valid) {
+      this.patchState({ loading: false, errorMessage: 'Nombre, apellido, email y contraseña son obligatorios.' });
+      return [];
+    }
+    this.patchState({ loading: true, errorMessage: '', registrationStage: CustomerRegistrationStage.Submitting });
+    return this.register.execute({
+      email: this.snapshot.email,
+      password: this.snapshot.password,
+      firstName: this.snapshot.firstName,
+      lastName: this.snapshot.lastName,
+    }).pipe(
+      switchMap(() => {
+        this.patchState({ password: '', registrationStage: CustomerRegistrationStage.ReconcileRequired });
+        return this.finishRegistration();
+      }),
+      tapResponse({
+        next: () => undefined,
+        error: (err: unknown) => this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.Capture, errorMessage: getApiErrorMessage(err) }),
+      }),
+    );
+  }
+
+  private finishRegistration() {
+    this.patchState({ loading: true, errorMessage: '', registrationStage: CustomerRegistrationStage.Reconciling });
+    return this.reconcileRegistration.execute().pipe(
+      tapResponse({
+        next: (accepted) => {
+          if (!accepted) {
+            this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.ReconcileRequired,
+              errorMessage: 'La cuenta fue creada, pero no pudimos confirmar la sesión. Reintentá sin volver a registrarte.' });
+            return;
+          }
+          this.patchState({ loading: false, authenticated: this.session.authenticated(), registrationStage: CustomerRegistrationStage.Complete });
+          void this.router.navigateByUrl(this.completeRegistration.route(this.returnDestination));
+        },
+        error: () => this.patchState({ loading: false, registrationStage: CustomerRegistrationStage.ReconcileRequired,
+          errorMessage: 'La cuenta fue creada, pero no pudimos confirmar la sesión. Reintentá sin volver a registrarte.' }),
+      }),
+    );
+  }
+
+  /* Legacy sign-in remains separate from unified access while callers migrate. */
   readonly submitSignIn = this.effect<void>((trigger$) =>
     trigger$.pipe(
       tap(() => {
