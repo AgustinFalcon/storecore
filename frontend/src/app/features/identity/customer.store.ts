@@ -2,7 +2,8 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, switchMap, tap } from 'rxjs';
+import { filter, Subject, switchMap, takeUntil, tap } from 'rxjs';
+import { AddressReadState } from '../../domain/customer/address-read-state';
 import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { CustomerAddress, CustomerProfile } from '../../domain/customer/customer.entity';
@@ -28,6 +29,8 @@ export interface CustomerState {
   readonly profileRevision: number;
   readonly addresses: readonly CustomerAddress[];
   readonly addressDraft: CustomerAddress;
+  readonly addressReadState: AddressReadState;
+  readonly addressMutationPending: boolean;
 }
 
 const emptyProfile: CustomerProfile = { email: '', firstName: '', lastName: '', phone: '' };
@@ -54,10 +57,14 @@ const INITIAL: CustomerState = {
   profileRevision: 0,
   addresses: [],
   addressDraft: emptyAddress,
+  addressReadState: AddressReadState.Idle,
+  addressMutationPending: false,
 };
 
 @Injectable()
 export class CustomerStore extends ComponentStore<CustomerState> {
+  private addressGeneration = 0;
+  private readonly addressCanceled = new Subject<void>();
   constructor(
     private readonly register: RegisterCustomerUseCase,
     private readonly signIn: SignInCustomerUseCase,
@@ -71,6 +78,11 @@ export class CustomerStore extends ComponentStore<CustomerState> {
     private readonly router: Router,
   ) {
     super({ ...INITIAL, authenticated: session.authenticated() });
+    this.effect<string | null>((actors$) => actors$.pipe(tap(() => {
+      this.invalidateAddresses();
+      this.patchState({ addresses: [], addressDraft: emptyAddress, addressReadState: AddressReadState.Idle,
+        addressMutationPending: false, loading: false, errorMessage: '', authenticated: session.authenticated() });
+    })))(session.actorChanges$);
   }
 
   get snapshot(): CustomerState {
@@ -187,63 +199,91 @@ export class CustomerStore extends ComponentStore<CustomerState> {
 
   readonly loadAddresses = this.effect<void>((trigger$) =>
     trigger$.pipe(
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap(() =>
-        this.listAddresses.execute().pipe(
+      filter(() => this.session.actorIdentity() !== null && !this.snapshot.addressMutationPending),
+      switchMap(() => {
+        const generation = this.invalidateAddresses();
+        this.patchState({ loading: true, errorMessage: '', addressReadState: AddressReadState.Loading });
+        return this.listAddresses.execute().pipe(
+          takeUntil(this.addressCanceled),
           tapResponse({
-            next: (addresses) => this.patchState({ addresses, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            next: (addresses) => {
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ addresses, loading: false, addressReadState: addresses.length ? AddressReadState.Ready : AddressReadState.Empty });
+            },
+            error: (err: unknown) => {
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), addressReadState: AddressReadState.Error });
+            },
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
 
   readonly persistAddress = this.effect<void>((trigger$) =>
     trigger$.pipe(
+      filter(() => this.session.actorIdentity() !== null && !this.snapshot.addressMutationPending),
       tap(() => {
         const draft = this.snapshot.addressDraft;
         if (!draft.street.trim() || !draft.number.trim() || !draft.city.trim() || !draft.province.trim() || !draft.postalCode.trim()) {
           this.patchState({ loading: false, errorMessage: 'Calle, número, ciudad, provincia y CP son obligatorios.' });
           return;
         }
-        this.patchState({ loading: true, errorMessage: '' });
       }),
       filter(() => {
         const draft = this.snapshot.addressDraft;
         return Boolean(draft.street.trim() && draft.number.trim() && draft.city.trim() && draft.province.trim() && draft.postalCode.trim());
       }),
-      switchMap(() =>
-        this.saveAddress.execute(this.snapshot.addressDraft).pipe(
+      switchMap(() => {
+        const generation = this.invalidateAddresses();
+        this.patchState({ loading: true, errorMessage: '', addressMutationPending: true, addressReadState: AddressReadState.Idle });
+        return this.saveAddress.execute(this.snapshot.addressDraft).pipe(
+          takeUntil(this.addressCanceled),
           tapResponse({
             next: () => {
-              this.patchState({ addressDraft: emptyAddress });
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ addressDraft: emptyAddress, addressMutationPending: false });
               this.loadAddresses();
             },
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => {
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ loading: false, addressMutationPending: false, addressReadState: AddressReadState.Error, errorMessage: getApiErrorMessage(err) });
+            },
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
 
   readonly removeAddress = this.effect<string>((id$) =>
     id$.pipe(
-      filter((id) => Boolean(id.trim())),
-      tap(() => this.patchState({ loading: true, errorMessage: '' })),
-      switchMap((id) =>
-        this.deleteAddress.execute(id).pipe(
+      filter((id) => Boolean(id.trim()) && this.session.actorIdentity() !== null && !this.snapshot.addressMutationPending),
+      switchMap((id) => {
+        const generation = this.invalidateAddresses();
+        this.patchState({ loading: true, errorMessage: '', addressMutationPending: true, addressReadState: AddressReadState.Idle });
+        return this.deleteAddress.execute(id).pipe(
+          takeUntil(this.addressCanceled),
           tapResponse({
             next: () => {
-              this.patchState({ addressDraft: emptyAddress });
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ addressDraft: emptyAddress, addressMutationPending: false });
               this.loadAddresses();
             },
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err) }),
+            error: (err: unknown) => {
+              if (generation !== this.addressGeneration) return;
+              this.patchState({ loading: false, addressMutationPending: false, addressReadState: AddressReadState.Error, errorMessage: getApiErrorMessage(err) });
+            },
           }),
-        ),
-      ),
+        );
+      }),
     ),
   );
+
+  private invalidateAddresses(): number {
+    ++this.addressGeneration;
+    this.addressCanceled.next();
+    return this.addressGeneration;
+  }
 
   readonly signOut = this.effect<void>((trigger$) =>
     trigger$.pipe(

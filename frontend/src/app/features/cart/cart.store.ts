@@ -7,6 +7,10 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
+import { CartFailureKind } from '../../domain/cart/cart-failure-kind';
+import { CheckoutAttemptState } from '../../domain/cart/checkout-attempt-state';
+import { AddressReadState } from '../../domain/customer/address-read-state';
+export { CartFailureKind } from '../../domain/cart/cart-failure-kind';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.util';
 import { ApiErrorCode } from '../../core/api/api-error-code';
 import { environment } from '../../../environments/environment';
@@ -27,14 +31,10 @@ export interface CartState {
   readonly idempotencyKey: string;
   readonly receipt: CheckoutReceipt | null;
   readonly failureKind: CartFailureKind;
-}
-
-export enum CartFailureKind {
-  None = 'NONE',
-  Load = 'LOAD',
-  CheckoutRetryable = 'CHECKOUT_RETRYABLE',
-  CheckoutProductUnavailable = 'CHECKOUT_PRODUCT_UNAVAILABLE',
-  CurrencyUnavailable = 'CURRENCY_UNAVAILABLE',
+  readonly addressReadState: AddressReadState;
+  readonly addressErrorMessage: string;
+  readonly checkoutAttemptState: CheckoutAttemptState;
+  readonly checkoutErrorMessage: string;
 }
 
 const initialState = (): CartState => ({
@@ -46,6 +46,10 @@ const initialState = (): CartState => ({
   idempotencyKey: crypto.randomUUID(),
   receipt: null,
   failureKind: CartFailureKind.None,
+  addressReadState: AddressReadState.Idle,
+  addressErrorMessage: '',
+  checkoutAttemptState: CheckoutAttemptState.Idle,
+  checkoutErrorMessage: '',
 });
 
 @Injectable({ providedIn: 'root' })
@@ -53,6 +57,7 @@ export class CartStore extends ComponentStore<CartState> {
   readonly authority = computed(() => CustomerCartAccess.resolve(this.access.state(), this.customer.actorIdentity()));
   private actor: string | null = null;
   private cartRequestGeneration = 0;
+  private addressRequestGeneration = 0;
   private currencyRevoked = false;
   private readonly cancelActorWork = new Subject<void>();
   constructor(
@@ -70,6 +75,7 @@ export class CartStore extends ComponentStore<CartState> {
       if (actor === this.actor) return;
       this.actor = actor;
       this.cartRequestGeneration += 1;
+      this.addressRequestGeneration += 1;
       this.currencyRevoked = false;
       this.cancelActorWork.next();
       this.setState(initialState());
@@ -86,9 +92,17 @@ export class CartStore extends ComponentStore<CartState> {
   readonly addresses$ = this.select((s) => s.addresses);
   readonly receipt$ = this.select((s) => s.receipt);
   readonly empty$ = this.select((s) => !s.loading && s.cart.lines.length === 0);
-  readonly canPay$ = this.select((s) => !s.loading && s.cart.lines.length > 0 && s.addressId.length > 0 && s.cart.currency.canCheckout);
+  readonly canPay$ = this.select((s) => s.checkoutAttemptState === CheckoutAttemptState.Idle && s.failureKind === CartFailureKind.None && !s.loading && s.cart.lines.length > 0 && s.addressReadState === AddressReadState.Ready && s.addresses.some((address) => address.id === s.addressId) && s.cart.currency.canCheckout);
 
-  readonly setAddressId = this.updater((s, addressId: string) => ({ ...s, addressId: s.addresses.some((address) => address.id === addressId) ? addressId : '' }));
+  readonly setAddressId = this.updater((s, addressId: string) => {
+    if (s.checkoutAttemptState.inFlight) return s;
+    const valid = s.addressReadState === AddressReadState.Ready && s.addresses.some((address) => address.id === addressId);
+    const opensAttempt = valid && addressId !== s.addressId
+      && (s.checkoutAttemptState === CheckoutAttemptState.Retryable
+        || s.checkoutAttemptState === CheckoutAttemptState.ProductUnavailable
+        || s.checkoutAttemptState === CheckoutAttemptState.Succeeded);
+    return { ...s, ...(opensAttempt ? this.newCheckoutAttempt() : {}), addressId: valid ? addressId : '' };
+  });
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
@@ -115,16 +129,24 @@ export class CartStore extends ComponentStore<CartState> {
   readonly loadAddresses = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
-      switchMap(() =>
+      map(() => ++this.addressRequestGeneration),
+      tap(() => this.patchState({ addressReadState: AddressReadState.Loading, addressErrorMessage: '' })),
+      switchMap((generation) =>
         this.listAddresses.execute().pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
-            next: (addresses) =>
+            next: (addresses) => {
+              if (generation !== this.addressRequestGeneration) return;
               this.patchState({
                 addresses,
+                addressReadState: addresses.length > 0 ? AddressReadState.Ready : AddressReadState.Empty,
                 addressId: addresses.some((address) => address.id === this.snapshot.addressId) ? this.snapshot.addressId : addresses[0]?.id ?? '',
-              }),
-            error: (err: unknown) => this.patchState({ errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
+              });
+            },
+            error: (err: unknown) => {
+              if (generation !== this.addressRequestGeneration) return;
+              this.patchState({ addressReadState: AddressReadState.Error, addressErrorMessage: getApiErrorMessage(err) });
+            },
           }),
         ),
       ),
@@ -133,7 +155,7 @@ export class CartStore extends ComponentStore<CartState> {
 
   readonly add = this.effect<{ sku: string; quantity: number }>((line$) =>
     line$.pipe(
-      filter(() => this.actor !== null),
+      filter(() => this.actor !== null && !this.snapshot.checkoutAttemptState.inFlight),
       map((line) => ({ line, request: this.beginCartRequest(false) })),
       tap(() => this.patchState({
         loading: true,
@@ -146,7 +168,10 @@ export class CartStore extends ComponentStore<CartState> {
         this.addLine.execute(line.sku, line.quantity).pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
-            next: (cart) => this.acceptCartResponse(request, cart),
+            next: (cart) => {
+              const accepted = this.acceptCartResponse(request, cart);
+              if (accepted && !this.snapshot.checkoutAttemptState.inFlight) this.patchState(this.newCheckoutAttempt());
+            },
             error: (err: unknown) => this.acceptCartError(request.generation, err),
           }),
         ),
@@ -157,21 +182,10 @@ export class CartStore extends ComponentStore<CartState> {
   readonly submitCheckout = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
-      tap(() => {
-        if (!this.hasCurrentAddress() || !this.snapshot.cart.currency.canCheckout) {
-          this.patchState({
-            errorMessage: this.snapshot.cart.currency.canCheckout
-              ? 'Elegí una dirección de entrega antes de pagar.'
-              : CartCurrency.Unknown.label,
-            failureKind: this.snapshot.cart.currency.canCheckout
-              ? CartFailureKind.None
-              : CartFailureKind.CurrencyUnavailable,
-          });
-          return;
-        }
-        this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None });
-      }),
-      filter(() => this.hasCurrentAddress() && this.snapshot.cart.currency.canCheckout),
+      filter(() => this.hasCurrentAddress() && this.snapshot.cart.currency.canCheckout
+        && (this.snapshot.checkoutAttemptState.paymentRetry
+          || (this.snapshot.checkoutAttemptState === CheckoutAttemptState.Idle && this.snapshot.cart.lines.length > 0 && !this.snapshot.loading && this.snapshot.failureKind === CartFailureKind.None))),
+      tap(() => this.patchState({ checkoutAttemptState: CheckoutAttemptState.Pending, checkoutErrorMessage: '' })),
       switchMap(() =>
         this.checkout
           .execute({
@@ -183,7 +197,7 @@ export class CartStore extends ComponentStore<CartState> {
             takeUntil(this.cancelActorWork),
             tapResponse({
               next: (receipt) => {
-                this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), failureKind: CartFailureKind.None });
+                this.patchState({ receipt, idempotencyKey: crypto.randomUUID(), checkoutAttemptState: CheckoutAttemptState.Succeeded, checkoutErrorMessage: '' });
                 const checkoutUrl = receipt.checkoutUrl ?? null;
                 if (this.isAllowlistedCheckoutUrl(checkoutUrl)) {
                   window.location.assign(checkoutUrl);
@@ -198,16 +212,18 @@ export class CartStore extends ComponentStore<CartState> {
                   this.currencyRevoked = true;
                 }
                 this.patchState({
-                  loading: false,
-                  errorMessage: getApiErrorMessage(err),
+                  checkoutErrorMessage: getApiErrorMessage(err),
                   cart: code === ApiErrorCode.UnsupportedCurrency
                     ? { ...this.snapshot.cart, currency: CartCurrency.Unknown }
                     : this.snapshot.cart,
                   failureKind: code === ApiErrorCode.UnsupportedCurrency
                     ? CartFailureKind.CurrencyUnavailable
+                    : this.snapshot.failureKind,
+                  checkoutAttemptState: code === ApiErrorCode.UnsupportedCurrency
+                    ? CheckoutAttemptState.Idle
                     : code === ApiErrorCode.ProductNotSellable
-                      ? CartFailureKind.CheckoutProductUnavailable
-                      : CartFailureKind.CheckoutRetryable,
+                      ? CheckoutAttemptState.ProductUnavailable
+                      : CheckoutAttemptState.Retryable,
                 });
               },
             }),
@@ -217,16 +233,21 @@ export class CartStore extends ComponentStore<CartState> {
   );
 
   private hasCurrentAddress(): boolean {
-    return this.snapshot.addresses.some((address) => address.id === this.snapshot.addressId);
+    return this.snapshot.addressReadState === AddressReadState.Ready && this.snapshot.addresses.some((address) => address.id === this.snapshot.addressId);
+  }
+
+  private newCheckoutAttempt(): Partial<CartState> {
+    return { checkoutAttemptState: CheckoutAttemptState.Idle, checkoutErrorMessage: '', idempotencyKey: crypto.randomUUID(), receipt: null };
   }
 
   private beginCartRequest(canRestoreCurrency: boolean): CartRequest {
     return { generation: ++this.cartRequestGeneration, canRestoreCurrency };
   }
 
-  private acceptCartResponse(request: CartRequest, cart: Cart): void {
-    if (request.generation !== this.cartRequestGeneration) return;
+  private acceptCartResponse(request: CartRequest, cart: Cart): boolean {
+    if (request.generation !== this.cartRequestGeneration) return false;
     this.patchState(this.cartLoadedState(cart, request.canRestoreCurrency));
+    return true;
   }
 
   private acceptCartError(generation: number, error: unknown): void {

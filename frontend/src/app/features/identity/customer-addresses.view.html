@@ -7,10 +7,13 @@
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
-    [empty]="!state.loading && state.addresses.length === 0"
+    [empty]="state.addressReadState === ReadState.Empty"
     emptyText="No hay direcciones para este customer."
     (retry)="retry.emit()"
   />
+  @if (canReturn) {
+    <a class="sc-btn sc-btn--primary" [routerLink]="returnTarget.path">{{ returnTarget.label }}</a>
+  }
   <div class="sc-workbench sc-workbench--even">
     <div class="sc-workbench__main">
       <h2>Guardadas</h2>
@@ -21,6 +24,7 @@
               type="button"
               class="sc-card sc-address-card"
               [class.is-on]="state.addressDraft.id === address.id"
+              [disabled]="state.loading"
               (click)="draftChange.emit(address)"
             >
               <strong>{{ address.street }} {{ address.number }}</strong>
@@ -29,7 +33,7 @@
                 <p class="sc-price__meta">Predeterminada</p>
               }
             </button>
-            <button type="button" class="sc-btn sc-btn--danger" (click)="remove.emit(address.id)">Quitar</button>
+            <button type="button" class="sc-btn sc-btn--danger" [disabled]="state.loading" (click)="remove.emit(address.id)">Quitar</button>
           </li>
         }
       </ul>
@@ -57,7 +61,7 @@
         <input type="checkbox" name="isDefault" [ngModel]="state.addressDraft.isDefault" (ngModelChange)="patch({ isDefault: $event })" />
         Predeterminada
       </label>
-      <button type="submit" class="sc-btn sc-btn--primary">{{ state.addressDraft.id ? 'Actualizar' : 'Agregar' }}</button>
+      <button type="submit" class="sc-btn sc-btn--primary" [disabled]="state.addressMutationPending">{{ state.addressDraft.id ? 'Actualizar' : 'Agregar' }}</button>
       @if (state.addressDraft.id) {
         <button type="button" class="sc-btn sc-btn--ghost" (click)="clearDraft.emit()">Nueva dirección</button>
       }
