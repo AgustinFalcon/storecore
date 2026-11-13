@@ -2,6 +2,10 @@
 
 Ninguna fila cerrada por este documento supone un emisor, servicio, trigger o credencial. La evidencia se conserva saneada y fechada.
 
+Las respuestas se preparan con `decision-intake-template.md`. La auditoría del
+2026-11-13 confirmó que ninguna propuesta existente alcanza todavía el cierre
+de una fila.
+
 | ID | Decisión/evidencia exigida | Dueño | Fuente/fecha/aprobador esperado | Estado |
 | --- | --- | --- | --- |
 | D-01 | Límite biblioteca externa/adaptador y ownership de datos. | Plataforma | ADR/SDD fechado + Sol | Open |

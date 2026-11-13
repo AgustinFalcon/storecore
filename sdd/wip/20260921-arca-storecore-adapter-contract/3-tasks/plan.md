@@ -9,7 +9,7 @@
 | SC-T03 | Fijar contrato Mercado Pago/origen, validación, idempotencia y correlaciones. | Blocked: product + platform | D-07 y SC-01/SC-02 aprobados. |
 | SC-T03b | Decidir provenance/ownership de inbox-outbox y capability fiscal. | Blocked: platform + Sol GO | SC-07 aprobado; sin reutilización implícita de `integration_outbox`. |
 | SC-T04 | Abrir WIP implementable de datos/outbox/worker/lock, con modelo y migraciones revisados. | Blocked: SC-T02 + SC-T03 + SC-T03b + Sol GO | SC-03/SC-04 resueltos; no introducir `store_id`. |
-| SC-T05 | Implementar el adaptador contra una versión publicada de la biblioteca. | Blocked: SC-T04 + library candidate | Pruebas de recuperación y seguridad aprobadas. |
+| SC-T05 | Implementar el adaptador contra una versión distribuida de forma reproducible y aprobada de la biblioteca. | Blocked: SC-T04 + library candidate | Coordenadas/SHA pinneados, lectura repetible y pruebas de recuperación/seguridad aprobadas. Publicación remota o estrategia local reproducible deben quedar decididas explícitamente. |
 | SC-T06 | Provisionar perfil de homologación y ejecutar end-to-end. | Blocked: issuer authorization | WSASS, certificado de prueba, configuración y evidencia saneada. |
 | SC-T07 | Activar producción por emisor. | Blocked: explicit release gate | Revisión fiscal, operacional, seguridad y Sol GO. |
 

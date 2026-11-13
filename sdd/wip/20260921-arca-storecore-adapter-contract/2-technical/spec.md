@@ -63,7 +63,14 @@ Tras un resultado ambiguo, el worker persiste `UNKNOWN_RECONCILIATION`, consulta
 
 Se separan snapshot/documento fiscal autoritativo protegido, proyección de auditoría/log redaccionada y política de retención/acceso/exportación/borrado bloqueado por obligación legal. La capability fiscal requiere agregarse explícitamente a la allowlist del baseline mediante WIP aprobado; `PAUSED` detiene nuevos despachos, pero no abandona conciliaciones `UNKNOWN`.
 
-SC-07 decide si el fiscal usa outbox propio o una extensión formal de `integration_outbox`, qué fuente elegible admite y cómo conserva atomicidad con `payment_event_applications`; queda prohibido reutilizar el outbox actual por inferencia.
+El lane comercial vigente de Mercado Pago Orders es
+`mp_order_commercial_applications` → `mp_verified_business_events` →
+`mp_order_outbox`. El worker legado de `payment_event_applications` no es una
+fuente fiscal vigente y `integration_outbox` no se reutiliza por inferencia.
+SC-07 debe decidir si la intención y el outbox fiscal participan en la misma
+transacción comercial o consumen el evento durable mediante cursor, dedupe y
+recovery propios. En ambos casos el outbox fiscal tiene ownership, payload y
+estado separados.
 
 ## Pruebas obligatorias antes de activar
 
@@ -77,4 +84,14 @@ SC-07 decide si el fiscal usa outbox propio o una extensión formal de `integrat
 
 ## Gate de implementación
 
-Ninguna clase, migración, endpoint, job ni secreto se agrega en StoreCore con este SDD. Para abrir un WIP implementable se exige el cierre documentado de D-01..D-07 y SC-01..SC-07, compatibilidad versionada con `arca-facturacion` (API, errores/estados, idempotencia y cambio de manual), evidencia de matriz fiscal/servicio, plan de homologación y GO de Sol.
+Ninguna clase, migración, endpoint, job ni secreto se agrega en StoreCore con
+este SDD. Para abrir un WIP implementable se exige el cierre documental de
+D-01..D-07 y SC-01..SC-07: ownership, invariantes, modelo lógico, fórmula de
+identidades, frontera transaccional, seguridad, retención y plan de pruebas
+aprobados; además compatibilidad y distribución reproducible de
+`arca-facturacion`, matriz fiscal/servicio, plan de homologación y GO de Sol.
+
+Las pruebas ejecutables de migraciones, dos workers, crash recovery, timeout y
+conciliación son aceptación **posterior** al GO del WIP implementable. No se
+exigen para cerrar el diseño previo al código y tampoco pueden sustituirse por
+las pruebas internas de la biblioteca.
