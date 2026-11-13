@@ -123,6 +123,139 @@ class CommerceHttpIntegrationTest(
     }
 
     @Test
+    fun `checkout freezes canonical buyer identity and replay never recaptures profile`() {
+        val email = "buyer-snapshot-${UUID.randomUUID()}@example.com"
+        var buyer = addAddress(registerCustomer(email))
+        val sku = "SKU-BUYER-${UUID.randomUUID()}"
+        putProduct(sku, "Buyer snapshot product", available = 8, safety = 1)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", buyer.cookie, buyer.csrf)
+        buyer = buyer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val key = UUID.randomUUID()
+        val checkoutBody = """{"idempotencyKey":"$key","addressId":"${buyer.addressId}","currency":"ARS"}"""
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, checkoutBody, buyer.cookie, buyer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        buyer = buyer.copy(csrf = checkout.headers.getFirst("X-CSRF-Token")!!)
+        val orderId = mapper.readTree(checkout.body!!).path("data").path("orderId").asText()
+        val snapshot = mapper.readTree(jdbc.queryForObject("SELECT buyer_snapshot::text FROM orders WHERE id=?", String::class.java, orderId.toLong())!!)
+        assertEquals("Person One", snapshot.path("name").asText())
+        assertEquals(email, snapshot.path("email").asText())
+
+        fun assertKnown(path: String, session: Session, list: Boolean) {
+            val response = exchange(path, HttpMethod.GET, null, session.cookie)
+            assertEquals(200, response.statusCode.value(), response.body)
+            val data = mapper.readTree(response.body!!).path("data")
+            val order = if (list) data.path("items").first { it.path("id").asText() == orderId } else data
+            assertEquals("KNOWN", order.path("buyerName").path("state").asText(), path)
+            assertEquals("Person One", order.path("buyerName").path("value").asText(), path)
+            assertEquals("KNOWN", order.path("buyerEmail").path("state").asText(), path)
+            assertEquals(email, order.path("buyerEmail").path("value").asText(), path)
+        }
+        assertKnown("/api/v1/customer/orders", buyer, true)
+        assertKnown("/api/v1/customer/orders/$orderId", buyer, false)
+        assertKnown("/api/v1/user/orders", admin, true)
+        assertKnown("/api/v1/user/orders/$orderId", admin, false)
+
+        val updated = exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"$email","firstName":"Updated","lastName":"Buyer","phone":null}""", buyer.cookie, buyer.csrf)
+        assertEquals(200, updated.statusCode.value(), updated.body)
+        buyer = buyer.copy(csrf = updated.headers.getFirst("X-CSRF-Token")!!)
+        val replay = exchange("/api/v1/customer/checkout", HttpMethod.POST, checkoutBody, buyer.cookie, buyer.csrf)
+        assertEquals(200, replay.statusCode.value(), replay.body)
+        assertEquals(orderId, mapper.readTree(replay.body!!).path("data").path("orderId").asText())
+        val unchanged = mapper.readTree(jdbc.queryForObject("SELECT buyer_snapshot::text FROM orders WHERE id=?", String::class.java, orderId.toLong())!!)
+        assertEquals("Person One", unchanged.path("name").asText())
+        assertEquals(email, unchanged.path("email").asText())
+        buyer = buyer.copy(csrf = replay.headers.getFirst("X-CSRF-Token")!!)
+
+        val addedAgain = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", buyer.cookie, buyer.csrf)
+        buyer = buyer.copy(csrf = addedAgain.headers.getFirst("X-CSRF-Token")!!)
+        val next = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${buyer.addressId}","currency":"ARS"}""", buyer.cookie, buyer.csrf)
+        assertEquals(200, next.statusCode.value(), next.body)
+        val nextId = mapper.readTree(next.body!!).path("data").path("orderId").asLong()
+        val nextSnapshot = mapper.readTree(jdbc.queryForObject("SELECT buyer_snapshot::text FROM orders WHERE id=?", String::class.java, nextId)!!)
+        assertEquals("Updated Buyer", nextSnapshot.path("name").asText())
+        assertEquals(email, nextSnapshot.path("email").asText())
+    }
+
+    @Test
+    fun `invalid canonical buyer identity fails before checkout effects`() {
+        val email = "invalid-buyer-${UUID.randomUUID()}@example.com"
+        var buyer = addAddress(registerCustomer(email))
+        val customerId = jdbc.queryForObject("SELECT id FROM customers WHERE email=?", Long::class.java, email)!!
+        val sku = "SKU-INVALID-BUYER-${UUID.randomUUID()}"
+        putProduct(sku, "Invalid buyer product", available = 8, safety = 1)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", buyer.cookie, buyer.csrf)
+        buyer = buyer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        jdbc.update("UPDATE customers SET email='not-an-email' WHERE id=?", customerId)
+        val key = UUID.randomUUID()
+        val denied = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${buyer.addressId}","currency":"ARS"}""", buyer.cookie, buyer.csrf)
+        assertEquals(409, denied.statusCode.value(), denied.body)
+        assertTrue(denied.body!!.contains("CUSTOMER_IDENTITY_UNAVAILABLE"), denied.body)
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM inventory_reservations WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", Int::class.java, sku))
+    }
+
+    @Test
+    fun `concurrent profile mutation and checkout never mix buyer name versions`() {
+        val email = "buyer-race-${UUID.randomUUID()}@example.com"
+        val updatedEmail = "buyer-race-updated-${UUID.randomUUID()}@example.com"
+        var checkoutSession = addAddress(registerCustomer(email))
+        val profileSession = loginCustomer(email)
+        val customerId = jdbc.queryForObject("SELECT id FROM customers WHERE email=?", Long::class.java, email)!!
+        val sku = "SKU-BUYER-RACE-${UUID.randomUUID()}"
+        putProduct(sku, "Buyer race product", available = 8, safety = 1)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", checkoutSession.cookie, checkoutSession.csrf)
+        checkoutSession = checkoutSession.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val key = UUID.randomUUID()
+        val start = java.util.concurrent.CountDownLatch(1)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(2)
+        jdbc.dataSource!!.connection.use { blocker ->
+            blocker.autoCommit = false
+            val blockerPid = blocker.createStatement().use { statement ->
+                statement.executeQuery("SELECT pg_backend_pid()").use { result -> result.next(); result.getInt(1) }
+            }
+            blocker.prepareStatement("SELECT pg_advisory_xact_lock(0,?)").use {
+                it.setInt(1, customerId.toInt())
+                it.executeQuery().close()
+            }
+            try {
+                val checkout = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    start.await()
+                    exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${checkoutSession.addressId}","currency":"ARS"}""", checkoutSession.cookie, checkoutSession.csrf)
+                }
+                val profile = executor.submit<org.springframework.http.ResponseEntity<String>> {
+                    start.await()
+                    exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"$updatedEmail","firstName":"Concurrent","lastName":"Buyer","phone":null}""", profileSession.cookie, profileSession.csrf)
+                }
+                start.countDown()
+                val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10)
+                var waiting = 0
+                while (waiting < 2 && System.nanoTime() < deadline) {
+                    waiting = jdbc.queryForObject(
+                        "SELECT count(*) FROM pg_stat_activity WHERE ?=ANY(pg_blocking_pids(pid))",
+                        Int::class.java,
+                        blockerPid,
+                    ) ?: 0
+                    if (waiting < 2) Thread.sleep(20)
+                }
+                assertEquals(2, waiting, "profile and checkout must both wait on the CUSTOMER root lock")
+                blocker.commit()
+                val checkoutResponse = checkout.get(15, java.util.concurrent.TimeUnit.SECONDS)
+                val profileResponse = profile.get(15, java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(200, checkoutResponse.statusCode.value(), checkoutResponse.body)
+                assertEquals(200, profileResponse.statusCode.value(), profileResponse.body)
+                val orderId = mapper.readTree(checkoutResponse.body!!).path("data").path("orderId").asLong()
+                val snapshot = mapper.readTree(jdbc.queryForObject("SELECT buyer_snapshot::text FROM orders WHERE id=?", String::class.java, orderId)!!)
+                val captured = snapshot.path("name").asText() to snapshot.path("email").asText()
+                assertTrue(captured in setOf("Person One" to email, "Concurrent Buyer" to updatedEmail), snapshot.toString())
+            } finally {
+                runCatching { blocker.rollback() }
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
     fun `missing installation currency is explicit unknown and checkout has no side effects`() {
         val sku = "SKU-NO-CURRENCY-${UUID.randomUUID()}"
         putProduct(sku, "No currency item", available = 5, safety = 0)
@@ -860,6 +993,11 @@ class CommerceHttpIntegrationTest(
     private fun registerCustomer(email: String): Session {
         val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password","firstName":"Person","lastName":"One"}""")
         return Session(registered.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';'), registered.headers.getFirst("X-CSRF-Token")!!)
+    }
+
+    private fun loginCustomer(email: String): Session {
+        val login = exchange("/api/v1/customer/auth/login", HttpMethod.POST, """{"email":"$email","password":"a-very-long-password"}""")
+        return Session(login.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';'), login.headers.getFirst("X-CSRF-Token")!!)
     }
 
     private fun addAddress(session: Session): Session {

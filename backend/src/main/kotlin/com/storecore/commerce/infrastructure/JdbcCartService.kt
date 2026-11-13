@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.domain.ProductStatus
 import com.storecore.catalog.domain.VariantStatus
 import com.storecore.offers.domain.DiscountKind
+import com.storecore.commerce.application.BuyerIdentityUnavailable
 import com.storecore.commerce.application.CheckoutConflict
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.LocalOfferDiscount
@@ -16,6 +17,7 @@ import com.storecore.commerce.domain.PaymentCurrency
 import com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.domain.CapabilityActor
+import com.storecore.identity.application.AuthenticationFailed
 import com.storecore.identity.application.ResourceNotFound
 import com.storecore.identity.domain.CustomerPrincipal
 import org.springframework.beans.factory.ObjectProvider
@@ -64,6 +66,7 @@ class JdbcCartService(
             if (replayed != null) return withRemoteCheckout(replayed)
             throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
+        val buyerIdentity = readBuyerIdentity(customer.customerId)
         val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
         if (cart.lines.isEmpty()) throw CommerceValidation("CART_EMPTY")
         val identities = lockSellableIdentities(cart)
@@ -84,7 +87,7 @@ class JdbcCartService(
             inventory.reserve(saga, lineKeys.getValue(line.sku), variantId, line.quantity, "CUSTOMER:${customer.customerId}")
         }
         val subtotal = cart.lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
-        val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("addressId", addressId).put("street", address["street"]).put("number", address["number"]).put("city", address["city"]).put("province", address["province"]).put("postalCode", address["postalCode"])
+        val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("name", buyerIdentity.name).put("email", buyerIdentity.email).put("addressId", addressId).put("street", address["street"]).put("number", address["number"]).put("city", address["city"]).put("province", address["province"]).put("postalCode", address["postalCode"])
         val orderId = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT',?::jsonb,?::jsonb,?,0,?,?) RETURNING id", Long::class.java, "SC-$claimId", claimId, idempotencyKey, hash, customer.customerId, buyer.toString(), payload.toString(), subtotal, subtotal, currencyWire)!!
         cart.lines.forEach { line ->
             val variantId = identities.getValue(line.sku)
@@ -110,6 +113,16 @@ class JdbcCartService(
         val starter = mpAttempts.ifAvailable ?: return receipt
         val url = runCatching { starter.startForLocalOrder(receipt.orderId.toLong()) }.getOrNull()
         return if (url.isNullOrBlank()) receipt else receipt.copy(checkoutUrl = url)
+    }
+
+    private fun readBuyerIdentity(customerId: Long): BuyerSnapshotIdentity {
+        val row = jdbc.query(
+            "SELECT email,first_name,last_name FROM customers WHERE id=? AND active=TRUE",
+            { rs, _ -> Triple(rs.getString("email"), rs.getString("first_name"), rs.getString("last_name")) },
+            customerId,
+        ).singleOrNull() ?: throw AuthenticationFailed()
+        return BuyerSnapshotIdentity.fromCanonical(row.first, row.second, row.third)
+            ?: throw BuyerIdentityUnavailable()
     }
 
     private fun ensureCart(customerId: Long): Long = jdbc.queryForObject("INSERT INTO carts(customer_id,session_id,expires_at) VALUES (?,? ,now()+interval '7 days') ON CONFLICT (session_id) DO UPDATE SET updated_at=now(),expires_at=now()+interval '7 days' RETURNING id", Long::class.java, customerId, "customer-$customerId")!!
