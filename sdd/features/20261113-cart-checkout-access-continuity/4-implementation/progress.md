@@ -39,3 +39,9 @@
   revisión del realm, y una prueba impide emitir `/me` durante la revocación.
 - Revisión final coordinada GPT-6.1 Sol: APPROVE funcional y APPROVE
   técnico/seguridad; sin hallazgos P0-P3 restantes.
+- PR #265: Verify `43514077477` con backend, frontend y
+  `unified-access-real-e2e` verdes.
+- Merge en `master`: `bfabff52bd1bd23ad4d5b9bba4510f1be0a6eec1`.
+- Post-merge Verify `43515110984`: 3/3 jobs verdes, incluida la matriz real
+  PostgreSQL + Spring + Angular HTTPS + navegador.
+- Estado final: completado y listo para archivar.
