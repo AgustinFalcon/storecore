@@ -4,6 +4,7 @@ import { CartLine } from '../../domain/cart/cart.entity';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { CartState } from './cart.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
+import { ReturnDestination } from '../../domain/access/return-destination';
 
 @Component({
   selector: 'sc-cart-page-view',
@@ -12,6 +13,7 @@ import { FeatureStatusComponent } from '../../shared/feature-status.component';
   templateUrl: './cart-page.view.html',
 })
 export class CartPageViewComponent {
+  protected readonly loginDestination = ReturnDestination.Cart;
   @Input({ required: true }) state!: CartState;
   @Input() access = CustomerCartAccess.Unknown;
   @Output() readonly selectCustomer = new EventEmitter<void>();

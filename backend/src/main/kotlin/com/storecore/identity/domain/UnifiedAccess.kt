@@ -54,7 +54,7 @@ enum class AccessHome {
 
 /** The only v1 destination translator; arbitrary paths never survive this boundary. */
 enum class ReturnDestination(private val context: AccessContext?) {
-    HOME(null), CATALOG(null), CUSTOMER_PROFILE(AccessContext.CUSTOMER),
+    HOME(null), CATALOG(null), CART(AccessContext.CUSTOMER), CHECKOUT(AccessContext.CUSTOMER), CUSTOMER_PROFILE(AccessContext.CUSTOMER),
     CUSTOMER_ORDERS(AccessContext.CUSTOMER), USER_ORDERS(AccessContext.USER), Unknown(null);
 
     fun permittedFor(selected: AccessContext): ReturnDestination = when {
@@ -71,6 +71,8 @@ enum class ReturnDestination(private val context: AccessContext?) {
         fun fromWire(raw: String?): ReturnDestination = when (raw) {
             "HOME" -> HOME
             "CATALOG" -> CATALOG
+            "CART" -> CART
+            "CHECKOUT" -> CHECKOUT
             "CUSTOMER_PROFILE" -> CUSTOMER_PROFILE
             "CUSTOMER_ORDERS" -> CUSTOMER_ORDERS
             "USER_ORDERS" -> USER_ORDERS
@@ -83,6 +85,8 @@ enum class ReturnDestination(private val context: AccessContext?) {
             return when (raw) {
                 "/", "/user/home" -> HOME
                 "/catalog" -> CATALOG
+                "/cart" -> CART
+                "/checkout" -> CHECKOUT
                 "/customer/profile" -> CUSTOMER_PROFILE
                 "/customer/orders" -> CUSTOMER_ORDERS
                 "/user/orders" -> USER_ORDERS

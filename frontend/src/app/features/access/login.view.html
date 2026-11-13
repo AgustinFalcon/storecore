@@ -26,7 +26,7 @@
       <button class="sc-btn sc-btn--primary" type="submit" [disabled]="state.busy">{{ state.stage === stages.Authenticate ? state.stage.label : 'Ingresar' }}</button>
     </form>
     <p><a routerLink="/recover" [queryParams]="{ returnTo: destination.wire }">Olvidé mi contraseña</a></p>
-    <p>¿Todavía no tenés cuenta? <a routerLink="/customer/register">Crear cuenta</a></p>
+    <p>¿Todavía no tenés cuenta? <a routerLink="/customer/register" [queryParams]="{ returnTo: destination.wire }">Crear cuenta</a></p>
   }
   <div aria-live="polite" aria-atomic="true">@if (state.message) { <p class="sc-notice sc-notice--error" role="alert">{{ state.message }}</p> }</div>
 </div></section>

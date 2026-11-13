@@ -194,6 +194,24 @@ class CoreSchemaMigrationTest {
                 assertEquals(1, statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=clock_timestamp() WHERE id='00000000-0000-0000-0000-000000000111'"))
                 assertThrows(PSQLException::class.java) { statement.executeUpdate("UPDATE unified_access_challenges SET consumed_at=clock_timestamp() WHERE id='00000000-0000-0000-0000-000000000111'") }
                 assertThrows(PSQLException::class.java) { statement.executeUpdate("DELETE FROM unified_access_challenges WHERE id='00000000-0000-0000-0000-000000000111'") }
+                listOf("00000000-0000-0000-0000-000000000113" to "CART", "00000000-0000-0000-0000-000000000114" to "CHECKOUT").forEachIndexed { index, (id, destination) ->
+                    assertEquals(1, statement.executeUpdate(
+                        """WITH issued AS (SELECT clock_timestamp() value)
+                           INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
+                           SELECT '$id',repeat('${if (index == 0) "e" else "f"}',64),repeat('${if (index == 0) "g" else "h"}',64),'http://localhost:4200',
+                                  (SELECT id FROM customers WHERE email='v11-customer@example.com'),
+                                  (SELECT id FROM users WHERE email='v11-user@example.com'),'$destination',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
+                    ))
+                }
+                assertThrows(PSQLException::class.java) {
+                    statement.executeUpdate(
+                        """WITH issued AS (SELECT clock_timestamp() value)
+                           INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)
+                           SELECT '00000000-0000-0000-0000-000000000115',repeat('i',64),repeat('j',64),'http://localhost:4200',
+                                  (SELECT id FROM customers WHERE email='v11-customer@example.com'),
+                                  (SELECT id FROM users WHERE email='v11-user@example.com'),'FUTURE',value,value+interval '120 seconds','VERIFIED',1,1 FROM issued""",
+                    )
+                }
                 statement.executeUpdate(
                     """WITH issued AS (SELECT clock_timestamp()-interval '180 seconds' value)
                        INSERT INTO unified_access_challenges(id,challenge_hash,binding_nonce_hash,accepted_origin,customer_id,user_id,return_destination,issued_at,expires_at,credential_evidence,customer_credential_version,user_credential_version)

@@ -4,9 +4,15 @@
     <h1 id="register-title">Crear cuenta customer</h1>
     <p class="sc-page__lede">Creá tu cuenta para comprar en la tienda.</p>
     <sc-feature-status [loading]="state.loading" [error]="state.errorMessage" (retry)="submitRegister.emit()" />
-    @if (authenticated) {
-      <p>Sesión customer activa. <a routerLink="/customer/profile">Ir al perfil</a></p>
-    } @else {
+    @if (state.registrationStage === stages.Complete) {
+      <p>Sesión customer activa. <a [routerLink]="authenticatedRoute">Continuar</a></p>
+    } @else if (state.registrationStage === stages.ReconcileRequired) {
+      <p role="status">La cuenta ya fue creada. Falta confirmar la sesión antes de continuar.</p>
+      <button type="button" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="state.loading" (click)="submitRegister.emit()">Reintentar confirmación</button>
+    } @else if (state.registrationStage === stages.InspectionRequired) {
+      <p role="status">No pudimos comprobar si ya tenés una sesión activa.</p>
+      <button type="button" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="state.loading" (click)="submitRegister.emit()">Reintentar comprobación</button>
+    } @else if (state.registrationStage === stages.Capture) {
       <form class="sc-auth__form" (submit)="$event.preventDefault(); submitRegister.emit()">
         <div class="sc-fields-2">
           <label>Nombre
@@ -22,9 +28,11 @@
         <label>Contraseña
           <input name="password" type="password" required autocomplete="new-password" [ngModel]="state.password" (ngModelChange)="passwordChange.emit($event)" />
         </label>
-        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block">Registrarme</button>
+        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="state.loading">Registrarme</button>
       </form>
-      <p>¿Ya tenés cuenta? <a routerLink="/login">Ya tengo cuenta</a></p>
+      <p>¿Ya tenés cuenta? <a routerLink="/login" [queryParams]="{ returnTo: loginDestination.wire }">Ya tengo cuenta</a></p>
+    } @else {
+      <p role="status">{{ state.registrationStage.label }}</p>
     }
   </div>
 </section>

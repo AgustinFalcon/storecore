@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AccessContext } from '../../domain/access/access-context';
-import { AccessState, AccessStateKind, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
+import { AccessState, AccessStateKind, ContextAuthorityInspection, ProbeOutcome, SessionProbe } from '../../domain/access/session-probe';
 import { UserRole } from '../../domain/user/user-role';
 import { AccessCoordinator, ActiveContextHint } from './access-coordinator';
 import { CustomerSession } from './customer-session';
@@ -61,6 +61,75 @@ describe('AccessCoordinator', () => {
     http.expectOne(url('internal/auth/csrf')).flush({}, { headers: { [CSRF_HEADER]: 'user-csrf' } });
   }
   function absent(path: string): void { http.expectOne(url(path)).flush({}, { status: 401, statusText: 'Unauthorized' }); }
+
+  it('reports verified CUSTOMER absence without probing the USER realm', async () => {
+    const inspection = firstValueFrom(access.inspectCustomerAccess());
+    absent('customer/me');
+    expect(await inspection).toBe(ContextAuthorityInspection.Absent);
+    http.expectNone(url('internal/me'));
+    expect(access.state().permits(AccessContext.Customer)).toBe(false);
+  });
+
+  it('accepts and selects an authoritatively inspected CUSTOMER session', async () => {
+    hint = AccessContext.User;
+    const inspection = firstValueFrom(access.inspectCustomerAccess());
+    flushCustomer();
+    expect(await inspection).toBe(ContextAuthorityInspection.Accepted);
+    expect(access.state().activeContext).toBe(AccessContext.Customer);
+    expect(customerSession.csrf()).toBe('customer-csrf');
+    expect(hint).toBe(AccessContext.Customer);
+    http.expectNone(url('internal/me'));
+  });
+
+  it('fails closed when CUSTOMER inspection is unavailable and preserves an accepted USER', async () => {
+    hint = AccessContext.User;
+    const initial = firstValueFrom(access.rehydrate());
+    absent('customer/me');
+    flushUser();
+    await initial;
+    const inspection = firstValueFrom(access.inspectCustomerAccess());
+    http.expectOne(url('customer/me')).flush({}, { status: 503, statusText: 'Unavailable' });
+    expect(await inspection).toBe(ContextAuthorityInspection.Unavailable);
+    expect(access.state().activeContext).toBe(AccessContext.User);
+    expect(userSession.csrf()).toBe('user-csrf');
+  });
+
+  it('does not inspect or restore CUSTOMER authority while its logout is pending', async () => {
+    const initial = firstValueFrom(access.rehydrate());
+    flushCustomer();
+    absent('internal/me');
+    await initial;
+    const logout = firstValueFrom(access.logout(AccessContext.Customer));
+    const revoke = http.expectOne(url('customer/auth/logout'));
+    expect(await firstValueFrom(access.inspectCustomerAccess())).toBe(ContextAuthorityInspection.Unavailable);
+    http.expectNone(url('customer/me'));
+    expect(access.state().permits(AccessContext.Customer)).toBe(false);
+    revoke.flush({});
+    await logout;
+  });
+
+  it('reconciles a registered customer authoritatively and selects it over a prior USER hint', async () => {
+    hint = AccessContext.User;
+    const result = firstValueFrom(access.reconcileRegisteredCustomer());
+    flushCustomer();
+    flushUser();
+    const state = await result;
+    expect(state.activeContext).toBe(AccessContext.Customer);
+    expect(state.permits(AccessContext.User)).toBe(true);
+    expect(hint).toBe(AccessContext.Customer);
+    expect(customerSession.csrf()).toBe('customer-csrf');
+  });
+
+  it('does not accept local registration state when CUSTOMER csrf probing fails', async () => {
+    customerSession.markAuthenticated(customer);
+    const result = firstValueFrom(access.reconcileRegisteredCustomer());
+    http.expectOne(url('customer/me')).flush(customer);
+    http.expectOne(url('customer/auth/csrf')).flush({});
+    absent('internal/me');
+    const state = await result;
+    expect(state.permits(AccessContext.Customer)).toBe(false);
+    expect(state.activeContext).toBe(AccessContext.Unknown);
+  });
 
   it('accepts recovery by clearing only the recovered realm and fencing its stale probes', async () => {
     for (const realm of [AccessContext.Customer, AccessContext.User]) {

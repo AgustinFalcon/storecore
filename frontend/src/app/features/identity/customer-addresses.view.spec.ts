@@ -4,12 +4,14 @@ import { AddressReadState } from '../../domain/customer/address-read-state';
 import { AddressReturnTarget } from '../../domain/customer/address-return-target';
 import { CustomerAddressesViewComponent } from './customer-addresses.view';
 import { CustomerState } from './customer.store';
+import { CustomerRegistrationStage } from './customer-registration-steps';
 
 const address = { id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
 const readyState: CustomerState = {
   loading: false, errorMessage: '', authenticated: true, email: '', firstName: '', lastName: '', password: '',
   profile: { email: '', firstName: '', lastName: '', phone: '' }, saved: false, profileRevision: 0,
   addresses: [address], addressDraft: address, addressReadState: AddressReadState.Ready, addressMutationPending: false,
+  registrationStage: CustomerRegistrationStage.Capture,
 };
 
 describe('CustomerAddressesViewComponent', () => {

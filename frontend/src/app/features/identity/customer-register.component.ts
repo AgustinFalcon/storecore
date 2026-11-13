@@ -1,6 +1,9 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { CustomerSession } from '../../core/auth/customer-session';
+import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { AccessContext } from '../../domain/access/access-context';
+import { ReturnDestination } from '../../domain/access/return-destination';
+import { CaptureReturnDestinationStep } from './customer-registration-steps';
 import { CustomerRegisterViewComponent } from './customer-register.view';
 import { CustomerStore } from './customer.store';
 
@@ -13,7 +16,8 @@ import { CustomerStore } from './customer.store';
     @if (store.state$ | async; as state) {
       <sc-customer-register-view
         [state]="state"
-        [authenticated]="session.authenticated()"
+        [loginDestination]="destination"
+        [authenticatedRoute]="authenticatedRoute"
         (firstNameChange)="store.setFirstName($event)"
         (lastNameChange)="store.setLastName($event)"
         (emailChange)="store.setEmail($event)"
@@ -23,9 +27,18 @@ import { CustomerStore } from './customer.store';
     }
   `,
 })
-export class CustomerRegisterComponent {
+export class CustomerRegisterComponent implements OnInit {
+  private readonly captureDestination = new CaptureReturnDestinationStep();
+  destination = ReturnDestination.Unknown;
+  authenticatedRoute = '/customer/profile';
   constructor(
     readonly store: CustomerStore,
-    readonly session: CustomerSession,
+    private readonly route: ActivatedRoute,
   ) {}
+  ngOnInit(): void {
+    this.destination = this.captureDestination.capture(this.route.snapshot.queryParamMap.get('returnTo'));
+    this.authenticatedRoute = this.destination.routeFor(AccessContext.Customer) ?? '/customer/profile';
+    this.store.setReturnDestination(this.destination);
+    this.store.initializeRegistration();
+  }
 }
