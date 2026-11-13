@@ -46,5 +46,12 @@ P0–P3 pendientes.
 
 ## Estado
 
-CCA-001 a CCA-006 cerradas. CCA-007 queda pendiente de PR, CI remoto, merge y
-verificación post-merge de `master`.
+CCA-001 a CCA-007 cerradas.
+
+- PR: `#259`, fusionado en `master` el 2026-11-13.
+- Merge commit: `653b5ebc96fa6f9bebd32d969177bc3e5c621f2e`.
+- CI del PR: backend, frontend y `unified-access-real-e2e` verdes. El primer
+  frontend tuvo un fallo intermitente en un E2E preexistente de alta de catálogo
+  (88/89); el rerun sin cambios pasó completo.
+- CI post-merge: run `43481720083` verde sobre el SHA de merge; backend 3:31,
+  frontend 4:43 y E2E real 6:06.

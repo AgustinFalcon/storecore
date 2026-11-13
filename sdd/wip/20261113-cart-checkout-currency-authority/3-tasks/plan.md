@@ -8,7 +8,7 @@
 | CCA-004 | Tipar mapper, dominio, store, repository y vista Angular. | Done | `CartCurrency`, sin strings/fallback/input editable; serialización sólo mediante `.wire`. |
 | CCA-005 | Agregar pruebas backend/frontend y UX fail-closed. | Done | Matrices ARS/Unknown, replay inválido, revocación concurrente y serialización cubiertas. |
 | CCA-006 | Ejecutar suites y doble revisión del código. | Done | Backend 407/407; frontend 1229/1229; dos GO GPT-6.1 Sol sin P0–P3. |
-| CCA-007 | Ejecutar CI, fusionar y verificar `master`. | Pending | Tres jobs verdes en PR y post-merge. |
+| CCA-007 | Ejecutar CI, fusionar y verificar `master`. | Done | PR #259 fusionado como `653b5eb`; tres jobs verdes en PR y post-merge. |
 
 Este plan no autoriza multimoneda, DDL, credenciales, activación de proveedores,
 homologación, fiscal ni producción.
