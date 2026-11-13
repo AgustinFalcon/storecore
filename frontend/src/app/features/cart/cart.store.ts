@@ -2,7 +2,7 @@ import { computed, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { filter, merge, Subject, switchMap, takeUntil, tap } from 'rxjs';
+import { filter, map, merge, Subject, switchMap, takeUntil, tap } from 'rxjs';
 import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessContext } from '../../domain/access/access-context';
@@ -11,6 +11,7 @@ import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.u
 import { ApiErrorCode } from '../../core/api/api-error-code';
 import { environment } from '../../../environments/environment';
 import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { CartCurrency } from '../../domain/cart/cart-currency';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.usecase';
 import { GetCartUseCase } from '../../domain/cart/use-cases/get-cart.usecase';
@@ -23,7 +24,6 @@ export interface CartState {
   readonly cart: Cart;
   readonly addresses: readonly CustomerAddress[];
   readonly addressId: string;
-  readonly currency: string;
   readonly idempotencyKey: string;
   readonly receipt: CheckoutReceipt | null;
   readonly failureKind: CartFailureKind;
@@ -34,15 +34,15 @@ export enum CartFailureKind {
   Load = 'LOAD',
   CheckoutRetryable = 'CHECKOUT_RETRYABLE',
   CheckoutProductUnavailable = 'CHECKOUT_PRODUCT_UNAVAILABLE',
+  CurrencyUnavailable = 'CURRENCY_UNAVAILABLE',
 }
 
 const initialState = (): CartState => ({
   loading: false,
   errorMessage: '',
-  cart: { lines: [], currency: '' },
+  cart: { lines: [], currency: CartCurrency.Unknown },
   addresses: [],
   addressId: '',
-  currency: 'ARS',
   idempotencyKey: crypto.randomUUID(),
   receipt: null,
   failureKind: CartFailureKind.None,
@@ -52,6 +52,8 @@ const initialState = (): CartState => ({
 export class CartStore extends ComponentStore<CartState> {
   readonly authority = computed(() => CustomerCartAccess.resolve(this.access.state(), this.customer.actorIdentity()));
   private actor: string | null = null;
+  private cartRequestGeneration = 0;
+  private currencyRevoked = false;
   private readonly cancelActorWork = new Subject<void>();
   constructor(
     private readonly getCart: GetCartUseCase,
@@ -67,6 +69,8 @@ export class CartStore extends ComponentStore<CartState> {
       const actor = this.authority().canMutate ? this.customer.actorIdentity() : null;
       if (actor === this.actor) return;
       this.actor = actor;
+      this.cartRequestGeneration += 1;
+      this.currencyRevoked = false;
       this.cancelActorWork.next();
       this.setState(initialState());
     });
@@ -82,26 +86,26 @@ export class CartStore extends ComponentStore<CartState> {
   readonly addresses$ = this.select((s) => s.addresses);
   readonly receipt$ = this.select((s) => s.receipt);
   readonly empty$ = this.select((s) => !s.loading && s.cart.lines.length === 0);
-  readonly canPay$ = this.select((s) => !s.loading && s.cart.lines.length > 0 && s.addressId.length > 0 && s.currency.length > 0);
+  readonly canPay$ = this.select((s) => !s.loading && s.cart.lines.length > 0 && s.addressId.length > 0 && s.cart.currency.canCheckout);
 
   readonly setAddressId = this.updater((s, addressId: string) => ({ ...s, addressId: s.addresses.some((address) => address.id === addressId) ? addressId : '' }));
-  readonly setCurrency = this.updater((s, currency: string) => ({ ...s, currency: currency === 'ARS' ? currency : 'ARS' }));
-
   readonly load = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
-      tap(() => this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None })),
-      switchMap(() =>
+      map(() => this.beginCartRequest(true)),
+      tap(() => this.patchState({
+        loading: true,
+        errorMessage: '',
+        failureKind: this.snapshot.failureKind === CartFailureKind.CurrencyUnavailable
+          ? CartFailureKind.CurrencyUnavailable
+          : CartFailureKind.None,
+      })),
+      switchMap((request) =>
         this.getCart.execute().pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
-            next: (cart) =>
-              this.patchState({
-                cart,
-                currency: 'ARS',
-                loading: false,
-              }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
+            next: (cart) => this.acceptCartResponse(request, cart),
+            error: (err: unknown) => this.acceptCartError(request.generation, err),
           }),
         ),
       ),
@@ -130,13 +134,20 @@ export class CartStore extends ComponentStore<CartState> {
   readonly add = this.effect<{ sku: string; quantity: number }>((line$) =>
     line$.pipe(
       filter(() => this.actor !== null),
-      tap(() => this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None })),
-      switchMap((line) =>
+      map((line) => ({ line, request: this.beginCartRequest(false) })),
+      tap(() => this.patchState({
+        loading: true,
+        errorMessage: '',
+        failureKind: this.snapshot.failureKind === CartFailureKind.CurrencyUnavailable
+          ? CartFailureKind.CurrencyUnavailable
+          : CartFailureKind.None,
+      })),
+      switchMap(({ line, request }) =>
         this.addLine.execute(line.sku, line.quantity).pipe(
           takeUntil(this.cancelActorWork),
           tapResponse({
-            next: (cart) => this.patchState({ cart, loading: false }),
-            error: (err: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(err), failureKind: CartFailureKind.Load }),
+            next: (cart) => this.acceptCartResponse(request, cart),
+            error: (err: unknown) => this.acceptCartError(request.generation, err),
           }),
         ),
       ),
@@ -147,25 +158,32 @@ export class CartStore extends ComponentStore<CartState> {
     trigger$.pipe(
       filter(() => this.actor !== null),
       tap(() => {
-        if (!this.hasCurrentAddress() || !this.snapshot.currency) {
-          this.patchState({ errorMessage: 'Elegí entrega y moneda antes de pagar.', failureKind: CartFailureKind.None });
+        if (!this.hasCurrentAddress() || !this.snapshot.cart.currency.canCheckout) {
+          this.patchState({
+            errorMessage: this.snapshot.cart.currency.canCheckout
+              ? 'Elegí una dirección de entrega antes de pagar.'
+              : CartCurrency.Unknown.label,
+            failureKind: this.snapshot.cart.currency.canCheckout
+              ? CartFailureKind.None
+              : CartFailureKind.CurrencyUnavailable,
+          });
           return;
         }
         this.patchState({ loading: true, errorMessage: '', failureKind: CartFailureKind.None });
       }),
-      filter(() => Boolean(this.hasCurrentAddress() && this.snapshot.currency)),
+      filter(() => this.hasCurrentAddress() && this.snapshot.cart.currency.canCheckout),
       switchMap(() =>
         this.checkout
           .execute({
             idempotencyKey: this.snapshot.idempotencyKey,
             addressId: this.snapshot.addressId,
-            currency: this.snapshot.currency,
+            currency: this.snapshot.cart.currency,
           })
           .pipe(
             takeUntil(this.cancelActorWork),
             tapResponse({
               next: (receipt) => {
-                this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), currency: 'ARS', failureKind: CartFailureKind.None });
+                this.patchState({ receipt, loading: false, idempotencyKey: crypto.randomUUID(), failureKind: CartFailureKind.None });
                 const checkoutUrl = receipt.checkoutUrl ?? null;
                 if (this.isAllowlistedCheckoutUrl(checkoutUrl)) {
                   window.location.assign(checkoutUrl);
@@ -173,13 +191,25 @@ export class CartStore extends ComponentStore<CartState> {
                 }
                 void this.router.navigate(['/checkout/result', receipt.orderId]);
               },
-              error: (err: unknown) => this.patchState({
-                loading: false,
-                errorMessage: getApiErrorMessage(err),
-                failureKind: getApiErrorCode(err) === ApiErrorCode.ProductNotSellable
-                  ? CartFailureKind.CheckoutProductUnavailable
-                  : CartFailureKind.CheckoutRetryable,
-              }),
+              error: (err: unknown) => {
+                const code = getApiErrorCode(err);
+                if (code === ApiErrorCode.UnsupportedCurrency) {
+                  this.cartRequestGeneration += 1;
+                  this.currencyRevoked = true;
+                }
+                this.patchState({
+                  loading: false,
+                  errorMessage: getApiErrorMessage(err),
+                  cart: code === ApiErrorCode.UnsupportedCurrency
+                    ? { ...this.snapshot.cart, currency: CartCurrency.Unknown }
+                    : this.snapshot.cart,
+                  failureKind: code === ApiErrorCode.UnsupportedCurrency
+                    ? CartFailureKind.CurrencyUnavailable
+                    : code === ApiErrorCode.ProductNotSellable
+                      ? CartFailureKind.CheckoutProductUnavailable
+                      : CartFailureKind.CheckoutRetryable,
+                });
+              },
             }),
           ),
       ),
@@ -188,6 +218,40 @@ export class CartStore extends ComponentStore<CartState> {
 
   private hasCurrentAddress(): boolean {
     return this.snapshot.addresses.some((address) => address.id === this.snapshot.addressId);
+  }
+
+  private beginCartRequest(canRestoreCurrency: boolean): CartRequest {
+    return { generation: ++this.cartRequestGeneration, canRestoreCurrency };
+  }
+
+  private acceptCartResponse(request: CartRequest, cart: Cart): void {
+    if (request.generation !== this.cartRequestGeneration) return;
+    this.patchState(this.cartLoadedState(cart, request.canRestoreCurrency));
+  }
+
+  private acceptCartError(generation: number, error: unknown): void {
+    if (generation !== this.cartRequestGeneration) return;
+    this.patchState({ loading: false, errorMessage: getApiErrorMessage(error), failureKind: CartFailureKind.Load });
+  }
+
+  private cartLoadedState(cart: Cart, canRestoreCurrency: boolean): Partial<CartState> {
+    if (!cart.currency.canCheckout) this.currencyRevoked = true;
+    if (canRestoreCurrency && cart.currency.canCheckout) this.currencyRevoked = false;
+    if (this.currencyRevoked) {
+      return {
+        cart: { ...cart, currency: CartCurrency.Unknown },
+        loading: false,
+        errorMessage: CartCurrency.Unknown.label,
+        failureKind: CartFailureKind.CurrencyUnavailable,
+      };
+    }
+    const currencyAvailable = cart.currency.canCheckout;
+    return {
+      cart,
+      loading: false,
+      errorMessage: currencyAvailable ? '' : CartCurrency.Unknown.label,
+      failureKind: currencyAvailable ? CartFailureKind.None : CartFailureKind.CurrencyUnavailable,
+    };
   }
 
   selectCustomer(): void {
@@ -208,4 +272,9 @@ export class CartStore extends ComponentStore<CartState> {
       return false;
     }
   }
+}
+
+interface CartRequest {
+  readonly generation: number;
+  readonly canRestoreCurrency: boolean;
 }

@@ -66,9 +66,7 @@
         <h2>Resumen</h2>
         <p class="sc-summary__label">Total efectivo</p>
         <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ total }}</p>
-        @if (state.cart.currency) {
-          <p class="sc-price__meta">{{ state.cart.currency }}</p>
-        }
+        <p class="sc-price__meta">{{ state.cart.currency.label }}</p>
         <a class="sc-btn sc-btn--primary sc-btn--block" routerLink="/checkout">Checkout</a>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/catalog">Seguir comprando</a>
       </aside>

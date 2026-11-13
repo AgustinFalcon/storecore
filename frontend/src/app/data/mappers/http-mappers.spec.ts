@@ -4,6 +4,7 @@ import { CapabilityModuleState } from '../../domain/user/capability-module-state
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, ShipmentStatus } from '../../domain/order/commerce-states';
 import { InventoryState } from '../../domain/catalog/catalog-states';
+import { CartCurrency } from '../../domain/cart/cart-currency';
 
 const inventoryPage = (items: unknown[]) => ({ items, total: items.length, page: 0, size: 50, truncated: false });
 
@@ -134,11 +135,13 @@ describe('http-mappers', () => {
   });
 
   it('accepts an explicit empty cart and rejects malformed collections and currency', () => {
-    expect(mapCart({ lines: [], currency: 'ARS' })).toEqual({ lines: [], currency: 'ARS' });
+    expect(mapCart({ lines: [], currency: 'ARS' })).toEqual({ lines: [], currency: CartCurrency.Ars });
     for (const invalid of [undefined, null, [], {}, true, 0, 'cart', { lines: null, currency: 'ARS' }, { lines: {}, currency: 'ARS' }]) {
       expect(() => mapCart(invalid)).toThrow();
     }
-    for (const currency of [undefined, null, '', '  ', 1, {}, [], false]) expect(() => mapCart({ lines: [], currency })).toThrow();
+    for (const currency of [undefined, null, '', '  ', 'USD', 1, {}, [], false]) {
+      expect(mapCart({ lines: [], currency }).currency).toBe(CartCurrency.Unknown);
+    }
   });
 
   it('requires complete line identities, safe positive quantities and coherent money without coercion', () => {

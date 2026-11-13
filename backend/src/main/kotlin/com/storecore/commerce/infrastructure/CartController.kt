@@ -1,6 +1,7 @@
 package com.storecore.commerce.infrastructure
 
 import com.storecore.identity.infrastructure.web.BaseResponse
+import com.storecore.commerce.domain.PaymentCurrency
 import com.storecore.identity.infrastructure.web.IdentityMutationCoordinator
 import com.storecore.identity.infrastructure.web.RequestAuth
 import jakarta.servlet.http.HttpServletRequest
@@ -33,7 +34,7 @@ class CartController(private val carts: JdbcCartService, private val auth: Reque
     @PostMapping("/checkout")
     fun checkout(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @Valid @RequestBody request: CheckoutRequest): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http); val customer = auth.customer(http)
-        return csrfOk(mutations.execute(customer, csrf) { carts.checkout(customer, UUID.fromString(request.idempotencyKey), request.addressId.toLong(), request.currency) })
+        return csrfOk(mutations.execute(customer, csrf) { carts.checkout(customer, UUID.fromString(request.idempotencyKey), request.addressId.toLong(), PaymentCurrency.fromWire(request.currency)) })
     }
 }
 

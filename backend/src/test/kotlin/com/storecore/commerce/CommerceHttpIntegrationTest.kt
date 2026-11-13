@@ -40,6 +40,7 @@ class CommerceHttpIntegrationTest(
 
     @BeforeEach
     fun seed() {
+        jdbc.update("INSERT INTO installation_settings(installation_id,business_name,allowed_host,currency) VALUES (1,'Test','localhost','ARS') ON CONFLICT (installation_id) DO UPDATE SET currency='ARS'")
         admin = provisionAdmin("admin-${UUID.randomUUID()}@example.com")
         customer = registerCustomer("shopper-${UUID.randomUUID()}@example.com")
         listOf("STOREFRONT", "CATALOG", "PAYMENTS_MP", "MANUAL_FULFILLMENT", "MANUAL_PROMOTIONS", "MARKETPLACE_ML", "PROFILE_CONTENT").forEach { activate(it) }
@@ -89,8 +90,8 @@ class CommerceHttpIntegrationTest(
         assertTrue(replay.body!!.contains("\"orderId\":\"$orderId\""))
         customer = customer.copy(csrf = replay.headers.getFirst("X-CSRF-Token")!!)
         val conflict = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"USD"}""", customer.cookie, customer.csrf)
-        assertTrue(conflict.statusCode.value() == 400 || conflict.statusCode.value() == 409, conflict.body)
-        assertTrue(conflict.body!!.contains("CHECKOUT_IDEMPOTENCY_CONFLICT") || conflict.body!!.contains("UNSUPPORTED_CURRENCY"))
+        assertEquals(400, conflict.statusCode.value(), conflict.body)
+        assertTrue(conflict.body!!.contains("UNSUPPORTED_CURRENCY"))
         customer = customer.copy(csrf = conflict.headers.getFirst("X-CSRF-Token") ?: customer.csrf)
         customer = addAddress(customer)
         val changedAddress = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
@@ -119,6 +120,62 @@ class CommerceHttpIntegrationTest(
         val foreign = exchange("/api/v1/customer/orders/$orderId", HttpMethod.GET, null, stranger.cookie)
         assertEquals(404, foreign.statusCode.value())
         assertTrue(foreign.body!!.contains("RESOURCE_NOT_FOUND"))
+    }
+
+    @Test
+    fun `missing installation currency is explicit unknown and checkout has no side effects`() {
+        val sku = "SKU-NO-CURRENCY-${UUID.randomUUID()}"
+        putProduct(sku, "No currency item", available = 5, safety = 0)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val beforeOrders = jdbc.queryForObject("SELECT COUNT(*) FROM orders", Int::class.java)!!
+        val beforePayments = jdbc.queryForObject("SELECT COUNT(*) FROM payments", Int::class.java)!!
+        val beforeReservations = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_reservations", Int::class.java)!!
+
+        jdbc.update("DELETE FROM installation_settings WHERE installation_id=1")
+        try {
+            val cart = exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie)
+            assertEquals("UNKNOWN", mapper.readTree(cart.body!!).path("data").path("currency").asText())
+            val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+            assertEquals(400, checkout.statusCode.value(), checkout.body)
+            assertTrue(checkout.body!!.contains("UNSUPPORTED_CURRENCY"))
+            assertEquals(beforeOrders, jdbc.queryForObject("SELECT COUNT(*) FROM orders", Int::class.java))
+            assertEquals(beforePayments, jdbc.queryForObject("SELECT COUNT(*) FROM payments", Int::class.java))
+            assertEquals(beforeReservations, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_reservations", Int::class.java))
+        } finally {
+            jdbc.update("INSERT INTO installation_settings(installation_id,business_name,allowed_host,currency) VALUES (1,'Test','localhost','ARS') ON CONFLICT (installation_id) DO UPDATE SET currency='ARS'")
+        }
+    }
+
+    @Test
+    fun `replay rejects an unknown snapshotted currency without creating new effects`() {
+        val sku = "SKU-REPLAY-CURRENCY-${UUID.randomUUID()}"
+        putProduct(sku, "Replay currency item", available = 5, safety = 0)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val key = UUID.randomUUID()
+        val body = """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}"""
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        customer = customer.copy(csrf = first.headers.getFirst("X-CSRF-Token")!!)
+        val beforeOrders = jdbc.queryForObject("SELECT COUNT(*) FROM orders", Int::class.java)!!
+        val beforePayments = jdbc.queryForObject("SELECT COUNT(*) FROM payments", Int::class.java)!!
+        val beforeReservations = jdbc.queryForObject("SELECT COUNT(*) FROM inventory_reservations", Int::class.java)!!
+        jdbc.execute("ALTER TABLE checkout_idempotency_claims DISABLE TRIGGER trg_prevent_checkout_claim_evidence_mutation")
+        try {
+            jdbc.update("UPDATE checkout_idempotency_claims SET checkout_snapshot=jsonb_set(checkout_snapshot,'{currency}','\"USD\"'::jsonb) WHERE checkout_idempotency_key=?", key)
+            val replay = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+
+            assertEquals(400, replay.statusCode.value(), replay.body)
+            assertTrue(replay.body!!.contains("UNSUPPORTED_CURRENCY"))
+            assertEquals(beforeOrders, jdbc.queryForObject("SELECT COUNT(*) FROM orders", Int::class.java))
+            assertEquals(beforePayments, jdbc.queryForObject("SELECT COUNT(*) FROM payments", Int::class.java))
+            assertEquals(beforeReservations, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_reservations", Int::class.java))
+        } finally {
+            jdbc.execute("ALTER TABLE checkout_idempotency_claims ENABLE TRIGGER trg_prevent_checkout_claim_evidence_mutation")
+        }
     }
 
     @Test

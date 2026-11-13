@@ -4,6 +4,10 @@ export class ApiErrorCode {
     'PRODUCT_NOT_SELLABLE',
     'Hay productos que ya no están disponibles. Volvé al carrito y quitá esos artículos antes de pagar.',
   );
+  static readonly UnsupportedCurrency = new ApiErrorCode(
+    'UNSUPPORTED_CURRENCY',
+    'La moneda de esta instalación no está disponible. Actualizá el carrito antes de continuar.',
+  );
   static readonly Unknown = new ApiErrorCode('UNKNOWN', '');
 
   private constructor(
@@ -14,6 +18,7 @@ export class ApiErrorCode {
   static fromWire(value: unknown): ApiErrorCode {
     if (value === ApiErrorCode.CsrfInvalid.wire) return ApiErrorCode.CsrfInvalid;
     if (value === ApiErrorCode.ProductNotSellable.wire) return ApiErrorCode.ProductNotSellable;
+    if (value === ApiErrorCode.UnsupportedCurrency.wire) return ApiErrorCode.UnsupportedCurrency;
     return ApiErrorCode.Unknown;
   }
 }
