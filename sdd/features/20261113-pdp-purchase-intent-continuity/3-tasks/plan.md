@@ -9,5 +9,5 @@
 - [x] T7. Integrar confirmación explícita, resultado ambiguo/terminal, TTL y cercos de actor/revisión/concurrencia.
 - [x] T8. Cubrir matriz focal y ejecutar gates completos.
 - [x] T9. Revisar código/seguridad con agentes Sol y corregir hasta aprobación.
-- [ ] T10. Crear PR, pasar CI, fusionar y verificar post-merge.
-- [ ] T11. Cerrar SDD con evidencia final.
+- [x] T10. Crear PR, pasar CI, fusionar y verificar post-merge.
+- [x] T11. Cerrar SDD con evidencia final.

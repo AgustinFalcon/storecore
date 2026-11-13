@@ -1,0 +1,18 @@
+{
+  "feature": "20261113-pdp-purchase-intent-continuity",
+  "status": "completed",
+  "stats": { "total": 11, "done": 11, "in_progress": 0, "pending": 0 },
+  "tasks": [
+    { "id": "PPI-001", "title": "Auditar PDP y acceso", "status": "done", "evidence": "Auditoría coordinada funcional/técnica" },
+    { "id": "PPI-002", "title": "Definir persistencia y mutación explícita", "status": "done", "evidence": "Same-tab, TTL y SET confirmado" },
+    { "id": "PPI-003", "title": "Aprobar specs", "status": "done", "evidence": "Dos reviews GPT-6.1 Sol" },
+    { "id": "PPI-004", "title": "Implementar dominio y coordinador", "status": "done", "evidence": "Tipos cerrados, puertos, adaptador y pasos" },
+    { "id": "PPI-005", "title": "Integrar PDP", "status": "done", "evidence": "Captura, restauración y confirmación exactas" },
+    { "id": "PPI-006", "title": "Propagar referencia opaca", "status": "done", "evidence": "Login, challenge y registro" },
+    { "id": "PPI-007", "title": "Cerrar concurrencia y outcomes", "status": "done", "evidence": "TTL, actor, revisión y resultado ambiguo" },
+    { "id": "PPI-008", "title": "Ejecutar gates locales", "status": "done", "evidence": "Frontend 203 archivos / 1380 pruebas" },
+    { "id": "PPI-009", "title": "Cerrar reviews", "status": "done", "evidence": "APPROVE funcional/UX y técnico/seguridad" },
+    { "id": "PPI-010", "title": "Entregar por PR y verificar master", "status": "done", "evidence": "PR #267; runs 43522541468 y 43523386759" },
+    { "id": "PPI-011", "title": "Archivar SDD", "status": "done", "evidence": "Documentación final generada" }
+  ]
+}
