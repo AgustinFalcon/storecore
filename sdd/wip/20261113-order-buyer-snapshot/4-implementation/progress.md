@@ -26,3 +26,12 @@
   exit 0. La primera ejecución aislada falló por permisos de lectura del sandbox;
   la repetición fuera del sandbox confirmó que no era un defecto del código.
 - Estado: listo para commit, PR y CI.
+- Commit de implementación: `fc72978` (`fix(orders): freeze canonical buyer identity`).
+- PR #263 fusionado en `master` como
+  `332cd52421323728907a80a2eebc8fad88ea275e`.
+- CI del PR `43506125028`: backend, frontend con accesibilidad y E2E de acceso
+  unificado reales, todos verdes.
+- CI post-merge `43507158447` sobre el SHA exacto `332cd524`: backend 5m08s,
+  frontend 5m03s y E2E real 5m43s, todos verdes.
+- Estado final: `DELIVERED`; no quedan tareas de implementación ni gates abiertos
+  en este corte.
