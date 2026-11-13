@@ -50,7 +50,10 @@ No se infiere homologación externa de ninguno de estos cortes.
 ## Gate `release/1.0` de integración BlackStore
 
 - [ ] `master` homologado con CI y reviews sobre el SHA final de cada corte core.
-- [ ] Facturación/ARCA homologada con contrato oficial, adapter, credenciales por referencia y E2E aprobado.
+- [ ] Facturación/ARCA homologada con contrato oficial, adapter, credenciales
+  por referencia y E2E aprobado. La biblioteca candidata RC.4 ya pasó sus gates
+  locales y CI remoto (`8efeace`), pero no tiene tag/paquete remoto acreditado y
+  no sustituye matriz fiscal, adapter StoreCore ni homologación.
 - [ ] Correo Argentino homologado con contrato oficial seleccionado, adapter,
   credenciales por referencia y E2E aprobado. Discovery actual:
   `sdd/wip/20261111-correo-argentino-carrier-discovery/` (NO-GO para código).

@@ -25,7 +25,14 @@
 - TODO-045 [high] [done] `commerce-rma-item-disposition-and-restock`: clasificación por ítem, reposición RESTOCK-only, auditoría, idempotencia, recuperación y carreras cerradas en `sdd/features/20261109-commerce-rma-item-disposition-and-restock/`. PR #233 candidato `fc80316`, Verify `42666041072` 3/3; comandos legacy INSPECTED/ADJUSTED permanecen rechazados.
 - TODO-046 [high] [done] `storecore-bounded-list-navigation`: paginación completa y accesible del catálogo público/admin e inventario sobre los reads HTTP existentes; contrato absoluto de `truncated`, recuperación acotada, actor binding y foco preservado. PR #234 candidato `4e99400`, Verify `42675235368` 3/3; sin DDL ni proveedores.
 
-- TODO-020 [high] [blocked] `external-fiscal-adapter`: biblioteca/repositorio externo conforme y auditable; D-01..D-07, titular/contador y Sol GO. Sin DDL/tarea fiscal StoreCore y nunca ventas ocultas/evasión.
+- TODO-020 [high] [blocked] `external-fiscal-adapter`: la biblioteca externa
+  `0.1.0-RC.4` ya tiene candidato auditable en `8efeace` con estados cerrados,
+  resiliencia JDBC/worker, 78 pruebas y CI post-merge verde. El adapter
+  StoreCore sigue bloqueado por matriz/emisor/PV, trigger durable,
+  correlaciones, ownership inbox/outbox, distribución versionada, titular/
+  contador y aprobación independiente. Ver
+  `sdd/wip/20261113-storecore-arca-library-readiness/`. Sin credenciales, DDL o
+  tarea fiscal StoreCore; nunca ventas ocultas/evasión.
 - TODO-030 [medium] [deferred] `ml-competition-insights`: sólo señales oficiales/licenciadas read-only, fuente/fecha/confianza. Rechaza premisa top-5 y scraping.
 - TODO-031 [high] [deferred] `ml-price-automation-management`: APIs oficiales; opt-in por listing, min/max, margen, cooldown, auditoría, kill switch y exclusión mutua con writer local.
 - TODO-032 [high] [deferred] `ml-promotion-orchestrator`: candidatos/ofertas/promos oficiales, eligibility/preflight, aprobación humana o preautorización acotada, margen, rollback/reconcile; no promo por scraping.
