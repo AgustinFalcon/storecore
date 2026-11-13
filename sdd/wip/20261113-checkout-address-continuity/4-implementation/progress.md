@@ -46,4 +46,10 @@ canales independientes, fence por actor y retorno cerrado/reactivo.
 - GitHub Actions pre-merge: run `43495650447`.
 - Jobs `backend`, `frontend` y `unified-access-real-e2e`: PASS.
 
-Pendiente exclusivo: merge y verificación post-merge de `master`.
+## Cierre
+
+- PR `#261` fusionado a `master` en `ae36a99e24152fbd38e93185d8254041a151b390`.
+- GitHub Actions post-merge: run `43497831638`.
+- Jobs `backend`, `frontend` y `unified-access-real-e2e`: PASS.
+- Sin tareas funcionales, técnicas, de review o de validación pendientes en este
+  corte.
