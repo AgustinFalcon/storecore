@@ -70,6 +70,57 @@ test('two already valid sessions choose locally and do not consume a challenge',
   expect(selectionRequests).toBe(0);
 });
 
+test('empty checkout resolves an address and returns with a confirmed selection', async ({ page }) => {
+  let addresses: Record<string, unknown>[] = [];
+  await page.route('**/api/v1/**', async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/internal/me')) return route.fulfill({ status: 401, json: {} });
+    if (path.endsWith('/customer/me') && request.method() === 'GET') {
+      return route.fulfill({ json: envelope({ id: 'buyer-1', email: 'buyer@example.test', firstName: 'Buyer', lastName: 'Test', phone: '' }) });
+    }
+    if (path.endsWith('/customer/auth/csrf')) {
+      return route.fulfill({ json: envelope({}), headers: { 'X-CSRF-Token': 'test-csrf' } });
+    }
+    if (path.endsWith('/customer/cart')) {
+      return route.fulfill({ json: envelope({ currency: 'ARS', lines: [{ sku: 'SKU-1', name: 'Taladro', quantity: 1, effectiveUnitPrice: 1000, originalUnitPrice: 1000, discountAmount: 0, offerRef: null, campaignRef: null }] }) });
+    }
+    if (path.endsWith('/customer/me/addresses') && request.method() === 'GET') {
+      return route.fulfill({ json: envelope(addresses) });
+    }
+    if (path.endsWith('/customer/me/addresses') && request.method() === 'POST') {
+      const payload = request.postDataJSON() as Record<string, unknown>;
+      const saved = { ...payload, id: 'address-1' };
+      addresses = [saved];
+      return route.fulfill({ json: envelope(saved) });
+    }
+    return route.fulfill({ status: 503, json: {} });
+  });
+
+  await page.goto('/checkout');
+  const addAddress = page.getByRole('link', { name: 'Agregar dirección' });
+  await expect(addAddress).toBeVisible();
+  await addAddress.focus();
+  await expect(addAddress).toBeFocused();
+  await checkAxe(page);
+  await addAddress.click();
+  await expect(page).toHaveURL(/\/customer\/addresses\?returnTo=checkout$/);
+
+  await page.getByLabel('Calle', { exact: true }).fill('Calle Demo');
+  await page.getByLabel('Número', { exact: true }).fill('42');
+  await page.getByLabel('Ciudad', { exact: true }).fill('Córdoba');
+  await page.getByLabel('Provincia', { exact: true }).fill('Córdoba');
+  await page.getByLabel('CP', { exact: true }).fill('5000');
+  await page.getByRole('button', { name: 'Agregar', exact: true }).click();
+  const back = page.getByRole('link', { name: 'Volver al checkout' });
+  await expect(back).toBeVisible();
+  await checkAxe(page);
+  await back.click();
+  await expect(page).toHaveURL(/\/checkout$/);
+  await expect(page.getByLabel('Dirección')).toHaveValue('address-1');
+  await expect(page.getByRole('button', { name: 'Pagar', exact: true })).toBeEnabled();
+});
+
 for (const role of [UserRole.Admin, UserRole.Operator]) {
   test(`operational home is accessible for ${role.label}`, async ({ page }) => {
     await page.route('**/api/v1/**', async (route) => {

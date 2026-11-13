@@ -1,7 +1,7 @@
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
 import { CheckoutPageViewComponent } from './checkout-page.view';
-import { CartFailureKind, CartStore } from './cart.store';
+import { CartStore } from './cart.store';
 
 @Component({
   selector: 'sc-checkout-page',
@@ -15,7 +15,8 @@ import { CartFailureKind, CartStore } from './cart.store';
         (selectCustomer)="store.selectCustomer()"
         (addressChange)="store.setAddressId($event)"
         (pay)="store.submitCheckout()"
-        (retry)="retry()"
+        (readRetry)="reload()"
+        (paymentRetry)="store.submitCheckout()"
       />
     }
   `,
@@ -32,11 +33,4 @@ export class CheckoutPageComponent implements OnInit {
     this.store.loadAddresses();
   }
 
-  retry(): void {
-    if (this.store.snapshot.failureKind === CartFailureKind.CheckoutRetryable) {
-      this.store.submitCheckout();
-      return;
-    }
-    this.reload();
-  }
 }
