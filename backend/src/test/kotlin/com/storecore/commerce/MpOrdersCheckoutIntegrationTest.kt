@@ -10,6 +10,7 @@ import com.storecore.commerce.application.port.output.WebhookSignatureDecision
 import com.storecore.commerce.domain.CreationObservation
 import com.storecore.commerce.domain.OfficialOrderResource
 import com.storecore.commerce.domain.OfficialOrderTransaction
+import com.storecore.commerce.domain.PaymentCurrency
 import com.storecore.commerce.domain.RemoteOrderCandidate
 import com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService
 import com.storecore.commerce.infrastructure.mporders.MpOrderApplicationWorker
@@ -193,6 +194,58 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals("REFETCHED_ORDER_ID_MISMATCH", jdbc.queryForObject("SELECT last_error FROM mp_order_notification_processing p JOIN mp_order_notification_inbox i ON i.id=p.inbox_id WHERE i.query_data_id=?", String::class.java, claimed))
         assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId))
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mp_order_commercial_applications WHERE order_id=?", Int::class.java, orderId))
+    }
+
+    @Test
+    fun `official order with unknown currency is quarantined without financial or stock effects`() {
+        val sku = "SKU-CURRENCY-${UUID.randomUUID()}"
+        val orderId = checkout(sku)
+        val providerOrderId = "ORD-CURRENCY-${UUID.randomUUID()}"
+        bindRemote(orderId, providerOrderId, currency = PaymentCurrency.UNKNOWN)
+        val balanceBefore = jdbc.queryForObject(
+            "SELECT available_quantity FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=?",
+            Int::class.java,
+            sku,
+        )
+        notify(providerOrderId, "evt-currency", "req-currency")
+
+        assertEquals(0, worker.process())
+        assertEquals("PENDING", jdbc.queryForObject("SELECT status FROM payments WHERE order_id=?", String::class.java, orderId))
+        assertEquals("PENDING_PAYMENT", jdbc.queryForObject("SELECT status FROM orders WHERE id=?", String::class.java, orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mp_order_commercial_applications WHERE order_id=?", Int::class.java, orderId))
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE actor=?", Int::class.java, "MP_ORDERS:$orderId"))
+        assertEquals(
+            balanceBefore,
+            jdbc.queryForObject(
+                "SELECT available_quantity FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=?",
+                Int::class.java,
+                sku,
+            ),
+        )
+        assertEquals(
+            "ACTIVE",
+            jdbc.queryForObject(
+                "SELECT status FROM inventory_reservations WHERE reservation_saga_key=(SELECT (checkout_snapshot->>'reservationSagaKey')::uuid FROM orders WHERE id=?)",
+                String::class.java,
+                orderId,
+            ),
+        )
+        assertEquals(
+            "OFFICIAL_ORDER_MISMATCH",
+            jdbc.queryForObject(
+                "SELECT last_error FROM mp_order_notification_processing p JOIN mp_order_notification_inbox i ON i.id=p.inbox_id WHERE i.query_data_id=?",
+                String::class.java,
+                providerOrderId,
+            ),
+        )
+        assertEquals(
+            "QUARANTINED",
+            jdbc.queryForObject(
+                "SELECT status FROM mp_order_notification_processing p JOIN mp_order_notification_inbox i ON i.id=p.inbox_id WHERE i.query_data_id=?",
+                String::class.java,
+                providerOrderId,
+            ),
+        )
     }
 
     @Test
@@ -971,6 +1024,7 @@ class MpOrdersCheckoutIntegrationTest(
         status: String = "processed",
         detail: String = "accredited",
         paid: BigDecimal? = null,
+        currency: PaymentCurrency = PaymentCurrency.ARS,
     ) {
         val amount = jdbc.queryForObject("SELECT total FROM orders WHERE id=?", BigDecimal::class.java, orderId)!!
         val paidAmount = paid ?: amount
@@ -1001,7 +1055,7 @@ class MpOrdersCheckoutIntegrationTest(
             applicationId = "app-1",
             totalAmount = amount,
             paidAmount = paidAmount,
-            currency = "ARS",
+            currency = currency,
             status = status,
             statusDetail = detail,
             transactions = listOf(OfficialOrderTransaction(providerOrderId + "-pay", status, detail, paidAmount, "account_money")),
@@ -1023,7 +1077,7 @@ class MpOrdersCheckoutIntegrationTest(
     )
 
     private fun candidate(id: String, reference: String) = RemoteOrderCandidate(
-        id, reference, "user-1", "app-1", BigDecimal("100.00"), "ARS",
+        id, reference, "user-1", "app-1", BigDecimal("100.00"), PaymentCurrency.ARS,
     )
 
     private fun putProduct(sku: String, name: String, available: Int) {
