@@ -8,7 +8,7 @@
 | ALR-004 | Aprobar matriz fiscal, emisor, PV, comprobantes y rectificativos. | Blocked | Titular + contador; evidencia saneada y fechada. |
 | ALR-005 | Aprobar trigger durable, correlaciones y ownership inbox/outbox. | Blocked | Producto + plataforma + seguridad. |
 | ALR-006 | Publicar/pinear una versión consumible y abrir WIP de adapter. | Blocked | ALR-004/005 + paquete remoto o estrategia reproducible aprobada. |
-| ALR-007 | Ejecutar homologación WSAA/WSFEv1 y fallos/recovery. | Blocked | Credenciales autorizadas por referencia + ALR-006. |
+| ALR-007 | Ejecutar homologación contra el servicio y protocolo seleccionados por D-04, incluidos fallos/recovery. | Blocked | Credenciales autorizadas por referencia + ALR-006; no se presupone WSFEv1 mientras D-04 siga Open. |
 | ALR-008 | Autorizar producción y `release/1.0`. | Blocked | Revisión fiscal, seguridad, operación y evidencia E2E. |
 
 No se crea una tarea de código StoreCore antes de ALR-004/005. El cierre de

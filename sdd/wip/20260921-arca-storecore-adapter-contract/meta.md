@@ -18,3 +18,8 @@ Revisión final: el contrato no presupone `store_id`, DDL, emisor fiscal, WSFEv1
 ## Gates
 
 La implementación se habilita sólo después de D-01..D-07 y SC-01..SC-07, matriz fiscal validada por contador/titular, fuente actual de contrato Mercado Pago, manual/WSDL ARCA fechado y un GO explícito de Sol para las tareas concretas.
+
+La auditoría del 2026-11-13 y el formulario para completar esos gates están en
+`4-implementation/20261113-gate-audit.md` y `decision-intake-template.md`.
+Todos los gates permanecen Open; el baseline comercial MP Orders V4 es evidencia
+de entrada, no autorización fiscal.

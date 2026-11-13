@@ -55,6 +55,7 @@ NOT_ELIGIBLE → ELIGIBLE_PERSISTED → DISPATCH_QUEUED → DISPATCHING
                                                         ├→ AUTHORIZED
                                                         ├→ ABSENT_CONFIRMED
                                                         └→ MANUAL_REVIEW
+ABSENT_CONFIRMED → RETRY_SCHEDULED
 ```
 
 La transición a `ELIGIBLE_PERSISTED` crea la intención y su outbox en la misma transacción. El worker nunca consume una intención no confirmada. `UNKNOWN_RECONCILIATION` prohíbe una nueva emisión hasta consultar el comprobante exacto con los datos disponibles.
@@ -71,7 +72,8 @@ La transición a `ELIGIBLE_PERSISTED` crea la intención y su outbox en la misma
 | `DISPATCHING` | adapter | fallo probado antes de enviar | `RETRY_SCHEDULED` |
 | `DISPATCHING` | adapter | duda después de despacho | `UNKNOWN_RECONCILIATION` |
 | `UNKNOWN_RECONCILIATION` | conciliador | comprobante exacto hallado | `AUTHORIZED` |
-| `UNKNOWN_RECONCILIATION` | conciliador | ausencia demostrable + política/lease vigentes | `RETRY_SCHEDULED` de la **misma** intención |
+| `UNKNOWN_RECONCILIATION` | conciliador | ausencia exacta demostrable y evidencia persistida | `ABSENT_CONFIRMED` |
+| `ABSENT_CONFIRMED` | conciliador | política, reserva y fencing de la misma intención siguen vigentes | `RETRY_SCHEDULED` de la **misma** intención |
 | `UNKNOWN_RECONCILIATION` | conciliador | evidencia inconclusa/no automatizable | `MANUAL_REVIEW` |
 | `RETRY_SCHEDULED` | worker | backoff vencido + mismas claves/reserva verificable | `DISPATCHING` |
 
