@@ -16,10 +16,11 @@
 - Revisión de compatibilidad GPT-6.1 Sol: `APPROVED`, sin P0–P3.
 - Revisión de seguridad/supply chain GPT-6.1 Sol: `APPROVED`, sin P0–P3.
 - Ambas revisiones contrastaron resultados y no encontraron discrepancias.
+- PR #257, run `43453833670`: frontend 3:50, backend 5:17 y
+  `unified-access-real-e2e` 6:29; los tres finalizaron `success`.
 
 ## Evidencia pendiente
 
-- CI del PR con backend, frontend y E2E real.
 - CI post-merge sobre `master`.
 
 Este archivo se actualiza únicamente con resultados ejecutados y enlaces o

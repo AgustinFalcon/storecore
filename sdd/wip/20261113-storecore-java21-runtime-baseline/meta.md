@@ -1,7 +1,7 @@
 ---
 id: 20261113-storecore-java21-runtime-baseline
 title: StoreCore Java 21 runtime baseline
-status: ready_for_pr
+status: pr_verified
 maturity: implementation
 owner: platform
 created: 2026-11-13
@@ -21,4 +21,4 @@ El cambio mantiene intactos el dominio, los estados cerrados, el esquema de
 base de datos y las APIs. La evidencia exigida incluye una compilación limpia
 con JDK 21 y el workflow completo de GitHub sobre la misma versión. La prueba
 local y dos revisiones independientes están completas; quedan pendientes el CI
-del PR y el CI post-merge.
+post-merge. El CI del PR aprobó los tres jobs obligatorios.
