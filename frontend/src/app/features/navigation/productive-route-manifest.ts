@@ -126,7 +126,7 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
   };
   const invalidSecret = `#realm=customer&token=${'a'.repeat(43)}`;
   return Object.freeze([
-    real('', '/', receipt.homeTitle, textSelector(receipt.homeTitle)),
+    real('', '/', 'Inicio', textSelector(receipt.homeTitle)),
     real('login', '/login', 'Ingresar', '#login-title'),
     real('recover', '/recover', 'Recuperar acceso', '#recovery-title'),
     real('reset-password', `/reset-password${invalidSecret}`, 'Nueva contraseña', '#recovery-title'),
