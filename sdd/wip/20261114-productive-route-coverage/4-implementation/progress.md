@@ -27,4 +27,9 @@
   `sendBeacon`; sólo se permiten documentos/assets GET del origen local.
 - Bugbot y Security Review revalidaron el diff final y emitieron `APPROVE`, sin
   hallazgos P0-P3.
+- El primer CI Linux detectó dos diferencias que Windows no expuso: la tabla de
+  detalle de orden no era enfocada cuando desbordaba y los controles de ofertas
+  podían imponer ancho intrínseco. Se agregó región accesible con foco y límites
+  de ancho para paneles, labels y controles. Los dos casos pasaron 10/10 en una
+  repetición focal; luego `verify` y `test:a11y` volvieron a pasar completos.
 - Ninguna de estas cifras se presenta como evidencia de backend real.

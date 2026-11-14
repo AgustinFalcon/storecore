@@ -840,6 +840,7 @@ pre {
 .sc-filters label {
   display: grid;
   gap: var(--sc-space-2);
+  min-width: 0;
 }
 
 .sc-auth__form input,
@@ -848,6 +849,9 @@ pre {
 .sc-panel textarea,
 .sc-table input {
   font: inherit;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--sc-color-line);
   border-radius: var(--sc-radius-sm);
@@ -1086,6 +1090,11 @@ pre {
 .sc-workbench .sc-panel,
 .sc-workbench__aside > .sc-panel {
   width: 100%;
+  min-width: 0;
+}
+
+.sc-workbench > * {
+  min-width: 0;
 }
 
 .sc-workbench__main,
