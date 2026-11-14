@@ -115,6 +115,31 @@ object MpCheckoutAttemptPolicy {
             else -> BindDecision.Conflict(existingProviderOrderId, requestedProviderOrderId)
         }
     }
+
+    fun start(state: CheckoutAttemptState?, hasAllowlistedCheckoutUrl: Boolean): CheckoutAttemptStartDecision {
+        if (state == null) return CheckoutAttemptStartDecision.CreateNew
+        if (hasAllowlistedCheckoutUrl && state in setOf(CheckoutAttemptState.READY_FOR_REDIRECT, CheckoutAttemptState.AWAITING_RESULT)) {
+            return CheckoutAttemptStartDecision.ReturnExistingUrl
+        }
+        return when (state) {
+            CheckoutAttemptState.CREATED, CheckoutAttemptState.POSTING -> CheckoutAttemptStartDecision.RetryCreate
+            CheckoutAttemptState.RECOVERY_REQUIRED -> CheckoutAttemptStartDecision.RequireRecovery
+            CheckoutAttemptState.SUPERSEDED, CheckoutAttemptState.TERMINAL_UNPAID_VERIFIED -> CheckoutAttemptStartDecision.CreateNew
+            CheckoutAttemptState.READY_FOR_REDIRECT,
+            CheckoutAttemptState.AWAITING_RESULT,
+            CheckoutAttemptState.QUARANTINED,
+            CheckoutAttemptState.ACCREDITED,
+            CheckoutAttemptState.UNKNOWN -> CheckoutAttemptStartDecision.Blocked
+        }
+    }
+}
+
+sealed interface CheckoutAttemptStartDecision {
+    data object ReturnExistingUrl : CheckoutAttemptStartDecision
+    data object RetryCreate : CheckoutAttemptStartDecision
+    data object RequireRecovery : CheckoutAttemptStartDecision
+    data object CreateNew : CheckoutAttemptStartDecision
+    data object Blocked : CheckoutAttemptStartDecision
 }
 
 data class ProposeAttemptInput(
@@ -147,6 +172,7 @@ enum class CheckoutAttemptState(val blocksAnotherAttempt: Boolean) {
     TERMINAL_UNPAID_VERIFIED(false),
     UNKNOWN(true);
     val allowsRemoteBinding: Boolean get() = this in setOf(CREATED, POSTING, RECOVERY_REQUIRED, READY_FOR_REDIRECT, AWAITING_RESULT)
+    val allowsRedirect: Boolean get() = this in setOf(READY_FOR_REDIRECT, AWAITING_RESULT)
     companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value } ?: UNKNOWN }
 }
 
@@ -213,20 +239,25 @@ sealed interface SearchDecision {
     data class Recovery(val reason: RecoveryReason) : SearchDecision
 }
 
-enum class RecoveryReason {
-    CREATE_TIMEOUT,
-    SERVER_ERROR,
-    RESOURCE_LOCKED,
-    IDEMPOTENCY_VALIDATION_FAILED,
-    IDEMPOTENCY_KEY_ALREADY_USED,
-    UNCLASSIFIED_CREATE_FAILURE,
-    INVALID_VERIFIED_SUCCESS,
-    INVALID_SEARCH_WINDOW,
-    SEARCH_INCOMPLETE,
-    ZERO_CANDIDATES,
-    MULTIPLE_CANDIDATES,
-    CANDIDATE_MISMATCH,
-    INVALID_PROVIDER_ORDER_ID,
+enum class RecoveryDisposition {
+    RETRYABLE,
+    QUARANTINE,
+}
+
+enum class RecoveryReason(val disposition: RecoveryDisposition) {
+    CREATE_TIMEOUT(RecoveryDisposition.RETRYABLE),
+    SERVER_ERROR(RecoveryDisposition.RETRYABLE),
+    RESOURCE_LOCKED(RecoveryDisposition.RETRYABLE),
+    IDEMPOTENCY_VALIDATION_FAILED(RecoveryDisposition.QUARANTINE),
+    IDEMPOTENCY_KEY_ALREADY_USED(RecoveryDisposition.QUARANTINE),
+    UNCLASSIFIED_CREATE_FAILURE(RecoveryDisposition.RETRYABLE),
+    INVALID_VERIFIED_SUCCESS(RecoveryDisposition.QUARANTINE),
+    INVALID_SEARCH_WINDOW(RecoveryDisposition.QUARANTINE),
+    SEARCH_INCOMPLETE(RecoveryDisposition.RETRYABLE),
+    ZERO_CANDIDATES(RecoveryDisposition.RETRYABLE),
+    MULTIPLE_CANDIDATES(RecoveryDisposition.QUARANTINE),
+    CANDIDATE_MISMATCH(RecoveryDisposition.QUARANTINE),
+    INVALID_PROVIDER_ORDER_ID(RecoveryDisposition.QUARANTINE),
 }
 
 sealed interface BindDecision {

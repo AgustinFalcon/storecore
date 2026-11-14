@@ -65,7 +65,7 @@ class JdbcCartService(
             val decision=deliveryPolicies.decision(existing.third)
             if(!currency.matchesVerified(PaymentCurrency.fromWire(original.path("currency").asText(null)))) throw CommerceValidation("UNSUPPORTED_CURRENCY")
             if(original.path("commandFingerprint").asText()!=fingerprint || decision.state!=DeliverySnapshotState.KNOWN || decision.resolvedMode()!=deliveryMode || decision.value?.configurationVersion!=deliveryConfigurationVersion) throw CheckoutConflict()
-            return replayReceipt(existing.first)?.let(::withRemoteCheckout) ?: throw CommerceValidation("CHECKOUT_IN_PROGRESS")
+            return replayReceipt(existing.first) ?: throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
         capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
         val cartId=ensureCart(customer.customerId)
@@ -97,7 +97,7 @@ class JdbcCartService(
         if(claimId==null) {
             val raced=jdbc.query("SELECT id,request_hash,checkout_snapshot->>'commandFingerprint' fingerprint FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?",{rs,_->Triple(rs.getLong("id"),rs.getString("request_hash"),rs.getString("fingerprint"))},customer.customerId,idempotencyKey).singleOrNull() ?: throw CheckoutConflict()
             if(raced.second!=hash || raced.third!=fingerprint) throw CheckoutConflict()
-            return replayReceipt(raced.first)?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
+            return replayReceipt(raced.first) ?: throw CheckoutConflict()
         }
         cart.lines.sortedBy { identities.getValue(it.sku) }.forEach { line ->
             val variantId = identities.getValue(line.sku)
@@ -116,7 +116,7 @@ class JdbcCartService(
         jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING')", orderId)
         jdbc.update("UPDATE checkout_idempotency_claims SET state='COMPLETED',updated_at=now() WHERE id=?", claimId)
         jdbc.update("DELETE FROM cart_items WHERE cart_id=?", ensureCart(customer.customerId))
-        return withRemoteCheckout(CheckoutReceipt(orderId.toString(), PaymentStatus.PENDING, OrderStatus.PENDING_PAYMENT))
+        return CheckoutReceipt(orderId.toString(), PaymentStatus.PENDING, OrderStatus.PENDING_PAYMENT)
     }
 
     private fun replayReceipt(claimId: Long): CheckoutReceipt? {
@@ -126,12 +126,12 @@ class JdbcCartService(
         return CheckoutReceipt(order.first.toString(), payments.singleOrNull() ?: PaymentStatus.UNKNOWN, order.second)
     }
 
-    private fun withRemoteCheckout(receipt: CheckoutReceipt): CheckoutReceipt {
+    fun attachRemoteCheckout(receipt: CheckoutReceipt): CheckoutReceipt = runCatching {
         capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
-        val starter = mpAttempts.ifAvailable ?: return receipt
-        val url = runCatching { starter.startForLocalOrder(receipt.orderId.toLong()) }.getOrNull()
-        return if (url.isNullOrBlank()) receipt else receipt.copy(checkoutUrl = url)
-    }
+        val starter = mpAttempts.ifAvailable ?: return@runCatching receipt
+        val url = starter.startForLocalOrder(receipt.orderId.toLong())
+        if (url.isNullOrBlank()) receipt else receipt.copy(checkoutUrl = url)
+    }.getOrDefault(receipt)
 
     private fun readBuyerIdentity(customerId: Long): BuyerSnapshotIdentity {
         val row = jdbc.query(

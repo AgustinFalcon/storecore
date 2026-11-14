@@ -10,6 +10,31 @@ import java.time.Instant
 import java.util.UUID
 
 class MpCheckoutAttemptPolicyTest {
+    @Test
+    fun `start decision is closed and fails safely`() {
+        assertEquals(CheckoutAttemptStartDecision.CreateNew, MpCheckoutAttemptPolicy.start(null, false))
+        assertEquals(CheckoutAttemptStartDecision.RetryCreate, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.CREATED, false))
+        assertEquals(CheckoutAttemptStartDecision.RetryCreate, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.POSTING, false))
+        assertEquals(CheckoutAttemptStartDecision.RequireRecovery, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.RECOVERY_REQUIRED, false))
+        assertEquals(CheckoutAttemptStartDecision.ReturnExistingUrl, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.READY_FOR_REDIRECT, true))
+        assertEquals(CheckoutAttemptStartDecision.Blocked, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.READY_FOR_REDIRECT, false))
+        assertEquals(CheckoutAttemptStartDecision.Blocked, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.UNKNOWN, true))
+        assertEquals(CheckoutAttemptStartDecision.CreateNew, MpCheckoutAttemptPolicy.start(CheckoutAttemptState.TERMINAL_UNPAID_VERIFIED, false))
+        assertTrue(CheckoutAttemptState.READY_FOR_REDIRECT.allowsRedirect)
+        assertTrue(CheckoutAttemptState.AWAITING_RESULT.allowsRedirect)
+        assertEquals(false, CheckoutAttemptState.QUARANTINED.allowsRedirect)
+        assertEquals(false, CheckoutAttemptState.UNKNOWN.allowsRedirect)
+    }
+
+    @Test
+    fun `recovery reasons close retryable and quarantine behavior in the domain`() {
+        assertEquals(RecoveryDisposition.RETRYABLE, RecoveryReason.CREATE_TIMEOUT.disposition)
+        assertEquals(RecoveryDisposition.RETRYABLE, RecoveryReason.ZERO_CANDIDATES.disposition)
+        assertEquals(RecoveryDisposition.QUARANTINE, RecoveryReason.IDEMPOTENCY_KEY_ALREADY_USED.disposition)
+        assertEquals(RecoveryDisposition.QUARANTINE, RecoveryReason.MULTIPLE_CANDIDATES.disposition)
+        assertEquals(RecoveryDisposition.QUARANTINE, RecoveryReason.CANDIDATE_MISMATCH.disposition)
+        assertEquals(RecoveryDisposition.QUARANTINE, RecoveryReason.INVALID_PROVIDER_ORDER_ID.disposition)
+    }
     private val orderId = 41L
     private val key = UUID.fromString("b39ea9e9-0c65-4533-8ff3-e0770954ebf8")
 

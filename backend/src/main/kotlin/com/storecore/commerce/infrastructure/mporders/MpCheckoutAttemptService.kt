@@ -8,6 +8,7 @@ import com.storecore.commerce.application.port.output.OfficialOrderSearchQuery
 import com.storecore.commerce.domain.BindDecision
 import com.storecore.commerce.domain.CheckoutAttemptSnapshot
 import com.storecore.commerce.domain.CheckoutAttemptState
+import com.storecore.commerce.domain.CheckoutAttemptStartDecision
 import com.storecore.commerce.domain.OrderStatus
 import com.storecore.commerce.domain.PaymentStatus
 import com.storecore.commerce.domain.PaymentCurrency
@@ -16,6 +17,8 @@ import com.storecore.commerce.domain.ExpectedOrderIdentity
 import com.storecore.commerce.domain.MpCheckoutAttemptPolicy
 import com.storecore.commerce.domain.ProposeAttemptDecision
 import com.storecore.commerce.domain.ProposeAttemptInput
+import com.storecore.commerce.domain.RecoveryDisposition
+import com.storecore.commerce.domain.RecoveryReason
 import com.storecore.commerce.domain.SearchDecision
 import com.storecore.commerce.domain.SearchEvaluationInput
 import com.storecore.commerce.domain.SearchLimits
@@ -39,16 +42,35 @@ class MpCheckoutAttemptService(
     private val mapper: ObjectMapper,
 ) {
     fun startForLocalOrder(orderId: Long): String? {
-        val existing = jdbc.query(
-            "SELECT checkout_url FROM mp_checkout_attempts WHERE order_id=? AND checkout_url IS NOT NULL AND state IN ('READY_FOR_REDIRECT','AWAITING_RESULT') ORDER BY attempt_no DESC LIMIT 1",
-            { rs, _ -> rs.getString(1) },
-            orderId,
-        ).firstOrNull()
-        if (existing != null && properties.allowlistedCheckoutUrl(existing)) return existing
-        val attemptId = prepare(orderId, UUID.randomUUID())
+        val existing = selectLatestAttempt(orderId)
+        val decision = MpCheckoutAttemptPolicy.start(
+            existing?.state,
+            existing?.checkoutUrl?.let(properties::allowlistedCheckoutUrl) == true,
+        )
+        if (decision == CheckoutAttemptStartDecision.ReturnExistingUrl) return existing?.checkoutUrl
+        if (decision == CheckoutAttemptStartDecision.RequireRecovery || decision == CheckoutAttemptStartDecision.Blocked) return null
+        val attemptId = when (decision) {
+            CheckoutAttemptStartDecision.RetryCreate -> requireNotNull(existing).id
+            CheckoutAttemptStartDecision.CreateNew -> prepare(orderId, UUID.randomUUID())
+            CheckoutAttemptStartDecision.ReturnExistingUrl,
+            CheckoutAttemptStartDecision.RequireRecovery,
+            CheckoutAttemptStartDecision.Blocked -> return null
+        }
         val bound = postAndBind(attemptId)
+        val boundState = CheckoutAttemptState.fromWire(bound["state"] as? String)
+        if (!boundState.allowsRedirect) return null
         val url = bound["checkoutUrl"] as? String
         return url?.takeIf { properties.allowlistedCheckoutUrl(it) }
+    }
+
+    private fun selectLatestAttempt(orderId: Long): ExistingAttempt? = transactions.execute {
+        jdbc.query("SELECT id FROM orders WHERE id=? FOR UPDATE", { rs, _ -> rs.getLong(1) }, orderId)
+            .singleOrNull() ?: throw CommerceValidation("ORDER_NOT_FOUND")
+        jdbc.query(
+            "SELECT id,state,checkout_url FROM mp_checkout_attempts WHERE order_id=? ORDER BY attempt_no DESC LIMIT 1",
+            { rs, _ -> ExistingAttempt(rs.getLong("id"), CheckoutAttemptState.fromWire(rs.getString("state")), rs.getString("checkout_url")) },
+            orderId,
+        ).singleOrNull()
     }
 
     fun prepare(orderId: Long, idempotencyKey: UUID): Long {
@@ -123,14 +145,14 @@ class MpCheckoutAttemptService(
         return when (val decision = MpCheckoutAttemptPolicy.classifyCreation(observation)) {
             is CreationDecision.ReadyForRedirect -> {
                 if (!properties.allowlistedCheckoutUrl(decision.checkoutUrl)) {
-                    markRecovery(attemptId, "CHECKOUT_URL_NOT_ALLOWLISTED")
-                    return mapOf("state" to "RECOVERY_REQUIRED")
+                    markQuarantined(attemptId, "CHECKOUT_URL_NOT_ALLOWLISTED")
+                    return mapOf("state" to "QUARANTINED")
                 }
                 bind(attemptId, decision.providerOrderId, decision.checkoutUrl)
             }
             is CreationDecision.Recovery -> {
-                markRecovery(attemptId, decision.reason.name)
-                mapOf("state" to "RECOVERY_REQUIRED", "reason" to decision.reason.name)
+                recordCreateRecovery(attemptId, decision.reason)
+                mapOf("state" to decision.reason.disposition.persistedState, "reason" to decision.reason.name)
             }
         }
     }
@@ -159,8 +181,8 @@ class MpCheckoutAttemptService(
         return when (decision) {
             is SearchDecision.Bind -> bind(attemptId, decision.providerOrderId, null)
             is SearchDecision.Recovery -> {
-                markRecovery(attemptId, decision.reason.name)
-                mapOf("state" to "RECOVERY_REQUIRED", "reason" to decision.reason.name)
+                recordAuthoritativeRecovery(attemptId, decision.reason)
+                mapOf("state" to decision.reason.disposition.persistedState, "reason" to decision.reason.name)
             }
         }
     }
@@ -169,7 +191,7 @@ class MpCheckoutAttemptService(
         return transactions.execute {
             lockAttemptOrder(attemptId)
             val current = jdbc.query("SELECT provider_order_id,state,checkout_url FROM mp_checkout_attempts WHERE id=? FOR UPDATE", { rs, _ -> Triple(rs.getString("provider_order_id"), CheckoutAttemptState.fromWire(rs.getString("state")), rs.getString("checkout_url")) }, attemptId).singleOrNull() ?: throw CommerceValidation("ATTEMPT_NOT_FOUND")
-            if (!current.second.allowsRemoteBinding) return@execute mapOf("state" to current.second.name, "providerOrderId" to current.first, "checkoutUrl" to current.third)
+            if (!current.second.allowsRemoteBinding) return@execute mapOf("state" to current.second.name, "providerOrderId" to current.first, "checkoutUrl" to null)
             when (val decision = MpCheckoutAttemptPolicy.bind(current.first, providerOrderId)) {
                 is BindDecision.Bind, is BindDecision.Replay -> {
                     val url = checkoutUrl ?: jdbc.queryForObject("SELECT checkout_url FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId)
@@ -180,15 +202,29 @@ class MpCheckoutAttemptService(
                     mapOf("state" to "READY_FOR_REDIRECT", "providerOrderId" to providerOrderId, "checkoutUrl" to url)
                 }
                 is BindDecision.Conflict -> {
-                    markRecovery(attemptId, "PROVIDER_ORDER_CONFLICT")
-                    mapOf("state" to "RECOVERY_REQUIRED")
+                    markQuarantined(attemptId, "PROVIDER_ORDER_CONFLICT")
+                    mapOf("state" to "QUARANTINED")
                 }
                 is BindDecision.Recovery -> {
-                    markRecovery(attemptId, decision.reason.name)
-                    mapOf("state" to "RECOVERY_REQUIRED")
+                    recordAuthoritativeRecovery(attemptId, decision.reason)
+                    mapOf("state" to decision.reason.disposition.persistedState)
                 }
             }
         } ?: mapOf("state" to "RECOVERY_REQUIRED")
+    }
+
+    private fun recordCreateRecovery(attemptId: Long, reason: RecoveryReason) {
+        when (reason.disposition) {
+            RecoveryDisposition.RETRYABLE -> markInconclusiveRecovery(attemptId, reason.name)
+            RecoveryDisposition.QUARANTINE -> markQuarantined(attemptId, reason.name)
+        }
+    }
+
+    private fun recordAuthoritativeRecovery(attemptId: Long, reason: RecoveryReason) {
+        when (reason.disposition) {
+            RecoveryDisposition.RETRYABLE -> markRecovery(attemptId, reason.name)
+            RecoveryDisposition.QUARANTINE -> markQuarantined(attemptId, reason.name)
+        }
     }
 
     private fun markRecovery(attemptId: Long, reason: String) {
@@ -200,6 +236,32 @@ class MpCheckoutAttemptService(
             )
         }
     }
+
+    private fun markInconclusiveRecovery(attemptId: Long, reason: String) {
+        transactions.executeWithoutResult {
+            lockAttemptOrder(attemptId)
+            jdbc.update(
+                "UPDATE mp_checkout_attempts SET state='RECOVERY_REQUIRED',error_sanitized=?,updated_at=now() WHERE id=? AND state IN ('CREATED','POSTING','RECOVERY_REQUIRED')",
+                reason.take(200), attemptId,
+            )
+        }
+    }
+
+    private fun markQuarantined(attemptId: Long, reason: String) {
+        transactions.executeWithoutResult {
+            lockAttemptOrder(attemptId)
+            jdbc.update(
+                "UPDATE mp_checkout_attempts SET state='QUARANTINED',error_sanitized=?,updated_at=now() WHERE id=? AND state IN ('CREATED','POSTING','RECOVERY_REQUIRED','READY_FOR_REDIRECT','AWAITING_RESULT')",
+                reason.take(200), attemptId,
+            )
+        }
+    }
+
+    private val RecoveryDisposition.persistedState: String
+        get() = when (this) {
+            RecoveryDisposition.RETRYABLE -> "RECOVERY_REQUIRED"
+            RecoveryDisposition.QUARANTINE -> "QUARANTINED"
+        }
 
     private fun lockAttemptOrder(attemptId: Long) {
         val orderId = jdbc.query("SELECT order_id FROM mp_checkout_attempts WHERE id=?", { rs, _ -> rs.getLong("order_id") }, attemptId).singleOrNull() ?: throw CommerceValidation("ATTEMPT_NOT_FOUND")
@@ -237,4 +299,6 @@ class MpCheckoutAttemptService(
         val currency: String,
         val createdAt: Instant,
     )
+
+    private data class ExistingAttempt(val id: Long, val state: CheckoutAttemptState, val checkoutUrl: String?)
 }
