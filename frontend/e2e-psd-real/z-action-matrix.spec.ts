@@ -13,7 +13,7 @@ import { CapabilityModuleState } from '../src/app/domain/user/capability-module-
 import { PolicyStatus, PolicyTransition, ChannelAvailability } from '../src/app/domain/user/channel-pricing';
 import { MercadoLibreAccountStatus } from '../src/app/domain/user/mercadolibre-account-status';
 import { UserRole } from '../src/app/domain/user/user-role';
-import { mapAdminOrder, mapCart, mapCapabilities, mapProductDetail } from '../src/app/data/mappers/http-mappers';
+import { mapAdminOrder, mapCart, mapCapabilities, mapProductDetail, mapProductSummaries } from '../src/app/data/mappers/http-mappers';
 import { mapChannelAccount, mapPricePolicy } from '../src/app/data/user/channel-pricing.mapper';
 import { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
 import { RealActionCase, JourneyCustomer, WriteMethod, body, mutate, mutation } from './action-matrix-support';
@@ -46,6 +46,41 @@ async function adminPage(): Promise<Page> {
   await expect(page).toHaveURL(/\/user\/home$/);
   return page;
 }
+
+test('PRM action: public catalog combines search brand category and active-offer filters against real data', async ({ browser }, info) => {
+  RealActionCase.CatalogDiscovery.annotate(info);
+  const admin = await adminPage();
+  const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
+  try {
+    const activated = await mutate(admin, AccessContext.User, `user/offers/${receipt.offerId}/state`,
+      { transition: OfferTransition.Activate.wire });
+    expect(activated.status()).toBe(200);
+
+    const page = await context.newPage();
+    await page.goto('/catalog');
+    await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible();
+    await page.getByLabel('Búsqueda', { exact: true }).fill('Taladro');
+    await page.getByLabel('Marca', { exact: true }).selectOption({ label: 'Showcase Tools' });
+    await page.getByLabel('Categoría', { exact: true }).selectOption({ label: 'Herramientas eléctricas' });
+    await page.getByLabel('Sólo ofertas', { exact: true }).check();
+    const responsePromise = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/v1/catalog' && url.searchParams.get('query') === 'Taladro'
+        && url.searchParams.has('brand') && url.searchParams.has('category') && url.searchParams.get('offers') === 'true';
+    });
+    await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const products = mapProductSummaries(readApiBody(await response.json()));
+    expect(products.map(product => product.sku)).toEqual([receipt.products[0].sku]);
+    await expect(page.getByRole('heading', { name: receipt.products[0].name, exact: true })).toBeVisible();
+    await expect(page.getByText(receipt.products[1].name, { exact: true })).toHaveCount(0);
+    expect((await context.cookies()).some(cookie => cookie.name.startsWith('__Host-storecore-'))).toBe(false);
+  } finally {
+    await context.close();
+    await admin.close();
+  }
+});
 
 test('PRM action: UI registration survives logout and subsequent login in CUSTOMER realm', async ({ browser }, info) => {
   RealActionCase.Registration.annotate(info);

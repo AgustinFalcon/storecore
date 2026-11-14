@@ -83,7 +83,7 @@ class PublishedActionKind extends PublicationValue {
   static values = [this.Read, this.Mutation, this.Rejection];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
-const publishedActionIds = new Set(['registration', 'profile', 'addresses-ownership', 'favorites',
+const publishedActionIds = new Set(['registration', 'catalog-discovery', 'profile', 'addresses-ownership', 'favorites',
   'cart-checkout-order-ownership', 'unpaid-order-rejection', 'catalog-inventory', 'offers', 'promos',
   'branding-conflict', 'content', 'profile-import', 'customer-revocation', 'operator-permissions-csrf',
   'external-unavailable', 'local-capability-command']);
@@ -442,7 +442,7 @@ async function run() {
   });
   await checkSafety();
   const evidence = publishEvidence(process.env.STORECORE_PSD_RAW_REPORT);
-  if (evidence.failures > 0 || evidence.routeAcceptances !== 90 || evidence.actionAcceptances !== 16) process.exitCode = 1;
+  if (evidence.failures > 0 || evidence.routeAcceptances !== 90 || evidence.actionAcceptances !== 17) process.exitCode = 1;
   writeFileSync(join(results, 'runtime-summary.json'), `${JSON.stringify({ sha: process.env.GITHUB_SHA ?? 'local',
     externalSafetyBefore: true, externalSafetyAfter: true, ...evidence, exitCode: process.exitCode })}\n`);
 }

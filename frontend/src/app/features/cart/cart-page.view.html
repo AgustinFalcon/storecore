@@ -21,7 +21,7 @@
   />
   @if (access.canMutate && state.cart.lines.length > 0) {
     <div class="sc-bag__layout">
-      <div class="sc-table-wrap">
+      <div class="sc-table-wrap" tabindex="0" role="region" aria-label="Productos del carrito">
         <table class="sc-table">
           <caption class="sc-price__meta">Artículos en la orden ({{ state.cart.lines.length }})</caption>
           <thead>

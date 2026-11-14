@@ -10,6 +10,7 @@ export class RealActionCase {
   private constructor(readonly id: string, readonly routes: readonly string[], readonly actor: RouteActor,
     readonly kind: RouteActionClass, readonly evidence = RouteEvidenceMode.RealBackend) {}
   static readonly Registration = new RealActionCase('registration', ['/customer/register', '/login'], RouteActor.Anonymous, RouteActionClass.Mutation);
+  static readonly CatalogDiscovery = new RealActionCase('catalog-discovery', ['/catalog'], RouteActor.Anonymous, RouteActionClass.Mutation);
   static readonly Profile = new RealActionCase('profile', ['/customer/profile'], RouteActor.Customer, RouteActionClass.Mutation);
   static readonly Addresses = new RealActionCase('addresses-ownership', ['/customer/addresses'], RouteActor.Customer, RouteActionClass.Mutation);
   static readonly Favorites = new RealActionCase('favorites', ['/catalog/:sku', '/customer/favorites'], RouteActor.Customer, RouteActionClass.Mutation);
@@ -26,7 +27,7 @@ export class RealActionCase {
   static readonly External = new RealActionCase('external-unavailable', ['/user/mercadolibre', '/user/capabilities'], RouteActor.Admin, RouteActionClass.Read);
   static readonly Capability = new RealActionCase('local-capability-command', ['/user/capabilities'], RouteActor.Admin, RouteActionClass.Mutation);
   static readonly Unknown = new RealActionCase('unknown', [], RouteActor.Unknown, RouteActionClass.Unknown, RouteEvidenceMode.Unknown);
-  static readonly all = [this.Registration, this.Profile, this.Addresses, this.Favorites, this.Checkout, this.Pending,
+  static readonly all = [this.Registration, this.CatalogDiscovery, this.Profile, this.Addresses, this.Favorites, this.Checkout, this.Pending,
     this.Catalog, this.Offers, this.Promos, this.Branding, this.Content, this.Import, this.Suspension,
     this.Permissions, this.External, this.Capability] as const;
   static fromWire(raw: unknown): RealActionCase { return this.all.find(row => row.id === raw) ?? this.Unknown; }

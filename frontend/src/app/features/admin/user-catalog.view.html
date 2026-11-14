@@ -18,7 +18,7 @@
       <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.loading" (click)="createProduct.emit()">Nuevo producto</button>
       @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
-    <div class="sc-table-wrap">
+    <div class="sc-table-wrap" tabindex="0" role="region" aria-label="Productos del catálogo administrable">
     <table class="sc-table">
       <thead>
         <tr>
