@@ -140,7 +140,7 @@ jobs:
             LANG=C.UTF-8 CI=true PLAYWRIGHT_BROWSERS_PATH="${{ runner.temp }}/storecore-psd-browsers" \
             PGHOST=127.0.0.1 PGPORT=5434 PGDATABASE=storecore_ua_e2e PGUSER=storecore PGPASSWORD=storecore \
             STORECORE_PSD_EGRESS_PROOF=/run/storecore-psd-egress.json GITHUB_SHA="$GITHUB_SHA" \
-            "$(command -v node)" scripts/run-psd-real-e2e.mjs
+            "$(command -v node)" "$GITHUB_WORKSPACE/frontend/scripts/run-psd-real-e2e.mjs"
       - name: Verify required evidence exists
         if: always()
         working-directory: frontend
