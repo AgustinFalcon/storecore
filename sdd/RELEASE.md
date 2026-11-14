@@ -1,5 +1,17 @@
 # StoreCore documentation baseline 1.0.0
 
+## Master vigente — 2026-11-14
+
+`master dc45c59` contiene el checkout de entrega/retiro fusionado por PR #272
+y su cierre SDD por PR #273. Los Verify de PR y ambos post-merge quedaron
+verdes en backend, frontend y navegador real. Este estado cierra el core local
+del corte; no crea tag, deploy, publicación ni autorización de tráfico live.
+
+La creación de `release/1.0` continúa condicionada a homologación ARCA y Correo
+Argentino. Mercado Pago live, SMTP productivo y StoreCore↔BlackStore conservan
+sus propios gates de credenciales, activación y rollback. La rama de integración
+no se promueve completa a `master`.
+
 ## Master vigente — 2026-11-13
 
 `master 33fca34` contiene PR #244–#253. `376790d` es el último snapshot
