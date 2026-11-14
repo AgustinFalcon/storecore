@@ -1,8 +1,8 @@
 ---
 id: 20261113-mp-orders-fail-closed-currency
 title: Mercado Pago Orders currency fail-closed
-status: ready_for_pr
-maturity: proposed_implementation
+status: completed
+maturity: delivered
 owner: payments
 created: 2026-11-13
 related:
@@ -23,5 +23,6 @@ credenciales, no activa Mercado Pago y no ejecuta MP-LIVE-05. Los gates
 MP-LIVE-03/04 establecieron el invariante de verificar importe y moneda, pero el
 closeout de 2026-09-23 cerró ese carril y prohibió trabajo adicional sin un GO
 nuevo. Por lo tanto, este WIP sólo puede implementarse si la revisión Sol actual
-emite y registra un GO estrecho para esta corrección offline. El pedido vigente
-autoriza continuar con correcciones revisadas, pero no sustituye ese gate SDD.
+emite y registra un GO estrecho para esta corrección offline. Ese gate fue
+emitido; PR #258 se fusionó como `43489ef` y Verify post-merge `43462225801`
+terminó 3/3 verde.

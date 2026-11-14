@@ -1,6 +1,23 @@
 # Estado canónico del SDD — StoreCore
 
-## Master vigente y cierre de recovery/Origin — 2026-11-13
+## Master vigente — 2026-11-13
+
+`master ba83f679f51a53025dd49ae87ec8f03097ae5180` integra PR #257–#270.
+El último snapshot funcional es `7053e8faba539babbbb0937915742aecfe702339`:
+Java 21, moneda Mercado Pago fail-closed, autoridad de moneda de carrito,
+continuidad checkout/direcciones, identidad histórica del comprador,
+continuidad de intención PDP y autoridad de precio por variante. PR #270 sólo
+archiva el SDD de ese último corte.
+
+Los Verify post-merge de las entregas funcionales son `43456288441`,
+`43462225801`, `43481720083`, `43497831638`, `43507158447`, `43523386759` y
+`43535120746`; todos terminaron con backend, frontend y E2E real verdes. Este
+bloque prevalece sobre referencias anteriores a `33fca34`.
+
+No acredita proveedores live, ARCA, Correo Argentino, Mercado Pago real,
+StoreCore↔BlackStore activo, deploy, homologación ni `release/1.0`.
+
+## Histórico — cierre de recovery/Origin — 2026-11-13
 
 `master 33fca347031ff8b812ed7bb6d4024318812ef82e` integra PR #244–#253. El
 tramo local posterior a `7300b8` agrega discovery honesto de Correo Argentino,

@@ -19,9 +19,11 @@
 - PR #257, run `43453833670`: frontend 3:50, backend 5:17 y
   `unified-access-real-e2e` 6:29; los tres finalizaron `success`.
 
-## Evidencia pendiente
+## Cierre alojado
 
-- CI post-merge sobre `master`.
+- PR #257 fusionado como `66e01b591be77a1dbce42b13a1947d928ed87322`.
+- Verify post-merge `43456288441`: backend, frontend y E2E real 3/3 verdes.
+- Estado final: `completed`; J21-001..007 cerradas.
 
 Este archivo se actualiza únicamente con resultados ejecutados y enlaces o
 identificadores verificables; no anticipa homologación ni producción.

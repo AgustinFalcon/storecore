@@ -1,6 +1,6 @@
 # Metadata — identidad histórica del comprador
 
-- Estado: `DELIVERED`
+- Estado: `completed`
 - Fecha: 2026-11-13
 - Modo: brownfield, StoreCore backend y contrato de pedidos existente
 - Issue origen: auditoría de paridad operativa posterior al cierre de checkout/direcciones

@@ -8,7 +8,7 @@
 | J21-004 | Ejecutar suite backend local bajo JDK 21. | Done | `mvn -B clean test`: 399 tests, 0 fallos/errores/omitidos, `BUILD SUCCESS`. |
 | J21-005 | Ejecutar revisiones de compatibilidad y seguridad. | Done | GPT-6.1 Sol: dos `APPROVED`, sin P0–P3 ni discrepancias. |
 | J21-006 | Ejecutar CI completo en PR. | Done | Run `43453833670`: backend, frontend y E2E real en verde. |
-| J21-007 | Fusionar y verificar CI post-merge. | Pending | SHA de merge y run de `master`. |
+| J21-007 | Fusionar y verificar CI post-merge. | Done | PR #257, merge `66e01b5`; run `43456288441`, 3/3 verde. |
 
 La finalización de J21-007 sólo declara el baseline Java 21. No hereda ni
 simula aprobación fiscal, credenciales, homologación o activación ARCA.
