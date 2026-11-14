@@ -2,15 +2,23 @@
 
 ## Current Classification
 
-- Source: StoreCore baseline SDD, audited locally on 2026-09-21.
-- Maturity: pre-coding documentation; no runtime or deployment artifact.
-- Sensitivity policy: deny-by-default remains for any file outside the explicit local allowlist.
-- Allowlisted baseline material: `AGENTS.md`, `README.md`, `GOVERNANCE.md`, `SOURCE-CLASSIFICATION.md`, `EVIDENCE-INDEX.md`, `sdd/**` and `docs/agent/**` after redaction review.
+- Source: StoreCore product source, SDD and evidence, continuously reviewed.
+- Maturity: active product implementation; provider homologation is tracked separately.
+- Sensitivity policy: deny-by-default remains outside the explicit source allowlist, with security exclusions that override allowed product trees.
+- Allowlisted product material includes the Kotlin backend, Angular frontend,
+  migrations, named test fixtures, SDD and redacted product documentation.
 
 ## Evidence Boundary
 
-The allowlisted corpus was reviewed for secrets, credentials, private hosts, personal data and actionable access procedures. Runtime runbooks, environments, dumps and any operational document remain excluded until independently redacted and classified.
+The tracked corpus is guarded for sensitive paths and high-confidence secret
+signatures on every pull request and `master` push. Runtime environments,
+private keys, credential containers, dumps and actionable access procedures
+remain excluded. The gate does not replace credential rotation or Git-history
+incident response.
 
 ## Promotion Criteria
 
-A file or claim can move into version control or Knowledge only when it has a named source/maturity, no sensitive content, clear ownership and shareable validation evidence. The allowlist authorizes local staging only; it does not authorize a commit, tag, push or GitHub Release.
+A file or claim can move into version control only when it has a named
+source/maturity, no sensitive content, clear ownership and shareable validation
+evidence. Promotion to `master`, a tag or a release additionally requires its
+applicable review and Verify gates.

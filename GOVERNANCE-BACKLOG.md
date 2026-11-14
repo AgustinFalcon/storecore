@@ -2,12 +2,14 @@
 
 ## Pending Work
 
-- Classify docs and SDD files before staging inherited material.
-- Create pre-coding gate for dual JWT, MercadoPago webhook idempotency, stock concurrency and order/payment/shipping states.
-- Create evidence index for closed decisions and gaps without reusing AssistTime material in this lane.
-- Prepare StoreCore auth ADR input for the transversal identity ADR.
-- Define first code-start checklist and local validation commands once implementation exists.
+- Keep provider credentials, private infrastructure values and operational dumps outside Git.
+- Add provider-backed secret scanning when repository administration permits it;
+  the deterministic local gate is complementary, not a history scanner.
+- Maintain evidence links for merged product increments and homologation gaps.
+- Rotate first, then approve a dedicated history-rewrite runbook if a real
+  credential is ever proven to have entered Git history.
 
 ## Blocked Material
 
-Inherited workspace files are intentionally excluded by .gitignore until an explicit safe allowlist is created.
+Live provider credentials and external homologation evidence remain excluded
+until independently redacted and classified.

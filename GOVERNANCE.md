@@ -2,14 +2,17 @@
 
 ## Classification
 
-- Source type: product-documentation
+- Source type: active product source and documentation
 - Sensitivity: standard
-- Git policy: local repository only; no remote, push or PR from this initialization.
-- Branch policy: master holds only the audited root governance baseline. Follow-up work happens on a branch created from master.
+- Git policy: GitHub remote with protected review, Verify gates and evidence-backed pull requests.
+- Branch policy: `master` holds reviewed product increments. Follow-up work happens on a branch created from current `master`.
 
 ## Versioning Boundary
 
-This repository starts deny-by-default. Pre-existing files and directories are not versioned by this root commit. They require explicit review, redaction and allowlist approval before they can be staged.
+The repository remains deny-by-default at its root and explicitly allowlists
+product areas. Security exclusions override those allowlists for environment
+files, private keys, credential containers, dumps and local databases. The CI
+repository-hygiene gate inspects stage-zero Git blobs before application builds.
 
 ## Promotion Rules
 
@@ -20,4 +23,6 @@ This repository starts deny-by-default. Pre-existing files and directories are n
 
 ## Current Summary
 
-StoreCore pre-coding product documentation workspace.
+StoreCore active product repository with Kotlin backend, Angular frontend,
+PostgreSQL migrations, SDD evidence and GitHub Verify automation. Live provider
+credentials and homologation remain outside version control.

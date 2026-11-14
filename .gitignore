@@ -5,6 +5,8 @@
 !/.github/
 !/.github/workflows/
 !/.github/workflows/verify.yml
+!/.github/scripts/
+!/.github/scripts/**
 !/GOVERNANCE.md
 !/EVIDENCE-INDEX.md
 !/GOVERNANCE-BACKLOG.md
@@ -45,3 +47,35 @@ frontend/recovery-real-results/
 !/docs/testing/**
 frontend/demo-playwright-report/
 frontend/debug.log
+
+# Security exclusions win over the source allowlist above.
+# Only inert environment templates may be versioned.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+
+# Private keys and credential containers.
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.jks
+**/*.keystore
+**/*.ppk
+**/*.kdbx
+
+# Database dumps, backups and local databases. Source migrations and the
+# explicit E2E fixture area are enforced separately by the repository gate.
+**/*.dump
+**/*.bak
+**/*.backup
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+**/dump.sql
+**/*-dump.sql
+**/*_dump.sql
+**/backup.sql
+**/*-backup.sql
+**/*_backup.sql
