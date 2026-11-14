@@ -91,6 +91,10 @@ const publishedSurfaces = new Set([
   ...Array.from({ length: 27 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
   'RD-VERIFY-EMAIL', 'RD-USER-ACCOUNT',
 ]);
+const publishedFailureFiles = new Set([
+  'route-matrix.spec.ts', 'route-matrix-support.ts', 'surfaces.spec.ts',
+  'z-action-matrix.spec.ts', 'action-matrix-support.ts',
+]);
 
 function publishEvidence(reportPath, target = results) {
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
@@ -104,9 +108,14 @@ function publishEvidence(reportPath, target = results) {
         const last = test.results?.at(-1);
         const outcome = BrowserOutcome.fromWire(last?.status);
         assert.notEqual(outcome, BrowserOutcome.Unknown, 'Unknown browser result');
+        const rawFailureLocation = (last?.errors ?? []).map(error => error.location)
+          .find(location => location && Number.isInteger(location.line));
+        const failureFile = basename(rawFailureLocation?.file ?? '');
+        const failureAt = !outcome.accepted && publishedFailureFiles.has(failureFile)
+          ? `${failureFile}:${rawFailureLocation.line}` : 'redacted:0';
         // Use a generated identifier; failure messages, source snippets and test stdout never leave scratch.
         rows.push({ name: `browser-case-${rows.length + 1}`, file: basename(spec.file ?? ''),
-          line: Number.isInteger(spec.line) ? spec.line : 0, outcome });
+          line: Number.isInteger(spec.line) ? spec.line : 0, outcome, failureAt });
         const actionAnnotation = (test.annotations ?? []).find(annotation => annotation.type === 'action');
         const evidenceAnnotation = (test.annotations ?? []).find(annotation => annotation.type === 'evidence');
         if (actionAnnotation) {
@@ -154,7 +163,7 @@ function publishEvidence(reportPath, target = results) {
   assert.equal(routeKeys.size, routes.length, 'Route evidence identities must be unique');
   mkdirSync(join(target, 'report'), { recursive: true });
   writeFileSync(join(target, 'junit.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites tests="${rows.length}" failures="${failures}"><testsuite name="productive-routes-real" tests="${rows.length}" failures="${failures}">${rows.map(row =>
-    `<testcase name="${row.name}" classname="${escape(row.file)}:${row.line}">${row.outcome.accepted ? '' : `<failure message="${escape(row.outcome.wire)}">Redacted; inspect route census and reproduce at the recorded SHA.</failure>`}</testcase>`).join('')}</testsuite></testsuites>\n`);
+    `<testcase name="${row.name}" classname="${escape(row.file)}:${row.line}">${row.outcome.accepted ? '' : `<failure message="${escape(row.outcome.wire)}">Assertion location: ${escape(row.failureAt)}. Values, messages and source are redacted.</failure>`}</testcase>`).join('')}</testsuite></testsuites>\n`);
   writeFileSync(join(target, 'report/index.html'), `<!doctype html><html lang="en"><meta charset="utf-8"><title>Productive routes real</title><main><h1>Productive routes real</h1><p>${rows.length} browser cases; ${failures} failed or incomplete. Error bodies, source and credentials are excluded.</p><ol>${rows.map(row =>
     `<li>${row.name} (${escape(row.file)}:${row.line}): ${escape(row.outcome.wire)}</li>`).join('')}</ol></main></html>\n`);
   writeFileSync(join(target, 'route-census.json'), `${JSON.stringify(routes, null, 2)}\n`);
@@ -174,13 +183,16 @@ function checkSecurityContracts() {
     { type: 'evidence', description: 'REAL_BACKEND' },
     { type: 'action', description: JSON.stringify({ id: 'profile', routes: ['/customer/profile'], actor: 'CUSTOMER', kind: 'MUTATION' }) },
   ], results: [{
-    status: BrowserOutcome.Failed.wire, error: { message: secret }, stdout: [{ text: secret }], attachments: [],
+    status: BrowserOutcome.Failed.wire, errors: [{ message: secret,
+      location: { file: `/tmp/${secret}/route-matrix.spec.ts`, line: 70, column: 1 } }],
+    stdout: [{ text: secret }], attachments: [],
   }] }] }] }] }));
   const target = join(scratch, 'safe-report');
   assert.deepEqual(publishEvidence(path, target), { cases: 1, failures: 1, routeAcceptances: 0, actionAcceptances: 1 });
   for (const file of ['junit.xml', 'report/index.html', 'route-census.json', 'action-census.json']) {
     assert.equal(readFileSync(join(target, file), 'utf8').includes(secret), false);
   }
+  assert.equal(readFileSync(join(target, 'junit.xml'), 'utf8').includes('route-matrix.spec.ts:70'), true);
   const invalidAttachment = (overrides = {}) => ({ suites: [{ specs: [{ file: 'route.spec.ts', line: 1, tests: [{ results: [{
     status: BrowserOutcome.Passed.wire, attachments: [{ name: 'real-route-acceptance', body: Buffer.from(JSON.stringify({
       pattern: 'catalog', width: 390, actor: PublishedActor.Customer.wire, evidence: 'REAL_BACKEND',
