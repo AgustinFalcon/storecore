@@ -27,7 +27,7 @@ internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private v
         sweep(now)
         val bucket = buckets[key] ?: run {
             if (buckets.size >= maxKeys) sweep(now, force = true)
-            if (buckets.size >= maxKeys) throw LoginRateLimited(900)
+            if (buckets.size >= maxKeys) throw LoginRateLimited(capacityRetryAfter(now))
             return
         }
         prune(bucket, now)
@@ -48,7 +48,7 @@ internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private v
     private fun bucket(key: K, now: Long): ArrayDeque<Long> {
         buckets[key]?.let { prune(it, now); return it }
         if (buckets.size >= maxKeys) sweep(now, force = true)
-        if (buckets.size >= maxKeys) throw LoginRateLimited(900)
+        if (buckets.size >= maxKeys) throw LoginRateLimited(capacityRetryAfter(now))
         return ArrayDeque<Long>().also { buckets[key] = it }
     }
 
@@ -68,6 +68,12 @@ internal class BoundedAttemptWindow<K : Any>(private val clock: Clock, private v
     }
     private fun retryAfter(bucket: ArrayDeque<Long>, now: Long): Long =
         ((bucket.first + windowMillis - now + 999) / 1000).coerceAtLeast(1)
+
+    /** Capacity is released only after every failure of one live key expires. */
+    private fun capacityRetryAfter(now: Long): Long {
+        val firstReleasedAt = buckets.values.minOf { it.last + windowMillis }
+        return ((firstReleasedAt - now + 999) / 1000).coerceAtLeast(1)
+    }
 }
 
 internal data class AuthenticationBudgetKey(val sourceIp: String, val digest: String)
