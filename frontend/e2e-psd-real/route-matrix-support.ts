@@ -1,39 +1,57 @@
 import { expect, type Page, type Request, type Response } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import type { ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import type { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
 
 const api = '/api/v1/';
 
+interface ObservedRequest {
+  readonly identity: string;
+  readonly sequence: number;
+  readonly method: string;
+  readonly path: string;
+}
+
 /** Observe actual transport only. No interception, replay, response bodies or secrets in artifacts. */
 export class RealReadTrace {
   readonly completed: { method: string; path: string; status: number }[] = [];
-  readonly failures: string[] = [];
+  readonly failures: ObservedRequest[] = [];
   readonly writes: string[] = [];
   private readonly pending = new Set<Request>();
+  private readonly observations = new WeakMap<Request, ObservedRequest>();
+  private readonly successes: ObservedRequest[] = [];
+  private sequence = 0;
   constructor(page: Page) {
     page.on('request', request => {
       const url = new URL(request.url());
       if (!url.pathname.startsWith(api)) return;
       this.pending.add(request);
       const method = request.method();
+      const bodyDigest = createHash('sha256').update(request.postData() ?? '').digest('hex');
+      this.observations.set(request, { identity: `${method} ${url.pathname}${url.search} ${bodyDigest}`,
+        sequence: ++this.sequence, method, path: url.pathname });
       const inspection = method === 'POST' && [api + 'customer/auth/recovery/inspect', api + 'customer/auth/email-verification/inspect'].includes(url.pathname);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !inspection) this.writes.push(`${method} ${url.pathname}`);
     });
     page.on('response', response => { void this.finish(response); });
     page.on('requestfailed', request => {
       if (!this.pending.delete(request)) return;
-      this.failures.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      const observation = this.observations.get(request);
+      if (observation) this.failures.push(observation);
     });
   }
   private async finish(response: Response): Promise<void> {
     const request = response.request();
     if (!this.pending.has(request)) return;
-    const path = new URL(response.url()).pathname;
+    const observation = this.observations.get(request);
+    if (!observation) return;
     let error: Error | null;
     try { error = await response.finished(); }
     catch { error = new Error('Response observation interrupted'); }
-    if (error) this.failures.push(`${request.method()} ${path}`);
-    else this.completed.push({ method: request.method(), path, status: response.status() });
+    const status = response.status();
+    this.completed.push({ method: observation.method, path: observation.path, status });
+    if (error) this.failures.push(observation);
+    else if (status >= 200 && status < 400) this.successes.push(observation);
     this.pending.delete(request);
   }
   async ready(paths: readonly string[]): Promise<void> {
@@ -43,9 +61,10 @@ export class RealReadTrace {
     await expect.poll(() => this.pending.size, { message: 'All real API responses finished' }).toBe(0);
     await new Promise(resolve => setTimeout(resolve, 100));
     await expect.poll(() => this.pending.size, { message: 'Real API response set remains stable' }).toBe(0);
-    const unresolvedFailures = this.failures.filter(failure => !this.completed.some(row =>
-      `${row.method} ${row.path}` === failure && row.status >= 200 && row.status < 400));
-    expect(unresolvedFailures, 'Failed real API requests without a successful replacement').toEqual([]);
+    const unresolvedFailures = this.failures.filter(failure => !this.successes.some(success =>
+      success.identity === failure.identity && success.sequence > failure.sequence));
+    expect(unresolvedFailures.map(failure => `${failure.method} ${failure.path}`),
+      'Failed real API requests without a later identical successful replacement').toEqual([]);
     expect(this.writes, 'Read-only matrix must not mutate domain data').toEqual([]);
     const unexpected = this.completed.filter(row => row.status >= 400 && !(row.status === 401 &&
       ['customer/me', 'internal/me'].some(path => row.path === api + path)));
