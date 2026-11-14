@@ -5,6 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
+import { CapabilityStateIntent } from '../../domain/user/capability-state-intent';
+import { ChangeCapabilityStateUseCase } from '../../domain/user/use-cases/change-capability-state.usecase';
 import { UserHttpRepository } from './user-http.repository';
 import { mapProductDetail } from '../mappers/http-mappers';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
@@ -14,6 +16,34 @@ describe('UserHttpRepository capabilities', () => {
   beforeEach(() => TestBed.configureTestingModule({
     providers: [provideHttpClient(), provideHttpClientTesting(), UserHttpRepository],
   }));
+
+  const intent = () => CapabilityStateIntent.create({ id: CapabilityModuleId.Catalog, state: CapabilityModuleState.Disabled, configVersion: 3 },
+    CapabilityModuleState.Active, '  autorización  ', () => '10000000-0000-4000-8000-000000000001')!;
+  it('sends the exact typed state command and maps the authoritative server version', async () => {
+    const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
+    const pending = firstValueFrom(new ChangeCapabilityStateUseCase(repository).execute(intent()));
+    const request = http.expectOne('/api/v1/user/capabilities/CATALOG/state');
+    expect(request.request.method).toBe('POST'); expect(request.request.body).toEqual({ state: CapabilityModuleState.Active.wire,
+      expectedConfigVersion: 3, reason: 'autorización', correlationId: intent().correlationId });
+    request.flush({ module: CapabilityModuleId.Catalog.wire, state: CapabilityModuleState.Active.wire, configVersion: 4 });
+    await expect(pending).resolves.toEqual({ id: CapabilityModuleId.Catalog, state: CapabilityModuleState.Active, configVersion: 4 }); http.verify();
+  });
+  it.each([null, {}, { module: 'FAVORITES', state: 'ACTIVE', configVersion: 4 },
+    { module: 'CATALOG', state: 'future', configVersion: 4 }, { module: 'CATALOG', state: 'ACTIVE', configVersion: null },
+    { module: 'CATALOG', state: 'ACTIVE', configVersion: 3 }, { module: 'CATALOG', state: 'ACTIVE', configVersion: 5 }])('rejects unusable or mismatched command responses', async response => {
+    const http = TestBed.inject(HttpTestingController); const pending = firstValueFrom(TestBed.inject(UserHttpRepository).changeCapabilityState(intent()));
+    const assertion = expect(pending).rejects.toThrow();
+    http.expectOne('/api/v1/user/capabilities/CATALOG/state').flush(response); await assertion; http.verify();
+  });
+  it('expires a command after a finite deadline without retrying it', async () => {
+    vi.useFakeTimers();
+    try {
+      const http = TestBed.inject(HttpTestingController); const pending = firstValueFrom(TestBed.inject(UserHttpRepository).changeCapabilityState(intent()));
+      const assertion = expect(pending).rejects.toThrow(); const request = http.expectOne('/api/v1/user/capabilities/CATALOG/state');
+      await vi.advanceTimersByTimeAsync(15001); await assertion;
+      expect(request.cancelled).toBe(true); http.verify();
+    } finally { vi.useRealTimers(); }
+  });
 
   it('serializes explicit bounded pages for protected catalog and inventory reads', async () => {
     const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);

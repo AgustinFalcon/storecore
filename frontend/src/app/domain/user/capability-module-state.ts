@@ -8,6 +8,13 @@ export class CapabilityModuleState {
   static readonly Error = new CapabilityModuleState('ERROR', 'Con error', 'danger');
   static readonly Unknown = new CapabilityModuleState('UNKNOWN', 'Estado no reconocido', 'neutral');
 
+  get allowedTargets(): readonly CapabilityModuleState[] {
+    if (this === CapabilityModuleState.Unknown) return [];
+    if (this === CapabilityModuleState.Disabled) return [CapabilityModuleState.ReadOnly, CapabilityModuleState.Active];
+    if (this === CapabilityModuleState.Error) return [CapabilityModuleState.Paused, CapabilityModuleState.Disabled];
+    return VALUES.filter(value => value !== this);
+  }
+
   static fromWire(raw: unknown): CapabilityModuleState {
     return VALUES.find((value) => value.wire === raw) ?? CapabilityModuleState.Unknown;
   }

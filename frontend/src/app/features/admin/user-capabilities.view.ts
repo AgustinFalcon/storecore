@@ -6,6 +6,9 @@ import { ModuleAvailability } from '../../domain/user/module-availability';
 import { CapabilityReadState } from './capability-read-state';
 import { CommercialCapabilityCard, CommercialCapabilityId, commercialCapabilityCards } from './user-capabilities.catalog';
 import { UserCapabilitiesState } from './user-capabilities.store';
+import { CapabilityModule } from '../../domain/user/user.entity';
+import { CapabilityModuleState } from '../../domain/user/capability-module-state';
+import { CapabilityStateIntent } from '../../domain/user/capability-state-intent';
 
 @Component({
   selector: 'sc-user-capabilities-view',
@@ -20,9 +23,33 @@ export class UserCapabilitiesViewComponent implements OnChanges, OnDestroy {
   @Output() readonly queryChange = new EventEmitter<string>();
   @Output() readonly filterChange = new EventEmitter<CapabilityFilter>();
   @Output() readonly clearFilters = new EventEmitter<void>();
+  @Output() readonly editModule = new EventEmitter<CapabilityModule>();
+  @Output() readonly draftChange = new EventEmitter<{ target?: CapabilityModuleState; reason?: string }>();
+  @Output() readonly confirmChange = new EventEmitter<void>();
+  @Output() readonly closeEditor = new EventEmitter<void>();
+  @ViewChild('editorDialog') private editorDialog?: ElementRef<HTMLDialogElement>;
+  @ViewChild('targetSelect') private targetSelect?: ElementRef<HTMLSelectElement>;
+  @ViewChild('pageHeading') private pageHeading?: ElementRef<HTMLHeadingElement>;
+  private editorTrigger: HTMLElement | null = null;
+  private editorTimer: ReturnType<typeof setTimeout> | null = null;
+  canEdit(row: CapabilityModule): boolean { return this.state.canMutate && CapabilityStateIntent.canEdit(row); }
+  get canConfirm(): boolean {
+    const draft = this.state.draft;
+    return !!draft && this.state.canMutate && !this.state.loading && !this.state.mutationLocked && !this.state.phase.isSaving
+      && draft.reviewedVersion && CapabilityStateIntent.isValid(draft.row, draft.target, draft.reason);
+  }
+  openEditor(row: CapabilityModule, event: Event): void {
+    this.editorTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    this.editModule.emit(row);
+  }
+  cancelEditor(event?: Event): void {
+    event?.preventDefault();
+    if (!this.state.phase.isSaving) this.closeEditor.emit();
+  }
   @ViewChild('informationDialog') private informationDialog?: ElementRef<HTMLDialogElement>;
 
   readonly filters = CapabilityFilter.values;
+  readonly unknownTarget = CapabilityModuleState.Unknown;
   private readonly activeCardId = signal<CommercialCapabilityId | null>(null);
   private focusBeforeDialog: HTMLElement | null = null;
   private dialogOpenTimer: ReturnType<typeof setTimeout> | null = null;
@@ -47,12 +74,33 @@ export class UserCapabilitiesViewComponent implements OnChanges, OnDestroy {
   }
 
   ngOnChanges(): void {
+    const editor = this.editorDialog?.nativeElement;
+    if (this.state.draft && !editor?.open && this.editorTimer === null) {
+      this.editorTimer = setTimeout(() => {
+        this.editorTimer = null;
+        if (!this.state.draft) return;
+        const dialog = this.editorDialog?.nativeElement;
+        if (dialog && !dialog.open) { dialog.showModal(); this.targetSelect?.nativeElement.focus(); }
+      });
+    } else if (!this.state.draft && editor?.open) {
+      editor.close();
+      const trigger = this.editorTrigger;
+      this.editorTimer = setTimeout(() => {
+        this.editorTimer = null;
+        if (this.state.draft) return;
+        if (this.state.readState.isAccessDenied || !this.state.canMutate) this.pageHeading?.nativeElement.focus();
+        else if (trigger?.isConnected && !(trigger instanceof HTMLButtonElement && trigger.disabled)) trigger.focus();
+        else this.pageHeading?.nativeElement.focus();
+      });
+      this.editorTrigger = null;
+    }
     if (this.activeCardId() === null || this.activeCard() !== null) return;
     if (this.informationDialog?.nativeElement.open) this.informationDialog.nativeElement.close();
     else this.restoreDialogFocus();
   }
 
   ngOnDestroy(): void {
+    if (this.editorTimer !== null) clearTimeout(this.editorTimer);
     this.cancelPendingDialogOpen();
     this.activeCardId.set(null);
     this.focusBeforeDialog = null;

@@ -1,4 +1,5 @@
 import { BoundedPageRequest } from '../catalog/bounded-page';
+import { CapabilityStateIntent } from './capability-state-intent';
 import { BoundedRows } from '../catalog/bounded-rows';
 import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
@@ -32,6 +33,7 @@ export interface IUserRepository {
   previewProfile(manifest: string): Observable<ProfilePreview>;
   mergeProfile(manifest: string): Observable<ProfilePreview>;
   listCapabilities(): Observable<readonly CapabilityModule[]>;
+  changeCapabilityState(intent: CapabilityStateIntent): Observable<CapabilityModule>;
   listInventory(page?: BoundedPageRequest): Observable<BoundedRows<InventoryRow>>;
   readMercadoLibreAccount(): Observable<MercadoLibreAccount>;
   listMercadoLibreListings(page?: number): Observable<BoundedRows<MercadoLibreListing>>;

@@ -66,6 +66,7 @@ import { ImportProfileUseCase } from '../../domain/user/use-cases/import-profile
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
 import { ReadCapabilitiesUseCase } from '../../domain/user/use-cases/read-capabilities.usecase';
+import { ChangeCapabilityStateUseCase } from '../../domain/user/use-cases/change-capability-state.usecase';
 import { ManagePromosUseCase } from '../../domain/user/use-cases/manage-promos.usecase';
 import { ProbeUserSessionUseCase } from '../../domain/user/use-cases/probe-user-session.usecase';
 import { SignInUserUseCase } from '../../domain/user/use-cases/sign-in-user.usecase';
@@ -113,6 +114,7 @@ export const USE_CASE_PROVIDERS: Provider[] = [
   { provide: ManageAdminCatalogUseCase, useFactory: (repo: IUserRepository) => new ManageAdminCatalogUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManageInstallationUseCase, useFactory: (repo: IUserRepository) => new ManageInstallationUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ReadCapabilitiesUseCase, useFactory: (repo: IUserRepository) => new ReadCapabilitiesUseCase(repo), deps: [USER_REPOSITORY] },
+  { provide: ChangeCapabilityStateUseCase, useFactory: (repo: IUserRepository) => new ChangeCapabilityStateUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ManagePromosUseCase, useFactory: (repo: IUserRepository) => new ManagePromosUseCase(repo), deps: [USER_REPOSITORY] },
   { provide: ProbeUserSessionUseCase, useFactory: (repo: IUserRepository, session: UserSession) => new ProbeUserSessionUseCase(repo, session), deps: [USER_REPOSITORY, UserSession] },
   { provide: ManageHomeCompositionUseCase, useFactory: (repo: IContentRepository) => new ManageHomeCompositionUseCase(repo), deps: [CONTENT_REPOSITORY] },
