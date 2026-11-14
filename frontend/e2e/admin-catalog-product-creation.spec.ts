@@ -34,7 +34,8 @@ test('operator creates a real catalog product with initial stock', async ({ page
   await page.getByLabel('Precio propio ARS').pressSequentially('120001.25');
   await page.getByRole('button', { name: 'Guardar producto' }).click();
 
-  await expect(page.getByRole('button', { name: 'NEW-1', exact: true })).toBeVisible();
+  await expect.poll(() => savedBody, { timeout: 15_000 }).not.toBeNull();
+  await expect(page.getByRole('button', { name: 'NEW-1', exact: true })).toBeVisible({ timeout: 15_000 });
   expect(savedBody).toMatchObject({ productBasePrice:120000.25, sku: 'NEW-1', name: 'Taladro nuevo', variants: [{ sku: 'NEW-1', name: 'Principal', availableQuantity: 6, priceCommand: { mode: 'OVERRIDE', base: 120001.25 } }] });
 });
 
