@@ -132,7 +132,9 @@ jobs:
           printf '{"uid":%s,"ipv4":"reject-non-loopback","ipv6":"reject-non-loopback"}\n' "$runtime_uid" | sudo tee /run/storecore-psd-egress.json >/dev/null
           sudo chmod 644 /run/storecore-psd-egress.json
           sudo chmod -R a+rX "${{ runner.temp }}/storecore-psd-browsers"
+          sudo chown storecore-psd:storecore-psd "$GITHUB_WORKSPACE"
           sudo chown -R storecore-psd:storecore-psd frontend
+          sudo -u storecore-psd test -r "$GITHUB_WORKSPACE/frontend/scripts/run-psd-real-e2e.mjs"
       - name: Run real PostgreSQL, Spring, production Angular and Chromium matrix
         working-directory: frontend
         run: |
