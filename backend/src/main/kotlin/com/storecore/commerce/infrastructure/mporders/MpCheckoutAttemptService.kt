@@ -30,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Service
@@ -274,7 +275,8 @@ class MpCheckoutAttemptService(
             StoredAttempt(
                 rs.getLong("id"), rs.getLong("order_id"), rs.getString("external_reference"),
                 rs.getObject("idempotency_key", UUID::class.java), rs.getString("request_hash"),
-                rs.getBigDecimal("amount"), rs.getString("currency"), rs.getTimestamp("created_at").toInstant(),
+                rs.getBigDecimal("amount"), rs.getString("currency"),
+                rs.getObject("created_at", OffsetDateTime::class.java).toInstant(),
             )
         },
         attemptId,

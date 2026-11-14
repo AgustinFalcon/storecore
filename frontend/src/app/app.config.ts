@@ -1,3 +1,5 @@
+import { BRANDING_REPOSITORY } from './core/tokens/branding.tokens';
+import { BrandingHttpRepository } from './data/branding/branding-http.repository';
 import { USE_CASE_PROVIDERS } from './core/providers/use-case.providers';
 import { INVENTORY_ADJUSTMENT_REPOSITORY } from './core/tokens/inventory-adjustment.tokens';
 import { InventoryAdjustmentHttpRepository } from './data/user/inventory-adjustment-http.repository';
@@ -74,6 +76,7 @@ export const appConfig: ApplicationConfig = {
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     { provide: RECOVERY_REPOSITORY, useClass: RecoveryHttpRepository },
     { provide: EMAIL_VERIFICATION_REPOSITORY, useClass: EmailVerificationHttpRepository },
+    { provide: BRANDING_REPOSITORY, useClass: BrandingHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],
 };

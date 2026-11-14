@@ -91,6 +91,7 @@ export async function installProductiveRouteFixture(page: Page, actor: RouteActo
     if (path === '/api/v1/catalog/brands' && get) return route.fulfill({ json: envelope([{ id: 'route-brand-1', name: 'Route Brand' }]) });
     if (path === '/api/v1/catalog' && get) return route.fulfill({ json: envelope({ items: [product], total: 1, page: 0, size: 50, truncated: false }) });
     if (path === '/api/v1/catalog/products/ROUTE-SKU-1' && get) return route.fulfill({ json: envelope(product) });
+    if ((path === '/api/v1/storefront/branding' || path === '/api/v1/user/settings/branding') && get) return route.fulfill({ json: envelope({ revision: 1, businessName: 'StoreCore', logoUrl: null, primaryColor: '#0f172a', onPrimaryColor: '#f8fafc' }) });
     if (path === '/api/v1/content/home' && get) return route.fulfill({ json: envelope(home) });
 
     if (path === '/api/v1/customer/cart' && get) return route.fulfill({ json: envelope({

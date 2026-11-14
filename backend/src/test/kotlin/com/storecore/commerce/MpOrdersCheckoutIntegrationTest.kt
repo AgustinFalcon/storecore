@@ -191,7 +191,7 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM inventory_ledger WHERE event_type='RELEASE' AND actor='MP_ORDERS:$orderId'", Int::class.java))
         Fakes.searchResult.set(OfficialOrderSearchResult(emptyList(), 1, true))
         val recovered = attempts.recover(jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE provider_order_id=?", Long::class.java, providerOrderId)!!)
-        assertEquals("RECOVERY_REQUIRED", recovered["state"])
+        assertEquals("RECOVERY_REQUIRED", recovered["state"], recovered.toString())
         assertEquals("RECOVERY_REQUIRED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE provider_order_id=?", String::class.java, providerOrderId))
         Fakes.searchResult.set(
             OfficialOrderSearchResult(

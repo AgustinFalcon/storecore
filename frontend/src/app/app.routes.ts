@@ -1,3 +1,5 @@
+import { adminGuard } from './core/auth/admin.guard';
+import { userBrandingLeaveGuard } from './features/admin/user-branding-leave.guard';
 import { RedirectFunction, Routes } from '@angular/router';
 import { ReturnDestination } from './domain/access/return-destination';
 import { LoginComponent } from './features/access/login.component';
@@ -71,6 +73,11 @@ export const routes: Routes = [
             loadComponent: () => import('./features/admin/user-home.component').then((module) => module.UserHomeComponent),
             title: 'Operaciones',
             canActivate: [userGuard],
+          },
+          {
+            path: 'settings',
+            loadComponent: () => import('./features/admin/user-branding.component').then(module => module.UserBrandingComponent),
+            title: 'Apariencia', canActivate: [userGuard, adminGuard], canDeactivate: [userBrandingLeaveGuard],
           },
           {
             path: 'content',

@@ -13,6 +13,7 @@ describe('UserAction', () => {
     expect(actions).toContain(UserAction.Catalog);
     expect(actions).not.toContain(UserAction.Promos);
     expect(actions).not.toContain(UserAction.Content);
+    expect(actions).not.toContain(UserAction.Settings);
     expect(actions).not.toContain(UserAction.MercadoLibre);
     expect(actions).toContain(UserAction.Capabilities);
     expect(actions).not.toContain(UserAction.ProfileImport);
@@ -20,6 +21,7 @@ describe('UserAction', () => {
   it('recomputes role loss and grants all known actions to an admin', () => {
     expect(UserAction.forRoles([UserRole.Admin])).toContain(UserAction.ProfileImport);
     expect(UserAction.forRoles([UserRole.Admin])).toContain(UserAction.Content);
+    expect(UserAction.forRoles([UserRole.Admin])).toContain(UserAction.Settings);
     expect(UserAction.forRoles([UserRole.Admin])).toContain(UserAction.MercadoLibre);
     expect(UserAction.forRoles([])).toEqual([]);
   });

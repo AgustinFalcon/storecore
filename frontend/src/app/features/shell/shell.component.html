@@ -3,14 +3,14 @@
 <div class="shell" [attr.aria-busy]="store.loading$ | async">
   @if (consoleMode$ | async) {
     <header class="chrome chrome--console">
-      <a class="chrome__brand" routerLink="/user/home">StoreCore <span>Consola</span></a>
+      <a class="chrome__brand" routerLink="/user/home">{{ branding.branding().businessName }} <span>Consola</span></a>
       <p class="chrome__hint">Operador · no es la cuenta que compra</p>
       <a class="chrome__text" routerLink="/">Ver tienda</a>
       <a class="chrome__text" routerLink="/login">Elegir acceso</a>
     </header>
   } @else {
     <header class="chrome">
-      <a class="chrome__brand" routerLink="/">StoreCore</a>
+      <a class="chrome__brand" routerLink="/"><sc-branding-logo [logo]="branding.branding().logo" [name]="branding.branding().businessName" />{{ branding.branding().businessName }}</a>
       <form class="chrome__search" (submit)="$event.preventDefault(); search()">
         <label class="chrome__search-label" for="chrome-search">Buscar en el catálogo</label>
         <input
@@ -68,6 +68,6 @@
   </main>
 
   <footer class="sc-shell-foot">
-    <p>StoreCore · una instalación, una tienda.</p>
+    <p>{{ branding.branding().businessName }} · una instalación, una tienda.</p>
   </footer>
 </div>

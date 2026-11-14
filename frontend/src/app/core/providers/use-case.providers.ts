@@ -1,3 +1,5 @@
+import { BRANDING_REPOSITORY } from '../tokens/branding.tokens';
+import { IBrandingRepository, ReadStoreBrandingUseCase, ManageBrandingUseCase } from '../../domain/branding/branding.repository';
 import { Provider } from '@angular/core';
 import { INVENTORY_ADJUSTMENT_REPOSITORY } from '../tokens/inventory-adjustment.tokens';
 import { AdjustAvailableStockUseCase, IInventoryAdjustmentRepository } from '../../domain/user/inventory-adjustment.repository';
@@ -71,6 +73,8 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 
 /** Angular composition lives outside the framework-free use cases. */
 export const USE_CASE_PROVIDERS: Provider[] = [
+  { provide: ReadStoreBrandingUseCase, useFactory: (repo: IBrandingRepository) => new ReadStoreBrandingUseCase(repo), deps: [BRANDING_REPOSITORY] },
+  { provide: ManageBrandingUseCase, useFactory: (repo: IBrandingRepository) => new ManageBrandingUseCase(repo), deps: [BRANDING_REPOSITORY] },
   { provide: AdjustAvailableStockUseCase, useFactory: (repository: IInventoryAdjustmentRepository) => new AdjustAvailableStockUseCase(repository), deps: [INVENTORY_ADJUSTMENT_REPOSITORY] },
   { provide: ManageReturnDispositionUseCase, useFactory: (repo: IReturnDispositionRepository) => new ManageReturnDispositionUseCase(repo), deps: [RETURN_DISPOSITION_REPOSITORY] },
   { provide: ReadOverviewUseCase, useFactory: (repo: IOverviewRepository) => new ReadOverviewUseCase(repo), deps: [OVERVIEW_REPOSITORY] },

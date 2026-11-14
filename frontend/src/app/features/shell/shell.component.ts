@@ -1,3 +1,5 @@
+import { StoreBrandingStore } from './store-branding.store';
+import { BrandingLogoComponent } from './branding-logo.component';
 import { AsyncPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -17,7 +19,7 @@ import { matchedSurface } from '../navigation/surface-host';
 
 @Component({
   selector: 'sc-shell',
-  imports: [AsyncPipe, FormsModule, RouterLink, RouterOutlet],
+  imports: [AsyncPipe, FormsModule, RouterLink, RouterOutlet, BrandingLogoComponent],
   providers: [ShellStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './shell.component.html',
@@ -39,10 +41,12 @@ export class ShellComponent implements OnInit {
     readonly user: UserSession,
     private readonly theme: ThemeAppearance,
     readonly access: AccessCoordinator,
+    readonly branding: StoreBrandingStore,
   ) {}
 
   ngOnInit(): void {
-    this.theme.apply();
+    this.theme.apply({ theme: this.branding.branding().primary.value, themeInk: this.branding.branding().onPrimary.value });
+    this.branding.load();
     this.store.loadHealth();
     this.store.loadFacets();
     this.access.navigationState().subscribe({

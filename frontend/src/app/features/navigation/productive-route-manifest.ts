@@ -68,6 +68,7 @@ export const productiveRouteManifest: readonly ProductiveRouteAcceptance[] = [
   route('customer/orders/:id', '/customer/orders/ROUTE-ORDER-1', SurfaceIdentity.Order, RouteActor.Customer, 'Orden ROUTE-ORDER-1', 'text=Taladro de ruta'),
   route('user/account', '/user/account', SurfaceIdentity.UserAccount, RouteActor.Admin, 'Mi cuenta', '#account-title'),
   route('user/home', '/user/home', SurfaceIdentity.Overview, RouteActor.Admin, 'Resumen operativo', 'text=Taladro de ruta'),
+  route('user/settings', '/user/settings', SurfaceIdentity.Settings, RouteActor.Admin, 'Apariencia', '#branding-name'),
   route('user/content', '/user/content', SurfaceIdentity.Content, RouteActor.Admin, 'Diseñá tu inicio', 'text=Portada de ruta'),
   route('user/catalog', '/user/catalog', SurfaceIdentity.AdminCatalog, RouteActor.Admin, 'Catálogo operador', 'text=Taladro de ruta'),
   route('user/offers', '/user/offers', SurfaceIdentity.Offers, RouteActor.Admin, 'Ofertas locales', 'text=ROUTE-SKU-1'),

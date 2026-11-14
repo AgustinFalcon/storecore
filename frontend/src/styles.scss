@@ -350,9 +350,7 @@ pre {
   overflow: hidden;
   min-height: clamp(26.25rem, 48vw, 30rem);
   border-radius: 1.25rem;
-  background:
-    radial-gradient(1200px 280px at 10% 0%, color-mix(in srgb, var(--sc-color-accent) 28%, transparent), transparent 55%),
-    var(--sc-color-theme);
+  background: var(--sc-color-theme);
   color: var(--sc-color-theme-ink);
 }
 
@@ -369,7 +367,7 @@ pre {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: var(--sc-text-xs);
-  opacity: 0.7;
+  opacity: 1;
 }
 
 .sc-carousel h2,
@@ -388,7 +386,7 @@ pre {
 
 .sc-carousel__controls .sc-btn--ghost {
   border-color: rgb(248 250 252 / 0.55);
-  background: rgb(15 23 42 / 0.6);
+  background: var(--sc-color-theme);
   color: var(--sc-color-theme-ink);
 }
 
@@ -1224,3 +1222,7 @@ pre {
     transition: none !important;
   }
 }
+
+/* Branded surfaces preserve their validated pair, including disabled controls. */
+.sc-carousel__controls .sc-btn--ghost:disabled,
+.sc-carousel__controls .sc-btn--ghost[aria-disabled='true'] { opacity: 1; cursor: not-allowed; border-style: dashed; }

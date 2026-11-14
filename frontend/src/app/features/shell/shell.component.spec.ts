@@ -1,3 +1,5 @@
+import { StoreBrandingStore } from './store-branding.store';
+import { MerchantBranding } from '../../domain/branding/merchant-branding';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { NEVER, of } from 'rxjs';
@@ -25,6 +27,7 @@ describe('Shell access lifecycle', () => {
       {} as UserSession,
       theme as ThemeAppearance,
       access as unknown as AccessCoordinator,
+      { branding: () => MerchantBranding.Default, load: vi.fn() } as unknown as StoreBrandingStore,
     ));
 
     component.ngOnInit();

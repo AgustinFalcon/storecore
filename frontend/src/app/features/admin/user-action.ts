@@ -3,6 +3,7 @@ import { UserRole } from '../../domain/user/user-role';
 /** Closed navigation actions follow the current backend role requirements. */
 export class UserAction {
   private constructor(readonly path: string, readonly label: string, private readonly roles: readonly UserRole[]) {}
+  static readonly Settings = new UserAction('/user/settings', 'Apariencia', [UserRole.Admin]);
   static readonly Content = new UserAction('/user/content', 'Contenido', [UserRole.Admin]);
   static readonly Catalog = new UserAction('/user/catalog', 'Catálogo', [UserRole.Admin, UserRole.Operator]);
   static readonly Promos = new UserAction('/user/promos', 'Promos', [UserRole.Admin]);
@@ -17,4 +18,4 @@ export class UserAction {
   permits(roles: readonly UserRole[]): boolean { return this.roles.some((role) => roles.includes(role)); }
   static forRoles(roles: readonly UserRole[]): readonly UserAction[] { return ACTIONS.filter((action) => action.permits(roles)); }
 }
-const ACTIONS = [UserAction.Account, UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Customers, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];
+const ACTIONS = [UserAction.Account, UserAction.Settings, UserAction.Content, UserAction.Catalog, UserAction.Offers, UserAction.Promos, UserAction.Orders, UserAction.Customers, UserAction.Inventory, UserAction.MercadoLibre, UserAction.Capabilities, UserAction.ProfileImport];
