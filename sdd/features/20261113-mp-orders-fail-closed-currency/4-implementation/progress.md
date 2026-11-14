@@ -16,7 +16,7 @@ correctivo offline, sin P0–P3 residuales. El dictamen está registrado en
 
 ## Estado
 
-Implementación y validación local completas; CI del PR y post-merge pendientes.
+Implementación y validación local y alojada completas.
 Configuración, red, credenciales, DDL y base de datos permanecen intactos.
 
 ## Implementación
@@ -41,7 +41,9 @@ Configuración, red, credenciales, DDL y base de datos permanecen intactos.
 - `git diff --check` limpio; no queda fallback `currency.asText("ARS")` en el
   borde Orders.
 
-## Pendiente
+## Cierre alojado
 
-- CI completo del PR.
-- Merge protegido por SHA y CI post-merge sobre `master`.
+- PR #258: Verify `43460940429`, 3/3 verde.
+- Merge `43489ef69192639034d833d32a0f4ccbf6bf1a68`.
+- Verify post-merge `43462225801`, 3/3 verde.
+- Estado final: `completed`; MPC-001..007 cerradas.

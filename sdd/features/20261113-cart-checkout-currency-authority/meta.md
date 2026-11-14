@@ -1,8 +1,8 @@
 ---
 id: 20261113-cart-checkout-currency-authority
 title: Autoridad cerrada de moneda en carrito y checkout
-status: implementation_authorized
-maturity: proposed_implementation
+status: completed
+maturity: delivered
 owner: commerce
 created: 2026-11-13
 related:
@@ -21,3 +21,6 @@ de instalación o el wire no sean válidos.
 La experiencia deja de ofrecer un campo editable que sugiere multimoneda. El
 checkout muestra ARS como dato fijo sólo cuando fue confirmado por backend; ante
 `Unknown` bloquea el pago y presenta indisponibilidad sin imprimir el wire.
+
+Entrega: PR #259, merge `653b5eb`; Verify PR `43479521115` y post-merge
+`43481720083`, ambos 3/3 verdes.
