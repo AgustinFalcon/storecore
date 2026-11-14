@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { expect, request, type FullConfig } from '@playwright/test';
 import { RouteActor } from '../src/app/features/navigation/productive-route-manifest';
 import { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
+import { UserRole } from '../src/app/domain/user/user-role';
 
 const passwordByActor = new Map<RouteActor, string>([
   [RouteActor.Customer, 'StoreCore-showcase-2026!'],
@@ -28,6 +29,19 @@ export default async function routeAuthSetup(config: FullConfig): Promise<void> 
       } });
       expect(response.status()).toBe(200);
       await context.storageState({ path: join(authDir, `${actor.wire}.json`) });
+    } finally { await context.dispose(); }
+  }
+
+  for (const role of [UserRole.Admin, UserRole.Operator]) {
+    const context = await request.newContext({ baseURL, ignoreHTTPSErrors: true,
+      extraHTTPHeaders: { Origin: baseURL } });
+    try {
+      const response = await context.post('/api/v1/internal/auth/login', { data: {
+        email: role === UserRole.Admin ? 'psd-action-admin@storecore.invalid' : 'psd-action-operator@storecore.invalid',
+        password: 'PSD-disposable-fixture-2026!',
+      } });
+      expect(response.status()).toBe(200);
+      await context.storageState({ path: join(authDir, `action-${role.wire}.json`) });
     } finally { await context.dispose(); }
   }
 }

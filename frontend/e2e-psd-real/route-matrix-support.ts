@@ -1,4 +1,4 @@
-import { expect, type Page, type Request, type Response } from '@playwright/test';
+import { expect, type Page, type Request } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import type { ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import type { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
@@ -37,25 +37,26 @@ export class RealReadTrace {
       const inspection = method === 'POST' && [api + 'customer/auth/recovery/inspect', api + 'customer/auth/email-verification/inspect'].includes(url.pathname);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !inspection) this.writes.push(`${method} ${url.pathname}`);
     });
-    page.on('response', response => { void this.finish(response); });
+    page.on('requestfinished', request => { void this.finish(request); });
     page.on('requestfailed', request => {
       if (!this.pending.delete(request)) return;
       const observation = this.observations.get(request);
       if (observation) this.failures.push(observation);
     });
   }
-  private async finish(response: Response): Promise<void> {
-    const request = response.request();
+  private async finish(request: Request): Promise<void> {
     if (!this.pending.has(request)) return;
     const observation = this.observations.get(request);
     if (!observation) return;
-    let error: Error | null = null;
-    try { await response.body(); }
-    catch { error = new Error('Response body observation interrupted'); }
+    const response = await request.response();
+    if (!response) {
+      this.failures.push(observation);
+      this.pending.delete(request);
+      return;
+    }
     const status = response.status();
     this.completed.push({ method: observation.method, path: observation.path, status });
-    if (error) this.failures.push(observation);
-    else if (status >= 200 && status < 400) this.successes.push({ ...observation, status });
+    if (status >= 200 && status < 400) this.successes.push({ ...observation, status });
     this.pending.delete(request);
   }
   async ready(paths: readonly string[]): Promise<void> {

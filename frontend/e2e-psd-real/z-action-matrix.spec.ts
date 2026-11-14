@@ -1,6 +1,7 @@
 /* eslint-disable no-empty-pattern -- Playwright requires destructuring even for cases using only testInfo. */
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { AccessContext } from '../src/app/domain/access/access-context';
 import { readApiBody } from '../src/app/core/api/base-response';
@@ -27,14 +28,13 @@ let receipt: RealRouteReceipt;
 // customer and every commercial entity belong to one journey, never the receipt.
 test.beforeAll(async ({ browser }) => {
   receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync('psd-real-results/fixture-receipt.json', 'utf8')));
+  const authDir = process.env['STORECORE_PSD_AUTH_DIR'];
+  if (!authDir) throw new Error('Missing ephemeral action auth directory');
   for (const role of [UserRole.Admin, UserRole.Operator]) {
-    const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
+    const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true,
+      storageState: join(authDir, `action-${role.wire}.json`) });
     if (role === UserRole.Admin) adminContext = context; else operatorContext = context;
-    const response = await context.request.post('/api/v1/internal/auth/login', { headers: { Origin: origin }, data: {
-      email: role === UserRole.Admin ? 'psd-action-admin@storecore.invalid' : 'psd-action-operator@storecore.invalid',
-      password: 'PSD-disposable-fixture-2026!',
-    } });
-    expect(response.status()).toBe(200);
+    expect((await context.request.get('/api/v1/internal/me')).status()).toBe(200);
     expect((await context.request.get('/api/v1/customer/me')).status()).toBe(401);
   }
 });
