@@ -59,6 +59,7 @@ data class CustomerAddress(
     val province: String,
     val postalCode: String,
     val isDefault: Boolean,
+    val revision: Instant? = null,
 )
 
 data class SessionSummary(

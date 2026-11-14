@@ -14,6 +14,7 @@ import { CartStore } from './cart.store';
         [access]="store.authority()"
         (selectCustomer)="store.selectCustomer()"
         (addressChange)="store.setAddressId($event)"
+        (deliveryChange)="store.setDeliveryMode($event)"
         (pay)="store.submitCheckout()"
         (readRetry)="reload()"
         (paymentRetry)="store.submitCheckout()"

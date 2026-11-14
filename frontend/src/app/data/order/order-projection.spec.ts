@@ -109,7 +109,7 @@ describe('Order projection HTTP boundary', () => {
     expect(reversedTopLevel.payment.value).toBeNull();
     expect(reversedTopLevel.paymentStatus).toBe(PaymentStatus.Unknown);
     expect(reversedTopLevel.orderStatus).toBe(OrderStatus.Unknown);
-    const valid = mapAdminOrder({ ...legacy, payment: { state: 'KNOWN', value: 'APPROVED', reason: null } });
+    const valid = mapAdminOrder({deliveryDecision:{state:'LEGACY_MISSING_BLOCK',value:null}, ...legacy, payment: { state: 'KNOWN', value: 'APPROVED', reason: null } });
     expect(valid.paymentStatus).toBe(PaymentStatus.Approved);
     expect(valid.orderStatus).toBe(OrderStatus.Paid);
     expect(allowedRma(valid)).not.toBeNull();

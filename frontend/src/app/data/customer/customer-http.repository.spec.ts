@@ -5,7 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { CustomerHttpRepository } from './customer-http.repository';
 
 const address = {
-  id: 'a-1',
+  revision: '2026-11-14T00:00:00Z', id: 'a-1',
   street: 'Calle',
   number: '1',
   city: 'CABA',

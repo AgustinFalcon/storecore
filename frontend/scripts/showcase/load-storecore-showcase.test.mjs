@@ -73,7 +73,7 @@ async function api(t, options = {}) {
     })),
     safety: { mpOrdersAdapter: ShowcaseAdapterMode.Unconfigured.wire, externalCheckoutDisabled: true,
       externalCapabilities: domain.ShowcaseExternalCapability.values.map(capability => ({ module: capability.wire, state: ShowcaseCapabilityState.Disabled.wire })) },
-    home: { revision: 0, sections: [] }, products: {}, customer: null, addresses: [], orders: [], cart: { lines: [] },
+    home: { revision: 0, sections: [] }, products: {}, customer: null, addresses: [], orders: [], cart: { lines: [], deliveryOptions:[{mode:domain.ShowcaseDeliveryMode.LocalDelivery.wire,label:'Entrega fixture',cost:0,currency:'ARS',minDays:1,maxDays:2,requiresAddress:true,configurationVersion:2,destination:null,instructions:null}] },
     favorites: [], offers: [], csrf: { user: '', customer: '' }, tokens: { user: 0, customer: 0 }, requests: [], writes: [], errors: [],
     overview: overview(),
   };
@@ -126,10 +126,15 @@ async function api(t, options = {}) {
           response.setHeader('set-cookie', 'customer=session; HttpOnly; Path=/'); rotate();
         } else if (path.endsWith('/showcase-safety')) data = state.safety;
         else if (path === '/api/v1/user/capabilities') data = state.modules;
+        else if (path.endsWith('/MANUAL_FULFILLMENT/policy')) {
+          const module=state.modules.find(item=>item.module===ShowcaseCapability.ManualFulfillment.wire);
+          assert.equal(body.expectedConfigVersion,module.configVersion);module.configVersion++;data={configurationVersion:module.configVersion};
+        }
         else if (path.startsWith('/api/v1/user/capabilities/')) {
           const module = state.modules.find((item) => item.module === path.split('/')[5]);
           assert.equal(body.expectedConfigVersion, module.configVersion);
           module.state = body.state; module.configVersion++; data = module;
+          if (module.module === ShowcaseCapability.ManualFulfillment.wire) state.cart.deliveryOptions?.forEach(option => option.configurationVersion = module.configVersion);
         } else if (path === '/api/v1/user/content/home') {
           if (method === 'PUT') {
             assert.equal(body.expectedRevision, state.home.revision);
@@ -206,7 +211,7 @@ async function api(t, options = {}) {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); assert.deepEqual(state.errors, []); });
-  const config = new ShowcaseConfig({ ...valid, baseUrl: `http://127.0.0.1:${server.address().port}`, includePendingOrder: options.includePendingOrder ?? true });
+  const config = new ShowcaseConfig({ ...valid, baseUrl: `http://127.0.0.1:${server.address().port}`, includePendingOrder: options.includePendingOrder ?? true, manualFulfillmentPolicy: options.manualFulfillmentPolicy });
   return { state, run: () => new ShowcaseLoader(config, () => {}).run() };
 }
 
@@ -439,4 +444,19 @@ test('overview accepts genuine unavailable facts and rejects contradictory/unkno
     (data) => { data.pendingPayments.items.push({ orderId: 1, orderNumber: 'SC-1', total: 1, createdAt: '2026-01-01T00:00:00Z', reason: 'future' }); data.pendingPayments.totalCount = 1; },
     (data) => { data.lowStock.totalCount = -1; },
   ]) { const data = overview(); mutate(data); assert.throws(() => domain.requireOverview(data), /VERIFICATION_FAILED/); }
+});
+
+test('manual policy opt-in uses exact baseline CAS and refuses operator drift without a write', async(t)=>{
+  const policy={pickup:{enabled:true,label:'Retiro fixture',cost:'0.00',minDays:0,maxDays:1,destination:'Local fixture',instructions:'Presentar confirmación'},localDelivery:{enabled:true,label:'Entrega fixture',cost:'0.00',minDays:1,maxDays:2}};
+  const first=await api(t,{manualFulfillmentPolicy:policy,prepare:state=>{state.modules.find(row=>row.module===ShowcaseCapability.ManualFulfillment.wire).configVersion=2;}});
+  await first.run();
+  const write=first.state.requests.find(row=>row.path.endsWith('/MANUAL_FULFILLMENT/policy'));
+  assert.equal(write.body.expectedConfigVersion,2);
+  assert.deepEqual(write.body.pickup,policy.pickup);
+  const checkout=first.state.requests.find(row=>row.path.endsWith('/checkout'));
+  assert.equal(checkout.body.deliveryMode,domain.ShowcaseDeliveryMode.LocalDelivery.wire);
+  assert.equal(checkout.body.deliveryConfigurationVersion,4);
+  const drift=await api(t,{manualFulfillmentPolicy:policy,prepare:state=>{const row=state.modules.find(row=>row.module===ShowcaseCapability.ManualFulfillment.wire);row.configVersion=3;row.state=ShowcaseCapabilityState.Active.wire;}});
+  await assert.rejects(drift.run(),/SHOWCASE_DELIVERY_POLICY_DRIFT/);
+  assert.equal(drift.state.requests.filter(row=>row.path.startsWith('/api/v1/user/capabilities/')&&row.method!=='GET').length,0);
 });

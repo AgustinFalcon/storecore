@@ -15,7 +15,7 @@ class RecoveryDeliveryMigrationTest {
         val user = account(jdbc, "users")
         val customer = account(jdbc, "customers")
         val history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("21", flyway(null).migrate().targetSchemaVersion.toString())
+        assertEquals("22", flyway(null).migrate().targetSchemaVersion.toString())
         assertEquals(history, jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=18 ORDER BY installed_rank"))
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM identity_email_verification_evidence", Int::class.java))
         for ((table, id) in listOf("users" to user, "customers" to customer)) {

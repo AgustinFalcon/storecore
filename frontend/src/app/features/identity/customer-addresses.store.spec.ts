@@ -17,7 +17,7 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
 import { ContinueCustomerPurchaseIntentPolicy } from '../../core/auth/continue-customer-purchase-intent.policy';
 import { AccessState } from '../../domain/access/session-probe';
 
-const address: CustomerAddress = { id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
+const address: CustomerAddress = { revision: '2026-11-14T00:00:00Z', id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
 
 function setup() {
   const list = { execute: vi.fn(() => of<readonly CustomerAddress[]>([address])) };

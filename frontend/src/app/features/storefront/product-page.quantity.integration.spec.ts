@@ -22,7 +22,7 @@ describe('ProductPage restored quantity integration', () => {
     const product = mapProductDetail({ id: 'p', sku: 'PRODUCT', name: 'Producto', status: 'ACTIVE', images: [],
       productBasePrice: 1, price: { base: 1, effective: 1, original: 1, offer: null }, variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku: 'VARIANT', name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE',
         attributes: {}, inventory: { variantId: 'v', sku: 'VARIANT', state: 'KNOWN', available: 20, reserved: 0, onHand: 20, safety: 0, saleable: 20 } }] });
-    const cart = { lines: [], currency: CartCurrency.Ars };
+    const cart = { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: CartCurrency.Ars };
     const flow = PurchaseIntent.capture('opaque-flow-id-001', 'PRODUCT', 'VARIANT', 2, 1);
     const snapshot: PurchaseIntentSnapshot = { intent: flow, stage: PurchaseIntentStage.ReadyForConfirmation,
       availability: RestoredPurchaseAvailability.Ready, confirmation: CartLineConfirmationResult.Idle, revision: 0,

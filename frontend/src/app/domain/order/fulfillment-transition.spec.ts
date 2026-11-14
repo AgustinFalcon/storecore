@@ -1,3 +1,4 @@
+import { DeliveryDecision } from '../cart/delivery';
 import { allowedRma, allowedShipment, nextRma, nextShipment } from './fulfillment-transition';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from './commerce-states';
 import { AdminOrder } from './order.entity';
@@ -6,7 +7,7 @@ import { ReturnEligibility } from './return-eligibility';
 
 const unavailable = { state: OrderFactState.Unavailable, value: null, reason: null };
 const approved = { state: OrderFactState.Known, value: PaymentStatus.Approved, reason: null };
-const order: AdminOrder = { orderNumber: null, createdAt: null, updatedAt: null, currency: null, subtotal: null, shippingCost: null, buyerName: unavailable, buyerEmail: unavailable, delivery: unavailable, payment: approved, timeline: unavailable, returnEligibility: ReturnEligibility.Unavailable, id: '1', orderStatus: OrderStatus.Paid, paymentStatus: PaymentStatus.Approved, shipmentStatus: ShipmentStatus.Pending, tracking: null, total: 100, lines: [], rmaStatus: RmaStatus.None, fulfillmentEligibility: FulfillmentEligibility.Eligible, shipmentAction: ShipmentTransition.Packed, rmaAction: null };
+const order: AdminOrder = { deliveryDecision: DeliveryDecision.fromWire({state:'LEGACY_MISSING_BLOCK',value:null}), orderNumber: null, createdAt: null, updatedAt: null, currency: null, subtotal: null, shippingCost: null, buyerName: unavailable, buyerEmail: unavailable, delivery: unavailable, payment: approved, timeline: unavailable, returnEligibility: ReturnEligibility.Unavailable, id: '1', orderStatus: OrderStatus.Paid, paymentStatus: PaymentStatus.Approved, shipmentStatus: ShipmentStatus.Pending, tracking: null, total: 100, lines: [], rmaStatus: RmaStatus.None, fulfillmentEligibility: FulfillmentEligibility.Eligible, shipmentAction: ShipmentTransition.Packed, rmaAction: null };
 
 describe('fulfillment policy', () => {
   it('orders shipment steps and blocks terminal or unknown states', () => {

@@ -26,12 +26,14 @@ export class OrderTimelineKind {
   static readonly PaymentReversed = new OrderTimelineKind('PAYMENT_REVERSED', 'Pago revertido');
   static readonly ShipmentPreparing = new OrderTimelineKind('SHIPMENT_PREPARING', 'Envío en preparación');
   static readonly ShipmentShipped = new OrderTimelineKind('SHIPMENT_SHIPPED', 'Envío despachado');
+  static readonly ShipmentReadyForPickup = new OrderTimelineKind('SHIPMENT_READY_FOR_PICKUP', 'Listo para retirar');
+  static readonly ShipmentPickedUp = new OrderTimelineKind('SHIPMENT_PICKED_UP', 'Retiro confirmado');
   static readonly ShipmentDelivered = new OrderTimelineKind('SHIPMENT_DELIVERED', 'Entrega registrada');
   static readonly ShipmentCancelled = new OrderTimelineKind('SHIPMENT_CANCELLED', 'Envío cancelado');
   static readonly ReturnOpened = new OrderTimelineKind('RETURN_OPENED', 'Devolución registrada');
   static readonly ReturnResolved = new OrderTimelineKind('RETURN_RESOLVED', 'Devolución resuelta');
   static readonly Unknown = new OrderTimelineKind('UNKNOWN', 'Evento desconocido');
-  static fromWire(raw: unknown): OrderTimelineKind { return [this.OrderCreated, this.PaymentPending, this.PaymentAccredited, this.PaymentReversed, this.ShipmentPreparing, this.ShipmentShipped, this.ShipmentDelivered, this.ShipmentCancelled, this.ReturnOpened, this.ReturnResolved].find((value) => value.wire === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): OrderTimelineKind { return [this.OrderCreated, this.PaymentPending, this.PaymentAccredited, this.PaymentReversed, this.ShipmentPreparing, this.ShipmentShipped, this.ShipmentDelivered, this.ShipmentReadyForPickup, this.ShipmentPickedUp, this.ShipmentCancelled, this.ReturnOpened, this.ReturnResolved].find((value) => value.wire === raw) ?? this.Unknown; }
 }
 export interface OrderFact<T> { readonly state: OrderFactState; readonly value: T | null; readonly reason: OrderFactReason | null; }
 export interface DeliverySnapshot { readonly recipient: string | null; readonly street: string | null; readonly city: string | null; readonly province: string | null; readonly postalCode: string | null; readonly country: string | null; }

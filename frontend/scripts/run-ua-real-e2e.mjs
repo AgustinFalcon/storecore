@@ -1,4 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
+import { seedManualFulfillment } from './ua-real-delivery-policy.mjs';
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -115,6 +116,7 @@ async function run() {
   await stop(migrationServer);
   const backendServer = spring(true, 'backend');
   await ready(backendServer, 'http://127.0.0.1:8080/actuator/health');
+  await seedManualFulfillment('http://127.0.0.1:8080', origin);
   const angular = start(process.execPath, [join(frontend, 'node_modules/@angular/cli/bin/ng.js'), 'serve',
     '--host', 'localhost', '--port', '4301', '--ssl', '--ssl-cert', certificate, '--ssl-key', key,
     '--proxy-config', 'proxy.ua-real.conf.json'], 'angular');

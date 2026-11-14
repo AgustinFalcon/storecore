@@ -9,7 +9,7 @@ import { CustomerState } from './customer.store';
 const state = (registrationStage: CustomerRegistrationStage, authenticated = false): CustomerState => ({
   loading: false, errorMessage: '', authenticated, email: '', firstName: '', lastName: '', password: '',
   profile: { email: '', firstName: '', lastName: '', phone: '' }, saved: false, profileRevision: 0,
-  addresses: [], addressDraft: { id: '', street: '', number: '', city: '', province: '', postalCode: '', isDefault: false },
+  addresses: [], addressDraft: { revision: '2026-11-14T00:00:00Z', id: '', street: '', number: '', city: '', province: '', postalCode: '', isDefault: false },
   addressReadState: AddressReadState.Idle, addressMutationPending: false, registrationStage,
 });
 

@@ -40,6 +40,7 @@ class JdbcOrderProjection(private val jdbc: JdbcTemplate, private val mapper: Ob
                 if (rs.getBoolean("contradictory")) OrderUnavailableReason.SOURCE_CONTRADICTORY else OrderUnavailableReason.SOURCE_MISSING)
                 else OrderFact.known(paymentStatus)
             val buyer = mapper.readTree(rs.getString("buyer_snapshot"))
+            val decision=DeliverySnapshotJson.decode(mapper,rs.getString("checkout_snapshot"))
             val persistedReturn = when {
                 rs.getLong("return_count") == 0L -> RmaStatus.NONE
                 rs.getBoolean("unknown_return") -> RmaStatus.UNKNOWN
@@ -51,12 +52,12 @@ class JdbcOrderProjection(private val jdbc: JdbcTemplate, private val mapper: Ob
                 OrderFact.known(DeliverySnapshot(text("recipient"), listOfNotNull(text("street"), text("number")).joinToString(" "), text("city"), text("province"), text("postalCode"), text("country")))
                 else OrderFact.unavailable(OrderUnavailableReason.SOURCE_MISSING)
             view.copy(orderNumber = rs.getString("order_number"), createdAt = rs.getTimestamp("created_at").toInstant(), updatedAt = rs.getTimestamp("updated_at").toInstant(),
-                currency = rs.getString("currency"), subtotal = rs.getBigDecimal("subtotal"), shippingCost = rs.getBigDecimal("shipping_cost"), buyerName = fact("name"), buyerEmail = fact("email"), delivery = delivery,
+                currency = rs.getString("currency"), subtotal = rs.getBigDecimal("subtotal"), shippingCost = rs.getBigDecimal("shipping_cost"),deliveryDecision=decision, buyerName = fact("name"), buyerEmail = fact("email"), delivery = delivery,
                 payment = payment, paymentStatus = paymentStatus,
                 orderStatus = OrderStatus.fromWire(rs.getString("projected_order")),
                 fulfillmentEligibility = view.fulfillmentEligibility.withPayment(payment),
-                returnEligibility = ReturnEligibility.evaluate(payment, view.shipmentStatus, persistedReturn),
-                shipmentAction = view.shipmentAction.takeIf { payment.value == PaymentStatus.APPROVED }, rmaAction = view.rmaAction.takeIf { payment.value == PaymentStatus.APPROVED })
+                returnEligibility = if(decision.allowsFulfillment()) ReturnEligibility.evaluate(payment, view.shipmentStatus, persistedReturn,decision) else ReturnEligibility.UNAVAILABLE,
+                shipmentAction = view.shipmentAction.takeIf { payment.value == PaymentStatus.APPROVED && decision.allowsFulfillment() }, rmaAction = view.rmaAction.takeIf { payment.value == PaymentStatus.APPROVED })
         }, id).singleOrNull() ?: throw ResourceNotFound()
         return header.copy(timeline = timeline(id, header))
     }
@@ -79,6 +80,8 @@ class JdbcOrderProjection(private val jdbc: JdbcTemplate, private val mapper: Ob
                 ShipmentStatus.PREPARING -> OrderTimelineEventKind.SHIPMENT_PREPARING
                 ShipmentStatus.SHIPPED -> OrderTimelineEventKind.SHIPMENT_SHIPPED
                 ShipmentStatus.DELIVERED -> OrderTimelineEventKind.SHIPMENT_DELIVERED
+                ShipmentStatus.READY_FOR_PICKUP -> OrderTimelineEventKind.SHIPMENT_READY_FOR_PICKUP
+                ShipmentStatus.PICKED_UP -> OrderTimelineEventKind.SHIPMENT_PICKED_UP
                 ShipmentStatus.CANCELLED -> OrderTimelineEventKind.SHIPMENT_CANCELLED
                 else -> OrderTimelineEventKind.UNKNOWN
             }

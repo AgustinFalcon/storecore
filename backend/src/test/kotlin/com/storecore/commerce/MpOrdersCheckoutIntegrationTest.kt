@@ -77,8 +77,40 @@ class MpOrdersCheckoutIntegrationTest(
         admin = provisionAdmin("admin-${UUID.randomUUID()}@example.com")
         customer = registerCustomer("shopper-${UUID.randomUUID()}@example.com")
         listOf("STOREFRONT", "CATALOG", "PAYMENTS_MP", "MANUAL_FULFILLMENT", "PROFILE_CONTENT").forEach { activate(it) }
+        configureDeliveryFixture()
     }
 
+    @Test fun `delivery cost reaches local order payment and fake provider total`() {
+        configureDeliveryFixture("3.50")
+        val orderId=checkoutWithQuantity("FEE-${UUID.randomUUID()}",2)
+        assertEquals(BigDecimal("203.50"),jdbc.queryForObject("SELECT total FROM orders WHERE id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("3.50"),jdbc.queryForObject("SELECT shipping_cost FROM orders WHERE id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("203.50"),jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("203.50"),Fakes.lastRequest.get()!!.amount)
+    }
+
+    @Test fun `paid pickup has ready collected timeline and return without tracking or fake shipment`() {
+        val orderId=checkoutWithQuantity("COLLECT-${UUID.randomUUID()}",1,mode=com.storecore.commerce.domain.DeliveryMode.PICKUP)
+        val provider="COLLECT-${UUID.randomUUID()}"
+        bindRemote(orderId,provider)
+        assertEquals(200,notify(provider,"collect-paid","collect-paid").statusCode.value())
+        assertEquals(1,worker.process())
+        assertClosedFulfillmentRejection(command(orderId,"shipments","PACKED"))
+        assertEquals(200,command(orderId,"shipments","PACKED",null).statusCode.value())
+        assertClosedFulfillmentRejection(command(orderId,"shipments","SHIPPED",null))
+        assertEquals(200,command(orderId,"shipments","READY_FOR_PICKUP",null).statusCode.value())
+        assertClosedFulfillmentRejection(command(orderId,"rma","RECEIVED"))
+        assertEquals(200,command(orderId,"shipments","PICKED_UP",null).statusCode.value())
+        val shipment=jdbc.queryForMap("SELECT status,tracking_code,shipped_at,delivered_at FROM shipments WHERE order_id=?",orderId)
+        assertEquals("PICKED_UP",shipment["status"])
+        assertEquals(null,shipment["tracking_code"])
+        assertEquals(null,shipment["shipped_at"])
+        assertTrue(shipment["delivered_at"]!=null)
+        val detail=exchange("/api/v1/customer/orders/$orderId",HttpMethod.GET,null,customer.cookie)
+        assertTrue(detail.body!!.contains("SHIPMENT_PICKED_UP"),detail.body)
+        assertTrue(detail.body!!.contains("ELIGIBLE"),detail.body)
+        assertEquals(200,command(orderId,"rma","RECEIVED").statusCode.value())
+    }
     @Test
     fun `signed order notification persists before ack and accredits once`() {
         val orderId = checkout("SKU-MP-${UUID.randomUUID()}")
@@ -416,8 +448,9 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals(ledger, jdbc.queryForList("SELECT l.* FROM inventory_ledger l JOIN product_variants v ON v.id=l.variant_id WHERE v.sku=? ORDER BY l.id", sku))
     }
 
-    private fun command(orderId: Long, route: String, wire: String): org.springframework.http.ResponseEntity<String> {
-        val response = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST, """{"status":"$wire","tracking":"fixture-tracking"}""", admin.cookie, admin.csrf)
+    private fun command(orderId: Long, route: String, wire: String, tracking:String?="fixture-tracking"): org.springframework.http.ResponseEntity<String> {
+        val body=if(tracking==null) """{"status":"$wire"}""" else """{"status":"$wire","tracking":"$tracking"}"""
+        val response = exchange("/api/v1/user/orders/$orderId/$route", HttpMethod.POST,body, admin.cookie, admin.csrf)
         response.headers.getFirst("X-CSRF-Token")?.let { admin = admin.copy(csrf = it) }
         return response
     }
@@ -449,13 +482,13 @@ class MpOrdersCheckoutIntegrationTest(
         // no role is rejected as unauthenticated; there is no invented third role.
         for (state in listOf(com.storecore.configuration.domain.CapabilityState.DISABLED, com.storecore.configuration.domain.CapabilityState.READ_ONLY)) {
             val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
-            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, state.wire, "{}", UUID.randomUUID(), "acceptance security matrix")
+            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, state.wire, jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"), UUID.randomUUID(), "acceptance security matrix")
             for ((route, wire) in listOf("shipments" to com.storecore.commerce.domain.ShipmentCommand.PACKED.name, "rma" to com.storecore.commerce.domain.RmaCommand.RECEIVED.name)) {
                 assertEquals(409, command(orderId, route, wire).statusCode.value())
             }
         }
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, "{}", UUID.randomUUID(), "restore fixture")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"), UUID.randomUUID(), "restore fixture")
         val stranger = registerCustomer("stranger-${UUID.randomUUID()}@example.com")
         assertEquals(404, exchange("/api/v1/customer/orders/$orderId", HttpMethod.GET, null, stranger.cookie).statusCode.value())
         assertEquals(shipments, jdbc.queryForList("SELECT * FROM shipments WHERE order_id=?", orderId))
@@ -864,14 +897,14 @@ class MpOrdersCheckoutIntegrationTest(
         val before = available(sku)
         assertEquals(401, exchange(route, HttpMethod.POST, payload, other.cookie, other.csrf).statusCode.value())
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.DISABLED.wire, "{}", UUID.randomUUID(), "RMA authority fixture")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", version, com.storecore.configuration.domain.CapabilityState.DISABLED.wire, jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"), UUID.randomUUID(), "RMA authority fixture")
         try {
             assertEquals(409, disposition(orderId, payload).statusCode.value())
             assertEquals(before, available(sku))
             assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id=?", Int::class.java, orderId))
         } finally {
             val disabledVersion = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)
-            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", disabledVersion, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, "{}", UUID.randomUUID(), "restore RMA authority fixture")
+            jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actor, adminSessionId(actor), "MANUAL_FULFILLMENT", disabledVersion, com.storecore.configuration.domain.CapabilityState.ACTIVE.wire, jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"), UUID.randomUUID(), "restore RMA authority fixture")
         }
     }
 
@@ -970,7 +1003,7 @@ class MpOrdersCheckoutIntegrationTest(
         bindRemote(orderId, provider)
         assertEquals(200, notify(provider, "rma-accredit", "rma-accredit").statusCode.value())
         assertEquals(1, worker.process())
-        com.storecore.commerce.domain.ShipmentCommand.entries.filter { it != com.storecore.commerce.domain.ShipmentCommand.UNKNOWN }.forEach { assertEquals(200, command(orderId, "shipments", it.name).statusCode.value()) }
+        listOf(com.storecore.commerce.domain.ShipmentCommand.PACKED,com.storecore.commerce.domain.ShipmentCommand.SHIPPED,com.storecore.commerce.domain.ShipmentCommand.DELIVERED).forEach { assertEquals(200, command(orderId, "shipments", it.name).statusCode.value()) }
         assertEquals(200, command(orderId, "rma", com.storecore.commerce.domain.RmaCommand.RECEIVED.name).statusCode.value())
         return orderId
     }
@@ -1019,14 +1052,16 @@ class MpOrdersCheckoutIntegrationTest(
         return checkoutWithQuantity(sku, 1)
     }
 
-    private fun checkoutWithQuantity(sku: String, quantity: Int, overrideAmount: BigDecimal? = null): Long {
+    private fun checkoutWithQuantity(sku: String, quantity: Int, overrideAmount: BigDecimal? = null,mode:com.storecore.commerce.domain.DeliveryMode=com.storecore.commerce.domain.DeliveryMode.LOCAL_DELIVERY): Long {
         putProduct(sku, "Paid Item", available = 5)
         if(overrideAmount != null) jdbc.update("UPDATE product_variants SET base_price_override=? WHERE sku=?",overrideAmount,sku)
         customer = addAddress(customer)
         val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":$quantity}""", customer.cookie, customer.csrf)
         assertEquals(200, added.statusCode.value(), added.body)
         customer = customer.copy(csrf = requireNotNull(added.headers.getFirst("X-CSRF-Token")) { "cart mutation must rotate CSRF" })
-        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val addressPart=if(mode.requiresAddress) "\"addressId\":\"${customer.addressId}\"," else ""
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}",${addressPart}"currency":"ARS","deliveryMode":"${mode.name}","deliveryConfigurationVersion":$version}""", customer.cookie, customer.csrf)
         assertEquals(200, checkout.statusCode.value(), checkout.body)
         customer = customer.copy(csrf = requireNotNull(checkout.headers.getFirst("X-CSRF-Token")) { "checkout must rotate CSRF" })
         return Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
@@ -1107,7 +1142,7 @@ class MpOrdersCheckoutIntegrationTest(
         if (state == "ACTIVE") return
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
         val actorId = adminUserId()
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module), UUID.randomUUID(), "test")
     }
 
     private fun adminSessionId(actorId: Long): UUID = jdbc.queryForObject(
@@ -1145,6 +1180,42 @@ class MpOrdersCheckoutIntegrationTest(
 
     private fun adminUserId() = jdbc.queryForObject("SELECT id FROM users WHERE email LIKE 'admin-%' ORDER BY id DESC LIMIT 1", Long::class.java)!!
 
+    private fun configureDeliveryFixture(cost:String="0.00") {
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val response=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,"""{"expectedConfigVersion":$version,"reason":"Explicit checkout fixture","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":true,"label":"Collect","cost":"0.00","minDays":0,"maxDays":1,"destination":"Store A","instructions":"Bring reference"},"localDelivery":{"enabled":true,"label":"Test local delivery ${UUID.randomUUID()}","cost":"$cost","minDays":1,"maxDays":2}}""",admin.cookie,admin.csrf)
+        assertEquals(200,response.statusCode.value(),response.body)
+        admin=admin.copy(csrf=response.headers.getFirst("X-CSRF-Token")!!)
+    }
+    // A retry sends the originally observed context, even after checkout clears the cart.
+    private val checkoutRevisionFixtures = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String?>>()
+
+    private fun deliveryFixtureBody(path:String,body:String?,cookie:String?):String? {
+        if(path!="/api/v1/customer/checkout" || body==null) return body
+        val json=com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(body) as com.fasterxml.jackson.databind.node.ObjectNode
+        if(!json.has("deliveryMode")) {
+            json.put("deliveryMode",com.storecore.commerce.domain.DeliveryMode.LOCAL_DELIVERY.name)
+            json.put("deliveryConfigurationVersion",jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!)
+        }
+        if (!json.has("cartRevision")) {
+            val revisions = checkoutRevisionFixtures.computeIfAbsent(json.path("idempotencyKey").asText()) {
+                val cart = exchange("/api/v1/customer/cart", HttpMethod.GET, null, cookie)
+                assertEquals(200, cart.statusCode.value(), cart.body)
+                val revision = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(cart.body!!).path("data").path("revision").asText()
+                assertTrue(revision.matches(Regex("[0-9a-f]{64}")), "cart must expose its authoritative revision")
+                val addressRevision = json.path("addressId").asText(null)?.let { addressId ->
+                    val addresses = exchange("/api/v1/customer/me/addresses", HttpMethod.GET, null, cookie)
+                    assertEquals(200, addresses.statusCode.value(), addresses.body)
+                    val selected = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(addresses.body!!).path("data").single { it.path("id").asText() == addressId }
+                    selected.path("revision").asText().also { java.time.Instant.parse(it) }
+                }
+                revision to addressRevision
+            }
+            json.put("cartRevision", revisions.first)
+            if (!json.has("addressRevision")) revisions.second?.let { json.put("addressRevision", it) }
+        }
+        return json.toString()
+    }
+
     private fun exchange(
         path: String,
         method: HttpMethod,
@@ -1156,7 +1227,7 @@ class MpOrdersCheckoutIntegrationTest(
         URI("http://localhost:$port$path"),
         method,
         HttpEntity(
-            body,
+            deliveryFixtureBody(path,body,cookie),
             HttpHeaders().apply {
                 contentType = MediaType.APPLICATION_JSON
                 set(HttpHeaders.ORIGIN, "http://localhost:4200")

@@ -2,7 +2,7 @@ package com.storecore.commerce.domain
 
 import java.math.BigDecimal
 
-data class CartView(val lines: List<CartLineView>, val currency: PaymentCurrency)
+data class CartView(val lines: List<CartLineView>, val currency: PaymentCurrency, val deliveryOptions:List<DeliveryOption> = emptyList(), val revision:String = "")
 data class CartLineView(val sku: String, val name: String, val quantity: Int, val originalUnitPrice: BigDecimal, val discountAmount: BigDecimal, val offerRef: String?, val campaignRef: String?, val effectiveUnitPrice: BigDecimal)
 data class CheckoutReceipt(val orderId: String, val paymentStatus: PaymentStatus, val orderStatus: OrderStatus, val checkoutUrl: String? = null)
 data class OrderView(val id: String, val orderStatus: OrderStatus, val paymentStatus: PaymentStatus, val shipmentStatus: ShipmentStatus, val tracking: String?, val total: BigDecimal, val lines: List<CartLineView>, val rmaStatus: RmaStatus = RmaStatus.NONE, val fulfillmentEligibility: FulfillmentEligibility = FulfillmentEligibility.PAYMENT_NOT_VERIFIED, val shipmentAction: ShipmentCommand? = null, val rmaAction: RmaCommand? = null,
@@ -13,6 +13,6 @@ data class OrderView(val id: String, val orderStatus: OrderStatus, val paymentSt
     val delivery: OrderFact<DeliverySnapshot> = OrderFact.unavailable(OrderUnavailableReason.SOURCE_MISSING),
     val payment: OrderFact<PaymentStatus> = OrderFact.unavailable(OrderUnavailableReason.SOURCE_MISSING),
     val timeline: OrderFact<List<OrderTimelineEvent>> = OrderFact.unavailable(OrderUnavailableReason.SOURCE_MISSING),
-    val returnEligibility: ReturnEligibility = ReturnEligibility.PAYMENT_UNVERIFIED)
+    val returnEligibility: ReturnEligibility = ReturnEligibility.PAYMENT_UNVERIFIED, val deliveryDecision:DeliveryDecision = DeliveryDecision.Legacy)
 data class InventoryRow(val sku: String, val availableQuantity: Int, val reservedQuantity: Int, val safetyStock: Int)
 data class ProfilePreview(val compatible: Boolean, val version: String, val diff: String)

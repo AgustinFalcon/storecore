@@ -34,9 +34,9 @@ class CartController(private val carts: JdbcCartService, private val auth: Reque
     @PostMapping("/checkout")
     fun checkout(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @Valid @RequestBody request: CheckoutRequest): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http); val customer = auth.customer(http)
-        return csrfOk(mutations.execute(customer, csrf) { carts.checkout(customer, UUID.fromString(request.idempotencyKey), request.addressId.toLong(), PaymentCurrency.fromWire(request.currency)) })
+        return csrfOk(mutations.execute(customer, csrf) { carts.checkout(customer, UUID.fromString(request.idempotencyKey), request.addressId?.toLongOrNull()?.takeIf { it>0 } ?: if(request.addressId==null) null else throw com.storecore.commerce.application.CommerceValidation("DELIVERY_SELECTION_INVALID"), PaymentCurrency.fromWire(request.currency),com.storecore.commerce.domain.DeliveryMode.fromWire(request.deliveryMode),request.deliveryConfigurationVersion.takeIf { it.isIntegralNumber && it.canConvertToInt() }?.intValue() ?: throw com.storecore.commerce.application.CommerceValidation("DELIVERY_SELECTION_INVALID"),request.cartRevision,request.addressRevision?.let { runCatching { java.time.Instant.parse(it) }.getOrElse { throw com.storecore.commerce.application.CommerceValidation("DELIVERY_SELECTION_INVALID") } }) })
     }
 }
 
 data class CartItemRequest(@field:NotBlank val sku: String, val quantity: Int)
-data class CheckoutRequest(@field:NotBlank val idempotencyKey: String, @field:NotBlank val addressId: String, @field:NotBlank val currency: String)
+data class CheckoutRequest(@field:NotBlank val idempotencyKey: String, val addressId: String? = null, @field:NotBlank val currency: String, val deliveryMode:String? = null, val deliveryConfigurationVersion:com.fasterxml.jackson.databind.JsonNode = com.fasterxml.jackson.databind.node.MissingNode.getInstance(), @field:NotBlank val cartRevision:String, val addressRevision:String? = null)

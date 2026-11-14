@@ -47,7 +47,7 @@ for (const entry of cases) {
           provideRouter([]),
           { provide: ActivatedRoute, useValue: { paramMap: params.asObservable(), queryParamMap: queryParams.asObservable() } },
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
-            cart$: of({ lines: [] }), loading$: of(false), viewState$: of({ cart: { lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { lines: [] } } } },
+            cart$: of({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }), loading$: of(false), viewState$: of({ cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] } } } },
           { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
@@ -71,7 +71,7 @@ for (const entry of cases) {
         providers: [
           provideRouter([{ path: entry.path, component: entry.component }]),
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
-            cart$: of({ lines: [] }), loading$: of(false), viewState$: of({ cart: { lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { lines: [] } } } },
+            cart$: of({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }), loading$: of(false), viewState$: of({ cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] } } } },
           { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();

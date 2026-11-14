@@ -1,3 +1,4 @@
+import { checkoutTotal, DeliveryMode, DeliveryQuote } from '../../domain/cart/delivery';
 import { HttpErrorResponse } from '@angular/common/http';
 import { computed, Injectable } from '@angular/core';
 import { Router } from '@angular/router';
@@ -15,7 +16,7 @@ export { CartFailureKind } from '../../domain/cart/cart-failure-kind';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.util';
 import { ApiErrorCode } from '../../core/api/api-error-code';
 import { environment } from '../../../environments/environment';
-import { Cart, CheckoutReceipt } from '../../domain/cart/cart.entity';
+import { Cart, CheckoutCommand, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { CartLineMutationOutcome, SetCartLineCommand } from '../../domain/cart/cart-line-mutation-outcome';
 import { CartCurrency } from '../../domain/cart/cart-currency';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
@@ -25,6 +26,10 @@ import { CustomerAddress } from '../../domain/customer/customer.entity';
 import { ListCustomerAddressesUseCase } from '../../domain/customer/use-cases/list-customer-addresses.usecase';
 
 export interface CartState {
+  readonly deliveryQuote: DeliveryQuote;
+  readonly attemptCommand: CheckoutCommand | null;
+  readonly attemptAddress: CustomerAddress | null;
+  readonly attemptLines?: Cart['lines'] | null;
   readonly loading: boolean;
   readonly errorMessage: string;
   readonly cart: Cart;
@@ -40,9 +45,10 @@ export interface CartState {
 }
 
 const initialState = (): CartState => ({
+  deliveryQuote: DeliveryQuote.Unknown, attemptCommand: null, attemptAddress: null, attemptLines: null,
   loading: false,
   errorMessage: '',
-  cart: { lines: [], currency: CartCurrency.Unknown },
+  cart: { revision: '', lines: [], currency: CartCurrency.Unknown },
   addresses: [],
   addressId: '',
   idempotencyKey: crypto.randomUUID(),
@@ -94,9 +100,21 @@ export class CartStore extends ComponentStore<CartState> {
   readonly addresses$ = this.select((s) => s.addresses);
   readonly receipt$ = this.select((s) => s.receipt);
   readonly empty$ = this.select((s) => !s.loading && s.cart.lines.length === 0);
-  readonly canPay$ = this.select((s) => s.checkoutAttemptState === CheckoutAttemptState.Idle && s.failureKind === CartFailureKind.None && !s.loading && s.cart.lines.length > 0 && s.addressReadState === AddressReadState.Ready && s.addresses.some((address) => address.id === s.addressId) && s.cart.currency.canCheckout);
+  readonly canPay$ = this.select((s) => s.checkoutAttemptState === CheckoutAttemptState.Idle && s.failureKind === CartFailureKind.None && !s.loading && s.cart.lines.length > 0 && deliverySelectionReady(s) && s.cart.currency.canCheckout);
   readonly viewState$ = this.select((s) => s);
 
+  private readonly selectDelivery = this.updater((s, mode: DeliveryMode) => {
+    if (s.checkoutAttemptState.inFlight) return s;
+    const quote = s.cart.deliveryOptions?.find(option => option.mode === mode) ?? DeliveryQuote.Unknown;
+    if (quote.same(s.deliveryQuote)) return s;
+    return { ...s, ...this.newCheckoutAttempt(), deliveryQuote: quote };
+  });
+
+  setDeliveryMode(mode: DeliveryMode): void {
+    if (this.snapshot.checkoutAttemptState.inFlight) return;
+    this.selectDelivery(mode);
+    if (mode.requiresAddress && this.snapshot.addressReadState !== AddressReadState.Ready) this.loadAddresses();
+  }
   readonly setAddressId = this.updater((s, addressId: string) => {
     if (s.checkoutAttemptState.inFlight) return s;
     const valid = s.addressReadState === AddressReadState.Ready && s.addresses.some((address) => address.id === addressId);
@@ -143,7 +161,7 @@ export class CartStore extends ComponentStore<CartState> {
               this.patchState({
                 addresses,
                 addressReadState: addresses.length > 0 ? AddressReadState.Ready : AddressReadState.Empty,
-                addressId: addresses.some((address) => address.id === this.snapshot.addressId) ? this.snapshot.addressId : addresses[0]?.id ?? '',
+                addressId: this.snapshot.attemptCommand ? this.snapshot.addressId : addresses.some((address) => address.id === this.snapshot.addressId) ? this.snapshot.addressId : addresses[0]?.id ?? '',
               });
             },
             error: (err: unknown) => {
@@ -192,17 +210,27 @@ export class CartStore extends ComponentStore<CartState> {
   readonly submitCheckout = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),
-      filter(() => this.hasCurrentAddress() && this.snapshot.cart.currency.canCheckout
-        && (this.snapshot.checkoutAttemptState.paymentRetry
-          || (this.snapshot.checkoutAttemptState === CheckoutAttemptState.Idle && this.snapshot.cart.lines.length > 0 && !this.snapshot.loading && this.snapshot.failureKind === CartFailureKind.None))),
-      tap(() => this.patchState({ checkoutAttemptState: CheckoutAttemptState.Pending, checkoutErrorMessage: '' })),
+      filter(() => this.snapshot.cart.currency.canCheckout
+        && (this.snapshot.checkoutAttemptState.paymentRetry && !!this.snapshot.attemptCommand
+          || this.snapshot.checkoutAttemptState === CheckoutAttemptState.Idle && deliverySelectionReady(this.snapshot)
+            && this.snapshot.cart.lines.length > 0 && !this.snapshot.loading && this.snapshot.failureKind === CartFailureKind.None)),
+      tap(() => {
+        this.cartRequestGeneration++;
+        this.addressRequestGeneration++;
+        const state = this.snapshot;
+        const command: CheckoutCommand = state.attemptCommand ?? {
+          idempotencyKey: state.idempotencyKey, currency: state.cart.currency, cartRevision: state.cart.revision,
+          deliveryMode: state.deliveryQuote.mode, deliveryConfigurationVersion: state.deliveryQuote.configurationVersion,
+          addressId: state.deliveryQuote.requiresAddress ? state.addressId : null,
+          addressRevision: state.deliveryQuote.requiresAddress ? state.addresses.find(address => address.id === state.addressId)?.revision ?? null : null,
+        };
+        this.patchState({ loading: false, addressReadState: state.addressReadState === AddressReadState.Loading ? AddressReadState.Idle : state.addressReadState, checkoutAttemptState: CheckoutAttemptState.Pending, checkoutErrorMessage: '', attemptCommand: command,
+          attemptLines: state.attemptCommand ? state.attemptLines : state.cart.lines.map(line => ({...line})),
+          attemptAddress: state.attemptCommand ? state.attemptAddress : state.addresses.find(address => address.id === command.addressId) ?? null });
+      }),
       switchMap(() =>
         this.checkout
-          .execute({
-            idempotencyKey: this.snapshot.idempotencyKey,
-            addressId: this.snapshot.addressId,
-            currency: this.snapshot.cart.currency,
-          })
+          .execute(this.snapshot.attemptCommand!)
           .pipe(
             takeUntil(this.cancelActorWork),
             tapResponse({
@@ -217,6 +245,13 @@ export class CartStore extends ComponentStore<CartState> {
               },
               error: (err: unknown) => {
                 const code = getApiErrorCode(err);
+                if (code.requiresDeliveryCorrection) {
+                  this.cartRequestGeneration++;
+                  this.patchState({ ...this.newCheckoutAttempt(), deliveryQuote: DeliveryQuote.Unknown, checkoutErrorMessage: code.label });
+                  this.load();
+                  this.loadAddresses();
+                  return;
+                }
                 if (code === ApiErrorCode.UnsupportedCurrency) {
                   this.cartRequestGeneration += 1;
                   this.currencyRevoked = true;
@@ -242,12 +277,8 @@ export class CartStore extends ComponentStore<CartState> {
     ),
   );
 
-  private hasCurrentAddress(): boolean {
-    return this.snapshot.addressReadState === AddressReadState.Ready && this.snapshot.addresses.some((address) => address.id === this.snapshot.addressId);
-  }
-
   private newCheckoutAttempt(): Partial<CartState> {
-    return { checkoutAttemptState: CheckoutAttemptState.Idle, checkoutErrorMessage: '', idempotencyKey: crypto.randomUUID(), receipt: null };
+    return { checkoutAttemptState: CheckoutAttemptState.Idle, checkoutErrorMessage: '', idempotencyKey: crypto.randomUUID(), receipt: null, attemptCommand: null, attemptAddress: null, attemptLines: null };
   }
 
   private beginCartRequest(canRestoreCurrency: boolean): CartRequest {
@@ -256,7 +287,10 @@ export class CartStore extends ComponentStore<CartState> {
 
   private acceptCartResponse(request: CartRequest, cart: Cart): boolean {
     if (request.generation !== this.cartRequestGeneration) return false;
-    this.patchState(this.cartLoadedState(cart, request.canRestoreCurrency));
+    const state = this.snapshot;
+    const retainAttempt = state.checkoutAttemptState.inFlight || state.checkoutAttemptState.paymentRetry && state.attemptCommand !== null;
+    const quote = retainAttempt || cart.deliveryOptions?.some(option => option.same(state.deliveryQuote)) ? state.deliveryQuote : DeliveryQuote.Unknown;
+    this.patchState({ ...this.cartLoadedState(cart, request.canRestoreCurrency), deliveryQuote: quote });
     return true;
   }
 
@@ -308,4 +342,11 @@ export class CartStore extends ComponentStore<CartState> {
 interface CartRequest {
   readonly generation: number;
   readonly canRestoreCurrency: boolean;
+}
+
+/** Shared checkout readiness: a pickup never depends on the address reader. */
+export function deliverySelectionReady(state: CartState): boolean {
+  const quote = state.deliveryQuote;
+  return !!quote?.known && /^[0-9a-f]{64}$/.test(state.cart.revision) && checkoutTotal(state.cart.lines, quote) !== null
+    && (!quote.requiresAddress || state.addressReadState === AddressReadState.Ready && state.addresses.some(address => address.id === state.addressId && !!address.revision));
 }

@@ -46,7 +46,7 @@ class JdbcFulfillmentEvidenceBoundaryTest {
         var saleActor: String? = null
         override fun <T : Any?> query(sql: String, rowMapper: RowMapper<T>, vararg args: Any?): List<T> {
             val rows = when {
-                sql.startsWith("SELECT status,total,currency") -> listOf(mapOf("status" to OrderStatus.PAID.name, "total" to BigDecimal.TEN, "currency" to "ARS"))
+                sql.startsWith("SELECT status,total,currency") -> listOf(mapOf("status" to OrderStatus.PAID.name, "total" to BigDecimal.TEN, "currency" to "ARS", "checkout_snapshot" to "{}"))
                 sql.contains("FROM mp_order_commercial_applications") -> payments
                 sql.startsWith("SELECT variant_id,quantity") -> listOf(mapOf("variant_id" to 8L, "quantity" to 1))
                 sql.contains("FROM inventory_ledger l") -> {

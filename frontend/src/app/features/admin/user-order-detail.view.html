@@ -14,10 +14,10 @@
       <p>
         <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
         <span class="sc-badge sc-badge--info">pago {{ order.payment.value?.label ?? order.payment.state.label }}</span>
-        <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
+        <span class="sc-badge sc-badge--warn">entrega {{ order.shipmentStatus.label }}</span>
         <span class="sc-badge">rma {{ order.rmaStatus.label }}</span>
       </p>
-      <p class="sc-price__meta">Tracking {{ order.tracking || 'No disponible' }}</p>
+      @if (order.deliveryDecision?.showsTracking) { <p class="sc-price__meta">Tracking {{ order.tracking || 'No disponible' }}</p> }
     </header>
     <sc-order-facts [order]="order" />
     <div class="sc-workbench">
@@ -51,7 +51,7 @@
                 <input name="tracking" [ngModel]="tracking" (ngModelChange)="tracking = $event" />
               </label>
             }
-            <button type="button" class="sc-btn sc-btn--primary" [disabled]="loading" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking || null })">
+            <button type="button" class="sc-btn sc-btn--primary" [disabled]="loading" (click)="ship.emit({ orderId: order.id, status: next, tracking: next.requiresTracking ? tracking || null : null })">
               {{ shipmentLabel(next) }}
             </button>
           </form>

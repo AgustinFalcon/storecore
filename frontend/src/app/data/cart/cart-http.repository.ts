@@ -27,7 +27,11 @@ export class CartHttpRepository implements ICartRepository {
     return this.http
       .post<unknown>(`${environment.apiBaseUrl}/customer/checkout`, {
         idempotencyKey: command.idempotencyKey,
-        addressId: command.addressId,
+        cartRevision: command.cartRevision,
+        ...(command.deliveryMode.requiresAddress ? { addressId: command.addressId } : {}),
+        ...(command.deliveryMode.requiresAddress ? { addressRevision: command.addressRevision } : {}),
+        deliveryMode: command.deliveryMode.wire,
+        deliveryConfigurationVersion: command.deliveryConfigurationVersion,
         currency: command.currency.wire,
       })
       .pipe(map((body) => mapReceipt(readApiBody<unknown>(body))));

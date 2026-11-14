@@ -10,9 +10,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 /** Writes call this only after locking orders; every payment writer uses the same aggregate lock. */
 @Component
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
-class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate) : FulfillmentEvidencePort {
+class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate,private val mapper:com.fasterxml.jackson.databind.ObjectMapper=com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)) : FulfillmentEvidencePort {
+    private data class Header(val status:OrderStatus,val total:java.math.BigDecimal,val currency:String,val decision:DeliveryDecision)
     override fun load(orderId: Long): FulfillmentSnapshot {
-        val header = jdbc.query("SELECT status,total,currency FROM orders WHERE id=?", { rs, _ -> Triple(OrderStatus.fromWire(rs.getString("status")), rs.getBigDecimal("total"), rs.getString("currency")) }, orderId).singleOrNull() ?: throw ResourceNotFound()
+        val header = jdbc.query("SELECT status,total,currency,checkout_snapshot FROM orders WHERE id=?", { rs, _ -> Header(OrderStatus.fromWire(rs.getString("status")), rs.getBigDecimal("total"), rs.getString("currency"),DeliverySnapshotJson.decode(mapper,rs.getString("checkout_snapshot"))) }, orderId).singleOrNull() ?: throw ResourceNotFound()
         val payments = jdbc.query(
             """SELECT p.status,p.amount payment_amount,p.currency payment_currency,
                       a.amount attempt_amount,a.currency attempt_currency,a.state,
@@ -43,7 +44,7 @@ class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate) : FulfillmentEvide
                   WHERE c.order_id=p.order_id AND c.transition='PAYMENT_ACCREDITED' AND a.payment_id=p.id
                     AND a.order_id=c.order_id AND a.provider_order_id=c.provider_order_id))""", Boolean::class.java, orderId,
         ) ?: true
-        return FulfillmentSnapshot(header.first, header.second, header.third, payments, blocked, items, sales, contradictoryPayment)
+        return FulfillmentSnapshot(header.status, header.total, header.currency, payments, blocked, items, sales, contradictoryPayment,header.decision)
     }
 
     fun paymentStatus(orderId: Long, snapshot: FulfillmentSnapshot): PaymentStatus {

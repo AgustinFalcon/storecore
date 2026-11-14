@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -37,6 +38,16 @@ export class ShowcaseStage {
   static fromWire(value) {
     return ShowcaseStage.values.find((stage) => stage.wire === value) ?? ShowcaseStage.Unknown;
   }
+}
+
+const DELIVERY_TOKEN = Symbol('ShowcaseDeliveryMode');
+export class ShowcaseDeliveryMode {
+  static Pickup = new ShowcaseDeliveryMode(DELIVERY_TOKEN, 'PICKUP');
+  static LocalDelivery = new ShowcaseDeliveryMode(DELIVERY_TOKEN, 'LOCAL_DELIVERY');
+  static Unknown = new ShowcaseDeliveryMode(DELIVERY_TOKEN, 'UNKNOWN');
+  static values = Object.freeze([this.Pickup, this.LocalDelivery]);
+  constructor(token, wire) { if (token !== DELIVERY_TOKEN) throw new TypeError('ShowcaseDeliveryMode is closed'); this.wire = wire; Object.freeze(this); }
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
 const CAPABILITY_CONSTRUCTION_TOKEN = Symbol('ShowcaseCapability');
@@ -217,7 +228,7 @@ const SHOWCASE_HOME = Object.freeze({ key: 'showcase-home-v1', kind: ShowcaseHom
 const SHOWCASE_OFFER_NAME = 'SHOWCASE_LOCAL_OFFER_V1';
 
 export class ShowcaseConfig {
-  constructor({ baseUrl, origin, adminEmail, adminPassword, customerEmail, customerPassword, includePendingOrder }) {
+  constructor({ baseUrl, origin, adminEmail, adminPassword, customerEmail, customerPassword, includePendingOrder, manualFulfillmentPolicy }) {
     const target = new URL(required(baseUrl, 'STORECORE_SHOWCASE_BASE_URL'));
     const allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
     if (target.protocol !== 'http:' || !allowedHosts.has(target.hostname)) throw new Error('SHOWCASE_LOOPBACK_TARGET_REQUIRED');
@@ -231,6 +242,9 @@ export class ShowcaseConfig {
     if (!this.customerEmail.endsWith('.invalid')) throw new Error('SHOWCASE_CUSTOMER_MUST_USE_INVALID_TLD');
     this.customerPassword = customerPassword?.trim() || 'StoreCore-showcase-2026!';
     this.includePendingOrder = includePendingOrder === true || includePendingOrder === 'true';
+    this.manualFulfillmentPolicy = manualFulfillmentPolicy == null || manualFulfillmentPolicy === '' ? null
+      : typeof manualFulfillmentPolicy === 'string' ? JSON.parse(manualFulfillmentPolicy) : manualFulfillmentPolicy;
+    if (this.manualFulfillmentPolicy !== null && (typeof this.manualFulfillmentPolicy !== 'object' || Array.isArray(this.manualFulfillmentPolicy))) throw new Error('SHOWCASE_DELIVERY_POLICY_INVALID');
     Object.freeze(this);
   }
 
@@ -243,6 +257,7 @@ export class ShowcaseConfig {
       customerEmail: env.STORECORE_SHOWCASE_CUSTOMER_EMAIL,
       customerPassword: env.STORECORE_SHOWCASE_CUSTOMER_PASSWORD,
       includePendingOrder: env.STORECORE_SHOWCASE_INCLUDE_PENDING_ORDER,
+      manualFulfillmentPolicy: env.STORECORE_SHOWCASE_DELIVERY_POLICY,
     });
   }
 }
@@ -466,6 +481,15 @@ const STEPS = Object.freeze([
       if (state === ShowcaseCapabilityState.Active) continue;
       if (state !== ShowcaseCapabilityState.Disabled) throw new Error(`SHOWCASE_CAPABILITY_STATE_UNSUPPORTED:${capability.wire}`);
     }
+    if (ctx.config.manualFulfillmentPolicy !== null) {
+      const manual = byModule.get(ShowcaseCapability.ManualFulfillment);
+      if (manual.configVersion !== 2 || ShowcaseCapabilityState.fromWire(manual.state) !== ShowcaseCapabilityState.Disabled) throw new Error('SHOWCASE_DELIVERY_POLICY_DRIFT');
+      const result = await ctx.admin.request('/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy', {
+        method:'PUT',csrf:true,body:{...ctx.config.manualFulfillmentPolicy,expectedConfigVersion:manual.configVersion,reason:'LOCAL_SHOWCASE_DELIVERY_OPT_IN',correlationId:randomUUID()},
+      });
+      if (!Number.isSafeInteger(result?.configurationVersion) || result.configurationVersion <= manual.configVersion) throw new Error('SHOWCASE_DELIVERY_POLICY_INVALID');
+      manual.configVersion = result.configurationVersion;
+    }
     for (const capability of ShowcaseCapability.values) {
       const module = byModule.get(capability);
       if (ShowcaseCapabilityState.fromWire(module.state) === ShowcaseCapabilityState.Active) continue;
@@ -530,7 +554,9 @@ const STEPS = Object.freeze([
     const cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(cart?.lines) || cart.lines.length !== 0) throw new Error('SHOWCASE_CHECKOUT_REQUIRES_EMPTY_CART');
     await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[0].sku, quantity: 1 } });
-    const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, currency: 'ARS' } });
+    const delivery = requireArray(cart.deliveryOptions, 'SHOWCASE_DELIVERY_OPTIONS_REQUIRED').find(option => ShowcaseDeliveryMode.fromWire(option.mode) === ShowcaseDeliveryMode.LocalDelivery);
+    if (!delivery || !Number.isSafeInteger(delivery.configurationVersion) || delivery.configurationVersion < 1 || delivery.currency !== 'ARS' || delivery.requiresAddress !== true) throw new Error('SHOWCASE_DELIVERY_OPTIONS_REQUIRED');
+    const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, currency: 'ARS', deliveryMode: ShowcaseDeliveryMode.LocalDelivery.wire, deliveryConfigurationVersion: delivery.configurationVersion } });
     requirePendingOrder(receipt);
     if (!validOrderId(receipt?.orderId) || receipt.checkoutUrl != null) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
     ctx.orderReceipt = receipt;

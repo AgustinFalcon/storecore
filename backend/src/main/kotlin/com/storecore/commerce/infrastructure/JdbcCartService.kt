@@ -1,11 +1,14 @@
 package com.storecore.commerce.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.commerce.domain.*
+import com.storecore.catalog.domain.ArsAmount
 import com.storecore.catalog.domain.ProductStatus
 import com.storecore.catalog.domain.VariantStatus
 import com.storecore.offers.domain.DiscountKind
 import com.storecore.commerce.application.BuyerIdentityUnavailable
 import com.storecore.commerce.application.CheckoutConflict
+import com.storecore.commerce.application.CheckoutContextChanged
 import com.storecore.commerce.application.CommerceValidation
 import com.storecore.commerce.application.LocalOfferDiscount
 import com.storecore.commerce.domain.CartLineView
@@ -31,6 +34,7 @@ import javax.sql.DataSource
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcCartService(
+    private val deliveryPolicies: ManualFulfillmentPolicyReader,
     private val priceAuthority: com.storecore.catalog.application.SkuPriceAuthority,
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
@@ -51,52 +55,64 @@ class JdbcCartService(
         return snapshot(cartId)
     }
 
-    fun checkout(customer: CustomerPrincipal, idempotencyKey: UUID, addressId: Long, currency: PaymentCurrency): CheckoutReceipt {
-        capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
-        val cart = snapshot(ensureCart(customer.customerId))
-        if (!currency.matchesVerified(cart.currency)) throw CommerceValidation("UNSUPPORTED_CURRENCY")
-        val currencyWire = currency.name
-        val hash = sha256("$addressId|$currencyWire|${cart.lines}")
-        val existing = jdbc.query("SELECT id,request_hash,checkout_snapshot FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", { rs, _ -> Triple(rs.getLong("id"), rs.getString("request_hash"), rs.getString("checkout_snapshot")) }, customer.customerId, idempotencyKey).firstOrNull()
-        if (existing != null) {
-            val original = mapper.readTree(existing.third)
-            if (original.path("addressId").asLong() != addressId) throw CheckoutConflict()
-            if (!currency.matchesVerified(PaymentCurrency.fromWire(original.path("currency").asText(null)))) throw CommerceValidation("UNSUPPORTED_CURRENCY")
-            if (cart.lines.isNotEmpty() && existing.second != hash) throw CheckoutConflict()
-            val replayed = replayReceipt(existing.first)
-            if (replayed != null) return withRemoteCheckout(replayed)
-            throw CommerceValidation("CHECKOUT_IN_PROGRESS")
+    fun checkout(customer: CustomerPrincipal, idempotencyKey: UUID, addressId: Long?, currency: PaymentCurrency, deliveryMode:DeliveryMode, deliveryConfigurationVersion:Int, expectedCartRevision:String, expectedAddressRevision:java.time.Instant?): CheckoutReceipt {
+        if(deliveryMode==DeliveryMode.UNKNOWN || deliveryConfigurationVersion<=0 || !expectedCartRevision.matches(Regex("^[0-9a-f]{64}$")) || (deliveryMode.requiresAddress && (addressId==null || addressId<=0 || expectedAddressRevision==null)) || (!deliveryMode.requiresAddress && (addressId!=null || expectedAddressRevision!=null))) throw CommerceValidation("DELIVERY_SELECTION_INVALID")
+        if(currency!=PaymentCurrency.ARS) throw CommerceValidation("UNSUPPORTED_CURRENCY")
+        val fingerprint=sha256(mapper.writeValueAsString(listOf(deliveryMode.name,deliveryConfigurationVersion,addressId,expectedAddressRevision?.toString(),expectedCartRevision,currency.name)))
+        val existing=jdbc.query("SELECT id,request_hash,checkout_snapshot FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?",{rs,_->Triple(rs.getLong("id"),rs.getString("request_hash"),rs.getString("checkout_snapshot"))},customer.customerId,idempotencyKey).singleOrNull()
+        if(existing!=null) {
+            val original=mapper.readTree(existing.third)
+            val decision=deliveryPolicies.decision(existing.third)
+            if(!currency.matchesVerified(PaymentCurrency.fromWire(original.path("currency").asText(null)))) throw CommerceValidation("UNSUPPORTED_CURRENCY")
+            if(original.path("commandFingerprint").asText()!=fingerprint || decision.state!=DeliverySnapshotState.KNOWN || decision.resolvedMode()!=deliveryMode || decision.value?.configurationVersion!=deliveryConfigurationVersion) throw CheckoutConflict()
+            return replayReceipt(existing.first)?.let(::withRemoteCheckout) ?: throw CommerceValidation("CHECKOUT_IN_PROGRESS")
         }
-        val buyerIdentity = readBuyerIdentity(customer.customerId)
-        val address = jdbc.query("SELECT street,number,city,province,postal_code FROM customer_addresses WHERE id=? AND customer_id=?", { rs, _ -> mapOf("street" to rs.getString("street"), "number" to rs.getString("number"), "city" to rs.getString("city"), "province" to rs.getString("province"), "postalCode" to rs.getString("postal_code")) }, addressId, customer.customerId).firstOrNull() ?: throw ResourceNotFound()
-        if (cart.lines.isEmpty()) throw CommerceValidation("CART_EMPTY")
+        capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
+        val cartId=ensureCart(customer.customerId)
+        jdbc.query("SELECT id FROM carts WHERE id=? FOR UPDATE",{rs,_->rs.getLong(1)},cartId).single()
+        val cart = snapshot(cartId)
+        if(cart.revision!=expectedCartRevision) throw CheckoutContextChanged()
+        if(!currency.matchesVerified(cart.currency)) throw CommerceValidation("UNSUPPORTED_CURRENCY")
+        if(cart.lines.isEmpty()) throw CommerceValidation("CART_EMPTY")
+        val option=deliveryPolicies.selection(deliveryMode,deliveryConfigurationVersion)
+        capabilities.decide("MANUAL_FULFILLMENT","READ",CapabilityActor.System)
+        val buyerIdentity=readBuyerIdentity(customer.customerId)
+        val address:DeliveryAddress?=if(deliveryMode.requiresAddress) jdbc.query("SELECT street,number,city,province,postal_code,updated_at FROM customer_addresses WHERE id=? AND customer_id=? FOR SHARE",{rs,_->
+            if(rs.getTimestamp("updated_at").toInstant()!=expectedAddressRevision) throw CheckoutContextChanged()
+            DeliveryPolicyTranslator.address(mapOf("street" to rs.getString("street"),"number" to rs.getString("number"),"city" to rs.getString("city"),"province" to rs.getString("province"),"postalCode" to rs.getString("postal_code")))
+        },addressId,customer.customerId).singleOrNull() ?: throw ResourceNotFound() else null
+        val target=if(address!=null) DeliveryDestination.Address(address) else DeliveryDestination.Pickup(option.destination!!)
+        val delivery=DeliveryPolicySnapshot(option.mode,option.label,option.cost,option.minDays,option.maxDays,option.configurationVersion,target,option.instructions)
+        val subtotal=cart.lines.fold(BigDecimal.ZERO) { acc,line -> acc+line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
+        val total=subtotal+option.cost
+        if(ArsAmount.fromWire(subtotal)==null || ArsAmount.fromWire(option.cost)==null || ArsAmount.fromWire(total)==null) throw CommerceValidation("CHECKOUT_TOTAL_INVALID")
+        val currencyWire=currency.name
+        val hash=sha256(fingerprint+"|"+mapper.writeValueAsString(cart.lines)+"|"+mapper.writeValueAsString(delivery))
         val identities = lockSellableIdentities(cart)
         val saga = UUID.randomUUID()
         val lineKeys = cart.lines.associate { it.sku to UUID.randomUUID() }
-        val payload = mapper.createObjectNode().put("addressId", addressId).put("currency", currencyWire).put("reservationSagaKey", saga.toString()).set<com.fasterxml.jackson.databind.node.ObjectNode>("address", mapper.valueToTree(address)).set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
+        val payload = mapper.createObjectNode().put("addressId", addressId).put("commandFingerprint",fingerprint).set<com.fasterxml.jackson.databind.node.ObjectNode>("delivery",mapper.valueToTree(delivery)).put("currency", currencyWire).put("reservationSagaKey", saga.toString()).set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
         lineKeys.forEach { (sku, key) -> payload.with("lineKeys").put(sku, key.toString()) }
-        val claimId = try {
-            jdbc.queryForObject("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) VALUES (?,?,?,?::jsonb,'PENDING') RETURNING id", Long::class.java, customer.customerId, idempotencyKey, hash, payload.toString())!!
-        } catch (exception: org.springframework.dao.DataIntegrityViolationException) {
-            val raced = jdbc.query("SELECT id,request_hash FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", { rs, _ -> rs.getLong("id") to rs.getString("request_hash") }, customer.customerId, idempotencyKey).firstOrNull() ?: throw CheckoutConflict()
-            if (raced.second != hash) throw CheckoutConflict()
-            val replayed = replayReceipt(raced.first)
-            return replayed?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
+        val claimId=jdbc.query("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) VALUES (?,?,?,?::jsonb,'PENDING') ON CONFLICT(customer_id,checkout_idempotency_key) DO NOTHING RETURNING id",{rs,_->rs.getLong("id")},customer.customerId,idempotencyKey,hash,payload.toString()).singleOrNull()
+        if(claimId==null) {
+            val raced=jdbc.query("SELECT id,request_hash,checkout_snapshot->>'commandFingerprint' fingerprint FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?",{rs,_->Triple(rs.getLong("id"),rs.getString("request_hash"),rs.getString("fingerprint"))},customer.customerId,idempotencyKey).singleOrNull() ?: throw CheckoutConflict()
+            if(raced.second!=hash || raced.third!=fingerprint) throw CheckoutConflict()
+            return replayReceipt(raced.first)?.let(::withRemoteCheckout) ?: throw CheckoutConflict()
         }
         cart.lines.sortedBy { identities.getValue(it.sku) }.forEach { line ->
             val variantId = identities.getValue(line.sku)
             inventory.reserve(saga, lineKeys.getValue(line.sku), variantId, line.quantity, "CUSTOMER:${customer.customerId}")
         }
-        val subtotal = cart.lines.fold(BigDecimal.ZERO) { acc, line -> acc + line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
-        val buyer = mapper.createObjectNode().put("customerId", customer.customerId).put("name", buyerIdentity.name).put("email", buyerIdentity.email).put("addressId", addressId).put("street", address["street"]).put("number", address["number"]).put("city", address["city"]).put("province", address["province"]).put("postalCode", address["postalCode"])
-        val orderId = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT',?::jsonb,?::jsonb,?,0,?,?) RETURNING id", Long::class.java, "SC-$claimId", claimId, idempotencyKey, hash, customer.customerId, buyer.toString(), payload.toString(), subtotal, subtotal, currencyWire)!!
+        val buyer = mapper.createObjectNode().put("customerId",customer.customerId).put("name",buyerIdentity.name).put("email",buyerIdentity.email)
+        if(address!=null) buyer.put("addressId",addressId).put("street",address.street).put("number",address.number).put("city",address.city).put("province",address.province).put("postalCode",address.postalCode)
+        val orderId = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT',?::jsonb,?::jsonb,?,?,?,?) RETURNING id", Long::class.java, "SC-$claimId", claimId, idempotencyKey, hash, customer.customerId, buyer.toString(), payload.toString(), subtotal, option.cost, total, currencyWire)!!
         cart.lines.forEach { line ->
             val variantId = identities.getValue(line.sku)
             val offerId = line.offerRef?.toLongOrNull()
             val snapshot = mapper.createObjectNode().put("sku", line.sku).put("name", line.name).toString()
             jdbc.update("INSERT INTO order_items(order_id,variant_id,offer_id,campaign_reference,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal) VALUES (?,?,?,?,?::jsonb,?,?,?,?,?)", orderId, variantId, offerId, line.campaignRef, snapshot, line.quantity, line.originalUnitPrice, line.discountAmount, line.effectiveUnitPrice, line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)))
         }
-        jdbc.update("INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,'PENDING',?,?)", orderId, "SC-$claimId", subtotal, currencyWire)
+        jdbc.update("INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,'PENDING',?,?)", orderId, "SC-$claimId", total, currencyWire)
         jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING')", orderId)
         jdbc.update("UPDATE checkout_idempotency_claims SET state='COMPLETED',updated_at=now() WHERE id=?", claimId)
         jdbc.update("DELETE FROM cart_items WHERE cart_id=?", ensureCart(customer.customerId))
@@ -111,6 +127,7 @@ class JdbcCartService(
     }
 
     private fun withRemoteCheckout(receipt: CheckoutReceipt): CheckoutReceipt {
+        capabilities.decide("PAYMENTS_MP", "CLAIM_CHECKOUT", CapabilityActor.System)
         val starter = mpAttempts.ifAvailable ?: return receipt
         val url = runCatching { starter.startForLocalOrder(receipt.orderId.toLong()) }.getOrNull()
         return if (url.isNullOrBlank()) receipt else receipt.copy(checkoutUrl = url)
@@ -130,7 +147,8 @@ class JdbcCartService(
 
     private fun snapshot(cartId: Long): CartView {
         val lines = jdbc.query("SELECT v.sku,v.label,i.quantity,i.original_unit_price,i.discount_amount,i.offer_id,i.campaign_reference,i.effective_unit_price FROM cart_items i JOIN product_variants v ON v.id=i.variant_id WHERE i.cart_id=? ORDER BY i.id", { rs, _ -> CartLineView(rs.getString("sku"), rs.getString("label"), rs.getInt("quantity"), rs.getBigDecimal("original_unit_price"), rs.getBigDecimal("discount_amount"), rs.getObject("offer_id")?.toString(), rs.getString("campaign_reference"), rs.getBigDecimal("effective_unit_price")) }, cartId)
-        return CartView(lines, installationCurrency())
+        val currency=installationCurrency()
+        return CartView(lines,currency,deliveryPolicies.options(),sha256(mapper.writeValueAsString(listOf(currency.name,lines))))
     }
 
     private fun installationCurrency(): PaymentCurrency = jdbc.query(
