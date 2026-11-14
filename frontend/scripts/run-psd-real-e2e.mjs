@@ -224,7 +224,10 @@ async function deniedNodeConnection(host, port) {
 
 async function egressSelfTests() {
   verifyEgressBoundary();
+  const controlSockets = new Set();
   const local = net.createServer(socket => {
+    controlSockets.add(socket);
+    socket.once('close', () => controlSockets.delete(socket));
     socket.on('error', () => undefined);
     socket.end('HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK');
   });
@@ -277,13 +280,13 @@ class PsdEgressProbe {
   writeFileSync(join(results, 'egress.json'), `${JSON.stringify({ uid: process.getuid(),
     node: true, jvm: true, chromium: true, hostname: true, ip: true, ipv6: true, websocket: true })}\n`);
   } finally {
+    for (const socket of controlSockets) socket.destroy();
     await new Promise((accept, reject) => {
       const timeout = setTimeout(() => reject(new Error('Egress positive-control server did not close')), 5_000);
       local.close(error => {
         clearTimeout(timeout);
         if (error) reject(error); else accept();
       });
-      local.closeAllConnections?.();
     });
   }
 }
