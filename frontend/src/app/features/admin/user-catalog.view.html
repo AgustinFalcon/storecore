@@ -18,6 +18,7 @@
       <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.loading" (click)="createProduct.emit()">Nuevo producto</button>
       @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
+    <div class="sc-table-wrap">
     <table class="sc-table">
       <thead>
         <tr>
@@ -42,6 +43,7 @@
         }
       </tbody>
     </table>
+    </div>
   }
   <form class="sc-panel sc-panel--grid" (submit)="$event.preventDefault(); saveProduct.emit()">
     <fieldset class="sc-form-lock" [disabled]="state.loading">
