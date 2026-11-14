@@ -10,5 +10,5 @@
 - [x] T8. Cubrir PDP, listados, admin, carrito, orden y pago fake.
 - [x] T9. Ejecutar gates completos y E2E real local.
 - [x] T10. Revisar funcional/UX y técnico/seguridad hasta APPROVE.
-- [ ] T11. Entregar por PR, verificar CI, fusionar y comprobar post-merge.
-- [ ] T12. Cerrar SDD con evidencia final.
+- [x] T11. Entregar por PR, verificar CI, fusionar y comprobar post-merge.
+- [x] T12. Cerrar SDD con evidencia final.
