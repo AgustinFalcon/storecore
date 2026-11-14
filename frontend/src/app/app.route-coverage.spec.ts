@@ -65,7 +65,8 @@ describe('productive route acceptance contract', () => {
     const real = realBindings();
     expect(real.find(row => row.pattern === 'catalog/:sku')?.url).toBe('/catalog/REAL-SKU%20%2F%207');
     expect(real.find(row => row.pattern === 'customer/orders/:id')?.heading).toBe('Orden 8001');
-    expect(real[0].heading).toBe('Inicio persistido');
+    expect(real[0].heading).toBe('Inicio');
+    expect(real[0].readiness).toContain('Inicio persistido');
     expect(real.every(row => row.evidence === RouteEvidenceMode.RealBackend)).toBe(true);
     expect(productiveHttpRouteBindings.every(row => row.evidence === RouteEvidenceMode.HttpFixture)).toBe(true);
     for (const pattern of ['reset-password', 'verify-email']) {
