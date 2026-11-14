@@ -2,11 +2,11 @@
 .inventory { color: var(--sc-color-ink); }
 .inventory__head { display: flex; align-items: start; justify-content: space-between; gap: 1.5rem; }
 button, input, select { font: inherit; }
-button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-theme); cursor: pointer; }
+button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-ink); cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 button[aria-disabled=true] { cursor: not-allowed; opacity: .65; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--sc-color-focus); outline-offset: 3px; }
-.inventory__refresh { flex-shrink: 0; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-theme); }
+.inventory__refresh { flex-shrink: 0; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-ink); }
 .inventory__notice { background: var(--sc-color-info-soft); border: 1px solid var(--sc-color-info); border-radius: var(--sc-radius-lg); padding: 1.25rem; margin-block: 1rem; }
 .inventory__notice h2 { margin: 0 0 .5rem; font-size: 1.125rem; }
 .inventory__notice--error { background: var(--sc-color-danger-soft); border-color: var(--sc-color-danger); }
@@ -43,3 +43,5 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .inventory__table td .inventory__badge { max-width: 62%; text-align: right; overflow-wrap: anywhere; }
   .inventory__table td:last-child { border-bottom: 0; }
 }
+
+.inventory__refresh:disabled, .inventory__refresh[aria-disabled=true] { opacity: 1; border-style: dashed; }

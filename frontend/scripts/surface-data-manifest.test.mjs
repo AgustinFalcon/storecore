@@ -16,11 +16,11 @@ const identitySource = readFileSync(identityPath, 'utf8');
 const routesSource = readFileSync(routesPath, 'utf8');
 const loaderSource = readFileSync(loaderPath, 'utf8');
 
-const identityPattern = /new SurfaceIdentity\('(SC-SURF-\d{2})', '([^']*)'(, false)?\)/g;
+const identityPattern = /new SurfaceIdentity\('(SC-SURF-\d{2})', '([^']*)'(?:, (true|false)(?:, (true|false))?)?\)/g;
 const identities = [...identitySource.matchAll(identityPattern)].map((match) => ({
   id: match[1],
   route: match[2] ? `/${match[2]}` : '/',
-  real: match[3] === undefined,
+  real: match[3] !== 'false',
 }));
 
 function filesUnder(directory, suffix) {
@@ -53,13 +53,13 @@ function controllerContracts() {
 test('productive surface manifest covers the closed identity set exactly once', () => {
   assert.equal(manifest.schemaVersion, 1);
   assert.deepEqual(manifest.states, ['REAL', 'DEMO_ONLY', 'EXTERNAL_BLOCKED', 'NOT_APPLICABLE']);
-  assert.equal(identities.length, 26);
-  assert.equal(manifest.surfaces.length, 26);
+  assert.equal(identities.length, 27);
+  assert.equal(manifest.surfaces.length, 27);
   assert.deepEqual(
     manifest.surfaces.map((surface) => surface.id).sort(),
     identities.map((surface) => surface.id).sort(),
   );
-  assert.equal(new Set(manifest.surfaces.map((surface) => surface.id)).size, 26);
+  assert.equal(new Set(manifest.surfaces.map((surface) => surface.id)).size, 27);
 });
 
 test('manifest current routes agree with productive SurfaceIdentity ownership', () => {

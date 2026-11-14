@@ -2,10 +2,10 @@
 .ml { color: var(--sc-color-ink); }
 .ml__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
 button, input { font: inherit; }
-button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-theme); cursor: pointer; }
+button { min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--sc-color-line-strong); border-radius: var(--sc-radius); background: var(--sc-color-surface); color: var(--sc-color-ink); cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--sc-color-focus); outline-offset: 3px; }
-.ml__refresh { flex: 0 0 auto; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-theme); }
+.ml__refresh { flex: 0 0 auto; background: var(--sc-color-theme); color: var(--sc-color-theme-ink); border-color: var(--sc-color-ink); }
 .ml__notice { margin-block: 1rem; padding: 1.15rem; border: 1px solid var(--sc-color-info); border-radius: var(--sc-radius-lg); background: var(--sc-color-info-soft); }
 .ml__notice h2, .ml__notice h3 { margin: 0 0 .45rem; font-size: 1.1rem; }
 .ml__notice p { margin: .35rem 0; line-height: 1.55; }
@@ -63,3 +63,5 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--sc-color-fo
   .ml__table td { align-items: flex-start; }
   .ml__table td::before { white-space: normal; }
 }
+
+.ml__refresh:disabled { opacity: 1; border-style: dashed; }

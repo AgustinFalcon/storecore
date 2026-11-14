@@ -1,3 +1,5 @@
+import { adminGuard } from './core/auth/admin.guard';
+import { userBrandingLeaveGuard } from './features/admin/user-branding-leave.guard';
 import { Route } from '@angular/router';
 import { routes } from './app.routes';
 import { userGuard } from './core/auth/user.guard';
@@ -7,6 +9,7 @@ const expectedUserLeaves = new Map<string, string>([
   ['account', 'Mi cuenta'],
   ['home', 'Operaciones'],
   ['content', 'Contenido'],
+  ['settings', 'Apariencia'],
   ['catalog', 'Catálogo admin'],
   ['offers', 'Ofertas'],
   ['customers', 'Clientes'],
@@ -35,7 +38,7 @@ describe('USER administration lazy route boundary', () => {
       expect(route?.component, `${path} must not be eager`).toBeUndefined();
       expect(route?.loadComponent, `${path} must expose a loader`).toEqual(expect.any(Function));
       expect(route?.title).toBe(title);
-      expect(route?.canActivate).toEqual([userGuard]);
+      expect(route?.canActivate).toEqual(path === 'settings' ? [userGuard, adminGuard] : [userGuard]);
       expect(await route?.loadComponent?.(), `${path} loader must resolve`).toBeTruthy();
     }
   });
@@ -43,5 +46,6 @@ describe('USER administration lazy route boundary', () => {
   it('keeps content navigation protected by the lightweight leave guard', () => {
     const content = userChildren().find((route) => route.path === 'content');
     expect(content?.canDeactivate).toEqual([userContentLeaveGuard]);
+    expect(userChildren().find(route => route.path === 'settings')?.canDeactivate).toEqual([userBrandingLeaveGuard]);
   });
 });
