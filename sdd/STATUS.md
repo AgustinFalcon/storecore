@@ -1,5 +1,29 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-14
+
+`master dc45c5942009d0f80eaf252054a54b8f51182f22` integra PR #271–#273.
+El último corte funcional es PR #272, merge
+`bfe34661a6d3cd1454a87e280397a3529bfb5abd`: checkout con decisión
+autoritativa de retiro o entrega local, costo exacto, snapshots históricos,
+revisiones de carrito/dirección y ciclos separados de fulfillment. PR #273
+archiva su SDD sin modificar runtime.
+
+Verify del PR #272 `43551669169`, post-merge funcional `43552311370` y
+post-merge documental `43553571761` terminaron con backend, frontend y E2E
+real verdes. La aceptación local incluye 437 pruebas backend, 1400 frontend,
+96 visual/accesibilidad y 23/23 escenarios reales con PostgreSQL, Spring,
+Angular HTTPS y navegador. Tres revisiones coordinadas aprobaron sin P0–P3.
+
+La paridad operativa local de Fase 1 no tiene un faltante P0–P3 demostrado en
+el código vigente. Su smoke Playwright de alta de catálogo intercepta HTTP: es
+evidencia de UI/contrato, no un E2E UI→Spring→PostgreSQL. No se lo presenta
+como homologación ni como integración real de proveedor.
+
+Este bloque prevalece sobre cabeceras anteriores. No acredita ARCA, Correo
+Argentino, Mercado Pago live, SMTP productivo, StoreCore↔BlackStore activo,
+deploy ni `release/1.0`; esos gates permanecen explícitamente separados.
+
 ## Master vigente — 2026-11-13
 
 `master ba83f679f51a53025dd49ae87ec8f03097ae5180` integra PR #257–#270.

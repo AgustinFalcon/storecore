@@ -7,5 +7,5 @@
 - [x] Bloquear doble envío y reemplazo del borrador mientras una escritura está pendiente.
 - [x] Actualizar el manifiesto de superficies con el ajuste real de inventario.
 - [x] Ejecutar gates frontend, backend y E2E productivo aplicable.
-- [ ] Revisar el head exacto con dos revisores GPT-6.1 Sol antes del PR/merge.
+- [x] Revisar el head exacto con dos revisores GPT-6.1 Sol antes del PR/merge.
 
