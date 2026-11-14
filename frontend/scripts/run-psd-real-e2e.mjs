@@ -276,7 +276,16 @@ class PsdEgressProbe {
   } finally { await browser.close(); }
   writeFileSync(join(results, 'egress.json'), `${JSON.stringify({ uid: process.getuid(),
     node: true, jvm: true, chromium: true, hostname: true, ip: true, ipv6: true, websocket: true })}\n`);
-  } finally { await new Promise(accept => local.close(accept)); }
+  } finally {
+    await new Promise((accept, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Egress positive-control server did not close')), 5_000);
+      local.close(error => {
+        clearTimeout(timeout);
+        if (error) reject(error); else accept();
+      });
+      local.closeAllConnections?.();
+    });
+  }
 }
 
 function start(command, args, name, env = process.env) {
