@@ -42,7 +42,12 @@ import java.math.BigDecimal
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import javax.sql.DataSource
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -74,6 +79,11 @@ class MpOrdersCheckoutIntegrationTest(
         Fakes.orders.clear()
         Fakes.createResult.set(null)
         Fakes.searchResult.set(OfficialOrderSearchResult(emptyList(), 1, true))
+        Fakes.createRequests.clear()
+        Fakes.throwOnCreate.set(false)
+        Fakes.transactionActiveAtCreate.set(null)
+        Fakes.durableAttemptVisibleAtCreate.set(null)
+        Fakes.createHandler.set(null)
         admin = provisionAdmin("admin-${UUID.randomUUID()}@example.com")
         customer = registerCustomer("shopper-${UUID.randomUUID()}@example.com")
         listOf("STOREFRONT", "CATALOG", "PAYMENTS_MP", "MANUAL_FULFILLMENT", "PROFILE_CONTENT").forEach { activate(it) }
@@ -182,6 +192,7 @@ class MpOrdersCheckoutIntegrationTest(
         Fakes.searchResult.set(OfficialOrderSearchResult(emptyList(), 1, true))
         val recovered = attempts.recover(jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE provider_order_id=?", Long::class.java, providerOrderId)!!)
         assertEquals("RECOVERY_REQUIRED", recovered["state"])
+        assertEquals("RECOVERY_REQUIRED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE provider_order_id=?", String::class.java, providerOrderId))
         Fakes.searchResult.set(
             OfficialOrderSearchResult(
                 listOf(
@@ -193,7 +204,8 @@ class MpOrdersCheckoutIntegrationTest(
             ),
         )
         val multi = attempts.recover(jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE provider_order_id=?", Long::class.java, providerOrderId)!!)
-        assertEquals("RECOVERY_REQUIRED", multi["state"])
+        assertEquals("QUARANTINED", multi["state"])
+        assertEquals("QUARANTINED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE provider_order_id=?", String::class.java, providerOrderId))
     }
 
     @Test
@@ -212,6 +224,200 @@ class MpOrdersCheckoutIntegrationTest(
         val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
         assertEquals("READY_FOR_REDIRECT", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
         assertEquals(providerOrderId, jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
+        assertEquals(false, Fakes.transactionActiveAtCreate.get(), "remote create must run outside Spring transaction")
+        assertEquals(true, Fakes.durableAttemptVisibleAtCreate.get(), "order and POSTING attempt must be committed before remote create")
+    }
+
+    @Test
+    fun `remote crash keeps one durable attempt and retry uses the same idempotency key`() {
+        val sku = "SKU-CRASH-${UUID.randomUUID()}"
+        val key = UUID.randomUUID()
+        Fakes.throwOnCreate.set(true)
+        putProduct(sku, "Crash-safe item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val body = """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}"""
+
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        customer = customer.copy(csrf = requireNotNull(first.headers.getFirst("X-CSRF-Token")))
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(first.body!!)!!.groupValues[1].toLong()
+        val persistedKey = jdbc.queryForObject("SELECT idempotency_key FROM mp_checkout_attempts WHERE order_id=?", UUID::class.java, orderId)
+        assertEquals("POSTING", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mp_checkout_attempts WHERE order_id=?", Int::class.java, orderId))
+
+        val providerOrderId = "ORD-RETRY-${UUID.randomUUID()}"
+        val checkoutUrl = "https://www.mercadopago.com.ar/checkout/$providerOrderId"
+        Fakes.throwOnCreate.set(false)
+        Fakes.createResult.set(CreationObservation.VerifiedSuccess(providerOrderId, checkoutUrl))
+        val retry = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+
+        assertEquals(200, retry.statusCode.value(), retry.body)
+        assertTrue(retry.body!!.contains(checkoutUrl), retry.body)
+        assertEquals(2, Fakes.createRequests.size, "retry must reach the remote port instead of becoming a no-op")
+        assertEquals(persistedKey, Fakes.createRequests[0].idempotencyKey)
+        assertEquals(persistedKey, Fakes.createRequests[1].idempotencyKey)
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mp_checkout_attempts WHERE order_id=?", Int::class.java, orderId))
+        assertEquals(providerOrderId, jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE order_id=?", String::class.java, orderId))
+    }
+
+    @Test
+    fun `capability denial during post commit attachment preserves receipt and rotated csrf`() {
+        val sku = "SKU-DENY-${UUID.randomUUID()}"
+        val key = UUID.randomUUID()
+        val providerOrderId = "ORD-DENY-${UUID.randomUUID()}"
+        Fakes.createResult.set(CreationObservation.VerifiedSuccess(providerOrderId, "https://www.mercadopago.com.ar/checkout/$providerOrderId"))
+        putProduct(sku, "Capability item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val body = """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}"""
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        customer = customer.copy(csrf = first.headers.getFirst("X-CSRF-Token")!!)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(first.body!!)!!.groupValues[1].toLong()
+        val remoteCalls = Fakes.createRequests.size
+
+        jdbc.update("UPDATE module_configurations SET state='PAUSED',config_version=config_version+1 WHERE module_code='PAYMENTS_MP'")
+        val replay = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+
+        assertEquals(200, replay.statusCode.value(), replay.body)
+        assertEquals(orderId.toString(), Regex(""""orderId"\s*:\s*"(\d+)"""").find(replay.body!!)!!.groupValues[1])
+        assertTrue(!replay.headers.getFirst("X-CSRF-Token").isNullOrBlank(), "committed replay must return the rotated CSRF")
+        assertEquals(remoteCalls, Fakes.createRequests.size, "denied capability must not invoke the remote port")
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+    }
+
+    @Test
+    fun `late concurrent create failure cannot degrade a bound checkout`() {
+        val sku = "SKU-RACE-${UUID.randomUUID()}"
+        Fakes.throwOnCreate.set(true)
+        putProduct(sku, "Concurrent retry item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(first.body!!)!!.groupValues[1].toLong()
+        val attemptId = jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE order_id=?", Long::class.java, orderId)!!
+        val providerOrderId = "ORD-RACE-${UUID.randomUUID()}"
+        val checkoutUrl = "https://www.mercadopago.com.ar/checkout/$providerOrderId"
+        val arrivals = CountDownLatch(2)
+        val sequence = AtomicInteger()
+        Fakes.throwOnCreate.set(false)
+        Fakes.createHandler.set { _ ->
+            val position = sequence.incrementAndGet()
+            arrivals.countDown()
+            check(arrivals.await(10, TimeUnit.SECONDS)) { "both concurrent creates must arrive" }
+            if (position == 1) {
+                CreationObservation.VerifiedSuccess(providerOrderId, checkoutUrl)
+            } else {
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+                while (System.nanoTime() < deadline && jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId) != "READY_FOR_REDIRECT") {
+                    Thread.sleep(10)
+                }
+                CreationObservation.Timeout
+            }
+        }
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val outcomes = listOf(
+                executor.submit<Map<String, Any?>> { attempts.postAndBind(attemptId) },
+                executor.submit<Map<String, Any?>> { attempts.postAndBind(attemptId) },
+            ).map { it.get(15, TimeUnit.SECONDS) }
+            assertTrue(outcomes.any { it["state"] == "READY_FOR_REDIRECT" }, outcomes.toString())
+        } finally {
+            executor.shutdownNow()
+            Fakes.createHandler.set(null)
+        }
+        assertEquals("READY_FOR_REDIRECT", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+        assertEquals(providerOrderId, jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+        assertEquals(checkoutUrl, attempts.startForLocalOrder(orderId))
+    }
+
+    @Test
+    fun `contradictory provider identity blocks an already bound checkout`() {
+        val sku = "SKU-CONFLICT-${UUID.randomUUID()}"
+        val firstProviderOrderId = "ORD-FIRST-${UUID.randomUUID()}"
+        val firstCheckoutUrl = "https://www.mercadopago.com.ar/checkout/$firstProviderOrderId"
+        Fakes.createResult.set(CreationObservation.VerifiedSuccess(firstProviderOrderId, firstCheckoutUrl))
+        putProduct(sku, "Provider conflict item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
+        val attemptId = jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE order_id=?", Long::class.java, orderId)!!
+        assertEquals("READY_FOR_REDIRECT", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+
+        val conflictingProviderOrderId = "ORD-CONFLICT-${UUID.randomUUID()}"
+        Fakes.createResult.set(
+            CreationObservation.VerifiedSuccess(
+                conflictingProviderOrderId,
+                "https://www.mercadopago.com.ar/checkout/$conflictingProviderOrderId",
+            ),
+        )
+        val conflict = attempts.postAndBind(attemptId)
+
+        assertEquals("QUARANTINED", conflict["state"])
+        assertEquals("QUARANTINED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+        assertEquals("PROVIDER_ORDER_CONFLICT", jdbc.queryForObject("SELECT error_sanitized FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+
+        Fakes.createResult.set(CreationObservation.VerifiedSuccess(firstProviderOrderId, firstCheckoutUrl))
+        val lateOriginal = attempts.postAndBind(attemptId)
+        assertEquals("QUARANTINED", lateOriginal["state"])
+        assertEquals(null, lateOriginal["checkoutUrl"])
+        assertEquals("QUARANTINED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+        assertEquals("PROVIDER_ORDER_CONFLICT", jdbc.queryForObject("SELECT error_sanitized FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
+        assertEquals(null, attempts.startForLocalOrder(orderId), "a contradictory provider identity must block URL replay")
+    }
+
+    @Test
+    fun `start already in flight cannot return a url after provider conflict quarantine`() {
+        val sku = "SKU-INFLIGHT-${UUID.randomUUID()}"
+        Fakes.throwOnCreate.set(true)
+        putProduct(sku, "In-flight quarantine item", available = 5)
+        customer = addAddress(customer)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":1}""", customer.cookie, customer.csrf)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val checkout = exchange("/api/v1/customer/checkout", HttpMethod.POST, """{"idempotencyKey":"${UUID.randomUUID()}","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie, customer.csrf)
+        assertEquals(200, checkout.statusCode.value(), checkout.body)
+        val orderId = Regex(""""orderId"\s*:\s*"(\d+)"""").find(checkout.body!!)!!.groupValues[1].toLong()
+        val attemptId = jdbc.queryForObject("SELECT id FROM mp_checkout_attempts WHERE order_id=?", Long::class.java, orderId)!!
+        val providerA = "ORD-INFLIGHT-A-${UUID.randomUUID()}"
+        val providerB = "ORD-INFLIGHT-B-${UUID.randomUUID()}"
+        val urlA = "https://www.mercadopago.com.ar/checkout/$providerA"
+        val firstEntered = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val sequence = AtomicInteger()
+        Fakes.throwOnCreate.set(false)
+        Fakes.createHandler.set {
+            when (sequence.incrementAndGet()) {
+                1 -> {
+                    firstEntered.countDown()
+                    check(releaseFirst.await(10, TimeUnit.SECONDS)) { "late start must be released" }
+                    CreationObservation.VerifiedSuccess(providerA, urlA)
+                }
+                2 -> CreationObservation.VerifiedSuccess(providerA, urlA)
+                else -> CreationObservation.VerifiedSuccess(providerB, "https://www.mercadopago.com.ar/checkout/$providerB")
+            }
+        }
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val inFlightStart = executor.submit<String?> { attempts.startForLocalOrder(orderId) }
+            assertTrue(firstEntered.await(10, TimeUnit.SECONDS), "start must reach remote create")
+            assertEquals("READY_FOR_REDIRECT", attempts.postAndBind(attemptId)["state"])
+            assertEquals("QUARANTINED", attempts.postAndBind(attemptId)["state"])
+            releaseFirst.countDown()
+            assertEquals(null, inFlightStart.get(15, TimeUnit.SECONDS), "quarantine must suppress the late URL")
+        } finally {
+            releaseFirst.countDown()
+            executor.shutdownNow()
+            Fakes.createHandler.set(null)
+        }
+        assertEquals("QUARANTINED", jdbc.queryForObject("SELECT state FROM mp_checkout_attempts WHERE id=?", String::class.java, attemptId))
     }
 
     @Test
@@ -1257,13 +1463,25 @@ class MpOrdersCheckoutIntegrationTest(
 
         @Bean
         @Primary
-        open fun officialOrders(): Lane = Lane
+        open fun officialOrders(dataSource: DataSource): Lane = Lane(dataSource)
 
-        object Lane : OfficialOrderQueryPort, OfficialOrderCommandPort {
+        class Lane(private val dataSource: DataSource) : OfficialOrderQueryPort, OfficialOrderCommandPort {
             override fun configured() = true
             override fun getByProviderOrderId(providerOrderId: String) = orders[providerOrderId]
             override fun create(request: OfficialOrderCreateRequest): CreationObservation {
                 lastRequest.set(request)
+                createRequests += request
+                transactionActiveAtCreate.set(TransactionSynchronizationManager.isActualTransactionActive())
+                durableAttemptVisibleAtCreate.set(dataSource.connection.use { connection ->
+                    connection.prepareStatement(
+                        "SELECT COUNT(*) FROM mp_checkout_attempts a JOIN orders o ON o.id=a.order_id WHERE a.external_reference=? AND a.state='POSTING'",
+                    ).use { statement ->
+                        statement.setString(1, request.externalReference)
+                        statement.executeQuery().use { result -> result.next() && result.getInt(1) == 1 }
+                    }
+                })
+                if (throwOnCreate.get()) throw IllegalStateException("simulated crash after remote acceptance window")
+                createHandler.get()?.let { return it(request) }
                 return createResult.get() ?: CreationObservation.Timeout
             }
             override fun search(query: OfficialOrderSearchQuery) = searchResult.get()
@@ -1271,6 +1489,11 @@ class MpOrdersCheckoutIntegrationTest(
 
         companion object {
             val lastRequest = AtomicReference<OfficialOrderCreateRequest?>(null)
+            val createRequests = CopyOnWriteArrayList<OfficialOrderCreateRequest>()
+            val throwOnCreate = AtomicBoolean(false)
+            val transactionActiveAtCreate = AtomicReference<Boolean?>(null)
+            val durableAttemptVisibleAtCreate = AtomicReference<Boolean?>(null)
+            val createHandler = AtomicReference<((OfficialOrderCreateRequest) -> CreationObservation)?>(null)
             val orders = ConcurrentHashMap<String, OfficialOrderResource>()
             val createResult = AtomicReference<CreationObservation?>(null)
             val searchResult = AtomicReference(OfficialOrderSearchResult(emptyList(), 1, true))
