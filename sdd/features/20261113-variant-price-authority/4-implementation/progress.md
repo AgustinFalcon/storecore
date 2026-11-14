@@ -32,3 +32,9 @@
   verdes y build productivo exitoso.
 - Gate backend completo: 424 tests verdes, incluidas migraciones V1→V21,
   contratos HTTP, carrito, órdenes, pagos y recuperación.
+- El smoke de creación detectó una carrera real de edición rápida: el hijo podía
+  emitir contra un `draft` anterior antes del repintado del padre. El editor
+  conserva ahora el último borrador emitido; prueba focal 8/8 y Playwright 2/2.
+- PR #269 fusionado en `master` como `7053e8f`. Verify del PR `43534342235` y
+  post-merge `43535120746`: backend, frontend y E2E real 3/3 verdes.
+- SDD cerrado con 12/12 tareas completas.

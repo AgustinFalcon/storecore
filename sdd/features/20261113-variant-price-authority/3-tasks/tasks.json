@@ -1,0 +1,19 @@
+{
+  "feature": "20261113-variant-price-authority",
+  "status": "completed",
+  "stats": { "total": 12, "done": 12, "in_progress": 0, "pending": 0 },
+  "tasks": [
+    { "id": "VPA-001", "title": "Auditar autoridad actual", "status": "done", "evidence": "Auditoría coordinada funcional y técnica" },
+    { "id": "VPA-002", "title": "Delimitar autoridad WEB por SKU", "status": "done", "evidence": "Canal, POS y snapshot histórico fuera del corte" },
+    { "id": "VPA-003", "title": "Aprobar specs", "status": "done", "evidence": "Reviews coordinadas GPT-6.1 Sol" },
+    { "id": "VPA-004", "title": "Persistir política y tipos cerrados", "status": "done", "evidence": "V21, ArsAmount y Unknown fail-closed" },
+    { "id": "VPA-005", "title": "Resolver precio exacto", "status": "done", "evidence": "Catálogo, carrito y favoritos sin N+1" },
+    { "id": "VPA-006", "title": "Extender comandos administrativos", "status": "done", "evidence": "Preserve, Inherit y Override" },
+    { "id": "VPA-007", "title": "Integrar presentación frontend", "status": "done", "evidence": "Exact, Desde y Unknown ligados al SKU" },
+    { "id": "VPA-008", "title": "Cubrir superficies transaccionales", "status": "done", "evidence": "PDP, listados, carrito, orden y pago" },
+    { "id": "VPA-009", "title": "Ejecutar gates locales", "status": "done", "evidence": "Frontend, backend, Playwright y recuperación" },
+    { "id": "VPA-010", "title": "Cerrar reviews", "status": "done", "evidence": "APPROVE funcional/UX y técnico/seguridad" },
+    { "id": "VPA-011", "title": "Entregar y verificar master", "status": "done", "evidence": "PR #269; runs 43534342235 y 43535120746" },
+    { "id": "VPA-012", "title": "Archivar SDD", "status": "done", "evidence": "Documentación final y evidencia generadas" }
+  ]
+}
