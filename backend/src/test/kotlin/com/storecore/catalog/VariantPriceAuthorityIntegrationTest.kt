@@ -116,4 +116,3 @@ class VariantPriceAuthorityIntegrationTest @Autowired constructor(
         assertTrue(favorites.list(customer).isEmpty())
     }
 }
-
