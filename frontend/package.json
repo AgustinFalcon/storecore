@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.19.0 || >=22.12.0"
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
     "start": "ng serve",
@@ -26,35 +26,41 @@
     "showcase:load": "node scripts/showcase/load-storecore-showcase.mjs",
     "showcase:test": "node --test scripts/showcase/load-storecore-showcase.test.mjs",
     "test:surface-data-manifest": "node --test scripts/surface-data-manifest.test.mjs",
+    "test:project-service-smoke": "node --test scripts/project-service-smoke.test.mjs",
     "lint": "eslint src e2e demo-e2e playwright.demo.config.ts",
     "check:architecture": "node --test scripts/domain-boundary.test.mjs scripts/surface-data-manifest.test.mjs && node scripts/check-architecture.mjs",
-    "verify": "npm run check:architecture && npm run lint && npm run test && npm run build"
+    "verify": "npm run check:architecture && npm run test:project-service-smoke && npm run lint && npm run test && npm run build"
   },
   "dependencies": {
-    "@angular/common": "~22.2.1",
-    "@angular/compiler": "~22.2.1",
-    "@angular/core": "~22.2.1",
-    "@angular/forms": "~22.2.1",
-    "@angular/platform-browser": "~22.2.1",
-    "@angular/router": "~22.2.1",
+    "@angular/common": "~22.2.6",
+    "@angular/compiler": "~22.2.6",
+    "@angular/core": "~22.2.6",
+    "@angular/forms": "~22.2.6",
+    "@angular/platform-browser": "~22.2.6",
+    "@angular/router": "~22.2.6",
     "@ngrx/component-store": "^22.0.1",
     "@ngrx/operators": "^22.0.1",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0",
+    "tslib": "~2.8.1",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular/build": "~22.2.1",
-    "@angular/cli": "~22.2.1",
-    "@angular/compiler-cli": "~22.2.1",
-    "@axe-core/playwright": "^4.10.2",
-    "@playwright/test": "^1.55.0",
+    "@angular/build": "~22.2.7",
+    "@angular/cli": "~22.2.7",
+    "@angular/compiler-cli": "~22.2.6",
+    "@axe-core/playwright": "~4.13.0",
+    "@playwright/test": "~1.63.0",
     "@types/node": "^22.20.5",
-    "angular-eslint": "^22.0.0",
+    "angular-eslint": "~22.6.0",
     "eslint": "^9.0.0",
     "jsdom": "^26.0.0",
     "typescript": "~6.0.0",
-    "typescript-eslint": "^8.0.0",
-    "vitest": "^4.0.8"
+    "typescript-eslint": "~8.72.2",
+    "vitest": "~4.1.12"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree@8.72.2": {
+      "minimatch": "11.0.1"
+    }
   }
 }
