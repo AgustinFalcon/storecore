@@ -13,5 +13,5 @@ enum class FavoriteMutationOutcome(val wire: String) {
     companion object { fun fromWire(raw: String?): FavoriteMutationOutcome = entries.firstOrNull { it.wire == raw } ?: UNKNOWN }
 }
 
-data class FavoriteItem(val sku: String, val name: String, val price: BigDecimal, val imageUrl: String?, val availability: FavoriteAvailability, val addedAt: Instant)
+data class FavoriteItem(val sku: String, val name: String, val price: BigDecimal?, val imageUrl: String?, val availability: FavoriteAvailability, val addedAt: Instant, val priceResolution: com.storecore.catalog.domain.SkuPriceResolution)
 data class FavoriteMutation(val sku: String, val outcome: FavoriteMutationOutcome)

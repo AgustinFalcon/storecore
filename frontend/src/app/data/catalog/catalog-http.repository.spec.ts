@@ -20,7 +20,7 @@ describe('CatalogHttpRepository', () => {
     expect(req.request.params.keys()).toEqual(['page', 'size']);
     expect(req.request.params.get('page')).toBe('0');
     expect(req.request.params.get('size')).toBe('50');
-    req.flush({ items: [{ sku: 'SKU-1', name: 'Lámpara', price: { base: 10, effective: 10, original: 10, offer: null } }], total: 400, page: 0, size: 50, truncated: true });
+    req.flush({ items: [{ sku: 'SKU-1', name: 'Lámpara', productBasePrice: 10, variants: [{ id:'v',sku:'SKU-1',status:'ACTIVE',pricePolicy:{mode:'INHERITED',base:null},price:{state:'KNOWN',price:{base:10,original:10,effective:10,offer:null}},availability:'UNAVAILABLE',inventory:{sku:'SKU-1',state:'MISSING',available:null,reserved:null,safety:null,onHand:null,saleable:null}}], price: { base: 10, effective: 10, original: 10, offer: null } }], total: 400, page: 0, size: 50, truncated: true });
     const result = await pending;
     expect(result[0]).toMatchObject({ sku: 'SKU-1', price: 10, originalPrice: null });
     expect(result.metadata).toEqual({ total: 400, page: 0, size: 50, truncated: true });

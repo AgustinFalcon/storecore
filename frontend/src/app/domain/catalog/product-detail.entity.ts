@@ -1,6 +1,7 @@
 import { ProductStatus, VariantStatus } from './catalog-states';
 import { InventoryAvailability } from '../user/inventory-availability';
 import type { InventoryRow } from '../user/user.entity';
+import type { SkuPriceResolution, VariantPricePolicy } from './variant-price';
 
 export interface ProductPrice {
   readonly base: number;
@@ -10,6 +11,9 @@ export interface ProductPrice {
 }
 export interface ProductMedia { readonly id: string; readonly url: string; readonly sortOrder: number; readonly primary: boolean; }
 export interface ProductVariant {
+  readonly price: SkuPriceResolution;
+  readonly pricePolicy: VariantPricePolicy;
+  readonly basePriceOverride: number | null;
   readonly id: string;
   readonly sku: string;
   readonly name: string;
@@ -20,6 +24,7 @@ export interface ProductVariant {
   readonly inventory: InventoryRow;
 }
 export interface ProductDetail {
+  readonly productBasePrice: number | null;
   readonly id: string;
   readonly sku: string;
   readonly name: string;
@@ -29,7 +34,7 @@ export interface ProductDetail {
   readonly images: readonly string[];
   readonly media: readonly ProductMedia[];
   readonly variants: readonly ProductVariant[];
-  readonly price: ProductPrice;
+  readonly price: ProductPrice | null;
   readonly offerRef: string | null;
   readonly status: ProductStatus;
   readonly active: boolean;

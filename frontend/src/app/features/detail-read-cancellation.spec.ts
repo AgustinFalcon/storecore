@@ -39,7 +39,7 @@ describe('detail reads across route identities', () => {
     const store = new CatalogStore({} as SearchCatalogUseCase, {} as GetHomeUseCase,
       { execute } as unknown as GetProductUseCase, {} as ListCatalogFacetsUseCase);
     const product: ProductDetail = { id: 'p', status: ProductStatus.Active, media: [], sku: 'A', name: 'A', description: '', brand: '', category: '',
-      images: [], variants: [], price: { base: 0, original: 0, offer: null, effective: 0 },
+      productBasePrice: 0, images: [], variants: [], price: { base: 0, original: 0, offer: null, effective: 0 },
       offerRef: null, active: true };
     store.loadProduct('A');
     old.next(product);

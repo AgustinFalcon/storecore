@@ -9,7 +9,7 @@ import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { HomeComposition } from '../../domain/content/home-composition';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
-import { ProductSummary } from '../../domain/catalog/product-summary.entity';
+import { ProductSummary, summarizeProduct } from '../../domain/catalog/product-summary.entity';
 import { GetHomeUseCase } from '../../domain/catalog/use-cases/get-home.usecase';
 import { GetProductUseCase } from '../../domain/catalog/use-cases/get-product.usecase';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
@@ -113,10 +113,7 @@ export class CatalogStore extends ComponentStore<CatalogState> {
           switchMap(({ home, facets }) => {
             const skus = [...new Set(home?.sections.flatMap(section => section.kind.referencesProducts ? section.content.skus ?? [] : []) ?? [])];
             const products = skus.map(sku => this.getProduct.execute(sku).pipe(
-              switchMap(product => of(product.status.isPublic && (product.sku === sku || product.variants.some(variant => variant.sku === sku && variant.status.isPublic)) ? {
-                sku, name: product.name, price: product.price.effective, originalPrice: product.price.offer ? product.price.original : null,
-                imageUrl: product.images[0] ?? null, offerRef: product.offerRef,
-              } as ProductSummary : null)),
+              switchMap(product => of(product.status.isPublic && (product.sku === sku || product.variants.some(variant => variant.sku === sku && variant.status.isPublic)) ? summarizeProduct(product, sku) : null)),
               catchError(() => of(null)),
             ));
             return (products.length ? forkJoin(products) : of([])).pipe(

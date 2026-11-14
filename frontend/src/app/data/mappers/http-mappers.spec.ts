@@ -127,9 +127,9 @@ describe('http-mappers', () => {
   it('fills missing product fields without mixing prices', () => {
     const product = mapProductDetail({ sku: 'SKU-1', price: { effective: 10, base: 10, original: 10 } });
     expect(product.sku).toBe('SKU-1');
-    expect(product.price.effective).toBe(10);
-    expect(product.price.base).toBe(10);
-    expect(product.price.original).toBe(10);
+    expect(product.price?.effective).toBe(10);
+    expect(product.price?.base).toBe(10);
+    expect(product.price?.original).toBe(10);
     expect(product.images).toEqual([]);
     expect(product.active).toBe(false);
   });
@@ -180,9 +180,11 @@ describe('http-mappers', () => {
         name: 'Lámpara',
         price: { effective: 80, base: 100, original: 100, offer: { id: 'O-1', name: 'Oferta' } },
         images: ['https://cdn.example.test/lamp.jpg'],
+        productBasePrice: 100,
+        variants: [{ id: 'V', sku: 'SKU-1', status: 'ACTIVE', pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { effective: 80, base: 100, original: 100, offer: { id: 'O-1', name: 'Oferta' } } }, availability: 'UNKNOWN', inventory: {sku:'SKU-1', state:'UNKNOWN',available:null,reserved:null,safety:null,onHand:null,saleable:null} }],
         offerRef: 'O-1',
       }),
-    ).toEqual({
+    ).toMatchObject({
       sku: 'SKU-1',
       name: 'Lámpara',
       price: 80,

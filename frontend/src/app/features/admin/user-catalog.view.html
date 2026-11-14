@@ -37,7 +37,7 @@
             <td>
               <span class="sc-badge">{{ product.status.label }}</span>
             </td>
-            <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</td>
+            <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price?.effective }}</td>
           </tr>
         }
       </tbody>
@@ -71,6 +71,15 @@
             </select>
           </label>
           <p>{{ variant.availability.label }}</p>
+          <p>Precio actual: {{ variant.pricePolicy.label }} @if (variant.basePriceOverride !== null) { · ARS {{ variant.basePriceOverride }} }</p>
+          <label>Política de precio
+            <select [name]="'priceCommand-' + variantIndex" [ngModel]="variant.priceCommand.wire" (ngModelChange)="setPriceCommand(variantIndex, $event)">
+              @for (command of priceCommands(variant); track command.wire) { <option [value]="command.wire">{{ command.label }}</option> }
+            </select>
+          </label>
+          @if (variant.priceCommand.requiresBase) {
+            <label>Precio propio ARS <input type="text" inputmode="decimal" required [name]="'variantPrice-' + variantIndex" [ngModel]="variant.priceInputRaw" (ngModelChange)="setVariantPriceInput(variantIndex, $event)" /></label>
+          }
           @if (!variant.id) {
             <label>Stock inicial
               <input type="number" min="0" step="1" required [name]="'variantStock-' + variantIndex" [ngModel]="variant.initialAvailableQuantity" (ngModelChange)="patchVariant(variantIndex, { initialAvailableQuantity: +$event })" />
@@ -97,9 +106,9 @@
       <button type="button" class="sc-btn sc-btn--ghost" (click)="addVariant()">Agregar variante</button>
     </section>
     <label>Precio base
-      <input type="number" required name="base" [ngModel]="state.draft.price.base" (ngModelChange)="patchPrice({ base: +$event })" />
+      <input type="text" inputmode="decimal" required name="base" [ngModel]="state.draft.productBasePriceRaw" (ngModelChange)="setProductBasePriceInput($event)" />
     </label>
-    <p>Original {{ state.draft.price.original }} · Efectivo {{ state.draft.price.effective }}</p>
+
     <label>Estado del producto
       <select name="productStatus" [ngModel]="state.draft.status.wire" (ngModelChange)="setProductStatus($event)">
         @if (state.draft.status === unknownProductStatus) { <option [value]="state.draft.status.wire" disabled>{{ state.draft.status.label }}</option> }

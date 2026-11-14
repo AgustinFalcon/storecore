@@ -59,15 +59,16 @@ describe('UserHttpRepository capabilities', () => {
 
   it('serializes closed catalog states without degrading archived products or inactive variants', async () => {
     const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
-    const wire = { id: 'p', sku: 'SKU', name: 'Producto', status: ProductStatus.Archived.wire, price: { base: 25, original: 25, effective: 25, offer: null },
+    const wire = { id: 'p', sku: 'SKU', name: 'Producto', status: ProductStatus.Archived.wire, productBasePrice: 25, price: { base: 25, original: 25, effective: 25, offer: null },
       variants: [{ id: 'v', sku: 'VAR', name: 'Variante', status: VariantStatus.Inactive.wire, availability: 'UNAVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' }, inventory: { sku: 'VAR', state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] };
     const pending = firstValueFrom(repository.saveProduct(catalogProductDraftFromDetail(mapProductDetail(wire))));
     const request = http.expectOne('/api/v1/user/catalog/products/SKU');
     expect(request.request.body.status).toBe(ProductStatus.Archived.wire);
-    expect(request.request.body.variants[0]).toEqual({ id: 'v', sku: 'VAR', name: 'Variante', status: VariantStatus.Inactive.wire, attributes: wire.variants[0].attributes });
+    expect(request.request.body.variants[0]).toEqual({ id: 'v', sku: 'VAR', name: 'Variante', status: VariantStatus.Inactive.wire, attributes: wire.variants[0].attributes, priceCommand: { mode: 'PRESERVE' } });
     expect(request.request.body).not.toHaveProperty('active');
     expect(request.request.body.variants[0]).not.toHaveProperty('active');
-    expect(request.request.body.price).toEqual({ base: 25 });
+    expect(request.request.body.productBasePrice).toBe(25);
+    expect(request.request.body).not.toHaveProperty('price');
     expect(request.request.body.variants[0]).not.toHaveProperty('availableQuantity');
     request.flush(wire); expect((await pending).status).toBe(ProductStatus.Archived); http.verify();
   });

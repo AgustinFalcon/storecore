@@ -32,7 +32,7 @@ open class JdbcCatalogProjectionReader(private val jdbc: JdbcTemplate, private v
     }
     open fun product(sku: String, admin: Boolean): CatalogProduct? {
         val where = "EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id AND v.sku=? ${if(admin) "" else "AND v.active"}) ${if(admin) "" else "AND p.status='ACTIVE'"}"
-        return assemble(readProducts(where, listOf(sku)), admin).firstOrNull()?.let { it.copy(sku = sku) }
+        return assemble(readProducts(where, listOf(sku)), admin).firstOrNull()?.let { it.copy(sku = sku, price = it.variants.firstOrNull { variant -> variant.sku == sku }?.price?.knownPrice()) }
     }
     open fun inventory(page: Int, size: Int): BoundedPage<InventoryProjection> {
         validatePage(page,size)
@@ -42,14 +42,12 @@ open class JdbcCatalogProjectionReader(private val jdbc: JdbcTemplate, private v
             ORDER BY v.sku,v.id LIMIT ? OFFSET ?""", { rs,_ -> balance(rs) },size,page.toLong()*size)
         return BoundedPage(items,total,page,size)
     }
-    private data class Row(val id: Long, val name: String, val description: String, val brand: String, val category: String, val status: ProductStatus, val price: PriceProjection)
+    private data class Row(val id: Long, val name: String, val description: String, val brand: String, val category: String, val status: ProductStatus, val base: java.math.BigDecimal?, val offer: SkuOffer?)
     private fun readProducts(where: String, args: List<Any>): List<Row> = jdbc.query("""SELECT p.id,p.name,p.description,p.status,p.base_price,b.name brand,c.name category,o.id offer_id,o.name offer_name,o.discount_type,o.discount_value
         FROM products p LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id
         LEFT JOIN LATERAL (SELECT o.* FROM offers o JOIN offer_products op ON op.offer_id=o.id WHERE op.product_id=p.id AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at ORDER BY o.priority DESC,o.id LIMIT 1) o ON TRUE WHERE $where""", { rs,_ ->
-        val base=rs.getBigDecimal("base_price")
-        val discount=rs.getBigDecimal("discount_value")?.let { com.storecore.offers.domain.DiscountKind.fromWire(rs.getString("discount_type")).discount(base,it) }
-        Row(rs.getLong("id"),rs.getString("name"),rs.getString("description") ?: "",rs.getString("brand") ?: "",rs.getString("category") ?: "",ProductStatus.fromWire(rs.getString("status")),
-            PriceProjection(base,base,base.subtract(discount ?: java.math.BigDecimal.ZERO), if(discount == null) null else OfferProjection(rs.getString("offer_id"),rs.getString("offer_name"))))
+        val offer=rs.getString("offer_id")?.let { SkuOffer(it,rs.getString("offer_name"),com.storecore.offers.domain.DiscountKind.fromWire(rs.getString("discount_type")),rs.getString("discount_value")?.toBigDecimalOrNull()) }
+        Row(rs.getLong("id"),rs.getString("name"),rs.getString("description") ?: "",rs.getString("brand") ?: "",rs.getString("category") ?: "",ProductStatus.fromWire(rs.getString("status")),rs.getString("base_price")?.toBigDecimalOrNull(),offer)
     },*args.toTypedArray())
     private fun assemble(rows: List<Row>, admin: Boolean): List<CatalogProduct> {
         if(rows.isEmpty()) return emptyList()
@@ -59,14 +57,16 @@ open class JdbcCatalogProjectionReader(private val jdbc: JdbcTemplate, private v
             row_number() OVER (PARTITION BY v.product_id ORDER BY v.id) rn FROM product_variants v JOIN products p ON p.id=v.product_id
             LEFT JOIN inventory_balances i ON i.variant_id=v.id WHERE v.product_id IN ($placeholders) ${if(admin) "" else "AND v.active"}) children WHERE rn<=1001 ORDER BY product_id,id""", { rs,_ ->
             val inventory=balance(rs,"balance_updated_at")
+            val product=rows.first { it.id == rs.getLong("product_id") }
+            val policy=VariantBasePricePolicy.fromPersistence(product.base,rs.getString("base_price_override"))
             rs.getLong("product_id") to CatalogVariant(rs.getString("id"),rs.getString("sku"),rs.getString("label"),VariantStatus.fromWire(rs.getBoolean("active")),
-                attributes(rs), if(admin) inventory.available else inventory.saleable,inventory)
+                attributes(rs), if(admin) inventory.available else inventory.saleable,inventory,SkuPricePolicy.resolve(policy,product.offer),policy.view)
         },*ids.toTypedArray()).groupBy({it.first},{it.second})
         val media=jdbc.query("""SELECT * FROM (SELECT m.*,row_number() OVER (PARTITION BY product_id ORDER BY sort_order,id) rn FROM product_images m WHERE product_id IN ($placeholders)) children WHERE rn<=1001 ORDER BY product_id,sort_order,id""",{rs,_ -> rs.getLong("product_id") to CatalogMedia(rs.getString("id"),rs.getString("url"),rs.getInt("sort_order"),rs.getBoolean("is_primary"))},*ids.toTypedArray()).groupBy({it.first},{it.second})
         return rows.map { row ->
             val v=variants[row.id].orEmpty(); val m=media[row.id].orEmpty()
             if(v.size>1000 || m.size>1000) throw CommerceValidation("CATALOG_PRODUCT_COLLECTION_LIMIT_EXCEEDED")
-            CatalogProduct(row.id.toString(),v.firstOrNull()?.sku ?: "",row.name,row.description,row.brand,row.category,row.status,m,v,row.price)
+            CatalogProduct(row.id.toString(),v.firstOrNull()?.sku ?: "",row.name,row.description,row.brand,row.category,row.status,m,v,v.firstOrNull()?.price?.knownPrice(),row.base)
         }
     }
     private fun attributes(rs: ResultSet): Map<String, Any?> {

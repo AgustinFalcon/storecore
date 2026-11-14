@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { FavoriteAvailability, FavoriteItem, FavoriteMutationOutcome, FavoriteMutationResult } from '../../domain/favorite/favorite';
 import { IFavoriteRepository } from '../../domain/favorite/favorite.repository';
+import { SkuPriceResolution } from '../../domain/catalog/variant-price';
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -16,17 +17,19 @@ export function mapFavorite(value: unknown): FavoriteItem {
   const row = record(value);
   const sku = text(row['sku']).trim();
   const name = text(row['name']).trim();
-  const price = row['price'];
+  const priceResolution = SkuPriceResolution.fromWire(row['priceResolution']);
+  const availability = FavoriteAvailability.fromWire(row['availability']);
+  const price = availability.canPurchase && priceResolution.known ? priceResolution.price!.effective : null;
   const addedAt = text(row['addedAt']);
-  if (!sku || !name || typeof price !== 'number' || !Number.isFinite(price) || price < 0 || !addedAt || Number.isNaN(Date.parse(addedAt))) {
+  if (!sku || !name || !addedAt || Number.isNaN(Date.parse(addedAt))) {
     throw new Error('La lista de favoritos contiene una fila inválida.');
   }
   return {
     sku,
     name,
-    price: Number.isFinite(price) ? price : 0,
+    price, priceResolution,
     imageUrl: text(row['imageUrl']) || null,
-    availability: FavoriteAvailability.fromWire(row['availability']),
+    availability: priceResolution.known ? availability : FavoriteAvailability.Unavailable,
     addedAt,
   };
 }

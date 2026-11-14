@@ -20,7 +20,7 @@ import { ProductPageViewComponent } from './product-page.view';
 describe('ProductPage restored quantity integration', () => {
   it('keeps the parent selection stable between the 1 and 2 keystrokes', async () => {
     const product = mapProductDetail({ id: 'p', sku: 'PRODUCT', name: 'Producto', status: 'ACTIVE', images: [],
-      price: { base: 1, effective: 1, original: 1, offer: null }, variants: [{ id: 'v', sku: 'VARIANT', name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE',
+      productBasePrice: 1, price: { base: 1, effective: 1, original: 1, offer: null }, variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku: 'VARIANT', name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE',
         attributes: {}, inventory: { variantId: 'v', sku: 'VARIANT', state: 'KNOWN', available: 20, reserved: 0, onHand: 20, safety: 0, saleable: 20 } }] });
     const cart = { lines: [], currency: CartCurrency.Ars };
     const flow = PurchaseIntent.capture('opaque-flow-id-001', 'PRODUCT', 'VARIANT', 2, 1);
