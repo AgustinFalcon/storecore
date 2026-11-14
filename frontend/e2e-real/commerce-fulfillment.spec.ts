@@ -6,6 +6,13 @@ import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTrans
 import { DamageReason, ReturnDispositionState } from '../src/app/domain/order/return-disposition';
 import { mapReturnDisposition } from '../src/app/data/order/return-disposition.mapper';
 import { AccessContext, RealmFixture, apiLogin, assertRealm, chooseExisting, database, origin, password, uiLogin } from './support/fixtures';
+import { RouteEvidenceMode } from '../src/app/features/navigation/route-evidence';
+
+// This suite runs only under the UA runner with its controlled official API
+// provider. Durable backend effects do not make it strict provider-free evidence.
+test.beforeEach(({}, info) => {
+  info.annotations.push({ type: 'evidence', description: RouteEvidenceMode.RealBackendLocalProvider.wire });
+});
 
 enum FixtureModule { Storefront = 'STOREFRONT', Catalog = 'CATALOG', Payments = 'PAYMENTS_MP', Fulfillment = 'MANUAL_FULFILLMENT', Profile = 'PROFILE_CONTENT' }
 enum FixtureCapabilityState { Active = 'ACTIVE' }

@@ -11,6 +11,7 @@ for (const viewport of [{ name: 'mobile', width: 390, height: 1000 }, { name: 'd
       const evidence = await installProductiveRouteFixture(page, acceptance.actor);
 
       await page.goto(acceptance.url, { waitUntil: 'domcontentloaded' });
+      await expect(page).toHaveURL(new URL(acceptance.finalUrl, page.url()).href);
       await expect(page.locator('sc-root')).toHaveAttribute('data-surface-id', acceptance.surface.wire);
       await expect(page.locator('h1')).toHaveCount(1);
       await expect(page.locator('h1')).toHaveText(acceptance.heading);

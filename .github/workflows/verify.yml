@@ -74,6 +74,110 @@ jobs:
         working-directory: frontend
         run: npm run test:a11y
 
+  productive-routes-real-e2e:
+    needs: repository-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: storecore_ua_e2e
+          POSTGRES_USER: storecore
+          POSTGRES_PASSWORD: storecore
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U storecore -d storecore_ua_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.22.3'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install isolated-runtime prerequisites
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client openssl iptables
+      - name: Package backend at the checked-out SHA
+        working-directory: backend
+        run: mvn -B -DskipTests package
+      - name: Build and check productive route acceptance
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/storecore-psd-browsers
+        run: |
+          npm ci
+          npm run build
+          npm run build:demo
+          npm run check:psd-real
+          npx playwright install --with-deps chromium
+      - name: Create dedicated runtime and enforce IPv4/IPv6 loopback-only egress
+        run: |
+          sudo useradd --system --create-home --shell /bin/bash storecore-psd
+          runtime_uid=$(id -u storecore-psd)
+          sudo iptables -I OUTPUT 1 -m owner --uid-owner "$runtime_uid" ! -d 127.0.0.0/8 -j REJECT
+          sudo ip6tables -I OUTPUT 1 -m owner --uid-owner "$runtime_uid" ! -d ::1/128 -j REJECT
+          sudo iptables -C OUTPUT -m owner --uid-owner "$runtime_uid" ! -d 127.0.0.0/8 -j REJECT
+          sudo ip6tables -C OUTPUT -m owner --uid-owner "$runtime_uid" ! -d ::1/128 -j REJECT
+          printf '198.51.100.1 psd-egress.invalid\n' | sudo tee -a /etc/hosts >/dev/null
+          printf '{"uid":%s,"ipv4":"reject-non-loopback","ipv6":"reject-non-loopback"}\n' "$runtime_uid" | sudo tee /run/storecore-psd-egress.json >/dev/null
+          sudo chmod 644 /run/storecore-psd-egress.json
+          sudo chmod -R a+rX "${{ runner.temp }}/storecore-psd-browsers"
+          sudo chown -R storecore-psd:storecore-psd frontend
+      - name: Run real PostgreSQL, Spring, production Angular and Chromium matrix
+        working-directory: frontend
+        run: |
+          sudo -u storecore-psd setpriv --no-new-privs env -i PATH="$PATH" JAVA_HOME="$JAVA_HOME" HOME=/home/storecore-psd \
+            LANG=C.UTF-8 CI=true PLAYWRIGHT_BROWSERS_PATH="${{ runner.temp }}/storecore-psd-browsers" \
+            PGHOST=127.0.0.1 PGPORT=5434 PGDATABASE=storecore_ua_e2e PGUSER=storecore PGPASSWORD=storecore \
+            STORECORE_PSD_EGRESS_PROOF=/run/storecore-psd-egress.json GITHUB_SHA="$GITHUB_SHA" \
+            "$(command -v node)" scripts/run-psd-real-e2e.mjs
+      - name: Verify required evidence exists
+        if: always()
+        working-directory: frontend
+        run: |
+          test -s psd-real-results/junit.xml
+          test -s psd-real-results/report/index.html
+          test -s psd-real-results/fixture-receipt.json
+          test -s psd-real-results/egress.json
+          test -s psd-real-results/runtime-summary.json
+          test -s psd-real-results/route-census.json
+          test -s psd-real-results/action-census.json
+      - name: Save productive route evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: productive-routes-real-e2e-${{ github.sha }}
+          path: |
+            frontend/psd-real-results/junit.xml
+            frontend/psd-real-results/report/index.html
+            frontend/psd-real-results/fixture-receipt.json
+            frontend/psd-real-results/egress.json
+            frontend/psd-real-results/route-census.json
+            frontend/psd-real-results/action-census.json
+            frontend/psd-real-results/runtime-summary.json
+            frontend/psd-real-results/*.log
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove only the dedicated runtime firewall rules
+        if: always()
+        run: |
+          if id storecore-psd >/dev/null 2>&1; then
+            runtime_uid=$(id -u storecore-psd)
+            sudo iptables -D OUTPUT -m owner --uid-owner "$runtime_uid" ! -d 127.0.0.0/8 -j REJECT || true
+            sudo ip6tables -D OUTPUT -m owner --uid-owner "$runtime_uid" ! -d ::1/128 -j REJECT || true
+          fi
+          sudo rm -f /run/storecore-psd-egress.json
+
   unified-access-real-e2e:
     needs: repository-hygiene
     runs-on: ubuntu-latest
