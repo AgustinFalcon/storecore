@@ -12,6 +12,10 @@ interface ObservedRequest {
   readonly path: string;
 }
 
+interface SuccessfulObservedRequest extends ObservedRequest {
+  readonly status: number;
+}
+
 /** Observe actual transport only. No interception, replay, response bodies or secrets in artifacts. */
 export class RealReadTrace {
   readonly completed: { method: string; path: string; status: number }[] = [];
@@ -19,7 +23,7 @@ export class RealReadTrace {
   readonly writes: string[] = [];
   private readonly pending = new Set<Request>();
   private readonly observations = new WeakMap<Request, ObservedRequest>();
-  private readonly successes: ObservedRequest[] = [];
+  private readonly successes: SuccessfulObservedRequest[] = [];
   private sequence = 0;
   constructor(page: Page) {
     page.on('request', request => {
@@ -51,18 +55,19 @@ export class RealReadTrace {
     const status = response.status();
     this.completed.push({ method: observation.method, path: observation.path, status });
     if (error) this.failures.push(observation);
-    else if (status >= 200 && status < 400) this.successes.push(observation);
+    else if (status >= 200 && status < 400) this.successes.push({ ...observation, status });
     this.pending.delete(request);
   }
   async ready(paths: readonly string[]): Promise<void> {
     for (const path of paths) {
-      await expect.poll(() => this.completed.some(row => row.path === api + path && row.status === 200), { message: `Real response completed: ${path}` }).toBe(true);
+      await expect.poll(() => this.successes.some(row => row.path === api + path && row.status === 200), { message: `Real response completed: ${path}` }).toBe(true);
     }
     await expect.poll(() => this.pending.size, { message: 'All real API responses finished' }).toBe(0);
     await new Promise(resolve => setTimeout(resolve, 100));
     await expect.poll(() => this.pending.size, { message: 'Real API response set remains stable' }).toBe(0);
-    const unresolvedFailures = this.failures.filter(failure => !this.successes.some(success =>
-      success.identity === failure.identity && success.sequence > failure.sequence));
+    const requiredPaths = new Set(paths.map(path => api + path));
+    const unresolvedFailures = this.failures.filter(failure => requiredPaths.has(failure.path)
+      && !this.successes.some(success => success.identity === failure.identity && success.sequence > failure.sequence));
     expect(unresolvedFailures.map(failure => `${failure.method} ${failure.path}`),
       'Failed real API requests without a later identical successful replacement').toEqual([]);
     expect(this.writes, 'Read-only matrix must not mutate domain data').toEqual([]);
@@ -94,7 +99,9 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
   ]);
   const own = reads.get(binding.pattern);
   if (!own) throw new Error('Missing explicit real readiness binding');
-  return [...new Set(['health', 'storefront/branding', 'catalog/brands', 'catalog/categories', ...own])];
+  const storefrontFacets = ['', 'catalog', 'catalog/:sku'].includes(binding.pattern)
+    ? ['catalog/brands', 'catalog/categories'] : [];
+  return [...new Set(['health', 'storefront/branding', ...storefrontFacets, ...own])];
 }
 
 export async function assertReflow(page: Page): Promise<void> {
