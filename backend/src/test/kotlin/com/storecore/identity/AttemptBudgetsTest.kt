@@ -109,6 +109,25 @@ class AttemptBudgetsTest {
         budget.recordFailure("ip", "b".repeat(64))
     }
 
+    @Test fun `challenge capacity retry after is exact for checks and failures`() {
+        val clock = BudgetClock()
+        val budget = ChallengeAttemptBudget(clock, maxKeys = 1)
+        val occupied = "a".repeat(64)
+        val other = "b".repeat(64)
+        budget.recordFailure("ip", occupied)
+        clock.advance(1_001)
+        budget.recordFailure("ip", occupied)
+
+        assertEquals(900L, assertFailsWith<LoginRateLimited> {
+            budget.checkAllowed("ip", other)
+        }.retryAfterSeconds)
+        assertEquals(900L, assertFailsWith<LoginRateLimited> {
+            budget.recordFailure("ip", other)
+        }.retryAfterSeconds)
+        clock.advance(900_000)
+        budget.recordFailure("ip", other)
+    }
+
     @Test fun `late in-flight rejections remain counted after older failures expire`() {
         val clock = BudgetClock()
         val budget = ChallengeAttemptBudget(clock)
@@ -122,16 +141,37 @@ class AttemptBudgetsTest {
         budget.checkAllowed("ip", hash)
     }
 
-    @Test fun `realm failure evidence survives successes until expiry and is bounded`() {
+    @Test fun `realm failure evidence survives successes and capacity is isolated until expiry`() {
         val clock = BudgetClock()
         val limiter = LoginRateLimiter(clock, maxKeys = 1)
         repeat(50) { limiter.recordFailure(IdentityRealm.USER, "ip", "buyer@example.com") }
         limiter.clear(IdentityRealm.USER, "ip", "buyer@example.com")
         assertFailsWith<LoginRateLimited> { limiter.checkAllowed(IdentityRealm.USER, "ip", "buyer@example.com") }
-        assertFailsWith<LoginRateLimited> { limiter.recordFailure(IdentityRealm.CUSTOMER, "ip", "buyer@example.com") }
+        limiter.recordFailure(IdentityRealm.CUSTOMER, "ip", "buyer@example.com")
+        assertFailsWith<LoginRateLimited> { limiter.recordFailure(IdentityRealm.USER, "ip", "other@example.com") }
+        assertFailsWith<LoginRateLimited> { limiter.recordFailure(IdentityRealm.CUSTOMER, "ip", "other@example.com") }
         clock.advance(900_000)
         limiter.checkAllowed(IdentityRealm.USER, "ip", "buyer@example.com")
-        limiter.recordFailure(IdentityRealm.CUSTOMER, "ip", "buyer@example.com")
+        limiter.recordFailure(IdentityRealm.USER, "ip", "other@example.com")
+        limiter.recordFailure(IdentityRealm.CUSTOMER, "ip", "other@example.com")
+    }
+
+    @Test fun `capacity retry after follows the newest failure of the first releasable key`() {
+        val clock = BudgetClock()
+        val budget = LoginAttemptBudget(clock, maxKeys = 1)
+        budget.acquire("ip", "buyer@example.com")
+        clock.advance(1_001)
+        budget.acquire("ip", "buyer@example.com")
+
+        assertEquals(900L, assertFailsWith<LoginRateLimited> {
+            budget.acquire("ip", "other@example.com")
+        }.retryAfterSeconds)
+        clock.advance(898_999)
+        assertEquals(2L, assertFailsWith<LoginRateLimited> {
+            budget.acquire("ip", "other@example.com")
+        }.retryAfterSeconds)
+        clock.advance(1_001)
+        budget.acquire("ip", "other@example.com")
     }
 
     @Test fun `email keys contain only a digest`() {
