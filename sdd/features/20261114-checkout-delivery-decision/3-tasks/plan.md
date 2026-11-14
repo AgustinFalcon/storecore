@@ -11,6 +11,6 @@
 - [x] T9. Cubrir dominio, HTTP, concurrencia, store, vista y E2E real.
 - [x] T10. Ejecutar gates completos y corregir regresiones.
 - [x] T11. Revisar código funcional/UX y técnico/seguridad hasta APPROVE.
-- [ ] T12. Entregar PR con evidencia, CI, merge y post-merge.
-- [ ] T13. Cerrar y archivar el SDD con evidencia final.
+- [x] T12. Entregar PR con evidencia, CI, merge y post-merge.
+- [x] T13. Cerrar y archivar el SDD con evidencia final.
 

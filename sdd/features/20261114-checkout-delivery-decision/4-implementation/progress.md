@@ -22,6 +22,9 @@
   cookies ni autoridades entre realms.
 - Rerevisión final coordinada funcional/producto, técnica y seguridad: tres
   `APPROVE`, sin hallazgos P0–P3.
+- PR #272 fusionado en `master` como `bfe34661`. Verify del PR `43551669169`
+  y post-merge `43552311370`: backend, frontend y E2E real 3/3 verdes.
+- SDD cerrado con 13/13 tareas completas y trasladado de `wip` a `features`.
 
 ## Evidencia local
 
