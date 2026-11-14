@@ -13,6 +13,7 @@ import { UserCapabilitiesViewComponent } from './user-capabilities.view';
     @if (store.vm$ | async; as state) {
       <sc-user-capabilities-view [state]="state"
         (refresh)="store.loadCapabilities()" (queryChange)="store.setQuery($event)"
+        (editModule)="store.beginEdit($event)" (draftChange)="store.updateDraft($event)" (confirmChange)="store.confirm()" (closeEditor)="store.closeEditor()"
         (filterChange)="store.setFilter($event)" (clearFilters)="store.clearFilters()" />
     }
   `,
@@ -20,7 +21,7 @@ import { UserCapabilitiesViewComponent } from './user-capabilities.view';
 export class UserCapabilitiesComponent {
   constructor(readonly store: UserCapabilitiesStore, session: UserSession) {
     effect(() => {
-      const actorChanged = store.setActor(session.authenticated() ? session.principal() : null);
+      const actorChanged = store.setActor(session.authenticated() ? session.principal() : null, session.authenticationEpoch());
       if (actorChanged) store.loadCapabilities();
     });
   }

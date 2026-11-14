@@ -6,6 +6,7 @@ import { CapabilityModuleState } from '../../domain/user/capability-module-state
 import { UserRole } from '../../domain/user/user-role';
 import { CapabilityModule } from '../../domain/user/user.entity';
 import { ReadCapabilitiesUseCase } from '../../domain/user/use-cases/read-capabilities.usecase';
+import { ChangeCapabilityStateUseCase } from '../../domain/user/use-cases/change-capability-state.usecase';
 import { CapabilityReadState } from './capability-read-state';
 import { UserCapabilitiesStore } from './user-capabilities.store';
 
@@ -14,19 +15,20 @@ const modules: readonly CapabilityModule[] = [
 ];
 
 function createStore(listCapabilities: () => Observable<readonly CapabilityModule[]> = vi.fn(() => of(modules))) {
-  const store = new UserCapabilitiesStore({ execute: listCapabilities } as unknown as ReadCapabilitiesUseCase);
+  const store = new UserCapabilitiesStore({ execute: listCapabilities } as unknown as ReadCapabilitiesUseCase, {} as ChangeCapabilityStateUseCase);
   store.setActor({ id: 'actor-a', roles: [UserRole.Operator] });
   return { store, listCapabilities };
 }
 
 describe('UserCapabilitiesStore', () => {
+  beforeEach(() => sessionStorage.clear());
   it('uses the read-only endpoint and accepts an empty authoritative snapshot', () => {
     const { store, listCapabilities } = createStore(vi.fn(() => of([])));
     store.loadCapabilities();
     expect(listCapabilities).toHaveBeenCalledTimes(1);
     expect(store.snapshot.hasSnapshot).toBe(true);
     expect(store.snapshot.readState).toBe(CapabilityReadState.Ready);
-    expect(store.snapshot.policy.allowsMutation).toBe(false);
+    expect(store.snapshot.canMutate).toBe(false);
     store.ngOnDestroy();
   });
 

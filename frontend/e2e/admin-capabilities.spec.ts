@@ -23,7 +23,7 @@ async function mockSession(page: Page, role = UserRole.Operator): Promise<void> 
 }
 
 for (const width of [390, 768, 1440]) {
-  test(`capabilities is professional, read-only and accessible at ${width}`, async ({ page }, testInfo) => {
+  test(`capabilities preserves role authority and accessibility at ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await mockSession(page, width === 768 ? UserRole.Admin : UserRole.Operator);
     const capabilityMethods: string[] = [];
@@ -41,7 +41,7 @@ for (const width of [390, 768, 1440]) {
     await expect(page.locator('.capability-card').first().locator('dt')).toHaveText(['Estado operativo', 'Disponibilidad', 'Nivel de entrega']);
     await expect(page.locator('.capabilities__table tbody tr')).toHaveCount(4);
     await expect(page.locator('.capabilities__technical')).toContainText('Pagos con Mercado Pago');
-    await expect(page.getByRole('button', { name: /habilitar|deshabilitar|guardar|pausar módulo|cambiar estado/i })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /cambiar estado de/i })).toHaveCount(width === 768 ? 3 : 0);
 
     await page.getByLabel('Buscar módulo').fill('envios');
     await expect(page.locator('.capability-card')).toHaveCount(1);
@@ -63,6 +63,36 @@ for (const width of [390, 768, 1440]) {
     expect(results.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical')).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath(`sc24-real-${width}.png`), fullPage: true });
     expect(capabilityMethods.length).toBeGreaterThan(0); expect(capabilityMethods.every((method) => method === 'GET')).toBe(true);
+  });
+}
+
+for (const width of [390, 768, 1440]) {
+  test(`ADMIN state editor confirms an authoritative command accessibly at ${width}`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 1000 }); await mockSession(page, UserRole.Admin);
+    const commands: Record<string, unknown>[] = []; let changed = false;
+    await page.route('**/api/v1/user/capabilities**', async route => {
+      if (route.request().method() === 'POST') {
+        commands.push(route.request().postDataJSON()); changed = true;
+        return route.fulfill({ json: envelope({ ...modules[0], state: CapabilityModuleState.Paused.wire, configVersion: 8 }) });
+      }
+      return route.fulfill({ json: envelope(changed ? [{ ...modules[0], state: CapabilityModuleState.Paused.wire, configVersion: 8 }, ...modules.slice(1)] : modules) });
+    });
+    await page.goto('/user/capabilities');
+    const trigger = page.getByRole('button', { name: 'Cambiar estado de Catálogo', exact: true }); await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Cambiar estado de Catálogo', exact: true });
+    await expect(dialog).toBeVisible(); await expect(page.getByLabel('Nuevo estado')).toBeFocused();
+    await page.getByLabel('Nuevo estado').selectOption({ label: CapabilityModuleState.Paused.label });
+    await page.getByLabel('Motivo (1 a 500 caracteres)').fill('  mantenimiento programado  ');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.filter(item => item.impact === 'serious' || item.impact === 'critical')).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`capability-editor-${width}.png`), fullPage: true });
+    await page.getByRole('button', { name: 'Confirmar cambio', exact: true }).click();
+    await expect(dialog).toBeHidden(); await expect(trigger).toBeFocused();
+    expect(commands).toHaveLength(1); expect(commands[0]).toEqual({ state: CapabilityModuleState.Paused.wire, expectedConfigVersion: 7,
+      reason: 'mantenimiento programado', correlationId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    await expect(page.locator('.capabilities__table tbody tr').first()).toContainText('8');
+    await expect(page.locator('.capabilities__table tbody tr').first()).toContainText(CapabilityModuleState.Paused.label);
   });
 }
 

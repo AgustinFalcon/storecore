@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CapabilityFilter } from '../../domain/user/capability-filter';
+import { CapabilityMutationPhase } from '../../domain/user/capability-mutation-phase';
 import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { CapabilityTargetPolicy } from '../../domain/user/capability-target-policy';
@@ -14,7 +15,8 @@ const modules = [
   { id: CapabilityModuleId.PaymentsMp, state: CapabilityModuleState.ReadOnly, configVersion: 3 },
 ];
 const ready: UserCapabilitiesState = { modules, loading: false, errorMessage: '', readState: CapabilityReadState.Ready,
-  hasSnapshot: true, query: '', filter: CapabilityFilter.All, selectedModule: null, policy: CapabilityTargetPolicy.RealReadOnly };
+  hasSnapshot: true, query: '', filter: CapabilityFilter.All, selectedModule: null, policy: CapabilityTargetPolicy.Productive,
+  canMutate: false, mutationLocked: false, phase: CapabilityMutationPhase.Idle, draft: null, intent: null, mutationMessage: '' };
 
 describe('User capabilities read-only presentation', () => {
   beforeEach(() => TestBed.configureTestingModule({ imports: [UserCapabilitiesViewComponent], providers: [provideRouter([])] }));
@@ -23,6 +25,64 @@ describe('User capabilities read-only presentation', () => {
     const fixture = TestBed.createComponent(UserCapabilitiesViewComponent);
     fixture.componentRef.setInput('state', { ...ready, ...patch }); fixture.detectChanges(); return fixture;
   }
+
+  it('offers ADMIN controls only for authoritative known editable rows', () => {
+    const fixture = render({ canMutate: true });
+    const controls = fixture.nativeElement.querySelectorAll('button[aria-label^="Cambiar estado"]');
+    expect(controls).toHaveLength(2);
+    expect(controls[0].getAttribute('aria-label')).toContain(CapabilityModuleId.Catalog.label);
+    fixture.componentRef.setInput('state', { ...ready, canMutate: true, mutationLocked: true }); fixture.detectChanges();
+    expect(Array.from(fixture.nativeElement.querySelectorAll('button[aria-label^="Cambiar estado"]')).every(button => (button as HTMLButtonElement).disabled)).toBe(true);
+  });
+  it('validates the closed selector and reason before enabling confirmation', () => {
+    const draft = { row: modules[0], target: CapabilityModuleState.Unknown, reason: '', reviewedVersion: true };
+    const fixture = render({ canMutate: true, phase: CapabilityMutationPhase.Editing, draft });
+    expect(fixture.componentInstance.canConfirm).toBe(false);
+    const select = fixture.nativeElement.querySelector('#capability-target');
+    expect(select.options).toHaveLength(modules[0].state.allowedTargets.length + 1);
+    fixture.componentRef.setInput('state', { ...ready, canMutate: true, phase: CapabilityMutationPhase.Editing,
+      draft: { ...draft, target: CapabilityModuleState.Paused, reason: 'motivo' } }); fixture.detectChanges();
+    expect(fixture.componentInstance.canConfirm).toBe(true);
+    fixture.componentRef.setInput('state', { ...fixture.componentInstance.state, phase: CapabilityMutationPhase.Saving }); fixture.detectChanges();
+    expect(fixture.componentInstance.canConfirm).toBe(false);
+    const close = vi.spyOn(fixture.componentInstance.closeEditor, 'emit'); fixture.componentInstance.cancelEditor(); expect(close).not.toHaveBeenCalled();
+  });
+  it('focuses the target selector and restores the trigger after authoritative confirmation', () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = render({ canMutate: true });
+      const trigger = fixture.nativeElement.querySelector('button[aria-label^="Cambiar estado"]') as HTMLButtonElement;
+      const dialog = fixture.nativeElement.querySelector('dialog[aria-labelledby="capability-editor-title"]') as HTMLDialogElement;
+      Object.defineProperty(dialog, 'showModal', { value: () => { Object.defineProperty(dialog, 'open', { value: true, configurable: true }); } });
+      Object.defineProperty(dialog, 'close', { value: () => { Object.defineProperty(dialog, 'open', { value: false, configurable: true }); } });
+      const restore = vi.spyOn(trigger, 'focus'); fixture.componentInstance.openEditor(modules[0], { currentTarget: trigger } as unknown as Event);
+      fixture.componentRef.setInput('state', { ...ready, canMutate: true, phase: CapabilityMutationPhase.Editing,
+        draft: { row: modules[0], target: CapabilityModuleState.Unknown, reason: '', reviewedVersion: true } }); fixture.detectChanges();
+      const focus = vi.spyOn(fixture.nativeElement.querySelector('#capability-target'), 'focus'); vi.runAllTimers(); expect(focus).toHaveBeenCalled();
+      fixture.componentRef.setInput('state', { ...ready, canMutate: true, phase: CapabilityMutationPhase.Confirmed }); fixture.detectChanges();
+      vi.runAllTimers();
+      expect(restore).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it.each(['epoch-change', 'disabled'])('focuses the page heading when the old editor trigger is unavailable: %s', scenario => {
+    vi.useFakeTimers();
+    try {
+      const fixture = render({ canMutate: true });
+      const trigger = fixture.nativeElement.querySelector('button[aria-label^="Cambiar estado"]') as HTMLButtonElement;
+      const dialog = fixture.nativeElement.querySelector('dialog[aria-labelledby="capability-editor-title"]') as HTMLDialogElement;
+      Object.defineProperty(dialog, 'showModal', { value: () => { Object.defineProperty(dialog, 'open', { value: true, configurable: true }); } });
+      Object.defineProperty(dialog, 'close', { value: () => { Object.defineProperty(dialog, 'open', { value: false, configurable: true }); } });
+      fixture.componentInstance.openEditor(modules[0], { currentTarget: trigger } as unknown as Event);
+      fixture.componentRef.setInput('state', { ...ready, canMutate: true, phase: CapabilityMutationPhase.Editing,
+        draft: { row: modules[0], target: CapabilityModuleState.Unknown, reason: '', reviewedVersion: true } }); fixture.detectChanges(); vi.runAllTimers();
+      const oldFocus = vi.spyOn(trigger, 'focus'); const headingFocus = vi.spyOn(fixture.nativeElement.querySelector('#cap-title'), 'focus');
+      // An epoch reset clears the snapshot/draft before the new actor's read completes.
+      fixture.componentRef.setInput('state', { ...ready, canMutate: true, modules: scenario === 'epoch-change' ? [] : modules,
+        hasSnapshot: scenario !== 'epoch-change', loading: scenario === 'disabled' }); fixture.detectChanges(); vi.runAllTimers();
+      expect(oldFocus).not.toHaveBeenCalled(); expect(headingFocus).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
 
   it('renders the exact seven commercial cards with three separate axes and no mutation control', () => {
     const fixture = render(); const text = fixture.nativeElement.textContent;

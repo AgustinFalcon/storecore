@@ -4,7 +4,8 @@ import { CreateManualPromo, PolicyTransition } from '../../domain/user/channel-p
 import { mapChannelPage, mapChannelAccount, mapChannelListing, mapPricePolicy } from './channel-pricing.mapper';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { map, Observable, timeout } from 'rxjs';
+import { CapabilityStateIntent } from '../../domain/user/capability-state-intent';
 import { environment } from '../../../environments/environment';
 import { readApiBody } from '../../core/api/base-response';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
@@ -24,6 +25,7 @@ import {
 import { IUserRepository } from '../../domain/user/user.repository';
 import {
   mapCapabilities,
+  mapCapability,
   mapFacet,
   mapInventory,
   mapPreview,
@@ -124,6 +126,18 @@ export class UserHttpRepository implements IUserRepository {
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/capabilities`)
       .pipe(map((body) => mapCapabilities(readApiBody<unknown>(body))));
+  }
+
+  changeCapabilityState(intent: CapabilityStateIntent): Observable<CapabilityModule> {
+    if (!CapabilityStateIntent.isValid({ id: intent.module, state: intent.current, configVersion: intent.expectedConfigVersion }, intent.target, intent.reason)) throw new Error('Cambio inválido.');
+    return this.http.post<unknown>(`${environment.apiBaseUrl}/user/capabilities/${encodeURIComponent(intent.module.wire)}/state`, {
+      state: intent.target.wire, expectedConfigVersion: intent.expectedConfigVersion,
+      reason: intent.reason, correlationId: intent.correlationId,
+    }).pipe(timeout(15000), map(body => {
+      const row = mapCapability(readApiBody(body));
+      if (!intent.accepts(row)) throw new Error('Respuesta de cambio no verificable.');
+      return row;
+    }));
   }
 
   listInventory(page = BoundedPageRequest.first()): Observable<BoundedRows<InventoryRow>> {

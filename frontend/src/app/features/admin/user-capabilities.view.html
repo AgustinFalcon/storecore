@@ -1,9 +1,10 @@
 <section class="sc-page sc-console capabilities" aria-labelledby="cap-title" [attr.aria-busy]="state.loading">
   <header class="sc-page-head capabilities__head">
-    <div><p class="sc-kicker">Configuración · Sólo lectura</p><h1 id="cap-title">Módulos del comercio</h1><p class="sc-page__lede">Revisá qué está operativo hoy, qué depende de otra implementación y cuál es el nivel real de entrega.</p></div>
-    @if (!state.readState.isAccessDenied) { <button type="button" class="capabilities__refresh" [disabled]="state.loading" (click)="refresh.emit()">{{ state.loading && state.hasSnapshot ? 'Actualizando…' : 'Actualizar módulos' }}</button> }
+    <div><p class="sc-kicker">Configuración{{ state.canMutate ? ' · Administración' : ' · Sólo lectura' }}</p><h1 #pageHeading tabindex="-1" id="cap-title">Módulos del comercio</h1><p class="sc-page__lede">Revisá qué está operativo hoy, qué depende de otra implementación y cuál es el nivel real de entrega.</p></div>
+    @if (!state.readState.isAccessDenied) { <button type="button" class="capabilities__refresh" [disabled]="state.loading || state.phase.isSaving" (click)="refresh.emit()">{{ state.loading && state.hasSnapshot ? 'Actualizando…' : 'Actualizar módulos' }}</button> }
   </header>
-  <div class="capabilities__scope" role="note"><strong>Vista informativa.</strong><span>Esta pantalla no habilita servicios, no cambia estados y no certifica integraciones ni homologaciones.</span></div>
+  <div class="capabilities__scope" role="note"><strong>Configuración local.</strong><span>Los cambios de estado requieren autorización ADMIN. Esta pantalla no certifica integraciones ni homologaciones.</span></div>
+  <p role="status" aria-live="polite">{{ state.phase.label }}</p>
   @if (state.readState.isAccessDenied) {
     <div class="capabilities__notice capabilities__notice--error" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión interna autorizada para consultar los módulos del comercio.</p></div>
   } @else if (unknownReadState) {
@@ -42,14 +43,32 @@
       <section class="capabilities__technical" aria-labelledby="technical-title">
         <div class="capabilities__section-head"><div><p class="sc-kicker">Fuente autoritativa</p><h2 id="technical-title">Módulos técnicos informados por el servidor</h2></div><p>Esta lista conserva cada fila recibida. La metadata comercial de las fichas no reemplaza el contrato técnico.</p></div>
         @if (!state.modules.length) { <div class="capabilities__notice"><h3>Sin módulos técnicos configurados</h3><p>La consulta fue válida, pero el servidor no informó módulos para esta instalación.</p></div> } @else {
-          <table class="capabilities__table"><caption>Estado operativo y versión de configuración de todos los módulos devueltos por el servidor.</caption><thead><tr><th scope="col">Módulo técnico</th><th scope="col">Estado operativo</th><th scope="col">Versión</th></tr></thead><tbody>
-            @for (module of state.modules; track $index) { <tr><th scope="row" class="capabilities__mono">{{ module.id.label }}</th><td data-label="Estado operativo"><span class="capability-card__badge" [attr.data-tone]="module.state.tone">{{ module.state.label }}</span></td><td data-label="Versión">{{ module.configVersion ?? 'No informada' }}</td></tr> }
+          <table class="capabilities__table"><caption>Estado operativo y versión de configuración de todos los módulos devueltos por el servidor.</caption><thead><tr><th scope="col">Módulo técnico</th><th scope="col">Estado operativo</th><th scope="col">Versión</th>@if (state.canMutate) { <th scope="col">Acción</th> }</tr></thead><tbody>
+            @for (module of state.modules; track $index) { <tr><th scope="row" class="capabilities__mono">{{ module.id.label }}</th><td data-label="Estado operativo"><span class="capability-card__badge" [attr.data-tone]="module.state.tone">{{ module.state.label }}</span></td><td data-label="Versión">{{ module.configVersion ?? 'No informada' }}</td>@if (state.canMutate) { <td data-label="Acción">@if (canEdit(module)) { <button type="button" [disabled]="state.loading || state.phase.isSaving || state.mutationLocked" [attr.aria-label]="'Cambiar estado de ' + module.id.label" (click)="openEditor(module, $event)">Cambiar estado</button> }</td> }</tr> }
           </tbody></table>
         }
       </section>
     }
   }
 </section>
+<dialog #editorDialog class="capabilities__dialog" aria-labelledby="capability-editor-title" (cancel)="cancelEditor($event)">
+  @if (state.draft; as draft) {
+    <h2 id="capability-editor-title">Cambiar estado de {{ draft.row.id.label }}</h2>
+    <p>Estado actual: {{ draft.row.state.label }} · Versión {{ draft.row.configVersion }}</p>
+    <form (ngSubmit)="canConfirm && confirmChange.emit()">
+      <label for="capability-target">Nuevo estado</label>
+      <select #targetSelect id="capability-target" name="target" required [disabled]="state.phase.isSaving || state.mutationLocked" [ngModel]="draft.target" (ngModelChange)="draftChange.emit({ target: $event })">
+        <option [ngValue]="unknownTarget" disabled>Seleccioná un estado</option>
+        @for (target of draft.row.state.allowedTargets; track target) { <option [ngValue]="target">{{ target.label }}</option> }
+      </select>
+      <label for="capability-reason">Motivo (1 a 500 caracteres)</label>
+      <textarea id="capability-reason" name="reason" required maxlength="500" [disabled]="state.phase.isSaving || state.mutationLocked" [ngModel]="draft.reason" (ngModelChange)="draftChange.emit({ reason: $event })"></textarea>
+      <p role="status" aria-live="polite">{{ state.phase.label }} {{ state.mutationMessage }}</p>
+      @if (state.intent; as intent) { <p class="capabilities__mono">Correlación: {{ intent.correlationId }}</p> }
+      <div class="capability-card__actions"><button type="button" [disabled]="state.phase.isSaving" (click)="cancelEditor()">Cerrar</button><button type="submit" class="capabilities__dialog-primary" [disabled]="!canConfirm">Confirmar cambio</button></div>
+    </form>
+  }
+</dialog>
 <dialog #informationDialog class="capabilities__dialog" aria-labelledby="capability-dialog-title" (cancel)="$event.preventDefault(); closeInformation()" (close)="restoreDialogFocus()">
   @if (activeCard(); as card) {
     <header><div><p class="sc-kicker">Detalle informativo</p><h2 id="capability-dialog-title">{{ card.name }}</h2></div><button type="button" aria-label="Cerrar información" (click)="closeInformation()">×</button></header>

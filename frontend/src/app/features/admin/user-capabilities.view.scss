@@ -70,3 +70,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 @media (max-width: 460px) { .capabilities__metrics { grid-template-columns: 1fr; gap: .65rem; } .capabilities__metrics li { grid-template-columns: 1fr auto; align-items: center; padding: .9rem; } .capability-card { padding: 1rem; } .capability-card__head { flex-direction: column; } .capability-card__actions > * { width: 100%; justify-content: center; } }
 
 .capabilities__refresh:disabled, .capabilities__dialog-primary:disabled { opacity: 1; border-style: dashed; }
+ .capabilities__dialog form { display: grid; gap: 12px; }
+ .capabilities__dialog select, .capabilities__dialog textarea { width: 100%; box-sizing: border-box; padding: 10px; font: inherit; }
+ .capabilities__dialog textarea { min-height: 110px; resize: vertical; }
+ .capabilities__dialog .capabilities__mono { overflow-wrap: anywhere; }
