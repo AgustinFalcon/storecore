@@ -20,7 +20,7 @@
             <th>Orden</th>
             <th>Pago</th>
             <th>Total</th>
-            <th>Envío</th>
+            <th>Entrega</th>
             <th>Tracking</th>
             <th>RMA</th>
             <th>Acción</th>
@@ -36,14 +36,14 @@
               <td>
                 @if (nextShip(order)?.requiresTracking) {
                   <input [ngModel]="trackingOf(order.id)" (ngModelChange)="tracking[order.id] = $event" [name]="'tracking-' + order.id" />
-                } @else {
+                } @else if (order.deliveryDecision?.showsTracking) {
                   {{ order.tracking || 'No disponible' }}
                 }
               </td>
               <td><span class="sc-badge">{{ order.rmaStatus.label }}</span></td>
               <td class="sc-table__actions">
                 @if (nextShip(order); as next) {
-                  <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: tracking[order.id] || null })">
+                  <button type="button" class="sc-btn sc-btn--primary" (click)="ship.emit({ orderId: order.id, status: next, tracking: next.requiresTracking ? tracking[order.id] || null : null })">
                     {{ shipLabel(next) }}
                   </button>
                 }
@@ -56,6 +56,6 @@
         </tbody>
       </table>
     </div>
-    <p class="sc-callout">Cada fila ofrece una sola transición de envío y, si corresponde, una de RMA.</p>
+    <p class="sc-callout">Cada fila ofrece una sola transición de entrega y, si corresponde, una de RMA.</p>
   }
 </section>

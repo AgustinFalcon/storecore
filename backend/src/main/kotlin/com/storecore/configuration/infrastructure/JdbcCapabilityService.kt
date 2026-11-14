@@ -60,6 +60,8 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
         val configJson = configJson(config["config"])
         if (module == BLACKSTORE_MODULE) {
             if (schema != 2 || !blackstoreSchemaV2Valid(configJson)) throw CapabilityConfigInvalid()
+        } else if(module == "MANUAL_FULFILLMENT") {
+            if(schema != 2 || jdbc.queryForObject("SELECT manual_fulfillment_schema_v2_valid(?::jsonb)",Boolean::class.java,configJson)!=true) throw CapabilityConfigInvalid()
         } else if (schema != 1 || configJson != "{}") {
             throw CapabilityConfigInvalid()
         }
@@ -105,7 +107,7 @@ open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDec
             "SELECT config_version FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
             Int::class.java, module,
         ) ?: throw CapabilityConfigurationMissing()
-        val configPayload = if (module == BLACKSTORE_MODULE) {
+        val configPayload = if (module == BLACKSTORE_MODULE || module == "MANUAL_FULFILLMENT") {
             jdbc.queryForObject(
                 "SELECT config::text FROM module_configurations WHERE module_code=? AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'",
                 String::class.java,

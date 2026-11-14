@@ -1,16 +1,24 @@
+import { DeliveryMode, DeliveryQuote } from '../src/app/domain/cart/delivery';
 import { createHmac, randomUUID } from 'node:crypto';
 import { expect, test, type APIResponse, type Page } from '@playwright/test';
 import { mapAdminOrder } from '../src/app/data/mappers/http-mappers';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../src/app/domain/order/commerce-states';
 import { DamageReason, ReturnDispositionState } from '../src/app/domain/order/return-disposition';
 import { mapReturnDisposition } from '../src/app/data/order/return-disposition.mapper';
-import { AccessContext, RealmFixture, apiLogin, assertRealm, database, origin, password, uiLogin } from './support/fixtures';
+import { AccessContext, RealmFixture, apiLogin, assertRealm, chooseExisting, database, origin, password, uiLogin } from './support/fixtures';
 
 enum FixtureModule { Storefront = 'STOREFRONT', Catalog = 'CATALOG', Payments = 'PAYMENTS_MP', Fulfillment = 'MANUAL_FULFILLMENT', Profile = 'PROFILE_CONTENT' }
 enum FixtureCapabilityState { Active = 'ACTIVE' }
 enum FixtureLedgerEvent { RmaRestock = 'RMA_RESTOCK' }
 const cfeAdminEmail = 'cfe-user-admin@example.test';
 const rmaAdminEmail = 'cfe-rma-admin@example.test';
+const malformedStateAdminEmail = 'cfe-malformed-admin@example.test';
+const pickupAdminEmail = 'cfe-pickup-admin@example.test';
+
+interface CheckoutFixtureOptions {
+  readonly userEmail?: string;
+  readonly mode?: DeliveryMode;
+}
 
 async function mutate(page: Page, realm: RealmFixture, path: string, data: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<APIResponse> {
   const csrf = await page.request.get(`/api/v1/${realm.path}/auth/csrf`);
@@ -18,13 +26,15 @@ async function mutate(page: Page, realm: RealmFixture, path: string, data: unkno
   return page.request.fetch(path, { method, headers: { Origin: origin, 'X-CSRF-Token': csrf.headers()['x-csrf-token']! }, data });
 }
 
-async function checkout(page: Page, userEmail = cfeAdminEmail): Promise<string> {
+async function checkout(page: Page, options: CheckoutFixtureOptions = {}): Promise<string> {
+  const userEmail = options.userEmail ?? cfeAdminEmail;
+  const mode = options.mode ?? DeliveryMode.LocalDelivery;
   await apiLogin(page, userEmail);
   for (const module of Object.values(FixtureModule)) {
-    database(`SELECT capability_session_change_configuration(u.id,s.id,'${module}',m.config_version,'${FixtureCapabilityState.Active}','{}'::jsonb,'${randomUUID()}'::uuid,'CFE browser fixture')
+    database(`SELECT capability_session_change_configuration(u.id,s.id,'${module}',m.config_version,'${FixtureCapabilityState.Active}',m.config,'${randomUUID()}'::uuid,'CFE browser fixture')
       FROM users u JOIN identity_sessions s ON s.user_id=u.id AND s.subject_kind='USER' AND s.revoked_at IS NULL
       CROSS JOIN module_configurations m WHERE u.email='${userEmail}' AND m.module_code='${module}'
-        AND (m.state<>'${FixtureCapabilityState.Active}' OR m.config<>'{}'::jsonb)
+        AND (m.state<>'${FixtureCapabilityState.Active}' )
       ORDER BY s.issued_at DESC LIMIT 1;`);
   }
   const sku = `CFE-${randomUUID()}`;
@@ -38,19 +48,38 @@ async function checkout(page: Page, userEmail = cfeAdminEmail): Promise<string> 
     email: `cfe-${randomUUID()}@example.test`, password, firstName: 'CFE', lastName: 'Fixture',
   } });
   expect(registration.status()).toBe(201);
-  const address = await mutate(page, RealmFixture.Customer, '/api/v1/customer/me/addresses', {
-    street: 'Fixture', number: '1', city: 'Fixture', province: 'Fixture', postalCode: '1000', isDefault: true,
-  });
-  expect(address.status()).toBe(200);
-  const addressId = (await address.json()).data.id;
+  if (mode.requiresAddress) {
+    const address = await mutate(page, RealmFixture.Customer, '/api/v1/customer/me/addresses', {
+      street: 'Fixture', number: '1', city: 'Fixture', province: 'Fixture', postalCode: '1000', isDefault: true,
+    });
+    expect(address.status()).toBe(200);
+  }
   expect((await mutate(page, RealmFixture.Customer, '/api/v1/customer/cart/items', { sku, quantity: 2 }, 'PUT')).status()).toBe(200);
-  const result = await mutate(page, RealmFixture.Customer, '/api/v1/customer/checkout', { idempotencyKey: randomUUID(), addressId, currency: 'ARS' });
+  const cartResponse = await page.request.get('/api/v1/customer/cart');
+  const cart = (await cartResponse.json()).data;
+  const delivery = DeliveryQuote.listFromWire(cart.deliveryOptions).find(option => option.mode === mode);
+  expect(delivery?.known).toBe(true);
+  if (!delivery || delivery.cost === null) throw new Error(`Missing real delivery quote for ${mode.wire}`);
+  if (mode === DeliveryMode.LocalDelivery) expect(delivery.cost).toBeGreaterThan(0);
+  await chooseExisting(page, RealmFixture.Customer);
+  await page.goto('/checkout');
+  const selectedMode = page.getByRole('radio', { name: new RegExp(delivery.label) });
+  await expect(selectedMode).toBeVisible();
+  await selectedMode.check();
+  const expectedTotal = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(200 + delivery.cost);
+  await expect(page.locator('.sc-summary')).toContainText(expectedTotal);
+  const checkoutResponse = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === '/api/v1/customer/checkout');
+  await page.getByRole('button', { name: 'Pagar', exact: true }).click();
+  const result = await checkoutResponse;
   expect(result.status()).toBe(200);
   const receipt = (await result.json()).data;
   expect(OrderStatus.fromWire(receipt.orderStatus)).toBe(OrderStatus.PendingPayment);
   expect(PaymentStatus.fromWire(receipt.paymentStatus)).toBe(PaymentStatus.Pending);
   expect(String(receipt.orderId)).toMatch(/^\d+$/);
-  await page.goto('/login');
+  await expect(page).toHaveURL(new RegExp(`/checkout/result/${receipt.orderId}$`));
+  expect(database(`SELECT count(*) FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=${receipt.orderId} AND o.shipping_cost=${delivery.cost.toFixed(2)} AND o.total=o.subtotal+o.shipping_cost AND p.amount=o.total;`)).toBe('1');
+  await page.evaluate(() => localStorage.removeItem('storecore.active-context'));
+  await page.reload();
   await expect(page.getByRole('button', { name: AccessContext.User.label, exact: true })).toBeVisible();
   await page.getByRole('button', { name: AccessContext.User.label, exact: true }).click();
   await expect(page).toHaveURL(/\/user\/home$/);
@@ -146,6 +175,29 @@ test('CFE E03/E09: signed provider observation reaches real worker and ordered b
   expect(footprint(id)).toBe(before);
 });
 
+test('delivery decision: real pickup needs no address, records history, completes collection and enables RMA', async ({ page }) => {
+  test.setTimeout(90_000);
+  const id = await checkout(page, { userEmail: pickupAdminEmail, mode: DeliveryMode.Pickup });
+  expect(database(`SELECT count(*) FROM customer_addresses a JOIN orders o ON o.customer_id=a.customer_id WHERE o.id=${id};`)).toBe('0');
+  expect(database(`SELECT count(*) FROM orders WHERE id=${id} AND shipping_cost=0 AND checkout_snapshot->'delivery'->>'mode'='${DeliveryMode.Pickup.wire}';`)).toBe('1');
+  await paid(page, id);
+  await advance(page, id, ShipmentTransition.Packed, ShipmentStatus.Preparing);
+  await advance(page, id, ShipmentTransition.ReadyForPickup, ShipmentStatus.ReadyForPickup);
+  await advance(page, id, ShipmentTransition.PickedUp, ShipmentStatus.PickedUp);
+  await page.goto(`/user/orders/${id}`);
+  await expect(page.getByRole('heading', { name: `Fulfillment ${id}`, exact: true })).toBeVisible();
+  await expect(page.getByText('Retiro fixture', { exact: true })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Listo para retirar' })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'Retiro confirmado' })).toBeVisible();
+  const rma = page.getByRole('button', { name: RmaTransition.Received.label, exact: true });
+  await expect(rma).toBeVisible();
+  const response = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === `/api/v1/user/orders/${id}/rma`);
+  await rma.click();
+  expect((await response).status()).toBe(200);
+  await expect(page.getByText(`rma ${RmaStatus.ReturnReceived.label}`, { exact: true })).toBeVisible();
+  expect((await read(page, id)).rmaStatus).toBe(RmaStatus.ReturnReceived);
+});
+
 test('CFE E07: reception is durable once and deferred inspection never changes stock', async ({ page }) => {
   const id = await checkout(page);
   await delivered(page, id);
@@ -166,7 +218,7 @@ test('CFE E07: reception is durable once and deferred inspection never changes s
 
 test('RMA: real mixed inspection commits once and a lost response recovers through GET and reload', async ({ page }) => {
   test.setTimeout(90_000);
-  const id = await checkout(page, rmaAdminEmail);
+  const id = await checkout(page, { userEmail: rmaAdminEmail });
   await delivered(page, id);
   const row = await open(page, id);
   const reception = page.waitForResponse(candidate => candidate.request().method() === 'POST' && new URL(candidate.url()).pathname === `/api/v1/user/orders/${id}/rma`);
@@ -251,7 +303,7 @@ test('CFE E06/E08: committed response loss recovers by authoritative GET and ses
 });
 
 test('CFE E02/E07 MockHttp only: malformed future states render Unknown safely without commands', async ({ page }) => {
-  await uiLogin(page, cfeAdminEmail);
+  await uiLogin(page, malformedStateAdminEmail);
   const raw = 'UNRECOGNIZED_FUTURE_STATE';
   await page.route((url) => url.pathname === '/api/v1/user/orders', (route) => route.fulfill({ json: { code: 200, data: { items: [{
     id: 'unknown-fixture', orderStatus: raw, paymentStatus: raw, shipmentStatus: raw, rmaStatus: raw,

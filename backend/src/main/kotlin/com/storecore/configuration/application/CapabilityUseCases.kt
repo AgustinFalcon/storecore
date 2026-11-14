@@ -19,3 +19,7 @@ interface CapabilityAdministrationPort {
     fun removeKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, reason: String, correlation: UUID)
     fun replaceKill(actor: InternalUserPrincipal, module: InstallationCapabilityModule, expectedActiveId: Long, owner: String, reason: String, expiresAt: Instant, ticket: String, correlation: UUID): Long
 }
+
+interface ManualFulfillmentPolicyAdministrationPort {
+    fun configure(actor:InternalUserPrincipal,expected:Int,reason:String,correlation:UUID,config:Map<String,Any?>):Int
+}

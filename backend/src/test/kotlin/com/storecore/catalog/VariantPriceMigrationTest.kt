@@ -18,7 +18,7 @@ class VariantPriceMigrationTest {
             val history=jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
             jdbc.update("INSERT INTO products(name,slug,base_price,status) VALUES ('Legacy','legacy-price',100,'ACTIVE')")
             jdbc.update("INSERT INTO product_variants(product_id,sku,label) SELECT id,'legacy-price','Legacy' FROM products WHERE slug='legacy-price'")
-            assertEquals("21",flyway().migrate().targetSchemaVersion.toString())
+            assertEquals("22",flyway().migrate().targetSchemaVersion.toString())
             assertEquals(history,jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=20 ORDER BY installed_rank"))
             assertNull(jdbc.queryForObject("SELECT base_price_override FROM product_variants WHERE sku='legacy-price'",java.math.BigDecimal::class.java))
             jdbc.update("UPDATE product_variants SET base_price_override=0 WHERE sku='legacy-price'")

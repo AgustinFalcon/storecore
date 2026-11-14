@@ -11,7 +11,7 @@ enum class PaymentStatus {
 }
 
 enum class ShipmentStatus {
-    NOT_CREATED, PENDING, PREPARING, SHIPPED, DELIVERED, CANCELLED, UNKNOWN;
+    NOT_CREATED, PENDING, PREPARING, SHIPPED, DELIVERED, READY_FOR_PICKUP, PICKED_UP, CANCELLED, UNKNOWN;
     companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value && it != NOT_CREATED } ?: UNKNOWN }
 }
 
@@ -26,7 +26,7 @@ enum class InspectionOutcome {
 }
 
 enum class ShipmentCommand {
-    PACKED, SHIPPED, DELIVERED, UNKNOWN;
+    PACKED, SHIPPED, DELIVERED, READY_FOR_PICKUP, PICKED_UP, UNKNOWN;
     companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value } ?: UNKNOWN }
 }
 

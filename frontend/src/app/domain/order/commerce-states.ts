@@ -38,10 +38,12 @@ export class ShipmentStatus {
   static readonly Pending = new ShipmentStatus('PENDING', 'Pendiente');
   static readonly Preparing = new ShipmentStatus('PREPARING', 'Preparando');
   static readonly Shipped = new ShipmentStatus('SHIPPED', 'Enviado');
+  static readonly ReadyForPickup = new ShipmentStatus('READY_FOR_PICKUP', 'Listo para retirar');
+  static readonly PickedUp = new ShipmentStatus('PICKED_UP', 'Retirado');
   static readonly Delivered = new ShipmentStatus('DELIVERED', 'Entregado');
   static readonly Cancelled = new ShipmentStatus('CANCELLED', 'Cancelado');
   static readonly Unknown = new ShipmentStatus('UNKNOWN', 'Estado desconocido');
-  private static readonly cases = [ShipmentStatus.NotCreated, ShipmentStatus.Pending, ShipmentStatus.Preparing, ShipmentStatus.Shipped, ShipmentStatus.Delivered, ShipmentStatus.Cancelled, ShipmentStatus.Unknown];
+  private static readonly cases = [ShipmentStatus.NotCreated, ShipmentStatus.Pending, ShipmentStatus.Preparing, ShipmentStatus.Shipped, ShipmentStatus.Delivered, ShipmentStatus.ReadyForPickup, ShipmentStatus.PickedUp, ShipmentStatus.Cancelled, ShipmentStatus.Unknown];
   static fromWire(value: unknown): ShipmentStatus {
     return ShipmentStatus.cases.find((state) => state.wire === value) ?? ShipmentStatus.Unknown;
   }
@@ -70,9 +72,11 @@ export class ShipmentTransition {
   get requiresTracking(): boolean { return this === ShipmentTransition.Shipped; }
   static readonly Packed = new ShipmentTransition('PACKED', 'Empacar');
   static readonly Shipped = new ShipmentTransition('SHIPPED', 'Enviar');
+  static readonly ReadyForPickup = new ShipmentTransition('READY_FOR_PICKUP', 'Marcar listo para retirar');
+  static readonly PickedUp = new ShipmentTransition('PICKED_UP', 'Confirmar retiro');
   static readonly Delivered = new ShipmentTransition('DELIVERED', 'Entregar');
   static readonly Unknown = new ShipmentTransition('UNKNOWN', 'Estado desconocido');
-  private static readonly cases = [ShipmentTransition.Packed, ShipmentTransition.Shipped, ShipmentTransition.Delivered, ShipmentTransition.Unknown];
+  private static readonly cases = [ShipmentTransition.Packed, ShipmentTransition.Shipped, ShipmentTransition.Delivered, ShipmentTransition.ReadyForPickup, ShipmentTransition.PickedUp, ShipmentTransition.Unknown];
   static fromWire(value: unknown): ShipmentTransition {
     return ShipmentTransition.cases.find((state) => state.wire === value) ?? ShipmentTransition.Unknown;
   }
@@ -92,6 +96,7 @@ export class RmaTransition {
 }
 
 export class FulfillmentEligibility {
+  static readonly DeliveryUnverified = new FulfillmentEligibility('DELIVERY_UNVERIFIED', 'Entrega sin evidencia verificable');
   private readonly nominal!: 'FulfillmentEligibility';
   private constructor(readonly wire: string, readonly label: string) {}
   static readonly Eligible = new FulfillmentEligibility('ELIGIBLE', 'Habilitado');
@@ -105,7 +110,7 @@ export class FulfillmentEligibility {
     if ([PaymentStatus.Refunded, PaymentStatus.ChargedBack, PaymentStatus.Cancelled].includes(payment)) return FulfillmentEligibility.ReversalOrIncident;
     return payment === PaymentStatus.Approved ? this : FulfillmentEligibility.PaymentNotVerified;
   }
-  private static readonly cases = [FulfillmentEligibility.Eligible, FulfillmentEligibility.OrderNotPaid, FulfillmentEligibility.PaymentNotVerified, FulfillmentEligibility.ReversalOrIncident, FulfillmentEligibility.StockNotVerified, FulfillmentEligibility.Unknown];
+  private static readonly cases = [FulfillmentEligibility.DeliveryUnverified, FulfillmentEligibility.Eligible, FulfillmentEligibility.OrderNotPaid, FulfillmentEligibility.PaymentNotVerified, FulfillmentEligibility.ReversalOrIncident, FulfillmentEligibility.StockNotVerified, FulfillmentEligibility.Unknown];
   static fromWire(value: unknown): FulfillmentEligibility {
     return FulfillmentEligibility.cases.find((state) => state.wire === value) ?? FulfillmentEligibility.Unknown;
   }

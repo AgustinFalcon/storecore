@@ -13,7 +13,7 @@ describe('FulfillmentStore authoritative reload', () => {
   it('reloads after ambiguous transport failure and serializes in-flight mutations', async () => {
     const injector = createEnvironmentInjector([], null as unknown as EnvironmentInjector);
     const response = new Subject<AdminOrder>();
-    const authoritative = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PREPARING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'SHIPPED' });
+    const authoritative = mapAdminOrder({ deliveryDecision:{state:'LEGACY_MISSING_BLOCK',value:null}, id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PREPARING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'SHIPPED' });
     const read = vi.fn(() => of({ items: [authoritative], page: 0, size: 25, total: 1, truncated: false }));
     const send = vi.fn(() => response);
     const store = runInInjectionContext(injector, () => new FulfillmentStore({ execute: read } as unknown as ListAdminOrdersUseCase, { ship: send } as unknown as AdvanceFulfillmentUseCase));
@@ -30,7 +30,7 @@ describe('FulfillmentStore authoritative reload', () => {
   });
   it('invalidates an actionable prior snapshot until an authoritative GET succeeds', async () => {
     const injector = createEnvironmentInjector([], null as unknown as EnvironmentInjector);
-    const stale = mapAdminOrder({ id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PENDING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'PACKED' });
+    const stale = mapAdminOrder({ deliveryDecision:{state:'LEGACY_MISSING_BLOCK',value:null}, id: '1', orderStatus: 'PAID', paymentStatus: 'APPROVED', payment: { state: 'KNOWN', value: 'APPROVED', reason: null }, shipmentStatus: 'PENDING', rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: 'PACKED' });
     const authoritative = { ...stale, shipmentStatus: ShipmentStatus.Preparing, shipmentAction: ShipmentTransition.Shipped };
     const failedReload = new Subject<unknown>();
     const retryReload = new Subject<unknown>();

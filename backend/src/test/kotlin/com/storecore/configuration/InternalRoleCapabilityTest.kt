@@ -33,10 +33,10 @@ class InternalRoleCapabilityTest {
         val jdbc = mock(JdbcTemplate::class.java) { invocation ->
             val sql = invocation.arguments.firstOrNull() as? String ?: ""
             when (invocation.method.name) {
-                "queryForObject" -> """{"state":"ACTIVE","actionKind":"$kind","switches":[]}"""
+                "queryForObject" -> if(sql.contains("manual_fulfillment_schema_v2_valid")) true else """{"state":"ACTIVE","actionKind":"$kind","switches":[]}"""
                 "queryForList" -> when {
                     sql.contains("capability_kill_switches") -> emptyList<Map<String, Any>>()
-                    sql.contains("module_configurations") -> listOf(mapOf("state" to "ACTIVE", "config" to "{}", "config_schema_version" to 1))
+                    sql.contains("module_configurations") -> if(invocation.arguments.any { it=="MANUAL_FULFILLMENT" }) listOf(mapOf("state" to "ACTIVE","config" to "{\"pickup\":{\"enabled\":false},\"localDelivery\":{\"enabled\":false}}","config_schema_version" to 2)) else listOf(mapOf("state" to "ACTIVE", "config" to "{}", "config_schema_version" to 1))
                     sql.contains("capability_actions") -> listOf(mapOf("action_kind" to kind))
                     else -> error("Unexpected query: $sql")
                 }

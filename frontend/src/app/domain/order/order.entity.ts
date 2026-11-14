@@ -1,9 +1,11 @@
 import { OrderStatus, PaymentStatus, ShipmentStatus, RmaStatus, FulfillmentEligibility, ShipmentTransition, RmaTransition } from './commerce-states';
 import { DeliverySnapshot, OrderFact, OrderTimelineEvent } from './order-projection';
 import { ReturnEligibility } from './return-eligibility';
+import type { DeliveryDecision } from '../cart/delivery';
 export { ShipmentTransition, RmaTransition } from './commerce-states';
 
 export interface CustomerOrder {
+  readonly deliveryDecision?: DeliveryDecision;
   readonly orderNumber: string | null;
   readonly createdAt: string | null;
   readonly updatedAt: string | null;

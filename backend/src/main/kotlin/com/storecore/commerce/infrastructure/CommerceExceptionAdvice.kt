@@ -1,6 +1,7 @@
 package com.storecore.commerce.infrastructure
 
 import com.storecore.commerce.application.CheckoutConflict
+import com.storecore.commerce.application.CheckoutContextChanged
 import com.storecore.commerce.application.BuyerIdentityUnavailable
 import com.storecore.commerce.application.CommerceException
 import com.storecore.commerce.application.CommerceValidation
@@ -40,7 +41,7 @@ class CommerceExceptionAdvice {
             .header("Retry-After", exception.retryAfterSeconds.toString())
             .body(BaseResponse<Nothing>(429, null, "Request rejected", "WEBHOOK_RATE_LIMITED", true, null))
 
-    @ExceptionHandler(CheckoutConflict::class, BuyerIdentityUnavailable::class, PromoWindowOverlap::class, MercadoLibreAccountMissing::class)
+    @ExceptionHandler(CheckoutConflict::class, CheckoutContextChanged::class, BuyerIdentityUnavailable::class, PromoWindowOverlap::class, MercadoLibreAccountMissing::class)
     fun conflict(exception: CommerceException) = error(HttpStatus.CONFLICT, exception.message ?: "CONFLICT", exception.retryable)
 
     @ExceptionHandler(CommerceValidation::class, ProfileRejected::class, InsufficientInventory::class, FulfillmentRejected::class, WebhookPayloadTooLarge::class)

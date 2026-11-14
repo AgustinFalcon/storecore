@@ -6,7 +6,7 @@ import { CustomerAddressesViewComponent } from './customer-addresses.view';
 import { CustomerState } from './customer.store';
 import { CustomerRegistrationStage } from './customer-registration-steps';
 
-const address = { id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
+const address = { revision: '2026-11-14T00:00:00Z', id: 'a', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
 const readyState: CustomerState = {
   loading: false, errorMessage: '', authenticated: true, email: '', firstName: '', lastName: '', password: '',
   profile: { email: '', firstName: '', lastName: '', phone: '' }, saved: false, profileRevision: 0,

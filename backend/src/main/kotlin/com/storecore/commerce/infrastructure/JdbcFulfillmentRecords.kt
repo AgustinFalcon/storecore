@@ -25,7 +25,7 @@ class JdbcFulfillmentRecords(private val jdbc: JdbcTemplate) : FulfillmentRecord
         val id = shipment?.id ?: jdbc.queryForObject("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING') RETURNING id", Long::class.java, orderId)!!
         val now = Timestamp.from(Instant.now())
         val shippedAt = if (step.target == ShipmentStatus.SHIPPED) now else shipment?.shippedAt
-        val deliveredAt = if (step.target == ShipmentStatus.DELIVERED) now else null
+        val deliveredAt = if (step.target == ShipmentStatus.DELIVERED || step.target == ShipmentStatus.PICKED_UP) now else null
         jdbc.update("UPDATE shipments SET status=?,tracking_code=?,shipped_at=?,delivered_at=?,updated_at=now() WHERE id=?", step.target.name, tracking ?: shipment?.tracking, shippedAt, deliveredAt, id)
         jdbc.update("INSERT INTO fulfillment_events(shipment_id,event_type,actor,details) VALUES (?,?,?, '{}'::jsonb)", id, step.target.name, "USER:$actorId")
     }

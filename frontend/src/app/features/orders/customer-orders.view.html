@@ -20,7 +20,7 @@
             <a [routerLink]="['/customer/orders', order.id]">{{ order.id }}</a>
             <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
             <span class="sc-badge sc-badge--info">pago {{ order.payment.value?.label ?? order.payment.state.label }}</span>
-            <span class="sc-badge sc-badge--warn">envío {{ order.shipmentStatus.label }}</span>
+            <span class="sc-badge sc-badge--warn">entrega {{ order.shipmentStatus.label }}</span>
           </p>
           <p>{{ order.orderNumber ?? 'Número no disponible' }} · {{ order.createdAt ?? 'Fecha no disponible' }}</p>
           <p class="sc-price"><span class="sc-price__kind">Total {{ order.currency ?? 'Moneda no disponible' }}</span>{{ order.total }}</p>

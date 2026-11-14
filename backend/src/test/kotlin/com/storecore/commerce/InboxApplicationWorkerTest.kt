@@ -146,7 +146,7 @@ class InboxApplicationWorkerTest(
         if (state == "ACTIVE") return
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
         val actorId = adminUserId()
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module), UUID.randomUUID(), "test")
     }
 
     private fun adminSessionId(actorId: Long): UUID = jdbc.queryForObject(

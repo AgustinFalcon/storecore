@@ -1,12 +1,22 @@
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from './commerce-states';
 import { AdminOrder } from './order.entity';
 import { OrderFactState } from './order-projection';
+import { DeliveryMode } from '../cart/delivery';
 
-export function nextShipment(status: ShipmentStatus): ShipmentTransition | null {
-  if (status === ShipmentStatus.NotCreated || status === ShipmentStatus.Pending) return ShipmentTransition.Packed;
-  if (status === ShipmentStatus.Preparing) return ShipmentTransition.Shipped;
-  if (status === ShipmentStatus.Shipped) return ShipmentTransition.Delivered;
-  return null;
+class ShipmentStep {
+  constructor(readonly from: readonly ShipmentStatus[], readonly command: ShipmentTransition) {}
+  accepts(status: ShipmentStatus): boolean { return this.from.includes(status); }
+}
+const prepare = new ShipmentStep([ShipmentStatus.NotCreated, ShipmentStatus.Pending], ShipmentTransition.Packed);
+const send = new ShipmentStep([ShipmentStatus.Preparing], ShipmentTransition.Shipped);
+const deliver = new ShipmentStep([ShipmentStatus.Shipped], ShipmentTransition.Delivered);
+const ready = new ShipmentStep([ShipmentStatus.Preparing], ShipmentTransition.ReadyForPickup);
+const collect = new ShipmentStep([ShipmentStatus.ReadyForPickup], ShipmentTransition.PickedUp);
+const deliveryJourney = [prepare, send, deliver];
+const pickupJourney = [prepare, ready, collect];
+export function nextShipment(status: ShipmentStatus, mode = DeliveryMode.LocalDelivery): ShipmentTransition | null {
+  if (!mode.known) return null;
+  return (mode === DeliveryMode.Pickup ? pickupJourney : deliveryJourney).find(step => step.accepts(status))?.command ?? null;
 }
 
 export function nextRma(status: RmaStatus): RmaTransition | null {
@@ -18,12 +28,16 @@ function eligible(order: AdminOrder): boolean {
 }
 
 export function allowedShipment(order: AdminOrder): ShipmentTransition | null {
-  const next = nextShipment(order.shipmentStatus);
+  const decision = order.deliveryDecision;
+  if (!decision?.canFulfill) return null;
+  const next = nextShipment(order.shipmentStatus, decision.state.permitsLegacy ? DeliveryMode.LocalDelivery : decision.quote.mode);
   return eligible(order) && next !== null && order.shipmentAction === next ? next : null;
 }
 
 export function allowedRma(order: AdminOrder): RmaTransition | null {
-  return eligible(order) && order.shipmentStatus === ShipmentStatus.Delivered && order.rmaAction === RmaTransition.Received ? nextRma(order.rmaStatus) : null;
+  const decision = order.deliveryDecision;
+  const final = decision?.quote.isPickup ? order.shipmentStatus === ShipmentStatus.PickedUp : order.shipmentStatus === ShipmentStatus.Delivered;
+  return !!decision?.canFulfill && eligible(order) && final && order.rmaAction === RmaTransition.Received ? nextRma(order.rmaStatus) : null;
 }
 
 export function shipmentLabel(status: ShipmentTransition): string { return status.label; }

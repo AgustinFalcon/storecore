@@ -14,6 +14,7 @@ export interface CustomerProfile {
 }
 
 export interface CustomerAddress {
+  readonly revision?: string | null;
   readonly id: string;
   readonly street: string;
   readonly number: string;

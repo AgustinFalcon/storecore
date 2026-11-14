@@ -79,7 +79,7 @@ class IdentityController(
 
     @GetMapping("/customer/me/addresses")
     fun addresses(http: HttpServletRequest): ResponseEntity<BaseResponse<List<AddressView>>> = cachedOk(
-        identity.customerAddresses(auth.customer(http)).map { AddressView(it.id, it.street, it.number, it.city, it.province, it.postalCode, it.isDefault) },
+        identity.customerAddresses(auth.customer(http)).map { AddressView(it.id, it.street, it.number, it.city, it.province, it.postalCode, it.isDefault, it.revision) },
     )
 
     @PostMapping("/customer/me/addresses")
@@ -88,7 +88,7 @@ class IdentityController(
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.addCustomerAddress(principal, request.street, request.number, request.city, request.province, request.postalCode, request.isDefault) }
         val address = mutation.value
-        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault, address.revision)))
     }
 
     @PutMapping("/customer/me/addresses/{addressId}")
@@ -97,7 +97,7 @@ class IdentityController(
         val principal = auth.customer(http)
         val mutation = mutations.execute(principal, csrf) { identity.updateCustomerAddress(principal, addressId, request.street, request.number, request.city, request.province, request.postalCode, request.isDefault) }
         val address = mutation.value
-        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault)))
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).header(CSRF_HEADER, mutation.nextCsrf).body(BaseResponse.ok(AddressView(address.id, address.street, address.number, address.city, address.province, address.postalCode, address.isDefault, address.revision)))
     }
 
     @DeleteMapping("/customer/me/addresses/{addressId}")
@@ -157,4 +157,4 @@ sealed interface PrincipalView
 data class CustomerView(val id: Long, val email: String?, val firstName: String?, val lastName: String?) : PrincipalView { constructor(principal: CustomerPrincipal, email: String?, firstName: String?, lastName: String?) : this(principal.customerId, email, firstName, lastName) }
 data class InternalView(val id: Long, val roles: List<String>) : PrincipalView
 data class CustomerProfileView(val id: Long, val email: String, val firstName: String, val lastName: String, val phone: String?)
-data class AddressView(val id: Long, val street: String, val number: String, val city: String, val province: String, val postalCode: String, val isDefault: Boolean)
+data class AddressView(val id: Long, val street: String, val number: String, val city: String, val province: String, val postalCode: String, val isDefault: Boolean, val revision: java.time.Instant?)

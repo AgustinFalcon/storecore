@@ -83,14 +83,14 @@ test('empty checkout resolves an address and returns with a confirmed selection'
       return route.fulfill({ json: envelope({}), headers: { 'X-CSRF-Token': 'test-csrf' } });
     }
     if (path.endsWith('/customer/cart')) {
-      return route.fulfill({ json: envelope({ currency: 'ARS', lines: [{ sku: 'SKU-1', name: 'Taladro', quantity: 1, effectiveUnitPrice: 1000, originalUnitPrice: 1000, discountAmount: 0, offerRef: null, campaignRef: null }] }) });
+      return route.fulfill({ json: envelope({ revision:'a'.repeat(64), deliveryOptions:[{mode:'LOCAL_DELIVERY',label:'Entrega local',cost:0,currency:'ARS',minDays:1,maxDays:2,requiresAddress:true,configurationVersion:2,destination:null,instructions:null}], currency: 'ARS', lines: [{ sku: 'SKU-1', name: 'Taladro', quantity: 1, effectiveUnitPrice: 1000, originalUnitPrice: 1000, discountAmount: 0, offerRef: null, campaignRef: null }] }) });
     }
     if (path.endsWith('/customer/me/addresses') && request.method() === 'GET') {
       return route.fulfill({ json: envelope(addresses) });
     }
     if (path.endsWith('/customer/me/addresses') && request.method() === 'POST') {
       const payload = request.postDataJSON() as Record<string, unknown>;
-      const saved = { ...payload, id: 'address-1' };
+      const saved = { ...payload, id: 'address-1', revision: '2026-11-14T00:00:00Z' };
       addresses = [saved];
       return route.fulfill({ json: envelope(saved) });
     }
@@ -98,6 +98,7 @@ test('empty checkout resolves an address and returns with a confirmed selection'
   });
 
   await page.goto('/checkout');
+  await page.getByRole('radio', {name:/Entrega local/}).check();
   const addAddress = page.getByRole('link', { name: 'Agregar dirección' });
   await expect(addAddress).toBeVisible();
   await addAddress.focus();

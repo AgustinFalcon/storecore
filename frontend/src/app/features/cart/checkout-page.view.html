@@ -2,7 +2,7 @@
   <header class="sc-page-head">
     <p class="sc-kicker">Compra</p>
     <h1 id="checkout-title">Checkout</h1>
-    <p class="sc-page__lede">Revisá tus productos y elegí una dirección para continuar al pago.</p>
+    <p class="sc-page__lede">Elegí cómo recibir tu compra y revisá el total antes de pagar.</p>
   </header>
   @if (!access.canMutate) {
     <p>{{ access.label }}</p>
@@ -13,7 +13,7 @@
     }
   }
   <sc-feature-status [loading]="state.loading" [error]="readError" (retry)="readRetry.emit()" />
-  <sc-feature-status [loading]="state.addressReadState === AddressState.Loading" [error]="state.addressErrorMessage" (retry)="readRetry.emit()" />
+
   @if (state.checkoutAttemptState.inFlight) {
     <p role="status">{{ state.checkoutAttemptState.label }}</p>
   }
@@ -25,7 +25,25 @@
   }
   <div class="sc-checkout__layout">
     <form class="sc-panel" (submit)="$event.preventDefault(); canPay && pay.emit()">
-      <h2>Entrega</h2>
+      <h2>Cómo recibir tu compra</h2>
+      <fieldset class="delivery-options" [disabled]="!access.canMutate || state.loading || state.checkoutAttemptState.inFlight">
+        <legend>Modalidad de entrega</legend>
+        @for (option of options; track option.mode.wire) {
+          <label class="delivery-option">
+            <input type="radio" name="deliveryMode" [value]="option.mode.wire" [checked]="quote.same(option)" (change)="deliveryChange.emit(option.mode)" />
+            <span><strong>{{ option.label }} · {{ amount(option.cost!) }}</strong><small>{{ option.eta }}</small>
+              @if (option.destination) { <span class="delivery-detail">{{ option.destination }}</span> }
+              @if (option.instructions) { <small class="delivery-detail">{{ option.instructions }}</small> }
+            </span>
+          </label>
+        }
+      </fieldset>
+      @if (!state.loading && !options.length) {
+        <p class="sc-callout" role="status">No hay opciones de entrega disponibles para esta compra.</p>
+        <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.checkoutAttemptState.inFlight" (click)="readRetry.emit()">Actualizar opciones</button>
+      }
+      @if (quote.requiresAddress) {
+      <sc-feature-status [loading]="state.addressReadState === AddressState.Loading" [error]="state.addressErrorMessage" (retry)="readRetry.emit()" />
       <label>Dirección
         <select required name="addressId" [attr.disabled]="!access.canMutate || !state.addressReadState.usable || state.checkoutAttemptState === AttemptState.Pending ? '' : null" [ngModel]="state.addressId" (ngModelChange)="addressChange.emit($event)">
           <option value="">Elegí una dirección</option>
@@ -38,11 +56,12 @@
         <p role="status">{{ state.addressReadState.label }}</p>
         <a class="sc-btn sc-btn--ghost" routerLink="/customer/addresses" [queryParams]="{ returnTo: checkoutReturn.wire }">Agregar dirección</a>
       }
+      }
       <h2>Cobro</h2>
       <p><strong>Moneda</strong><br>{{ state.cart.currency.label }}</p>
       <p class="sc-callout sc-callout--info">Al continuar vas a revisar el pago de tu pedido. Si necesitás reintentar, conservamos el mismo intento de compra.</p>
       @if (state.failureKind === FailureKind.None && state.checkoutAttemptState === AttemptState.Idle) {
-        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay" [attr.title]="canPay ? null : 'Falta dirección, la moneda no está disponible o el carrito está vacío'">Pagar</button>
+        <button type="submit" class="sc-btn sc-btn--primary sc-btn--block" [disabled]="!canPay" [attr.title]="canPay ? null : 'Elegí una entrega válida, revisá su dirección y verificá el carrito y la moneda'">Pagar</button>
       }
       @if (state.checkoutAttemptState.paymentRetry) {
         <button type="button" class="sc-btn sc-btn--ghost sc-btn--block" [disabled]="!canRetryCheckout" (click)="canRetryCheckout && paymentRetry.emit()">{{ state.checkoutAttemptState.label }}</button>
@@ -57,14 +76,27 @@
     <aside class="sc-summary">
       <h2>Pedido</h2>
       <ul class="sc-summary__lines">
-        @for (line of state.cart.lines; track line.sku) {
+        @for (line of summaryLines; track line.sku) {
           <li>
             <span>{{ line.name }} × {{ line.quantity }}</span>
             <strong class="sc-price">{{ amount(line.effectiveUnitPrice * line.quantity) }}</strong>
           </li>
         }
       </ul>
-      <p class="sc-summary__total"><strong>Total de mercadería: {{ amount(merchandiseTotal) }}</strong></p><p>Entrega: costo no disponible en este paso. No está incluido en el total de mercadería.</p>
+      <dl aria-live="polite" aria-atomic="true">
+        <div><dt>Mercadería</dt><dd>{{ amount(merchandiseTotal) }}</dd></div>
+        <div><dt>Entrega</dt><dd>{{ quote.known ? amount(quote.cost!) : 'Elegí una modalidad' }}</dd></div>
+        <div class="sc-summary__total"><dt><strong>Total final</strong></dt><dd><strong>{{ finalTotal === null ? 'No disponible' : amount(finalTotal) }}</strong></dd></div>
+      </dl>
+      @if (quote.known) {
+        <p><strong>{{ quote.label }}</strong><br>{{ quote.eta }}</p>
+        @if (quote.destination) { <p class="delivery-detail">{{ quote.destination }}</p> }
+        @if (quote.instructions) { <p class="delivery-detail">{{ quote.instructions }}</p> }
+      }
+      @if (state.attemptCommand && state.checkoutAttemptState.paymentRetry) {
+        <p class="sc-callout">El reintento conserva la entrega y el total del mismo intento de compra.</p>
+        @if (state.attemptAddress; as address) { <p>{{ address.street }} {{ address.number }} · {{ address.city }}</p> }
+      }
       @if (state.receipt) {
         <p>
           Orden {{ state.receipt.orderId }}

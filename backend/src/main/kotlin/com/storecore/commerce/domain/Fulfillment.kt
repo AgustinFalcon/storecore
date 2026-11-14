@@ -2,7 +2,7 @@ package com.storecore.commerce.domain
 
 import java.math.BigDecimal
 
-enum class FulfillmentEligibility { ELIGIBLE, ORDER_NOT_PAID, PAYMENT_NOT_VERIFIED, REVERSAL_OR_INCIDENT, STOCK_NOT_VERIFIED;
+enum class FulfillmentEligibility { ELIGIBLE, DELIVERY_UNVERIFIED, ORDER_NOT_PAID, PAYMENT_NOT_VERIFIED, REVERSAL_OR_INCIDENT, STOCK_NOT_VERIFIED;
     fun withPayment(payment: OrderFact<PaymentStatus>): FulfillmentEligibility = when {
         this == ORDER_NOT_PAID || this == REVERSAL_OR_INCIDENT -> this
         payment.state != OrderFactState.KNOWN -> PAYMENT_NOT_VERIFIED
@@ -14,10 +14,11 @@ enum class FulfillmentEligibility { ELIGIBLE, ORDER_NOT_PAID, PAYMENT_NOT_VERIFI
 data class SoldItem(val variantId: Long, val quantity: Int)
 data class StockConsumption(val reservationId: Long?, val variantId: Long, val quantity: Int, val consumedVariantId: Long?, val consumedQuantity: Int?, val reservationConsumed: Boolean, val saleCount: Int)
 data class PaymentAccreditation(val paymentStatus: PaymentStatus, val sameOrder: Boolean, val sameProvider: Boolean, val attemptAccredited: Boolean, val paymentAmount: BigDecimal, val attemptAmount: BigDecimal, val confirmedAmount: BigDecimal, val paymentCurrency: String, val attemptCurrency: String, val confirmedCurrency: String)
-data class FulfillmentSnapshot(val orderStatus: OrderStatus, val total: BigDecimal, val currency: String, val accreditations: List<PaymentAccreditation>, val blockedByReview: Boolean, val items: List<SoldItem>, val consumptions: List<StockConsumption>, val contradictoryPayment: Boolean = false)
+data class FulfillmentSnapshot(val orderStatus: OrderStatus, val total: BigDecimal, val currency: String, val accreditations: List<PaymentAccreditation>, val blockedByReview: Boolean, val items: List<SoldItem>, val consumptions: List<StockConsumption>, val contradictoryPayment: Boolean = false, val deliveryDecision:DeliveryDecision = DeliveryDecision.Legacy)
 
 object FulfillmentPolicy {
     fun evaluate(snapshot: FulfillmentSnapshot): FulfillmentEligibility {
+        if(!snapshot.deliveryDecision.allowsFulfillment()) return FulfillmentEligibility.DELIVERY_UNVERIFIED
         if (snapshot.orderStatus != OrderStatus.PAID) return FulfillmentEligibility.ORDER_NOT_PAID
         val payment = snapshot.accreditations.singleOrNull() ?: return FulfillmentEligibility.PAYMENT_NOT_VERIFIED
         if (payment.paymentStatus != PaymentStatus.APPROVED || !payment.sameOrder || !payment.sameProvider || !payment.attemptAccredited ||
@@ -38,5 +39,30 @@ interface ShipmentStep { val command: ShipmentCommand; val target: ShipmentStatu
 object PackShipment : ShipmentStep { override val command = ShipmentCommand.PACKED; override val target = ShipmentStatus.PREPARING; override fun accepts(current: ShipmentStatus) = current == ShipmentStatus.NOT_CREATED || current == ShipmentStatus.PENDING }
 object ShipShipment : ShipmentStep { override val command = ShipmentCommand.SHIPPED; override val target = ShipmentStatus.SHIPPED; override fun accepts(current: ShipmentStatus) = current == ShipmentStatus.PREPARING }
 object DeliverShipment : ShipmentStep { override val command = ShipmentCommand.DELIVERED; override val target = ShipmentStatus.DELIVERED; override fun accepts(current: ShipmentStatus) = current == ShipmentStatus.SHIPPED }
-object ShipmentJourney { private val steps = listOf(PackShipment, ShipShipment, DeliverShipment); fun next(current: ShipmentStatus) = steps.singleOrNull { it.accepts(current) }; fun transition(current: ShipmentStatus, command: ShipmentCommand) = steps.singleOrNull { it.command == command && it.accepts(current) } }
-object ReceiveReturn { fun accepts(shipment: ShipmentStatus, rma: RmaStatus, command: RmaCommand) = shipment == ShipmentStatus.DELIVERED && rma == RmaStatus.NONE && command == RmaCommand.RECEIVED }
+object ReadyPickup : ShipmentStep { override val command=ShipmentCommand.READY_FOR_PICKUP; override val target=ShipmentStatus.READY_FOR_PICKUP; override fun accepts(current:ShipmentStatus)=current==ShipmentStatus.PREPARING }
+object CollectPickup : ShipmentStep { override val command=ShipmentCommand.PICKED_UP; override val target=ShipmentStatus.PICKED_UP; override fun accepts(current:ShipmentStatus)=current==ShipmentStatus.READY_FOR_PICKUP }
+object ShipmentJourney {
+    private fun steps(decision:DeliveryDecision):List<ShipmentStep> = when(decision.state) {
+        DeliverySnapshotState.INVALID -> emptyList()
+        DeliverySnapshotState.LEGACY_MISSING_BLOCK -> listOf(PackShipment,ShipShipment,DeliverShipment)
+        DeliverySnapshotState.KNOWN -> when(decision.resolvedMode()) {
+            DeliveryMode.PICKUP -> listOf(PackShipment,ReadyPickup,CollectPickup)
+            DeliveryMode.LOCAL_DELIVERY -> listOf(PackShipment,ShipShipment,DeliverShipment)
+            DeliveryMode.UNKNOWN -> emptyList()
+        }
+    }
+    fun next(current:ShipmentStatus,decision:DeliveryDecision=DeliveryDecision.Legacy)=steps(decision).singleOrNull { it.accepts(current) }
+    fun transition(current:ShipmentStatus,command:ShipmentCommand,decision:DeliveryDecision=DeliveryDecision.Legacy)=steps(decision).singleOrNull { it.command==command && it.accepts(current) }
+}
+object ReceiveReturn {
+    fun completed(shipment:ShipmentStatus,decision:DeliveryDecision)=when(decision.state) {
+        DeliverySnapshotState.INVALID -> false
+        DeliverySnapshotState.LEGACY_MISSING_BLOCK -> shipment==ShipmentStatus.DELIVERED
+        DeliverySnapshotState.KNOWN -> when(decision.resolvedMode()) {
+            DeliveryMode.PICKUP -> shipment==ShipmentStatus.PICKED_UP
+            DeliveryMode.LOCAL_DELIVERY -> shipment==ShipmentStatus.DELIVERED
+            DeliveryMode.UNKNOWN -> false
+        }
+    }
+    fun accepts(shipment:ShipmentStatus,rma:RmaStatus,command:RmaCommand,decision:DeliveryDecision=DeliveryDecision.Legacy)=completed(shipment,decision) && rma==RmaStatus.NONE && command==RmaCommand.RECEIVED
+}

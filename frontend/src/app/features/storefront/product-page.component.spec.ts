@@ -18,7 +18,7 @@ import { CatalogStore } from './catalog.store';
 import { ProductPageComponent } from './product-page.component';
 
 const product = (sku: string) => ({ sku, variants: [] } as unknown as ProductDetail);
-const cart: Cart = { lines: [], currency: CartCurrency.Ars };
+const cart: Cart = { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: CartCurrency.Ars };
 const emptySnapshot = (intent = PurchaseIntent.Unknown, stage = PurchaseIntentStage.Unknown, message = ''): PurchaseIntentSnapshot => ({
   intent, stage, availability: RestoredPurchaseAvailability.Unknown, confirmation: CartLineConfirmationResult.Idle,
   revision: 0, currentQuantity: 0, storageResult: PurchaseIntentStorageResult.Empty, message,

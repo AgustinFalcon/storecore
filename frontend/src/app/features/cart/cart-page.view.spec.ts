@@ -1,3 +1,4 @@
+import { DeliveryQuote } from '../../domain/cart/delivery';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
@@ -11,11 +12,11 @@ describe('CartPageViewComponent', () => {
   it('offers an explicit full removal command even when the line has multiple units', () => {
     TestBed.configureTestingModule({ imports: [CartPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(CartPageViewComponent);
-    const state: CartState = {
+    const state: CartState = {deliveryQuote:DeliveryQuote.Unknown,attemptCommand:null,attemptAddress:null,
       addressReadState: AddressReadState.Idle, addressErrorMessage: '', checkoutAttemptState: CheckoutAttemptState.Idle, checkoutErrorMessage: '',
       loading: false,
       errorMessage: '',
-      cart: { currency: CartCurrency.Ars, lines: [{ sku: 'RETIRED', name: 'Taladro', quantity: 3, originalUnitPrice: 100, discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 100 }] },
+      cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', currency: CartCurrency.Ars, lines: [{ sku: 'RETIRED', name: 'Taladro', quantity: 3, originalUnitPrice: 100, discountAmount: 0, offerRef: null, campaignRef: null, effectiveUnitPrice: 100 }] },
       addresses: [],
       addressId: '',
       idempotencyKey: 'attempt',

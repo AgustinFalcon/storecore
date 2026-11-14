@@ -264,7 +264,7 @@ class StockAdjustmentHttpIntegrationTest @Autowired constructor(
     private fun capability(session:Session,state:String) {
         if(jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",String::class.java)==state)return
         val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},session.userId,session.sessionId,"MANUAL_FULFILLMENT",version,state,"{}",UUID.randomUUID(),"test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},session.userId,session.sessionId,"MANUAL_FULFILLMENT",version,state,jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"),UUID.randomUUID(),"test")
     }
     private fun variant(available:Int?):Long {
         val product=jdbc.queryForObject("INSERT INTO products(name,slug,base_price) VALUES ('Stock',?,100) RETURNING id",Long::class.java,"stock-${UUID.randomUUID()}")!!

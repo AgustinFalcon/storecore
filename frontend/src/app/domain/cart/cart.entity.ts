@@ -1,5 +1,6 @@
 import { CartCurrency } from './cart-currency';
 import { OrderStatus, PaymentStatus } from '../order/commerce-states';
+import { DeliveryMode, DeliveryQuote } from './delivery';
 
 export interface CartLine {
   readonly sku: string;
@@ -13,13 +14,19 @@ export interface CartLine {
 }
 
 export interface Cart {
+  readonly revision: string;
+  readonly deliveryOptions?: readonly DeliveryQuote[];
   readonly lines: readonly CartLine[];
   readonly currency: CartCurrency;
 }
 
 export interface CheckoutCommand {
+  readonly cartRevision: string;
+  readonly deliveryMode: DeliveryMode;
+  readonly deliveryConfigurationVersion: number;
   readonly idempotencyKey: string;
-  readonly addressId: string;
+  readonly addressId: string | null;
+  readonly addressRevision: string | null;
   readonly currency: CartCurrency;
 }
 

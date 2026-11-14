@@ -1,4 +1,4 @@
-import { mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapPreview, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
+import { mapAddress, mapAdminOrder, mapCapabilities, mapCart, mapCustomerSession, mapInventory, mapPreview, mapProductDetail, mapProductSummary, mapReceipt } from './http-mappers';
 import { CapabilityModuleId } from '../../domain/user/capability-module-id';
 import { CapabilityModuleState } from '../../domain/user/capability-module-state';
 import { InventoryAvailability } from '../../domain/user/inventory-availability';
@@ -134,19 +134,33 @@ describe('http-mappers', () => {
     expect(product.active).toBe(false);
   });
 
+  it('requires an exact lowercase cart revision and preserves only valid address revisions', () => {
+    const revision = 'a'.repeat(64);
+    expect(mapCart({ revision, lines: [], currency: CartCurrency.Ars.wire }).revision).toBe(revision);
+    for (const invalid of [undefined, null, '', 'a'.repeat(63), 'a'.repeat(65), 'A'.repeat(64), 'g'.repeat(64), 42, {}]) {
+      expect(() => mapCart({ revision: invalid, lines: [], currency: CartCurrency.Ars.wire })).toThrow();
+    }
+    const address = { id: 'address', street: 'Calle', number: '1', city: 'Ciudad', province: 'Provincia', postalCode: '1000', isDefault: true };
+    const addressRevision = '2026-11-14T00:00:00Z';
+    expect(mapAddress({ ...address, revision: addressRevision }).revision).toBe(addressRevision);
+    for (const revision of [undefined, null, '', 'not-a-date', 42, {}]) {
+      expect(mapAddress({ ...address, revision }).revision).toBeNull();
+    }
+  });
+
   it('accepts an explicit empty cart and rejects malformed collections and currency', () => {
-    expect(mapCart({ lines: [], currency: 'ARS' })).toEqual({ lines: [], currency: CartCurrency.Ars });
-    for (const invalid of [undefined, null, [], {}, true, 0, 'cart', { lines: null, currency: 'ARS' }, { lines: {}, currency: 'ARS' }]) {
+    expect(mapCart({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: 'ARS' })).toEqual({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: CartCurrency.Ars, deliveryOptions: [] });
+    for (const invalid of [undefined, null, [], {}, true, 0, 'cart', { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: null, currency: 'ARS' }, { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: {}, currency: 'ARS' }]) {
       expect(() => mapCart(invalid)).toThrow();
     }
     for (const currency of [undefined, null, '', '  ', 'USD', 1, {}, [], false]) {
-      expect(mapCart({ lines: [], currency }).currency).toBe(CartCurrency.Unknown);
+      expect(mapCart({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency }).currency).toBe(CartCurrency.Unknown);
     }
   });
 
   it('requires complete line identities, safe positive quantities and coherent money without coercion', () => {
     const line = { sku: 'SKU', name: 'Producto', quantity: 2, originalUnitPrice: 10, discountAmount: 2, effectiveUnitPrice: 8 };
-    const cart = (value: unknown) => mapCart({ lines: [value], currency: 'ARS' });
+    const cart = (value: unknown) => mapCart({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [value], currency: 'ARS' });
     expect(cart(line).lines[0]).toEqual({ ...line, offerRef: null, campaignRef: null });
     for (const invalid of [null, [], {}, false, 0, 'line']) expect(() => cart(invalid)).toThrow();
     for (const field of ['sku', 'name']) {

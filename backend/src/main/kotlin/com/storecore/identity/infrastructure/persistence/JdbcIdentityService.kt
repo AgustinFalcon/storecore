@@ -249,7 +249,7 @@ open class JdbcIdentityService(
         return CustomerProfile(row.requiredLong("id"), row.requiredString("email"), row.requiredString("first_name"), row.requiredString("last_name"), row["phone"]?.toString())
     }
     override fun customerAddresses(principal: CustomerPrincipal): List<CustomerAddress> = jdbc.queryForList(
-        "SELECT id, street, number, city, province, postal_code, is_default FROM customer_addresses WHERE customer_id=? ORDER BY id",
+        "SELECT id, street, number, city, province, postal_code, is_default, updated_at FROM customer_addresses WHERE customer_id=? ORDER BY id",
         principal.customerId,
     ).map { it.toAddress() }
 
@@ -257,7 +257,7 @@ open class JdbcIdentityService(
     override fun updateCustomerAddress(principal: CustomerPrincipal, addressId: Long, street: String, number: String, city: String, province: String, postalCode: String, isDefault: Boolean): CustomerAddress {
         lockCustomerAddresses(principal.customerId)
         if (isDefault) jdbc.update("UPDATE customer_addresses SET is_default=FALSE,updated_at=clock_timestamp() WHERE customer_id=? AND id<>? AND is_default=TRUE", principal.customerId, addressId)
-        val row = jdbc.queryForList("UPDATE customer_addresses SET street=?,number=?,city=?,province=?,postal_code=?,is_default=?,updated_at=clock_timestamp() WHERE id=? AND customer_id=? RETURNING id,street,number,city,province,postal_code,is_default", street.trim(),number.trim(),city.trim(),province.trim(),postalCode.trim(),isDefault,addressId,principal.customerId).singleOrNull() ?: throw ResourceNotFound()
+        val row = jdbc.queryForList("UPDATE customer_addresses SET street=?,number=?,city=?,province=?,postal_code=?,is_default=?,updated_at=clock_timestamp() WHERE id=? AND customer_id=? RETURNING id,street,number,city,province,postal_code,is_default,updated_at", street.trim(),number.trim(),city.trim(),province.trim(),postalCode.trim(),isDefault,addressId,principal.customerId).singleOrNull() ?: throw ResourceNotFound()
         return row.toAddress()
     }
 
@@ -272,7 +272,7 @@ open class JdbcIdentityService(
         if (isDefault) jdbc.update("UPDATE customer_addresses SET is_default=FALSE, updated_at=clock_timestamp() WHERE customer_id=? AND is_default=TRUE", principal.customerId)
         val row = jdbc.queryForList(
             """INSERT INTO customer_addresses(customer_id,street,number,city,province,postal_code,is_default)
-               VALUES(?,?,?,?,?,?,?) RETURNING id,street,number,city,province,postal_code,is_default""",
+               VALUES(?,?,?,?,?,?,?) RETURNING id,street,number,city,province,postal_code,is_default,updated_at""",
             principal.customerId, street.trim(), number.trim(), city.trim(), province.trim(), postalCode.trim(), isDefault,
         ).single()
         return row.toAddress()
@@ -367,5 +367,5 @@ open class JdbcIdentityService(
         is Number -> value.toInt() != 0
         else -> value?.toString().equals("t", true) || value?.toString().equals("true", true)
     }
-    private fun Map<String, Any?>.toAddress() = CustomerAddress(requiredLong("id"), requiredString("street"), requiredString("number"), requiredString("city"), requiredString("province"), requiredString("postal_code"), this["is_default"] as Boolean)
+    private fun Map<String, Any?>.toAddress() = CustomerAddress(requiredLong("id"), requiredString("street"), requiredString("number"), requiredString("city"), requiredString("province"), requiredString("postal_code"), this["is_default"] as Boolean, (this["updated_at"] as java.sql.Timestamp).toInstant())
 }

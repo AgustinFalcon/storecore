@@ -44,8 +44,218 @@ class CommerceHttpIntegrationTest(
         admin = provisionAdmin("admin-${UUID.randomUUID()}@example.com")
         customer = registerCustomer("shopper-${UUID.randomUUID()}@example.com")
         listOf("STOREFRONT", "CATALOG", "PAYMENTS_MP", "MANUAL_FULFILLMENT", "MANUAL_PROMOTIONS", "MARKETPLACE_ML", "PROFILE_CONTENT").forEach { activate(it) }
+        configureDeliveryFixture()
     }
 
+    @Test fun `unclaimed checkout rejects old cart revision after quantity changes from one to three`() {
+        val sku = "STALE-CART-${UUID.randomUUID()}"
+        putProduct(sku, "Cart context", available = 8, safety = 0)
+        customer = addAddress(customer)
+        putCheckoutContextQuantity(sku, 1)
+        val key = UUID.randomUUID()
+        val command = capturedCheckoutCommand(key)
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+
+        putCheckoutContextQuantity(sku, 3)
+        val currentCart = exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie).body
+        assertTrue(mapper.readTree(currentCart).path("data").path("revision").asText() != mapper.readTree(command).path("cartRevision").asText())
+        val effects = checkoutEffects()
+        val balances = checkoutContextBalances(sku)
+        repeat(2) {
+            val rejected = exchange("/api/v1/customer/checkout", HttpMethod.POST, command, customer.cookie, customer.csrf)
+            assertEquals(409, rejected.statusCode.value(), rejected.body)
+            assertEquals("CHECKOUT_CONTEXT_CHANGED", mapper.readTree(rejected.body).path("errorCode").asText())
+            customer = customer.copy(csrf = rejected.headers.getFirst("X-CSRF-Token") ?: customer.csrf)
+            assertEquals(effects, checkoutEffects())
+            assertEquals(balances, checkoutContextBalances(sku))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+            assertEquals(mapper.readTree(currentCart).path("data"), mapper.readTree(exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie).body).path("data"))
+        }
+    }
+
+    @Test fun `unclaimed checkout rejects old revision when the same address id is edited`() {
+        val sku = "STALE-ADDRESS-${UUID.randomUUID()}"
+        putProduct(sku, "Address context", available = 8, safety = 0)
+        customer = addAddress(customer)
+        putCheckoutContextQuantity(sku, 1)
+        val key = UUID.randomUUID()
+        val command = capturedCheckoutCommand(key)
+        val selectedAddressId = customer.addressId
+        editCheckoutContextAddress()
+        assertEquals(selectedAddressId, customer.addressId)
+        val address = jdbc.queryForMap("SELECT street,updated_at FROM customer_addresses WHERE id=?", selectedAddressId.toLong())
+        assertEquals("Changed street", address["street"])
+        assertTrue((address["updated_at"] as java.sql.Timestamp).toInstant() != Instant.parse(mapper.readTree(command).path("addressRevision").asText()))
+        val effects = checkoutEffects()
+        val balances = checkoutContextBalances(sku)
+        repeat(2) {
+            val rejected = exchange("/api/v1/customer/checkout", HttpMethod.POST, command, customer.cookie, customer.csrf)
+            assertEquals(409, rejected.statusCode.value(), rejected.body)
+            assertEquals("CHECKOUT_CONTEXT_CHANGED", mapper.readTree(rejected.body).path("errorCode").asText())
+            customer = customer.copy(csrf = rejected.headers.getFirst("X-CSRF-Token") ?: customer.csrf)
+            assertEquals(effects, checkoutEffects())
+            assertEquals(balances, checkoutContextBalances(sku))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+            assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+            assertEquals(1, jdbc.queryForObject("SELECT quantity FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=(SELECT customer_id FROM customer_addresses WHERE id=?)", Int::class.java, selectedAddressId.toLong()))
+        }
+    }
+
+    @Test fun `claimed checkout replays historical cart and address after both current contexts change`() {
+        val sku = "HISTORICAL-CONTEXT-${UUID.randomUUID()}"
+        putProduct(sku, "Historical context", available = 8, safety = 0)
+        customer = addAddress(customer)
+        putCheckoutContextQuantity(sku, 1)
+        val key = UUID.randomUUID()
+        val command = capturedCheckoutCommand(key)
+        val first = exchange("/api/v1/customer/checkout", HttpMethod.POST, command, customer.cookie, customer.csrf)
+        assertEquals(200, first.statusCode.value(), first.body)
+        customer = customer.copy(csrf = first.headers.getFirst("X-CSRF-Token")!!)
+        val orderId = mapper.readTree(first.body).path("data").path("orderId").asLong()
+        val historicalOrder = jdbc.queryForMap("SELECT buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total FROM orders WHERE id=?", orderId)
+        assertEquals("Main", mapper.readTree(historicalOrder["buyer_snapshot"].toString()).path("street").asText())
+        assertEquals(1, jdbc.queryForObject("SELECT quantity FROM order_items WHERE order_id=?", Int::class.java, orderId))
+
+        putCheckoutContextQuantity(sku, 3)
+        editCheckoutContextAddress()
+        val effects = checkoutEffects()
+        val balances = checkoutContextBalances(sku)
+        val replay = exchange("/api/v1/customer/checkout", HttpMethod.POST, command, customer.cookie, customer.csrf)
+        assertEquals(200, replay.statusCode.value(), replay.body)
+        assertEquals(orderId, mapper.readTree(replay.body).path("data").path("orderId").asLong())
+        assertEquals(historicalOrder, jdbc.queryForMap("SELECT buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total FROM orders WHERE id=?", orderId))
+        assertEquals(effects, checkoutEffects())
+        assertEquals(balances, checkoutContextBalances(sku))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+        val cart = mapper.readTree(exchange("/api/v1/customer/cart", HttpMethod.GET, null, customer.cookie).body).path("data")
+        assertEquals(3, cart.path("lines").single().path("quantity").asInt())
+        assertEquals("Changed street", jdbc.queryForObject("SELECT street FROM customer_addresses WHERE id=?", String::class.java, customer.addressId.toLong()))
+    }
+
+    private fun putCheckoutContextQuantity(sku: String, quantity: Int) {
+        val response = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":$quantity}""", customer.cookie, customer.csrf)
+        assertEquals(200, response.statusCode.value(), response.body)
+        customer = customer.copy(csrf = response.headers.getFirst("X-CSRF-Token")!!)
+    }
+
+    private fun editCheckoutContextAddress() {
+        val response = exchange("/api/v1/customer/me/addresses/${customer.addressId}", HttpMethod.PUT, """{"street":"Changed street","number":"3","city":"City","province":"Province","postalCode":"1000","isDefault":true}""", customer.cookie, customer.csrf)
+        assertEquals(200, response.statusCode.value(), response.body)
+        customer = customer.copy(csrf = response.headers.getFirst("X-CSRF-Token")!!)
+    }
+
+    private fun capturedCheckoutCommand(key: UUID): String = deliveryFixtureBody("/api/v1/customer/checkout", """{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""", customer.cookie)!!
+
+    private fun checkoutEffects() = listOf("checkout_idempotency_claims", "orders", "order_items", "payments", "shipments", "inventory_reservations", "inventory_ledger", "mp_checkout_attempts").associateWith {
+        jdbc.queryForObject("SELECT count(*) FROM $it", Long::class.java)!!
+    }
+
+    private fun checkoutContextBalances(sku: String) = jdbc.queryForList("SELECT * FROM inventory_balances WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)", sku)
+
+    @Test fun `delivery policy writer waits for checked quote through checkout commit`() {
+        val sku="LOCK-FEE-${UUID.randomUUID()}"
+        putProduct(sku,"Quote locked",available=5,safety=0)
+        customer=addAddress(customer)
+        val added=exchange("/api/v1/customer/cart/items",HttpMethod.PUT,"""{"sku":"$sku","quantity":1}""",customer.cookie,customer.csrf)
+        customer=customer.copy(csrf=added.headers.getFirst("X-CSRF-Token")!!)
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val key=UUID.randomUUID()
+        val checkoutBody="""{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS","deliveryMode":"LOCAL_DELIVERY","deliveryConfigurationVersion":$version}"""
+        val policy="""{"expectedConfigVersion":$version,"reason":"Concurrent configured fee","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":false},"localDelivery":{"enabled":true,"label":"Delivery","cost":"5.00","minDays":1,"maxDays":2}}"""
+        val executor=java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            jdbc.dataSource!!.connection.use { blocker ->
+                blocker.autoCommit=false
+                blocker.prepareStatement("SELECT b.variant_id FROM inventory_balances b JOIN product_variants v ON v.id=b.variant_id WHERE v.sku=? FOR UPDATE OF b").use { it.setString(1,sku);it.executeQuery().close() }
+                val checkout=executor.submit<org.springframework.http.ResponseEntity<String>> { exchange("/api/v1/customer/checkout",HttpMethod.POST,checkoutBody,customer.cookie,customer.csrf) }
+                fun waiting():Int=jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock' AND (query LIKE '%inventory_balances%' OR query LIKE '%module_configurations%')",Int::class.java)!!
+                var deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(8)
+                while(waiting()<1 && System.nanoTime()<deadline) Thread.sleep(20)
+                assertTrue(waiting()>=1,"checkout must wait on inventory after locking configuration")
+                val writer=executor.submit<org.springframework.http.ResponseEntity<String>> { exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,policy,admin.cookie,admin.csrf) }
+                deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(8)
+                while(waiting()<2 && System.nanoTime()<deadline) Thread.sleep(20)
+                assertTrue(waiting()>=2,"policy writer must wait until checkout commits")
+                blocker.commit()
+                val created=checkout.get(15,java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(200,created.statusCode.value(),created.body)
+                val configured=writer.get(15,java.util.concurrent.TimeUnit.SECONDS)
+                assertEquals(200,configured.statusCode.value(),configured.body)
+                assertEquals(java.math.BigDecimal("0.00"),jdbc.queryForObject("SELECT shipping_cost FROM orders WHERE checkout_idempotency_key=?",java.math.BigDecimal::class.java,key))
+                assertEquals(version+1,jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java))
+            }
+        } finally { executor.shutdownNow() }
+    }
+
+    @Test fun `shipping overflow rejects before claims stock or orders`() {
+        val sku="OVERFLOW-${UUID.randomUUID()}"
+        putProduct(sku,"Bounded total",available=5,safety=0)
+        jdbc.update("UPDATE products SET base_price=999999999999.99 WHERE id=(SELECT product_id FROM product_variants WHERE sku=?)",sku)
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val policy="""{"expectedConfigVersion":$version,"reason":"Overflow fixture","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":false},"localDelivery":{"enabled":true,"label":"Delivery","cost":"0.01","minDays":1,"maxDays":2}}"""
+        val configured=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,policy,admin.cookie,admin.csrf)
+        assertEquals(200,configured.statusCode.value(),configured.body)
+        customer=addAddress(customer)
+        val added=exchange("/api/v1/customer/cart/items",HttpMethod.PUT,"""{"sku":"$sku","quantity":1}""",customer.cookie,customer.csrf)
+        customer=customer.copy(csrf=added.headers.getFirst("X-CSRF-Token")!!)
+        val before=jdbc.queryForList("SELECT * FROM inventory_balances WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)",sku)
+        val key=UUID.randomUUID()
+        val failed=exchange("/api/v1/customer/checkout",HttpMethod.POST,"""{"idempotencyKey":"$key","addressId":"${customer.addressId}","currency":"ARS"}""",customer.cookie,customer.csrf)
+        assertEquals(400,failed.statusCode.value(),failed.body)
+        assertEquals("CHECKOUT_TOTAL_INVALID",mapper.readTree(failed.body!!).path("errorCode").asText())
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?",Int::class.java,key))
+        assertEquals(before,jdbc.queryForList("SELECT * FROM inventory_balances WHERE variant_id=(SELECT id FROM product_variants WHERE sku=?)",sku))
+    }
+    @Test fun `pickup without addresses freezes quote and replay survives configuration replacement`() {
+        val sku="PICKUP-${UUID.randomUUID()}"
+        putProduct(sku,"Pickup product",available=4,safety=0)
+        val selectedVersion=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val policy="""{"expectedConfigVersion":$selectedVersion,"reason":"Pickup contract","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":true,"label":"Collect","cost":"0.00","minDays":0,"maxDays":1,"destination":"Store A","instructions":"Bring reference"},"localDelivery":{"enabled":false}}"""
+        val configured=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,policy,admin.cookie,admin.csrf)
+        assertEquals(200,configured.statusCode.value(),configured.body)
+        admin=admin.copy(csrf=configured.headers.getFirst("X-CSRF-Token")!!)
+        val version=selectedVersion+1
+        val added=exchange("/api/v1/customer/cart/items",HttpMethod.PUT,"""{"sku":"$sku","quantity":1}""",customer.cookie,customer.csrf)
+        customer=customer.copy(csrf=added.headers.getFirst("X-CSRF-Token")!!)
+        val key=UUID.randomUUID()
+        val body="""{"idempotencyKey":"$key","currency":"ARS","deliveryMode":"PICKUP","deliveryConfigurationVersion":$version}"""
+        val created=exchange("/api/v1/customer/checkout",HttpMethod.POST,body,customer.cookie,customer.csrf)
+        assertEquals(200,created.statusCode.value(),created.body)
+        customer=customer.copy(csrf=created.headers.getFirst("X-CSRF-Token")!!)
+        val orderId=mapper.readTree(created.body!!).path("data").path("orderId").asText().toLong()
+        val snapshot=mapper.readTree(jdbc.queryForObject("SELECT checkout_snapshot::text FROM orders WHERE id=?",String::class.java,orderId))
+        assertEquals("Store A",snapshot.path("delivery").path("destination").asText())
+        assertEquals("Bring reference",snapshot.path("delivery").path("instructions").asText())
+        assertEquals(0,jdbc.queryForObject("SELECT shipping_cost FROM orders WHERE id=?",Int::class.java,orderId))
+        val buyer=mapper.readTree(jdbc.queryForObject("SELECT buyer_snapshot::text FROM orders WHERE id=?",String::class.java,orderId))
+        assertEquals(false,buyer.has("street"))
+        val disabled="""{"expectedConfigVersion":$version,"reason":"Disable future orders","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":false},"localDelivery":{"enabled":false}}"""
+        assertEquals(200,exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,disabled,admin.cookie,admin.csrf).statusCode.value())
+        val replay=exchange("/api/v1/customer/checkout",HttpMethod.POST,body,customer.cookie,customer.csrf)
+        assertEquals(200,replay.statusCode.value(),replay.body)
+        assertEquals(orderId.toString(),mapper.readTree(replay.body!!).path("data").path("orderId").asText())
+        val detail=exchange("/api/v1/customer/orders/$orderId",HttpMethod.GET,null,customer.cookie)
+        assertEquals("KNOWN",mapper.readTree(detail.body!!).path("data").path("deliveryDecision").path("state").asText())
+    }
+
+    @Test fun `manual policy endpoint is admin CSRF CAS validated and audited`() {
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val body="""{"expectedConfigVersion":$version,"reason":"Contract verification","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":false},"localDelivery":{"enabled":true,"label":"Delivery","cost":"3.50","minDays":1,"maxDays":2}}"""
+        assertEquals(401,exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,body,customer.cookie,customer.csrf).statusCode.value())
+        assertEquals(403,exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,body,admin.cookie).statusCode.value())
+        assertEquals(409,exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,body.replace("3.50","3.005"),admin.cookie,admin.csrf).statusCode.value())
+        val accepted=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,body,admin.cookie,admin.csrf)
+        assertEquals(200,accepted.statusCode.value(),accepted.body)
+        admin=admin.copy(csrf=accepted.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(409,exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,body,admin.cookie,admin.csrf).statusCode.value())
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM capability_configuration_audit_events WHERE module_code='MANUAL_FULFILLMENT' AND resulting_config_version=?",Int::class.java,version+1))
+        val before=jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",String::class.java)
+        val state=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/state",HttpMethod.POST,"""{"state":"PAUSED","expectedConfigVersion":${version+1},"reason":"Preserve quote policy","correlationId":"${UUID.randomUUID()}"}""",admin.cookie,admin.csrf)
+        assertEquals(200,state.statusCode.value(),state.body)
+        assertEquals(before,jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",String::class.java))
+    }
     @Test
     fun `catalog search and admin home draft`() {
         val sku = "SKU-HOME-${UUID.randomUUID()}"
@@ -345,7 +555,12 @@ class CommerceHttpIntegrationTest(
                 customer = customer.copy(csrf = removed.headers.getFirst("X-CSRF-Token")!!)
                 assertTrue(!removed.body!!.contains(retired))
             }
-            assertEquals(200, exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf).statusCode.value())
+            val stale = exchange("/api/v1/customer/checkout", HttpMethod.POST, body, customer.cookie, customer.csrf)
+            assertEquals(409, stale.statusCode.value(), stale.body)
+            assertEquals("CHECKOUT_CONTEXT_CHANGED", mapper.readTree(stale.body).path("errorCode").asText())
+            customer = customer.copy(csrf = stale.headers.getFirst("X-CSRF-Token") ?: customer.csrf)
+            val refreshed = capturedCheckoutCommand(UUID.randomUUID())
+            assertEquals(200, exchange("/api/v1/customer/checkout", HttpMethod.POST, refreshed, customer.cookie, customer.csrf).statusCode.value())
         }
     }
 
@@ -471,7 +686,7 @@ class CommerceHttpIntegrationTest(
         assertEquals(200, allowed.statusCode.value(), allowed.body)
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, "MANUAL_FULFILLMENT")
         val actorId = adminUserId()
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), "MANUAL_FULFILLMENT", version, "PAUSED", "{}", UUID.randomUUID(), "test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), "MANUAL_FULFILLMENT", version, "PAUSED", jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,"MANUAL_FULFILLMENT"), UUID.randomUUID(), "test")
         val denied = exchange("/api/v1/user/orders", HttpMethod.GET, null, admin.cookie)
         assertEquals(409, denied.statusCode.value(), denied.body)
         assertTrue(denied.body!!.contains("CAPABILITY_PAUSED"))
@@ -971,7 +1186,7 @@ class CommerceHttpIntegrationTest(
         if (state == "ACTIVE") return
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)
         val actorId = adminUserId()
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, actorId, adminSessionId(actorId), module, version, "ACTIVE", jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module), UUID.randomUUID(), "test")
     }
 
     private fun adminSessionId(actorId: Long): UUID = jdbc.queryForObject(
@@ -1007,9 +1222,45 @@ class CommerceHttpIntegrationTest(
 
     private fun adminUserId() = jdbc.queryForObject("SELECT id FROM users WHERE email LIKE 'admin-%' ORDER BY id DESC LIMIT 1", Long::class.java)!!
 
+    private fun configureDeliveryFixture() {
+        val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!
+        val response=exchange("/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy",HttpMethod.PUT,"""{"expectedConfigVersion":$version,"reason":"Explicit checkout fixture","correlationId":"${UUID.randomUUID()}","pickup":{"enabled":false},"localDelivery":{"enabled":true,"label":"Test local delivery ${UUID.randomUUID()}","cost":"0.00","minDays":1,"maxDays":2}}""",admin.cookie,admin.csrf)
+        assertEquals(200,response.statusCode.value(),response.body)
+        admin=admin.copy(csrf=response.headers.getFirst("X-CSRF-Token")!!)
+    }
+    // A retry sends the originally observed context, even after checkout clears the cart.
+    private val checkoutRevisionFixtures = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String?>>()
+
+    private fun deliveryFixtureBody(path:String,body:String?,cookie:String?):String? {
+        if(path!="/api/v1/customer/checkout" || body==null) return body
+        val json=com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(body) as com.fasterxml.jackson.databind.node.ObjectNode
+        if(!json.has("deliveryMode")) {
+            json.put("deliveryMode",com.storecore.commerce.domain.DeliveryMode.LOCAL_DELIVERY.name)
+            json.put("deliveryConfigurationVersion",jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'",Int::class.java)!!)
+        }
+        if (!json.has("cartRevision")) {
+            val revisions = checkoutRevisionFixtures.computeIfAbsent(json.path("idempotencyKey").asText()) {
+                val cart = exchange("/api/v1/customer/cart", HttpMethod.GET, null, cookie)
+                assertEquals(200, cart.statusCode.value(), cart.body)
+                val revision = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(cart.body!!).path("data").path("revision").asText()
+                assertTrue(revision.matches(Regex("[0-9a-f]{64}")), "cart must expose its authoritative revision")
+                val addressRevision = json.path("addressId").asText(null)?.let { addressId ->
+                    val addresses = exchange("/api/v1/customer/me/addresses", HttpMethod.GET, null, cookie)
+                    assertEquals(200, addresses.statusCode.value(), addresses.body)
+                    val selected = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper().readTree(addresses.body!!).path("data").single { it.path("id").asText() == addressId }
+                    selected.path("revision").asText().also { java.time.Instant.parse(it) }
+                }
+                revision to addressRevision
+            }
+            json.put("cartRevision", revisions.first)
+            if (!json.has("addressRevision")) revisions.second?.let { json.put("addressRevision", it) }
+        }
+        return json.toString()
+    }
+
     private fun exchange(path: String, method: HttpMethod, body: String?, cookie: String? = null, csrf: String? = null, origin: String = "http://localhost:4200") = http.exchange(
         URI("http://localhost:$port$path"), method,
-        HttpEntity(body, HttpHeaders().apply {
+        HttpEntity(deliveryFixtureBody(path,body,cookie), HttpHeaders().apply {
             contentType = MediaType.APPLICATION_JSON
             set(HttpHeaders.ORIGIN, origin)
             cookie?.let { set(HttpHeaders.COOKIE, it) }

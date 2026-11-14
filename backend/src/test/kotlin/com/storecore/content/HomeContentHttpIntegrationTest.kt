@@ -272,7 +272,7 @@ class HomeContentHttpIntegrationTest(
         if (state == "ACTIVE") return
         val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?", Int::class.java, module)!!
         val sessionId = jdbc.queryForObject("SELECT id FROM identity_sessions WHERE subject_kind='USER' AND user_id=? AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1", UUID::class.java, admin.userId)!!
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, admin.userId, sessionId, module, version, "ACTIVE", "{}", UUID.randomUUID(), "test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)", { _, _ -> }, admin.userId, sessionId, module, version, "ACTIVE", jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module), UUID.randomUUID(), "test")
     }
 
     private fun exchange(path: String, method: HttpMethod, body: String? = null, cookie: String? = null, csrf: String? = null, origin: String = "http://localhost:4200") = http.exchange(

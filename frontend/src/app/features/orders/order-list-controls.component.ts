@@ -17,7 +17,7 @@ import { firstOrderPage, OrderQuery } from '../../domain/order/order-projection'
         <option [ngValue]="null">Todos</option>
         @for (state of paymentStates; track state.wire) { <option [ngValue]="state">{{ state.label }}</option> }
       </select></label>
-      <label>Estado de envío <select [ngModel]="query.shipmentStatus ?? null" (ngModelChange)="change({shipmentStatus: $event})">
+      <label>Estado de entrega <select [ngModel]="query.shipmentStatus ?? null" (ngModelChange)="change({shipmentStatus: $event})">
         <option [ngValue]="null">Todos</option>
         @for (state of shipmentStates; track state.wire) { <option [ngValue]="state">{{ state.label }}</option> }
       </select></label>
@@ -38,7 +38,7 @@ export class OrderListControlsComponent {
   @Output() readonly queryChange = new EventEmitter<OrderQuery>();
   readonly orderStates = [OrderStatus.Created, OrderStatus.PendingPayment, OrderStatus.Paid, OrderStatus.PaidStockReview, OrderStatus.Cancelled, OrderStatus.Expired, OrderStatus.Refunded];
   readonly paymentStates = [PaymentStatus.Pending, PaymentStatus.Approved, PaymentStatus.Rejected, PaymentStatus.Cancelled, PaymentStatus.Refunded, PaymentStatus.ChargedBack];
-  readonly shipmentStates = [ShipmentStatus.NotCreated, ShipmentStatus.Pending, ShipmentStatus.Preparing, ShipmentStatus.Shipped, ShipmentStatus.Delivered, ShipmentStatus.Cancelled];
+  readonly shipmentStates = [ShipmentStatus.NotCreated, ShipmentStatus.Pending, ShipmentStatus.Preparing, ShipmentStatus.Shipped, ShipmentStatus.Delivered, ShipmentStatus.ReadyForPickup, ShipmentStatus.PickedUp, ShipmentStatus.Cancelled];
   change(filter: Partial<OrderQuery>): void { this.queryChange.emit({ ...this.query, ...filter, page: 0 }); }
   navigate(page: number): void { this.queryChange.emit({ ...this.query, page }); }
 }

@@ -11,6 +11,7 @@ const detail = {
   orderStatus: 'PAID', paymentStatus: 'APPROVED', shipmentStatus: 'DELIVERED', tracking: null,
   rmaStatus: 'NONE', fulfillmentEligibility: 'ELIGIBLE', shipmentAction: null, rmaAction: 'RECEIVED',
   currency: 'ARS', subtotal: 90, shippingCost: 10, total: 100,
+  deliveryDecision: { state: 'LEGACY_MISSING_BLOCK', value: null },
   lines: [{ sku: 'SKU-101', name: 'Producto histórico', quantity: 1, originalUnitPrice: 90, effectiveUnitPrice: 90, discountAmount: 0 }],
   buyerName: unavailable, buyerEmail: unavailable, payment: { state: 'KNOWN', value: 'APPROVED', reason: null },
   delivery: { state: 'KNOWN', value: { recipient: null, street: 'Calle 123', city: 'Ciudad', province: 'Provincia', postalCode: '1234', country: null }, reason: null },

@@ -12,7 +12,7 @@ describe('PurchaseIntentCoordinator', () => {
   let now: number;
   let storage: SessionPurchaseIntentStorageAdapter;
   const actor: PurchaseIntentActor = { identity: 'customer-a', revision: 1, canMutate: true };
-  const cart: Cart = { lines: [], currency: CartCurrency.fromWire('ARS') };
+  const cart: Cart = { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: CartCurrency.fromWire('ARS') };
   const product = { sku: 'PRODUCT-1', active: true, status: ProductStatus.Active,
     variants: [{ sku: 'FIRST', status: VariantStatus.Active, availableQuantity: 10 }, { sku: 'VARIANT-2', status: VariantStatus.Active, availableQuantity: 5 }] } as unknown as ProductDetail;
   beforeEach(() => {

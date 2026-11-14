@@ -183,7 +183,7 @@ class CatalogProjectionHttpIntegrationTest(
         if(jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?",String::class.java,module)=="ACTIVE") return
         val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?",Int::class.java,module)!!
         val session=jdbc.queryForObject("SELECT id FROM identity_sessions WHERE user_id=? AND revoked_at IS NULL",UUID::class.java,admin.userId)!!
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},admin.userId,session,module,version,"ACTIVE","{}",UUID.randomUUID(),"test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},admin.userId,session,module,version,"ACTIVE",jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module),UUID.randomUUID(),"test")
     }
     companion object {
         private val postgres=PostgreSQLContainer<Nothing>("postgres:16-alpine")

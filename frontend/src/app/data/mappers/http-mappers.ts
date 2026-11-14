@@ -2,6 +2,7 @@ import { ProductStatus, VariantStatus, InventoryState } from '../../domain/catal
 import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { CartCurrency } from '../../domain/cart/cart-currency';
+import { DeliveryDecision, DeliveryQuote } from '../../domain/cart/delivery';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary, summarizeProduct } from '../../domain/catalog/product-summary.entity';
@@ -61,6 +62,16 @@ function money(value: unknown): number {
   return value;
 }
 
+function cartRevision(value: unknown): string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/.test(value)) throw new Error('Revisión de carrito no informada o inválida.');
+  return value;
+}
+
+function addressRevision(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim() || !Number.isFinite(Date.parse(value))) return null;
+  return value;
+}
+
 export function mapCustomerSession(value: unknown): CustomerSessionResult {
   const row = asRecord(value);
   return {
@@ -92,6 +103,7 @@ export function mapProfile(value: unknown): CustomerProfile {
 export function mapAddress(value: unknown): CustomerAddress {
   const row = asRecord(value);
   return {
+    revision: addressRevision(row['revision']),
     id: text(row['id']),
     street: text(row['street']),
     number: text(row['number']),
@@ -187,7 +199,7 @@ function mapCartLine(value: unknown): CartLine {
 export function mapCart(value: unknown): Cart {
   const row = requiredRecord(value);
   if (!Array.isArray(row['lines'])) throw new Error('Líneas del carrito no informadas.');
-  return { lines: row['lines'].map(mapCartLine), currency: CartCurrency.fromWire(row['currency']) };
+  return { revision: cartRevision(row['revision']), lines: row['lines'].map(mapCartLine), currency: CartCurrency.fromWire(row['currency']), deliveryOptions: DeliveryQuote.listFromWire(row['deliveryOptions']) };
 }
 
 export function mapReceipt(value: unknown): CheckoutReceipt {
@@ -220,6 +232,7 @@ function mapOrder(value: unknown): CustomerOrder {
     currency: nullableOrderText(row['currency']),
     subtotal: orderAmount(row['subtotal']),
     shippingCost: orderAmount(row['shippingCost']),
+    deliveryDecision: DeliveryDecision.fromWire(row['deliveryDecision']),
     buyerName: mapOrderFact(row['buyerName'], nullableOrderText),
     buyerEmail: mapOrderFact(row['buyerEmail'], nullableOrderText),
     delivery: mapOrderFact(row['delivery'], (raw) => {

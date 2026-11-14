@@ -12,7 +12,7 @@ data class OrderFact<T>(val state: OrderFactState, val value: T?, val reason: Or
 }
 enum class OrderTimelineEventKind {
     ORDER_CREATED, PAYMENT_PENDING, PAYMENT_ACCREDITED, PAYMENT_REVERSED, SHIPMENT_PREPARING,
-    SHIPMENT_SHIPPED, SHIPMENT_DELIVERED, SHIPMENT_CANCELLED, RETURN_OPENED, RETURN_RESOLVED, UNKNOWN;
+    SHIPMENT_SHIPPED, SHIPMENT_DELIVERED, SHIPMENT_READY_FOR_PICKUP, SHIPMENT_PICKED_UP, SHIPMENT_CANCELLED, RETURN_OPENED, RETURN_RESOLVED, UNKNOWN;
     companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value } ?: UNKNOWN }
 }
 data class OrderTimelineEvent(val id: String, val kind: OrderTimelineEventKind, val occurredAt: Instant)
@@ -20,9 +20,9 @@ data class DeliverySnapshot(val recipient: String?, val street: String?, val cit
 enum class ReturnEligibility {
     ELIGIBLE, NOT_DELIVERED, ALREADY_OPEN, PAYMENT_UNVERIFIED, UNAVAILABLE, UNKNOWN;
     companion object {
-        fun evaluate(payment: OrderFact<PaymentStatus>, shipment: ShipmentStatus, returns: RmaStatus): ReturnEligibility = when {
+        fun evaluate(payment: OrderFact<PaymentStatus>, shipment: ShipmentStatus, returns: RmaStatus,decision:DeliveryDecision=DeliveryDecision.Legacy): ReturnEligibility = when {
             payment.state != OrderFactState.KNOWN || payment.value != PaymentStatus.APPROVED -> PAYMENT_UNVERIFIED
-            shipment != ShipmentStatus.DELIVERED -> NOT_DELIVERED
+            !ReceiveReturn.completed(shipment,decision) -> NOT_DELIVERED
             returns == RmaStatus.UNKNOWN -> UNAVAILABLE
             returns != RmaStatus.NONE -> ALREADY_OPEN
             else -> ELIGIBLE
