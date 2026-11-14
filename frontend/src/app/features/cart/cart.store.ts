@@ -147,6 +147,10 @@ export class CartStore extends ComponentStore<CartState> {
     ),
   );
 
+  ensureLoaded(): void {
+    if (!this.snapshot.loading) this.load();
+  }
+
   readonly loadAddresses = this.effect<void>((trigger$) =>
     trigger$.pipe(
       filter(() => this.actor !== null),

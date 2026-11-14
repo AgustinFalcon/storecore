@@ -17,7 +17,7 @@ describe('Shell access lifecycle', () => {
     const router = { events: NEVER, url: '/user/orders', navigate: vi.fn(), navigateByUrl: vi.fn() };
     TestBed.configureTestingModule({ providers: [{ provide: Router, useValue: router }] });
     const store = { loadHealth: vi.fn(), loadFacets: vi.fn() };
-    const cart = { load: vi.fn() };
+    const cart = { ensureLoaded: vi.fn() };
     const theme = { apply: vi.fn() };
     const access = { navigationState: vi.fn(() => of(AccessState.Anonymous)), rehydrate: vi.fn() };
     const component = TestBed.runInInjectionContext(() => new ShellComponent(
