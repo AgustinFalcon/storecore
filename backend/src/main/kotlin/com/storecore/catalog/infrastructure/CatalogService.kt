@@ -1,6 +1,8 @@
 package com.storecore.catalog.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.catalog.domain.ArsAmount
+import com.storecore.catalog.domain.VariantPriceCommand
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
 import com.storecore.commerce.infrastructure.JdbcInventoryService
@@ -21,12 +23,14 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
     fun search(query: String, brand: Long?, category: Long?, offers: Boolean, page: Int = 0, size: Int = 50) = projections.list(false, query, brand, category, offers, page, size)
     fun product(sku: String, admin: Boolean = false) = projections.product(sku, admin)
     fun adminList(page: Int = 0, size: Int = 50) = projections.list(true, page = page, size = size)
-    fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean?, actor: Long, status: String? = null): com.storecore.catalog.domain.CatalogProduct {
+    fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean?, actor: Long, status: String? = null, productBasePrice: com.fasterxml.jackson.databind.JsonNode = com.fasterxml.jackson.databind.node.MissingNode.getInstance()): com.storecore.catalog.domain.CatalogProduct {
         val productStatus = if (status == null) {
             if (active ?: true) com.storecore.catalog.domain.ProductStatus.ACTIVE else com.storecore.catalog.domain.ProductStatus.DRAFT
         } else com.storecore.catalog.domain.ProductStatus.fromWire(status)
         if (productStatus == com.storecore.catalog.domain.ProductStatus.UNKNOWN) throw CommerceValidation("CATALOG_PRODUCT_STATUS_INVALID")
         if (status != null && active != null && active != productStatus.active) throw CommerceValidation("CATALOG_PRODUCT_STATUS_CONFLICT")
+        val variantSkus = variants.mapIndexed { index, variant -> variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if(index == 0) sku else throw CommerceValidation("CATALOG_VARIANT_SKU_REQUIRED") }
+        if(variantSkus.distinct().size != variantSkus.size) throw CommerceValidation("CATALOG_VARIANT_SKU_DUPLICATED")
         val variantStates = variants.map { variant ->
             val legacyActive = variant["active"] as? Boolean
             if (variant["active"] != null && legacyActive == null) throw CommerceValidation("CATALOG_VARIANT_STATUS_INVALID")
@@ -38,7 +42,12 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         val primaryEntry = variants.withIndex().firstOrNull { (index, variant) -> (variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if (index == 0) sku else null) == sku }
         val primaryActive = primaryEntry?.let { variantStates[it.index].active } ?: (active ?: true)
         val brandId = named("brands", brand); val categoryId = named("categories", category)
-        val base = number(price["base"]) ?: number(price["effective"]) ?: BigDecimal.ZERO
+        val rawBase: Any? = if(productBasePrice.isMissingNode) price["base"] else when {
+            productBasePrice.isNumber -> productBasePrice.decimalValue()
+            productBasePrice.isTextual -> productBasePrice.textValue()
+            else -> null
+        }
+        val base = ArsAmount.fromWire(rawBase)?.value ?: throw CommerceValidation("CATALOG_BASE_PRICE_INVALID")
         val existing = jdbc.query("SELECT p.id,v.id variant_id FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=?", { rs, _ -> rs.getLong("id") to rs.getLong("variant_id") }, sku).firstOrNull()
         val productId: Long; val variantId: Long
         if (existing == null) {
@@ -59,7 +68,7 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
         val stockChanges = mutableListOf<Triple<Long, Int, String?>>()
         variants.forEachIndexed { index, variant ->
             val variantActive = variantStates[index].active
-            val variantSku = variant["sku"]?.toString()?.takeIf { it.isNotBlank() } ?: if (index == 0) sku else return@forEachIndexed
+            val variantSku = variantSkus[index]
             val (targetVariantId, createdVariant) = if (variantSku == sku) {
                 jdbc.update("UPDATE product_variants SET label=?,active=?,updated_at=now() WHERE id=?", variant["name"]?.toString() ?: variantSku, variantActive, variantId)
                 variantId to (existing == null)
@@ -72,6 +81,12 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
                     jdbc.update("UPDATE product_variants SET label=?,active=?,updated_at=now() WHERE id=?", variant["name"]?.toString() ?: variantSku, variantActive, existingVariant.first)
                     existingVariant.first to false
                 }
+            }
+            when(val command = VariantPriceCommand.fromWire(variant.containsKey("priceCommand"),variant["priceCommand"],!createdVariant)) {
+                VariantPriceCommand.Preserve -> Unit
+                VariantPriceCommand.Inherit -> jdbc.update("UPDATE product_variants SET base_price_override=NULL WHERE id=?",targetVariantId)
+                is VariantPriceCommand.Override -> jdbc.update("UPDATE product_variants SET base_price_override=? WHERE id=?",command.amount.value,targetVariantId)
+                VariantPriceCommand.Unknown -> throw CommerceValidation("CATALOG_VARIANT_PRICE_COMMAND_INVALID")
             }
             if (variant.containsKey("attributes")) {
                 val attributes = variant["attributes"] as? Map<*, *> ?: throw CommerceValidation("CATALOG_ATTRIBUTES_INVALID")

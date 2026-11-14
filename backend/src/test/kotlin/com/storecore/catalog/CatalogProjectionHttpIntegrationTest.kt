@@ -30,6 +30,26 @@ class CatalogProjectionHttpIntegrationTest(
     @Autowired private val reader: JdbcCatalogProjectionReader,
     @LocalServerPort private val port: Int,
 ) {
+    @Test fun `HTTP money and commands reject malformed input without partial catalog writes`() {
+        val session=provision();activate("CATALOG",session)
+        val p=product();val v=variant(p,"Price validation")
+        val endpoint="/api/v1/user/catalog/products/${v.second}"
+        for(raw in listOf("1.005","1.000","999999999999.999","1000000000000","null","true","{}","\"\"","\"1e2\"","1.00000000000000001")) {
+            val body="""{"name":"Must rollback","status":"ACTIVE","productBasePrice":$raw,"price":{"base":100},"variants":[{"sku":"${v.second}"}]}"""
+            assertEquals(400,exchange(endpoint,HttpMethod.PUT,body,session.cookie,session.csrf).statusCode.value(),raw)
+            assertNotEquals("Must rollback",catalog.product(v.second,true)!!.name)
+        }
+        for(command in listOf("null","{}","{\"mode\":\"OVERRIDE\",\"base\":1.005}","{\"mode\":\"INHERIT\",\"base\":null}","{\"mode\":\"FUTURE\"}")) {
+            val body="""{"name":"Must rollback","status":"ACTIVE","productBasePrice":100,"variants":[{"sku":"${v.second}","priceCommand":$command}]}"""
+            assertEquals(400,exchange(endpoint,HttpMethod.PUT,body,session.cookie,session.csrf).statusCode.value(),command)
+            assertNotEquals("Must rollback",catalog.product(v.second,true)!!.name)
+        }
+        val valid="""{"name":"Valid","status":"ACTIVE","productBasePrice":999999999999.99,"variants":[{"sku":"${v.second}","priceCommand":{"mode":"OVERRIDE","base":0}}]}"""
+        val accepted=exchange(endpoint,HttpMethod.PUT,valid,session.cookie,session.csrf)
+        assertEquals(200,accepted.statusCode.value())
+        assertEquals("KNOWN",data(accepted).path("variants").first().path("price").path("state").asText())
+        assertEquals(0,data(accepted).path("variants").first().path("price").path("price").path("effective").asInt())
+    }
     @Test fun `missing and zero remain distinct with exact inventory formulas and closed precedence`() {
         val session=provision(); activate("STOREFRONT",session); activate("MANUAL_FULFILLMENT",session)
         val p=product(); val missing=variant(p,"Missing"); val zero=variant(p,"Zero"); val stocked=variant(p,"Stocked")

@@ -40,7 +40,7 @@ class CatalogController(
     }
     @PutMapping("/user/catalog/products/{sku}") fun saveProduct(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable sku: String, @RequestBody request: ProductDetailRequest): ResponseEntity<BaseResponse<Any?>> {
         auth.requireSameOrigin(http); val actor = auth.operatorOrAdmin(http)
-        val mutation = mutations.execute(actor, csrf) { capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor)); catalog.saveProduct(sku, request.name, request.description, request.brand, request.category, request.images, request.variants, request.price, request.active, actor.userId, request.status) }
+        val mutation = mutations.execute(actor, csrf) { capabilities.decide("CATALOG", "MANAGE", CapabilityActor.Internal(actor)); catalog.saveProduct(sku, request.name, request.description, request.brand, request.category, request.images, request.variants, request.price, request.active, actor.userId, request.status, request.productBasePrice) }
         return csrfOk(mutation)
     }
     @PutMapping("/user/catalog/brands/{id}") fun saveBrand(http: HttpServletRequest, @RequestHeader("X-CSRF-Token") csrf: String, @PathVariable id: Long, @RequestBody request: FacetWriteRequest): ResponseEntity<BaseResponse<Any?>> {
@@ -57,4 +57,4 @@ class CatalogController(
 }
 
 data class FacetWriteRequest(@field:NotBlank val name: String, val id: Long? = null)
-data class ProductDetailRequest(val sku: String = "", val name: String = "", val description: String = "", val brand: String = "", val category: String = "", val images: List<String> = emptyList(), val variants: List<Map<String, Any?>> = emptyList(), val price: Map<String, Any?> = emptyMap(), val offerRef: String? = null, val active: Boolean? = null, val status: String? = null)
+data class ProductDetailRequest(val sku: String = "", val name: String = "", val description: String = "", val brand: String = "", val category: String = "", val images: List<String> = emptyList(), val variants: List<Map<String, Any?>> = emptyList(), val price: Map<String, Any?> = emptyMap(), val offerRef: String? = null, val active: Boolean? = null, val status: String? = null, val productBasePrice: com.fasterxml.jackson.databind.JsonNode = com.fasterxml.jackson.databind.node.MissingNode.getInstance())

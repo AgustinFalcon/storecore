@@ -35,13 +35,13 @@ data class InventoryProjection(val variantId: String, val sku: String, val produ
 data class OfferProjection(val id: String, val name: String)
 data class PriceProjection(val base: BigDecimal, val original: BigDecimal, val effective: BigDecimal, val offer: OfferProjection?)
 data class CatalogMedia(val id: String, val url: String, val sortOrder: Int, val primary: Boolean)
-data class CatalogVariant(val id: String, val sku: String, val name: String, val status: VariantStatus, val attributes: Map<String, Any?>, val availableQuantity: Long?, val inventory: InventoryProjection) {
+data class CatalogVariant(val id: String, val sku: String, val name: String, val status: VariantStatus, val attributes: Map<String, Any?>, val availableQuantity: Long?, val inventory: InventoryProjection, val price: SkuPriceResolution, val pricePolicy: VariantPricePolicyView) {
     val active: Boolean get() = status.active
     val availability: VariantAvailability get() = inventory.availability()
 }
 data class CatalogProduct(val id: String, val sku: String, val name: String, val description: String, val brand: String, val category: String,
-    val status: ProductStatus, val media: List<CatalogMedia>, val variants: List<CatalogVariant>, val price: PriceProjection) {
+    val status: ProductStatus, val media: List<CatalogMedia>, val variants: List<CatalogVariant>, val price: PriceProjection?, val productBasePrice: BigDecimal?) {
     val active: Boolean get() = status.active
     val images: List<String> get() = media.map { it.url }
-    val offerRef: String? get() = price.offer?.id
+    val offerRef: String? get() = price?.offer?.id
 }

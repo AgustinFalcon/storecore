@@ -1003,12 +1003,25 @@ class MpOrdersCheckoutIntegrationTest(
         assertEquals(com.storecore.commerce.application.FulfillmentRejected().message, envelope.path("errorCode").asText())
     }
 
+    @Test fun `variant override reaches order payment snapshot and fake provider unchanged by later edit`() {
+        val sku="SKU-OVERRIDE-${UUID.randomUUID()}"
+        val orderId=checkoutWithQuantity(sku,2,BigDecimal("230.25"))
+        assertEquals(BigDecimal("460.50"),jdbc.queryForObject("SELECT total FROM orders WHERE id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("460.50"),jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("230.25"),jdbc.queryForObject("SELECT effective_unit_price FROM order_items WHERE order_id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("460.50"),Fakes.lastRequest.get()!!.amount)
+        assertEquals(BigDecimal("460.50"),jdbc.queryForObject("SELECT amount FROM mp_checkout_attempts WHERE order_id=?",BigDecimal::class.java,orderId))
+        jdbc.update("UPDATE product_variants SET base_price_override=999 WHERE sku=?",sku)
+        assertEquals(BigDecimal("230.25"),jdbc.queryForObject("SELECT effective_unit_price FROM order_items WHERE order_id=?",BigDecimal::class.java,orderId))
+        assertEquals(BigDecimal("460.50"),jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?",BigDecimal::class.java,orderId))
+    }
     private fun checkout(sku: String): Long {
         return checkoutWithQuantity(sku, 1)
     }
 
-    private fun checkoutWithQuantity(sku: String, quantity: Int): Long {
+    private fun checkoutWithQuantity(sku: String, quantity: Int, overrideAmount: BigDecimal? = null): Long {
         putProduct(sku, "Paid Item", available = 5)
+        if(overrideAmount != null) jdbc.update("UPDATE product_variants SET base_price_override=? WHERE sku=?",overrideAmount,sku)
         customer = addAddress(customer)
         val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":$quantity}""", customer.cookie, customer.csrf)
         assertEquals(200, added.statusCode.value(), added.body)
@@ -1178,12 +1191,15 @@ class MpOrdersCheckoutIntegrationTest(
         object Lane : OfficialOrderQueryPort, OfficialOrderCommandPort {
             override fun configured() = true
             override fun getByProviderOrderId(providerOrderId: String) = orders[providerOrderId]
-            override fun create(request: OfficialOrderCreateRequest) =
-                createResult.get() ?: CreationObservation.Timeout
+            override fun create(request: OfficialOrderCreateRequest): CreationObservation {
+                lastRequest.set(request)
+                return createResult.get() ?: CreationObservation.Timeout
+            }
             override fun search(query: OfficialOrderSearchQuery) = searchResult.get()
         }
 
         companion object {
+            val lastRequest = AtomicReference<OfficialOrderCreateRequest?>(null)
             val orders = ConcurrentHashMap<String, OfficialOrderResource>()
             val createResult = AtomicReference<CreationObservation?>(null)
             val searchResult = AtomicReference(OfficialOrderSearchResult(emptyList(), 1, true))

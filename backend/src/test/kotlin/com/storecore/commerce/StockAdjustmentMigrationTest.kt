@@ -21,7 +21,7 @@ class StockAdjustmentMigrationTest {
             jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) VALUES (?,8,3,1)",variant)
             val history=jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
             val balances=jdbc.queryForList("SELECT * FROM inventory_balances")
-            assertEquals("20",flyway().migrate().targetSchemaVersion.toString())
+            assertEquals("21",flyway().migrate().targetSchemaVersion.toString())
             assertEquals(history,jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=15 ORDER BY installed_rank"))
             assertEquals(balances,jdbc.queryForList("SELECT * FROM inventory_balances"))
             assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM inventory_adjustment_commands",Int::class.java))

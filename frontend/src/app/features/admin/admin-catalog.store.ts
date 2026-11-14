@@ -10,6 +10,7 @@ import { getApiErrorMessage } from '../../core/api/http-error.util';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { CatalogProductDraft, catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
+import { isArsAmount } from '../../domain/catalog/variant-price';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 
@@ -129,6 +130,10 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     trigger$.pipe(
       filter(() => !!this.actorKey && !this.snapshot.loading),
       tap(() => {
+        if (!this.validPrices()) this.patchState({ errorMessage: 'Informá precios ARS válidos, no negativos y con hasta dos decimales.' });
+      }),
+      filter(() => this.validPrices()),
+      tap(() => {
         const draft = this.snapshot.draft;
         const invalidVariant = draft.variants.some(variant =>
           !variant.sku.trim() || !variant.name.trim() || !variant.status.canPersist ||
@@ -166,6 +171,12 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       ),
     ),
   );
+
+  private validPrices(): boolean {
+    const draft = this.snapshot.draft;
+    return isArsAmount(draft.productBasePrice) && draft.variants.every(variant => variant.priceCommand.known
+      && (!variant.priceCommand.requiresBase || isArsAmount(variant.priceInput)));
+  }
 
   readonly persistBrand = this.effect<void>((trigger$) =>
     trigger$.pipe(

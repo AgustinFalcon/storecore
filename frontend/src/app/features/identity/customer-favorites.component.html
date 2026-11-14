@@ -24,7 +24,12 @@
             <div class="sc-favorite-card__body">
               <p class="sc-mono">SKU {{ item.sku }}</p>
               <h2><a [routerLink]="['/catalog', item.sku]">{{ item.name }}</a></h2>
-              <p class="sc-price">{{ item.price }}</p>
+              @if (item.availability.canPurchase && item.price !== null) {
+                @if (item.priceResolution?.price?.offer && item.priceResolution!.price!.original > item.price) { <p class="sc-price__was">{{ item.priceResolution!.price!.original }}</p> }
+                <p class="sc-price">{{ item.price }}</p>
+                @if (item.priceResolution?.price?.offer; as offer) { <span class="sc-badge">{{ offer.name }}</span> }
+              }
+              @else { <p class="sc-price__meta">Precio no disponible</p> }
               <span class="sc-badge" [class.sc-badge--ok]="item.availability.canPurchase" [class.sc-badge--warn]="!item.availability.canPurchase">
                 {{ item.availability.label }}
               </span>

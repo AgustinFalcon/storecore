@@ -88,9 +88,10 @@ export class UserHttpRepository implements IUserRepository {
         sku: product.sku, name: product.name, description: product.description, brand: product.brand, category: product.category,
         images: product.images, variants: product.variants.map(variant => ({
           id: variant.id, sku: variant.sku, name: variant.name, status: variant.status.wire, attributes: variant.attributes,
+          priceCommand: variant.priceCommand.toWire(variant.priceInput),
           ...(variant.id ? {} : { availableQuantity: variant.initialAvailableQuantity }),
         })),
-        price: { base: product.price.base }, status: product.status.wire,
+        productBasePrice: product.productBasePrice, status: product.status.wire,
       })
       .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));
   }

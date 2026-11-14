@@ -30,7 +30,7 @@ describe('bounded administrative catalog', () => {
   });
 
   it('edits existing variant presentation and attributes without changing identity or SKU', async () => {
-    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', price: { base: 10, original: 10, effective: 10 },
+    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', productBasePrice: 10, price: { base: 10, original: 10, effective: 10 },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
@@ -53,7 +53,7 @@ describe('bounded administrative catalog', () => {
   });
 
   it('preserves untouched JSON attribute types and rejects duplicate key collisions', async () => {
-    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', price: { base: 10, original: 10, effective: 10 },
+    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', productBasePrice: 10, price: { base: 10, original: 10, effective: 10 },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Weight: 2, Enabled: true, Nested: { a: 1 }, Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
@@ -83,7 +83,7 @@ describe('bounded administrative catalog', () => {
   });
 
   it('blocks persistence when a variant arrives with an unknown closed status', () => {
-    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', price: { base: 10, original: 10, effective: 10 },
+    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', productBasePrice: 10, price: { base: 10, original: 10, effective: 10 },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'FUTURE', availability: 'AVAILABLE', attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     const save = vi.fn(() => of(product));
     const store = new AdminCatalogStore({ save } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);

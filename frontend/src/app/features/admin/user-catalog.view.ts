@@ -7,6 +7,7 @@ import { CatalogProductDraft, CatalogVariantDraft, newCatalogVariant } from '../
 import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
+import { parseArsAmountInput, VariantPriceCommand } from '../../domain/catalog/variant-price';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -15,6 +16,20 @@ import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-state
   templateUrl: './user-catalog.view.html',
 })
 export class UserCatalogViewComponent {
+  priceCommands(variant: CatalogVariantDraft): readonly VariantPriceCommand[] {
+    return variant.id ? VariantPriceCommand.selectable : [VariantPriceCommand.Inherit, VariantPriceCommand.Override];
+  }
+  setPriceCommand(index: number, raw: unknown): void {
+    this.patchVariant(index, { priceCommand: VariantPriceCommand.fromWire(raw) });
+  }
+  setProductBasePriceInput(raw: unknown): void {
+    const value = typeof raw === 'string' ? raw : '';
+    this.patch({ productBasePriceRaw: value, productBasePrice: parseArsAmountInput(value) });
+  }
+  setVariantPriceInput(index: number, raw: unknown): void {
+    const value = typeof raw === 'string' ? raw : '';
+    this.patchVariant(index, { priceInputRaw: value, priceInput: parseArsAmountInput(value) });
+  }
   readonly productStatuses = ProductStatus.selectable;
   readonly unknownProductStatus = ProductStatus.Unknown;
   readonly variantStatuses = VariantStatus.selectable;
@@ -106,11 +121,6 @@ export class UserCatalogViewComponent {
     const variant = this.state.draft.variants[variantIndex];
     if (!variant) return;
     this.patchVariant(variantIndex, { attributes: Object.fromEntries(Object.entries(variant.attributes).filter(([name]) => name !== key)) });
-  }
-
-  patchPrice(partial: Partial<CatalogProductDraft['price']>): void {
-    const draft = this.state.draft;
-    this.draftChange.emit({ ...draft, price: { ...draft.price, ...partial } });
   }
 
   setImages(value: string): void {

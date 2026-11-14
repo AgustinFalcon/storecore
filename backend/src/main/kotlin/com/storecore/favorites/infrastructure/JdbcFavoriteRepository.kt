@@ -1,5 +1,7 @@
 package com.storecore.favorites.infrastructure
 
+import com.storecore.catalog.domain.*
+import com.storecore.offers.domain.DiscountKind
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import com.storecore.favorites.application.FavoriteLimitReached
 import com.storecore.favorites.application.FavoriteProductUnavailable
@@ -18,13 +20,20 @@ import java.time.Instant
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcFavoriteRepository(private val jdbc: JdbcTemplate) : FavoriteRepository {
     override fun list(customer: CustomerPrincipal): List<FavoriteItem> = jdbc.query(
-        """SELECT v.sku,p.name,p.base_price,im.url,f.added_at,
+        """SELECT v.sku,p.name,p.base_price,v.base_price_override,o.id offer_id,o.name offer_name,o.discount_type,o.discount_value,im.url,f.added_at,
            (v.active AND p.status='ACTIVE') AS available
            FROM customer_favorites f JOIN product_variants v ON v.id=f.variant_id
            JOIN products p ON p.id=v.product_id
            LEFT JOIN LATERAL (SELECT url FROM product_images WHERE product_id=p.id AND is_primary ORDER BY id LIMIT 1) im ON TRUE
+           LEFT JOIN LATERAL (SELECT o.* FROM offers o JOIN offer_products op ON op.offer_id=o.id WHERE op.product_id=p.id AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at ORDER BY o.priority DESC,o.id LIMIT 1) o ON TRUE
            WHERE f.customer_id=? ORDER BY f.added_at DESC,v.sku LIMIT 200""",
-        { rs, _ -> FavoriteItem(rs.getString("sku"), rs.getString("name"), rs.getBigDecimal("base_price"), rs.getString("url"), if (rs.getBoolean("available")) FavoriteAvailability.AVAILABLE else FavoriteAvailability.UNAVAILABLE, rs.getTimestamp("added_at").toInstant()) },
+        { rs, _ ->
+            val policy=VariantBasePricePolicy.fromPersistence(rs.getString("base_price")?.toBigDecimalOrNull(),rs.getString("base_price_override"))
+            val offer=rs.getString("offer_id")?.let { SkuOffer(it,rs.getString("offer_name"),DiscountKind.fromWire(rs.getString("discount_type")),rs.getString("discount_value")?.toBigDecimalOrNull()) }
+            val resolution=if(rs.getBoolean("available")) SkuPricePolicy.resolve(policy,offer) else SkuPriceResolution.Unknown(PriceUnknownReason.SKU_UNAVAILABLE)
+            val available=rs.getBoolean("available") && resolution is SkuPriceResolution.Known
+            FavoriteItem(rs.getString("sku"),rs.getString("name"),if(available) resolution.knownPrice()?.effective else null,rs.getString("url"),if(available) FavoriteAvailability.AVAILABLE else FavoriteAvailability.UNAVAILABLE,rs.getTimestamp("added_at").toInstant(),resolution)
+        },
         customer.customerId,
     )
 

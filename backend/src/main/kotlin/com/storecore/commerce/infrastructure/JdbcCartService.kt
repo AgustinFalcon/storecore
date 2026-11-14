@@ -31,6 +31,7 @@ import javax.sql.DataSource
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcCartService(
+    private val priceAuthority: com.storecore.catalog.application.SkuPriceAuthority,
     private val jdbc: JdbcTemplate,
     private val mapper: ObjectMapper,
     private val inventory: JdbcInventoryService,
@@ -140,12 +141,8 @@ class JdbcCartService(
     private data class Priced(val variantId: Long, val original: BigDecimal, val discount: BigDecimal, val effective: BigDecimal, val offerId: Long?, val campaign: String?)
 
     private fun price(sku: String): Priced {
-        val row = jdbc.query("SELECT v.id,p.id product_id,p.base_price FROM product_variants v JOIN products p ON p.id=v.product_id WHERE v.sku=? AND p.status='ACTIVE' AND v.active", { rs, _ -> Triple(rs.getLong("id"), rs.getLong("product_id"), rs.getBigDecimal("base_price")) }, sku).firstOrNull() ?: throw ResourceNotFound()
-        val offer = jdbc.query("SELECT o.id,o.name,o.discount_type,o.discount_value FROM offers o JOIN offer_products op ON op.offer_id=o.id WHERE op.product_id=? AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at ORDER BY o.priority DESC,o.id LIMIT 1", { rs, _ -> mapOf("id" to rs.getLong("id"), "name" to rs.getString("name"), "type" to rs.getString("discount_type"), "value" to rs.getBigDecimal("discount_value")) }, row.second).firstOrNull()
-        val original = row.third
-        val discount = if (offer == null) BigDecimal.ZERO else
-            LocalOfferDiscount(DiscountKind.fromWire(offer["type"] as? String), offer["value"] as BigDecimal).applyTo(original)
-        return Priced(row.first, original, discount, original.subtract(discount), offer?.get("id") as Long?, offer?.get("name") as String?)
+        val (variantId,quote)=com.storecore.catalog.application.SellableSkuPrice(priceAuthority).resolve(sku)
+        return Priced(variantId,quote.original,quote.original.subtract(quote.effective),quote.effective,quote.offer?.id?.toLongOrNull(),quote.offer?.name)
     }
 
     /** Products precede variants, which precede balances, across every cart line. */

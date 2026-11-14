@@ -1,3 +1,4 @@
+import { SkuPriceResolution, VariantPricePolicy } from './variant-price';
 import { CatalogEditorMode, catalogProductDraftFromDetail, newCatalogProductDraft } from './catalog-product-draft';
 import { ProductStatus, VariantStatus, InventoryState } from './catalog-states';
 import { InventoryAvailability } from '../user/inventory-availability';
@@ -14,9 +15,9 @@ describe('catalog product draft', () => {
     expect(created.mode).toBe(CatalogEditorMode.Create);
     expect(created.variants).toEqual([expect.objectContaining({ id: '', initialAvailableQuantity: 0 })]);
     const detail: ProductDetail = {
-      id: 'p', sku: 'SKU', name: 'Producto', description: '', brand: '', category: '', images: [], media: [], offerRef: null,
+      productBasePrice: 10, id: 'p', sku: 'SKU', name: 'Producto', description: '', brand: '', category: '', images: [], media: [], offerRef: null,
       price: { base: 10, original: 10, effective: 10, offer: null }, status: ProductStatus.Active, active: true,
-      variants: [{ id: 'v', sku: 'SKU', name: 'Principal', status: VariantStatus.Active, attributes: {}, availableQuantity: 3, availability: InventoryAvailability.Normal,
+      variants: [{ price: SkuPriceResolution.Unknown, pricePolicy: VariantPricePolicy.Inherited, basePriceOverride: null, id: 'v', sku: 'SKU', name: 'Principal', status: VariantStatus.Active, attributes: {}, availableQuantity: 3, availability: InventoryAvailability.Normal,
         inventory: { variantId: 'v', productName: 'Producto', variantLabel: 'Principal', onHand: 3, saleable: 3, updatedAt: null, state: InventoryState.Known, sku: 'SKU', availableQuantity: 3, reservedQuantity: 0, safetyStock: 0, availability: InventoryAvailability.Normal } }],
     };
     const edited = catalogProductDraftFromDetail(detail);

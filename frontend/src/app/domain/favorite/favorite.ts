@@ -1,3 +1,4 @@
+import type { SkuPriceResolution } from '../catalog/variant-price';
 export class FavoriteAvailability {
   private constructor(readonly wire: string, readonly label: string, readonly canPurchase: boolean, readonly canRemove: boolean) {}
 
@@ -29,7 +30,8 @@ export class FavoriteMutationOutcome {
 export interface FavoriteItem {
   readonly sku: string;
   readonly name: string;
-  readonly price: number;
+  readonly price: number | null;
+  readonly priceResolution?: SkuPriceResolution;
   readonly imageUrl: string | null;
   readonly availability: FavoriteAvailability;
   readonly addedAt: string;

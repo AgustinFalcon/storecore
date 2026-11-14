@@ -4,7 +4,8 @@ import { Cart, CartLine, CheckoutReceipt } from '../../domain/cart/cart.entity';
 import { CartCurrency } from '../../domain/cart/cart-currency';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
-import { ProductSummary } from '../../domain/catalog/product-summary.entity';
+import { ProductSummary, summarizeProduct } from '../../domain/catalog/product-summary.entity';
+import { isArsAmount, SkuPriceResolution, VariantPricePolicy } from '../../domain/catalog/variant-price';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
@@ -125,10 +126,7 @@ export function mapBoundedRows<T>(value: unknown, mapper: (value: unknown) => T)
   return Object.assign(entries.map(mapper), { metadata: { total, page, size, truncated: row['truncated'] } });
 }
 export function mapProductSummary(value: unknown): ProductSummary {
-  const row = asRecord(value); const price = mapPrice(row['price']);
-  return { sku: text(row['sku']), name: text(row['name']), price: price.effective,
-    originalPrice: price.offer && price.original !== null && price.original > price.effective ? price.original : null,
-    imageUrl: text(row['imageUrl'] ?? items(row['images'])[0]) || null, offerRef: price.offer?.id ?? null };
+  return summarizeProduct(mapProductDetail(value));
 }
 export function mapProductSummaries(value: unknown): BoundedRows<ProductSummary> { return mapBoundedRows(value, mapProductSummary); }
 function mapPrice(value: unknown): ProductPrice {
@@ -140,16 +138,25 @@ function mapPrice(value: unknown): ProductPrice {
   if (row['offer'] == null && (effective !== base || (original != null && original !== base))) throw new Error('Precio sin autoridad de oferta.');
   return { base, original, effective, offer: row['offer'] == null ? null : { id: offer['id'] as string, name: offer['name'] as string } };
 }
-function mapVariant(value: unknown): ProductVariant {
+function mapVariant(value: unknown, productBase: unknown): ProductVariant {
   const row = asRecord(value); const inventory = mapInventoryRow(row['inventory'] ?? { sku: row['sku'], state: 'UNKNOWN' });
+  const policy = asRecord(row['pricePolicy']);
+  let pricePolicy = VariantPricePolicy.fromWire(policy['mode']);
+  const base = policy['base'];
+  if (pricePolicy.isOverride ? !isArsAmount(base) : base !== null) pricePolicy = VariantPricePolicy.Unknown;
+  let price = pricePolicy.known ? SkuPriceResolution.fromWire(row['price']) : SkuPriceResolution.Unknown;
+  if (price.known && price.price!.base !== (pricePolicy.isOverride ? base : productBase)) price = SkuPriceResolution.Unknown;
   if (InventoryAvailability.fromWire(row['availability']) !== inventory.availability) throw new Error('Disponibilidad de variante contradictoria.');
-  return { id: text(row['id']), sku: text(row['sku']), name: text(row['name']), status: VariantStatus.fromWire(row['status']), attributes: asRecord(row['attributes']), availableQuantity: inventory.state === InventoryState.Missing ? null : inventory.saleable, availability: inventory.availability, inventory };
+  return { id: text(row['id']), sku: text(row['sku']), name: text(row['name']), status: VariantStatus.fromWire(row['status']), attributes: asRecord(row['attributes']), availableQuantity: inventory.state === InventoryState.Missing ? null : inventory.saleable, availability: inventory.availability, inventory,
+    pricePolicy, basePriceOverride: pricePolicy.isOverride ? base as number : null,
+    price };
 }
 export function mapProductDetail(value: unknown): ProductDetail {
   const row = asRecord(value); const status = ProductStatus.fromWire(row['status']);
   return { id: text(row['id']), sku: text(row['sku']), name: text(row['name']), description: text(row['description']), brand: text(row['brand']), category: text(row['category']), images: items(row['images']).map(text),
     media: items(row['media']).map(value => { const media = asRecord(value); return { id: text(media['id']), url: text(media['url']), sortOrder: num(media['sortOrder']), primary: media['primary'] === true }; }),
-    variants: items(row['variants']).map(mapVariant), price: mapPrice(row['price']), offerRef: text(row['offerRef']) || null, status, active: status.isPublic };
+    variants: items(row['variants']).map(value => mapVariant(value, row['productBasePrice'])), productBasePrice: isArsAmount(row['productBasePrice']) ? row['productBasePrice'] : null,
+    price: row['price'] == null ? null : mapPrice(row['price']), offerRef: text(row['offerRef']) || null, status, active: status.isPublic };
 }
 export function mapProductDetails(value: unknown): BoundedRows<ProductDetail> { return mapBoundedRows(value, mapProductDetail); }
 

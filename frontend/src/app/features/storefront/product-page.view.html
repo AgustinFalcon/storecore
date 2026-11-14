@@ -36,13 +36,13 @@
         <p>{{ product.description }}</p>
         <div class="sc-price-stack">
           @if (hasDiscount) {
-            <p class="sc-price__was">{{ product.price.original }}</p>
+            <p class="sc-price__was">{{ selectedPrice?.original }}</p>
           }
-          <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ product.price.effective }}</p>
+          @if (selectedPrice) { <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ selectedPrice.effective }}</p> } @else { <p role="status">Precio no disponible</p> }
         </div>
-        @if (product.offerRef) {
-          <span class="sc-badge sc-badge--warn">oferta {{ product.offerRef }}</span>
-        } @else {
+        @if (selectedPrice?.offer?.id) {
+          <span class="sc-badge sc-badge--warn">oferta {{ selectedPrice.offer.id }}</span>
+        } @else if (selectedPrice) {
           <span class="sc-badge">sin oferta</span>
         }
         @if (!product.status.isPublic) {

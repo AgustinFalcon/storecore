@@ -5,11 +5,35 @@ import { ProductPageViewComponent } from './product-page.view';
 import { mapProductDetail } from '../../data/mappers/http-mappers';
 
 const productFixture = (sku: string, images: string[] = []) => mapProductDetail({ id: 'p', sku, name: sku, status: 'ACTIVE', images,
-  price: { base: 1, effective: 1, original: 1, offer: null },
-  variants: [{ id: 'v', sku, name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' },
+  productBasePrice: 1, price: { base: 1, effective: 1, original: 1, offer: null },
+  variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku, name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' },
     inventory: { variantId: 'v', sku, state: 'KNOWN', available: 4, reserved: 2, onHand: 6, safety: 1, saleable: 3 } }] });
 
 describe('ProductPage closed cart controls', () => {
+  it('binds price and offer to the exact selection and blocks unknown variant prices', async () => {
+    TestBed.configureTestingModule({imports:[ProductPageViewComponent],providers:[provideRouter([])]});
+    const fixture=TestBed.createComponent(ProductPageViewComponent);
+    const quote=(base:number,effective:number)=>({state:'KNOWN',price:{base,original:base,effective,offer:effective<base?{id:'O',name:'Oferta'}:null}});
+    const base=productFixture('A');
+    const raw=(sku:string,amount:number,effective=amount)=>({...base.variants[0],id:sku,sku,status:'ACTIVE',availability:'AVAILABLE',
+      inventory:{sku,state:'KNOWN',available:4,reserved:0,safety:0,onHand:4,saleable:4},pricePolicy:{mode:'OVERRIDE',base:amount},price:quote(amount,effective)});
+    fixture.componentRef.setInput('product',mapProductDetail({...base,status:'ACTIVE',productBasePrice:1,variants:[raw('A',100),raw('B',200,150)]}));
+    fixture.componentRef.setInput('access',CustomerCartAccess.Ready);
+    fixture.detectChanges(); await fixture.whenStable();
+    fixture.componentInstance.quantity=3;
+    fixture.componentInstance.selectVariant('B'); fixture.detectChanges();
+    expect(fixture.componentInstance.quantity).toBe(1);
+    expect(fixture.componentInstance.selectedPrice?.effective).toBe(150);
+    expect(fixture.nativeElement.querySelector('.sc-price--hero').textContent).toContain('150');
+    expect(fixture.nativeElement.querySelector('.sc-price__was').textContent).toContain('200');
+    const add=vi.fn();fixture.componentInstance.add.subscribe(add);fixture.componentInstance.submit('A');
+    expect(add).toHaveBeenCalledWith({sku:'B',quantity:1});
+    fixture.componentRef.setInput('product',mapProductDetail({...base,status:'ACTIVE',productBasePrice:1,variants:[{...raw('A',100),price:undefined}]}));
+    fixture.componentInstance.selectVariant('A'); fixture.detectChanges();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Precio no disponible');
+    expect(fixture.nativeElement.textContent).not.toContain('sin oferta');
+  });
   it('selects the requested variant when opening and reusing routes for the same product', async () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(ProductPageViewComponent);

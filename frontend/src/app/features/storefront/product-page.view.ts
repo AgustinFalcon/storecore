@@ -64,15 +64,16 @@ export class ProductPageViewComponent implements OnChanges {
   }
 
   get hasDiscount(): boolean {
-    return !!this.product?.price.offer && this.product.price.original !== null && this.product.price.original > this.product.price.effective;
+    return !!this.selectedPrice?.offer && this.selectedPrice.original > this.selectedPrice.effective;
   }
+  get selectedPrice() { return this.selectedVariant?.pricePolicy?.known ? this.selectedVariant.price?.price ?? null : null; }
 
   get selectedVariant() {
     return this.product?.variants.find(variant => variant.id === this.selectedVariantId) ?? null;
   }
   get canPurchase(): boolean {
     const variant = this.selectedVariant;
-    return !!this.product?.status.isPublic && !!variant?.status.isPublic && variant.availability.canSell &&
+    return !!this.product?.status.isPublic && !!variant?.status.isPublic && !!variant.price?.known && !!variant.pricePolicy?.known && variant.availability.canSell &&
       Number.isSafeInteger(this.quantity) && this.quantity > 0 && variant.inventory.saleable !== null && this.quantity <= variant.inventory.saleable;
   }
   get canIncrease(): boolean {
