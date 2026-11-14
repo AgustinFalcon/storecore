@@ -106,7 +106,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - name: Install isolated-runtime prerequisites
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client openssl iptables
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client openssl iptables acl
       - name: Package backend at the checked-out SHA
         working-directory: backend
         run: mvn -B -DskipTests package
@@ -132,6 +132,10 @@ jobs:
           printf '{"uid":%s,"ipv4":"reject-non-loopback","ipv6":"reject-non-loopback"}\n' "$runtime_uid" | sudo tee /run/storecore-psd-egress.json >/dev/null
           sudo chmod 644 /run/storecore-psd-egress.json
           sudo chmod -R a+rX "${{ runner.temp }}/storecore-psd-browsers"
+          workspace_parent=$(dirname "$GITHUB_WORKSPACE")
+          work_root=$(dirname "$workspace_parent")
+          runner_home=$(dirname "$work_root")
+          sudo setfacl -m u:storecore-psd:--x "$runner_home" "$work_root" "$workspace_parent"
           sudo chown storecore-psd:storecore-psd "$GITHUB_WORKSPACE"
           sudo chown -R storecore-psd:storecore-psd frontend
           sudo -u storecore-psd test -r "$GITHUB_WORKSPACE/frontend/scripts/run-psd-real-e2e.mjs"
