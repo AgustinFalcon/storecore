@@ -1,4 +1,4 @@
-import { expect, type Page, type Request } from '@playwright/test';
+import { expect, type Page, type Request, type Response } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import type { ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import type { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
@@ -23,6 +23,7 @@ export class RealReadTrace {
   readonly writes: string[] = [];
   private readonly pending = new Set<Request>();
   private readonly observations = new WeakMap<Request, ObservedRequest>();
+  private readonly responseStatuses = new WeakMap<Request, number>();
   private readonly successes: SuccessfulObservedRequest[] = [];
   private sequence = 0;
   constructor(page: Page) {
@@ -37,25 +38,33 @@ export class RealReadTrace {
       const inspection = method === 'POST' && [api + 'customer/auth/recovery/inspect', api + 'customer/auth/email-verification/inspect'].includes(url.pathname);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !inspection) this.writes.push(`${method} ${url.pathname}`);
     });
-    page.on('requestfinished', request => { void this.finish(request); });
+    page.on('requestfinished', request => this.finish(request));
+    page.on('response', response => this.observeResponse(response));
     page.on('requestfailed', request => {
       if (!this.pending.delete(request)) return;
       const observation = this.observations.get(request);
       if (observation) this.failures.push(observation);
     });
   }
-  private async finish(request: Request): Promise<void> {
+  private observeResponse(response: Response): void {
+    const request = response.request();
     if (!this.pending.has(request)) return;
     const observation = this.observations.get(request);
     if (!observation) return;
-    const response = await request.response();
-    if (!response) {
+    const status = response.status();
+    this.responseStatuses.set(request, status);
+    this.completed.push({ method: observation.method, path: observation.path, status });
+  }
+  private finish(request: Request): void {
+    if (!this.pending.has(request)) return;
+    const observation = this.observations.get(request);
+    if (!observation) return;
+    const status = this.responseStatuses.get(request);
+    if (status === undefined) {
       this.failures.push(observation);
       this.pending.delete(request);
       return;
     }
-    const status = response.status();
-    this.completed.push({ method: observation.method, path: observation.path, status });
     if (status >= 200 && status < 400) this.successes.push({ ...observation, status });
     this.pending.delete(request);
   }
