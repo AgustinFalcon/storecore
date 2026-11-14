@@ -32,6 +32,7 @@ process.env.STORECORE_IDENTITY_DELIVERY_WORKER_ENABLED = 'false';
 process.env.PLAYWRIGHT_HTML_OPEN = 'never';
 const scratch = mkdtempSync(join(tmpdir(), 'storecore-psd-e2e-'));
 process.env.STORECORE_PSD_RAW_REPORT = join(scratch, 'browser-report.json');
+process.env.STORECORE_PSD_AUTH_DIR = join(scratch, 'route-auth');
 mkdirSync(results, { recursive: true });
 
 const OUTCOME_TOKEN = Symbol('BrowserOutcome');
@@ -416,6 +417,14 @@ async function run() {
   const firstResult = await first.run();
   assert.equal(firstResult.pendingOrderCreated, true);
   writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify(firstResult.receipt, null, 2)}\n`);
+  query(`WITH account AS (
+      INSERT INTO channel_accounts(account_key,channel,oauth_secret_reference,state)
+      VALUES ('psd-local-read-model','MERCADO_LIBRE','psd:external-secret-unconfigured','READ_ONLY') RETURNING id
+    ), variant AS (
+      SELECT id FROM product_variants WHERE sku='${firstResult.receipt.products[0].sku}'
+    )
+    INSERT INTO channel_listings(account_id,external_listing_id,variation_id,variant_id,desired_quantity,state)
+    SELECT account.id,'PSD-ML-READ-ONLY','PSD-VARIANT-1',variant.id,3,'READ_ONLY' FROM account,variant;`);
   const unrelated = await first.context.admin.request('/api/v1/user/offers', {
     method: 'POST', csrf: true, expected: [201], envelopeCode: 200,
     body: { name: 'PSD_OPERATOR_OWNED', priority: 7, startsAt: new Date().toISOString(),

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { resolve } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type BrowserContext } from '@playwright/test';
@@ -19,25 +20,21 @@ const contexts = new Map<RouteActor, BrowserContext>();
 let receipt: RealRouteReceipt;
 let bindings: readonly ProductiveRouteAcceptance[];
 
-// Contexts survive tests in memory only. One login per principal keeps the real
-// five-attempt/15-minute budget intact without disabling its production policy.
+// Contexts survive tests in memory only. Global setup authenticates each principal
+// once so worker restarts cannot consume the real five-attempt/15-minute budget.
 test.beforeAll(async ({ browser }) => {
   receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync(resolve('psd-real-results/fixture-receipt.json'), 'utf8')));
   bindings = bindProductiveRealRoutes(receipt);
   expect(bindings).toHaveLength(30);
   for (const actor of [RouteActor.Anonymous, RouteActor.Customer, RouteActor.Admin]) {
-    const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
+    const authDir = process.env['STORECORE_PSD_AUTH_DIR'];
+    if (!authDir) throw new Error('Missing ephemeral route auth directory');
+    const storageState = actor === RouteActor.Anonymous ? undefined : join(authDir, `${actor.wire}.json`);
+    const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true, storageState });
     contexts.set(actor, context);
     if (actor === RouteActor.Anonymous) continue;
     const page = await context.newPage();
     try {
-      await page.goto('/login');
-      await page.getByLabel('Email', { exact: true }).fill(actor === RouteActor.Customer ? receipt.customerEmail : 'psd-route-admin@storecore.invalid');
-      await page.getByLabel('Contraseña', { exact: true }).fill(actor === RouteActor.Customer ? 'StoreCore-showcase-2026!' : 'PSD-disposable-fixture-2026!');
-      const response = page.waitForResponse(item => new URL(item.url()).pathname === '/api/v1/auth/login');
-      await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-      expect((await response).status()).toBe(200);
-      await expect(page).not.toHaveURL(/\/login/);
       const own = actor === RouteActor.Customer ? 'customer' : 'internal';
       const other = actor === RouteActor.Customer ? 'internal' : 'customer';
       const principal = await page.request.get(`/api/v1/${own}/me`);

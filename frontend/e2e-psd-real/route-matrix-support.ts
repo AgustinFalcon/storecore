@@ -49,9 +49,9 @@ export class RealReadTrace {
     if (!this.pending.has(request)) return;
     const observation = this.observations.get(request);
     if (!observation) return;
-    let error: Error | null;
-    try { error = await response.finished(); }
-    catch { error = new Error('Response observation interrupted'); }
+    let error: Error | null = null;
+    try { await response.body(); }
+    catch { error = new Error('Response body observation interrupted'); }
     const status = response.status();
     this.completed.push({ method: observation.method, path: observation.path, status });
     if (error) this.failures.push(observation);
@@ -98,7 +98,7 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
     ['user/catalog', ['user/catalog']], ['user/offers', ['user/offers']], ['user/customers', ['user/customers']],
     ['user/promos', ['user/promos']], ['user/orders', ['user/orders']], ['user/orders/:id', [`user/orders/${order}`]],
     ['user/inventory', ['user/inventory']], ['user/mercadolibre', ['user/mercadolibre/account', 'user/mercadolibre/listings']],
-    ['user/capabilities', ['user/capabilities']], ['user/profile-import', ['internal/me']],
+    ['user/capabilities', ['user/capabilities']], ['user/profile-import', []],
   ]);
   const own = reads.get(binding.pattern);
   if (!own) throw new Error('Missing explicit real readiness binding');

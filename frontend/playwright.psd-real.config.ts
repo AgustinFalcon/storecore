@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 export default defineConfig({
   testDir: './e2e-psd-real', fullyParallel: false, workers: 1, retries: 0,
+  globalSetup: './e2e-psd-real/route-auth.global-setup.ts',
   timeout: 60_000, expect: { timeout: 15_000 },
   // The runner publishes allowlisted metadata as HTML/JUnit. Raw failures can
   // contain credentials from browser actions and belong in ephemeral scratch.
