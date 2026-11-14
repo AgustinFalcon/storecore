@@ -35,4 +35,9 @@
   coordinator, PDP y carrito verdes.
 - Gate frontend completo: arquitectura y lint verdes; 203 archivos / 1380 pruebas
   verdes; build de producción verde.
-- Estado: listo para PR y CI.
+- PR #267: Verify `43522541468` con backend, frontend y
+  `unified-access-real-e2e` verdes.
+- Merge en `master`: `c0595e54b175009758b8940024115c024dd21215`.
+- Post-merge Verify `43523386759`: 3/3 jobs verdes, incluida la matriz real
+  PostgreSQL + Spring + Angular HTTPS + navegador.
+- Estado final: completado y listo para archivar.
