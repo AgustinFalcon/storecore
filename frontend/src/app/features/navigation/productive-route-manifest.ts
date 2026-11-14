@@ -134,7 +134,7 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('catalog', '/catalog', 'Catálogo', textSelector(product.name)),
     real('catalog/:sku', `/catalog/${encodeURIComponent(product.sku)}`, product.name, textSelector(product.name)),
     real('cart', '/cart', 'Carrito', textSelector(cartProduct.sku)),
-    real('checkout', '/checkout', 'Checkout', textSelector(cartProduct.name)),
+    real('checkout', '/checkout', 'Checkout', `text=${cartProduct.name}`),
     real('checkout/result/:orderId', `/checkout/result/${encodeURIComponent(orderId)}`, 'Pedido iniciado', textSelector(`Orden ${orderId}`)),
     real('customer/register', '/customer/register', 'Crear cuenta customer', '#register-title'),
     real('customer/profile', '/customer/profile', 'Perfil customer', 'input[name="profileEmail"]'),

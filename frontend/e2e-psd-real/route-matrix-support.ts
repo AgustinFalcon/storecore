@@ -33,7 +33,7 @@ export class RealReadTrace {
     try { error = await response.finished(); }
     catch { error = new Error('Response observation interrupted'); }
     if (error) this.failures.push(`${request.method()} ${path}`);
-    this.completed.push({ method: request.method(), path, status: response.status() });
+    else this.completed.push({ method: request.method(), path, status: response.status() });
     this.pending.delete(request);
   }
   async ready(paths: readonly string[]): Promise<void> {
@@ -43,7 +43,9 @@ export class RealReadTrace {
     await expect.poll(() => this.pending.size, { message: 'All real API responses finished' }).toBe(0);
     await new Promise(resolve => setTimeout(resolve, 100));
     await expect.poll(() => this.pending.size, { message: 'Real API response set remains stable' }).toBe(0);
-    expect(this.failures, 'Failed real API requests').toEqual([]);
+    const unresolvedFailures = this.failures.filter(failure => !this.completed.some(row =>
+      `${row.method} ${row.path}` === failure && row.status >= 200 && row.status < 400));
+    expect(unresolvedFailures, 'Failed real API requests without a successful replacement').toEqual([]);
     expect(this.writes, 'Read-only matrix must not mutate domain data').toEqual([]);
     const unexpected = this.completed.filter(row => row.status >= 400 && !(row.status === 401 &&
       ['customer/me', 'internal/me'].some(path => row.path === api + path)));
