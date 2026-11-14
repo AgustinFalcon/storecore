@@ -59,9 +59,12 @@ export class RealReadTrace {
     this.pending.delete(request);
   }
   async ready(paths: readonly string[]): Promise<void> {
-    for (const path of paths) {
-      await expect.poll(() => this.successes.some(row => row.path === api + path && row.status === 200), { message: `Real response completed: ${path}` }).toBe(true);
-    }
+    const [health, branding, ...owned] = paths;
+    expect(health).toBe('health');
+    expect(branding).toBe('storefront/branding');
+    await expect.poll(() => this.successes.some(row => row.path === api + health && row.status === 200), { message: 'Real health response completed' }).toBe(true);
+    await expect.poll(() => this.successes.some(row => row.path === api + branding && row.status === 200), { message: 'Real branding response completed' }).toBe(true);
+    for (const path of owned) await expect.poll(() => this.successes.some(row => row.path === api + path && row.status === 200), { message: 'Real route-owned response completed' }).toBe(true);
     await expect.poll(() => this.pending.size, { message: 'All real API responses finished' }).toBe(0);
     await new Promise(resolve => setTimeout(resolve, 100));
     await expect.poll(() => this.pending.size, { message: 'Real API response set remains stable' }).toBe(0);

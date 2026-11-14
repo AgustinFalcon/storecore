@@ -31,7 +31,7 @@ test.beforeAll(async ({ browser }) => {
     const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
     if (role === UserRole.Admin) adminContext = context; else operatorContext = context;
     const response = await context.request.post('/api/v1/internal/auth/login', { headers: { Origin: origin }, data: {
-      email: role === UserRole.Admin ? 'psd-route-admin@storecore.invalid' : 'psd-operator@storecore.invalid',
+      email: role === UserRole.Admin ? 'psd-action-admin@storecore.invalid' : 'psd-action-operator@storecore.invalid',
       password: 'PSD-disposable-fixture-2026!',
     } });
     expect(response.status()).toBe(200);

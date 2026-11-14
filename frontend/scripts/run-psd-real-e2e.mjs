@@ -93,7 +93,7 @@ const publishedSurfaces = new Set([
 ]);
 const publishedFailureFiles = new Set([
   'route-matrix.spec.ts', 'route-matrix-support.ts', 'surfaces.spec.ts',
-  'z-action-matrix.spec.ts', 'action-matrix-support.ts',
+  'z-action-matrix.spec.ts', 'action-matrix-support.ts', 'support.ts',
 ]);
 
 function publishEvidence(reportPath, target = results) {
@@ -391,10 +391,16 @@ async function run() {
       SELECT 'psd-browser-admin@storecore.invalid',password_hash,'PSD','Browser' FROM customers WHERE email='psd-hash@storecore.invalid';
     INSERT INTO users(email,password_hash,first_name,last_name)
       SELECT 'psd-route-admin@storecore.invalid',password_hash,'PSD','Routes' FROM customers WHERE email='psd-hash@storecore.invalid';
+    INSERT INTO users(email,password_hash,first_name,last_name)
+      SELECT 'psd-action-admin@storecore.invalid',password_hash,'PSD','Action admin' FROM customers WHERE email='psd-hash@storecore.invalid';
+    INSERT INTO users(email,password_hash,first_name,last_name)
+      SELECT 'psd-action-operator@storecore.invalid',password_hash,'PSD','Action operator' FROM customers WHERE email='psd-hash@storecore.invalid';
     INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='ADMIN' WHERE u.email='${adminEmail}';
     INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='OPERATOR' WHERE u.email='psd-operator@storecore.invalid';
     INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='ADMIN' WHERE u.email='psd-browser-admin@storecore.invalid';
     INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='ADMIN' WHERE u.email='psd-route-admin@storecore.invalid';
+    INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='ADMIN' WHERE u.email='psd-action-admin@storecore.invalid';
+    INSERT INTO user_roles(user_id,role_id) SELECT u.id,r.id FROM users u JOIN roles r ON r.code='OPERATOR' WHERE u.email='psd-action-operator@storecore.invalid';
     COMMIT;`);
   await stop(provision);
   const loading = spring(httpOrigin, true, 'backend-loader');
@@ -415,6 +421,11 @@ async function run() {
     body: { name: 'PSD_OPERATOR_OWNED', priority: 7, startsAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + 86400000).toISOString(), discountKind: ShowcaseDiscountKind.Percent.wire,
       discountValue: 3, minMarginPercent: 0, skus: ['SHOW-SET-MANUAL'] } });
+  const seededPromo = await first.context.admin.request('/api/v1/user/promos', {
+    method: 'POST', csrf: true, expected: [200], envelopeCode: 200,
+    body: { listingSku: firstResult.receipt.products[0].sku, currency: 'ARS', priceScope: 'DEFAULT',
+      desiredPrice: 180000, effectivePromoPrice: null, validFrom: new Date(Date.now() - 86_400_000).toISOString(),
+      validTo: new Date(Date.now() + 7 * 86_400_000).toISOString(), writer: 'MANUAL' } });
   const historical = query("SELECT count(*) FROM orders;");
   const balances = query('SELECT row_to_json(b)::text FROM inventory_balances b ORDER BY variant_id;');
   const ledger = query('SELECT row_to_json(l)::text FROM inventory_ledger l ORDER BY id;');
@@ -426,6 +437,8 @@ async function run() {
   assert.equal(query('SELECT row_to_json(l)::text FROM inventory_ledger l ORDER BY id;'), ledger);
   const replayOffers = await first.context.admin.request('/api/v1/user/offers');
   assert.deepEqual(replayOffers.find(offer => offer.id === unrelated.id), unrelated);
+  const replayPromos = await first.context.admin.request('/api/v1/user/promos');
+  assert.deepEqual(replayPromos.items.find(promo => promo.id === seededPromo.id), seededPromo);
   await stop(loading);
   const backend = spring(httpsOrigin, true, 'backend-browser');
   await ready(backend, 'http://127.0.0.1:8080/actuator/health');

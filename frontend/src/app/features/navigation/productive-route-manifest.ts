@@ -153,7 +153,7 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('user/orders', '/user/orders', 'Fulfillment', textSelector(orderId)),
     real('user/orders/:id', `/user/orders/${encodeURIComponent(orderId)}`, `Fulfillment ${orderId}`, textSelector(product.name)),
     real('user/inventory', '/user/inventory', 'Inventario WEB', textSelector(product.sku)),
-    real('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', 'text=Sin publicaciones vinculadas'),
+    real('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', '#ml-account-title'),
     real('user/capabilities', '/user/capabilities', 'Módulos del comercio', 'text=Preparación y entregas'),
     real('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
   ]);
