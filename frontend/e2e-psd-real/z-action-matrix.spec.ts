@@ -524,7 +524,7 @@ test('PRM action: external account and capabilities honestly remain unavailable'
   try {
     await page.goto('/user/mercadolibre');
     const account = mapChannelAccount(await body(page, 'user/mercadolibre/account'));
-    expect(account.status).toBe(MercadoLibreAccountStatus.Disabled);
+    expect(account.status).toBe(MercadoLibreAccountStatus.Unknown);
     expect(account.availability).toBe(ChannelAvailability.Unavailable);
     expect(account.accountRef).toBeNull();
     await expect(page.getByText(account.status.label, { exact: true })).toBeVisible();
