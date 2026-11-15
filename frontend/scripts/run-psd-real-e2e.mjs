@@ -84,6 +84,13 @@ class PublishedActionKind extends PublicationValue {
   static values = [this.Read, this.Mutation, this.Rejection];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
+class PublishedReadTerminal extends PublicationValue {
+  static Pending = new PublishedReadTerminal(PUBLICATION_TOKEN, 'pending', true);
+  static Finished = new PublishedReadTerminal(PUBLICATION_TOKEN, 'finished', true);
+  static Failed = new PublishedReadTerminal(PUBLICATION_TOKEN, 'failed', true);
+  static values = [this.Pending, this.Finished, this.Failed];
+  static fromWire(raw) { return super.fromWire(raw, this.values); }
+}
 const publishedActionIds = new Set(['registration', 'catalog-discovery', 'profile', 'addresses-ownership', 'favorites',
   'cart-checkout-order-ownership', 'unpaid-order-rejection', 'catalog-inventory', 'offers', 'promos',
   'branding-conflict', 'content', 'profile-import', 'customer-revocation', 'operator-permissions-csrf',
@@ -99,7 +106,7 @@ const publishedFailureFiles = new Set([
 
 function publishEvidence(reportPath, target = results) {
   const report = JSON.parse(readFileSync(reportPath, 'utf8'));
-  const rows = [], routes = [], actions = [], routeKeys = new Set(), actionKeys = new Set();
+  const rows = [], routes = [], actions = [], diagnostics = [], routeKeys = new Set(), actionKeys = new Set();
   const escape = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
   const pathOnly = value => new URL(value, httpsOrigin).pathname;
@@ -133,6 +140,20 @@ function publishEvidence(reportPath, target = results) {
             evidence: 'REAL_BACKEND', accepted: outcome.accepted });
         }
         for (const attachment of last.attachments ?? []) {
+          if (attachment.name === 'real-route-diagnostic' && attachment.body) {
+            const raw = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));
+            assert.ok(Number.isInteger(raw.width) && [390, 768, 1440].includes(raw.width));
+            assert.ok(typeof raw.pattern === 'string' && typeof raw.finalPath === 'string' && Array.isArray(raw.requests));
+            diagnostics.push({ pattern: pathOnly(raw.pattern), width: raw.width, finalPath: pathOnly(raw.finalPath),
+              accepted: outcome.accepted, requests: raw.requests.map(request => {
+                assert.match(request.method, /^(GET|HEAD|OPTIONS|POST|PUT|PATCH|DELETE)$/);
+                assert.ok(request.status === null || Number.isInteger(request.status) && request.status >= 100 && request.status <= 599);
+                const terminal = PublishedReadTerminal.fromWire(request.terminal);
+                assert.equal(terminal.accepted, true, 'Unknown request terminal');
+                return { method: request.method, path: pathOnly(request.path), status: request.status, terminal: terminal.wire };
+              }) });
+            continue;
+          }
           if (attachment.name !== 'real-route-acceptance' || !attachment.body) continue;
           const raw = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));
           assert.equal(raw.evidence, 'REAL_BACKEND');
@@ -169,6 +190,7 @@ function publishEvidence(reportPath, target = results) {
     `<li>${row.name} (${escape(row.file)}:${row.line}): ${escape(row.outcome.wire)}</li>`).join('')}</ol></main></html>\n`);
   writeFileSync(join(target, 'route-census.json'), `${JSON.stringify(routes, null, 2)}\n`);
   writeFileSync(join(target, 'action-census.json'), `${JSON.stringify(actions, null, 2)}\n`);
+  writeFileSync(join(target, 'route-diagnostics.json'), `${JSON.stringify(diagnostics, null, 2)}\n`);
   return { cases: rows.length, failures, routeAcceptances: routes.length, actionAcceptances: actions.length };
 }
 
@@ -186,14 +208,20 @@ function checkSecurityContracts() {
   ], results: [{
     status: BrowserOutcome.Failed.wire, errors: [{ message: secret,
       location: { file: `/tmp/${secret}/route-matrix.spec.ts`, line: 70, column: 1 } }],
-    stdout: [{ text: secret }], attachments: [],
+    stdout: [{ text: secret }], attachments: [{ name: 'real-route-diagnostic', body: Buffer.from(JSON.stringify({
+      pattern: `/customer/profile?secret=${secret}`, width: 390, finalPath: `/customer/profile?secret=${secret}#${secret}`,
+      requests: [{ method: 'GET', path: `/api/v1/customer/me?secret=${secret}`, status: 200,
+        terminal: PublishedReadTerminal.Finished.wire, body: secret, identity: secret }],
+    })).toString('base64') }],
   }] }] }] }] }));
   const target = join(scratch, 'safe-report');
   assert.deepEqual(publishEvidence(path, target), { cases: 1, failures: 1, routeAcceptances: 0, actionAcceptances: 1 });
-  for (const file of ['junit.xml', 'report/index.html', 'route-census.json', 'action-census.json']) {
+  for (const file of ['junit.xml', 'report/index.html', 'route-census.json', 'action-census.json', 'route-diagnostics.json']) {
     assert.equal(readFileSync(join(target, file), 'utf8').includes(secret), false);
   }
   assert.equal(readFileSync(join(target, 'junit.xml'), 'utf8').includes('route-matrix.spec.ts:70'), true);
+  assert.deepEqual(JSON.parse(readFileSync(join(target, 'route-diagnostics.json'), 'utf8'))[0].requests,
+    [{ method: 'GET', path: '/api/v1/customer/me', status: 200, terminal: PublishedReadTerminal.Finished.wire }]);
   const invalidAttachment = (overrides = {}) => ({ suites: [{ specs: [{ file: 'route.spec.ts', line: 1, tests: [{ results: [{
     status: BrowserOutcome.Passed.wire, attachments: [{ name: 'real-route-acceptance', body: Buffer.from(JSON.stringify({
       pattern: 'catalog', width: 390, actor: PublishedActor.Customer.wire, evidence: 'REAL_BACKEND',

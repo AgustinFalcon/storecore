@@ -1,6 +1,7 @@
 import { channelAccountFixture, channelListingFixture } from '../../data/user/channel-pricing.spec-fixtures';
 import { BoundedRows } from '../../domain/catalog/bounded-rows';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ApiErrorCode } from '../../core/api/api-error-code';
 import { Observable, of, Subject, throwError } from 'rxjs';
 import { UserRole } from '../../domain/user/user-role';
 import { MercadoLibreAccount, MercadoLibreListing } from '../../domain/user/user.entity';
@@ -25,6 +26,39 @@ function createStore(
 }
 
 describe('UserMercadoLibreStore', () => {
+  it('waits for both disabled reads and presents the closed disabled state without a snapshot', () => {
+    const accountRead = new Subject<MercadoLibreAccount>();
+    const listingsRead = new Subject<BoundedRows<MercadoLibreListing>>();
+    const { store } = createStore(() => accountRead, () => listingsRead);
+    store.loadMercadoLibre();
+    accountRead.error(new HttpErrorResponse({ status: 409, error: { errorCode: ApiErrorCode.CapabilityDisabled.wire } }));
+    expect(store.snapshot.readPhase).toBe(MercadoLibreReadPhase.Loading);
+    listingsRead.error(new HttpErrorResponse({ status: 409, error: { errorCode: ApiErrorCode.CapabilityDisabled.wire } }));
+    expect(store.snapshot.readPhase).toBe(MercadoLibreReadPhase.Disabled);
+    expect(MercadoLibreReadPhase.fromWire(store.snapshot.readPhase.wire)).toBe(MercadoLibreReadPhase.Disabled);
+    expect(store.snapshot.hasSnapshot).toBe(false);
+    expect(store.snapshot.account).toBeNull();
+    expect(store.snapshot.listings).toEqual([]);
+    store.ngOnDestroy();
+  });
+  it('rejects a partial or wrongly transported disabled result instead of presenting a disabled module', () => {
+    const disabled = () => throwError(() => new HttpErrorResponse({
+      status: 409, error: { errorCode: ApiErrorCode.CapabilityDisabled.wire },
+    }));
+    const partial = createStore(disabled, () => of(listings)).store;
+    partial.loadMercadoLibre();
+    expect(partial.snapshot.readPhase).toBe(MercadoLibreReadPhase.Error);
+    expect(partial.snapshot.errorMessage).toContain('inconsistentes');
+    partial.ngOnDestroy();
+
+    const wrongStatus = createStore(() => throwError(() => new HttpErrorResponse({
+      status: 400, error: { errorCode: ApiErrorCode.CapabilityDisabled.wire },
+    })), () => of(listings)).store;
+    wrongStatus.loadMercadoLibre();
+    expect(wrongStatus.snapshot.readPhase).toBe(MercadoLibreReadPhase.Error);
+    expect(wrongStatus.snapshot.hasSnapshot).toBe(false);
+    wrongStatus.ngOnDestroy();
+  });
   it('bounds navigation, blocks concurrent paging, and publishes page identity only with its snapshot', () => {
     const firstPage = Object.assign([...listings], { metadata: { page: 0, size: 25, total: 26, truncated: true } });
     const secondPage = new Subject<BoundedRows<MercadoLibreListing>>();

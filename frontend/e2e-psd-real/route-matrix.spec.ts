@@ -72,9 +72,9 @@ for (const width of [390, 768, 1440]) {
       const context = contexts.get(binding.actor);
       if (!context) throw new Error('Unknown matrix actor');
       const page = await context.newPage();
+      const trace = new RealReadTrace(page);
       try {
         await page.setViewportSize({ width, height: 1000 });
-        const trace = new RealReadTrace(page);
         await page.goto(binding.url, { waitUntil: 'domcontentloaded' });
         await expect(page).toHaveURL(new URL(binding.finalUrl, origin).href);
         await expect(page.locator('sc-root')).toHaveAttribute('data-surface-id', binding.surface.wire);
@@ -92,6 +92,8 @@ for (const width of [390, 768, 1440]) {
         await expect(skip).toBeFocused();
         await page.keyboard.press('Enter');
         await expect(page.locator('main')).toBeFocused();
+        await expect(page).toHaveURL(new URL(binding.finalUrl, origin).href);
+        await expect(page.locator('sc-root')).toHaveAttribute('data-surface-id', binding.surface.wire);
         await assertReflow(page);
         const axe = await new AxeBuilder({ page }).analyze();
         const blocking = axe.violations.filter(item => item.impact === 'serious' || item.impact === 'critical');
@@ -101,7 +103,12 @@ for (const width of [390, 768, 1440]) {
           surface: binding.surface.wire, finalUrl: binding.finalUrl, result: RouteGateResult.Accepted.wire,
           responses: trace.completed, axeBlocking: blocking.length,
         }) });
-      } finally { await page.close(); }
+      } finally {
+        await testInfo.attach('real-route-diagnostic', { contentType: 'application/json', body: JSON.stringify({
+          pattern: binding.pattern, width, ...trace.snapshot(page.url()),
+        }) });
+        await page.close();
+      }
     });
   }
 }

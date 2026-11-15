@@ -76,7 +76,7 @@ describe('productive route acceptance contract', () => {
     }
     expect(real.find(row => row.pattern === 'user/home')?.readiness).toContain('Indicadores');
     expect(real.find(row => row.pattern === 'user/promos')?.readiness).toContain('REAL-SKU / 7');
-    expect(real.find(row => row.pattern === 'user/mercadolibre')?.readiness).toBe('#ml-account-title');
+    expect(real.find(row => row.pattern === 'user/mercadolibre')?.readiness).toBe('#ml-disabled-title');
   });
   it('copies and freezes receipt data at the boundary', () => {
     const wire = receiptWire(), receipt = RealRouteReceipt.fromWire(wire);

@@ -1,6 +1,6 @@
 import { StoreBrandingStore } from './store-branding.store';
 import { BrandingLogoComponent } from './branding-logo.component';
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe, DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -27,6 +27,12 @@ import { matchedSurface } from '../navigation/surface-host';
 })
 export class ShellComponent implements OnInit {
   private readonly router = inject(Router);
+  private readonly document = inject(DOCUMENT);
+  get skipLinkHref(): string { return `${this.router.url.split('#')[0]}#contenido-principal`; }
+  skipToContent(event: Event): void {
+    event.preventDefault();
+    this.document.getElementById('contenido-principal')?.focus();
+  }
   query = '';
   readonly consoleMode$ = this.router.events.pipe(
     filter((event): event is NavigationEnd => event instanceof NavigationEnd),

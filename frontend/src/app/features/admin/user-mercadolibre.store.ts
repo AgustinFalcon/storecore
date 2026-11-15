@@ -2,8 +2,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { ComponentStore } from '@ngrx/component-store';
 import { tapResponse } from '@ngrx/operators';
-import { defer, EMPTY, forkJoin, switchMap } from 'rxjs';
-import { getApiErrorMessage } from '../../core/api/http-error.util';
+import { catchError, defer, EMPTY, forkJoin, of, switchMap, throwError } from 'rxjs';
+import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.util';
+import { ApiErrorCode } from '../../core/api/api-error-code';
 import { UserRole } from '../../domain/user/user-role';
 import { MercadoLibreAccount, MercadoLibreListing, UserSessionResult } from '../../domain/user/user.entity';
 import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-installation.usecase';
@@ -33,6 +34,11 @@ function initialState(actor: UserSessionResult | null = null): UserMercadoLibreS
     hasSnapshot: false,
     query: '', page: 0, total: 0,
   };
+}
+
+function isCapabilityDisabled(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && error.status === 409 &&
+    getApiErrorCode(error) === ApiErrorCode.CapabilityDisabled;
 }
 
 @Injectable()
@@ -78,11 +84,25 @@ export class UserMercadoLibreStore extends ComponentStore<UserMercadoLibreState>
         readPhase: this.snapshot.hasSnapshot ? MercadoLibreReadPhase.Refreshing : MercadoLibreReadPhase.Loading,
       });
       return defer(() => forkJoin({
-        account: this.ops.readMercadoLibreAccount(),
-        listings: this.ops.listMercadoLibreListings(requestedPage),
+        account: this.ops.readMercadoLibreAccount().pipe(catchError((error: unknown) =>
+          isCapabilityDisabled(error) ? of(null) : throwError(() => error))),
+        listings: this.ops.listMercadoLibreListings(requestedPage).pipe(catchError((error: unknown) =>
+          isCapabilityDisabled(error) ? of(null) : throwError(() => error))),
       })).pipe(tapResponse({
         next: ({ account, listings }) => {
           if (generation !== this.generation) return;
+          if (account === null && listings === null) {
+            this.setState({ ...initialState(this.snapshot.actor), readPhase: MercadoLibreReadPhase.Disabled });
+            return;
+          }
+          if (account === null || listings === null) {
+            this.patchState({
+              loading: false,
+              errorMessage: 'Las respuestas del módulo de Mercado Libre fueron inconsistentes.',
+              readPhase: this.snapshot.hasSnapshot ? MercadoLibreReadPhase.Stale : MercadoLibreReadPhase.Error,
+            });
+            return;
+          }
           this.patchState({ account, listings, page: listings.metadata.page, total: listings.metadata.total, loading: false, errorMessage: '', hasSnapshot: true, readPhase: MercadoLibreReadPhase.Ready });
         },
         error: (error: unknown) => {

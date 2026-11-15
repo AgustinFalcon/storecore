@@ -2,8 +2,43 @@ import { expect, type Page, type Request, type Response } from '@playwright/test
 import { createHash } from 'node:crypto';
 import type { ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import type { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
+import { ApiErrorCode } from '../src/app/core/api/api-error-code';
 
 const api = '/api/v1/';
+
+export class RealReadExpectation {
+  private constructor(readonly wire: string, readonly status: number, readonly errorCode: ApiErrorCode | null) {}
+  static readonly Data = new RealReadExpectation('DATA', 200, null);
+  static readonly CapabilityDisabled = new RealReadExpectation('CAPABILITY_DISABLED', 409, ApiErrorCode.CapabilityDisabled);
+  static readonly Unknown = new RealReadExpectation('UNKNOWN', 0, ApiErrorCode.Unknown);
+  static fromWire(raw: unknown): RealReadExpectation {
+    return [this.Data, this.CapabilityDisabled].find(value => value.wire === raw) ?? this.Unknown;
+  }
+  accepts(row: FinishedObservedRequest): boolean {
+    return this !== RealReadExpectation.Unknown && row.status === this.status &&
+      (this.errorCode === null || row.errorCode === this.errorCode);
+  }
+}
+
+export class RealReadRequirement {
+  private constructor(readonly path: string, readonly expectation: RealReadExpectation) {}
+  static data(path: string): RealReadRequirement { return new RealReadRequirement(path, RealReadExpectation.Data); }
+  static disabled(path: string): RealReadRequirement {
+    if (!['user/mercadolibre/account', 'user/mercadolibre/listings'].includes(path)) throw new Error('Unexpected disabled real read');
+    return new RealReadRequirement(path, RealReadExpectation.CapabilityDisabled);
+  }
+}
+
+export class RealReadTerminal {
+  private constructor(readonly wire: string) {}
+  static readonly Pending = new RealReadTerminal('pending');
+  static readonly Finished = new RealReadTerminal('finished');
+  static readonly Failed = new RealReadTerminal('failed');
+  static readonly Unknown = new RealReadTerminal('unknown');
+  static fromWire(raw: unknown): RealReadTerminal {
+    return [this.Pending, this.Finished, this.Failed].find(value => value.wire === raw) ?? this.Unknown;
+  }
+}
 
 interface ObservedRequest {
   readonly identity: string;
@@ -12,8 +47,9 @@ interface ObservedRequest {
   readonly path: string;
 }
 
-interface SuccessfulObservedRequest extends ObservedRequest {
+interface FinishedObservedRequest extends ObservedRequest {
   readonly status: number;
+  readonly errorCode: ApiErrorCode;
 }
 
 /** Observe actual transport only. No interception, replay, response bodies or secrets in artifacts. */
@@ -24,7 +60,10 @@ export class RealReadTrace {
   private readonly pending = new Set<Request>();
   private readonly observations = new WeakMap<Request, ObservedRequest>();
   private readonly responseStatuses = new WeakMap<Request, number>();
-  private readonly successes: SuccessfulObservedRequest[] = [];
+  private readonly responses = new WeakMap<Request, Response>();
+  private readonly finished: FinishedObservedRequest[] = [];
+  private readonly interruptedHttpErrors: { method: string; path: string; status: number }[] = [];
+  private readonly diagnostics = new Map<Request, { method: string; path: string; status: number | null; terminal: RealReadTerminal }>();
   private sequence = 0;
   constructor(page: Page) {
     page.on('request', request => {
@@ -32,18 +71,27 @@ export class RealReadTrace {
       if (!url.pathname.startsWith(api)) return;
       this.pending.add(request);
       const method = request.method();
+      this.diagnostics.set(request, { method, path: url.pathname, status: null, terminal: RealReadTerminal.Pending });
       const bodyDigest = createHash('sha256').update(request.postData() ?? '').digest('hex');
       this.observations.set(request, { identity: `${method} ${url.pathname}${url.search} ${bodyDigest}`,
         sequence: ++this.sequence, method, path: url.pathname });
       const inspection = method === 'POST' && [api + 'customer/auth/recovery/inspect', api + 'customer/auth/email-verification/inspect'].includes(url.pathname);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !inspection) this.writes.push(`${method} ${url.pathname}`);
     });
-    page.on('requestfinished', request => this.finish(request));
+    page.on('requestfinished', request => { void this.finish(request); });
     page.on('response', response => this.observeResponse(response));
     page.on('requestfailed', request => {
       if (!this.pending.delete(request)) return;
+      const diagnostic = this.diagnostics.get(request);
+      if (diagnostic) diagnostic.terminal = RealReadTerminal.Failed;
       const observation = this.observations.get(request);
-      if (observation) this.failures.push(observation);
+      if (observation) {
+        this.failures.push(observation);
+        const status = this.responseStatuses.get(request);
+        if (status !== undefined && status >= 400) this.interruptedHttpErrors.push({
+          method: observation.method, path: observation.path, status,
+        });
+      }
     });
   }
   private observeResponse(response: Response): void {
@@ -52,45 +100,72 @@ export class RealReadTrace {
     const observation = this.observations.get(request);
     if (!observation) return;
     const status = response.status();
+    this.responses.set(request, response);
     this.responseStatuses.set(request, status);
+    const diagnostic = this.diagnostics.get(request);
+    if (diagnostic) diagnostic.status = status;
     this.completed.push({ method: observation.method, path: observation.path, status });
   }
-  private finish(request: Request): void {
+  private async finish(request: Request): Promise<void> {
     if (!this.pending.has(request)) return;
     const observation = this.observations.get(request);
     if (!observation) return;
     const status = this.responseStatuses.get(request);
+    const diagnostic = this.diagnostics.get(request);
+    if (diagnostic) diagnostic.terminal = RealReadTerminal.Finished;
     if (status === undefined) {
       this.failures.push(observation);
       this.pending.delete(request);
       return;
     }
-    if (status >= 200 && status < 400) this.successes.push({ ...observation, status });
+    let errorCode = ApiErrorCode.Unknown;
+    if (status === RealReadExpectation.CapabilityDisabled.status) {
+      try {
+        const raw: unknown = await this.responses.get(request)?.json();
+        if (raw && typeof raw === 'object') errorCode = ApiErrorCode.fromWire((raw as Record<string, unknown>)['errorCode']);
+      } catch { /* An unreadable error cannot satisfy the typed denial contract. */ }
+    }
+    this.finished.push({ ...observation, status, errorCode });
     this.pending.delete(request);
   }
-  async ready(paths: readonly string[]): Promise<void> {
+  snapshot(finalUrl: string): { finalPath: string; requests: { method: string; path: string; status: number | null; terminal: string }[] } {
+    return { finalPath: new URL(finalUrl).pathname, requests: [...this.diagnostics.values()].map(row =>
+      ({ method: row.method, path: row.path, status: row.status, terminal: row.terminal.wire })) };
+  }
+  async ready(reads: readonly (string | RealReadRequirement)[]): Promise<void> {
+    const requirements = reads.map(read => typeof read === 'string' ? RealReadRequirement.data(read) : read);
+    const paths = requirements.map(read => read.path);
     const [health, branding, ...owned] = paths;
     expect(health).toBe('health');
     expect(branding).toBe('storefront/branding');
-    await expect.poll(() => this.successes.some(row => row.path === api + health && row.status === 200), { message: 'Real health response completed' }).toBe(true);
-    await expect.poll(() => this.successes.some(row => row.path === api + branding && row.status === 200), { message: 'Real branding response completed' }).toBe(true);
-    for (const path of owned) await expect.poll(() => this.successes.some(row => row.path === api + path && row.status === 200), { message: 'Real route-owned response completed' }).toBe(true);
+    await expect.poll(() => this.finished.some(row => row.path === api + health && RealReadExpectation.Data.accepts(row)), { message: 'Real health response completed' }).toBe(true);
+    await expect.poll(() => this.finished.some(row => row.path === api + branding && RealReadExpectation.Data.accepts(row)), { message: 'Real branding response completed' }).toBe(true);
+    for (const path of owned) {
+      const requirement = requirements.find(read => read.path === path)!;
+      await expect.poll(() => this.finished.some(row => row.path === api + path && requirement.expectation.accepts(row)), { message: 'Real route-owned response completed' }).toBe(true);
+    }
     await expect.poll(() => this.pending.size, { message: 'All real API responses finished' }).toBe(0);
     await new Promise(resolve => setTimeout(resolve, 100));
     await expect.poll(() => this.pending.size, { message: 'Real API response set remains stable' }).toBe(0);
     const requiredPaths = new Set(paths.map(path => api + path));
     const unresolvedFailures = this.failures.filter(failure => requiredPaths.has(failure.path)
-      && !this.successes.some(success => success.identity === failure.identity && success.sequence > failure.sequence));
+      && !this.finished.some(success => success.identity === failure.identity && success.sequence > failure.sequence &&
+        requirements.some(read => api + read.path === success.path && read.expectation.accepts(success))));
     expect(unresolvedFailures.map(failure => `${failure.method} ${failure.path}`),
       'Failed real API requests without a later identical successful replacement').toEqual([]);
     expect(this.writes, 'Read-only matrix must not mutate domain data').toEqual([]);
+    const wrongDenials = this.finished.filter(row => requirements.some(read => read.expectation === RealReadExpectation.CapabilityDisabled &&
+      api + read.path === row.path && row.status === read.expectation.status && !read.expectation.accepts(row)));
+    expect(wrongDenials.map(row => `${row.method} ${row.path}`), 'Only the typed capability denial is expected').toEqual([]);
+    expect(this.interruptedHttpErrors, 'Interrupted HTTP errors remain errors even when a later request succeeds').toEqual([]);
     const unexpected = this.completed.filter(row => row.status >= 400 && !(row.status === 401 &&
-      ['customer/me', 'internal/me'].some(path => row.path === api + path)));
+      ['customer/me', 'internal/me'].some(path => row.path === api + path)) &&
+      !requirements.some(read => read.expectation === RealReadExpectation.CapabilityDisabled && api + read.path === row.path && row.status === read.expectation.status));
     expect(unexpected, 'Unexpected HTTP errors (only absent-realm probes may return 401)').toEqual([]);
   }
 }
 
-export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealRouteReceipt): readonly string[] {
+export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealRouteReceipt): readonly RealReadRequirement[] {
   const product = receipt.products[0];
   const order = receipt.pendingOrderId;
   const reads = new Map<string, readonly string[]>([
@@ -114,7 +189,8 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
   if (!own) throw new Error('Missing explicit real readiness binding');
   const storefrontFacets = ['', 'catalog', 'catalog/:sku'].includes(binding.pattern)
     ? ['catalog/brands', 'catalog/categories'] : [];
-  return [...new Set(['health', 'storefront/branding', ...storefrontFacets, ...own])];
+  return [...new Set(['health', 'storefront/branding', ...storefrontFacets, ...own])].map(path =>
+    binding.pattern === 'user/mercadolibre' && own.includes(path) ? RealReadRequirement.disabled(path) : RealReadRequirement.data(path));
 }
 
 export async function assertReflow(page: Page): Promise<void> {

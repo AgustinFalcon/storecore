@@ -1,4 +1,5 @@
 export class ApiErrorCode {
+  static readonly CapabilityDisabled = new ApiErrorCode('CAPABILITY_DISABLED', 'El módulo está deshabilitado en esta instalación.');
   static readonly CapabilityConfigVersionConflict = new ApiErrorCode('CAPABILITY_CONFIG_VERSION_CONFLICT', 'La configuración cambió. Revisá la versión actual antes de confirmar nuevamente.');
   static readonly DeliveryConfigurationChanged = new ApiErrorCode('DELIVERY_CONFIGURATION_CHANGED', 'Cambió la opción de entrega. Actualizá las opciones y confirmá tu elección nuevamente.');
   static readonly DeliveryUnavailable = new ApiErrorCode('DELIVERY_UNAVAILABLE', 'La entrega no está disponible. Actualizá las opciones para continuar.');
@@ -23,6 +24,7 @@ export class ApiErrorCode {
   ) {}
 
   static fromWire(value: unknown): ApiErrorCode {
+    if (value === this.CapabilityDisabled.wire) return this.CapabilityDisabled;
     if (value === this.CapabilityConfigVersionConflict.wire) return this.CapabilityConfigVersionConflict;
     const delivery = [this.DeliveryConfigurationChanged, this.DeliveryUnavailable, this.DeliverySelectionInvalid, this.CheckoutTotalInvalid, this.CheckoutContextChanged].find(code => code.wire === value);
     if (delivery) return delivery;

@@ -77,8 +77,17 @@ casos sin simulación ni a una homologación externa.
 
 Cada aceptación espera las respuestas reales que alimentan la pantalla, valida
 URL final, superficie, heading y readiness vinculada al receipt, y recién después
-ejecuta Axe/reflow. Redirects y wildcards tienen casos propios. La suite
-`HTTP_FIXTURE` conserva sus negativos de wire/red y agrega la aserción de URL que
+ejecuta Axe/reflow. Redirects y wildcards tienen casos propios.
+
+La activación del skip link conserva ruta, query y superficie y enfoca el main
+existente; la matriz vuelve a comprobar identidad antes de Axe/reflow. Las
+lecturas de datos exigen HTTP 200 terminado. Sólo account/listings de Mercado
+Libre, con capability deshabilitada, exigen HTTP 409 terminado y el tipo cerrado
+`CAPABILITY_DISABLED`, junto a la UI de módulo deshabilitado, sin snapshot
+inventado. Cada caso adjunta también al fallar un diagnóstico de pathname,
+método, status y fase terminal, sin query, cuerpo, credenciales ni identidad hash.
+
+La suite `HTTP_FIXTURE` conserva sus negativos de wire/red y agrega la aserción de URL que
 su spec ya promete; no se presenta como backend real.
 
 ## CI y artefactos

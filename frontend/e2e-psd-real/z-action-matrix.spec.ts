@@ -6,18 +6,21 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { AccessContext } from '../src/app/domain/access/access-context';
 import { readApiBody } from '../src/app/core/api/base-response';
 import { DeliveryMode } from '../src/app/domain/cart/delivery';
+import { ProductStatus } from '../src/app/domain/catalog/catalog-states';
+import { HomeBlockKind } from '../src/app/domain/content/home-composition';
 import { CustomerAccountState, CustomerStateTransition } from '../src/app/domain/customer-admin/customer-admin';
-import { OfferStatus, OfferTransition } from '../src/app/domain/offer/offer';
+import { DiscountKind, OfferStatus, OfferTransition } from '../src/app/domain/offer/offer';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, ShipmentTransition } from '../src/app/domain/order/commerce-states';
 import { CapabilityModuleId } from '../src/app/domain/user/capability-module-id';
 import { CapabilityModuleState } from '../src/app/domain/user/capability-module-state';
-import { PolicyStatus, PolicyTransition, ChannelAvailability } from '../src/app/domain/user/channel-pricing';
-import { MercadoLibreAccountStatus } from '../src/app/domain/user/mercadolibre-account-status';
+import { PolicyStatus, PolicyTransition } from '../src/app/domain/user/channel-pricing';
 import { UserRole } from '../src/app/domain/user/user-role';
 import { mapAdminOrder, mapCart, mapCapabilities, mapProductDetail, mapProductSummaries } from '../src/app/data/mappers/http-mappers';
-import { mapChannelAccount, mapPricePolicy } from '../src/app/data/user/channel-pricing.mapper';
+import { mapPricePolicy } from '../src/app/data/user/channel-pricing.mapper';
+import { mapHomeComposition } from '../src/app/data/content/home-composition.mapper';
+import { ApiErrorCode } from '../src/app/core/api/api-error-code';
 import { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
-import { RealActionCase, JourneyCustomer, WriteMethod, body, mutate, mutation } from './action-matrix-support';
+import { RealActionCase, JourneyCustomer, WriteMethod, body, mutate, mutation, observeActionTransport } from './action-matrix-support';
 import { origin } from './support';
 
 let adminContext: BrowserContext;
@@ -51,32 +54,56 @@ test('PRM action: public catalog combines search brand category and active-offer
   RealActionCase.CatalogDiscovery.annotate(info);
   const admin = await adminPage();
   const context = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
+  let offerId: number | null = null;
   try {
-    const activated = await mutate(admin, AccessContext.User, `user/offers/${receipt.offerId}/state`,
+    // Own the offer lifecycle; the immutable receipt offer remains unchanged.
+    const created = await mutate(admin, AccessContext.User, 'user/offers', {
+      name: `PRM discovery ${randomUUID()}`, priority: 1,
+      startsAt: new Date(Date.now() - 86_400_000).toISOString(), endsAt: new Date(Date.now() + 86_400_000).toISOString(),
+      discountKind: DiscountKind.Percent.wire, discountValue: 1, minMarginPercent: 0, skus: [receipt.products[0].sku],
+    });
+    expect(created.status()).toBe(201);
+    offerId = readApiBody<{ id: number }>(await created.json()).id;
+    const activated = await mutate(admin, AccessContext.User, `user/offers/${offerId}/state`,
       { transition: OfferTransition.Activate.wire });
     expect(activated.status()).toBe(200);
 
     const page = await context.newPage();
-    await page.goto('/catalog');
+    observeActionTransport(page, info);
+    await test.step('Load real catalog and await its initial response', async () => {
+      const initial = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
+      await page.goto('/catalog');
+      expect((await initial).status()).toBe(200);
+      await expect(page.locator('sc-catalog-page-view > section')).toHaveAttribute('aria-busy', 'false');
+    });
     await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible();
     await page.getByLabel('Búsqueda', { exact: true }).fill('Taladro');
     await page.getByLabel('Marca', { exact: true }).selectOption({ label: 'Showcase Tools' });
     await page.getByLabel('Categoría', { exact: true }).selectOption({ label: 'Herramientas eléctricas' });
     await page.getByLabel('Sólo ofertas', { exact: true }).check();
-    const responsePromise = page.waitForResponse(response => {
-      const url = new URL(response.url());
-      return url.pathname === '/api/v1/catalog' && url.searchParams.get('query') === 'Taladro'
-        && url.searchParams.has('brand') && url.searchParams.has('category') && url.searchParams.get('offers') === 'true';
-    });
+    await expect(page.getByLabel('Búsqueda', { exact: true })).toHaveValue('Taladro');
+    await expect(page.getByLabel('Sólo ofertas', { exact: true })).toBeChecked();
+    const brand = await page.getByLabel('Marca', { exact: true }).inputValue();
+    const category = await page.getByLabel('Categoría', { exact: true }).inputValue();
+    const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
     await page.getByRole('button', { name: 'Buscar', exact: true }).click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
+    const query = new URL(response.url()).searchParams;
+    expect(query.get('query')).toBe('Taladro');
+    expect(query.get('brand')).toBe(brand);
+    expect(query.get('category')).toBe(category);
+    expect(query.get('offers')).toBe('true');
     const products = mapProductSummaries(readApiBody(await response.json()));
     expect(products.map(product => product.sku)).toEqual([receipt.products[0].sku]);
     await expect(page.getByRole('heading', { name: receipt.products[0].name, exact: true })).toBeVisible();
     await expect(page.getByText(receipt.products[1].name, { exact: true })).toHaveCount(0);
     expect((await context.cookies()).some(cookie => cookie.name.startsWith('__Host-storecore-'))).toBe(false);
   } finally {
+    if (offerId !== null) {
+      const ended = await mutate(admin, AccessContext.User, `user/offers/${offerId}/state`, { transition: OfferTransition.End.wire });
+      expect(ended.status()).toBe(200);
+    }
     await context.close();
     await admin.close();
   }
@@ -99,7 +126,7 @@ test('PRM action: UI registration survives logout and subsequent login in CUSTOM
     expect((await created).status()).toBe(201);
     await expect(page).toHaveURL(/\/customer\/profile$/);
     expect((await body<{ email: string }>(page, 'customer/me')).email).toBe(email);
-    expect((await mutate(page, AccessContext.Customer, 'customer/auth/logout', {})).status()).toBe(200);
+    expect((await mutate(page, AccessContext.Customer, 'customer/auth/logout', {})).status()).toBe(204);
     await page.goto('/login');
     await page.getByLabel('Email', { exact: true }).fill(email);
     await page.getByLabel('Contraseña', { exact: true }).fill(password);
@@ -139,7 +166,13 @@ test('PRM action: addresses create edit delete and foreign ownership reject pers
   const stranger = await JourneyCustomer.create(browser);
   try {
     const page = owner.page;
-    await page.goto('/customer/addresses');
+    observeActionTransport(page, info);
+    await test.step('Hydrate CUSTOMER and complete owned address read before editing', async () => {
+      const ready = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/customer/me/addresses');
+      await page.goto('/customer/addresses');
+      expect((await ready).status()).toBe(200);
+      await expect(page.getByRole('button', { name: 'Agregar', exact: true })).toBeEnabled();
+    });
     for (const [label, value] of [['Calle', 'PRM propia'], ['Número', '42'], ['Ciudad', 'Ciudad'], ['Provincia', 'Provincia'], ['CP', '1000']]) {
       await page.getByLabel(label, { exact: true }).fill(value);
     }
@@ -274,9 +307,10 @@ async function createProduct(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Nuevo producto', exact: true }).click();
   await page.locator('input[name="sku"]').fill(sku);
   await page.locator('input[name="name"]').fill(sku);
-  await page.locator('input[name="variantName-0"]').fill(sku);
+  await page.locator('section[aria-labelledby="variant-editor-title"]').getByLabel('Nombre', { exact: true }).fill(sku);
   await page.getByLabel('Stock inicial', { exact: true }).fill('10');
   await page.getByLabel('Precio base', { exact: true }).fill('100');
+  await page.getByLabel('Estado del producto', { exact: true }).selectOption(ProductStatus.Active.wire);
   const saved = mutation(page, `user/catalog/products/${sku}`, WriteMethod.Put);
   await page.getByRole('button', { name: 'Guardar producto', exact: true }).click();
   expect((await saved).status()).toBe(200);
@@ -291,7 +325,7 @@ test('PRM action: real product creation variant editing and authorized inventory
     await page.reload();
     await page.getByRole('button', { name: sku, exact: true }).click();
     await expect(page.getByLabel('Stock inicial', { exact: true })).toHaveCount(0);
-    await page.locator('input[name="variantName-0"]').fill('Variante persistida');
+    await page.locator('section[aria-labelledby="variant-editor-title"]').getByLabel('Nombre', { exact: true }).fill('Variante persistida');
     const updated = mutation(page, `user/catalog/products/${sku}`, WriteMethod.Put);
     await page.getByRole('button', { name: 'Guardar producto', exact: true }).click();
     expect((await updated).status()).toBe(200);
@@ -402,6 +436,7 @@ test('PRM action: content publication persists and appears in public composition
   const page = await adminPage();
   try {
     const title = `PRM portada ${randomUUID().slice(0, 8)}`;
+    observeActionTransport(page, info);
     await page.goto('/user/content');
     await page.getByLabel('Título', { exact: true }).first().fill(title);
     const saved = mutation(page, 'user/content/home', WriteMethod.Put);
@@ -411,7 +446,16 @@ test('PRM action: content publication persists and appears in public composition
     await page.reload();
     await expect(page.getByLabel('Título', { exact: true }).first()).toHaveValue(title);
     expect(await body(page, 'user/content/home')).toEqual(confirmed);
-    await page.goto('/');
+    const composition = mapHomeComposition(confirmed);
+    const changed = composition.sections.find(section => section.content.title === title);
+    expect(changed?.active).toBe(true);
+    await test.step('Read the published section from the public API and render that exact resource', async () => {
+      const publicReadback = mapHomeComposition(await body(page, 'content/home'), true);
+      expect(publicReadback.sections.find(section => section.key === changed?.key)?.content.title).toBe(title);
+      const rendered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/content/home');
+      await page.goto('/');
+      expect((await rendered).status()).toBe(200);
+    });
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     expect(JSON.stringify(await body(page, 'content/home'))).toContain(title);
   } finally { await page.close(); }
@@ -423,8 +467,8 @@ test('PRM action: profile import rejects incompatible version and explicit compa
   try {
     const key = `prm_${randomUUID().replaceAll('-', '')}`;
     const title = `Perfil PRM ${key}`;
-    const manifest = { profile_name: key, profile_version: '1.0.0', coreCompatibility: '1.x',
-      content: { homeSections: [{ sectionKey: key, content: { title }, active: false, sortOrder: 100 }] } };
+    const manifest = { profile_name: 'universal-tools-profile', profile_version: '1.0.0', coreCompatibility: '1.x',
+      content: { homeSections: [{ sectionKey: key, content: { kind: HomeBlockKind.Hero.wire, title, body: 'Contenido local PRM' }, active: false, sortOrder: 100 }] } };
     await page.goto('/user/profile-import');
     const editor = page.getByLabel('Contenido del perfil', { exact: true });
     await editor.fill(JSON.stringify({ ...manifest, coreCompatibility: '999.x' }));
@@ -512,7 +556,7 @@ test('PRM action: OPERATOR read permissions CSRF separation and realm logout fai
     expect((await customer.page.request.put('/api/v1/customer/me', { headers: { Origin: origin },
       data: { firstName: 'Missing csrf', lastName: 'Rejected', email: customer.email } })).status()).toBe(403);
     expect((await body<{ firstName: string }>(customer.page, 'customer/me')).firstName).toBe('PRM');
-    expect((await mutate(customer.page, AccessContext.Customer, 'customer/auth/logout', {})).status()).toBe(200);
+    expect((await mutate(customer.page, AccessContext.Customer, 'customer/auth/logout', {})).status()).toBe(204);
     expect((await customer.page.request.get('/api/v1/customer/me')).status()).toBe(401);
     expect((await page.request.get('/api/v1/internal/me')).status()).toBe(200);
   } finally { await page.close(); await customer.close(); }
@@ -523,15 +567,13 @@ test('PRM action: external account and capabilities honestly remain unavailable'
   const page = await adminPage();
   try {
     await page.goto('/user/mercadolibre');
-    const account = mapChannelAccount(await body(page, 'user/mercadolibre/account'));
-    expect(account.status).toBe(MercadoLibreAccountStatus.Unknown);
-    expect(account.availability).toBe(ChannelAvailability.Unavailable);
-    expect(account.accountRef).toBeNull();
-    await expect(page.getByText(account.status.label, { exact: true })).toBeVisible();
-    await expect(page.getByText('Estado local registrado: no certifica autorización OAuth ni disponibilidad del proveedor.', { exact: true })).toBeVisible();
-    const listings = await body<{ items: unknown[]; total: number }>(page, 'user/mercadolibre/listings');
-    expect(listings.items).toEqual([]);
-    expect(listings.total).toBe(0);
+    for (const path of ['user/mercadolibre/account', 'user/mercadolibre/listings']) {
+      const denied = await page.request.get(`/api/v1/${path}`);
+      expect(denied.status()).toBe(409);
+      expect(ApiErrorCode.fromWire((await denied.json()).errorCode)).toBe(ApiErrorCode.CapabilityDisabled);
+    }
+    await expect(page.getByRole('heading', { name: 'Módulo de Mercado Libre deshabilitado', exact: true })).toBeVisible();
+    await expect(page.locator('#ml-account-title')).toHaveCount(0);
     await page.goto('/user/capabilities');
     const modules = mapCapabilities(await body(page, 'user/capabilities'));
     for (const id of [CapabilityModuleId.PaymentsMp, CapabilityModuleId.MarketplaceMl, CapabilityModuleId.Carriers,

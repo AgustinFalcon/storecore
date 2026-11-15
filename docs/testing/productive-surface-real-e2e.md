@@ -94,6 +94,10 @@ redirect/wildcard cases. It checks exact resource readiness, surface identity,
 final URL, Axe and reflow. Success requires 90 route acceptance attachments and
 no failed/incomplete browser case. The UA/CFE provider-local journey remains
 separately classified; it cannot count as disabled-adapter or live coverage.
+The skip link must retain that URL and surface before Axe/reflow. Required data
+reads require a finished HTTP 200. Only the two Mercado Libre reads accept a
+finished HTTP 409 with the closed `CAPABILITY_DISABLED` code, together with the
+disabled-module UI; they do not claim an account or provider snapshot.
 
 Only allowlisted evidence under `frontend/psd-real-results/` is uploaded:
 
@@ -101,9 +105,11 @@ Only allowlisted evidence under `frontend/psd-real-results/` is uploaded:
 - `egress.json`: successful isolation probes;
 - `route-census.json`: route/viewport/actor/surface, URL paths, HTTP method/path/status
   and Axe counts;
-- `action-census.json`: the 16 closed action identities with owned routes, actor,
+- `action-census.json`: the 17 closed action identities with owned routes, actor,
   action class, strict evidence mode and browser outcome;
 - `runtime-summary.json`: SHA, external safety and outcome counts;
+- `route-diagnostics.json`: also on failed route cases, final pathname and request
+  method/path/status/terminal phase; no query, fragment, body or request identity;
 - sanitized JUnit/HTML: generated case IDs, source locations and closed outcomes;
 - process lifecycle logs: names and exit status only.
 

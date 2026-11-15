@@ -10,6 +10,7 @@ describe('MercadoLibreReadPhase', () => {
       MercadoLibreReadPhase.Stale,
       MercadoLibreReadPhase.Error,
       MercadoLibreReadPhase.AccessDenied,
+      MercadoLibreReadPhase.Disabled,
       MercadoLibreReadPhase.Unknown,
     ]) {
       expect(MercadoLibreReadPhase.fromWire(phase.wire)).toBe(phase);

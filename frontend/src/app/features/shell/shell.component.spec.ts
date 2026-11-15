@@ -13,6 +13,27 @@ import { ShellComponent } from './shell.component';
 import { ShellStore } from './shell.store';
 
 describe('Shell access lifecycle', () => {
+  it('keeps the current path and query when skipping to the main content', () => {
+    const router = { events: NEVER, url: '/customer/orders/73?filter=paid', navigate: vi.fn(), navigateByUrl: vi.fn() };
+    TestBed.configureTestingModule({ providers: [{ provide: Router, useValue: router }] });
+    const component = TestBed.runInInjectionContext(() => new ShellComponent(
+      {} as ShellStore, {} as CartStore, {} as CustomerSession, {} as UserSession,
+      {} as ThemeAppearance, {} as AccessCoordinator, {} as StoreBrandingStore,
+    ));
+    const main = document.createElement('main');
+    main.id = 'contenido-principal'; main.tabIndex = -1;
+    document.body.append(main);
+    try {
+      expect(component.skipLinkHref).toBe('/customer/orders/73?filter=paid#contenido-principal');
+      const event = new MouseEvent('click', { cancelable: true });
+      component.skipToContent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(main);
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(router.navigateByUrl).not.toHaveBeenCalled();
+      expect(router.url).toBe('/customer/orders/73?filter=paid');
+    } finally { main.remove(); }
+  });
   it('reuses the accepted navigation state instead of rotating realm CSRF again', () => {
     const router = { events: NEVER, url: '/user/orders', navigate: vi.fn(), navigateByUrl: vi.fn() };
     TestBed.configureTestingModule({ providers: [{ provide: Router, useValue: router }] });
