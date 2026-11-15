@@ -91,6 +91,22 @@ class PublishedReadTerminal extends PublicationValue {
   static values = [this.Pending, this.Finished, this.Failed];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
+class PublishedReadFailure extends PublicationValue {
+  static Aborted = new PublishedReadFailure(PUBLICATION_TOKEN, 'aborted', true);
+  static Connection = new PublishedReadFailure(PUBLICATION_TOKEN, 'connection', true);
+  static UnknownFailure = new PublishedReadFailure(PUBLICATION_TOKEN, 'unknown', true);
+  static values = [this.Aborted, this.Connection, this.UnknownFailure];
+  static fromWire(raw) { return super.fromWire(raw, this.values); }
+}
+class PublishedAxeImpact extends PublicationValue {
+  static Minor = new PublishedAxeImpact(PUBLICATION_TOKEN, 'minor', true);
+  static Moderate = new PublishedAxeImpact(PUBLICATION_TOKEN, 'moderate', true);
+  static Serious = new PublishedAxeImpact(PUBLICATION_TOKEN, 'serious', true);
+  static Critical = new PublishedAxeImpact(PUBLICATION_TOKEN, 'critical', true);
+  static UnknownImpact = new PublishedAxeImpact(PUBLICATION_TOKEN, 'unknown', true);
+  static values = [this.Minor, this.Moderate, this.Serious, this.Critical, this.UnknownImpact];
+  static fromWire(raw) { return super.fromWire(raw, this.values); }
+}
 const publishedActionIds = new Set(['registration', 'catalog-discovery', 'profile', 'addresses-ownership', 'favorites',
   'cart-checkout-order-ownership', 'unpaid-order-rejection', 'catalog-inventory', 'offers', 'promos',
   'branding-conflict', 'content', 'profile-import', 'customer-revocation', 'operator-permissions-csrf',
@@ -110,6 +126,12 @@ function publishEvidence(reportPath, target = results) {
   const escape = value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
   const pathOnly = value => new URL(value, httpsOrigin).pathname;
+  const pathShape = value => pathOnly(value).split('/').map(segment => {
+    if (/^\d+$/.test(segment)) return ':id';
+    if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(segment)) return ':uuid';
+    if (/^000-PRM-[0-9a-f-]+$/i.test(segment)) return ':sku';
+    return segment;
+  }).join('/');
   const visit = suite => {
     for (const spec of suite.specs ?? []) {
       for (const test of spec.tests ?? []) {
@@ -136,21 +158,52 @@ function publishEvidence(reportPath, target = results) {
           assert.ok(Array.isArray(action.routes) && action.routes.length > 0 &&
             action.routes.every(route => typeof route === 'string' && route.startsWith('/')));
           actionKeys.add(action.id);
+          const transport = (test.annotations ?? []).filter(annotation => annotation.type === 'action-http').map(annotation => {
+            const row = JSON.parse(annotation.description ?? '{}');
+            assert.match(row.method, /^(GET|HEAD|OPTIONS|POST|PUT|PATCH|DELETE)$/);
+            assert.ok(row.status === null || Number.isInteger(row.status) && row.status >= 100 && row.status <= 599);
+            const terminal = PublishedReadTerminal.fromWire(row.terminal);
+            assert.equal(terminal.accepted, true, 'Unknown action transport terminal');
+            return { method: row.method, path: pathShape(row.path), status: row.status, terminal: terminal.wire };
+          });
           actions.push({ id: action.id, routes: action.routes, actor: action.actor, kind: action.kind,
-            evidence: 'REAL_BACKEND', accepted: outcome.accepted });
+            evidence: 'REAL_BACKEND', accepted: outcome.accepted, transport });
         }
         for (const attachment of last.attachments ?? []) {
           if (attachment.name === 'real-route-diagnostic' && attachment.body) {
             const raw = JSON.parse(Buffer.from(attachment.body, 'base64').toString('utf8'));
             assert.ok(Number.isInteger(raw.width) && [390, 768, 1440].includes(raw.width));
             assert.ok(typeof raw.pattern === 'string' && typeof raw.finalPath === 'string' && Array.isArray(raw.requests));
+            const reflow = raw.reflow === null || raw.reflow === undefined ? null : (() => {
+              assert.ok(Number.isInteger(raw.reflow.viewportWidth) && Number.isInteger(raw.reflow.documentWidth));
+              assert.equal(typeof raw.reflow.overflow, 'boolean');
+              assert.ok(Array.isArray(raw.reflow.nodes));
+              return { viewportWidth: raw.reflow.viewportWidth, documentWidth: raw.reflow.documentWidth,
+                overflow: raw.reflow.overflow, nodes: raw.reflow.nodes.map(node => {
+                  assert.match(node.tag, /^[a-z][a-z0-9-]*$/);
+                  assert.match(node.path, /^(?:[a-z][a-z0-9-]*:\d+)(?:\/[a-z][a-z0-9-]*:\d+)*$/);
+                  for (const key of ['left', 'right', 'width']) assert.ok(Number.isInteger(node[key]));
+                  return { tag: node.tag, path: node.path, left: node.left, right: node.right, width: node.width };
+                }) };
+            })();
+            const axe = (raw.axe ?? []).map(row => {
+              assert.match(row.id, /^[a-z0-9-]+$/);
+              const impact = PublishedAxeImpact.fromWire(row.impact);
+              assert.equal(impact.accepted, true, 'Unknown accessibility impact');
+              assert.ok(Number.isInteger(row.nodeCount) && row.nodeCount >= 0);
+              return { id: row.id, impact: impact.wire, nodeCount: row.nodeCount };
+            });
             diagnostics.push({ pattern: pathOnly(raw.pattern), width: raw.width, finalPath: pathOnly(raw.finalPath),
+              reflow, axe,
               accepted: outcome.accepted, requests: raw.requests.map(request => {
                 assert.match(request.method, /^(GET|HEAD|OPTIONS|POST|PUT|PATCH|DELETE)$/);
                 assert.ok(request.status === null || Number.isInteger(request.status) && request.status >= 100 && request.status <= 599);
                 const terminal = PublishedReadTerminal.fromWire(request.terminal);
                 assert.equal(terminal.accepted, true, 'Unknown request terminal');
-                return { method: request.method, path: pathOnly(request.path), status: request.status, terminal: terminal.wire };
+                const failure = request.failure === null || request.failure === undefined ? null : PublishedReadFailure.fromWire(request.failure);
+                if (failure) assert.equal(failure.accepted, true, 'Unknown request failure');
+                return { method: request.method, path: pathOnly(request.path), status: request.status,
+                  terminal: terminal.wire, failure: failure?.wire ?? null };
               }) });
             continue;
           }
@@ -205,13 +258,17 @@ function checkSecurityContracts() {
   writeFileSync(path, JSON.stringify({ suites: [{ specs: [{ title: secret, tests: [{ annotations: [
     { type: 'evidence', description: 'REAL_BACKEND' },
     { type: 'action', description: JSON.stringify({ id: 'profile', routes: ['/customer/profile'], actor: 'CUSTOMER', kind: 'MUTATION' }) },
+    { type: 'action-http', description: JSON.stringify({ method: 'GET', path: `/api/v1/customer/me?secret=${secret}`,
+      status: 200, terminal: PublishedReadTerminal.Finished.wire, body: secret }) },
   ], results: [{
     status: BrowserOutcome.Failed.wire, errors: [{ message: secret,
       location: { file: `/tmp/${secret}/route-matrix.spec.ts`, line: 70, column: 1 } }],
     stdout: [{ text: secret }], attachments: [{ name: 'real-route-diagnostic', body: Buffer.from(JSON.stringify({
       pattern: `/customer/profile?secret=${secret}`, width: 390, finalPath: `/customer/profile?secret=${secret}#${secret}`,
       requests: [{ method: 'GET', path: `/api/v1/customer/me?secret=${secret}`, status: 200,
-        terminal: PublishedReadTerminal.Finished.wire, body: secret, identity: secret }],
+        terminal: PublishedReadTerminal.Finished.wire, failure: null, body: secret, identity: secret }],
+      reflow: { viewportWidth: 390, documentWidth: 390, overflow: false, nodes: [], secret },
+      axe: [{ id: 'color-contrast', impact: PublishedAxeImpact.Serious.wire, nodeCount: 1, secret }],
     })).toString('base64') }],
   }] }] }] }] }));
   const target = join(scratch, 'safe-report');
@@ -221,7 +278,7 @@ function checkSecurityContracts() {
   }
   assert.equal(readFileSync(join(target, 'junit.xml'), 'utf8').includes('route-matrix.spec.ts:70'), true);
   assert.deepEqual(JSON.parse(readFileSync(join(target, 'route-diagnostics.json'), 'utf8'))[0].requests,
-    [{ method: 'GET', path: '/api/v1/customer/me', status: 200, terminal: PublishedReadTerminal.Finished.wire }]);
+    [{ method: 'GET', path: '/api/v1/customer/me', status: 200, terminal: PublishedReadTerminal.Finished.wire, failure: null }]);
   const invalidAttachment = (overrides = {}) => ({ suites: [{ specs: [{ file: 'route.spec.ts', line: 1, tests: [{ results: [{
     status: BrowserOutcome.Passed.wire, attachments: [{ name: 'real-route-acceptance', body: Buffer.from(JSON.stringify({
       pattern: 'catalog', width: 390, actor: PublishedActor.Customer.wire, evidence: 'REAL_BACKEND',

@@ -13,7 +13,8 @@ import { mapUserSession } from '../src/app/data/mappers/http-mappers';
 import { UserRole } from '../src/app/domain/user/user-role';
 import { bindProductiveRealRoutes, productiveRouteDefinitions, RouteActor, RouteEvidenceMode, RouteGateResult, type ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
-import { assertReflow, RealReadTrace, requiredReads } from './route-matrix-support';
+import { AccessibilityImpact, assertReflow, measureReflow, RealReadTrace, requiredReads,
+  type SafeReflowDiagnostic } from './route-matrix-support';
 import { origin } from './support';
 
 const contexts = new Map<RouteActor, BrowserContext>();
@@ -73,6 +74,8 @@ for (const width of [390, 768, 1440]) {
       if (!context) throw new Error('Unknown matrix actor');
       const page = await context.newPage();
       const trace = new RealReadTrace(page);
+      let reflow: SafeReflowDiagnostic | null = null;
+      let axeBlocking: readonly { id: string; impact: string; nodeCount: number }[] = [];
       try {
         await page.setViewportSize({ width, height: 1000 });
         await page.goto(binding.url, { waitUntil: 'domcontentloaded' });
@@ -94,9 +97,12 @@ for (const width of [390, 768, 1440]) {
         await expect(page.locator('main')).toBeFocused();
         await expect(page).toHaveURL(new URL(binding.finalUrl, origin).href);
         await expect(page.locator('sc-root')).toHaveAttribute('data-surface-id', binding.surface.wire);
-        await assertReflow(page);
+        reflow = await measureReflow(page);
         const axe = await new AxeBuilder({ page }).analyze();
-        const blocking = axe.violations.filter(item => item.impact === 'serious' || item.impact === 'critical');
+        const blocking = axe.violations.filter(item => AccessibilityImpact.fromWire(item.impact).blocking);
+        axeBlocking = blocking.map(item => ({ id: item.id, impact: AccessibilityImpact.fromWire(item.impact).wire,
+          nodeCount: item.nodes.length }));
+        await assertReflow(page, reflow);
         expect(blocking.map(item => ({ id: item.id, impact: item.impact, nodes: item.nodes.map(node => node.target) }))).toEqual([]);
         await testInfo.attach('real-route-acceptance', { contentType: 'application/json', body: JSON.stringify({
           pattern: binding.pattern, width, actor: binding.actor.wire, evidence: binding.evidence.wire,
@@ -105,7 +111,7 @@ for (const width of [390, 768, 1440]) {
         }) });
       } finally {
         await testInfo.attach('real-route-diagnostic', { contentType: 'application/json', body: JSON.stringify({
-          pattern: binding.pattern, width, ...trace.snapshot(page.url()),
+          pattern: binding.pattern, width, ...trace.snapshot(page.url()), reflow, axe: axeBlocking,
         }) });
         await page.close();
       }

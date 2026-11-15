@@ -78,13 +78,15 @@ test('PRM action: public catalog combines search brand category and active-offer
     });
     await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible();
     await page.getByLabel('Búsqueda', { exact: true }).fill('Taladro');
-    await page.getByLabel('Marca', { exact: true }).selectOption({ label: 'Showcase Tools' });
-    await page.getByLabel('Categoría', { exact: true }).selectOption({ label: 'Herramientas eléctricas' });
+    const brandFilter = page.getByRole('combobox', { name: 'Marca', exact: true });
+    const categoryFilter = page.getByRole('combobox', { name: 'Categoría', exact: true });
+    await brandFilter.selectOption({ label: 'Showcase Tools' });
+    await categoryFilter.selectOption({ label: 'Herramientas eléctricas' });
     await page.getByLabel('Sólo ofertas', { exact: true }).check();
     await expect(page.getByLabel('Búsqueda', { exact: true })).toHaveValue('Taladro');
     await expect(page.getByLabel('Sólo ofertas', { exact: true })).toBeChecked();
-    const brand = await page.getByLabel('Marca', { exact: true }).inputValue();
-    const category = await page.getByLabel('Categoría', { exact: true }).inputValue();
+    const brand = await brandFilter.inputValue();
+    const category = await categoryFilter.inputValue();
     const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
     await page.getByRole('button', { name: 'Buscar', exact: true }).click();
     const response = await responsePromise;
@@ -310,10 +312,14 @@ async function createProduct(page: Page): Promise<string> {
   await page.locator('section[aria-labelledby="variant-editor-title"]').getByLabel('Nombre', { exact: true }).fill(sku);
   await page.getByLabel('Stock inicial', { exact: true }).fill('10');
   await page.getByLabel('Precio base', { exact: true }).fill('100');
-  await page.getByLabel('Estado del producto', { exact: true }).selectOption(ProductStatus.Active.wire);
+  await page.getByRole('combobox', { name: 'Estado del producto', exact: true }).selectOption(ProductStatus.Active.wire);
   const saved = mutation(page, `user/catalog/products/${sku}`, WriteMethod.Put);
   await page.getByRole('button', { name: 'Guardar producto', exact: true }).click();
   expect((await saved).status()).toBe(200);
+  const persisted = mapProductDetail(await body(page, `catalog/products/${sku}`));
+  expect(persisted.status).toBe(ProductStatus.Active);
+  expect(persisted.variants).toHaveLength(1);
+  expect(persisted.variants[0].inventory.saleable).toBe(10);
   return sku;
 }
 
@@ -431,9 +437,10 @@ test('PRM action: branding publishes publicly and stale revision cannot overwrit
   } finally { await page.close(); }
 });
 
-test('PRM action: content publication persists and appears in public composition', async ({}, info) => {
+test('PRM action: content publication persists and appears in public composition', async ({ browser }, info) => {
   RealActionCase.Content.annotate(info);
   const page = await adminPage();
+  const publicContext = await browser.newContext({ baseURL: origin, ignoreHTTPSErrors: true });
   try {
     const title = `PRM portada ${randomUUID().slice(0, 8)}`;
     observeActionTransport(page, info);
@@ -452,13 +459,15 @@ test('PRM action: content publication persists and appears in public composition
     await test.step('Read the published section from the public API and render that exact resource', async () => {
       const publicReadback = mapHomeComposition(await body(page, 'content/home'), true);
       expect(publicReadback.sections.find(section => section.key === changed?.key)?.content.title).toBe(title);
-      const rendered = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/content/home');
-      await page.goto('/');
+      const publicPage = await publicContext.newPage();
+      observeActionTransport(publicPage, info);
+      const rendered = publicPage.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/content/home');
+      await publicPage.goto('/');
       expect((await rendered).status()).toBe(200);
+      await expect(publicPage.getByRole('heading', { name: title, exact: true })).toBeVisible();
     });
-    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     expect(JSON.stringify(await body(page, 'content/home'))).toContain(title);
-  } finally { await page.close(); }
+  } finally { await publicContext.close(); await page.close(); }
 });
 
 test('PRM action: profile import rejects incompatible version and explicit compatible merge persists', async ({}, info) => {
@@ -576,7 +585,11 @@ test('PRM action: external account and capabilities honestly remain unavailable'
     await expect(page.locator('#ml-account-title')).toHaveCount(0);
     await page.goto('/user/capabilities');
     const modules = mapCapabilities(await body(page, 'user/capabilities'));
-    for (const id of [CapabilityModuleId.PaymentsMp, CapabilityModuleId.MarketplaceMl, CapabilityModuleId.Carriers,
+    const payments = modules.find(row => row.id === CapabilityModuleId.PaymentsMp);
+    expect(payments?.state).toBe(CapabilityModuleState.Active);
+    const safety = await body<{ externalCheckoutDisabled: boolean }>(page, 'user/showcase-safety');
+    expect(safety.externalCheckoutDisabled).toBe(true);
+    for (const id of [CapabilityModuleId.MarketplaceMl, CapabilityModuleId.Carriers, CapabilityModuleId.MlVirtualKits,
       CapabilityModuleId.MlPriceAutomation, CapabilityModuleId.MlCompetitionInsights, CapabilityModuleId.MlPromotionOrchestrator]) {
       const row = modules.find(row => row.id === id);
       expect(row, `External module must be present: ${id.label}`).toBeTruthy();

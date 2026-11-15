@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { expect, test, type Browser, type BrowserContext, type Page, type Response, type TestInfo } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Page, type Request, type Response, type TestInfo } from '@playwright/test';
 import { AccessContext } from '../src/app/domain/access/access-context';
 import { readApiBody } from '../src/app/core/api/base-response';
 import { RouteActionClass, RouteActor, RouteEvidenceMode } from '../src/app/features/navigation/route-evidence';
@@ -40,6 +40,12 @@ export class RealActionCase {
 
 export enum WriteMethod { Post = 'POST', Put = 'PUT', Delete = 'DELETE' }
 
+export class ActionTransportTerminal {
+  private constructor(readonly wire: string) {}
+  static readonly Finished = new ActionTransportTerminal('finished');
+  static readonly Failed = new ActionTransportTerminal('failed');
+}
+
 export async function body<T = Record<string, unknown>>(page: Page, path: string): Promise<T> {
   const response = await page.request.get(`/api/v1/${path}`);
   expect(response.status(), `Real readback: ${path}`).toBe(200);
@@ -55,17 +61,31 @@ export async function mutate(page: Page, realm: AccessContext, path: string, dat
 }
 
 export function mutation(page: Page, path: string, method = WriteMethod.Post): Promise<Response> {
-  return test.step(`Real mutation ${method} ${path}`, () => page.waitForResponse(response =>
-    new URL(response.url()).pathname === `/api/v1/${path}` && response.request().method() === method));
+  const response = page.waitForResponse(candidate =>
+    new URL(candidate.url()).pathname === `/api/v1/${path}` && candidate.request().method() === method);
+  return test.step(`Real mutation ${method} ${path}`, () => response);
 }
 
 /** Transport metadata only: never headers, query strings, request bodies or response bodies. */
 export function observeActionTransport(page: Page, info: TestInfo): void {
+  const statuses = new WeakMap<Request, number>();
   page.on('response', response => {
     const path = new URL(response.url()).pathname;
     if (!path.startsWith('/api/v1/')) return;
+    statuses.set(response.request(), response.status());
+  });
+  page.on('requestfinished', request => {
+    const path = new URL(request.url()).pathname;
+    if (!path.startsWith('/api/v1/')) return;
     info.annotations.push({ type: 'action-http', description: JSON.stringify({
-      method: response.request().method(), path, status: response.status(),
+      method: request.method(), path, status: statuses.get(request) ?? null, terminal: ActionTransportTerminal.Finished.wire,
+    }) });
+  });
+  page.on('requestfailed', request => {
+    const path = new URL(request.url()).pathname;
+    if (!path.startsWith('/api/v1/')) return;
+    info.annotations.push({ type: 'action-http', description: JSON.stringify({
+      method: request.method(), path, status: statuses.get(request) ?? null, terminal: ActionTransportTerminal.Failed.wire,
     }) });
   });
 }

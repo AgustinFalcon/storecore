@@ -17,7 +17,7 @@ export class CartPageComponent implements OnInit {
   constructor(readonly store: CartStore) {}
 
   ngOnInit(): void {
-    this.store.load();
+    this.store.ensureLoaded();
   }
 
   changeQty(line: { sku: string; quantity: number }): void {

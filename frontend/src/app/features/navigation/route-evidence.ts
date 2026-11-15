@@ -60,4 +60,3 @@ export class RouteGateResult {
     return this.all.find(value => value.wire === raw) ?? this.Unknown;
   }
 }
-

@@ -19,7 +19,7 @@ function loadTs(relative) {
   new Function('require', 'module', 'exports', source)(importModule, module, module.exports);
   return module.exports;
 }
-const { RealReadTrace, RealReadRequirement, RealReadExpectation, RealReadTerminal } = loadTs('../e2e-psd-real/route-matrix-support.ts');
+const { RealReadTrace, RealReadRequirement, RealReadExpectation, RealReadTerminal, RealReadFailure } = loadTs('../e2e-psd-real/route-matrix-support.ts');
 const { ApiErrorCode } = loadTs('../src/app/core/api/api-error-code.ts');
 const required = ['health', 'storefront/branding', 'catalog'];
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -27,7 +27,8 @@ function fixture() {
   const page = new EventEmitter();
   const trace = new RealReadTrace(page);
   const read = (path, { status = 200, failed = false, pending = false, code, body = null, method = 'GET' } = {}) => {
-    const request = { url: () => `https://localhost/api/v1/${path}`, method: () => method, postData: () => body };
+    const request = { url: () => `https://localhost/api/v1/${path}`, method: () => method, postData: () => body,
+      failure: () => failed ? { errorText: 'net::ERR_ABORTED' } : null };
     page.emit('request', request);
     page.emit('response', { request: () => request, status: () => status, json: async () => ({ errorCode: code }) });
     if (!pending) page.emit(failed ? 'requestfailed' : 'requestfinished', request);
@@ -41,6 +42,9 @@ test('closed read expectations and terminal states reject unknown wires', () => 
   for (const value of [RealReadTerminal.Pending, RealReadTerminal.Finished, RealReadTerminal.Failed]) assert.equal(RealReadTerminal.fromWire(value.wire), value);
   assert.equal(RealReadExpectation.fromWire('future'), RealReadExpectation.Unknown);
   assert.equal(RealReadTerminal.fromWire('future'), RealReadTerminal.Unknown);
+  assert.equal(RealReadFailure.fromTransport('net::ERR_ABORTED'), RealReadFailure.Aborted);
+  assert.equal(RealReadFailure.fromTransport('net::ERR_CONNECTION_RESET'), RealReadFailure.Connection);
+  assert.equal(RealReadFailure.fromTransport('PRIVATE_BROWSER_DETAIL'), RealReadFailure.Unknown);
   assert.throws(() => RealReadRequirement.disabled('catalog'));
 });
 
@@ -99,8 +103,9 @@ test('failure diagnostics exclude query, fragment, body and full request identit
   const snapshot = trace.snapshot('https://localhost/customer/profile?secret=PRIVATE_QUERY#PRIVATE_FRAGMENT');
   assert.equal(snapshot.finalPath, '/customer/profile');
   assert.deepEqual(snapshot.requests.slice(-2), [
-    { method: 'POST', path: '/api/v1/catalog', status: 200, terminal: RealReadTerminal.Pending.wire },
-    { method: 'GET', path: '/api/v1/customer/me', status: 401, terminal: RealReadTerminal.Failed.wire },
+    { method: 'POST', path: '/api/v1/catalog', status: 200, terminal: RealReadTerminal.Pending.wire, failure: null },
+    { method: 'GET', path: '/api/v1/customer/me', status: 401, terminal: RealReadTerminal.Failed.wire,
+      failure: RealReadFailure.Aborted.wire },
   ]);
   assert.equal(JSON.stringify(snapshot).includes('PRIVATE_'), false);
   assert.equal(JSON.stringify(snapshot).includes('identity'), false);

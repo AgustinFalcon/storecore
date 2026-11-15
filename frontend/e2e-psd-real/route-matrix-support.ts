@@ -40,6 +40,39 @@ export class RealReadTerminal {
   }
 }
 
+export class RealReadFailure {
+  private constructor(readonly wire: string) {}
+  static readonly Aborted = new RealReadFailure('aborted');
+  static readonly Connection = new RealReadFailure('connection');
+  static readonly Unknown = new RealReadFailure('unknown');
+  static fromTransport(raw: unknown): RealReadFailure {
+    if (typeof raw !== 'string') return this.Unknown;
+    if (raw.includes('ERR_ABORTED') || raw.includes('NS_BINDING_ABORTED') || raw.toLowerCase().includes('cancel')) return this.Aborted;
+    if (raw.includes('ERR_CONNECTION') || raw.includes('ERR_NETWORK') || raw.includes('ERR_NAME_NOT_RESOLVED') ||
+      raw.includes('ERR_INTERNET_DISCONNECTED') || raw.includes('ERR_TIMED_OUT')) return this.Connection;
+    return this.Unknown;
+  }
+}
+
+export class AccessibilityImpact {
+  private constructor(readonly wire: string, readonly blocking: boolean) {}
+  static readonly Minor = new AccessibilityImpact('minor', false);
+  static readonly Moderate = new AccessibilityImpact('moderate', false);
+  static readonly Serious = new AccessibilityImpact('serious', true);
+  static readonly Critical = new AccessibilityImpact('critical', true);
+  static readonly Unknown = new AccessibilityImpact('unknown', true);
+  static fromWire(raw: unknown): AccessibilityImpact {
+    return [this.Minor, this.Moderate, this.Serious, this.Critical].find(value => value.wire === raw) ?? this.Unknown;
+  }
+}
+
+export interface SafeReflowDiagnostic {
+  readonly viewportWidth: number;
+  readonly documentWidth: number;
+  readonly overflow: boolean;
+  readonly nodes: readonly { tag: string; path: string; left: number; right: number; width: number }[];
+}
+
 interface ObservedRequest {
   readonly identity: string;
   readonly sequence: number;
@@ -63,7 +96,8 @@ export class RealReadTrace {
   private readonly responses = new WeakMap<Request, Response>();
   private readonly finished: FinishedObservedRequest[] = [];
   private readonly interruptedHttpErrors: { method: string; path: string; status: number }[] = [];
-  private readonly diagnostics = new Map<Request, { method: string; path: string; status: number | null; terminal: RealReadTerminal }>();
+  private readonly diagnostics = new Map<Request, { method: string; path: string; status: number | null;
+    terminal: RealReadTerminal; failure: RealReadFailure | null }>();
   private sequence = 0;
   constructor(page: Page) {
     page.on('request', request => {
@@ -71,7 +105,7 @@ export class RealReadTrace {
       if (!url.pathname.startsWith(api)) return;
       this.pending.add(request);
       const method = request.method();
-      this.diagnostics.set(request, { method, path: url.pathname, status: null, terminal: RealReadTerminal.Pending });
+      this.diagnostics.set(request, { method, path: url.pathname, status: null, terminal: RealReadTerminal.Pending, failure: null });
       const bodyDigest = createHash('sha256').update(request.postData() ?? '').digest('hex');
       this.observations.set(request, { identity: `${method} ${url.pathname}${url.search} ${bodyDigest}`,
         sequence: ++this.sequence, method, path: url.pathname });
@@ -83,7 +117,10 @@ export class RealReadTrace {
     page.on('requestfailed', request => {
       if (!this.pending.delete(request)) return;
       const diagnostic = this.diagnostics.get(request);
-      if (diagnostic) diagnostic.terminal = RealReadTerminal.Failed;
+      if (diagnostic) {
+        diagnostic.terminal = RealReadTerminal.Failed;
+        diagnostic.failure = RealReadFailure.fromTransport(request.failure()?.errorText);
+      }
       const observation = this.observations.get(request);
       if (observation) {
         this.failures.push(observation);
@@ -128,9 +165,10 @@ export class RealReadTrace {
     this.finished.push({ ...observation, status, errorCode });
     this.pending.delete(request);
   }
-  snapshot(finalUrl: string): { finalPath: string; requests: { method: string; path: string; status: number | null; terminal: string }[] } {
+  snapshot(finalUrl: string): { finalPath: string; requests: { method: string; path: string; status: number | null;
+    terminal: string; failure: string | null }[] } {
     return { finalPath: new URL(finalUrl).pathname, requests: [...this.diagnostics.values()].map(row =>
-      ({ method: row.method, path: row.path, status: row.status, terminal: row.terminal.wire })) };
+      ({ method: row.method, path: row.path, status: row.status, terminal: row.terminal.wire, failure: row.failure?.wire ?? null })) };
   }
   async ready(reads: readonly (string | RealReadRequirement)[]): Promise<void> {
     const requirements = reads.map(read => typeof read === 'string' ? RealReadRequirement.data(read) : read);
@@ -193,8 +231,33 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
     binding.pattern === 'user/mercadolibre' && own.includes(path) ? RealReadRequirement.disabled(path) : RealReadRequirement.data(path));
 }
 
-export async function assertReflow(page: Page): Promise<void> {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Document must fit viewport').toBe(true);
+export async function measureReflow(page: Page): Promise<SafeReflowDiagnostic> {
+  return page.evaluate(() => {
+    const structuralPath = (target: Element): string => {
+      const segments: string[] = [];
+      let element: Element | null = target;
+      while (element) {
+        const tag = element.tagName.toLowerCase();
+        const siblings = element.parentElement ? [...element.parentElement.children].filter(row => row.tagName === element!.tagName) : [element];
+        segments.unshift(`${tag}:${siblings.indexOf(element) + 1}`);
+        element = element.parentElement;
+      }
+      return segments.join('/');
+    };
+    const nodes = [...document.body.querySelectorAll('*')].flatMap(element => {
+      const rect = element.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 || rect.left >= -1 && rect.right <= innerWidth + 1) return [];
+      return [{ tag: element.tagName.toLowerCase(), path: structuralPath(element), left: Math.round(rect.left),
+        right: Math.round(rect.right), width: Math.round(rect.width) }];
+    }).slice(0, 12);
+    return { viewportWidth: innerWidth, documentWidth: document.documentElement.scrollWidth,
+      overflow: document.documentElement.scrollWidth > innerWidth + 1, nodes };
+  });
+}
+
+export async function assertReflow(page: Page, diagnostic?: SafeReflowDiagnostic): Promise<void> {
+  const measured = diagnostic ?? await measureReflow(page);
+  expect(measured.overflow, 'Document must fit viewport').toBe(false);
   const inaccessibleTables = await page.locator('table:visible').evaluateAll(tables => tables.flatMap(table => {
     if (table.getBoundingClientRect().width <= innerWidth) return [];
     let element: HTMLElement | null = table.parentElement;
