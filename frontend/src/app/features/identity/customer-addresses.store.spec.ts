@@ -37,6 +37,15 @@ function setup() {
 }
 
 describe('CustomerStore address authority', () => {
+  it('merges field edits into the selected authoritative draft without losing identity', () => {
+    const f = setup();
+    f.store.loadAddresses();
+    f.store.setAddressDraft(address);
+    f.store.patchAddressDraft({ street: 'Nueva' });
+    f.store.persistAddress();
+    expect(f.save.execute).toHaveBeenCalledWith({ ...address, street: 'Nueva' });
+  });
+
   it('requires a confirmed current read and preserves read errors until retry', () => {
     const f = setup();
     f.store.loadAddresses();

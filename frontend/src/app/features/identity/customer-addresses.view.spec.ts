@@ -43,4 +43,12 @@ describe('CustomerAddressesViewComponent', () => {
     fixture.componentRef.setInput('state', readyState); fixture.componentRef.setInput('returnTarget', AddressReturnTarget.Unknown); fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('a')).toBeNull();
   });
+
+  it('emits field patches without rebuilding them from a potentially stale input', () => {
+    const fixture = setup();
+    const patch = vi.fn();
+    fixture.componentInstance.draftPatch.subscribe(patch);
+    fixture.componentInstance.patch({ street: 'Nueva' });
+    expect(patch).toHaveBeenCalledWith({ street: 'Nueva' });
+  });
 });

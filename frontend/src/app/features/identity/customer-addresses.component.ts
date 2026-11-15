@@ -19,6 +19,7 @@ import { CustomerStore } from './customer.store';
         [state]="state"
         [returnTarget]="returnTarget()"
         (draftChange)="store.setAddressDraft($event)"
+        (draftPatch)="store.patchAddressDraft($event)"
         (save)="store.persistAddress()"
         (remove)="store.removeAddress($event)"
         (clearDraft)="store.clearAddressDraft()"

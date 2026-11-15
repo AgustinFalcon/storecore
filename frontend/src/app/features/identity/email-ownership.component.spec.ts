@@ -29,7 +29,9 @@ describe('accessible account email verification panel', () => {
     const session = TestBed.inject(UserSession); session.markAuthenticated({ id: 'one', roles: [UserRole.Operator] });
     const fixture = TestBed.createComponent(EmailOwnershipComponent); fixture.componentRef.setInput('realm', RecoveryRealm.User); fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain(EmailOwnership.Verified.label);
+    expect(repository.ownership).toHaveBeenCalledTimes(1);
     repository.ownership.mockReturnValue(of(EmailOwnership.Unknown)); fixture.componentRef.setInput('revision', 1); fixture.detectChanges(); expect(fixture.nativeElement.textContent).toContain(EmailOwnership.Unknown.label);
+    expect(repository.ownership).toHaveBeenCalledTimes(2);
     session.clear(); fixture.detectChanges(); fixture.componentInstance.store.request(); expect(repository.request).not.toHaveBeenCalled(); expect(fixture.componentInstance.store.snapshot.canRequest).toBe(false); fixture.destroy();
   });
 });

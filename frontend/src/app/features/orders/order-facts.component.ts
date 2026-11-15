@@ -5,6 +5,7 @@ import { CustomerOrder } from '../../domain/order/order.entity';
 @Component({
   selector: 'sc-order-facts',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styles: [':host { display: block; min-width: 0; } .sc-panel, dd { min-width: 0; overflow-wrap: anywhere; }'],
   template: `
     @if (order; as value) {
       <section class="sc-panel" aria-label="Datos históricos de la orden">

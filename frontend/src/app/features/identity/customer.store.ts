@@ -135,6 +135,8 @@ export class CustomerStore extends ComponentStore<CustomerState> {
   }
   readonly setProfile = this.updater((s, profile: CustomerProfile) => ({ ...s, profile, saved: false }));
   readonly setAddressDraft = this.updater((s, addressDraft: CustomerAddress) => ({ ...s, addressDraft }));
+  readonly patchAddressDraft = this.updater((s, patch: Partial<CustomerAddress>) =>
+    ({ ...s, addressDraft: { ...s.addressDraft, ...patch } }));
   readonly clearAddressDraft = this.updater((s) => ({ ...s, addressDraft: emptyAddress }));
 
   readonly submitRegister = this.effect<void>((trigger$) =>

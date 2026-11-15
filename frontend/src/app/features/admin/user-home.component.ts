@@ -20,7 +20,9 @@ export class UserHomeComponent implements OnInit {
   readonly actions = computed(() => this.session.authenticated() ? UserAction.forRoles(this.session.roles()) : []);
   constructor(readonly session: UserSession, readonly store: UserHomeStore) {}
   ngOnInit(): void { this.store.load(OverviewPeriod.Today); }
-  changePeriod(period: OverviewPeriod): void { if (period !== OverviewPeriod.Unknown) this.store.load(period); }
+  changePeriod(period: OverviewPeriod): void {
+    if (period !== OverviewPeriod.Unknown && period !== this.store.snapshot.period) this.store.load(period);
+  }
   factValue(fact: OverviewFact): number | null { return fact.state === OverviewFactState.Known ? fact.value : null; }
   queueAvailable(queue: OverviewQueue<unknown>): boolean { return queue.state === OverviewFactState.Known; }
   instant(value: string, timezone: string): string {

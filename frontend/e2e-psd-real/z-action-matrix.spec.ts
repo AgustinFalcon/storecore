@@ -85,6 +85,7 @@ test('PRM action: public catalog combines search brand category and active-offer
     await page.getByLabel('Sólo ofertas', { exact: true }).check();
     await expect(page.getByLabel('Búsqueda', { exact: true })).toHaveValue('Taladro');
     await expect(page.getByLabel('Sólo ofertas', { exact: true })).toBeChecked();
+    await expect(page.getByRole('status')).toHaveText('Aplicá Buscar para consultar estos filtros.');
     const brand = await brandFilter.inputValue();
     const category = await categoryFilter.inputValue();
     const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
@@ -193,6 +194,9 @@ test('PRM action: addresses create edit delete and foreign ownership reject pers
     expect(await body(stranger.page, 'customer/me/addresses')).toEqual([]);
     await page.reload();
     await page.getByRole('button', { name: /PRM propia 42/ }).click();
+    await expect(page.getByRole('heading', { name: 'Editar dirección', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Calle', { exact: true })).toHaveValue('PRM propia');
+    await expect(page.getByRole('button', { name: 'Actualizar', exact: true })).toBeEnabled();
     await page.getByLabel('Calle', { exact: true }).fill('PRM editada');
     const edited = mutation(page, `customer/me/addresses/${id}`, WriteMethod.Put);
     await page.getByRole('button', { name: 'Actualizar', exact: true }).click();
