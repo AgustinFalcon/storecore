@@ -21,3 +21,16 @@
   continuidad total. Sin implementación runtime en este PR documental.
 - Exact-head detectó un nivel no topológico y una ruta Angular obsoleta en la
   matriz; ambos fueron corregidos antes del gate final.
+- TASK-001 implementada en Kotlin y TypeScript: tipos cerrados, traducción wire
+  única y fail-closed, snapshots inmutables, límites compartidos, unicidad Unicode
+  y pasos de flujo independientes.
+- Base pura de TASK-006 implementada sin marcar la tarea completa: resolución
+  determinista parcial/completa, combinaciones imposibles, cantidad, precio/stock
+  y fallback genérico exclusivo para `Absent`. Tombstones e integración PDP siguen
+  pendientes.
+- Evidencia local del corte: `OptionDomainTest` 8/8; frontend 74/74; ESLint focal
+  limpio; build Angular completo exitoso.
+- Dos rondas de revisión GPT-6.1 Sol corrigieron cuatro hallazgos P2 y un P3:
+  case-fold `ß/ẞ`, singletons mutables, variante ajena en `withQuantity` y rangos
+  numéricos divergentes. Ronda final de arquitectura y seguridad: APPROVE, sin
+  P0–P3 pendientes. La aprobación cubre sólo dominio/motor aislados.

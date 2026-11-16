@@ -2,7 +2,7 @@
 
 ## Corte A — dominio, datos y comandos
 
-- [ ] TASK-001 Tipos cerrados y pasos independientes de schema/selección.
+- [x] TASK-001 Tipos cerrados y pasos independientes de schema/selección.
 - [ ] TASK-002 Migración PostgreSQL, vectores diferibles e interlock legacy.
 - [ ] TASK-003 Writer único/CAS para schema, asignaciones y actividad.
 - [ ] TASK-004 Proyección pública/admin y contrato wire fail-closed.
@@ -28,3 +28,7 @@
 
 La implementación se realiza en PR separado de este contrato documental y no
 cierra #10 hasta que los catorce gates estén completos.
+
+El corte inicial también implementa y prueba el motor puro de TASK-006, pero esa
+tarea permanece abierta hasta integrar tombstones durables, fences de generación
+y la selección autoritativa con el PDP.
