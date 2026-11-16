@@ -1,0 +1,21 @@
+# Progreso
+
+## 2026-11-16
+
+- Issue #10 y baseline auditados.
+- Confirmado: attributes/attribute_order y selector genérico existen; schema,
+  ejes select/swatch y búsqueda por nombre de categoría no existen.
+- Specs funcional/técnica creados para revisión; sin código ni migración.
+- Primera revisión paralela Astra Product/UX y Security: NO-GO (sin P0; P1/P2
+  sobre Absent, selección parcial, writer único/CAS, búsqueda y rollback).
+- Specs corregidas; pendiente segunda revisión exacta antes de generar tareas.
+- Segunda revisión paralela: NO-GO por ruta pública incorrecta, persistencia no
+  ejecutable en PostgreSQL, DTO de operaciones incompleto, interlock legacy e
+  intención recuperable tras recarga.
+- Segunda corrección aplicada con vector/guard diferible, comando cerrado,
+  interlock externo obligatorio y tombstone durable. Pendiente tercera revisión.
+- Rondas tres y cuatro corrigieron compatibilidad `Absent`, captura de intención,
+  Clear y búsqueda SKU. Hashes finales aprobados por Product/UX y Security, sin
+  P0–P3: funcional `38975151`, técnica `815F618D`.
+- Plan de 14 tareas generado y aprobado por el owner mediante instrucción de
+  continuidad total. Sin implementación runtime en este PR documental.
