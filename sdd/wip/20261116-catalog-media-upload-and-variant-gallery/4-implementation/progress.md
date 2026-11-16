@@ -12,3 +12,5 @@
   continuidad total. La implementación queda habilitada en PR separado.
 - Exact-head detectó interlock legacy, keyword de cierre y DAG documental; fueron
   corregidos antes del gate final. Cloudinary live continúa sin GO.
+- El DAG final ejecuta E2E/CI antes de tres reviews paralelas sobre SHA congelado;
+  merge/post-merge sólo se registran después de las tres aprobaciones.

@@ -22,10 +22,14 @@
 
 ## Corte D — evidencia
 
+- [ ] TASK-015 E2E PostgreSQL/browser y CI alojado sobre el head candidato.
 - [ ] TASK-012 Review funcional/código exact-head.
 - [ ] TASK-013 Review de performance/recursos exact-head.
 - [ ] TASK-014 Review de seguridad exact-head.
-- [ ] TASK-015 E2E PostgreSQL/browser, CI, PR, merge y post-merge.
+
+Las tres reviews corren en paralelo después de TASK-015 sobre el mismo SHA
+inmutable. Sólo tras las tres aprobaciones se registra merge y post-merge en
+progreso; cualquier cambio reinicia TASK-015 y los tres dictámenes.
 
 ## Gate externo separado
 

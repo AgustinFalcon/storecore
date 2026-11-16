@@ -87,28 +87,28 @@
       "references": ["Functional: Experiencia storefront"], "design_decisions": ["DD-variant-media-selection"]
     },
     {
-      "id": "TASK-012", "title": "Run exact-head code and product review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
+      "id": "TASK-012", "title": "Run exact-head code and product review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-015"],
       "description": "Review implementation against issue #7 and approved functional/technical specs.",
       "files": [], "acceptance_criteria": ["AC-1: Findings P0-P3 are recorded", "GATE: exact-head functional/code review approves"],
       "references": ["Issue #7"], "design_decisions": []
     },
     {
-      "id": "TASK-013", "title": "Run media performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
+      "id": "TASK-013", "title": "Run media performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-015"],
       "description": "Review memory, decoding, concurrency, database locks, delivery TTL and cleanup behavior under bounded load.",
       "files": [], "acceptance_criteria": ["AC-1: Resource limits have measured evidence", "GATE: exact-head performance review approves"],
       "references": ["Technical: Observabilidad y operación"], "design_decisions": []
     },
     {
-      "id": "TASK-014", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
+      "id": "TASK-014", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-015"],
       "description": "Review upload corpus, authorization, CSRF, private delivery, secrets, egress and provider failure handling.",
       "files": [], "acceptance_criteria": ["AC-1: No unresolved P0-P3 remains", "GATE: exact-head security review approves"],
       "references": ["Technical: Seguridad y privacidad"], "design_decisions": []
     },
     {
-      "id": "TASK-015", "title": "Prove browser and hosted gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014"],
-      "description": "Run real PostgreSQL/Spring/Angular/Chromium acceptance and hosted CI, then obtain independent Product/Code and Security verdicts in parallel on the immutable SHA intended for merge before recording PR and post-merge evidence.",
+      "id": "TASK-015", "title": "Prove browser and hosted gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011"],
+      "description": "Run real PostgreSQL/Spring/Angular/Chromium acceptance and hosted CI on the candidate head; freeze that SHA for the three parallel exact-head reviews.",
       "files": ["frontend/e2e", ".github/workflows", "sdd/wip/20261116-catalog-media-upload-and-variant-gallery/4-implementation"],
-      "acceptance_criteria": ["AC-1: Multi-actor, crash, accessibility and direct-delivery scenarios pass", "AC-2: Hosted required checks pass on exact head", "AC-3: independent parallel Product/Code and Security reviews approve the same final SHA after every test/workflow change", "GATE: merge and post-merge are recorded separately"],
+      "acceptance_criteria": ["AC-1: Multi-actor, crash, accessibility and direct-delivery scenarios pass", "AC-2: Hosted required checks pass on candidate head", "AC-3: candidate SHA is frozen before reviews", "GATE: any later change reruns this task and all three reviews"],
       "references": ["Technical: Verificación"], "design_decisions": ["DD-test-provider-only"]
     }
   ],
