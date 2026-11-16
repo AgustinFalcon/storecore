@@ -1007,8 +1007,7 @@ pre {
   }
 
   .sc-pdp__layout,
-  .sc-bag__layout,
-  .sc-checkout__layout {
+  .sc-bag__layout {
     grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
     align-items: start;
   }
@@ -1019,6 +1018,13 @@ pre {
 
   .sc-home__tiles {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sc-checkout__layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
+    align-items: start;
   }
 }
 

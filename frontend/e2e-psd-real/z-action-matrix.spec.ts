@@ -88,9 +88,11 @@ test('PRM action: public catalog combines search brand category and active-offer
     await expect(page.getByRole('status')).toHaveText('Aplicá Buscar para consultar estos filtros.');
     const brand = await brandFilter.inputValue();
     const category = await categoryFilter.inputValue();
-    const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
-    await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-    const response = await responsePromise;
+    const catalog = page.locator('sc-catalog-page-view');
+    const [response] = await Promise.all([
+      page.waitForResponse(candidate => new URL(candidate.url()).pathname === '/api/v1/catalog'),
+      catalog.getByRole('button', { name: 'Buscar', exact: true }).click(),
+    ]);
     expect(response.status()).toBe(200);
     const query = new URL(response.url()).searchParams;
     expect(query.get('query')).toBe('Taladro');
