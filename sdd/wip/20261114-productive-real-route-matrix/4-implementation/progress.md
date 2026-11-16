@@ -37,3 +37,20 @@
   frontend 1.480/1.480, arquitectura/lint/build verdes; backend 459/459 verde.
 - El runtime de PRM-011/012 y la reclasificación LOCAL_PROVIDER de PRM-012A no
   se acreditan localmente: deben pasar los jobs Linux aislados del PR.
+
+## 2026-11-16
+
+- PR #282 creado y validado sobre el head
+  `44993bfa318fef43f4b43118fde6aa6ad837a157`.
+- Verify exact-head `43805915347` verde: `repository-hygiene`, `backend`,
+  `frontend`, `productive-routes-real-e2e` y `unified-access-real-e2e` (5/5).
+- La matriz productiva real Linux acreditó PRM-011, PRM-012 y PRM-012A con
+  PostgreSQL 16, backend Spring y Angular/Chromium productivos aislados.
+- Gates locales del mismo corte: frontend 217 archivos y 1.491 tests, backend,
+  lint/build, loader 79/79, PSD y checkout responsive en cinco anchos verdes;
+  fixture de rutas 61/61.
+- Reviews exact-head coordinadas GPT-6.1 Sol, producto/UX y seguridad:
+  `APPROVE`, sin hallazgos P0-P3.
+- Estado remoto observado antes de esta sincronización documental: PR mergeable
+  `MERGEABLE`, `mergeStateStatus=CLEAN`, cero threads sin resolver.
+- PRM-016B sigue abierto: no se acredita merge, post-merge ni cierre de #106.

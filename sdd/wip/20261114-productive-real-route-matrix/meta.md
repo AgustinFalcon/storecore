@@ -1,11 +1,13 @@
 # Matriz productiva real de rutas y acciones
 
-- Estado: `planning`
+- Estado: `implementation_review`
 - Fecha: 2026-11-14
 - Base: `master@94d005a2f2d5ae6ef4433102ba511f6aba0eb317`
 - Issue: #106
 - Rama: `feat/real-route-matrix-20261114`
 - Perfil: técnico
+- PR: #282
+- Head acreditado antes de la sincronización documental: `44993bfa318fef43f4b43118fde6aa6ad837a157`
 
 ## Objetivo
 
@@ -19,3 +21,9 @@ simulados ni pantallas redirigidas como backend real.
 El cierre acredita comercio web local. No acredita Mercado Pago live, Mercado
 Libre live, ARCA, Correo Argentino, BlackStore, correo productivo, despliegue,
 release ni homologación externa.
+
+## Gate restante
+
+La implementación, la matriz real aislada, las revisiones exact-head y el CI del
+PR están acreditados. Permanecen abiertos el merge, la verificación post-merge
+sobre `master` y el cierre de #106; este documento no los da por realizados.
