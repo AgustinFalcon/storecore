@@ -1,5 +1,19 @@
 # StoreCore documentation baseline 1.0.0
 
+## Master vigente — 2026-11-16
+
+`master 94d005a` integra PR #274–#281. Es la base canónica para nuevos cortes;
+los bloques anteriores basados en `dc45c59`/PR #273 son históricos. Mantiene
+proveedores live, carrier, ARCA, integración BlackStore, deploy y release bajo
+sus gates independientes.
+
+## Candidato documental apilado — 2026-11-16
+
+La reconciliación de #8/#13 se prepara sobre PR #282 y no altera el gate de
+release. Debe retargetearse a `master` después del merge del padre y repetir CI y
+reviews. Carrier, email logístico, guest cart y retornos Mercado Pago live siguen
+fuera del core homologado y no se habilitan por documentación.
+
 ## Master vigente — 2026-11-14
 
 `master dc45c59` contiene el checkout de entrega/retiro fusionado por PR #272

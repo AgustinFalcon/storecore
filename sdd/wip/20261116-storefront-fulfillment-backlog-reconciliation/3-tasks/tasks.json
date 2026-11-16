@@ -1,0 +1,13 @@
+{
+  "feature": "storefront-fulfillment-backlog-reconciliation",
+  "stats": { "total": 7, "done": 3, "by_layer": { "1": 5, "2": 0, "3": 2 } },
+  "tasks": [
+    { "id": "REC-001", "title": "Audit executable baseline", "status": "done", "layer": 1, "depends_on": [], "acceptance_criteria": ["Runtime and tests are cited without modification"] },
+    { "id": "REC-002", "title": "Reconcile fulfillment issue", "status": "done", "layer": 1, "depends_on": ["REC-001"], "acceptance_criteria": ["Satisfied, Reconciled and Deferred outcomes are explicit"] },
+    { "id": "REC-003", "title": "Reconcile storefront issue", "status": "done", "layer": 1, "depends_on": ["REC-001"], "acceptance_criteria": ["CUSTOMER-only cart policy and MP live boundary are explicit"] },
+    { "id": "REC-004", "title": "Run exact-head reviews", "status": "pending", "layer": 3, "depends_on": ["REC-002", "REC-003"], "acceptance_criteria": ["Product/architecture and security approve with no P0-P3"] },
+    { "id": "REC-005", "title": "Validate stacked PR", "status": "pending", "layer": 1, "depends_on": ["REC-004"], "acceptance_criteria": ["PR targets #282 branch and hosted CI passes"] },
+    { "id": "REC-006", "title": "Rebase after parent merge", "status": "pending", "layer": 1, "depends_on": ["REC-005"], "acceptance_criteria": ["Base is master containing #282; CI and reviews rerun"] },
+    { "id": "REC-007", "title": "Record merge and issue comments", "status": "pending", "layer": 3, "depends_on": ["REC-006"], "acceptance_criteria": ["Post-merge passes and issues retain honest residuals"] }
+  ]
+}

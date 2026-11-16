@@ -1,5 +1,28 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-16
+
+`master 94d005a2f2d5ae6ef4433102ba511f6aba0eb317` integra PR #274–#281.
+Sobre el cierre checkout #272 agrega reconciliación documental, capacidad de
+login aislada por realm, manifiesto/a11y de rutas productivas, dependencias sin
+advisories conocidos, escritura Mercado Pago post-commit, higiene de secretos,
+branding merchant runtime y comandos tipados de capabilities. Este bloque
+prevalece sobre el bloque 2026-11-14 basado en `dc45c59`, que queda histórico.
+
+No acredita el PR #282 todavía abierto ni proveedores live, carrier, ARCA,
+StoreCore↔BlackStore, deploy, homologación o release.
+
+## Candidato pendiente — PR #282 y reconciliación #8/#13 — 2026-11-16
+
+PR #282 head `067921e13a316e2a6d72c1636f8f93fa131740dc` está abierto,
+mergeable/CLEAN y Verify `43812281889` terminó 5/5 verde. No forma parte de
+`master` hasta merge/post-merge; #106 continúa abierto.
+
+`sdd/wip/20261116-storefront-fulfillment-backlog-reconciliation/` documenta,
+apilado sobre ese head, que fulfillment local y storefront CUSTOMER ya existen.
+No acredita guest cart, carrier, emails logísticos ni Mercado Pago live y no
+cierra #8/#13. Este bloque de candidato no reemplaza `master 94d005a`.
+
 ## Master vigente — 2026-11-14
 
 `master dc45c5942009d0f80eaf252054a54b8f51182f22` integra PR #271–#273.
