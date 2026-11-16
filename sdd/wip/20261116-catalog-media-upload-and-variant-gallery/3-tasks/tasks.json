@@ -1,0 +1,122 @@
+{
+  "feature": "catalog-media-upload-and-variant-gallery",
+  "local_config": { "postgresql": "container", "media_object_store": "test_stub" },
+  "blocked_external": [
+    "Cloudinary account and plan",
+    "private delivery and signed TTL contract",
+    "secret manager and credential rotation",
+    "non-production provider evidence and security GO"
+  ],
+  "stats": { "total": 15, "done": 0, "by_layer": { "1": 12, "2": 0, "3": 3 } },
+  "tasks": [
+    {
+      "id": "TASK-001", "title": "Model closed media domain", "status": "pending", "layer": 1, "complexity": "High", "depends_on": [],
+      "description": "Implement closed states, value objects and independent flow steps with one wire translator per boundary.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "frontend/src/app/domain/catalog"],
+      "acceptance_criteria": ["AC-1: Unknown values fail closed in Kotlin and Angular", "AC-2: Flow steps have one responsibility", "GATE: domain tests pass"],
+      "references": ["Functional: Estados visibles cerrados", "Technical: Dominio cerrado"], "design_decisions": ["DD-closed-domain", "DD-step-objects"]
+    },
+    {
+      "id": "TASK-002", "title": "Migrate media persistence safely", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
+      "description": "Add V24 drafts, assets, commands and variant associations while migrating every legal V1 image deterministically.",
+      "files": ["backend/src/main/resources/db/migration", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Clean and upgrade PostgreSQL 16 paths pass", "AC-2: Legacy ties, missing primary, 200-char names and galleries over 20 are preserved", "GATE: migration tests pass"],
+      "references": ["Technical: Persistencia"], "design_decisions": ["DD-source-kind", "DD-managed-path"]
+    },
+    {
+      "id": "TASK-003", "title": "Implement durable media commands", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
+      "description": "Implement draft ownership, replay hashes, CAS, leases, fencing, attach/delete/GC locks and recovery workers.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Crash points replay without duplicate object or row", "AC-2: Cross actor/draft/product access is denied", "GATE: PostgreSQL concurrency tests pass"],
+      "references": ["Technical: Upload y consistencia externa"], "design_decisions": ["DD-durable-command", "DD-scope-authority"]
+    },
+    {
+      "id": "TASK-004", "title": "Build private object-store port", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-001"],
+      "description": "Implement put-if-absent, head, signed private read and digest-guarded delete plus an isolated deterministic test adapter.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Test adapter never serves unauthorised bytes", "AC-2: Outcomes are closed and idempotent", "GATE: contract tests pass without external network"],
+      "references": ["Technical: MediaObjectStore"], "design_decisions": ["DD-always-private"]
+    },
+    {
+      "id": "TASK-005", "title": "Inspect and normalize image bytes", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-004"],
+      "description": "Choose the decoder in an ADR, then implement deterministic bounded inspection, metadata removal and re-encoding.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "sdd/wip/20261116-catalog-media-upload-and-variant-gallery/2-technical/adr"],
+      "acceptance_criteria": ["AC-1: Corrupt, polyglot, animated and oversized inputs are rejected", "AC-2: Temporaries are bounded and swept after abrupt termination", "GATE: file security corpus passes"],
+      "references": ["Technical: Inspección y normalización"], "design_decisions": ["DD-deterministic-normalization"]
+    },
+    {
+      "id": "TASK-006", "title": "Enforce multipart resource limits", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-003", "TASK-005"],
+      "description": "Add the pre-DispatcherServlet envelope filter, streaming counter, quotas, concurrency limits and Retry-After responses.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Origin/session/size failures stop before multipart parsing", "AC-2: Chunked overflow and quota exhaustion fail closed", "GATE: resource-limit tests pass"],
+      "references": ["Technical: Inspección y normalización"], "design_decisions": ["DD-preparser-filter"]
+    },
+    {
+      "id": "TASK-007", "title": "Expose secure media HTTP API", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004", "TASK-006"],
+      "description": "Implement capability, draft, upload, lookup, preview, delete, composition and public delivery endpoints with current USER identity semantics.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Role, origin, CSRF, capability and ownership matrix passes", "AC-2: Delivery checks STOREFRONT/SERVE and emits no-store signed reads <=60s", "GATE: HTTP integration tests pass"],
+      "references": ["Technical: HTTP"], "design_decisions": ["DD-same-origin-delivery", "DD-csrf-resync"]
+    },
+    {
+      "id": "TASK-008", "title": "Integrate catalog writes and readers", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003", "TASK-007"],
+      "description": "Separate textual saves from media composition, add atomic create claim and migrate catalog, home, favorites and BlackStore readers.",
+      "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/main/resources/openapi", "backend/src/test"],
+      "acceptance_criteria": ["AC-1: Old payloads cannot delete managed galleries", "AC-2: Create replay returns stable product, variant IDs and media revision", "GATE: reader and rollback compatibility tests pass"],
+      "references": ["Technical: Baseline y decisión", "Technical: HTTP"], "design_decisions": ["DD-atomic-create-claim"]
+    },
+    {
+      "id": "TASK-009", "title": "Implement Angular media domain and store", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-007"],
+      "description": "Add closed types, mappers, repository and store fenced by actor, draft, product and route generation with a global CSRF mutation queue.",
+      "files": ["frontend/src/app/domain/catalog", "frontend/src/app/data", "frontend/src/app/features"],
+      "acceptance_criteria": ["AC-1: Late responses cannot cross product or actor", "AC-2: Lost responses recover by uploadId after session rehydrate", "GATE: Angular store tests pass"],
+      "references": ["Technical: Frontend Angular"], "design_decisions": ["DD-angular-fence", "DD-global-csrf-queue"]
+    },
+    {
+      "id": "TASK-010", "title": "Build accessible gallery editor", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-008", "TASK-009"],
+      "description": "Build upload, preview, alt, cover, ordering and variant-association UI with keyboard parity and honest error states.",
+      "files": ["frontend/src/app/features", "frontend/src/app/shared"],
+      "acceptance_criteria": ["AC-1: Keyboard, focus and live-region journeys pass", "AC-2: Multi-admin and create/edit variant flows preserve drafts", "GATE: component and accessibility tests pass"],
+      "references": ["Functional: Flujos", "Technical: Frontend Angular"], "design_decisions": ["DD-accessible-editor"]
+    },
+    {
+      "id": "TASK-011", "title": "Render deterministic storefront galleries", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-008", "TASK-009"],
+      "description": "Integrate PDP variant gallery and safe product-card media without changing price, quantity, stock or purchase intent.",
+      "files": ["frontend/src/app/features/storefront", "frontend/src/app/shared"],
+      "acceptance_criteria": ["AC-1: Route SKU and restored intent select the matching gallery", "AC-2: Failed images fall back once then show accessible placeholder", "GATE: storefront tests pass at 390/768/1440"],
+      "references": ["Functional: Experiencia storefront"], "design_decisions": ["DD-variant-media-selection"]
+    },
+    {
+      "id": "TASK-012", "title": "Run exact-head code and product review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
+      "description": "Review implementation against issue #7 and approved functional/technical specs.",
+      "files": [], "acceptance_criteria": ["AC-1: Findings P0-P3 are recorded", "GATE: exact-head functional/code review approves"],
+      "references": ["Issue #7"], "design_decisions": []
+    },
+    {
+      "id": "TASK-013", "title": "Run media performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-012"],
+      "description": "Review memory, decoding, concurrency, database locks, delivery TTL and cleanup behavior under bounded load.",
+      "files": [], "acceptance_criteria": ["AC-1: Resource limits have measured evidence", "GATE: exact-head performance review approves"],
+      "references": ["Technical: Observabilidad y operación"], "design_decisions": []
+    },
+    {
+      "id": "TASK-014", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-012", "TASK-013"],
+      "description": "Review upload corpus, authorization, CSRF, private delivery, secrets, egress and provider failure handling.",
+      "files": [], "acceptance_criteria": ["AC-1: No unresolved P0-P3 remains", "GATE: exact-head security review approves"],
+      "references": ["Technical: Seguridad y privacidad"], "design_decisions": []
+    },
+    {
+      "id": "TASK-015", "title": "Prove browser and hosted gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014"],
+      "description": "Run real PostgreSQL/Spring/Angular/Chromium acceptance, hosted CI, PR evidence and post-merge verification without external provider access.",
+      "files": ["frontend/e2e", ".github/workflows", "sdd/wip/20261116-catalog-media-upload-and-variant-gallery/4-implementation"],
+      "acceptance_criteria": ["AC-1: Multi-actor, crash, accessibility and direct-delivery scenarios pass", "AC-2: Hosted required checks pass on exact head", "GATE: merge and post-merge are recorded separately"],
+      "references": ["Technical: Verificación"], "design_decisions": ["DD-test-provider-only"]
+    }
+  ],
+  "dependency_graph": {
+    "by_layer": {
+      "1": { "level_0": ["TASK-001"], "level_1": ["TASK-002", "TASK-004"], "level_2": ["TASK-003", "TASK-005"], "level_3": ["TASK-006", "TASK-007", "TASK-008", "TASK-009"], "level_4": ["TASK-010", "TASK-011"], "level_5": ["TASK-015"] },
+      "2": {},
+      "3": { "level_0": ["TASK-012"], "level_1": ["TASK-013"], "level_2": ["TASK-014"] }
+    }
+  }
+}
