@@ -119,6 +119,7 @@ textarea:focus-visible {
   margin: var(--sc-space-5) 0;
 }
 
+.sc-card h3 { overflow-wrap: anywhere; }
 .sc-card-grid { display: grid; gap: var(--sc-space-4); }
 .sc-card header,
 .sc-page-head--compact,
