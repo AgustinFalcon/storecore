@@ -55,7 +55,7 @@
     {
       "id": "TASK-008", "title": "Build ADMIN option editor", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004"],
       "description": "Build ordered axis/value/assignment editor, preview, Clear/Replace commands and explicit diff/reapply after 409.",
-      "files": ["frontend/src/app/features/user-catalog", "frontend/src/app/data"],
+      "files": ["frontend/src/app/features/admin", "frontend/src/app/data"],
       "acceptance_criteria": ["AC-1: 409 preserves draft without automatic overwrite", "AC-2: OPERATOR is read-only", "AC-3: invalid labels/codes/combinations are explained", "GATE: admin component tests pass"],
       "references": ["Functional: Administración"], "design_decisions": ["DD-explicit-reapply"]
     },
@@ -101,7 +101,7 @@
   ],
   "dependency_graph": {
     "by_layer": {
-      "1": { "level_0": ["TASK-001"], "level_1": ["TASK-002"], "level_2": ["TASK-003"], "level_3": ["TASK-004", "TASK-006"], "level_4": ["TASK-005", "TASK-007", "TASK-008"], "level_5": ["TASK-009"], "level_6": ["TASK-010"], "level_7": ["TASK-014"] },
+      "1": { "level_0": ["TASK-001"], "level_1": ["TASK-002"], "level_2": ["TASK-003"], "level_3": ["TASK-004"], "level_4": ["TASK-005", "TASK-006", "TASK-008"], "level_5": ["TASK-007", "TASK-009"], "level_6": ["TASK-010"], "level_7": ["TASK-014"] },
       "2": {},
       "3": { "level_0": ["TASK-011"], "level_1": ["TASK-012"], "level_2": ["TASK-013"] }
     }

@@ -19,3 +19,5 @@
   P0–P3: funcional `38975151`, técnica `815F618D`.
 - Plan de 14 tareas generado y aprobado por el owner mediante instrucción de
   continuidad total. Sin implementación runtime en este PR documental.
+- Exact-head detectó un nivel no topológico y una ruta Angular obsoleta en la
+  matriz; ambos fueron corregidos antes del gate final.
