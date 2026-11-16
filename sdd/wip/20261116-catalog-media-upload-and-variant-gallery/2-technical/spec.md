@@ -200,8 +200,12 @@ devuelve producto, IDs de variantes, composición y `mediaRevision`; reutilizar
 el draft con otro producto/hash devuelve 409. Lectura legacy aprobada permanece;
 legacy bloqueada sólo se expone a ADMIN con estado cerrado y en público usa
 placeholder.
-Durante rollback, el binario anterior se rechaza o funciona read-only sobre
-productos managed; no puede ejecutar su DELETE+reinsert destructivo. Respuestas usan
+La migración escribe un marcador de compatibilidad media. Un interlock externo
+obligatorio del deploy lo consulta antes de arrancar/admitir artefactos, drena
+instancias previas y rechaza el binario anterior antes de tráfico o escritura;
+no se confía en que ese artefacto conozca `source_kind` ni implemente read-only.
+El gate se prueba con el artefacto anterior real y una DB migrada con media
+managed, verificando que jamás ejecuta su DELETE+reinsert destructivo. Respuestas usan
 `BaseResponse`, códigos cerrados, límites sin payload crudo y CSRF rotado por
 `IdentityMutationCoordinator` cuando hay mutación local.
 
@@ -276,7 +280,8 @@ rollback. Rollback de aplicación no elimina DDL ni objetos.
 - dominio: todos los estados/fromWire/Unknown, URL, dimensiones y transiciones
 - seguridad de archivos: magic mismatch, polyglot, corrupto, animado, exceso de
   píxeles/tamaño, metadata removida y temporal eliminado
-- PostgreSQL 16: clean/upgrade, replay/conflicto, CAS, constraints, rollback,
+- PostgreSQL 16: clean/upgrade, replay/conflicto, CAS, constraints, marcador e
+  interlock externo probado con artefacto anterior, rollback,
   crash antes/después de Tx-A/put/Tx-B, lease/fencing, attach/delete/GC
   concurrente, worker delete, draft claim y ownership cruzado
 - upgrade desde filas V1 legales: sin portada, sort_order repetido, nombre de

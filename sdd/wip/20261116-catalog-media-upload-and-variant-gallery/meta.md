@@ -1,6 +1,6 @@
 # Catalog media upload and variant gallery
 
-- Estado: `spec_review`
+- Estado: `tasks_approved`
 - Fecha: 2026-11-16
 - Issue: #7
 - Base: `master@94d005a2f2d5ae6ef4433102ba511f6aba0eb317`
@@ -18,6 +18,6 @@ como autoridad de media administrada.
 
 ## Gate actual
 
-Este corte contiene especificación funcional y técnica para revisión. No concede
-GO de implementación, no activa Cloudinary y no acredita credenciales, deploy u
-homologación externa.
+Las especificaciones y las 15 tareas están aprobadas: existe GO local para el
+adapter determinista y la implementación en PR separado. No existe GO live para
+Cloudinary, credenciales, deploy ni homologación externa hasta cerrar su gate.

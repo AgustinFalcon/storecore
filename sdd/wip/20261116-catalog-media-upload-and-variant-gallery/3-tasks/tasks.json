@@ -20,7 +20,7 @@
       "id": "TASK-002", "title": "Migrate media persistence safely", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
       "description": "Add V24 drafts, assets, commands and variant associations while migrating every legal V1 image deterministically.",
       "files": ["backend/src/main/resources/db/migration", "backend/src/test"],
-      "acceptance_criteria": ["AC-1: Clean and upgrade PostgreSQL 16 paths pass", "AC-2: Legacy ties, missing primary, 200-char names and galleries over 20 are preserved", "GATE: migration tests pass"],
+      "acceptance_criteria": ["AC-1: Clean and upgrade PostgreSQL 16 paths pass", "AC-2: Legacy ties, missing primary, 200-char names and galleries over 20 are preserved", "AC-3: external interlock denies the previous artifact before traffic against migrated managed media", "GATE: migration and compatibility tests pass"],
       "references": ["Technical: Persistencia"], "design_decisions": ["DD-source-kind", "DD-managed-path"]
     },
     {
@@ -93,30 +93,30 @@
       "references": ["Issue #7"], "design_decisions": []
     },
     {
-      "id": "TASK-013", "title": "Run media performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-012"],
+      "id": "TASK-013", "title": "Run media performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
       "description": "Review memory, decoding, concurrency, database locks, delivery TTL and cleanup behavior under bounded load.",
       "files": [], "acceptance_criteria": ["AC-1: Resource limits have measured evidence", "GATE: exact-head performance review approves"],
       "references": ["Technical: Observabilidad y operación"], "design_decisions": []
     },
     {
-      "id": "TASK-014", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-012", "TASK-013"],
+      "id": "TASK-014", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010", "TASK-011"],
       "description": "Review upload corpus, authorization, CSRF, private delivery, secrets, egress and provider failure handling.",
       "files": [], "acceptance_criteria": ["AC-1: No unresolved P0-P3 remains", "GATE: exact-head security review approves"],
       "references": ["Technical: Seguridad y privacidad"], "design_decisions": []
     },
     {
       "id": "TASK-015", "title": "Prove browser and hosted gates", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011", "TASK-012", "TASK-013", "TASK-014"],
-      "description": "Run real PostgreSQL/Spring/Angular/Chromium acceptance, hosted CI, PR evidence and post-merge verification without external provider access.",
+      "description": "Run real PostgreSQL/Spring/Angular/Chromium acceptance and hosted CI, then obtain independent Product/Code and Security verdicts in parallel on the immutable SHA intended for merge before recording PR and post-merge evidence.",
       "files": ["frontend/e2e", ".github/workflows", "sdd/wip/20261116-catalog-media-upload-and-variant-gallery/4-implementation"],
-      "acceptance_criteria": ["AC-1: Multi-actor, crash, accessibility and direct-delivery scenarios pass", "AC-2: Hosted required checks pass on exact head", "GATE: merge and post-merge are recorded separately"],
+      "acceptance_criteria": ["AC-1: Multi-actor, crash, accessibility and direct-delivery scenarios pass", "AC-2: Hosted required checks pass on exact head", "AC-3: independent parallel Product/Code and Security reviews approve the same final SHA after every test/workflow change", "GATE: merge and post-merge are recorded separately"],
       "references": ["Technical: Verificación"], "design_decisions": ["DD-test-provider-only"]
     }
   ],
   "dependency_graph": {
     "by_layer": {
-      "1": { "level_0": ["TASK-001"], "level_1": ["TASK-002", "TASK-004"], "level_2": ["TASK-003", "TASK-005"], "level_3": ["TASK-006", "TASK-007", "TASK-008", "TASK-009"], "level_4": ["TASK-010", "TASK-011"], "level_5": ["TASK-015"] },
+      "1": { "level_0": ["TASK-001"], "level_1": ["TASK-002", "TASK-004"], "level_2": ["TASK-003", "TASK-005"], "level_3": ["TASK-006"], "level_4": ["TASK-007"], "level_5": ["TASK-008", "TASK-009"], "level_6": ["TASK-010", "TASK-011"], "level_7": ["TASK-015"] },
       "2": {},
-      "3": { "level_0": ["TASK-012"], "level_1": ["TASK-013"], "level_2": ["TASK-014"] }
+      "3": { "level_0": ["TASK-012", "TASK-013", "TASK-014"] }
     }
   }
 }

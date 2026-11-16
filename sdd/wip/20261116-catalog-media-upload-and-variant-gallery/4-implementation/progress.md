@@ -10,3 +10,5 @@
 - Cuatro rondas Astra Product/UX y Security cerradas en APPROVE, sin P0–P3.
 - Plan de 15 tareas aprobado por el owner el 2026-11-16 mediante instrucción de
   continuidad total. La implementación queda habilitada en PR separado.
+- Exact-head detectó interlock legacy, keyword de cierre y DAG documental; fueron
+  corregidos antes del gate final. Cloudinary live continúa sin GO.
