@@ -126,6 +126,23 @@ describe('AdminProductOptionsStore', () => {
     store.ngOnDestroy();
   });
 
+  it('promotes an Unknown remote revision and rejects known reads below that highwater', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), unknown = new Subject<ReturnType<typeof projection>>(), stale = new Subject<ReturnType<typeof projection>>(), recovered = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(unknown).mockReturnValueOnce(stale).mockReturnValueOnce(recovered), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+    const store = new AdminProductOptionsStore(manager);
+    store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1)); store.save();
+    write.next({ revision: 2, state: projection(2).schema.state });
+    unknown.next(AdminProductOptionsMapper.fromWire({ revision: 7, state: 'FUTURE', axes: [], assignments: [] }));
+    expect(store.snapshot.revisionHighwater).toBe(7);
+    store.refresh(); stale.next(projection(2));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.RefreshRequired);
+    expect(store.snapshot.revisionHighwater).toBe(7);
+    store.refresh(); recovered.next(projection(7));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.Success);
+    expect(store.snapshot.verificationUnknown).toBe(false);
+    store.ngOnDestroy();
+  });
+
   it('invalidates late reads when the actor epoch changes and keeps operators read-only', () => {
     const late = new Subject<ReturnType<typeof projection>>(), manager = { read: vi.fn().mockReturnValue(late), write: vi.fn() } as unknown as ManageProductOptionsUseCase;
     const store = new AdminProductOptionsStore(manager);

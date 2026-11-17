@@ -196,7 +196,9 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     this.request = this.manager.read(sku).subscribe({
       next: remote => {
         if (!this.accepts(generation, sku)) return;
-        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.OutcomeUnknown, message: 'La versión publicada todavía no es verificable. No se habilitó otra escritura.' }); return; }
+        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote,
+          revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: true,
+          phase: OptionEditorPhase.OutcomeUnknown, message: 'La versión publicada todavía no es verificable. No se habilitó otra escritura.' }); return; }
         if (remote.revision < this.snapshot.revisionHighwater) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.OutcomeUnknown,
           message: 'La lectura publicada es anterior a la última revisión conocida. No se habilitó otra escritura.' }); return; }
         if (remote.revision === baseRevision) this.patchState({ base: remote, remote: null, revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: false,
@@ -225,7 +227,9 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
 
   private acceptRemoteConflict(remote: AdminProductOptionsSnapshot, localDraft: AdminProductOptionsDraft, operation: OptionSchemaCommandOperation): void {
     const base = this.snapshot.base; if (!base) return;
-    if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.ConflictReadRequired, message: 'Conservamos tu borrador, pero la versión publicada no es verificable.' }); return; }
+    if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote,
+      revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: true,
+      phase: OptionEditorPhase.ConflictReadRequired, message: 'Conservamos tu borrador, pero la versión publicada no es verificable.' }); return; }
     if (remote.revision < this.snapshot.revisionHighwater) { this.patchState({ verificationUnknown: true, phase: OptionEditorPhase.ConflictReadRequired,
       message: 'La lectura publicada es anterior a la última revisión conocida. Reintentá la actualización.' }); return; }
     const conflicts = OptionDraftRebase.conflicts(optionDraft(base), localDraft, optionDraft(remote));
@@ -247,7 +251,7 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
 
   private acceptsHighwater(remote: AdminProductOptionsSnapshot): boolean {
     if (remote.schema.state !== OptionSchemaState.Unknown && remote.revision >= this.snapshot.revisionHighwater) return true;
-    this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.RefreshRequired,
+    this.patchState({ remote, revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: true, phase: OptionEditorPhase.RefreshRequired,
       message: remote.schema.state === OptionSchemaState.Unknown
         ? 'La versión publicada todavía no es verificable. Reintentá la actualización.'
         : 'La lectura publicada es anterior a la última revisión conocida. Reintentá la actualización.' });
