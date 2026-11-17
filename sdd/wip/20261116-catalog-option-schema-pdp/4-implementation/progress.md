@@ -203,3 +203,10 @@
   Chromium entre 7,7 y 16,4 ms, frente a 713–758 ms antes del cambio, y aprobó
   el corte sin P0–P3. Seguridad, CI, PR y post-merge siguen abiertos en
   TASK-013/TASK-014; el feature permanece en `sdd/wip` y no se declara merge.
+- TASK-013 completada sobre `240a4ce7d6d5cfb499a2f60629ec8ff827f8add9`.
+  GPT-6.1 Sol revisó autorización ADMIN/OPERATOR, CSRF/origin, ownership, CAS y
+  replay, serialización explícita, `Unknown` fail-closed, labels/colores,
+  cardinalidad, exposición de datos, logging y secretos. Emitió `APPROVE` sin
+  P0–P3; `git diff --check 5cba1ec 240a4ce` quedó limpio y el barrido focal no
+  encontró credenciales hardcodeadas. TASK-014 permanece abierto y no se
+  declara CI, PR, merge ni post-merge hasta obtener evidencia independiente.
