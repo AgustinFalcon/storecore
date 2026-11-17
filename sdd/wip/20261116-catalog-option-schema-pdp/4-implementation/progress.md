@@ -125,3 +125,19 @@
   a carga diferida: bundle inicial 681,19 kB, sin exceder el presupuesto. Dos
   revisiones GPT-6.1 Sol (arquitectura y seguridad) aprobaron el diff final sin
   P0–P3. Los controles Select/Swatch y Axe siguen exclusivamente en TASK-007.
+- TASK-007 completada con controles nativos Select y radio/Swatch derivados del
+  tipo cerrado `OptionPresentation`. Labels, motivos deshabilitados, texto de
+  color, cantidad, mensajes parciales/desconocidos y reintento mantienen
+  semántica accesible; una selección parcial retira SKU, precio, favorito y
+  submit antiguos sin autocompletar combinaciones.
+- Elegir otra variante conserva cantidad aunque exceda su stock y vuelve a
+  validar compra; los errores tardíos de favoritos quedan acotados al SKU y no
+  contaminan catálogo, mientras la vista general conserva su feedback. Carga y
+  error retiran identidad de compra, y un rechazo de intención restaura el valor
+  nativo autoritativo.
+- Evidencia final TASK-007: 1.572/1.572 pruebas Angular en 221 archivos, matriz
+  focal 18/18, Playwright 6/6 en 390/768/1.440 con cuatro ejes y etiquetas de 80
+  caracteres, teclado Tab/Space, Axe sin impactos serious/critical y sin
+  overflow. Lint, arquitectura, smoke de servicios y build productivo pasan.
+  GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico/seguridad aprobaron la cabeza
+  final sin P0–P3 pendientes. CI hosted permanece como gate independiente.

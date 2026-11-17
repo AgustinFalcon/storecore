@@ -11,7 +11,7 @@
 ## Corte B — experiencia Angular
 
 - [x] TASK-006 Motor de selección e intención tombstonada.
-- [ ] TASK-007 Select/Swatch accesibles y compra derivada de una selección.
+- [x] TASK-007 Select/Swatch accesibles y compra derivada de una selección.
 - [ ] TASK-008 Editor ADMIN con diff/reaplicación explícita tras 409.
 
 ## Corte C — pruebas integrales
@@ -31,4 +31,6 @@ cierra #10 hasta que los catorce gates estén completos.
 
 TASK-006 integra el motor cerrado con la selección autoritativa del PDP, retiro
 síncrono de referencias, tombstones durables, fences de generación y bloqueo
-fail-closed. Select/Swatch y sus pruebas de accesibilidad permanecen en TASK-007.
+fail-closed. TASK-007 proyecta esa autoridad en Select/Swatch nativos,
+accesibles y responsive; separa elegibilidad de variante de cantidad comprable
+y aísla favoritos de los hechos autoritativos del catálogo.

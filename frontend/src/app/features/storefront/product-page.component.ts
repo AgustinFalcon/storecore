@@ -26,11 +26,11 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
       [product]="store.product$ | async"
       [cart]="cart.cart$ | async"
       [loading]="(store.loading$ | async) ?? false"
-      [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || (favorites.errorMessage$ | async) || ''"
+      [error]="(store.errorMessage$ | async) || (cart.errorMessage$ | async) || ''"
       [access]="cart.authority()"
-      [favorite]="favorites.isFavorite((store.product$ | async)?.sku || '')"
-      [favoriteBusy]="((favorites.viewState$ | async)?.mutationSku || '') === ((store.product$ | async)?.sku || '')"
-      [favoriteFeedback]="(favorites.feedback$ | async) || ''"
+      [favorite]="favorites.isFavorite(selectedSku)"
+      [favoriteBusy]="((favorites.viewState$ | async)?.mutationSku || '') === selectedSku"
+      [favoriteFeedback]="(favorites.selectedMessage$ | async) || ''"
       [restoredSelection]="restoredSelection"
       [intentMessage]="intentMessage"
       [intentCanConfirm]="intentCanConfirm"
@@ -41,6 +41,7 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
       (requestAccess)="beginAccess($event)"
       (reviseIntent)="reviseIntent($event)"
       (requestSelectionChange)="authorizeSelectionChange($event)"
+      (selectedSkuChange)="selectedSkuChanged($event)"
       (cancelIntent)="cancelIntent()"
       (add)="addToCart($event)"
       (toggleFavorite)="toggleFavorite($event)"
@@ -60,6 +61,7 @@ export class ProductPageComponent implements OnInit {
   private restoredSelectionValue: ProductPurchaseSelection | null = null;
   selectionBlocked = false;
   private requiresFreshIntent = false;
+  selectedSku = '';
   constructor(
     readonly store: CatalogStore,
     readonly cart: CartStore,
@@ -264,6 +266,10 @@ export class ProductPageComponent implements OnInit {
     if (!this.cart.authority().canMutate) return;
     if (this.favorites.isFavorite(sku)) this.favorites.remove(sku);
     else this.favorites.add(sku);
+  }
+  selectedSkuChanged(sku: string): void {
+    this.selectedSku = sku;
+    this.favorites.selectSku(sku);
   }
 
   private retireResumeAddress(): boolean {

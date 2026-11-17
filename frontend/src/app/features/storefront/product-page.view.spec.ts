@@ -4,6 +4,7 @@ import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { ProductPageViewComponent } from './product-page.view';
 import { mapProductDetail } from '../../data/mappers/http-mappers';
 import { OptionWireMapper } from '../../domain/catalog/option-wire.mapper';
+import { OptionSelectionState } from '../../domain/catalog/option-schema';
 import { SkuPriceResolution } from '../../domain/catalog/variant-price';
 
 const absentOptionSchema = { revision: 1, state: 'ABSENT', cause: null, axes: [] };
@@ -188,6 +189,22 @@ describe('ProductPage closed cart controls', () => {
     expect(fixture.componentInstance.canPurchase).toBe(false);
   });
 
+  it('offers retry instead of an impossible completion instruction when a valid selection cannot be verified', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const schema = { revision: 1, state: 'VALID', cause: null, axes: [{ code: 'size', label: 'Talle', presentation: 'SELECT', order: 0,
+      values: [{ code: 'only', label: 'Único', order: 0 }] }] };
+    const product = mapProductDetail({ id: 'p', sku: 'A', name: 'Producto', status: 'ACTIVE', productBasePrice: 100, images: [], media: [],
+      optionSchema: schema, variants: [{ id: 'v', sku: 'A', name: 'Única', status: 'ACTIVE', availability: 'UNKNOWN', attributes: {}, optionValues: { size: 'only' },
+        pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 100, original: 100, effective: 100, offer: null } },
+        inventory: { sku: 'A', state: 'UNKNOWN', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] });
+    fixture.componentRef.setInput('product', product); fixture.detectChanges();
+    expect(fixture.componentInstance.selectionState).toBe(OptionSelectionState.Unknown);
+    expect(fixture.nativeElement.textContent).not.toContain('Completá las opciones para conocer el SKU');
+    expect(fixture.nativeElement.textContent).toContain('Disponibilidad no verificada');
+    expect(fixture.nativeElement.querySelector('.sc-option-selector .sc-notice button').textContent).toContain('Reintentar opciones');
+  });
+
   it('revalidates the same SKU when stock, price or schema changes', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(ProductPageViewComponent);
@@ -206,5 +223,72 @@ describe('ProductPage closed cart controls', () => {
     fixture.componentRef.setInput('product', unknown); fixture.detectChanges();
     expect(fixture.componentInstance.selectedVariant).toBeNull();
     expect(fixture.componentInstance.canPurchase).toBe(false);
+  });
+
+  it('keeps compatible later options and quantity while removing every stale purchase fact', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const axes = ['a', 'b', 'c'].map((code, order) => ({ code, label: `Eje ${code}`, presentation: order === 2 ? 'SWATCH' : 'SELECT', order,
+      values: ['x', 'y'].map((value, valueOrder) => ({ code: value, label: `Valor ${value}`, order: valueOrder, swatchColor: order === 2 ? (value === 'x' ? '#111111' : null) : undefined })) }));
+    const variant = (id: string, sku: string, optionValues: Record<string, string>, saleable: number) => ({ id, sku, name: sku, status: 'ACTIVE', availability: saleable ? 'AVAILABLE' : 'OUT_OF_STOCK', optionValues,
+      pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 100, original: 100, effective: 100, offer: null } }, attributes: {},
+      inventory: { variantId: id, sku, state: 'KNOWN', available: saleable, reserved: 0, onHand: saleable, safety: 0, saleable } });
+    const product = mapProductDetail({ id: 'p', sku: 'sku2', name: 'Configurable', status: 'ACTIVE', productBasePrice: 100,
+      optionSchema: { revision: 1, state: 'VALID', cause: null, axes }, variants: [
+        variant('1', 'sku1', { a: 'x', b: 'x', c: 'x' }, 2), variant('2', 'sku2', { a: 'y', b: 'y', c: 'x' }, 10),
+        variant('3', 'sku3', { a: 'y', b: 'x', c: 'y' }, 10),
+      ] });
+    fixture.componentRef.setInput('product', product);
+    fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
+    fixture.detectChanges(); await fixture.whenStable();
+    fixture.componentInstance.setQuantity(3);
+    fixture.componentInstance.requestSelectionChange.subscribe(request => request.apply());
+    fixture.componentInstance.chooseOption({ axisCode: 'a', valueCode: 'x' });
+    expect(fixture.componentInstance.quantity).toBe(3);
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.selectedSku).toBe('');
+    expect(fixture.componentInstance.selectedPrice).toBeNull();
+    expect(fixture.componentInstance.optionAxes.find(axis => axis.code === 'b')?.selectedValue).toBeNull();
+    expect(fixture.componentInstance.optionAxes.find(axis => axis.code === 'c')?.selectedValue).toBe('x');
+    fixture.componentInstance.chooseOption({ axisCode: 'b', valueCode: 'x' });
+    expect(fixture.componentInstance.selectedSku).toBe('sku1');
+    expect(fixture.componentInstance.quantity).toBe(3);
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    expect(fixture.componentInstance.quantityMessage).toContain('(2)');
+    fixture.componentInstance.setQuantity(2);
+    expect(fixture.componentInstance.canPurchase).toBe(true);
+  });
+
+  it('withdraws stale purchase identity while a sibling SKU read is loading or failed', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    fixture.componentRef.setInput('product', productFixture('A'));
+    fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('SKU A');
+    fixture.componentRef.setInput('loading', true); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('SKU A');
+    expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('button.is-on')).toBeNull();
+    fixture.componentRef.setInput('loading', false);
+    fixture.componentRef.setInput('error', 'No disponible'); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+  });
+
+  it('restores the authoritative visible value when intent retirement denies a native change', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
+    fixture.componentRef.setInput('product', withVariants('A', variants));
+    fixture.componentInstance.requestSelectionChange.subscribe(() => undefined);
+    fixture.detectChanges(); await fixture.whenStable();
+    const select = fixture.nativeElement.querySelector('select[name=variant]') as HTMLSelectElement;
+    select.value = 'B'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.componentInstance.selectedVariant?.sku).toBe('A');
+    expect(select.value).toBe('A');
   });
 });
