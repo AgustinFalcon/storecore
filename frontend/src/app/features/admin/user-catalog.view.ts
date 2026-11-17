@@ -8,6 +8,7 @@ import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
 import { parseArsAmountInput, VariantPriceCommand } from '../../domain/catalog/variant-price';
+import { CatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -45,6 +46,7 @@ export class UserCatalogViewComponent {
   @Output() readonly draftChange = new EventEmitter<CatalogProductDraft>();
   @Output() readonly createProduct = new EventEmitter<void>();
   @Output() readonly editProduct = new EventEmitter<ProductDetail>();
+  @Output() readonly editOptions = new EventEmitter<string>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly categoryDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly saveProduct = new EventEmitter<void>();
@@ -53,6 +55,12 @@ export class UserCatalogViewComponent {
   @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly editError = new EventEmitter<string>();
+  @Output() readonly queryChange = new EventEmitter<CatalogQuery>();
+  @Output() readonly searchSubmit = new EventEmitter<void>();
+
+  patchQuery(partial: Partial<CatalogQuery>): void {
+    this.queryChange.emit({ ...this.state.query, ...partial });
+  }
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');
@@ -82,7 +90,10 @@ export class UserCatalogViewComponent {
     this.patch({ variants });
   }
 
-  addVariant(): void { this.patch({ variants: [...this.currentDraft.variants, newCatalogVariant()] }); }
+  addVariant(): void {
+    const created = newCatalogVariant();
+    this.patch({ variants: [...this.currentDraft.variants, this.currentDraft.optionSchemaState.allowsGeneric ? created : { ...created, status: VariantStatus.Inactive }] });
+  }
   removeNewVariant(index: number): void {
     const variant = this.currentDraft.variants[index];
     if (!variant || variant.id || index === 0) return;
@@ -90,7 +101,12 @@ export class UserCatalogViewComponent {
   }
 
   setVariantStatus(index: number, raw: unknown): void {
+    if (!this.currentDraft.optionSchemaState.allowsGeneric) return;
     this.patchVariant(index, { status: VariantStatus.fromWire(raw) });
+  }
+
+  configureDraftOptions(): void {
+    if (this.currentDraft.sku) this.editOptions.emit(this.currentDraft.sku);
   }
 
   patchAttributeKey(variantIndex: number, attributeIndex: number, key: string): void {

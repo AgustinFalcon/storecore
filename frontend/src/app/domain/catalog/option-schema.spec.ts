@@ -59,6 +59,18 @@ describe('option wire boundary', () => {
     expect(mapped.variants[0].values.get('constructor')).toBe('x');
   });
 
+  it('keeps valid administrative schemas with incomplete or duplicate inactive variants', () => {
+    const variants = [
+      { ...variant, active: true },
+      { id: 'inactive-empty', sku: 'inactive-empty', active: false, optionValues: {} },
+      { id: 'inactive-duplicate', sku: 'inactive-duplicate', active: false, optionValues: { a: 'x' } },
+    ];
+    expect(OptionWireMapper.fromWire(schema(), variants).schema.state).toBe(OptionSchemaState.Unknown);
+    const mapped = OptionWireMapper.fromAdminWire(schema(), variants);
+    expect(mapped.schema.state).toBe(OptionSchemaState.Valid);
+    expect(mapped.variants.map(row => row.values.size)).toEqual([1, 0, 1]);
+  });
+
   it('permits only explicit Absent fallback and validates legacy identities', () => {
     const absent = { state: OptionSchemaState.Absent.wire, revision: 1, cause: null, axes: [] };
     expect(OptionWireMapper.fromWire(absent, [{ id: 'id', sku: 'sku' }]).schema.state).toBe(OptionSchemaState.Absent);

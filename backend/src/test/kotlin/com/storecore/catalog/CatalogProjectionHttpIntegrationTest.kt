@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.domain.*
 import com.storecore.catalog.infrastructure.JdbcCatalogService
 import com.storecore.catalog.infrastructure.JdbcCatalogProjectionReader
+import com.storecore.catalog.infrastructure.ProductOptionCommandParser
 import com.storecore.identity.infrastructure.security.Argon2PasswordHasher
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
@@ -17,6 +18,8 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.net.URI
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
 
@@ -92,8 +95,44 @@ class CatalogProjectionHttpIntegrationTest(
         val complete=data(get("/api/v1/catalog?query=$name&size=50"))
         assertEquals(2,complete.path("items").size());assertFalse(complete.path("truncated").asBoolean())
         assertEquals(400,get("/api/v1/user/catalog?size=51",session.cookie).statusCode.value())
-        val all=reader.list(true,query=name).items;assertEquals(4,all.size);assertEquals(4,all.map{it.id}.distinct().size);assertTrue(all.any{it.status==ProductStatus.ARCHIVED});assertTrue(all.any{it.status==ProductStatus.DRAFT})
+        val all=reader.list(true,query=CatalogSearchTerm.fromWire(name)).items;assertEquals(4,all.size);assertEquals(4,all.map{it.id}.distinct().size);assertTrue(all.any{it.status==ProductStatus.ARCHIVED});assertTrue(all.any{it.status==ProductStatus.DRAFT})
         assertEquals(400,get("/api/v1/catalog?size=51").statusCode.value());assertEquals(400,get("/api/v1/catalog?page=-1").statusCode.value())
+    }
+    @Test fun `public and admin search remain literal authorized and stable across pages`() {
+        val session=provision();activate("STOREFRONT",session);activate("CATALOG",session)
+        val marker=UUID.randomUUID().toString();val categoryName="Herramientas $marker"
+        val categoryId=jdbc.queryForObject("INSERT INTO categories(name,slug,active) VALUES (?,?,TRUE) RETURNING id",Long::class.java,categoryName,"tools-$marker")!!
+        val firstProduct=product("Taladro uno $marker");val secondProduct=product("Taladro dos $marker")
+        jdbc.update("UPDATE products SET category_id=? WHERE id IN (?,?)",categoryId,firstProduct,secondProduct)
+        val first=variant(firstProduct,"First");variant(secondProduct,"Second")
+        fun encoded(value:String)=URLEncoder.encode(value,StandardCharsets.UTF_8)
+
+        val firstPage=data(get("/api/v1/catalog?query=${encoded(categoryName.uppercase())}&size=1&page=0"))
+        val secondPage=data(get("/api/v1/catalog?query=${encoded(categoryName.lowercase())}&size=1&page=1"))
+        assertEquals(2,firstPage.path("total").asInt());assertEquals(2,secondPage.path("total").asInt())
+        assertNotEquals(firstPage.path("items").first().path("id").asText(),secondPage.path("items").first().path("id").asText())
+        assertTrue(firstPage.path("truncated").asBoolean());assertFalse(secondPage.path("truncated").asBoolean())
+        assertEquals(firstProduct.toString(),data(get("/api/v1/catalog?query=${encoded(first.second.lowercase())}")).path("items").single().path("id").asText())
+        val adminPage0=data(get("/api/v1/user/catalog?query=${encoded(categoryName)}&size=1&page=0",session.cookie))
+        val adminPage1=data(get("/api/v1/user/catalog?query=${encoded(categoryName)}&size=1&page=1",session.cookie))
+        assertEquals(2,adminPage0.path("total").asInt());assertEquals(2,adminPage1.path("total").asInt())
+        assertNotEquals(adminPage0.path("items").first().path("id").asText(),adminPage1.path("items").first().path("id").asText())
+
+        val literalProduct=product("Literal %_! $marker");variant(literalProduct,"Literal")
+        val broadProduct=product("Literal ordinary $marker");variant(broadProduct,"Broad")
+        val literal=data(get("/api/v1/catalog?query=${encoded("%_!")}"))
+        assertEquals(1,literal.path("total").asInt());assertEquals(literalProduct.toString(),literal.path("items").single().path("id").asText())
+        assertFalse(literal.path("items").any { it.path("id").asLong() == broadProduct })
+
+        val mixedProduct=product("Mixed visibility $marker");variant(mixedProduct,"Public")
+        val hidden=variant(mixedProduct,"Private",false)
+        assertEquals(0,data(get("/api/v1/catalog?query=${encoded(hidden.second)}")).path("total").asInt())
+        val admin=data(get("/api/v1/user/catalog?query=${encoded(hidden.second)}",session.cookie))
+        assertEquals(1,admin.path("total").asInt());assertEquals(mixedProduct.toString(),admin.path("items").single().path("id").asText())
+        assertTrue(admin.path("items").single().path("variants").any { it.path("sku").asText()==hidden.second })
+
+        assertEquals(400,get("/api/v1/catalog?query=${"x".repeat(121)}").statusCode.value())
+        assertEquals(400,get("/api/v1/user/catalog?query=${"x".repeat(121)}",session.cookie).statusCode.value())
     }
     @Test fun `HTTP writer preserves archived and inactive closed statuses and rejects unknown atomically`() {
         val session=provision();activate("CATALOG",session)
@@ -130,7 +169,7 @@ class CatalogProjectionHttpIntegrationTest(
             }
         }
         val batchReader=JdbcCatalogProjectionReader(JdbcTemplate(source),mapper)
-        val page=batchReader.list(true,query=name)
+        val page=batchReader.list(true,query=CatalogSearchTerm.fromWire(name))
         assertEquals(12,page.items.size);assertTrue(page.items.all{it.variants.size==3});assertEquals(6,count.get())
     }
     @Test fun `public and admin option projections share integrity while visibility stays authorized`() {
@@ -162,8 +201,8 @@ class CatalogProjectionHttpIntegrationTest(
 
         val invalidIdentityName="Invalid identity ${UUID.randomUUID()}";val invalidIdentityProduct=product(invalidIdentityName)
         jdbc.update("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,'','Invalid',TRUE)",invalidIdentityProduct)
-        val publicInvalid=reader.list(false,query=invalidIdentityName).items.single().optionSchema
-        val adminInvalid=reader.list(true,query=invalidIdentityName).items.single().optionSchema
+        val publicInvalid=reader.list(false,query=CatalogSearchTerm.fromWire(invalidIdentityName)).items.single().optionSchema
+        val adminInvalid=reader.list(true,query=CatalogSearchTerm.fromWire(invalidIdentityName)).items.single().optionSchema
         assertEquals(OptionSchemaState.UNKNOWN,publicInvalid.state);assertEquals(OptionResolutionCause.CORRUPT,publicInvalid.cause)
         assertEquals(publicInvalid,adminInvalid)
 
@@ -334,6 +373,68 @@ class CatalogProjectionHttpIntegrationTest(
         assertEquals(200,deactivated.statusCode.value(),deactivated.body);assertFalse(jdbc.queryForObject("SELECT active FROM product_variants WHERE id=?",Boolean::class.java,inactive.first)!!)
         assertEquals(4,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
     }
+    @Test fun `inactive duplicate remains hidden until a unique complete vector is activated`() {
+        val admin=provision();activate("CATALOG",admin);activate("STOREFRONT",admin)
+        val p=product("Inactive duplicate");val active=variant(p,"Active");val duplicate=variant(p,"Duplicate",false);val incomplete=variant(p,"Incomplete",false)
+        val path="/api/v1/user/catalog/products/${active.second}/options"
+        fun body(revision:Int,assignments:String,operations:String="[]")="""{"expectedRevision":$revision,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SELECT","order":0,"values":[{"code":"red","label":"Rojo","order":0,"swatchColor":null},{"code":"blue","label":"Azul","order":1,"swatchColor":null}]}],"assignments":$assignments,"variantOperations":$operations}"""
+        val duplicateAssignments="""[{"variantSku":"${active.second}","optionValues":{"color":"red"}},{"variantSku":"${duplicate.second}","optionValues":{"color":"red"}}]"""
+        val initial=exchange(path,HttpMethod.PUT,body(1,duplicateAssignments),admin.cookie,admin.csrf)
+        assertEquals(200,initial.statusCode.value(),initial.body);val csrf=initial.headers.getFirst("X-CSRF-Token")!!
+        val publicBefore=data(get("/api/v1/catalog/products/${active.second}"))
+        assertEquals(listOf(active.second),publicBefore.path("variants").map { it.path("sku").asText() })
+        assertEquals(404,get("/api/v1/catalog/products/${duplicate.second}").statusCode.value())
+
+        val duplicateActivation=exchange(path,HttpMethod.PUT,body(2,duplicateAssignments,"""[{"operation":"Activate","variantSku":"${duplicate.second}"}]"""),admin.cookie,csrf)
+        assertEquals(400,duplicateActivation.statusCode.value(),duplicateActivation.body);assertNull(duplicateActivation.headers.getFirst("X-CSRF-Token"))
+        val incompleteActivation=exchange(path,HttpMethod.PUT,body(2,duplicateAssignments,"""[{"operation":"Activate","variantSku":"${incomplete.second}"}]"""),admin.cookie,csrf)
+        assertEquals(400,incompleteActivation.statusCode.value(),incompleteActivation.body);assertNull(incompleteActivation.headers.getFirst("X-CSRF-Token"))
+        assertEquals(2,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+        assertFalse(jdbc.queryForObject("SELECT active FROM product_variants WHERE id=?",Boolean::class.java,duplicate.first)!!)
+
+        val uniqueAssignments="""[{"variantSku":"${active.second}","optionValues":{"color":"red"}},{"variantSku":"${duplicate.second}","optionValues":{"color":"blue"}}]"""
+        val activated=exchange(path,HttpMethod.PUT,body(2,uniqueAssignments,"""[{"operation":"Activate","variantSku":"${duplicate.second}"}]"""),admin.cookie,csrf)
+        assertEquals(200,activated.statusCode.value(),activated.body)
+        val publicAfter=data(get("/api/v1/catalog/products/${duplicate.second}"))
+        assertEquals(setOf(active.second,duplicate.second),publicAfter.path("variants").map { it.path("sku").asText() }.toSet())
+        assertEquals("blue",publicAfter.path("variants").single { it.path("sku").asText()==duplicate.second }.path("optionValues").path("color").asText())
+    }
+    @Test fun `absent replace clear preserves catalog inventory cart and order evidence`() {
+        val admin=provision();activate("CATALOG",admin);activate("STOREFRONT",admin)
+        val customer=provisionCustomer();val p=product("Commercial continuity");val v=variant(p,"Commercial")
+        jdbc.update("UPDATE product_variants SET base_price_override=75,attributes=?::jsonb,attribute_order=ARRAY['finish','warranty'] WHERE id=?","""{"warranty":"12m","finish":"matte"}""",v.first)
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) VALUES (?,12,3,2)",v.first)
+        val cartId=jdbc.queryForObject("INSERT INTO carts(customer_id,session_id,expires_at) VALUES (?,?,now()+interval '1 day') RETURNING id",Long::class.java,customer.userId,"continuity-${UUID.randomUUID()}")!!
+        val cartItemId=jdbc.queryForObject("INSERT INTO cart_items(cart_id,variant_id,quantity,original_unit_price,discount_amount,effective_unit_price) VALUES (?,?,2,75,5,70) RETURNING id",Long::class.java,cartId,v.first)!!
+        val key=UUID.randomUUID();val hash="a".repeat(64)
+        val checkoutJson="""{"source":"task009"}""";val buyerJson="""{"name":"Buyer"}""";val productJson="""{"sku":"${v.second}"}"""
+        val claimId=jdbc.queryForObject("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) VALUES (?,?,?,?::jsonb,'COMPLETED') RETURNING id",Long::class.java,customer.userId,key,hash,checkoutJson)!!
+        val orderId=jdbc.queryForObject("""INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total)
+            VALUES (?,?,?,?,?,'PAID',?::jsonb,?::jsonb,140,10,150) RETURNING id""",Long::class.java,"TASK009-${UUID.randomUUID()}",claimId,key,hash,customer.userId,buyerJson,checkoutJson)!!
+        val orderItemId=jdbc.queryForObject("INSERT INTO order_items(order_id,variant_id,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal) VALUES (?,?,?::jsonb,2,75,5,70,140) RETURNING id",Long::class.java,orderId,v.first,productJson)!!
+        val beforeVariant=jdbc.queryForMap("SELECT sku,base_price_override,attributes::text,attribute_order::text FROM product_variants WHERE id=?",v.first)
+        val beforeInventory=jdbc.queryForMap("SELECT available_quantity,reserved_quantity,safety_stock FROM inventory_balances WHERE variant_id=?",v.first)
+        val beforeCart=jdbc.queryForMap("SELECT id,cart_id,variant_id,quantity,original_unit_price,discount_amount,effective_unit_price FROM cart_items WHERE id=?",cartItemId)
+        val beforeOrder=jdbc.queryForMap("SELECT id,order_id,variant_id,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal,product_snapshot::text FROM order_items WHERE id=?",orderItemId)
+        fun assertCommercialEvidence() {
+            assertEquals(beforeVariant,jdbc.queryForMap("SELECT sku,base_price_override,attributes::text,attribute_order::text FROM product_variants WHERE id=?",v.first))
+            assertEquals(beforeInventory,jdbc.queryForMap("SELECT available_quantity,reserved_quantity,safety_stock FROM inventory_balances WHERE variant_id=?",v.first))
+            assertEquals(beforeCart,jdbc.queryForMap("SELECT id,cart_id,variant_id,quantity,original_unit_price,discount_amount,effective_unit_price FROM cart_items WHERE id=?",cartItemId))
+            assertEquals(beforeOrder,jdbc.queryForMap("SELECT id,order_id,variant_id,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal,product_snapshot::text FROM order_items WHERE id=?",orderItemId))
+            assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM orders WHERE id=? AND status='PAID' AND total=150",Int::class.java,orderId))
+        }
+
+        val path="/api/v1/user/catalog/products/${v.second}/options"
+        val replace="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"finish","label":"Terminación","presentation":"SELECT","order":0,"values":[{"code":"matte","label":"Mate","order":0,"swatchColor":null}]}],"assignments":[{"variantSku":"${v.second}","optionValues":{"finish":"matte"}}],"variantOperations":[]}"""
+        val replaced=exchange(path,HttpMethod.PUT,replace,admin.cookie,admin.csrf)
+        assertEquals(200,replaced.statusCode.value(),replaced.body);assertEquals(2,data(replaced).path("revision").asInt())
+        assertCommercialEvidence()
+        val clear="""{"expectedRevision":2,"operation":"Clear","axes":[],"assignments":[],"variantOperations":[]}"""
+        val cleared=exchange(path,HttpMethod.PUT,clear,admin.cookie,replaced.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(200,cleared.statusCode.value(),cleared.body);assertEquals(3,data(cleared).path("revision").asInt());assertEquals("ABSENT",data(cleared).path("state").asText())
+
+        assertCommercialEvidence()
+    }
     @Test fun `catalog editor preserves valid option activity forces additions inactive and rolls back exhausted revision`() {
         val admin=provision();activate("CATALOG",admin)
         val p=product("Option protocol");val primary=variant(p,"Primary")
@@ -363,6 +464,85 @@ class CatalogProjectionHttpIntegrationTest(
         assertEquals("Text only",jdbc.queryForObject("SELECT name FROM products WHERE id=?",String::class.java,p))
         assertEquals(beforeCount,jdbc.queryForObject("SELECT count(*) FROM product_variants WHERE product_id=?",Int::class.java,p))
     }
+    @Test fun `maximum option aggregate is stored and projected without truncation within fixed query budgets`() {
+        val admin=provision();activate("CATALOG",admin);activate("STOREFRONT",admin)
+        val marker="MAX-${UUID.randomUUID()}";val p=product(marker)
+        fun sku(index:Int)="$marker-${index.toString().padStart(4,'0')}"
+        val inserted=jdbc.update(
+                """INSERT INTO product_variants(product_id,sku,label,active)
+                   SELECT ?, ? || '-' || lpad(value::text,4,'0'), 'Variant ' || value, TRUE
+                   FROM generate_series(0,?) value""",
+                p,marker,OptionLimits.MAX_VARIANTS-1,
+            )
+            assertEquals(OptionLimits.MAX_VARIANTS,inserted)
+
+            val axes=(0 until OptionLimits.MAX_AXES).joinToString(",") { axisIndex ->
+                val values=(0 until OptionLimits.MAX_VALUES_PER_AXIS).joinToString(",") { valueIndex ->
+                    """{"code":"v$valueIndex","label":"Value $valueIndex","order":$valueIndex,"swatchColor":null}"""
+                }
+                """{"code":"a$axisIndex","label":"Axis $axisIndex","presentation":"SELECT","order":$axisIndex,"values":[$values]}"""
+            }
+            val assignments=(0 until OptionLimits.MAX_VARIANTS).joinToString(",") { index ->
+                val digits=List(OptionLimits.MAX_AXES) { axis -> (index / integerPower(OptionLimits.MAX_VALUES_PER_AXIS,axis)) % OptionLimits.MAX_VALUES_PER_AXIS }
+                val values=digits.mapIndexed { axis,value -> "\"a$axis\":\"v$value\"" }.joinToString(",")
+                """{"variantSku":"${sku(index)}","optionValues":{$values}}"""
+            }
+            val body="""{"expectedRevision":1,"operation":"Replace","axes":[$axes],"assignments":[$assignments],"variantOperations":[]}"""
+            val payloadBytes=body.toByteArray(StandardCharsets.UTF_8).size
+            assertTrue(payloadBytes<ProductOptionCommandParser.MAX_BYTES,"payload=$payloadBytes")
+            val writeStarted=System.nanoTime()
+            val saved=exchange("/api/v1/user/catalog/products/${sku(0)}/options",HttpMethod.PUT,body,admin.cookie,admin.csrf)
+            val writeMillis=(System.nanoTime()-writeStarted)/1_000_000
+            assertEquals(200,saved.statusCode.value(),saved.body)
+            assertEquals(4_000,jdbc.queryForObject("SELECT count(*) FROM variant_option_values WHERE product_id=?",Int::class.java,p))
+
+            val optionData=data(get("/api/v1/user/catalog/products/${sku(777)}/options",admin.cookie))
+            assertEquals(2,optionData.path("revision").asInt());assertEquals("VALID",optionData.path("state").asText())
+            assertEquals(OptionLimits.MAX_AXES,optionData.path("axes").size())
+            assertTrue(optionData.path("axes").all { it.path("values").size()==OptionLimits.MAX_VALUES_PER_AXIS })
+            assertEquals(OptionLimits.MAX_VARIANTS,optionData.path("assignments").size())
+            fun assignmentValues(index:Int)=optionData.path("assignments").single { it.path("variantSku").asText()==sku(index) }.path("optionValues")
+            assertEquals(mapOf("a0" to "v0","a1" to "v0","a2" to "v0","a3" to "v0"),assignmentValues(0).fields().asSequence().associate { it.key to it.value.asText() })
+            assertEquals(mapOf("a0" to "v49","a1" to "v19","a2" to "v0","a3" to "v0"),assignmentValues(999).fields().asSequence().associate { it.key to it.value.asText() })
+
+            val publicData=data(get("/api/v1/catalog/products/${sku(999)}"))
+            val adminData=data(get("/api/v1/user/catalog/products/${sku(500)}",admin.cookie))
+            for(projected in listOf(publicData,adminData)) {
+                assertEquals(OptionLimits.MAX_VARIANTS,projected.path("variants").size())
+                assertEquals(OptionLimits.MAX_AXES,projected.path("optionSchema").path("axes").size())
+                assertEquals(OptionLimits.MAX_VALUES_PER_AXIS,projected.path("optionSchema").path("axes").first().path("values").size())
+                assertEquals(sku(0),projected.path("variants").first().path("sku").asText())
+                assertEquals(sku(999),projected.path("variants").last().path("sku").asText())
+                assertEquals(OptionLimits.MAX_AXES,projected.path("variants").first().path("optionValues").size())
+                assertEquals(OptionLimits.MAX_AXES,projected.path("variants").last().path("optionValues").size())
+            }
+            assertEquals(sku(999),publicData.path("sku").asText())
+            assertEquals(sku(500),adminData.path("sku").asText())
+
+            fun measuredReader():Pair<JdbcCatalogProjectionReader,java.util.concurrent.atomic.AtomicInteger> {
+                val count=java.util.concurrent.atomic.AtomicInteger();val delegate=jdbc.dataSource!!
+                val source=object:org.springframework.jdbc.datasource.DelegatingDataSource(delegate) {
+                    override fun getConnection():java.sql.Connection {
+                        val connection=delegate.connection
+                        return java.lang.reflect.Proxy.newProxyInstance(java.sql.Connection::class.java.classLoader,arrayOf(java.sql.Connection::class.java)) { _,method,args ->
+                            if(method.name=="prepareStatement") count.incrementAndGet()
+                            try { method.invoke(connection,*(args ?: emptyArray())) } catch(error:java.lang.reflect.InvocationTargetException) { throw error.targetException }
+                        } as java.sql.Connection
+                    }
+                }
+                return JdbcCatalogProjectionReader(JdbcTemplate(source),mapper) to count
+            }
+            val (listReader,listQueries)=measuredReader();val listStarted=System.nanoTime()
+            val page=listReader.list(true,query=CatalogSearchTerm.fromWire(marker),size=1)
+            val listMillis=(System.nanoTime()-listStarted)/1_000_000
+            assertEquals(1,page.items.size);assertEquals(OptionLimits.MAX_VARIANTS,page.items.single().variants.size);assertEquals(6,listQueries.get())
+            val (detailReader,detailQueries)=measuredReader();val detailStarted=System.nanoTime()
+            val detail=detailReader.product(sku(999),false)
+            val detailMillis=(System.nanoTime()-detailStarted)/1_000_000
+            assertNotNull(detail);assertEquals(OptionLimits.MAX_VARIANTS,detail!!.variants.size);assertEquals(5,detailQueries.get())
+        println("TASK009_RESOURCE_BUDGET variants=${OptionLimits.MAX_VARIANTS} pairs=4000 payloadBytes=$payloadBytes writeMs=$writeMillis listMs=$listMillis detailMs=$detailMillis listQueries=${listQueries.get()} detailQueries=${detailQueries.get()}")
+    }
+    private fun integerPower(base:Int,exponent:Int):Int { var result=1;repeat(exponent){result*=base};return result }
     private fun product(name:String="PARITY-${UUID.randomUUID()}",status:String="ACTIVE")=jdbc.queryForObject("INSERT INTO products(name,slug,base_price,status) VALUES (?,?,100,?) RETURNING id",Long::class.java,name,"parity-${UUID.randomUUID()}",status)!!
     private fun variant(product:Long,label:String,active:Boolean=true):Pair<Long,String> { val sku="PARITY-${UUID.randomUUID()}";return jdbc.queryForObject("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,?) RETURNING id",Long::class.java,product,sku,label,active)!! to sku }
     private fun data(response:ResponseEntity<String>):com.fasterxml.jackson.databind.JsonNode { assertEquals(200,response.statusCode.value(),response.body);return mapper.readTree(response.body!!).path("data") }

@@ -1,6 +1,7 @@
 package com.storecore.catalog.infrastructure
 
 import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.core.StreamReadConstraints
 import com.fasterxml.jackson.core.StreamReadFeature
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -11,11 +12,16 @@ import org.springframework.stereotype.Component
 import java.io.InputStream
 
 @Component
-class ProductOptionCommandParser {
+class ProductOptionCommandParser internal constructor(
+    private val treeDecoder: (ByteArray) -> JsonNode,
+) {
+    constructor() : this({ bytes -> mapper.readTree(bytes) })
+
     fun parse(input: InputStream): ProductOptionSchemaCommand {
         val bytes = input.readNBytes(MAX_BYTES + 1)
         if (bytes.size > MAX_BYTES) invalid("CATALOG_OPTION_COMMAND_TOO_LARGE")
-        val root: JsonNode = try { mapper.readTree(bytes) } catch (_: Exception) { invalid() }
+        try { preflight(bytes) } catch (error: CatalogOptionInvalid) { throw error } catch (_: Exception) { invalid() }
+        val root: JsonNode = try { treeDecoder(bytes) } catch (error: CatalogOptionInvalid) { throw error } catch (_: Exception) { invalid() }
         if (!root.isObject || root.fieldNames().asSequence().toSet() != ROOT_FIELDS) invalid()
         val revisionNode = root.get("expectedRevision")
         val revision = revisionNode?.takeIf { it.isIntegralNumber && it.canConvertToLong() }
@@ -105,6 +111,120 @@ class ProductOptionCommandParser {
     }
     private fun transport(value: String): String = value.takeIf { it.codePointCount(0, it.length) <= MAX_STRING_CODE_POINTS } ?: invalid()
     private fun invalid(code: String = "CATALOG_OPTION_COMMAND_INVALID"): Nothing = throw CatalogOptionInvalid(code)
+
+    /**
+     * Rejects bounded collections while the document is still a token stream. The
+     * domain decoder remains the only wire translator; this pass only protects its
+     * materialization boundary.
+     */
+    private fun preflight(bytes: ByteArray) {
+        mapper.factory.createParser(bytes).use { parser ->
+            if (parser.nextToken() != JsonToken.START_OBJECT) invalid()
+            scanObject(parser, StreamContext.ROOT)
+            if (parser.nextToken() != null) invalid()
+        }
+    }
+
+    private fun scanObject(parser: com.fasterxml.jackson.core.JsonParser, context: StreamContext) {
+        var fields = 0
+        while (parser.nextToken() != JsonToken.END_OBJECT) {
+            if (parser.currentToken != JsonToken.FIELD_NAME) invalid()
+            val field = parser.currentName
+            fields++
+            if (context == StreamContext.OPTION_VALUES) {
+                if (fields > OptionLimits.MAX_AXES) invalid()
+                validateTransport(field)
+            }
+            val valueToken = parser.nextToken() ?: invalid()
+            val arrayContext = context.arrayContext(field)
+            val objectContext = context.objectContext(field)
+            when {
+                arrayContext != null -> {
+                    if (valueToken != JsonToken.START_ARRAY) invalid()
+                    scanArray(parser, arrayContext)
+                }
+                objectContext != null -> {
+                    if (valueToken != JsonToken.START_OBJECT) invalid()
+                    scanObject(parser, objectContext)
+                }
+                else -> validateScalar(parser, context, field, valueToken)
+            }
+        }
+    }
+
+    private fun scanArray(parser: com.fasterxml.jackson.core.JsonParser, context: StreamContext) {
+        var elements = 0
+        while (parser.nextToken() != JsonToken.END_ARRAY) {
+            elements++
+            if (elements > context.maximum) invalid()
+            if (parser.currentToken != JsonToken.START_OBJECT) invalid()
+            scanObject(parser, context.elementContext)
+        }
+    }
+
+    private fun validateScalar(parser: com.fasterxml.jackson.core.JsonParser, context: StreamContext, field: String, token: JsonToken) {
+        val textual = when (context) {
+            StreamContext.ROOT -> field == "operation"
+            StreamContext.AXIS -> field in setOf("code", "label", "presentation")
+            StreamContext.VALUE -> field in setOf("code", "label") || (field == "swatchColor" && token != JsonToken.VALUE_NULL)
+            StreamContext.ASSIGNMENT -> field in REFERENCE_FIELDS
+            StreamContext.VARIANT_OPERATION -> field in setOf("operation", "variantId", "variantSku", "sku", "label")
+            StreamContext.OPTION_VALUES -> true
+            else -> false
+        }
+        val integral = (context == StreamContext.ROOT && field == "expectedRevision") ||
+            ((context == StreamContext.AXIS || context == StreamContext.VALUE) && field == "order")
+        val nullableSwatch = context == StreamContext.VALUE && field == "swatchColor" && token == JsonToken.VALUE_NULL
+        if (textual) {
+            if (token != JsonToken.VALUE_STRING) invalid()
+            validateTransport(parser.text)
+        } else if (integral) {
+            if (token != JsonToken.VALUE_NUMBER_INT) invalid()
+        } else if (!nullableSwatch) invalid()
+    }
+
+    private fun validateTransport(value: String) {
+        if (value.codePointCount(0, value.length) > MAX_STRING_CODE_POINTS) invalid()
+    }
+
+    private enum class StreamContext(val maximum: Int = Int.MAX_VALUE) {
+        ROOT,
+        AXES(OptionLimits.MAX_AXES),
+        AXIS,
+        VALUES(OptionLimits.MAX_VALUES_PER_AXIS),
+        VALUE,
+        ASSIGNMENTS(OptionLimits.MAX_ASSIGNMENTS),
+        ASSIGNMENT,
+        OPTION_VALUES,
+        VARIANT_OPERATIONS(OptionLimits.MAX_VARIANTS),
+        VARIANT_OPERATION,
+        OTHER;
+
+        val elementContext: StreamContext
+            get() = when (this) {
+                AXES -> AXIS
+                VALUES -> VALUE
+                ASSIGNMENTS -> ASSIGNMENT
+                VARIANT_OPERATIONS -> VARIANT_OPERATION
+                else -> OTHER
+            }
+
+        fun arrayContext(field: String): StreamContext? = when (this) {
+            ROOT -> when (field) {
+                "axes" -> AXES
+                "assignments" -> ASSIGNMENTS
+                "variantOperations" -> VARIANT_OPERATIONS
+                else -> null
+            }
+            AXIS -> if (field == "values") VALUES else null
+            else -> null
+        }
+
+        fun objectContext(field: String): StreamContext? = when (this) {
+            ASSIGNMENT -> if (field == "optionValues") OPTION_VALUES else null
+            else -> null
+        }
+    }
 
     companion object {
         const val MAX_BYTES = 2 * 1024 * 1024
