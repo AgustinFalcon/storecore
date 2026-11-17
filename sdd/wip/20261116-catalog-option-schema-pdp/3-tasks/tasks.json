@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 7, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 9, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -53,14 +53,14 @@
       "references": ["Functional: Experiencia del comprador"], "design_decisions": ["DD-single-purchase-selection"]
     },
     {
-      "id": "TASK-008", "title": "Build ADMIN option editor", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004"],
+      "id": "TASK-008", "title": "Build ADMIN option editor", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004"],
       "description": "Build ordered axis/value/assignment editor, preview, Clear/Replace commands and explicit diff/reapply after 409.",
       "files": ["frontend/src/app/features/admin", "frontend/src/app/data"],
       "acceptance_criteria": ["AC-1: 409 preserves draft without automatic overwrite", "AC-2: OPERATOR is read-only", "AC-3: invalid labels/codes/combinations are explained", "GATE: admin component tests pass"],
       "references": ["Functional: Administración"], "design_decisions": ["DD-explicit-reapply"]
     },
     {
-      "id": "TASK-009", "title": "Prove backend integrity and resource bounds", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003", "TASK-004", "TASK-005"],
+      "id": "TASK-009", "title": "Prove backend integrity and resource bounds", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003", "TASK-004", "TASK-005"],
       "description": "Run clean/upgrade, FK ownership, swaps, 400/404/409, role/origin/CSRF, 1,000 variants and 4,000 assignment scenarios.",
       "files": ["backend/src/test"],
       "acceptance_criteria": ["AC-1: database invariants survive concurrency", "AC-2: limits apply before materialization", "GATE: backend suite and measured budget pass"],

@@ -141,3 +141,31 @@
   overflow. Lint, arquitectura, smoke de servicios y build productivo pasan.
   GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico/seguridad aprobaron la cabeza
   final sin P0–P3 pendientes. CI hosted permanece como gate independiente.
+- TASK-008 completada con editor ADMIN independiente, lectura OPERATOR,
+  borrador/base/remoto separados, CAS y diff/reaplicación explícita tras 409,
+  Clear confirmado, reconciliación de resultado incierto y operaciones cerradas
+  Keep/AddInactive/Activate/Deactivate. La vista no usa strings mágicos para las
+  fases ni operaciones.
+- Evidencia final TASK-008: build, lint, arquitectura 9/9, smoke 3/3, matriz
+  focal 12/12, suite Angular 1.584/1.584 en 224 archivos y Playwright/Axe 4/4 a
+  390/768/1.440 sin overflow ni impactos serious/critical. GPT-6.1 Sol técnico y
+  GPT-6.1 Astra UX/Product aprobaron sin P0–P3. El PR #293 y su CI hosted siguen
+  siendo gates independientes; no se declara merge.
+- TASK-009 completada con preflight streaming antes de materializar JSON. El
+  borde rechaza estructuras, propiedades, cardinalidades y strings fuera de
+  contrato, conserva el límite binario de 2 MiB y delega la traducción semántica
+  al dominio. Los límites probados son 4 ejes, 50 valores por eje, 1.000
+  operaciones de variante, 4.000 asignaciones y 4 valores por vector.
+- La matriz HTTP/PostgreSQL prueba el agregado máximo real mediante escritura y
+  lectura pública/administrativa: 1.000 variantes activas y 4.000 pares, con
+  vectores extremos exactos. El presupuesto observado fue un payload de 134.376
+  bytes, escritura de 1.634 ms, lista de 49 ms con 6 consultas y detalle de
+  40 ms con 5 consultas. También cubre duplicados inactivos, rechazo atómico al
+  activar combinaciones duplicadas o incompletas y activación posterior válida.
+- La regresión comercial demuestra `Absent → Replace → Clear` preservando
+  override de precio, atributos, orden, inventario, carrito y orden pagada. La
+  matriz focal terminó 28/28; la suite backend exact-head terminó 513 tests,
+  0 fallos, 0 errores y 7 omisiones correspondientes al interlock shell Linux
+  que se ejecuta en CI Ubuntu. GPT-6.1 Sol técnico y GPT-6.1 Astra UX/Product
+  aprobaron la cabeza corregida sin P0–P3. CI hosted y PR permanecen como gates
+  separados; no se declara merge.
