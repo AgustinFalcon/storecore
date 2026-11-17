@@ -46,6 +46,7 @@
           <th>Nombre</th>
           <th>Estado</th>
           <th>Efectivo</th>
+          <th>Opciones</th>
         </tr>
       </thead>
       <tbody>
@@ -59,6 +60,7 @@
               <span class="sc-badge">{{ product.status.label }}</span>
             </td>
             <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price?.effective }}</td>
+            <td><button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.loading" (click)="editOptions.emit(product)">Configurar opciones</button></td>
           </tr>
         }
       </tbody>

@@ -46,6 +46,7 @@ export class UserCatalogViewComponent {
   @Output() readonly draftChange = new EventEmitter<CatalogProductDraft>();
   @Output() readonly createProduct = new EventEmitter<void>();
   @Output() readonly editProduct = new EventEmitter<ProductDetail>();
+  @Output() readonly editOptions = new EventEmitter<ProductDetail>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly categoryDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly saveProduct = new EventEmitter<void>();

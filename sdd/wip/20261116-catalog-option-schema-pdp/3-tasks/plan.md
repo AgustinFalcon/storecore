@@ -12,7 +12,7 @@
 
 - [x] TASK-006 Motor de selección e intención tombstonada.
 - [x] TASK-007 Select/Swatch accesibles y compra derivada de una selección.
-- [ ] TASK-008 Editor ADMIN con diff/reaplicación explícita tras 409.
+- [x] TASK-008 Editor ADMIN con diff/reaplicación explícita tras 409.
 
 ## Corte C — pruebas integrales
 
@@ -34,3 +34,8 @@ síncrono de referencias, tombstones durables, fences de generación y bloqueo
 fail-closed. TASK-007 proyecta esa autoridad en Select/Swatch nativos,
 accesibles y responsive; separa elegibilidad de variante de cantidad comprable
 y aísla favoritos de los hechos autoritativos del catálogo.
+TASK-008 agrega el editor administrativo independiente con lectura OPERATOR,
+escritura ADMIN, CAS por revisión, diff base/local/remoto, reaplicación
+explícita, confirmación de Clear, reconciliación fail-closed y alta de variantes
+inactivas. La evidencia focal incluye 12 pruebas de dominio/repositorio/store,
+1.584 pruebas Angular de regresión y Playwright/Axe en 390/768/1440 px.
