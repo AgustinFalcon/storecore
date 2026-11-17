@@ -219,3 +219,12 @@
   `44118012266` volvió a aprobar los cuatro jobs.
 - El PR apilado #295 permanece abierto, limpio y sin autorización de merge;
   TASK-014 continúa abierta hasta completar su propio CI, merge y post-merge.
+- TASK-014 completada con el PR acumulativo #284. El head exacto
+  `394e08fa1867faaafe18fd1772213fb362b7ee33` obtuvo aprobación de GPT-6.1
+  Astra UX/Product y GPT-6.1 Sol técnico/seguridad sin P0–P3. El run pre-merge
+  `44156064449` aprobó los cuatro jobs requeridos.
+- GitHub integró #284 en `master` mediante
+  `edb769067d720fc8e9f80cf2a8b53c6b328b123b`. El run posmerge
+  `44157739605`, ejecutado sobre ese SHA, volvió a aprobar
+  `repository-hygiene`, `backend`, `frontend` y `unified-access-real-e2e`.
+  Los catorce gates están cerrados y el feature puede archivarse.

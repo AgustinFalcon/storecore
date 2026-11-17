@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 10, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 14, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -74,27 +74,27 @@
       "references": ["Functional: Criterios de aceptación"], "design_decisions": []
     },
     {
-      "id": "TASK-011", "title": "Run exact-head code and product review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010"],
+      "id": "TASK-011", "title": "Run exact-head code and product review", "status": "done", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-001", "TASK-002", "TASK-003", "TASK-004", "TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009", "TASK-010"],
       "description": "Review implementation against issue #10 and approved SDD with Product/UX and technology reviewers.",
       "files": [], "acceptance_criteria": ["AC-1: findings P0-P3 recorded", "GATE: exact-head reviews approve"],
       "references": ["Issue #10"], "design_decisions": []
     },
     {
-      "id": "TASK-012", "title": "Run exact-head performance review", "status": "pending", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-011"],
+      "id": "TASK-012", "title": "Run exact-head performance review", "status": "done", "layer": 3, "complexity": "Medium", "depends_on": ["TASK-011"],
       "description": "Review SQL plans, deferred validation, payload limits, Angular indexes and browser rendering under maximum supported bounds.",
       "files": [], "acceptance_criteria": ["AC-1: measured budgets have evidence", "GATE: performance review approves"],
       "references": ["Technical: Seguridad y accesibilidad"], "design_decisions": []
     },
     {
-      "id": "TASK-013", "title": "Run exact-head security review", "status": "pending", "layer": 3, "complexity": "High", "depends_on": ["TASK-011", "TASK-012"],
+      "id": "TASK-013", "title": "Run exact-head security review", "status": "done", "layer": 3, "complexity": "High", "depends_on": ["TASK-011", "TASK-012"],
       "description": "Review role/capability/CSRF, parser bounds, prototype safety, fail-closed wire, interlock and intent replay defenses.",
       "files": [], "acceptance_criteria": ["AC-1: no unresolved P0-P3", "GATE: security review approves"],
       "references": ["Technical: Seguridad y accesibilidad"], "design_decisions": []
     },
     {
-      "id": "TASK-014", "title": "Prove hosted gates and integration", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011", "TASK-012", "TASK-013"],
+      "id": "TASK-014", "title": "Prove hosted gates and integration", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-010", "TASK-011", "TASK-012", "TASK-013"],
       "description": "Run complete local/hosted CI, preserve exact-head evidence, ship the implementation PR and record merge/post-merge separately.",
-      "files": [".github/workflows", "sdd/wip/20261116-catalog-option-schema-pdp/4-implementation"],
+      "files": [".github/workflows", "sdd/features/20261116-catalog-option-schema-pdp/4-implementation"],
       "acceptance_criteria": ["AC-1: required checks pass on exact head", "AC-2: merge and post-merge are independently recorded", "GATE: issue closure evidence complete"],
       "references": ["Technical: Verificación"], "design_decisions": []
     }
