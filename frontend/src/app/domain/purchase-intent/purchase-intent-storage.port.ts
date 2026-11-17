@@ -5,9 +5,11 @@ export class PurchaseIntentStorageResult {
   static readonly Saved = new PurchaseIntentStorageResult('SAVED', 'Selección guardada en esta pestaña', true);
   static readonly Empty = new PurchaseIntentStorageResult('EMPTY', 'Sin selección guardada', true);
   static readonly Cleared = new PurchaseIntentStorageResult('CLEARED', 'Selección eliminada', true);
+  static readonly EmergencyCleared = new PurchaseIntentStorageResult('EMERGENCY_CLEARED', 'La selección se eliminó, pero no pudo guardarse el cierre durable. Iniciá un flujo nuevo', false);
+  static readonly Retired = new PurchaseIntentStorageResult('RETIRED', 'La selección anterior quedó cerrada', false);
   static readonly Unavailable = new PurchaseIntentStorageResult('UNAVAILABLE', 'No se pudo guardar o limpiar la selección. No puede garantizarse la limpieza al recargar', false);
   static readonly Unknown = new PurchaseIntentStorageResult('UNKNOWN', 'Selección guardada no reconocida', false);
-  static fromWire(raw: unknown): PurchaseIntentStorageResult { return [this.Saved, this.Empty, this.Cleared, this.Unavailable].find(value => value.wire === raw) ?? this.Unknown; }
+  static fromWire(raw: unknown): PurchaseIntentStorageResult { return [this.Saved, this.Empty, this.Cleared, this.EmergencyCleared, this.Retired, this.Unavailable].find(value => value.wire === raw) ?? this.Unknown; }
 }
 export interface PurchaseIntentLoad { readonly intent: PurchaseIntent; readonly result: PurchaseIntentStorageResult; }
 export interface PurchaseIntentStoragePort {

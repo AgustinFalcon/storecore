@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 2, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 10, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -18,56 +18,56 @@
       "references": ["Technical: Persistencia"], "design_decisions": ["DD-deferred-vector", "DD-external-interlock"]
     },
     {
-      "id": "TASK-003", "title": "Implement option CAS and writer protocol", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
+      "id": "TASK-003", "title": "Implement option CAS and writer protocol", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
       "description": "Implement Replace/Clear and closed variant operations under product-to-variant locks while preserving authorized Absent legacy behavior.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: stale or invalid commands change no data, audit or CSRF", "AC-2: only ADMIN activates assignments for Valid schema", "AC-3: Absent price/stock/active regression passes", "GATE: concurrency tests pass"],
       "references": ["Technical: Comando administrativo y concurrencia"], "design_decisions": ["DD-single-writer-protocol"]
     },
     {
-      "id": "TASK-004", "title": "Project fail-closed option wire", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003"],
+      "id": "TASK-004", "title": "Project fail-closed option wire", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003"],
       "description": "Expose ABSENT/VALID/UNKNOWN with closed cause and bounded bulk axes/assignment reads without N+1.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: only Absent enables generic fallback", "AC-2: corrupt/duplicate data blocks purchase", "GATE: projection and query-count tests pass"],
       "references": ["Technical: Proyección pública y wire"], "design_decisions": ["DD-fail-closed-projection"]
     },
     {
-      "id": "TASK-005", "title": "Add public and admin catalog search", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-004"],
+      "id": "TASK-005", "title": "Add public and admin catalog search", "status": "done", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-004"],
       "description": "Wire normalized literal search through both controllers, services, readers and Angular stores for name, case-insensitive SKU and nullable category.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "frontend/src/app", "backend/src/test"],
       "acceptance_criteria": ["AC-1: items and count share authorization/predicate", "AC-2: public excludes inactive while admin keeps its authorized visibility", "GATE: two-page search tests pass"],
       "references": ["Technical: Búsqueda"], "design_decisions": ["DD-search-predicate-parity"]
     },
     {
-      "id": "TASK-006", "title": "Build deterministic selection engine", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001", "TASK-004"],
+      "id": "TASK-006", "title": "Build deterministic selection engine", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-001", "TASK-004"],
       "description": "Resolve partial/complete/unavailable/unknown combinations, quantity semantics and durable purchase-intent tombstones with generation fences.",
       "files": ["frontend/src/app/domain/catalog", "frontend/src/app/features/storefront"],
       "acceptance_criteria": ["AC-1: partial vectors never autocomplete", "AC-2: reload/late response cannot revive tombstoned SKU", "AC-3: explicit action creates a new flowId", "GATE: engine tests pass"],
       "references": ["Technical: Motor de selección Angular"], "design_decisions": ["DD-durable-intent-tombstone"]
     },
     {
-      "id": "TASK-007", "title": "Render accessible PDP option controls", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-006"],
+      "id": "TASK-007", "title": "Render accessible PDP option controls", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-006"],
       "description": "Build Select and Swatch axes with visible labels, keyboard semantics, disabled reasons and one authoritative purchase selection.",
       "files": ["frontend/src/app/features/storefront", "frontend/src/app/shared"],
       "acceptance_criteria": ["AC-1: swatches never rely on color alone", "AC-2: price/stock/SKU/favorite/submit never reuse stale selection", "GATE: component and Axe tests pass"],
       "references": ["Functional: Experiencia del comprador"], "design_decisions": ["DD-single-purchase-selection"]
     },
     {
-      "id": "TASK-008", "title": "Build ADMIN option editor", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004"],
+      "id": "TASK-008", "title": "Build ADMIN option editor", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-003", "TASK-004"],
       "description": "Build ordered axis/value/assignment editor, preview, Clear/Replace commands and explicit diff/reapply after 409.",
       "files": ["frontend/src/app/features/admin", "frontend/src/app/data"],
       "acceptance_criteria": ["AC-1: 409 preserves draft without automatic overwrite", "AC-2: OPERATOR is read-only", "AC-3: invalid labels/codes/combinations are explained", "GATE: admin component tests pass"],
       "references": ["Functional: Administración"], "design_decisions": ["DD-explicit-reapply"]
     },
     {
-      "id": "TASK-009", "title": "Prove backend integrity and resource bounds", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003", "TASK-004", "TASK-005"],
+      "id": "TASK-009", "title": "Prove backend integrity and resource bounds", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003", "TASK-004", "TASK-005"],
       "description": "Run clean/upgrade, FK ownership, swaps, 400/404/409, role/origin/CSRF, 1,000 variants and 4,000 assignment scenarios.",
       "files": ["backend/src/test"],
       "acceptance_criteria": ["AC-1: database invariants survive concurrency", "AC-2: limits apply before materialization", "GATE: backend suite and measured budget pass"],
       "references": ["Technical: Verificación"], "design_decisions": []
     },
     {
-      "id": "TASK-010", "title": "Prove buyer and admin browser journeys", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009"],
+      "id": "TASK-010", "title": "Prove buyer and admin browser journeys", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-005", "TASK-006", "TASK-007", "TASK-008", "TASK-009"],
       "description": "Exercise simple hardware, clothing Select/Swatch, non-cartesian partials, quantity, intent reload, search and admin conflict at 390/768/1440.",
       "files": ["frontend/e2e", "frontend/src/app"],
       "acceptance_criteria": ["AC-1: buyer and admin acceptance matrix passes", "AC-2: no overflow or critical Axe violation", "GATE: real-browser suite passes"],

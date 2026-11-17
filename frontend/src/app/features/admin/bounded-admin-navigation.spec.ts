@@ -10,6 +10,7 @@ import { ManageInstallationUseCase } from '../../domain/user/use-cases/manage-in
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { AdminCatalogStore } from './admin-catalog.store';
 import { UserInventoryStore } from './user-inventory.store';
+import { CatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 function page<T>(index: number, total: number): BoundedRows<T> {
   return Object.assign([] as T[], { metadata: { page: index, size: 50, total, truncated: total > (index + 1) * 50 } });
@@ -18,22 +19,22 @@ const actor = { id: 'actor', roles: [UserRole.Admin] };
 
 describe('bounded protected navigation', () => {
   it('admin preserves the selected page on refresh and recovers exactly once after shrink', () => {
-    const list = vi.fn((request: BoundedPageRequest) => of(page<ProductDetail>(request.page, 51)));
+    const list = vi.fn((request: CatalogQuery) => of(page<ProductDetail>(request.pagination.page, 51)));
     const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor(actor); store.load(); store.goToPage(1); store.load();
-    expect(list.mock.calls.map(([request]) => request.page)).toEqual([0, 1, 1]);
-    list.mockImplementation(request => of(page<ProductDetail>(request.page, 50)));
+    expect(list.mock.calls.map(([request]) => request.pagination.page)).toEqual([0, 1, 1]);
+    list.mockImplementation(request => of(page<ProductDetail>(request.pagination.page, 50)));
     store.load();
-    expect(list.mock.calls.slice(-2).map(([request]) => request.page)).toEqual([1, 0]);
+    expect(list.mock.calls.slice(-2).map(([request]) => request.pagination.page)).toEqual([1, 0]);
     expect(store.snapshot.list?.page).toBe(0);
     store.ngOnDestroy();
   });
 
   it('does not loop when the recovery response shrinks again', () => {
-    const list = vi.fn((request: BoundedPageRequest) => of(page<ProductDetail>(request.page, 151)));
+    const list = vi.fn((request: CatalogQuery) => of(page<ProductDetail>(request.pagination.page, 151)));
     const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor(actor); store.load(); store.goToPage(1); store.goToPage(2);
-    list.mockImplementation(request => of(page<ProductDetail>(request.page, request.page === 2 ? 51 : 0)));
+    list.mockImplementation(request => of(page<ProductDetail>(request.pagination.page, request.pagination.page === 2 ? 51 : 0)));
     const before = list.mock.calls.length; store.load();
     expect(list.mock.calls.length - before).toBe(2);
     expect(store.snapshot.loading).toBe(false); expect(store.snapshot.products).toHaveLength(0);
@@ -60,6 +61,30 @@ describe('bounded protected navigation', () => {
     const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor(actor); store.load(); store.load(); newer.next(page(0, 100)); older.next(page(0, 200));
     expect(store.snapshot.list?.total).toBe(100); store.ngOnDestroy();
+  });
+
+  it('never lets stale page recovery overwrite newly edited admin filters', () => {
+    const stale = new Subject<BoundedRows<ProductDetail>>();
+    const list = vi.fn().mockReturnValueOnce(of(page<ProductDetail>(0, 51))).mockReturnValueOnce(stale);
+    const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor(actor); store.load(); store.goToPage(1);
+    store.setQuery({ ...store.snapshot.query, query: 'new-filter' });
+    stale.next(page<ProductDetail>(1, 50)); stale.complete();
+    expect(list).toHaveBeenCalledTimes(2); expect(store.snapshot.query.query).toBe('new-filter');
+    expect(store.snapshot.queryDirty).toBe(true); expect(store.snapshot.query.pagination.page).toBe(0);
+    store.ngOnDestroy();
+  });
+
+  it('resets pagination for admin search and keeps every criterion on navigation', () => {
+    const list = vi.fn((request: CatalogQuery) => of(page<ProductDetail>(request.pagination.page, 51)));
+    const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor(actor); store.load();
+    store.setQuery({ ...store.snapshot.query, query: 'sku', brand: '3', category: '7', offersOnly: true, pagination: BoundedPageRequest.at(4) });
+    expect(store.snapshot.queryDirty).toBe(true); store.load();
+    expect(list.mock.lastCall?.[0]).toMatchObject({ query: 'sku', brand: '3', category: '7', offersOnly: true, pagination: { page: 0 } });
+    store.goToPage(1);
+    expect(list.mock.lastCall?.[0]).toMatchObject({ query: 'sku', brand: '3', category: '7', offersOnly: true, pagination: { page: 1 } });
+    store.ngOnDestroy();
   });
 
   it('inventory preserves local filters and refresh page, and resets page for a new actor', () => {

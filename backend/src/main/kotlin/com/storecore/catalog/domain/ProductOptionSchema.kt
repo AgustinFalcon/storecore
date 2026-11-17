@@ -53,6 +53,7 @@ sealed class ProductOptionSchema {
     }
     class Unknown(override val revision: SchemaRevision? = null, override val cause: OptionResolutionCause = OptionResolutionCause.UNKNOWN) : ProductOptionSchema() {
         override val state = OptionSchemaState.UNKNOWN
+        init { require(cause == OptionResolutionCause.UNKNOWN || cause == OptionResolutionCause.CORRUPT) }
     }
 }
 

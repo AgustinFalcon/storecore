@@ -2,6 +2,7 @@ import { ProductStatus, VariantStatus } from './catalog-states';
 import { InventoryAvailability } from '../user/inventory-availability';
 import type { InventoryRow } from '../user/user.entity';
 import type { SkuPriceResolution, VariantPricePolicy } from './variant-price';
+import type { OptionSnapshot } from './option-schema';
 
 export interface ProductPrice {
   readonly base: number;
@@ -24,6 +25,7 @@ export interface ProductVariant {
   readonly inventory: InventoryRow;
 }
 export interface ProductDetail {
+  readonly optionSnapshot: OptionSnapshot;
   readonly productBasePrice: number | null;
   readonly id: string;
   readonly sku: string;

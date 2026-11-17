@@ -29,7 +29,10 @@ object OptionWireMapper {
                 }
             }
             OptionSchemaState.INVALID -> corrupt()
-            OptionSchemaState.UNKNOWN -> ProductOptionSchema.Unknown(revision, cause(row["cause"]))
+            OptionSchemaState.UNKNOWN -> when (val reason = cause(row["cause"])) {
+                OptionResolutionCause.CORRUPT, OptionResolutionCause.UNKNOWN -> ProductOptionSchema.Unknown(revision, reason)
+                else -> corrupt()
+            }
         }
     }
 
