@@ -46,6 +46,66 @@ class CatalogOptionSchemaMigrationTest {
         assertEquals(0, flyway().migrate().migrationsExecuted)
     }
 
+    @Test fun `runtime role can read compatibility and operate the option aggregate used by invoker triggers`() {
+        val sql = jdbc()
+        val runtimeTables = listOf(
+            "product_option_axes",
+            "product_option_values",
+            "variant_option_values",
+            "variant_option_vectors",
+            "product_option_validation_guard",
+        )
+        runtimeTables.forEach { table ->
+            assertTrue(
+                sql.queryForObject(
+                    "SELECT has_table_privilege('storecore_runtime', ?, 'SELECT,INSERT,UPDATE,DELETE')",
+                    Boolean::class.java,
+                    table,
+                )!!,
+                table,
+            )
+        }
+        assertTrue(
+            sql.queryForObject(
+                "SELECT has_table_privilege('storecore_runtime','catalog_schema_compatibility_version','SELECT')",
+                Boolean::class.java,
+            )!!,
+        )
+        assertFalse(
+            sql.queryForObject(
+                "SELECT has_table_privilege('storecore_runtime','catalog_schema_compatibility_version','INSERT,UPDATE,DELETE')",
+                Boolean::class.java,
+            )!!,
+        )
+        listOf("product_option_axes_id_seq", "product_option_values_id_seq").forEach { sequence ->
+            assertTrue(
+                sql.queryForObject(
+                    "SELECT has_sequence_privilege('storecore_runtime', ?, 'USAGE,SELECT')",
+                    Boolean::class.java,
+                    sequence,
+                )!!,
+                sequence,
+            )
+        }
+
+        postgres.createConnection("").use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("SET ROLE storecore_runtime")
+                assertTrue(
+                    statement.executeQuery(
+                        "SELECT version=2 FROM catalog_schema_compatibility_version WHERE singleton",
+                    ).use { result -> result.next() && result.getBoolean(1) },
+                )
+                runtimeTables.forEach { table ->
+                    statement.executeQuery("SELECT count(*) FROM $table").use { result ->
+                        assertTrue(result.next(), table)
+                    }
+                }
+                statement.execute("RESET ROLE")
+            }
+        }
+    }
+
     @Test fun `V23 upgrade preserves all legal legacy data and published migration checksums`() {
         val database = "option_upgrade_" + UUID.randomUUID().toString().replace("-", "")
         postgres.createConnection("").use { connection -> connection.createStatement().use { it.execute("CREATE DATABASE $database") } }
@@ -63,7 +123,7 @@ class CatalogOptionSchemaMigrationTest {
         val beforeVariants = variantDigest(sql, product)
         val beforeBalances = sql.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id")
         val history = sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("24", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("25", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history WHERE version::int<=23 ORDER BY installed_rank"))
         val afterProduct = sql.queryForMap("SELECT * FROM products WHERE id=?", product)
         beforeProduct.forEach { (column, value) -> assertEquals(value, afterProduct[column], column) }
@@ -87,7 +147,7 @@ class CatalogOptionSchemaMigrationTest {
 
         val result = CatalogSchemaMigrationRunner.migrate(url, postgres.username, postgres.password)
 
-        assertEquals("24", result.targetSchemaVersion.toString())
+        assertEquals("25", result.targetSchemaVersion.toString())
         assertEquals(2, jdbc(url).queryForObject(
             "SELECT version FROM catalog_schema_compatibility_version WHERE singleton",
             Int::class.java,
