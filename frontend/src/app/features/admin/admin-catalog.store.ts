@@ -14,6 +14,8 @@ import { isArsAmount } from '../../domain/catalog/variant-price';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
+import { DomainReadonlyMap } from '../../domain/catalog/option-schema';
+import { VerifiedProductOptionsSnapshot } from '../../domain/catalog/admin-product-options';
 
 export interface AdminCatalogState {
   readonly loading: boolean;
@@ -90,6 +92,16 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly setDraft = this.updater((s, draft: CatalogProductDraft) => s.loading ? s : ({ ...s, draft }));
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
+  readonly syncOptionSnapshot = this.updater((s, verified: VerifiedProductOptionsSnapshot) => {
+    const optionSnapshot = Object.freeze({ schema: verified.snapshot.schema, variants: Object.freeze(verified.snapshot.assignments.map(assignment => Object.freeze({
+      variantId: assignment.variantId, sku: assignment.variantSku, values: new DomainReadonlyMap(assignment.optionValues),
+    }))) });
+    return {
+      ...s,
+      products: s.products.map(product => product.sku === verified.sku ? { ...product, optionSnapshot } : product),
+      draft: s.draft.sku === verified.sku ? { ...s.draft, optionSchemaState: verified.snapshot.schema.state } : s.draft,
+    };
+  });
   readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));

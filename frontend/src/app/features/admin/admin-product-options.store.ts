@@ -141,7 +141,7 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     this.request = this.manager.write(sku, command).subscribe({
       next: () => {
         if (!this.accepts(generation, sku)) return;
-        this.patchState({ phase: OptionEditorPhase.RefreshRequired, message: 'Guardado confirmado. Actualizando la configuración publicada…' });
+        this.patchState({ phase: OptionEditorPhase.Loading, message: 'Guardado confirmado. Actualizando la configuración publicada…' });
         this.readAfterWrite(generation, sku);
       },
       error: error => { if (this.accepts(generation, sku)) this.writeError(error, submittedDraft, operation); },

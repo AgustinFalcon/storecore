@@ -1,5 +1,5 @@
 import {
-  AdminProductOptionsMapper, ConflictResolutionChoice, OptionDraftRebase, optionCommand, optionDraft, validateOptionDraft,
+  AdminProductOptionsMapper, ConflictResolutionChoice, OptionDraftRebase, optionAssignmentValue, optionCommand, optionDraft, validateOptionDraft,
 } from './admin-product-options';
 import { OptionPresentation, OptionSchemaState } from './option-schema';
 
@@ -38,6 +38,28 @@ describe('admin product options closed domain', () => {
     const command = optionCommand(base, { ...draft, pendingAdditions: [{ localId: 'local-1', sku: 'NEW-1', label: 'Nueva' }] });
     expect(command.variantOperations).toContainEqual({ operation: 'AddInactive', sku: 'NEW-1', label: 'Nueva' });
     expect(command.assignments).not.toContainEqual(expect.objectContaining({ variantSku: 'NEW-1' }));
+  });
+
+  it('treats inherited axis names as unassigned and enforces the total variant cap', () => {
+    expect(optionAssignmentValue({ optionValues: new Map() }, 'constructor')).toBe('');
+    const base = optionDraft(AdminProductOptionsMapper.fromWire(wire()));
+    const rows = Array.from({ length: 1000 }, (_, index) => ({ ...base.assignments[1], variantId: String(index), variantSku: `SKU-${index}` }));
+    expect(validateOptionDraft({ ...base, assignments: rows.slice(0, 999), pendingAdditions: [{ localId: 'ok', sku: 'NEW', label: 'Nueva' }] }).valid).toBe(true);
+    const overflow = validateOptionDraft({ ...base, assignments: rows, pendingAdditions: [{ localId: 'overflow', sku: 'EXTRA', label: 'Extra' }] });
+    expect(overflow.valid).toBe(false);
+    expect(overflow.message).toContain('1.000');
+  });
+
+  it('roundtrips an own constructor assignment through Map and the wire object', () => {
+    const base = AdminProductOptionsMapper.fromWire({ revision: 1, state: 'VALID', cause: null,
+      axes: [{ code: 'constructor', label: 'Constructor', presentation: 'SELECT', order: 0, values: [{ code: 'own', label: 'Propio', order: 0, swatchColor: null }] }],
+      assignments: [{ variantId: '1', variantSku: 'SKU', active: true, optionValues: { constructor: 'own' } }] });
+    const draft = optionDraft(base);
+    expect(optionAssignmentValue(draft.assignments[0], 'constructor')).toBe('own');
+    const command = optionCommand(base, draft);
+    const serialized = command.assignments[0] as { optionValues: Record<string, string> };
+    expect(Object.hasOwn(serialized.optionValues, 'constructor')).toBe(true);
+    expect(serialized.optionValues.constructor).toBe('own');
   });
 
   it('makes remove-versus-edit hierarchical and honors the explicit choice', () => {

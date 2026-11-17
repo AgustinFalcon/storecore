@@ -1,12 +1,14 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, ElementRef, Input, ViewChild, effect, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, EventEmitter, Input, Output, ViewChild, effect, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { UserSession } from '../../core/auth/user-session';
 import {
-  AdminProductOptionsDraft, ConflictResolutionChoice, OptionAssignmentDraft, OptionAxisDraft, OptionSchemaCommandOperation, OptionValueDraft,
+  AdminProductOptionsDraft, ConflictResolutionChoice, OptionAssignmentDraft, OptionAxisDraft, OptionSchemaCommandOperation, OptionValueDraft, VerifiedProductOptionsSnapshot, optionAssignmentValue,
 } from '../../domain/catalog/admin-product-options';
-import { OptionPresentation } from '../../domain/catalog/option-schema';
+import { DomainReadonlyMap, OptionPresentation } from '../../domain/catalog/option-schema';
 import { AdminProductOptionsStore } from './admin-product-options.store';
+import { distinctUntilChanged, filter, map } from 'rxjs';
 
 @Component({
   selector: 'sc-admin-product-options',
@@ -29,6 +31,7 @@ export class AdminProductOptionsComponent {
   readonly assignmentQuery = signal('');
   readonly assignmentPage = signal(0);
   readonly assignmentPageSize = 25;
+  @Output() readonly verifiedSnapshot = new EventEmitter<VerifiedProductOptionsSnapshot>();
 
   @Input({ required: true }) set sku(value: string) {
     if (value !== this.requestedSku) this.resetAssignmentNavigation();
@@ -41,6 +44,13 @@ export class AdminProductOptionsComponent {
       const changed = this.store.setActor(session.authenticated() ? session.principal() : null, session.authenticationEpoch());
       if (changed && this.requestedSku) this.store.open(this.requestedSku, true);
     });
+    this.store.state$.pipe(
+      map(state => state.sku && state.base ? { sku: state.sku, snapshot: state.base } : null),
+      filter((value): value is VerifiedProductOptionsSnapshot => value !== null),
+      distinctUntilChanged((left, right) => left.sku === right.sku && left.snapshot.revision === right.snapshot.revision
+        && left.snapshot.schema.state === right.snapshot.schema.state),
+      takeUntilDestroyed(),
+    ).subscribe(value => this.verifiedSnapshot.emit(value));
   }
   open(sku: string): void { if (sku !== this.store.snapshot.sku) this.resetAssignmentNavigation(); this.store.open(sku); }
   private resetAssignmentNavigation(): void { this.assignmentQuery.set(''); this.assignmentPage.set(0); }
@@ -65,7 +75,7 @@ export class AdminProductOptionsComponent {
   removeAxis(draft: AdminProductOptionsDraft, index: number): void {
     const removed = draft.axes[index]; if (!removed) return;
     const axes = draft.axes.filter((_, current) => current !== index).map((axis, order) => ({ ...axis, order }));
-    const assignments = draft.assignments.map(row => ({ ...row, optionValues: Object.fromEntries(Object.entries(row.optionValues).filter(([key]) => key !== removed.code)) }));
+    const assignments = draft.assignments.map(row => ({ ...row, optionValues: new DomainReadonlyMap([...row.optionValues].filter(([key]) => key !== removed.code)) }));
     this.store.setDraft({ ...draft, axes, assignments });
   }
   moveAxis(draft: AdminProductOptionsDraft, index: number, offset: number): void {
@@ -90,8 +100,8 @@ export class AdminProductOptionsComponent {
   removeValue(draft: AdminProductOptionsDraft, axisIndex: number, valueIndex: number): void {
     const axis = draft.axes[axisIndex], removed = axis?.values[valueIndex]; if (!axis || !removed || axis.values.length === 1) return;
     const axes = draft.axes.map((candidate, current) => current === axisIndex ? { ...candidate, values: candidate.values.filter((_, position) => position !== valueIndex).map((value, order) => ({ ...value, order })) } : candidate);
-    const assignments = draft.assignments.map(row => row.optionValues[axis.code] === removed.code
-      ? { ...row, optionValues: Object.fromEntries(Object.entries(row.optionValues).filter(([key]) => key !== axis.code)) } : row);
+    const assignments = draft.assignments.map(row => row.optionValues.get(axis.code) === removed.code
+      ? { ...row, optionValues: new DomainReadonlyMap([...row.optionValues].filter(([key]) => key !== axis.code)) } : row);
     this.store.setDraft({ ...draft, axes, assignments });
   }
   patchAssignment(draft: AdminProductOptionsDraft, index: number, partial: Partial<OptionAssignmentDraft>): void {
@@ -99,12 +109,14 @@ export class AdminProductOptionsComponent {
   }
   setAssignmentValue(draft: AdminProductOptionsDraft, index: number, axis: string, value: string): void {
     const row = draft.assignments[index]; if (!row) return;
-    const optionValues = { ...row.optionValues }; if (value) optionValues[axis] = value; else delete optionValues[axis];
-    this.patchAssignment(draft, index, { optionValues });
+    const optionValues = new Map(row.optionValues); if (value) optionValues.set(axis, value); else optionValues.delete(axis);
+    this.patchAssignment(draft, index, { optionValues: new DomainReadonlyMap(optionValues) });
   }
   addInactive(draft: AdminProductOptionsDraft): void {
+    if (!this.canAddInactive(draft)) return;
     this.store.setDraft({ ...draft, pendingAdditions: [...draft.pendingAdditions, { localId: crypto.randomUUID(), sku: '', label: '' }] });
   }
+  canAddInactive(draft: AdminProductOptionsDraft): boolean { return draft.assignments.length + draft.pendingAdditions.length < 1000; }
   patchPending(draft: AdminProductOptionsDraft, index: number, partial: { sku?: string; label?: string }): void {
     this.store.setDraft({ ...draft, pendingAdditions: draft.pendingAdditions.map((row, current) => current === index ? { ...row, ...partial } : row) });
   }
@@ -126,13 +138,16 @@ export class AdminProductOptionsComponent {
   setAssignmentQuery(value: string): void { this.assignmentQuery.set(value); this.assignmentPage.set(0); }
   missingAxes(draft: AdminProductOptionsDraft, row: OptionAssignmentDraft): string {
     if (!row.active) return '';
-    return draft.axes.filter(axis => !row.optionValues[axis.code]).map(axis => axis.label).join(', ');
+    return draft.axes.filter(axis => !this.assignmentValue(row, axis.code)).map(axis => axis.label).join(', ');
   }
   duplicateActiveSkus(draft: AdminProductOptionsDraft, row: OptionAssignmentDraft): string {
-    if (!draft.axes.length || !row.active || draft.axes.some(axis => !row.optionValues[axis.code])) return '';
-    const key = JSON.stringify(draft.axes.map(axis => row.optionValues[axis.code]));
+    if (!draft.axes.length || !row.active || draft.axes.some(axis => !this.assignmentValue(row, axis.code))) return '';
+    const key = JSON.stringify(draft.axes.map(axis => this.assignmentValue(row, axis.code)));
     return draft.assignments.filter(candidate => candidate.active && candidate.variantId !== row.variantId
-      && !draft.axes.some(axis => !candidate.optionValues[axis.code])
-      && JSON.stringify(draft.axes.map(axis => candidate.optionValues[axis.code])) === key).map(candidate => candidate.variantSku).join(', ');
+      && !draft.axes.some(axis => !this.assignmentValue(candidate, axis.code))
+      && JSON.stringify(draft.axes.map(axis => this.assignmentValue(candidate, axis.code))) === key).map(candidate => candidate.variantSku).join(', ');
+  }
+  assignmentValue(row: OptionAssignmentDraft, axisCode: string): string {
+    return optionAssignmentValue(row, axisCode);
   }
 }

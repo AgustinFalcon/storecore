@@ -48,6 +48,20 @@ describe('AdminProductOptionsStore', () => {
     store.save(); expect(manager.write).toHaveBeenCalledTimes(1); store.ngOnDestroy();
   });
 
+  it('keeps refresh blocked while the authoritative post-write read is pending', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), afterWrite = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(afterWrite), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+    const store = new AdminProductOptionsStore(manager);
+    store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1)); store.save();
+    write.next({ revision: 2, state: projection(2).schema.state });
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.Loading);
+    store.refresh();
+    expect(manager.read).toHaveBeenCalledTimes(2);
+    afterWrite.next(projection(2));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.Success);
+    store.ngOnDestroy();
+  });
+
   it('keeps Clear intent and blocks on Unknown while reconciling a transport failure', () => {
     const initial = new Subject<ReturnType<typeof projection>>(), firstCheck = new Subject<ReturnType<typeof projection>>(), secondCheck = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
     const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(firstCheck).mockReturnValueOnce(secondCheck), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;

@@ -55,7 +55,7 @@ export interface AdminProductOptionsSnapshot {
 }
 export interface OptionValueDraft { readonly code: string; readonly label: string; readonly swatchColor: string; readonly order: number; }
 export interface OptionAxisDraft { readonly code: string; readonly label: string; readonly presentation: OptionPresentation; readonly order: number; readonly values: readonly OptionValueDraft[]; }
-export interface OptionAssignmentDraft { readonly variantId: string; readonly variantSku: string; readonly active: boolean; readonly optionValues: Readonly<Record<string, string>>; }
+export interface OptionAssignmentDraft { readonly variantId: string; readonly variantSku: string; readonly active: boolean; readonly optionValues: ReadonlyMap<string, string>; }
 export interface PendingInactiveVariantDraft { readonly localId: string; readonly sku: string; readonly label: string; }
 export interface AdminProductOptionsDraft { readonly axes: readonly OptionAxisDraft[]; readonly assignments: readonly OptionAssignmentDraft[]; readonly pendingAdditions: readonly PendingInactiveVariantDraft[]; }
 export interface OptionConflictEntry {
@@ -67,6 +67,7 @@ export interface OptionConflictEntry {
   readonly choice: ConflictResolutionChoice | null;
 }
 export interface ProductOptionsWriteResult { readonly revision: number; readonly state: OptionSchemaState; }
+export interface VerifiedProductOptionsSnapshot { readonly sku: string; readonly snapshot: AdminProductOptionsSnapshot; }
 export interface ProductOptionsCommand {
   readonly expectedRevision: number;
   readonly operation: OptionSchemaCommandOperation;
@@ -138,13 +139,17 @@ export function optionDraft(snapshot: AdminProductOptionsSnapshot): AdminProduct
     presentation: axis.presentation, order: axisOrder, values: Object.freeze([...axis.values].sort((left, right) => left.order - right.order).map((value, valueOrder) => Object.freeze({ code: value.code.value,
       label: value.label.value, swatchColor: value.swatchColor?.value ?? '', order: valueOrder }))) }))),
   assignments: Object.freeze(snapshot.assignments.map(row => Object.freeze({ variantId: row.variantId, variantSku: row.variantSku,
-    active: row.active, optionValues: Object.freeze(Object.fromEntries(row.optionValues)) }))), pendingAdditions: Object.freeze([]) });
+    active: row.active, optionValues: new DomainReadonlyMap(row.optionValues) }))), pendingAdditions: Object.freeze([]) });
 }
 
 export interface OptionDraftValidation { readonly valid: boolean; readonly message: string; }
+export function optionAssignmentValue(assignment: Pick<OptionAssignmentDraft, 'optionValues'>, axisCode: string): string {
+  return assignment.optionValues.get(axisCode) ?? '';
+}
 export function validateOptionDraft(draft: AdminProductOptionsDraft): OptionDraftValidation {
   try {
-    if (draft.axes.length < 1 || draft.axes.length > 4 || draft.assignments.length > 1000) throw new Error('Definí entre 1 y 4 ejes.');
+    if (draft.axes.length < 1 || draft.axes.length > 4) throw new Error('Definí entre 1 y 4 ejes.');
+    if (draft.assignments.length + draft.pendingAdditions.length > 1000) throw new Error('El producto admite hasta 1.000 variantes, incluidas las altas pendientes.');
     const axes: OptionAxis[] = draft.axes.map((axis, index) => {
       if (axis.order !== index || (axis.presentation !== OptionPresentation.Select && axis.presentation !== OptionPresentation.Swatch)
         || axis.values.length < 1 || axis.values.length > 50) throw new Error('Revisá orden, presentación y valores.');
@@ -163,11 +168,12 @@ export function validateOptionDraft(draft: AdminProductOptionsDraft): OptionDraf
     }
     const combinations = new Set<string>();
     for (const assignment of draft.assignments) {
-      const entries = Object.entries(assignment.optionValues);
-      if (assignment.active && entries.length !== axes.length) throw new Error(`Asigná todas las opciones a ${assignment.variantSku}.`);
+      const entries = [...assignment.optionValues.entries()];
+      const complete = axes.every(axis => Boolean(optionAssignmentValue(assignment, axis.code.value)));
+      if (assignment.active && (entries.length !== axes.length || !complete)) throw new Error(`Asigná todas las opciones a ${assignment.variantSku}.`);
       for (const [axisCode, valueCode] of entries) if (!axes.some(axis => axis.code.value === axisCode && axis.values.some(value => value.code.value === valueCode))) throw new Error(`Revisá la asignación de ${assignment.variantSku}.`);
-      if (assignment.active && entries.length === axes.length) {
-        const key = JSON.stringify(axes.map(axis => [axis.code.value, assignment.optionValues[axis.code.value]]));
+      if (assignment.active && entries.length === axes.length && complete) {
+        const key = JSON.stringify(axes.map(axis => [axis.code.value, optionAssignmentValue(assignment, axis.code.value)]));
         if (combinations.has(key)) throw new Error('Dos variantes no pueden compartir la misma combinación.'); combinations.add(key);
       }
     }
@@ -188,7 +194,7 @@ export function optionCommand(base: AdminProductOptionsSnapshot, draft: AdminPro
   return { expectedRevision: base.revision, operation,
     axes: draft.axes.map(axis => ({ code: axis.code, label: axis.label, presentation: axis.presentation.wire, order: axis.order,
       values: axis.values.map(value => ({ code: value.code, label: value.label, order: value.order, swatchColor: value.swatchColor || null })) })),
-    assignments: draft.assignments.map(row => ({ variantId: row.variantId, optionValues: row.optionValues })),
+    assignments: draft.assignments.map(row => ({ variantId: row.variantId, optionValues: Object.fromEntries(row.optionValues) })),
     variantOperations: [...draft.assignments.flatMap(row => {
       const prior = before.get(row.variantId); if (!prior || prior.active === row.active) return [];
       return [{ operation: row.active ? VariantOptionCommandOperation.Activate.wire : VariantOptionCommandOperation.Deactivate.wire, variantId: row.variantId }];
@@ -205,7 +211,7 @@ function flatten(draft: AdminProductOptionsDraft): Map<string, FlatValue> {
   }
   for (const row of draft.assignments) { const root = `variant/${encodeURIComponent(row.variantId)}`; result.set(`${root}/exists`, true);
     result.set(`${root}/sku`, row.variantSku); result.set(`${root}/active`, row.active);
-    for (const [axis, value] of Object.entries(row.optionValues)) result.set(`${root}/option/${axis}`, value); }
+    for (const [axis, value] of row.optionValues) result.set(`${root}/option/${axis}`, value); }
   for (const row of draft.pendingAdditions) { const root = `pending/${encodeURIComponent(row.localId)}`; result.set(`${root}/exists`, true);
     result.set(`${root}/sku`, row.sku); result.set(`${root}/label`, row.label); }
   return result;
@@ -289,11 +295,11 @@ export class OptionDraftRebase {
       values: axis.values.map((value, valueOrder) => ({ ...value, order: valueOrder })) }));
     const variantIds = [...flat.keys()].flatMap(path => /^variant\/([^/]+)\/exists$/.exec(path)?.[1] ?? []);
     const assignments = variantIds.filter(id => flat.get(`variant/${id}/exists`) === true).map(encodedId => {
-      const root = `variant/${encodedId}`, optionValues: Record<string, string> = Object.create(null) as Record<string, string>;
+      const root = `variant/${encodedId}`, optionValues = new Map<string, string>();
       for (const path of flat.keys()) { const match = new RegExp(`^variant/${encodedId}/option/([^/]+)$`).exec(path);
-        if (match) optionValues[match[1]] = String(flat.get(path)); }
+        if (match) optionValues.set(match[1], String(flat.get(path))); }
       return { variantId: decodeURIComponent(encodedId), variantSku: String(flat.get(`${root}/sku`) ?? ''),
-        active: flat.get(`${root}/active`) === true, optionValues: Object.freeze(optionValues) };
+        active: flat.get(`${root}/active`) === true, optionValues: new DomainReadonlyMap(optionValues) };
     });
     const pendingIds = [...flat.keys()].flatMap(path => /^pending\/([^/]+)\/exists$/.exec(path)?.[1] ?? []);
     const pendingAdditions = pendingIds.filter(id => flat.get(`pending/${id}/exists`) === true).map(encodedId => ({ localId: decodeURIComponent(encodedId),

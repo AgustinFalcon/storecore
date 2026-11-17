@@ -8,6 +8,9 @@ import { AdminCatalogStore } from './admin-catalog.store';
 import { UserCatalogViewComponent } from './user-catalog.view';
 import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 import { emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
+import { VariantStatus } from '../../domain/catalog/catalog-states';
+import { AdminProductOptionsMapper } from '../../domain/catalog/admin-product-options';
+import { OptionSchemaState } from '../../domain/catalog/option-schema';
 
 describe('bounded administrative catalog', () => {
   it('keeps one product with multiple variants, closed statuses and exact partial totals', async () => {
@@ -35,7 +38,7 @@ describe('bounded administrative catalog', () => {
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
 
     const renamedEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.patchVariant(0, { name: 'Renombrada' });
@@ -51,6 +54,51 @@ describe('bounded administrative catalog', () => {
     fixture.componentInstance.patchAttributeValue(0, 0, 'Grafito');
     const attributed = await valueEvent;
     expect(attributed.variants[0].attributes).toEqual({ Tono: 'Grafito' });
+  });
+
+  it('routes variant activity to the option editor when the product has a valid schema', async () => {
+    const product = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Producto', status: 'ACTIVE', productBasePrice: 10,
+      optionSchema: { revision: 1, state: 'VALID', cause: null, axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }] },
+      variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: { color: 'red' }, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
+    TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
+    const fixture = TestBed.createComponent(UserCatalogViewComponent);
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
+    fixture.detectChanges(); await fixture.whenStable(); fixture.detectChanges();
+    const disabledSelects = Array.from(fixture.nativeElement.querySelectorAll('select') as NodeListOf<HTMLSelectElement>).filter(select => select.disabled);
+    expect(disabledSelects).toHaveLength(1);
+    expect(disabledSelects[0].value).toBe('ACTIVE');
+    const draftEmit = vi.spyOn(fixture.componentInstance.draftChange, 'emit');
+    fixture.componentInstance.setVariantStatus(0, 'INACTIVE');
+    expect(draftEmit).not.toHaveBeenCalled();
+    const additionEvent = firstValueFrom(fixture.componentInstance.draftChange);
+    fixture.componentInstance.addVariant();
+    expect((await additionEvent).variants.at(-1)?.status).toBe(VariantStatus.Inactive);
+    const optionsEvent = firstValueFrom(fixture.componentInstance.editOptions);
+    fixture.componentInstance.configureDraftOptions();
+    expect(await optionsEvent).toBe(product.sku);
+  });
+
+  it('synchronizes verified option transitions without discarding the open product draft', () => {
+    const products = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Original', status: 'ACTIVE', productBasePrice: 10,
+      variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false });
+    const product = products[0];
+    const store = new AdminCatalogStore({ list: () => of(products) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    store.setActor({ id: 'actor', roles: [UserRole.Admin] }); store.load(); store.beginEdit(product);
+    store.setDraft({ ...store.snapshot.draft, name: 'Edición sin publicar' });
+    const valid = AdminProductOptionsMapper.fromWire({ revision: 2, state: 'VALID', cause: null,
+      axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }],
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: { color: 'red' } }] });
+    store.syncOptionSnapshot({ sku: 'SKU', snapshot: valid });
+    expect(store.snapshot.draft.name).toBe('Edición sin publicar');
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Valid);
+    expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
+    const absent = AdminProductOptionsMapper.fromWire({ revision: 3, state: 'ABSENT', cause: null, axes: [],
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
+    store.syncOptionSnapshot({ sku: 'SKU', snapshot: absent });
+    expect(store.snapshot.draft.name).toBe('Edición sin publicar');
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Absent);
+    expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Absent);
+    store.ngOnDestroy();
   });
 
   it('preserves untouched JSON attribute types and rejects duplicate key collisions', async () => {

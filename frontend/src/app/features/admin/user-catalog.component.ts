@@ -4,7 +4,6 @@ import { ChangeDetectionStrategy, Component, ViewChild, effect, signal } from '@
 import { AdminCatalogStore } from './admin-catalog.store';
 import { UserCatalogViewComponent } from './user-catalog.view';
 import { AdminProductOptionsComponent } from './admin-product-options.component';
-import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 
 @Component({
   selector: 'sc-user-catalog',
@@ -30,7 +29,7 @@ import { ProductDetail } from '../../domain/catalog/product-detail.entity';
         (queryChange)="store.setQuery($event)"
         (searchSubmit)="store.load()"
       />
-      @if (optionsSku(); as sku) { <sc-admin-product-options [sku]="sku" /> }
+      @if (optionsSku(); as sku) { <sc-admin-product-options [sku]="sku" (verifiedSnapshot)="store.syncOptionSnapshot($event)" /> }
     }
   `,
 })
@@ -48,8 +47,8 @@ export class UserCatalogComponent  {
     this.store.load();
     this.store.loadFacets();
   }
-  openOptions(product: ProductDetail): void {
-    if (this.optionsSku() === product.sku && this.optionsEditor) this.optionsEditor.open(product.sku);
-    else this.optionsSku.set(product.sku);
+  openOptions(sku: string): void {
+    if (this.optionsSku() === sku && this.optionsEditor) this.optionsEditor.open(sku);
+    else this.optionsSku.set(sku);
   }
 }
