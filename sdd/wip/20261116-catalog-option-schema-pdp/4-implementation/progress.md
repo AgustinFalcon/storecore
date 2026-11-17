@@ -110,3 +110,18 @@
   Unicode divergente. Tras las correcciones, 29/29 pruebas Angular afectadas y
   19/19 backend HTTP/value-object volvieron a pasar. Ronda final de arquitectura
   y seguridad: APPROVE, sin P0–P3 pendientes; CI hosted queda como gate del PR.
+- TASK-006 completada: el wire de detalle traduce `optionSchema` y
+  `optionValues` una sola vez; `ProductPageViewComponent` reconstruye
+  `OptionSelectionEngine` ante cada snapshot y deriva identidad, precio, stock,
+  cantidad y submit de su resultado cerrado. `Unknown` y vectores parciales
+  bloquean; sólo `Absent` habilita selección genérica.
+- Cambiar opción suspende primero el intent durable, invalida claims, persiste un
+  tombstone `RETIRED` y retira `resume` sincrónicamente antes de aplicar el cambio.
+  Un fallo de lectura, escritura, limpieza de emergencia o History bloquea la
+  selección. Una acción explícita posterior crea otro `flowId`; callbacks y
+  reconciliaciones tardíos verifican resultado, flow y revisión.
+- Evidencia final TASK-006: 41/41 pruebas focales de PDP/intent/storage, suite
+  Angular 1.563/1.563 en 219 archivos y build productivo exitoso. El PDP se movió
+  a carga diferida: bundle inicial 681,19 kB, sin exceder el presupuesto. Dos
+  revisiones GPT-6.1 Sol (arquitectura y seguridad) aprobaron el diff final sin
+  P0–P3. Los controles Select/Swatch y Axe siguen exclusivamente en TASK-007.

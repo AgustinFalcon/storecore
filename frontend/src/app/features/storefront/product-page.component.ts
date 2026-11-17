@@ -5,10 +5,10 @@ import { combineLatest, distinctUntilChanged, map, take } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CartStore } from '../cart/cart.store';
 import { CatalogStore } from './catalog.store';
-import { ProductPageViewComponent, ProductPurchaseSelection } from './product-page.view';
+import { ProductPageViewComponent, ProductPurchaseSelection, ProductSelectionChangeRequest } from './product-page.view';
 import { CustomerFavoritesStore } from '../identity/customer-favorites.store';
 import { PurchaseIntentCoordinator } from '../../core/purchase-intent/purchase-intent-coordinator';
-import { CartLineConfirmationResult, PurchaseIntentStage, RestoredPurchaseAvailability } from '../../domain/purchase-intent/purchase-intent';
+import { CartLineConfirmationResult, PurchaseIntentResolutionResult, PurchaseIntentStage, RestoredPurchaseAvailability } from '../../domain/purchase-intent/purchase-intent';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { AccessMutationFence } from '../../core/auth/access-mutation-fence';
 import { AccessContext } from '../../domain/access/access-context';
@@ -35,10 +35,12 @@ import { AccessCoordinator } from '../../core/auth/access-coordinator';
       [intentMessage]="intentMessage"
       [intentCanConfirm]="intentCanConfirm"
       [intentBusy]="intentBusy"
+      [selectionBlocked]="selectionBlocked"
       [currentCartQuantity]="intent.snapshot().currentQuantity"
       (selectCustomer)="cart.selectCustomer()"
       (requestAccess)="beginAccess($event)"
       (reviseIntent)="reviseIntent($event)"
+      (requestSelectionChange)="authorizeSelectionChange($event)"
       (cancelIntent)="cancelIntent()"
       (add)="addToCart($event)"
       (toggleFavorite)="toggleFavorite($event)"
@@ -56,6 +58,8 @@ export class ProductPageComponent implements OnInit {
   private observedCartLoading = false;
   private restoredSelectionKey = '';
   private restoredSelectionValue: ProductPurchaseSelection | null = null;
+  selectionBlocked = false;
+  private requiresFreshIntent = false;
   constructor(
     readonly store: CatalogStore,
     readonly cart: CartStore,
@@ -103,7 +107,11 @@ export class ProductPageComponent implements OnInit {
     const key = `${state.intent.flowId}:${state.revision}:${state.intent.variantSku}:${state.intent.quantity}`;
     if (key !== this.restoredSelectionKey) {
       this.restoredSelectionKey = key;
-      this.restoredSelectionValue = { variantSku: state.intent.variantSku, quantity: state.intent.quantity, revision: state.revision };
+      const product = this.store.snapshot.product;
+      const variant = product?.variants.find(value => value.sku === state.intent.variantSku);
+      const assignment = product?.optionSnapshot?.variants.find(value => value.variantId === variant?.id);
+      this.restoredSelectionValue = { variantId: variant?.id ?? '', variantSku: state.intent.variantSku,
+        optionValues: assignment?.values ?? new Map(), quantity: state.intent.quantity, revision: state.revision };
     }
     return this.restoredSelectionValue;
   }
@@ -146,6 +154,8 @@ export class ProductPageComponent implements OnInit {
     const productSku = this.store.snapshot.product?.sku ?? '';
     const state = this.intent.capture(productSku, line.sku, line.quantity);
     if (!state.intent.isKnown) { this.flowFeedback = state.message; return; }
+    this.selectionBlocked = false;
+    this.requiresFreshIntent = false;
     this.flowFeedback = '';
     this.resumeReference = state.intent.flowId;
     if (this.cart.authority().requiresSelection) {
@@ -168,7 +178,30 @@ export class ProductPageComponent implements OnInit {
     this.refreshCart();
   }
 
+  authorizeSelectionChange(request: ProductSelectionChangeRequest): void {
+    if (!this.resumeReference) { request.apply(); return; }
+    const suspended = this.intent.suspendForSelectionChange(this.resumeReference);
+    const urlRetired = this.retireResumeAddress();
+    this.resumeReference = null;
+    this.requiresFreshIntent = true;
+    this.selectionBlocked = !suspended.storageResult.succeeded || !urlRetired;
+    this.flowFeedback = suspended.message;
+    void this.router.navigate([], { relativeTo: this.route, queryParams: { resume: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    if (!this.selectionBlocked) request.apply();
+  }
+
   addToCart(line: { sku: string; quantity: number }): void {
+    if (this.selectionBlocked) return;
+    if (this.requiresFreshIntent) {
+      const captured = this.intent.capture(this.store.snapshot.product?.sku ?? '', line.sku, line.quantity);
+      if (!captured.intent.isKnown) { this.selectionBlocked = true; this.flowFeedback = captured.message; return; }
+      this.requiresFreshIntent = false;
+      this.resumeReference = captured.intent.flowId;
+      void this.router.navigate([], { relativeTo: this.route, queryParams: { resume: this.resumeReference }, queryParamsHandling: 'merge', replaceUrl: true });
+      this.refreshProduct(captured.intent.productSku);
+      this.refreshCart();
+      return;
+    }
     const state = this.intent.snapshot();
     if (!this.hasActiveRouteIntent) {
       this.cart.add(line);
@@ -179,16 +212,21 @@ export class ProductPageComponent implements OnInit {
     if (!claim) return;
     const command: SetCartLineCommand = { ...line, report: (outcome) => {
       if (outcome === CartLineMutationOutcome.Accepted) {
-        this.intent.markAccepted(claim);
+        if (this.intent.markAccepted(claim) !== PurchaseIntentResolutionResult.Applied) return;
         this.flowFeedback = this.intent.snapshot().message;
         this.resumeReference = null;
         void this.router.navigate([], { relativeTo: this.route, queryParams: { resume: null }, queryParamsHandling: 'merge', replaceUrl: true });
         this.cart.load();
       }
-      else if (outcome === CartLineMutationOutcome.Rejected) this.intent.markRejected(claim);
-      else this.intent.markUnknown(claim);
+      else if (outcome === CartLineMutationOutcome.Rejected) {
+        if (this.intent.markRejected(claim) !== PurchaseIntentResolutionResult.Applied) return;
+      }
+      else if (this.intent.markUnknown(claim) !== PurchaseIntentResolutionResult.Applied) return;
       if (outcome === CartLineMutationOutcome.OutcomeUnknown) {
+        const reconciliationFlow = claim.flowId, reconciliationRevision = claim.revision;
         this.access.reconcileRegisteredCustomer().pipe(take(1)).subscribe((accessState) => {
+          const current = this.intent.snapshot();
+          if (current.intent.flowId !== reconciliationFlow || current.revision !== reconciliationRevision || this.resumeReference !== reconciliationFlow) return;
           if (accessState.activeContext === AccessContext.Customer && accessState.permits(AccessContext.Customer)) this.refreshCart();
           else this.intent.invalidateAuthority();
         });
@@ -226,5 +264,14 @@ export class ProductPageComponent implements OnInit {
     if (!this.cart.authority().canMutate) return;
     if (this.favorites.isFavorite(sku)) this.favorites.remove(sku);
     else this.favorites.add(sku);
+  }
+
+  private retireResumeAddress(): boolean {
+    try {
+      const current = new URL(globalThis.location.href);
+      current.searchParams.delete('resume');
+      globalThis.history.replaceState(globalThis.history.state, '', `${current.pathname}${current.search}${current.hash}`);
+      return !new URL(globalThis.location.href).searchParams.has('resume');
+    } catch { return false; }
   }
 }

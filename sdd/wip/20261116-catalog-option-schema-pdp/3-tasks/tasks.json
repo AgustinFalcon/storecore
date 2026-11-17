@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 5, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 6, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -39,7 +39,7 @@
       "references": ["Technical: Búsqueda"], "design_decisions": ["DD-search-predicate-parity"]
     },
     {
-      "id": "TASK-006", "title": "Build deterministic selection engine", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001", "TASK-004"],
+      "id": "TASK-006", "title": "Build deterministic selection engine", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-001", "TASK-004"],
       "description": "Resolve partial/complete/unavailable/unknown combinations, quantity semantics and durable purchase-intent tombstones with generation fences.",
       "files": ["frontend/src/app/domain/catalog", "frontend/src/app/features/storefront"],
       "acceptance_criteria": ["AC-1: partial vectors never autocomplete", "AC-2: reload/late response cannot revive tombstoned SKU", "AC-3: explicit action creates a new flowId", "GATE: engine tests pass"],

@@ -1,7 +1,7 @@
 import { Inject, Injectable, InjectionToken, signal } from '@angular/core';
 import { Cart } from '../../domain/cart/cart.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
-import { CartLineConfirmationResult, PurchaseIntent, PurchaseIntentStage, RestoredPurchaseAvailability, validPurchaseFlowId } from '../../domain/purchase-intent/purchase-intent';
+import { CartLineConfirmationResult, PurchaseIntent, PurchaseIntentResolutionResult, PurchaseIntentStage, RestoredPurchaseAvailability, validPurchaseFlowId } from '../../domain/purchase-intent/purchase-intent';
 import { ClockPort, OpaqueIdPort, PurchaseIntentStoragePort, PurchaseIntentStorageResult } from '../../domain/purchase-intent/purchase-intent-storage.port';
 import { CapturePurchaseIntentStep, CompletePurchaseIntentStep, PersistPurchaseIntentStep, RestoreExactSelectionStep } from '../../domain/purchase-intent/purchase-intent-steps';
 import { SessionPurchaseIntentStorageAdapter } from '../../data/purchase-intent/session-purchase-intent-storage.adapter';
@@ -100,6 +100,28 @@ export class PurchaseIntentCoordinator {
     return this.snapshot();
   }
 
+  /** Retires the current flow before a local option choice can expose another selection. */
+  suspendForSelectionChange(rawResume: unknown = null): PurchaseIntentSnapshot {
+    if (this.pending) return this.snapshot();
+    const published = this.snapshot().intent;
+    const loaded = validPurchaseFlowId(rawResume) ? this.storage.load(this.clock.now()) : { intent: PurchaseIntent.Unknown, result: PurchaseIntentStorageResult.Empty };
+    if (!published.isKnown && !loaded.result.succeeded) {
+      this.state.set({ ...initial(), stage: PurchaseIntentStage.Unavailable, storageResult: loaded.result, message: loaded.result.label });
+      return this.snapshot();
+    }
+    const intent = published.isKnown ? published : loaded.intent.isKnown && loaded.intent.flowId === rawResume ? loaded.intent : PurchaseIntent.Unknown;
+    if (!intent.isKnown) {
+      this.state.set({ ...initial(), stage: PurchaseIntentStage.Completed, storageResult: loaded.result, message: 'Selección anterior cerrada' });
+      return this.snapshot();
+    }
+    this.terminal.add(intent.flowId);
+    this.invalidateAuthority();
+    const storageResult = new CompletePurchaseIntentStep(this.storage).execute(intent);
+    this.state.set({ ...initial(), stage: storageResult.succeeded ? PurchaseIntentStage.Completed : PurchaseIntentStage.Unavailable,
+      storageResult, message: storageResult.succeeded ? 'Selección anterior cerrada. Confirmá nuevamente para continuar' : storageResult.label });
+    return this.snapshot();
+  }
+
   beginConfirmation(actor: PurchaseIntentActor): PurchaseIntentClaim | null {
     if (this.pending || this.expire() || this.snapshot().stage !== PurchaseIntentStage.ReadyForConfirmation || !this.claimValue
       || !this.accepts(this.claimValue) || !actor.canMutate || !actor.identity || actor.identity !== this.claimValue.actor.identity || actor.revision !== this.claimValue.actor.revision) return null;
@@ -108,9 +130,9 @@ export class PurchaseIntentCoordinator {
     return this.pending;
   }
 
-  markAccepted(claim: PurchaseIntentClaim): void { this.resolve(claim, CartLineConfirmationResult.Accepted); }
-  markRejected(claim: PurchaseIntentClaim): void { this.resolve(claim, CartLineConfirmationResult.Rejected); }
-  markUnknown(claim: PurchaseIntentClaim): void { this.resolve(claim, CartLineConfirmationResult.OutcomeUnknown); }
+  markAccepted(claim: PurchaseIntentClaim): PurchaseIntentResolutionResult { return this.resolve(claim, CartLineConfirmationResult.Accepted); }
+  markRejected(claim: PurchaseIntentClaim): PurchaseIntentResolutionResult { return this.resolve(claim, CartLineConfirmationResult.Rejected); }
+  markUnknown(claim: PurchaseIntentClaim): PurchaseIntentResolutionResult { return this.resolve(claim, CartLineConfirmationResult.OutcomeUnknown); }
   cancel(): void {
     if (this.pending) { this.closeAfterPending = true; return; }
     this.close(PurchaseIntentStage.Completed, 'Selección cancelada');
@@ -132,8 +154,8 @@ export class PurchaseIntentCoordinator {
   }
   accepts(claim: PurchaseIntentClaim): boolean { return claim === this.claimValue && claim.generation === this.generation && claim.revision === this.snapshot().revision && claim.flowId === this.snapshot().intent.flowId && !this.terminal.has(claim.flowId); }
 
-  private resolve(claim: PurchaseIntentClaim, result: CartLineConfirmationResult): void {
-    if (claim !== this.pending) return;
+  private resolve(claim: PurchaseIntentClaim, result: CartLineConfirmationResult): PurchaseIntentResolutionResult {
+    if (claim !== this.pending) return PurchaseIntentResolutionResult.Stale;
     this.pending = null;
     if (result === CartLineConfirmationResult.Accepted) {
       // Acceptance is terminal before storage or refresh can fail.
@@ -148,6 +170,7 @@ export class PurchaseIntentCoordinator {
       this.state.update(state => ({ ...state, stage: PurchaseIntentStage.Restoring, availability: RestoredPurchaseAvailability.Unknown, confirmation: result, message: result.label }));
     }
     this.closeAfterPending = false;
+    return PurchaseIntentResolutionResult.Applied;
   }
   private expire(): boolean {
     if (!this.snapshot().intent.isKnown) return true;

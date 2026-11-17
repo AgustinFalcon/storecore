@@ -57,7 +57,7 @@
           }
         </ul>
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
-          <label>Variante<select name="variant" [ngModel]="selectedVariant?.id" (ngModelChange)="selectVariant($event)">
+          <label>Variante<select name="variant" [disabled]="intentBusy" [ngModel]="selectedVariant?.id" (ngModelChange)="selectVariant($event)">
             @for (variant of product.variants; track variant.id) { <option [value]="variant.id">{{ variant.name }} · {{ variant.availability.label }}</option> }
           </select></label>
           @if (!product.variants.length) { <p role="status">Sin variantes disponibles.</p> }

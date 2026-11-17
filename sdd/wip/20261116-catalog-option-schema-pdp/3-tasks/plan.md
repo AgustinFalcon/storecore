@@ -10,7 +10,7 @@
 
 ## Corte B — experiencia Angular
 
-- [ ] TASK-006 Motor de selección e intención tombstonada.
+- [x] TASK-006 Motor de selección e intención tombstonada.
 - [ ] TASK-007 Select/Swatch accesibles y compra derivada de una selección.
 - [ ] TASK-008 Editor ADMIN con diff/reaplicación explícita tras 409.
 
@@ -29,6 +29,6 @@
 La implementación se realiza en PR separado de este contrato documental y no
 cierra #10 hasta que los catorce gates estén completos.
 
-El corte inicial también implementa y prueba el motor puro de TASK-006, pero esa
-tarea permanece abierta hasta integrar tombstones durables, fences de generación
-y la selección autoritativa con el PDP.
+TASK-006 integra el motor cerrado con la selección autoritativa del PDP, retiro
+síncrono de referencias, tombstones durables, fences de generación y bloqueo
+fail-closed. Select/Swatch y sus pruebas de accesibilidad permanecen en TASK-007.

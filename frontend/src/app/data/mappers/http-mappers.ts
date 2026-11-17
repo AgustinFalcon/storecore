@@ -7,6 +7,7 @@ import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalog/product-detail.entity';
 import { ProductSummary, summarizeProduct } from '../../domain/catalog/product-summary.entity';
 import { isArsAmount, SkuPriceResolution, VariantPricePolicy } from '../../domain/catalog/variant-price';
+import { OptionWireMapper } from '../../domain/catalog/option-wire.mapper';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
@@ -165,9 +166,12 @@ function mapVariant(value: unknown, productBase: unknown): ProductVariant {
 }
 export function mapProductDetail(value: unknown): ProductDetail {
   const row = asRecord(value); const status = ProductStatus.fromWire(row['status']);
+  const rawVariants = items(row['variants']);
+  const variants = rawVariants.map(value => mapVariant(value, row['productBasePrice']));
   return { id: text(row['id']), sku: text(row['sku']), name: text(row['name']), description: text(row['description']), brand: text(row['brand']), category: text(row['category']), images: items(row['images']).map(text),
     media: items(row['media']).map(value => { const media = asRecord(value); return { id: text(media['id']), url: text(media['url']), sortOrder: num(media['sortOrder']), primary: media['primary'] === true }; }),
-    variants: items(row['variants']).map(value => mapVariant(value, row['productBasePrice'])), productBasePrice: isArsAmount(row['productBasePrice']) ? row['productBasePrice'] : null,
+    variants, optionSnapshot: OptionWireMapper.fromWire(row['optionSchema'], rawVariants.map(value => { const variant = asRecord(value); return { id: variant['id'], sku: variant['sku'], optionValues: variant['optionValues'] }; })),
+    productBasePrice: isArsAmount(row['productBasePrice']) ? row['productBasePrice'] : null,
     price: row['price'] == null ? null : mapPrice(row['price']), offerRef: text(row['offerRef']) || null, status, active: status.isPublic };
 }
 export function mapProductDetails(value: unknown): BoundedRows<ProductDetail> { return mapBoundedRows(value, mapProductDetail); }
