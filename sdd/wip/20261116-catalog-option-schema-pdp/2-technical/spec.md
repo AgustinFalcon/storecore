@@ -44,7 +44,8 @@ el siguiente número al rebase; el nombre lógico es
 `catalog_product_option_schema`.
 
 - `products.has_option_schema BOOLEAN NOT NULL DEFAULT FALSE`
-- `products.option_schema_revision BIGINT NOT NULL DEFAULT 1 CHECK (>0)`
+- `products.option_schema_revision BIGINT NOT NULL DEFAULT 1 CHECK (BETWEEN 1
+  AND 2147483647)`, alineado con `SchemaRevision` y el wire compartido
 - `product_option_axes`: product_id, code, label, presentation, sort_order;
   únicos por `(product_id,code)` y `(product_id,sort_order)`
 - `product_option_values`: axis_id, code, label, swatch_color nullable,
@@ -69,6 +70,12 @@ vector. Altas, bajas, reordenamientos e intercambios
 se realizan con staging/constraints diferibles para no fallar por estados
 intermedios válidos del mismo comando.
 
+La base asegura códigos canónicos ASCII y unicidad estructural. La equivalencia
+Unicode de labels (NFKC, colapso de espacios y case-fold completo, incluido
+`ß/ẞ`) pertenece al writer de dominio de TASK-003; no se aproxima con
+`lower()` de PostgreSQL. Datos que no hayan pasado por ese writer serán tratados
+como `UNKNOWN` por la proyección fail-closed de TASK-004.
+
 La migración no infiere ejes desde `attributes`: productos existentes quedan con
 schema `Absent` y fallback genérico. `attribute_order` sigue siendo descriptivo.
 La migración prueba productos legacy con múltiples variantes, ausencia de
@@ -91,8 +98,28 @@ y `Deactivate` preservan identidad/precio/stock. `AddInactive` crea sin vector n
 exposición. Eliminar el último eje sólo se expresa como `Clear`, nunca como un
 `Replace` vacío ambiguo.
 
+El wire usa exactamente los discriminadores documentales
+`Replace/Clear/Keep/AddInactive/Activate/Deactivate`. Las operaciones de
+variante son sparse: una variante existente omitida equivale a `Keep`.
+`AddInactive` tiene `{operation,sku,label}`, crea una variante nueva inactiva y
+no puede aparecer en assignments. Las demás operaciones y cada assignment usan
+exactamente una referencia `{variantId}` o `{variantSku}`; repetir una referencia
+o usar ambas formas es inválido. `assignments` representa el estado completo que
+quedará tras `Replace`: toda variante finalmente activa debe aparecer completa;
+una inactiva puede omitirse o conservar una asignación parcial válida.
+
+Toda orden válida —incluido `Clear` sobre `Absent` o un `Replace` equivalente—
+incrementa `option_schema_revision` exactamente una vez y audita el intento
+aceptado. La revisión no hace wrap: `2147483647` devuelve 409
+`CATALOG_OPTION_REVISION_EXHAUSTED` sin efectos.
+
 El parser impone límite de bytes, profundidad, cantidad de ejes/valores/
 asignaciones y claves duplicadas antes de materializar objetos o combinaciones.
+El presupuesto es 2 MiB inclusive, profundidad máxima 12, hasta 1.000
+`variantOperations`, 4.000 assignments y strings de transporte de hasta 2.048
+code points antes de aplicar los límites más estrechos del dominio. Body mayor,
+chunked incluido, trailing JSON, clave duplicada o límite excedido responde 400
+sin rotar CSRF.
 `ReplaceProductOptionSchema` valida el payload completo en dominio. El repositorio
 toma locks siempre producto→variantes, compara revisión y reemplaza ejes, valores
 y asignaciones dentro de una transacción. Incrementa revisión una vez, registra
@@ -115,13 +142,20 @@ Existe un único protocolo de escritura para pertenencia/actividad/asignaciones:
 - un 400/404/409 no cambia schema, variantes, auditoría ni CSRF; el cliente relee,
   compara y reaplica explícitamente, sin retry automático
 
-La migración escribe un marcador `catalog_schema_compatibility_version`. Un
-interlock externo obligatorio del despliegue consulta ese marcador antes de
-arrancar/admitir cualquier artefacto y drena instancias previas; así bloquea el
-binario anterior, que no conoce el marcador, antes de recibir tráfico o escribir.
-Se prueba el artefacto anterior real a través del wrapper contra una base migrada
-con schemas configurados y se verifica que nunca es admitido. No hay rollback
-destructivo.
+La migración escribe un marcador `catalog_schema_compatibility_version`. Cada
+artefacto declara la versión admitida en
+`catalog-schema-compatibility-version.txt`. Tras drenar instancias previas, el
+despliegue ejecuta `migrate-catalog-schema.sh`: éste rechaza artefactos sin
+declaración e invoca un runner Flyway offline del artefacto nuevo, sin Spring ni
+listener HTTP, por lo que puede llevar una base limpia/V23 hasta V24. Después,
+el wrapper Linux obligatorio `run-with-catalog-schema-interlock.sh` compara el
+marcador con la declaración antes de ejecutar la aplicación y falla cerrado ante
+marcador ausente, corrupto, inaccesible o incompatible. El wrapper exporta a
+Spring exactamente la datasource verificada y rechaza argumentos/opciones JVM
+que puedan sustituir datasource, Flyway o configuración. La matriz prueba
+artefactos compatible/anterior/corrupto, clean/V23, base inaccesible y bypasses
+de configuración. No hay rollback destructivo ni soporte para arrancar
+producción con `java -jar` directamente.
 
 ## Proyección pública y wire
 
@@ -141,6 +175,11 @@ No publica labels o CSS crudos sin value objects.
 `JdbcCatalogProjectionReader` mantiene query count fijo: agrega dos consultas
 bulk acotadas (axes/values y assignments) para los products de la página, sin
 N+1. Límite excedido falla con código cerrado; no trunca identidad.
+La página no vacía ejecuta seis consultas y el detalle existente cinco,
+independientemente de productos, variantes o ejes. Ambas lecturas validan el
+agregado completo —incluidas variantes inactivas y ownership producto/eje/valor—
+antes de aplicar la visibilidad pública. El GET administrativo reutiliza el
+mismo proyector puro y expone causa cerrada cuando el resultado es `UNKNOWN`.
 
 El contrato BlackStore conserva su catálogo actual sin option schema en este
 corte; el agregado público es backward-compatible y no cambia su autoridad.
@@ -197,8 +236,11 @@ lo transportan explícitamente. La cláusula queda:
 `lower(product.name) LIKE ? OR lower(authorized_variant.sku) LIKE ? OR
 lower(category.name) LIKE ?`.
 
-El query se normaliza/limita antes de SQL, usa parámetros y escapa comodines con
-semántica literal. Items y count reutilizan el mismo predicado `EXISTS`/joins,
+El query se normaliza NFKC, recorta extremos y colapsa whitespace; admite hasta
+120 code points normalizados con un techo de transporte de 2.048. Controles no
+whitespace y excesos se rechazan con `CATALOG_QUERY_INVALID`, nunca se truncan.
+Antes de SQL se escapan `!`, `%` y `_`, se usa `ESCAPE '!'` y el case-fold se
+evalúa en PostgreSQL sobre ambos operandos. Items y count reutilizan el mismo predicado `EXISTS`/joins,
 incluida categoría nullable, sin alias ausentes. Público aplica producto ACTIVE y
 variante ACTIVE; SKU se compara case-insensitive. Admin conserva su visibilidad
 actual e incluye SKU inactivo sólo

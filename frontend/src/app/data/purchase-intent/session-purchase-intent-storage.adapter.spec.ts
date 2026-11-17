@@ -21,6 +21,9 @@ describe('SessionPurchaseIntentStorageAdapter', () => {
     expect(adapter.load(now).intent).toEqual(replacement);
     expect(adapter.clear(replacement.flowId)).toBe(PurchaseIntentStorageResult.Cleared);
     expect(adapter.load(now).intent).toBe(PurchaseIntent.Unknown);
+    expect(adapter.load(now).result).toBe(PurchaseIntentStorageResult.Cleared);
+    expect(adapter.save(replacement)).toBe(PurchaseIntentStorageResult.Retired);
+    expect(adapter.save(intent)).toBe(PurchaseIntentStorageResult.Saved);
   });
   it('removes corrupt or expired data without returning raw input', () => {
     for (const raw of ['{', JSON.stringify({ ...intent.toWire(), version: 99 }), JSON.stringify(intent.toWire())]) {
@@ -28,6 +31,12 @@ describe('SessionPurchaseIntentStorageAdapter', () => {
       expect(adapter.load(intent.expiresAt).intent).toBe(PurchaseIntent.Unknown);
       expect(values.has(SessionPurchaseIntentStorageAdapter.key)).toBe(false);
     }
+  });
+  it('reads the previous active wire once and rewrites it through the current envelope', () => {
+    values.set(SessionPurchaseIntentStorageAdapter.key, JSON.stringify(intent.toWire()));
+    expect(adapter.load(now).intent).toEqual(intent);
+    expect(adapter.save(intent)).toBe(PurchaseIntentStorageResult.Saved);
+    expect(JSON.parse(values.get(SessionPurchaseIntentStorageAdapter.key) ?? '{}').kind).toBe('ACTIVE');
   });
   it('fails closed for unavailable storage and quota exceptions', () => {
     for (const unavailable of [new SessionPurchaseIntentStorageAdapter(() => undefined), new SessionPurchaseIntentStorageAdapter(() => { throw Error('denied'); })]) {
@@ -42,12 +51,13 @@ describe('SessionPurchaseIntentStorageAdapter', () => {
     tombstone.save(intent);
     expect(tombstone.clear(intent.flowId)).toBe(PurchaseIntentStorageResult.Cleared);
     expect(tombstone.load(now).intent).toBe(PurchaseIntent.Unknown);
+    expect(tombstone.load(now).result).toBe(PurchaseIntentStorageResult.Cleared);
   });
   it('removes the draft as fallback if writing a tombstone fails', () => {
     adapter.save(intent);
     const fallback = new SessionPurchaseIntentStorageAdapter(() => ({ getItem: key => values.get(key) ?? null,
       setItem: () => { throw Error('quota'); }, removeItem: key => { values.delete(key); } }));
-    expect(fallback.clear(intent.flowId)).toBe(PurchaseIntentStorageResult.Cleared);
+    expect(fallback.clear(intent.flowId)).toBe(PurchaseIntentStorageResult.EmergencyCleared);
     expect(values.size).toBe(0);
   });
 });
