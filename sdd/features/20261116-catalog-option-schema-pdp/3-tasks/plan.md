@@ -24,10 +24,10 @@
 - [x] TASK-011 Review exact-head de código, producto y arquitectura.
 - [x] TASK-012 Review exact-head de performance PostgreSQL/Angular.
 - [x] TASK-013 Review exact-head de seguridad.
-- [ ] TASK-014 CI, PR, merge y post-merge con evidencia separada.
+- [x] TASK-014 CI, PR, merge y post-merge con evidencia separada.
 
-La implementación se realiza en PR separado de este contrato documental y no
-cierra #10 hasta que los catorce gates estén completos.
+La implementación quedó integrada mediante el PR #284. El cierre de #10 se
+realiza únicamente después de archivar esta evidencia final.
 
 TASK-006 integra el motor cerrado con la selección autoritativa del PDP, retiro
 síncrono de referencias, tombstones durables, fences de generación y bloqueo
