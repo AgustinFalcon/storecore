@@ -14,6 +14,9 @@ import { isArsAmount } from '../../domain/catalog/variant-price';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
+import { DomainReadonlyMap, OptionResolutionCause, OptionSchemaState } from '../../domain/catalog/option-schema';
+import { AdminProductOptionsSnapshot, ProductOptionsAuthorityObservation } from '../../domain/catalog/admin-product-options';
+import { VariantStatus } from '../../domain/catalog/catalog-states';
 
 export interface AdminCatalogState {
   readonly loading: boolean;
@@ -35,6 +38,10 @@ const emptyFacet: CatalogFacet = { id: '', name: '' };
 export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   private actorKey: string | null = null;
   private generation = 0;
+  private readonly verifiedOptionsBySku = new Map<string, AdminProductOptionsSnapshot>();
+  private readonly optionRevisionHighwaterBySku = new Map<string, number>();
+  private readonly unverifiableOptionSkus = new Set<string>();
+  private readonly optionAuthorityEpochBySku = new Map<string, number>();
   private readonly actorChanged = new Subject<void>();
 
   setActor(principal: UserSessionResult | null): boolean {
@@ -42,6 +49,8 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map(role => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
     this.actorKey = actorKey; this.generation++; this.actorChanged.next();
+    this.verifiedOptionsBySku.clear();
+    this.optionRevisionHighwaterBySku.clear(); this.unverifiableOptionSkus.clear(); this.optionAuthorityEpochBySku.clear();
     this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: newCatalogProductDraft(), brandDraft: emptyFacet, categoryDraft: emptyFacet, query: emptyCatalogQuery, queryDirty: false });
     return true;
   }
@@ -90,6 +99,32 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly setDraft = this.updater((s, draft: CatalogProductDraft) => s.loading ? s : ({ ...s, draft }));
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
+  readonly syncOptionSnapshot = this.updater((s, verified: ProductOptionsAuthorityObservation) => {
+    const productRevision = s.products.find(product => product.sku === verified.sku)?.optionSnapshot.schema.revision?.value ?? 0;
+    const draftRevision = s.draft.sku === verified.sku ? s.draft.optionSchemaRevision ?? 0 : 0;
+    const cachedRevision = this.verifiedOptionsBySku.get(verified.sku)?.revision ?? 0;
+    const highwater = Math.max(productRevision, draftRevision, cachedRevision, this.optionRevisionHighwaterBySku.get(verified.sku) ?? 0, verified.minimumRevision);
+    if (verified.state === OptionSchemaState.Unknown) {
+      this.optionAuthorityEpochBySku.set(verified.sku, (this.optionAuthorityEpochBySku.get(verified.sku) ?? 0) + 1);
+      this.optionRevisionHighwaterBySku.set(verified.sku, highwater); this.unverifiableOptionSkus.add(verified.sku);
+      this.verifiedOptionsBySku.delete(verified.sku);
+      const unknownSchema = verified.snapshot?.schema ?? Object.freeze({ revision: null, state: OptionSchemaState.Unknown,
+        cause: OptionResolutionCause.Unknown, axes: Object.freeze([]) });
+      const unknownOptionSnapshot = Object.freeze({ schema: unknownSchema, variants: Object.freeze([]) });
+      return { ...s,
+        products: s.products.map(product => product.sku === verified.sku ? { ...product, optionSnapshot: unknownOptionSnapshot } : product),
+        draft: s.draft.sku === verified.sku ? { ...s.draft, optionSchemaState: OptionSchemaState.Unknown,
+          optionSchemaRevision: highwater || s.draft.optionSchemaRevision } : s.draft };
+    }
+    const snapshot = verified.snapshot; if (!snapshot || snapshot.revision < highwater) return s;
+    this.optionRevisionHighwaterBySku.set(verified.sku, Math.max(highwater, snapshot.revision)); this.unverifiableOptionSkus.delete(verified.sku);
+    this.verifiedOptionsBySku.set(verified.sku, snapshot);
+    return {
+      ...s,
+      products: s.products.map(product => product.sku === verified.sku ? this.withVerifiedOptions(product, snapshot) : product),
+      draft: s.draft.sku === verified.sku ? this.withVerifiedDraft(s.draft, snapshot) : s.draft,
+    };
+  });
   readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
   readonly setBrandDraft = this.updater((s, brandDraft: CatalogFacet) => ({ ...s, brandDraft }));
   readonly setCategoryDraft = this.updater((s, categoryDraft: CatalogFacet) => ({ ...s, categoryDraft }));
@@ -98,6 +133,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     if (!this.actorKey) return EMPTY;
     const generation = ++this.generation;
     const requested = this.snapshot.query;
+    const authorityEpochAtRequest = new Map(this.optionAuthorityEpochBySku);
     this.patchState({ loading: true, errorMessage: '', products: [], queryDirty: false });
     return this.catalog.list(requested).pipe(
       switchMap(products => {
@@ -116,7 +152,36 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       }),
       takeUntil(this.actorChanged),
       tapResponse({
-        next: products => { if (generation === this.generation) this.patchState({ products, list: products.metadata, loading: false }); },
+        next: products => { if (generation === this.generation) {
+          const synchronizedProducts = products.map(product => {
+          const serverRevision = product.optionSnapshot.schema.revision?.value;
+          const highwater = this.optionRevisionHighwaterBySku.get(product.sku) ?? 0;
+          if (product.optionSnapshot.schema.state === OptionSchemaState.Unknown) {
+            const unknownRevision = serverRevision ?? 0;
+            this.optionRevisionHighwaterBySku.set(product.sku, Math.max(highwater, unknownRevision));
+            this.optionAuthorityEpochBySku.set(product.sku, (this.optionAuthorityEpochBySku.get(product.sku) ?? 0) + 1);
+            this.verifiedOptionsBySku.delete(product.sku); this.unverifiableOptionSkus.add(product.sku); return product;
+          }
+          if (this.unverifiableOptionSkus.has(product.sku) && (serverRevision ?? 0) <= highwater) {
+            const requestEpoch = authorityEpochAtRequest.get(product.sku) ?? 0;
+            const currentEpoch = this.optionAuthorityEpochBySku.get(product.sku) ?? 0;
+            if (serverRevision !== highwater || requestEpoch !== currentEpoch) return this.withUnknownOptions(product);
+            this.unverifiableOptionSkus.delete(product.sku);
+          }
+          if (serverRevision !== undefined && serverRevision !== null && serverRevision > highwater) {
+            this.optionRevisionHighwaterBySku.set(product.sku, serverRevision); this.unverifiableOptionSkus.delete(product.sku);
+          }
+          const verified = this.verifiedOptionsBySku.get(product.sku);
+          if (!verified) return product;
+          if (serverRevision !== undefined && serverRevision !== null && serverRevision >= verified.revision) {
+            this.verifiedOptionsBySku.delete(product.sku); return product;
+          }
+          return this.withVerifiedOptions(product, verified);
+          });
+          const currentDraft = this.snapshot.draft, listedDraft = synchronizedProducts.find(product => product.sku === currentDraft.sku);
+          this.patchState({ products: synchronizedProducts, draft: listedDraft ? this.withListedDraft(currentDraft, listedDraft) : currentDraft,
+            list: products.metadata, loading: false });
+        } },
         error: (error: unknown) => { if (generation === this.generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }); },
       }),
     );
@@ -187,6 +252,54 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const draft = this.snapshot.draft;
     return isArsAmount(draft.productBasePrice) && draft.variants.every(variant => variant.priceCommand.known
       && (!variant.priceCommand.requiresBase || isArsAmount(variant.priceInput)));
+  }
+
+  private withVerifiedOptions(product: ProductDetail, snapshot: AdminProductOptionsSnapshot): ProductDetail {
+    const activity = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active]));
+    const optionSnapshot = Object.freeze({ schema: snapshot.schema, variants: Object.freeze(snapshot.assignments.map(assignment => Object.freeze({
+      variantId: assignment.variantId, sku: assignment.variantSku, values: new DomainReadonlyMap(assignment.optionValues),
+    }))) });
+    return { ...product, optionSnapshot, variants: product.variants.map(variant => {
+      const active = activity.get(variant.id);
+      return active === undefined ? variant : { ...variant, status: active ? VariantStatus.Active : VariantStatus.Inactive };
+    }) };
+  }
+
+  private withUnknownOptions(product: ProductDetail): ProductDetail {
+    return { ...product, optionSnapshot: Object.freeze({ schema: Object.freeze({ revision: null, state: OptionSchemaState.Unknown,
+      cause: OptionResolutionCause.Unknown, axes: Object.freeze([]) }), variants: Object.freeze([]) }) };
+  }
+
+  private withVerifiedDraft(draft: CatalogProductDraft, snapshot: AdminProductOptionsSnapshot): CatalogProductDraft {
+    const samePublishedRevision = draft.optionSchemaRevision !== null && snapshot.revision <= draft.optionSchemaRevision
+      && draft.optionSchemaState === snapshot.schema.state;
+    if (samePublishedRevision) return { ...draft, optionSchemaState: snapshot.schema.state, optionSchemaLastKnownState: snapshot.schema.state,
+      optionSchemaRevision: Math.max(draft.optionSchemaRevision!, snapshot.revision) };
+    const statuses = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active ? VariantStatus.Active : VariantStatus.Inactive]));
+    return this.reconcileDraft(draft, snapshot.schema.state, snapshot.revision, statuses);
+  }
+
+  private withListedDraft(draft: CatalogProductDraft, product: ProductDetail): CatalogProductDraft {
+    const schema = product.optionSnapshot.schema;
+    if (schema.state === OptionSchemaState.Unknown) return { ...draft, optionSchemaState: OptionSchemaState.Unknown };
+    const revision = schema.revision?.value;
+    if (revision === undefined || revision === null || draft.optionSchemaRevision !== null && (revision < draft.optionSchemaRevision
+      || revision === draft.optionSchemaRevision && draft.optionSchemaState !== OptionSchemaState.Unknown)) return draft;
+    return this.reconcileDraft(draft, schema.state, revision, new Map(product.variants.map(variant => [variant.id, variant.status])));
+  }
+
+  private reconcileDraft(draft: CatalogProductDraft, state: OptionSchemaState, revision: number,
+    published: ReadonlyMap<string, VariantStatus>): CatalogProductDraft {
+    const preserveIndependentAbsentDelta = draft.optionSchemaLastKnownState === OptionSchemaState.Absent && state === OptionSchemaState.Absent;
+    return { ...draft, optionSchemaState: state, optionSchemaLastKnownState: state, optionSchemaRevision: revision,
+      variantPublishedStatuses: new DomainReadonlyMap(published), variants: draft.variants.map(variant => {
+        if (!variant.id) return state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
+        const remote = published.get(variant.id); if (!remote) return variant;
+        const previous = draft.variantPublishedStatuses.get(variant.id);
+        const localChanged = previous !== undefined && variant.status !== previous;
+        const remoteChanged = previous !== undefined && remote !== previous;
+        return preserveIndependentAbsentDelta && localChanged && !remoteChanged ? variant : { ...variant, status: remote };
+      }) };
   }
 
   readonly persistBrand = this.effect<void>((trigger$) =>

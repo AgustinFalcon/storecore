@@ -46,6 +46,7 @@ export class UserCatalogViewComponent {
   @Output() readonly draftChange = new EventEmitter<CatalogProductDraft>();
   @Output() readonly createProduct = new EventEmitter<void>();
   @Output() readonly editProduct = new EventEmitter<ProductDetail>();
+  @Output() readonly editOptions = new EventEmitter<string>();
   @Output() readonly brandDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly categoryDraftChange = new EventEmitter<CatalogFacet>();
   @Output() readonly saveProduct = new EventEmitter<void>();
@@ -89,7 +90,10 @@ export class UserCatalogViewComponent {
     this.patch({ variants });
   }
 
-  addVariant(): void { this.patch({ variants: [...this.currentDraft.variants, newCatalogVariant()] }); }
+  addVariant(): void {
+    const created = newCatalogVariant();
+    this.patch({ variants: [...this.currentDraft.variants, this.currentDraft.optionSchemaState.allowsGeneric ? created : { ...created, status: VariantStatus.Inactive }] });
+  }
   removeNewVariant(index: number): void {
     const variant = this.currentDraft.variants[index];
     if (!variant || variant.id || index === 0) return;
@@ -97,7 +101,12 @@ export class UserCatalogViewComponent {
   }
 
   setVariantStatus(index: number, raw: unknown): void {
+    if (!this.currentDraft.optionSchemaState.allowsGeneric) return;
     this.patchVariant(index, { status: VariantStatus.fromWire(raw) });
+  }
+
+  configureDraftOptions(): void {
+    if (this.currentDraft.sku) this.editOptions.emit(this.currentDraft.sku);
   }
 
   patchAttributeKey(variantIndex: number, attributeIndex: number, key: string): void {

@@ -160,8 +160,8 @@ class MpCheckoutAttemptService(
 
     fun recover(attemptId: Long): Map<String, Any?> {
         val attempt = load(attemptId)
-        val now = Instant.now()
-        val window = SearchWindow(attempt.createdAt.minus(Duration.ofMinutes(5)), now.plus(Duration.ofMinutes(5)), now)
+        val queriedAt = jdbc.queryForObject("SELECT clock_timestamp()", OffsetDateTime::class.java)!!.toInstant()
+        val window = SearchWindow(attempt.createdAt.minus(Duration.ofMinutes(5)), queriedAt.plus(Duration.ofMinutes(5)), queriedAt)
         val result = commands.search(
             OfficialOrderSearchQuery(attempt.externalReference, window.from, window.to, 1, 20),
         )
