@@ -3,7 +3,7 @@
 ## Corte A — dominio, datos y comandos
 
 - [x] TASK-001 Tipos cerrados y pasos independientes de schema/selección.
-- [ ] TASK-002 Migración PostgreSQL, vectores diferibles e interlock legacy.
+- [x] TASK-002 Migración PostgreSQL, vectores diferibles e interlock legacy.
 - [ ] TASK-003 Writer único/CAS para schema, asignaciones y actividad.
 - [ ] TASK-004 Proyección pública/admin y contrato wire fail-closed.
 - [ ] TASK-005 Búsqueda pública/admin por nombre, SKU y categoría.

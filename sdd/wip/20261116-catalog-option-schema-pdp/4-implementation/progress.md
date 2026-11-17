@@ -34,3 +34,22 @@
   case-fold `ß/ẞ`, singletons mutables, variante ajena en `withQuantity` y rangos
   numéricos divergentes. Ronda final de arquitectura y seguridad: APPROVE, sin
   P0–P3 pendientes. La aprobación cubre sólo dominio/motor aislados.
+- TASK-002 implementada con Flyway V24: presencia/revisión acotada, ejes,
+  valores, asignaciones con ownership compuesto, vectores JSONB completos y
+  únicos de forma diferible, guard coalescido y validación integral al commit.
+- La migración conserva los productos legacy como `Absent`, no infiere opciones
+  desde `attributes`, no genera vectores vacíos y mantiene precio, stock e
+  historial. La matriz PostgreSQL 16 cubre clean/upgrade, staging, swaps,
+  rollback, límites, pertenencia, concurrencia y reparación de vectores.
+- Se agregó compatibilidad de artefacto fail-closed: marcador de base V2,
+  declaración embebida, migrador Flyway offline y wrapper Linux obligatorio. La
+  secuencia drena, migra clean/V23 sin servir tráfico y sólo admite la aplicación
+  si marcador y artefacto coinciden; además fija la datasource efectiva y
+  rechaza overrides que pudieran eludir el preflight.
+- Evidencia local focal tras corregir el protocolo de despliegue: matriz
+  PostgreSQL con 44 pruebas, 0 fallos y 0 errores; la suite final del interlock
+  compila y sus 7 casos de shell se omiten en Windows por diseño, reservados al
+  runner Ubuntu de CI. El fat JAR construye y el entrypoint offline fue cargado
+  mediante `PropertiesLauncher` sin iniciar Spring. La
+  equivalencia Unicode de labels queda explícitamente en TASK-003 y cualquier
+  dato no validado fallará cerrado en TASK-004.

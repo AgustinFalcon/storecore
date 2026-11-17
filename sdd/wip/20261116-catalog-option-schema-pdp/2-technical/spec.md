@@ -44,7 +44,8 @@ el siguiente número al rebase; el nombre lógico es
 `catalog_product_option_schema`.
 
 - `products.has_option_schema BOOLEAN NOT NULL DEFAULT FALSE`
-- `products.option_schema_revision BIGINT NOT NULL DEFAULT 1 CHECK (>0)`
+- `products.option_schema_revision BIGINT NOT NULL DEFAULT 1 CHECK (BETWEEN 1
+  AND 2147483647)`, alineado con `SchemaRevision` y el wire compartido
 - `product_option_axes`: product_id, code, label, presentation, sort_order;
   únicos por `(product_id,code)` y `(product_id,sort_order)`
 - `product_option_values`: axis_id, code, label, swatch_color nullable,
@@ -68,6 +69,12 @@ ejes/asignaciones y ningún vector. Variantes inactivas incompletas no generan
 vector. Altas, bajas, reordenamientos e intercambios
 se realizan con staging/constraints diferibles para no fallar por estados
 intermedios válidos del mismo comando.
+
+La base asegura códigos canónicos ASCII y unicidad estructural. La equivalencia
+Unicode de labels (NFKC, colapso de espacios y case-fold completo, incluido
+`ß/ẞ`) pertenece al writer de dominio de TASK-003; no se aproxima con
+`lower()` de PostgreSQL. Datos que no hayan pasado por ese writer serán tratados
+como `UNKNOWN` por la proyección fail-closed de TASK-004.
 
 La migración no infiere ejes desde `attributes`: productos existentes quedan con
 schema `Absent` y fallback genérico. `attribute_order` sigue siendo descriptivo.
@@ -115,13 +122,20 @@ Existe un único protocolo de escritura para pertenencia/actividad/asignaciones:
 - un 400/404/409 no cambia schema, variantes, auditoría ni CSRF; el cliente relee,
   compara y reaplica explícitamente, sin retry automático
 
-La migración escribe un marcador `catalog_schema_compatibility_version`. Un
-interlock externo obligatorio del despliegue consulta ese marcador antes de
-arrancar/admitir cualquier artefacto y drena instancias previas; así bloquea el
-binario anterior, que no conoce el marcador, antes de recibir tráfico o escribir.
-Se prueba el artefacto anterior real a través del wrapper contra una base migrada
-con schemas configurados y se verifica que nunca es admitido. No hay rollback
-destructivo.
+La migración escribe un marcador `catalog_schema_compatibility_version`. Cada
+artefacto declara la versión admitida en
+`catalog-schema-compatibility-version.txt`. Tras drenar instancias previas, el
+despliegue ejecuta `migrate-catalog-schema.sh`: éste rechaza artefactos sin
+declaración e invoca un runner Flyway offline del artefacto nuevo, sin Spring ni
+listener HTTP, por lo que puede llevar una base limpia/V23 hasta V24. Después,
+el wrapper Linux obligatorio `run-with-catalog-schema-interlock.sh` compara el
+marcador con la declaración antes de ejecutar la aplicación y falla cerrado ante
+marcador ausente, corrupto, inaccesible o incompatible. El wrapper exporta a
+Spring exactamente la datasource verificada y rechaza argumentos/opciones JVM
+que puedan sustituir datasource, Flyway o configuración. La matriz prueba
+artefactos compatible/anterior/corrupto, clean/V23, base inaccesible y bypasses
+de configuración. No hay rollback destructivo ni soporte para arrancar
+producción con `java -jar` directamente.
 
 ## Proyección pública y wire
 

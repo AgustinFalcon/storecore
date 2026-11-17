@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 1, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 2, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -11,7 +11,7 @@
       "references": ["Functional: Conceptos cerrados", "Technical: Dominio"], "design_decisions": ["DD-closed-types", "DD-flow-steps"]
     },
     {
-      "id": "TASK-002", "title": "Migrate option persistence safely", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
+      "id": "TASK-002", "title": "Migrate option persistence safely", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
       "description": "Add axes, values, assignments, deferred complete vectors, validation guard, schema presence/revision and mandatory external compatibility interlock.",
       "files": ["backend/src/main/resources/db/migration", "backend/src/test"],
       "acceptance_criteria": ["AC-1: Clean/upgrade preserve every legal legacy product", "AC-2: Absent creates no empty vector", "AC-3: previous artifact is denied before traffic", "GATE: PostgreSQL 16 migration tests pass"],
