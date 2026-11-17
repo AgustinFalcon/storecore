@@ -73,4 +73,19 @@ describe('admin product options closed domain', () => {
     expect(mineResult?.axes[0].values[0].label).toBe('Rojo mío');
     expect(remoteResult?.axes).toHaveLength(0);
   });
+
+  it('rebases the maximum supported assignment cardinality without a per-variant path scan', () => {
+    const axes = ['color', 'size', 'material', 'finish'].map((code, order) => ({ code, label: code, presentation: 'SELECT', order,
+      values: [{ code: 'only', label: 'Único', order: 0, swatchColor: null }] }));
+    const assignments = Array.from({ length: 1000 }, (_, index) => ({ variantId: String(index), variantSku: `SKU-${index}`, active: false,
+      optionValues: Object.fromEntries(axes.map(axis => [axis.code, 'only'])) }));
+    const base = optionDraft(AdminProductOptionsMapper.fromWire({ revision: 1, state: 'VALID', cause: null, axes, assignments }));
+    const mine = { ...base, axes: base.axes.map((axis, index) => index ? axis : { ...axis, label: 'Color local' }) };
+    const remote = { ...base, assignments: base.assignments.map((row, index) => index === 999 ? { ...row, active: true } : row) };
+    const started = performance.now();
+    const merged = OptionDraftRebase.merge(base, mine, remote, new Map());
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(merged?.axes[0].label).toBe('Color local');
+    expect(merged?.assignments[999].active).toBe(true);
+  });
 });

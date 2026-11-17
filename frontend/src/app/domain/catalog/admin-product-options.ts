@@ -74,7 +74,7 @@ export class ProductOptionsAuthorityObservation {
     return new ProductOptionsAuthorityObservation(sku, snapshot.schema.state, Math.max(minimumRevision, snapshot.revision), snapshot);
   }
   static unknown(sku: string, minimumRevision: number, snapshot: AdminProductOptionsSnapshot | null = null): ProductOptionsAuthorityObservation {
-    return new ProductOptionsAuthorityObservation(sku, OptionSchemaState.Unknown, minimumRevision, snapshot);
+    return new ProductOptionsAuthorityObservation(sku, OptionSchemaState.Unknown, Math.max(minimumRevision, snapshot?.revision ?? 0), snapshot);
   }
 }
 export interface ProductOptionsCommand {
@@ -295,10 +295,23 @@ export class OptionDraftRebase {
   }
 
   private static inflate(flat: Flat): AdminProductOptionsDraft {
-    const axisCodes = [...flat.keys()].flatMap(path => /^axis\/([^/]+)\/exists$/.exec(path)?.[1] ?? []);
+    const axisCodes: string[] = [], valueCodesByAxis = new Map<string, string[]>(), variantIds: string[] = [], pendingIds: string[] = [];
+    const optionValuesByVariant = new Map<string, Map<string, string>>();
+    for (const [path, value] of flat) {
+      const parts = path.split('/');
+      if (parts[0] === 'axis' && parts.length === 3 && parts[2] === 'exists') axisCodes.push(parts[1]);
+      else if (parts[0] === 'axis' && parts.length === 5 && parts[2] === 'value' && parts[4] === 'exists') {
+        const valueCodes = valueCodesByAxis.get(parts[1]) ?? [];
+        valueCodes.push(parts[3]); valueCodesByAxis.set(parts[1], valueCodes);
+      } else if (parts[0] === 'variant' && parts.length === 3 && parts[2] === 'exists') variantIds.push(parts[1]);
+      else if (parts[0] === 'variant' && parts.length === 4 && parts[2] === 'option') {
+        const optionValues = optionValuesByVariant.get(parts[1]) ?? new Map<string, string>();
+        optionValues.set(parts[3], String(value)); optionValuesByVariant.set(parts[1], optionValues);
+      } else if (parts[0] === 'pending' && parts.length === 3 && parts[2] === 'exists') pendingIds.push(parts[1]);
+    }
     const axes = axisCodes.filter(code => flat.get(`axis/${code}/exists`) === true).map(code => {
       const root = `axis/${code}`;
-      const valueCodes = [...flat.keys()].flatMap(path => new RegExp(`^axis/${code}/value/([^/]+)/exists$`).exec(path)?.[1] ?? []);
+      const valueCodes = valueCodesByAxis.get(code) ?? [];
       const presentation = flat.get(`${root}/presentation`) === OptionPresentation.Swatch.wire ? OptionPresentation.Swatch : OptionPresentation.Select;
       return { code, label: String(flat.get(`${root}/label`) ?? ''), presentation, order: Number(flat.get(`${root}/order`) ?? 0),
         values: valueCodes.filter(value => flat.get(`${root}/value/${value}/exists`) === true).map(value => ({ code: value,
@@ -306,15 +319,11 @@ export class OptionDraftRebase {
           order: Number(flat.get(`${root}/value/${value}/order`) ?? 0) })).sort((left, right) => left.order - right.order) };
     }).sort((left, right) => left.order - right.order).map((axis, order) => ({ ...axis, order,
       values: axis.values.map((value, valueOrder) => ({ ...value, order: valueOrder })) }));
-    const variantIds = [...flat.keys()].flatMap(path => /^variant\/([^/]+)\/exists$/.exec(path)?.[1] ?? []);
     const assignments = variantIds.filter(id => flat.get(`variant/${id}/exists`) === true).map(encodedId => {
-      const root = `variant/${encodedId}`, optionValues = new Map<string, string>();
-      for (const path of flat.keys()) { const match = new RegExp(`^variant/${encodedId}/option/([^/]+)$`).exec(path);
-        if (match) optionValues.set(match[1], String(flat.get(path))); }
+      const root = `variant/${encodedId}`, optionValues = optionValuesByVariant.get(encodedId) ?? new Map<string, string>();
       return { variantId: decodeURIComponent(encodedId), variantSku: String(flat.get(`${root}/sku`) ?? ''),
         active: flat.get(`${root}/active`) === true, optionValues: new DomainReadonlyMap(optionValues) };
     });
-    const pendingIds = [...flat.keys()].flatMap(path => /^pending\/([^/]+)\/exists$/.exec(path)?.[1] ?? []);
     const pendingAdditions = pendingIds.filter(id => flat.get(`pending/${id}/exists`) === true).map(encodedId => ({ localId: decodeURIComponent(encodedId),
       sku: String(flat.get(`pending/${encodedId}/sku`) ?? ''), label: String(flat.get(`pending/${encodedId}/label`) ?? '') }));
     return Object.freeze({ axes: Object.freeze(axes), assignments: Object.freeze(assignments), pendingAdditions: Object.freeze(pendingAdditions) });

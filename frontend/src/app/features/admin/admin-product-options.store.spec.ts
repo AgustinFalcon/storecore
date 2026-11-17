@@ -18,7 +18,10 @@ describe('AdminProductOptionsStore', () => {
     const store = new AdminProductOptionsStore(manager);
     store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); firstRead.next(projection(1));
     const draft = store.snapshot.draft!; store.setDraft({ ...draft, axes: [{ ...draft.axes[0], label: 'Color local' }] }); store.save();
-    write.error(new HttpErrorResponse({ status: 409, error: { errorCode: 'CATALOG_OPTION_REVISION_CONFLICT' } })); conflictRead.next(projection(2, 'Color remoto'));
+    write.error(new HttpErrorResponse({ status: 409, error: { errorCode: 'CATALOG_OPTION_REVISION_CONFLICT' } }));
+    expect(store.snapshot.verificationUnknown).toBe(true);
+    expect(verifiedOptionsSnapshot(store.snapshot)?.revision).toBe(1);
+    conflictRead.next(projection(2, 'Color remoto'));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Conflict);
     expect(store.snapshot.base?.revision).toBe(1); expect(store.snapshot.remote?.revision).toBe(2);
     expect(store.snapshot.draft?.axes[0].label).toBe('Color local'); expect(manager.write).toHaveBeenCalledTimes(1); expect(manager.read).toHaveBeenCalledTimes(2);
@@ -50,17 +53,33 @@ describe('AdminProductOptionsStore', () => {
     store.save(); expect(manager.write).toHaveBeenCalledTimes(1); store.ngOnDestroy();
   });
 
-  it('keeps refresh blocked while the authoritative post-write read is pending', () => {
-    const initial = new Subject<ReturnType<typeof projection>>(), afterWrite = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
-    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(afterWrite), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+  it('rejects a post-write read below the acknowledged highwater and recovers at that revision', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), stale = new Subject<ReturnType<typeof projection>>(), recovered = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(stale).mockReturnValueOnce(recovered), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
     const store = new AdminProductOptionsStore(manager);
     store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1)); store.save();
     write.next({ revision: 2, state: projection(2).schema.state });
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Loading);
     store.refresh();
     expect(manager.read).toHaveBeenCalledTimes(2);
-    afterWrite.next(projection(2));
+    stale.next(projection(1));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.RefreshRequired);
+    expect(store.snapshot.verificationUnknown).toBe(true);
+    expect(store.snapshot.base?.revision).toBe(1);
+    store.refresh(); recovered.next(projection(2));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Success);
+    expect(store.snapshot.verificationUnknown).toBe(false);
+    store.ngOnDestroy();
+  });
+
+  it('keeps authority unknown when the conflict read fails after 409', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), conflictRead = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(conflictRead), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+    const store = new AdminProductOptionsStore(manager);
+    store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1)); store.save();
+    write.error(new HttpErrorResponse({ status: 409 })); conflictRead.error(new Error('offline'));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.ConflictReadRequired);
+    expect(store.snapshot.verificationUnknown).toBe(true);
     store.ngOnDestroy();
   });
 

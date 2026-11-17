@@ -82,8 +82,8 @@ describe('bounded administrative catalog', () => {
     const products = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Original', status: 'ACTIVE', productBasePrice: 10,
       optionSchema: { revision: 1, state: 'ABSENT', cause: null, axes: [] },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false });
-    const product = products[0], lateList = new Subject<typeof products>(), newerList = new Subject<typeof products>(), oldAfterUnknown = new Subject<typeof products>();
-    const list = vi.fn().mockReturnValueOnce(of(products)).mockReturnValueOnce(lateList).mockReturnValueOnce(newerList).mockReturnValueOnce(oldAfterUnknown);
+    const product = products[0], lateList = new Subject<typeof products>(), newerList = new Subject<typeof products>(), oldAfterUnknown = new Subject<typeof products>(), sameRevisionRecovery = new Subject<typeof products>();
+    const list = vi.fn().mockReturnValueOnce(of(products)).mockReturnValueOnce(lateList).mockReturnValueOnce(newerList).mockReturnValueOnce(oldAfterUnknown).mockReturnValueOnce(sameRevisionRecovery);
     const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor({ id: 'actor', roles: [UserRole.Admin] }); store.load(); store.beginEdit(product);
     store.setDraft({ ...store.snapshot.draft, name: 'Edición sin publicar', variants: [{ ...store.snapshot.draft.variants[0], status: VariantStatus.Inactive },
@@ -129,13 +129,19 @@ describe('bounded administrative catalog', () => {
     store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', unchangedAbsent));
     expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Active);
-    const unknown = AdminProductOptionsMapper.fromWire({ revision: 99, state: 'FUTURE', axes: [], assignments: [] });
+    store.setDraft({ ...store.snapshot.draft, variants: store.snapshot.draft.variants.map(variant => ({ ...variant, status: VariantStatus.Inactive })) });
+    store.load();
+    const unknown = AdminProductOptionsMapper.fromWire({ revision: 5, state: 'FUTURE', axes: [], assignments: [] });
     store.syncOptionSnapshot(ProductOptionsAuthorityObservation.unknown('SKU', 5, unknown));
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Unknown);
-    store.load(); oldAfterUnknown.next(products); oldAfterUnknown.complete();
+    oldAfterUnknown.next(newerProducts); oldAfterUnknown.complete();
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Unknown);
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Unknown);
     expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
+    store.load(); sameRevisionRecovery.next(newerProducts); sameRevisionRecovery.complete();
+    expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Absent);
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Absent);
+    expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
     const recovered = AdminProductOptionsMapper.fromWire({ revision: 6, state: 'ABSENT', cause: null, axes: [],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
     store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', recovered));
