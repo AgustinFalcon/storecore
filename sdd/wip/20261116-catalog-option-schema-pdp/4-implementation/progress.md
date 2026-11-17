@@ -169,3 +169,19 @@
   que se ejecuta en CI Ubuntu. GPT-6.1 Sol técnico y GPT-6.1 Astra UX/Product
   aprobaron la cabeza corregida sin P0–P3. CI hosted y PR permanecen como gates
   separados; no se declara merge.
+- TASK-010 completada con journeys browser deterministas de comprador y consola.
+  El producto simple `Absent` no muestra selector redundante, conserva cantidad
+  a través del acceso CUSTOMER y confirma exactamente un PUT de carrito con el
+  SKU/cantidad visibles. El escenario no cartesiano conserva el sufijo compatible,
+  retira SKU/precio/favorito/submit antiguos y prueba el tombstone en un documento
+  nuevo antes de permitir una intención explícita distinta.
+- El editor ADMIN prueba 409→GET remoto→elección→reaplicación explícita→segundo
+  PUT con revisión nueva; conserva el reordenamiento remoto independiente y la
+  etiqueta local elegida. La búsqueda transporta nombre, SKU secundario y
+  categoría en público/admin y demuestra que un SKU de variante inactiva sólo
+  aparece en consola.
+- Evidencia exacta TASK-010: 17/17 Playwright con cero retries; matriz 0/1/2/4
+  ejes a 390/768/1.440, overflow controlado y Axe sin impactos serious/critical.
+  ESLint focal, suite Angular 1.584/1.584 en 224 archivos y build productivo
+  pasan. GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico aprobaron el diff final
+  sin P0–P3. CI hosted y PR son gates separados.

@@ -17,7 +17,7 @@
 ## Corte C — pruebas integrales
 
 - [x] TASK-009 PostgreSQL, API, concurrencia, límites y regresión legacy.
-- [ ] TASK-010 Browser responsive de comprador/admin y búsqueda.
+  - [x] TASK-010 Browser responsive de comprador/admin y búsqueda.
 
 ## Corte D — evidencia
 
