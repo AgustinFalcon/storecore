@@ -30,6 +30,7 @@ export interface CatalogVariantDraft {
 
 export interface CatalogProductDraft {
   readonly optionSchemaState: OptionSchemaState;
+  readonly optionSchemaRevision: number | null;
   readonly productBasePrice: number | null;
   readonly productBasePriceRaw: string;
   readonly mode: CatalogEditorMode;
@@ -51,7 +52,7 @@ export function newCatalogVariant(sku = ''): CatalogVariantDraft {
 
 export function newCatalogProductDraft(): CatalogProductDraft {
   return {
-    optionSchemaState: OptionSchemaState.Absent,
+    optionSchemaState: OptionSchemaState.Absent, optionSchemaRevision: null,
     mode: CatalogEditorMode.Create, id: '', sku: '', name: '', description: '', brand: '', category: '', images: [],
     variants: [newCatalogVariant()], productBasePrice: 0, productBasePriceRaw: '0', status: ProductStatus.Draft,
   };
@@ -59,7 +60,7 @@ export function newCatalogProductDraft(): CatalogProductDraft {
 
 export function catalogProductDraftFromDetail(product: ProductDetail): CatalogProductDraft {
   return {
-    optionSchemaState: product.optionSnapshot.schema.state,
+    optionSchemaState: product.optionSnapshot.schema.state, optionSchemaRevision: product.optionSnapshot.schema.revision?.value ?? null,
     mode: CatalogEditorMode.Edit, id: product.id, sku: product.sku, name: product.name, description: product.description,
     brand: product.brand, category: product.category, images: product.images, productBasePrice: product.productBasePrice,
     productBasePriceRaw: product.productBasePrice === null ? '' : String(product.productBasePrice),

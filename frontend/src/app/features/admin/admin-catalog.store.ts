@@ -14,7 +14,7 @@ import { isArsAmount } from '../../domain/catalog/variant-price';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
-import { DomainReadonlyMap } from '../../domain/catalog/option-schema';
+import { DomainReadonlyMap, OptionSchemaState } from '../../domain/catalog/option-schema';
 import { AdminProductOptionsSnapshot, VerifiedProductOptionsSnapshot } from '../../domain/catalog/admin-product-options';
 import { VariantStatus } from '../../domain/catalog/catalog-states';
 
@@ -96,6 +96,10 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
   readonly syncOptionSnapshot = this.updater((s, verified: VerifiedProductOptionsSnapshot) => {
+    const productRevision = s.products.find(product => product.sku === verified.sku)?.optionSnapshot.schema.revision?.value ?? 0;
+    const draftRevision = s.draft.sku === verified.sku ? s.draft.optionSchemaRevision ?? 0 : 0;
+    const cachedRevision = this.verifiedOptionsBySku.get(verified.sku)?.revision ?? 0;
+    if (verified.snapshot.revision < Math.max(productRevision, draftRevision, cachedRevision)) return s;
     this.verifiedOptionsBySku.set(verified.sku, verified.snapshot);
     return {
       ...s,
@@ -129,10 +133,21 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       }),
       takeUntil(this.actorChanged),
       tapResponse({
-        next: products => { if (generation === this.generation) this.patchState({ products: products.map(product => {
+        next: products => { if (generation === this.generation) {
+          const synchronizedProducts = products.map(product => {
           const verified = this.verifiedOptionsBySku.get(product.sku);
-          return verified ? this.withVerifiedOptions(product, verified) : product;
-        }), list: products.metadata, loading: false }); },
+          if (!verified) return product;
+          if (product.optionSnapshot.schema.state === OptionSchemaState.Unknown) { this.verifiedOptionsBySku.delete(product.sku); return product; }
+          const serverRevision = product.optionSnapshot.schema.revision?.value;
+          if (serverRevision !== undefined && serverRevision !== null && serverRevision >= verified.revision) {
+            this.verifiedOptionsBySku.delete(product.sku); return product;
+          }
+          return this.withVerifiedOptions(product, verified);
+          });
+          const currentDraft = this.snapshot.draft, listedDraft = synchronizedProducts.find(product => product.sku === currentDraft.sku);
+          this.patchState({ products: synchronizedProducts, draft: listedDraft ? this.withListedDraft(currentDraft, listedDraft) : currentDraft,
+            list: products.metadata, loading: false });
+        } },
         error: (error: unknown) => { if (generation === this.generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }); },
       }),
     );
@@ -217,11 +232,26 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   }
 
   private withVerifiedDraft(draft: CatalogProductDraft, snapshot: AdminProductOptionsSnapshot): CatalogProductDraft {
+    const samePublishedRevision = draft.optionSchemaRevision !== null && snapshot.revision <= draft.optionSchemaRevision
+      && draft.optionSchemaState === snapshot.schema.state;
+    if (samePublishedRevision) return { ...draft, optionSchemaState: snapshot.schema.state, optionSchemaRevision: Math.max(draft.optionSchemaRevision!, snapshot.revision) };
     const activity = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active]));
-    return { ...draft, optionSchemaState: snapshot.schema.state, variants: draft.variants.map(variant => {
+    return { ...draft, optionSchemaState: snapshot.schema.state, optionSchemaRevision: snapshot.revision, variants: draft.variants.map(variant => {
       if (!variant.id) return snapshot.schema.state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
       const active = activity.get(variant.id);
       return active === undefined ? variant : { ...variant, status: active ? VariantStatus.Active : VariantStatus.Inactive };
+    }) };
+  }
+
+  private withListedDraft(draft: CatalogProductDraft, product: ProductDetail): CatalogProductDraft {
+    const schema = product.optionSnapshot.schema;
+    if (schema.state === OptionSchemaState.Unknown) return { ...draft, optionSchemaState: OptionSchemaState.Unknown, optionSchemaRevision: null };
+    const revision = schema.revision?.value;
+    if (revision === undefined || revision === null || draft.optionSchemaRevision !== null && revision <= draft.optionSchemaRevision) return draft;
+    const statuses = new Map(product.variants.map(variant => [variant.id, variant.status]));
+    return { ...draft, optionSchemaState: schema.state, optionSchemaRevision: revision, variants: draft.variants.map(variant => {
+      if (!variant.id) return schema.state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
+      return { ...variant, status: statuses.get(variant.id) ?? variant.status };
     }) };
   }
 
