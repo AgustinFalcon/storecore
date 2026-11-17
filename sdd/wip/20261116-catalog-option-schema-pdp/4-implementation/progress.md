@@ -210,3 +210,12 @@
   P0–P3; `git diff --check 5cba1ec 240a4ce` quedó limpio y el barrido focal no
   encontró credenciales hardcodeadas. TASK-014 permanece abierto y no se
   declara CI, PR, merge ni post-merge hasta obtener evidencia independiente.
+- TASK-014 — evidencia parcial del PR correctivo: #296 se abrió desde
+  `fix/storecore-option-review-findings-20261117` hacia
+  `feat/storecore-option-browser-journeys-20261117`. El run pre-merge
+  `44116184857` aprobó `repository-hygiene`, `frontend`, `backend` y
+  `unified-access-real-e2e`. Tras autorización explícita, GitHub creó el merge
+  commit `05ea7521a4223abafc1d623b3ccd4467bcba1121`; el run post-merge
+  `44118012266` volvió a aprobar los cuatro jobs.
+- El PR apilado #295 permanece abierto, limpio y sin autorización de merge;
+  TASK-014 continúa abierta hasta completar su propio CI, merge y post-merge.
