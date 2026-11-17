@@ -122,7 +122,7 @@ class CatalogProjectionHttpIntegrationTest(
         val broadProduct=product("Literal ordinary $marker");variant(broadProduct,"Broad")
         val literal=data(get("/api/v1/catalog?query=${encoded("%_!")}"))
         assertEquals(1,literal.path("total").asInt());assertEquals(literalProduct.toString(),literal.path("items").single().path("id").asText())
-        assertFalse(literal.toString().contains(broadProduct.toString()))
+        assertFalse(literal.path("items").any { it.path("id").asLong() == broadProduct })
 
         val mixedProduct=product("Mixed visibility $marker");variant(mixedProduct,"Public")
         val hidden=variant(mixedProduct,"Private",false)
