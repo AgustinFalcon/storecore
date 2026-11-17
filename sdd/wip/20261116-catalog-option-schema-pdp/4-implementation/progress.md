@@ -110,3 +110,112 @@
   Unicode divergente. Tras las correcciones, 29/29 pruebas Angular afectadas y
   19/19 backend HTTP/value-object volvieron a pasar. Ronda final de arquitectura
   y seguridad: APPROVE, sin P0–P3 pendientes; CI hosted queda como gate del PR.
+- TASK-006 completada: el wire de detalle traduce `optionSchema` y
+  `optionValues` una sola vez; `ProductPageViewComponent` reconstruye
+  `OptionSelectionEngine` ante cada snapshot y deriva identidad, precio, stock,
+  cantidad y submit de su resultado cerrado. `Unknown` y vectores parciales
+  bloquean; sólo `Absent` habilita selección genérica.
+- Cambiar opción suspende primero el intent durable, invalida claims, persiste un
+  tombstone `RETIRED` y retira `resume` sincrónicamente antes de aplicar el cambio.
+  Un fallo de lectura, escritura, limpieza de emergencia o History bloquea la
+  selección. Una acción explícita posterior crea otro `flowId`; callbacks y
+  reconciliaciones tardíos verifican resultado, flow y revisión.
+- Evidencia final TASK-006: 41/41 pruebas focales de PDP/intent/storage, suite
+  Angular 1.563/1.563 en 219 archivos y build productivo exitoso. El PDP se movió
+  a carga diferida: bundle inicial 681,19 kB, sin exceder el presupuesto. Dos
+  revisiones GPT-6.1 Sol (arquitectura y seguridad) aprobaron el diff final sin
+  P0–P3. Los controles Select/Swatch y Axe siguen exclusivamente en TASK-007.
+- TASK-007 completada con controles nativos Select y radio/Swatch derivados del
+  tipo cerrado `OptionPresentation`. Labels, motivos deshabilitados, texto de
+  color, cantidad, mensajes parciales/desconocidos y reintento mantienen
+  semántica accesible; una selección parcial retira SKU, precio, favorito y
+  submit antiguos sin autocompletar combinaciones.
+- Elegir otra variante conserva cantidad aunque exceda su stock y vuelve a
+  validar compra; los errores tardíos de favoritos quedan acotados al SKU y no
+  contaminan catálogo, mientras la vista general conserva su feedback. Carga y
+  error retiran identidad de compra, y un rechazo de intención restaura el valor
+  nativo autoritativo.
+- Evidencia final TASK-007: 1.572/1.572 pruebas Angular en 221 archivos, matriz
+  focal 18/18, Playwright 6/6 en 390/768/1.440 con cuatro ejes y etiquetas de 80
+  caracteres, teclado Tab/Space, Axe sin impactos serious/critical y sin
+  overflow. Lint, arquitectura, smoke de servicios y build productivo pasan.
+  GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico/seguridad aprobaron la cabeza
+  final sin P0–P3 pendientes. CI hosted permanece como gate independiente.
+- TASK-008 completada con editor ADMIN independiente, lectura OPERATOR,
+  borrador/base/remoto separados, CAS y diff/reaplicación explícita tras 409,
+  Clear confirmado, reconciliación de resultado incierto y operaciones cerradas
+  Keep/AddInactive/Activate/Deactivate. La vista no usa strings mágicos para las
+  fases ni operaciones.
+- Evidencia final TASK-008: build, lint, arquitectura 9/9, smoke 3/3, matriz
+  focal 12/12, suite Angular 1.584/1.584 en 224 archivos y Playwright/Axe 4/4 a
+  390/768/1.440 sin overflow ni impactos serious/critical. GPT-6.1 Sol técnico y
+  GPT-6.1 Astra UX/Product aprobaron sin P0–P3. El PR #293 y su CI hosted siguen
+  siendo gates independientes; no se declara merge.
+- TASK-009 completada con preflight streaming antes de materializar JSON. El
+  borde rechaza estructuras, propiedades, cardinalidades y strings fuera de
+  contrato, conserva el límite binario de 2 MiB y delega la traducción semántica
+  al dominio. Los límites probados son 4 ejes, 50 valores por eje, 1.000
+  operaciones de variante, 4.000 asignaciones y 4 valores por vector.
+- La matriz HTTP/PostgreSQL prueba el agregado máximo real mediante escritura y
+  lectura pública/administrativa: 1.000 variantes activas y 4.000 pares, con
+  vectores extremos exactos. El presupuesto observado fue un payload de 134.376
+  bytes, escritura de 1.634 ms, lista de 49 ms con 6 consultas y detalle de
+  40 ms con 5 consultas. También cubre duplicados inactivos, rechazo atómico al
+  activar combinaciones duplicadas o incompletas y activación posterior válida.
+- La regresión comercial demuestra `Absent → Replace → Clear` preservando
+  override de precio, atributos, orden, inventario, carrito y orden pagada. La
+  matriz focal terminó 28/28; la suite backend exact-head terminó 513 tests,
+  0 fallos, 0 errores y 7 omisiones correspondientes al interlock shell Linux
+  que se ejecuta en CI Ubuntu. GPT-6.1 Sol técnico y GPT-6.1 Astra UX/Product
+  aprobaron la cabeza corregida sin P0–P3. CI hosted y PR permanecen como gates
+  separados; no se declara merge.
+- TASK-010 completada con journeys browser deterministas de comprador y consola.
+  El producto simple `Absent` no muestra selector redundante, conserva cantidad
+  a través del acceso CUSTOMER y confirma exactamente un PUT de carrito con el
+  SKU/cantidad visibles. El escenario no cartesiano conserva el sufijo compatible,
+  retira SKU/precio/favorito/submit antiguos y prueba el tombstone en un documento
+  nuevo antes de permitir una intención explícita distinta.
+- El editor ADMIN prueba 409→GET remoto→elección→reaplicación explícita→segundo
+  PUT con revisión nueva; conserva el reordenamiento remoto independiente y la
+  etiqueta local elegida. La búsqueda transporta nombre, SKU secundario y
+  categoría en público/admin y demuestra que un SKU de variante inactiva sólo
+  aparece en consola.
+- Evidencia exacta TASK-010: 17/17 Playwright con cero retries; matriz 0/1/2/4
+  ejes a 390/768/1.440, overflow controlado y Axe sin impactos serious/critical.
+  ESLint focal, suite Angular 1.584/1.584 en 224 archivos y build productivo
+  pasan. GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico aprobaron el diff final
+  sin P0–P3. CI hosted y PR son gates separados.
+- TASK-011 completada sobre `82da298565266fa003231e027a32f243f22d24d4`.
+  La revisión acumulativa cerró las carreras de autoridad entre el editor general
+  y el editor de opciones: acuse y conflicto 409 bloquean de inmediato, cada
+  `Unknown` eleva el highwater, respuestas anteriores no rehabilitan escritura,
+  una lectura iniciada después del bloqueo puede recuperar la misma revisión y
+  el delta local de actividad bajo `Absent` se conserva por identidad.
+- Los rechazos intermedios quedaron preservados como evidencia: detectaron la
+  ventana post-PUT, listados tardíos, recuperación a igual revisión, highwater
+  interno y el requisito `expectedRevision + 1` del conflicto tipado. Astra y
+  Sol aprobaron el SHA final sin P0–P3. El gate local final pasó 1.595/1.595
+  pruebas Angular en 224 archivos, lint, arquitectura 9/9 y build productivo de
+  699,99 kB dentro del presupuesto.
+- TASK-012 completada. `OptionDraftRebase.inflate` dejó de escanear todos los
+  paths por cada variante y construye índices en una única pasada O(K). La
+  regresión cubre 1.000 variantes y cuatro ejes; Sol midió diez corridas en
+  Chromium entre 7,7 y 16,4 ms, frente a 713–758 ms antes del cambio, y aprobó
+  el corte sin P0–P3. Seguridad, CI, PR y post-merge siguen abiertos en
+  TASK-013/TASK-014; el feature permanece en `sdd/wip` y no se declara merge.
+- TASK-013 completada sobre `240a4ce7d6d5cfb499a2f60629ec8ff827f8add9`.
+  GPT-6.1 Sol revisó autorización ADMIN/OPERATOR, CSRF/origin, ownership, CAS y
+  replay, serialización explícita, `Unknown` fail-closed, labels/colores,
+  cardinalidad, exposición de datos, logging y secretos. Emitió `APPROVE` sin
+  P0–P3; `git diff --check 5cba1ec 240a4ce` quedó limpio y el barrido focal no
+  encontró credenciales hardcodeadas. TASK-014 permanece abierto y no se
+  declara CI, PR, merge ni post-merge hasta obtener evidencia independiente.
+- TASK-014 — evidencia parcial del PR correctivo: #296 se abrió desde
+  `fix/storecore-option-review-findings-20261117` hacia
+  `feat/storecore-option-browser-journeys-20261117`. El run pre-merge
+  `44116184857` aprobó `repository-hygiene`, `frontend`, `backend` y
+  `unified-access-real-e2e`. Tras autorización explícita, GitHub creó el merge
+  commit `05ea7521a4223abafc1d623b3ccd4467bcba1121`; el run post-merge
+  `44118012266` volvió a aprobar los cuatro jobs.
+- El PR apilado #295 permanece abierto, limpio y sin autorización de merge;
+  TASK-014 continúa abierta hasta completar su propio CI, merge y post-merge.

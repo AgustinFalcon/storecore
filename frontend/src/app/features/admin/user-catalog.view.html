@@ -46,6 +46,7 @@
           <th>Nombre</th>
           <th>Estado</th>
           <th>Efectivo</th>
+          <th>Opciones</th>
         </tr>
       </thead>
       <tbody>
@@ -59,6 +60,7 @@
               <span class="sc-badge">{{ product.status.label }}</span>
             </td>
             <td class="sc-price"><span class="sc-price__kind">Efectivo</span>{{ product.price?.effective }}</td>
+            <td><button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.loading" (click)="editOptions.emit(product.sku)">Configurar opciones</button></td>
           </tr>
         }
       </tbody>
@@ -87,11 +89,15 @@
             <input required [name]="'variantName-' + variantIndex" [ngModel]="variant.name" (ngModelChange)="patchVariant(variantIndex, { name: $event })" />
           </label>
           <label>Estado
-            <select [name]="'variantStatus-' + variantIndex" [ngModel]="variant.status.wire" (ngModelChange)="setVariantStatus(variantIndex, $event)">
+            <select [disabled]="!state.draft.optionSchemaState.allowsGeneric" [name]="'variantStatus-' + variantIndex" [ngModel]="variant.status.wire" (ngModelChange)="setVariantStatus(variantIndex, $event)">
               @if (!variant.status.canPersist) { <option [value]="variant.status.wire" disabled>{{ variant.status.label }}</option> }
               @for (status of variantStatuses; track status.wire) { <option [value]="status.wire">{{ status.label }}</option> }
             </select>
           </label>
+          @if (!state.draft.optionSchemaState.allowsGeneric) {
+            <p>La actividad de variantes con opciones se administra junto con sus combinaciones.</p>
+            <button type="button" class="sc-btn sc-btn--ghost" (click)="configureDraftOptions()">Configurar opciones y actividad</button>
+          }
           <p>{{ variant.availability.label }}</p>
           <p>Precio actual: {{ variant.pricePolicy.label }} @if (variant.basePriceOverride !== null) { · ARS {{ variant.basePriceOverride }} }</p>
           <label>Política de precio

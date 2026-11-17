@@ -30,8 +30,8 @@ import {
   mapFacet,
   mapInventory,
   mapPreview,
-  mapProductDetail,
-  mapProductDetails,
+  mapAdminProductDetail,
+  mapAdminProductDetails,
   mapUserSession,
 } from '../mappers/http-mappers';
 
@@ -87,7 +87,7 @@ export class UserHttpRepository implements IUserRepository {
     if (query.offersOnly) params = { ...params, offers: true };
     return this.http
       .get<unknown>(`${environment.apiBaseUrl}/user/catalog`, { params })
-      .pipe(map((body) => mapProductDetails(readApiBody<unknown>(body))));
+      .pipe(map((body) => mapAdminProductDetails(readApiBody<unknown>(body))));
   }
 
   saveProduct(product: CatalogProductDraft): Observable<ProductDetail> {
@@ -101,7 +101,7 @@ export class UserHttpRepository implements IUserRepository {
         })),
         productBasePrice: product.productBasePrice, status: product.status.wire,
       })
-      .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));
+      .pipe(map((body) => mapAdminProductDetail(readApiBody<unknown>(body))));
   }
 
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet> {
