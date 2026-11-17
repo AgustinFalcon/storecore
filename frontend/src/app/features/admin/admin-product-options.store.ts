@@ -28,11 +28,14 @@ export interface AdminProductOptionsState {
   readonly clearPending: boolean;
   readonly conflictOperation: OptionSchemaCommandOperation | null;
   readonly uncertainOperation: OptionSchemaCommandOperation | null;
+  readonly revisionHighwater: number;
+  readonly verificationUnknown: boolean;
 }
 
 const initialState: AdminProductOptionsState = {
   sku: '', canRead: false, canWrite: false, phase: OptionEditorPhase.Idle, message: '', base: null, draft: null,
   remote: null, conflicts: [], choices: new Map(), pendingSku: '', clearPending: false, conflictOperation: null, uncertainOperation: null,
+  revisionHighwater: 0, verificationUnknown: false,
 };
 
 export function verifiedOptionsSnapshot(state: Pick<AdminProductOptionsState, 'remote' | 'base'>): AdminProductOptionsSnapshot | null {
@@ -118,15 +121,16 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
   private load(sku: string): void {
     this.invalidate(); const generation = this.generation;
     this.patchState({ sku, pendingSku: '', phase: OptionEditorPhase.Loading, message: '', remote: null, conflicts: [], choices: new Map(), conflictOperation: null, uncertainOperation: null, clearPending: false,
+      revisionHighwater: 0, verificationUnknown: false,
       base: null, draft: null });
     this.request = this.manager.read(sku).subscribe({
       next: value => {
         if (!this.accepts(generation, sku)) return;
         if (value.schema.state === OptionSchemaState.Unknown) {
-          this.patchState({ base: value, draft: null, phase: OptionEditorPhase.Error, message: 'El servidor devolvió una configuración no verificable. Volvé a cargar antes de editar.' });
+          this.patchState({ base: value, draft: null, revisionHighwater: value.revision, verificationUnknown: true, phase: OptionEditorPhase.Error, message: 'El servidor devolvió una configuración no verificable. Volvé a cargar antes de editar.' });
           return;
         }
-        this.patchState({ base: value, draft: optionDraft(value), phase: OptionEditorPhase.Ready, message: '', uncertainOperation: null });
+        this.patchState({ base: value, draft: optionDraft(value), revisionHighwater: value.revision, verificationUnknown: false, phase: OptionEditorPhase.Ready, message: '', uncertainOperation: null });
       },
       error: error => { if (this.accepts(generation, sku)) this.patchState({ phase: OptionEditorPhase.Error, message: getApiErrorMessage(error) }); },
     });
@@ -143,9 +147,10 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     const generation = this.generation, sku = state.sku;
     this.patchState({ phase: OptionEditorPhase.Saving, message: '' });
     this.request = this.manager.write(sku, command).subscribe({
-      next: () => {
+      next: result => {
         if (!this.accepts(generation, sku)) return;
-        this.patchState({ phase: OptionEditorPhase.Loading, message: 'Guardado confirmado. Actualizando la configuración publicada…' });
+        this.patchState({ revisionHighwater: Math.max(this.snapshot.revisionHighwater, result.revision), verificationUnknown: true,
+          phase: OptionEditorPhase.Loading, message: 'Guardado confirmado. Actualizando la configuración publicada…' });
         this.readAfterWrite(generation, sku);
       },
       error: error => { if (this.accepts(generation, sku)) this.writeError(error, submittedDraft, operation); },
@@ -156,10 +161,11 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     this.request = this.manager.read(sku).subscribe({
       next: value => {
         if (!this.accepts(generation, sku)) return;
-        if (value.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote: value, phase: OptionEditorPhase.RefreshRequired, message: 'El guardado fue confirmado, pero la relectura no es verificable. Reintentá sólo la actualización.' }); return; }
-        this.patchState({ base: value, draft: optionDraft(value), remote: null, conflicts: [], choices: new Map(), conflictOperation: null, uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'Opciones publicadas y verificadas.' });
+        if (value.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote: value, verificationUnknown: true, phase: OptionEditorPhase.RefreshRequired, message: 'El guardado fue confirmado, pero la relectura no es verificable. Reintentá sólo la actualización.' }); return; }
+        this.patchState({ base: value, draft: optionDraft(value), remote: null, revisionHighwater: Math.max(this.snapshot.revisionHighwater, value.revision), verificationUnknown: false,
+          conflicts: [], choices: new Map(), conflictOperation: null, uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'Opciones publicadas y verificadas.' });
       },
-      error: () => { if (this.accepts(generation, sku)) this.patchState({ phase: OptionEditorPhase.RefreshRequired, message: 'El guardado fue confirmado, pero todavía no pudimos releerlo. Reintentá sólo la actualización.' }); },
+      error: () => { if (this.accepts(generation, sku)) this.patchState({ verificationUnknown: true, phase: OptionEditorPhase.RefreshRequired, message: 'El guardado fue confirmado, pero todavía no pudimos releerlo. Reintentá sólo la actualización.' }); },
     });
   }
 
@@ -178,7 +184,7 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
       return;
     }
     if (!(error instanceof HttpErrorResponse) || error.status === 0 || error.status >= 500) {
-      this.patchState({ phase: OptionEditorPhase.OutcomeUnknown, uncertainOperation: operation, message: 'No sabemos si el guardado llegó al servidor. Verificá la versión publicada; no se reenviará automáticamente.' }); return;
+      this.patchState({ verificationUnknown: true, phase: OptionEditorPhase.OutcomeUnknown, uncertainOperation: operation, message: 'No sabemos si el guardado llegó al servidor. Verificá la versión publicada; no se reenviará automáticamente.' }); return;
     }
     this.patchState({ canWrite: error.status === 403 ? false : state.canWrite, phase: OptionEditorPhase.Error, message: getApiErrorMessage(error) });
   }
@@ -190,9 +196,11 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     this.request = this.manager.read(sku).subscribe({
       next: remote => {
         if (!this.accepts(generation, sku)) return;
-        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, phase: OptionEditorPhase.OutcomeUnknown, message: 'La versión publicada todavía no es verificable. No se habilitó otra escritura.' }); return; }
-        if (remote.revision === baseRevision) this.patchState({ phase: OptionEditorPhase.Ready, uncertainOperation: null, message: 'La revisión no cambió. Conservamos tu borrador para que decidas si querés guardar nuevamente.' });
-        else if (operation === OptionSchemaCommandOperation.Clear && remote.schema.state === OptionSchemaState.Absent) this.patchState({ base: remote, draft: optionDraft(remote), uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'La lectura confirma que la configuración fue quitada.' });
+        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.OutcomeUnknown, message: 'La versión publicada todavía no es verificable. No se habilitó otra escritura.' }); return; }
+        if (remote.revision === baseRevision) this.patchState({ base: remote, remote: null, revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: false,
+          phase: OptionEditorPhase.Ready, uncertainOperation: null, message: 'La revisión no cambió. Conservamos tu borrador para que decidas si querés guardar nuevamente.' });
+        else if (operation === OptionSchemaCommandOperation.Clear && remote.schema.state === OptionSchemaState.Absent) this.patchState({ base: remote, draft: optionDraft(remote), remote: null,
+          revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: false, uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'La lectura confirma que la configuración fue quitada.' });
         else this.acceptRemoteConflict(remote, localDraft, operation);
       },
       error: error => { if (this.accepts(generation, sku)) this.patchState({ phase: OptionEditorPhase.OutcomeUnknown, message: getApiErrorMessage(error) }); },
@@ -205,8 +213,9 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     this.request = this.manager.read(sku).subscribe({
       next: remote => {
         if (!this.accepts(generation, sku)) return;
-        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, phase: OptionEditorPhase.RefreshRequired, message: 'El guardado está confirmado, pero la lectura continúa sin ser verificable.' }); return; }
-        this.patchState({ base: remote, draft: optionDraft(remote), remote: null, conflicts: [], choices: new Map(), conflictOperation: null, uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'Opciones publicadas y verificadas.' });
+        if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.RefreshRequired, message: 'El guardado está confirmado, pero la lectura continúa sin ser verificable.' }); return; }
+        this.patchState({ base: remote, draft: optionDraft(remote), remote: null, revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: false,
+          conflicts: [], choices: new Map(), conflictOperation: null, uncertainOperation: null, phase: OptionEditorPhase.Success, message: 'Opciones publicadas y verificadas.' });
       },
       error: error => { if (this.accepts(generation, sku)) this.patchState({ phase: OptionEditorPhase.RefreshRequired, message: getApiErrorMessage(error) }); },
     });
@@ -214,9 +223,10 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
 
   private acceptRemoteConflict(remote: AdminProductOptionsSnapshot, localDraft: AdminProductOptionsDraft, operation: OptionSchemaCommandOperation): void {
     const base = this.snapshot.base; if (!base) return;
-    if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, phase: OptionEditorPhase.ConflictReadRequired, message: 'Conservamos tu borrador, pero la versión publicada no es verificable.' }); return; }
+    if (remote.schema.state === OptionSchemaState.Unknown) { this.patchState({ remote, verificationUnknown: true, phase: OptionEditorPhase.ConflictReadRequired, message: 'Conservamos tu borrador, pero la versión publicada no es verificable.' }); return; }
     const conflicts = OptionDraftRebase.conflicts(optionDraft(base), localDraft, optionDraft(remote));
-    this.patchState({ remote, draft: localDraft, conflicts: operation === OptionSchemaCommandOperation.Clear ? [] : conflicts, choices: new Map(), conflictOperation: operation, phase: OptionEditorPhase.Conflict,
+    this.patchState({ remote, draft: localDraft, revisionHighwater: Math.max(this.snapshot.revisionHighwater, remote.revision), verificationUnknown: false,
+      conflicts: operation === OptionSchemaCommandOperation.Clear ? [] : conflicts, choices: new Map(), conflictOperation: operation, phase: OptionEditorPhase.Conflict,
       message: operation === OptionSchemaCommandOperation.Clear ? 'La configuración cambió antes de quitarla. Revisá el impacto actualizado y confirmá nuevamente.'
         : conflicts.length ? 'Revisá los cambios superpuestos. Los cambios independientes se conservarán al reaplicar.' : 'Hay cambios publicados independientes. Reaplicá y revisá antes de guardar.' });
   }

@@ -88,6 +88,22 @@ describe('AdminProductOptionsStore', () => {
     expect(store.snapshot.phase).toBe(OptionEditorPhase.OutcomeUnknown); expect(manager.write).toHaveBeenCalledTimes(1);
     store.refresh(); secondCheck.next(AdminProductOptionsMapper.fromWire({ revision: 2, state: 'ABSENT', cause: null, axes: [], assignments: [] }));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Success); expect(store.snapshot.base?.schema.state.wire).toBe('ABSENT'); expect(manager.write).toHaveBeenCalledTimes(1);
+    expect(verifiedOptionsSnapshot(store.snapshot)?.schema.state.wire).toBe('ABSENT');
+    store.ngOnDestroy();
+  });
+
+  it('clears an Unknown observation when reconciliation verifies the unchanged base revision', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), unknown = new Subject<ReturnType<typeof projection>>(), recovered = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(unknown).mockReturnValueOnce(recovered), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+    const store = new AdminProductOptionsStore(manager);
+    store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1)); store.save();
+    write.error(new HttpErrorResponse({ status: 0 })); store.refresh();
+    unknown.next(AdminProductOptionsMapper.fromWire({ revision: 1, state: 'FUTURE', axes: [], assignments: [] }));
+    expect(verifiedOptionsSnapshot(store.snapshot)?.schema.state.wire).toBe('UNKNOWN');
+    store.refresh(); recovered.next(projection(1));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.Ready);
+    expect(verifiedOptionsSnapshot(store.snapshot)?.schema.state.wire).toBe('VALID');
+    expect(store.snapshot.verificationUnknown).toBe(false);
     store.ngOnDestroy();
   });
 

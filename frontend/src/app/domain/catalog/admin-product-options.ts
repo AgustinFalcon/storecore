@@ -67,7 +67,16 @@ export interface OptionConflictEntry {
   readonly choice: ConflictResolutionChoice | null;
 }
 export interface ProductOptionsWriteResult { readonly revision: number; readonly state: OptionSchemaState; }
-export interface VerifiedProductOptionsSnapshot { readonly sku: string; readonly snapshot: AdminProductOptionsSnapshot; }
+export class ProductOptionsAuthorityObservation {
+  private constructor(readonly sku: string, readonly state: OptionSchemaState, readonly minimumRevision: number,
+    readonly snapshot: AdminProductOptionsSnapshot | null) { Object.freeze(this); }
+  static known(sku: string, snapshot: AdminProductOptionsSnapshot, minimumRevision = snapshot.revision): ProductOptionsAuthorityObservation {
+    return new ProductOptionsAuthorityObservation(sku, snapshot.schema.state, Math.max(minimumRevision, snapshot.revision), snapshot);
+  }
+  static unknown(sku: string, minimumRevision: number, snapshot: AdminProductOptionsSnapshot | null = null): ProductOptionsAuthorityObservation {
+    return new ProductOptionsAuthorityObservation(sku, OptionSchemaState.Unknown, minimumRevision, snapshot);
+  }
+}
 export interface ProductOptionsCommand {
   readonly expectedRevision: number;
   readonly operation: OptionSchemaCommandOperation;

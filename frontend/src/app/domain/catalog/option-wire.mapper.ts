@@ -125,7 +125,7 @@ export class NormalizeOptionSchemaStep {
 
 export class ValidateVariantAssignmentsStep {
   execute(schema: ProductOptionSchema, raw: readonly OptionVariantWire[]): readonly VariantOptionAssignment[] {
-    if (raw.length > 1000) throw new Error('Demasiadas variantes');
+    if (raw.length > 1000) throw new Error();
     const variants = raw.map(value => {
       const row = record(value);
       const variantId = string(field(row, 'id')), sku = string(field(row, 'sku'));
@@ -151,23 +151,23 @@ export class ValidateVariantAssignmentsStep {
 
 export class ValidateAdminVariantAssignmentsStep {
   execute(schema: ProductOptionSchema, raw: readonly AdminOptionVariantWire[]): readonly VariantOptionAssignment[] {
-    if (raw.length > 1000) throw new Error('Demasiadas variantes');
+    if (raw.length > 1000) throw new Error();
     const parsed = raw.map(value => {
       const row = record(value), active = field(row, 'active');
-      if (typeof active !== 'boolean') throw new Error('Actividad inválida');
+      if (typeof active !== 'boolean') throw new Error();
       const variantId = string(field(row, 'id')), sku = string(field(row, 'sku'));
-      if (!variantId.trim() || !sku.trim()) throw new Error('Identidad vacía');
+      if (!variantId.trim() || !sku.trim()) throw new Error();
       const values = new Map<string, string>(), supplied = field(row, 'optionValues');
       if (supplied != null) {
         const entries = Object.entries(record(supplied));
-        if (entries.length > 4) throw new Error('Demasiadas asignaciones');
+        if (entries.length > 4) throw new Error();
         for (const [axis, rawValue] of entries) values.set(OptionCode.create(axis).value, OptionCode.create(string(rawValue)).value);
       }
-      if (schema.state === OptionSchemaState.Absent && values.size !== 0) throw new Error('Asignaciones sin schema');
+      if (schema.state === OptionSchemaState.Absent && values.size !== 0) throw new Error();
       const valuesValid = [...values].every(([axisCode, valueCode]) => schema.axes.some(axis => axis.code.value === axisCode
         && axis.values.some(option => option.code.value === valueCode)));
       if (schema.state === OptionSchemaState.Valid && (!valuesValid || active && (values.size !== schema.axes.length
-        || schema.axes.some(axis => !values.has(axis.code.value))))) throw new Error('Asignación administrativa inválida');
+        || schema.axes.some(axis => !values.has(axis.code.value))))) throw new Error();
       return { active, assignment: Object.freeze({ variantId, sku, values: new DomainReadonlyMap(values) }) };
     });
     unique(parsed, row => row.assignment.variantId); unique(parsed, row => row.assignment.sku);

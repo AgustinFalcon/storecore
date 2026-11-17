@@ -4,9 +4,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { UserSession } from '../../core/auth/user-session';
 import {
-  AdminProductOptionsDraft, ConflictResolutionChoice, OptionAssignmentDraft, OptionAxisDraft, OptionSchemaCommandOperation, OptionValueDraft, VerifiedProductOptionsSnapshot, optionAssignmentValue,
+  AdminProductOptionsDraft, ConflictResolutionChoice, OptionAssignmentDraft, OptionAxisDraft, OptionSchemaCommandOperation, OptionValueDraft, ProductOptionsAuthorityObservation, optionAssignmentValue,
 } from '../../domain/catalog/admin-product-options';
-import { DomainReadonlyMap, OptionPresentation } from '../../domain/catalog/option-schema';
+import { DomainReadonlyMap, OptionPresentation, OptionSchemaState } from '../../domain/catalog/option-schema';
 import { AdminProductOptionsStore, verifiedOptionsSnapshot } from './admin-product-options.store';
 import { distinctUntilChanged, filter, map } from 'rxjs';
 
@@ -31,7 +31,7 @@ export class AdminProductOptionsComponent {
   readonly assignmentQuery = signal('');
   readonly assignmentPage = signal(0);
   readonly assignmentPageSize = 25;
-  @Output() readonly verifiedSnapshot = new EventEmitter<VerifiedProductOptionsSnapshot>();
+  @Output() readonly verifiedSnapshot = new EventEmitter<ProductOptionsAuthorityObservation>();
 
   @Input({ required: true }) set sku(value: string) {
     if (value !== this.requestedSku) this.resetAssignmentNavigation();
@@ -47,11 +47,14 @@ export class AdminProductOptionsComponent {
     this.store.state$.pipe(
       map(state => {
         const snapshot = verifiedOptionsSnapshot(state);
-        return state.sku && snapshot ? { sku: state.sku, snapshot } : null;
+        if (!state.sku) return null;
+        if (state.verificationUnknown) return ProductOptionsAuthorityObservation.unknown(state.sku, state.revisionHighwater,
+          snapshot?.schema.state === OptionSchemaState.Unknown ? snapshot : null);
+        return snapshot ? ProductOptionsAuthorityObservation.known(state.sku, snapshot, state.revisionHighwater) : null;
       }),
-      filter((value): value is VerifiedProductOptionsSnapshot => value !== null),
-      distinctUntilChanged((left, right) => left.sku === right.sku && left.snapshot.revision === right.snapshot.revision
-        && left.snapshot.schema.state === right.snapshot.schema.state),
+      filter((value): value is ProductOptionsAuthorityObservation => value !== null),
+      distinctUntilChanged((left, right) => left.sku === right.sku && left.state === right.state && left.minimumRevision === right.minimumRevision
+        && left.snapshot?.revision === right.snapshot?.revision),
       takeUntilDestroyed(),
     ).subscribe(value => this.verifiedSnapshot.emit(value));
   }

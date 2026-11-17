@@ -9,7 +9,7 @@ import { UserCatalogViewComponent } from './user-catalog.view';
 import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
 import { emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { VariantStatus } from '../../domain/catalog/catalog-states';
-import { AdminProductOptionsMapper } from '../../domain/catalog/admin-product-options';
+import { AdminProductOptionsMapper, ProductOptionsAuthorityObservation } from '../../domain/catalog/admin-product-options';
 import { OptionSchemaState } from '../../domain/catalog/option-schema';
 
 describe('bounded administrative catalog', () => {
@@ -82,27 +82,27 @@ describe('bounded administrative catalog', () => {
     const products = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Original', status: 'ACTIVE', productBasePrice: 10,
       optionSchema: { revision: 1, state: 'ABSENT', cause: null, axes: [] },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false });
-    const product = products[0], lateList = new Subject<typeof products>(), newerList = new Subject<typeof products>();
-    const list = vi.fn().mockReturnValueOnce(of(products)).mockReturnValueOnce(lateList).mockReturnValueOnce(newerList);
+    const product = products[0], lateList = new Subject<typeof products>(), newerList = new Subject<typeof products>(), oldAfterUnknown = new Subject<typeof products>();
+    const list = vi.fn().mockReturnValueOnce(of(products)).mockReturnValueOnce(lateList).mockReturnValueOnce(newerList).mockReturnValueOnce(oldAfterUnknown);
     const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor({ id: 'actor', roles: [UserRole.Admin] }); store.load(); store.beginEdit(product);
     store.setDraft({ ...store.snapshot.draft, name: 'Edición sin publicar', variants: [{ ...store.snapshot.draft.variants[0], status: VariantStatus.Inactive },
       { ...newCatalogProductDraft().variants[0], sku: 'NEW', name: 'Nueva', status: VariantStatus.Active }] });
     const unchangedAbsent = AdminProductOptionsMapper.fromWire({ revision: 1, state: 'ABSENT', cause: null, axes: [],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: unchangedAbsent });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', unchangedAbsent));
     expect(store.snapshot.draft.variants.map(variant => variant.status)).toEqual([VariantStatus.Inactive, VariantStatus.Active]);
     const independentRemote = AdminProductOptionsMapper.fromWire({ revision: 2, state: 'ABSENT', cause: null, axes: [],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} },
         { variantId: 'remote-b', variantSku: 'REMOTE-B', active: false, optionValues: {} }] });
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: independentRemote });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', independentRemote));
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
     expect(store.snapshot.draft.variantPublishedStatuses.get('remote-b')).toBe(VariantStatus.Inactive);
     store.load();
     const valid = AdminProductOptionsMapper.fromWire({ revision: 3, state: 'VALID', cause: null,
       axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: valid });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', valid));
     expect(store.snapshot.draft.name).toBe('Edición sin publicar');
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Valid);
     expect(store.snapshot.draft.variants.map(variant => variant.status)).toEqual([VariantStatus.Inactive, VariantStatus.Inactive]);
@@ -113,7 +113,7 @@ describe('bounded administrative catalog', () => {
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
     const absent = AdminProductOptionsMapper.fromWire({ revision: 4, state: 'ABSENT', cause: null, axes: [],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: absent });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', absent));
     expect(store.snapshot.draft.name).toBe('Edición sin publicar');
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Absent);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
@@ -126,12 +126,21 @@ describe('bounded administrative catalog', () => {
     expect(store.snapshot.products[0].variants[0].status).toBe(VariantStatus.Active);
     expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Active);
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: unchangedAbsent });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', unchangedAbsent));
     expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Active);
     const unknown = AdminProductOptionsMapper.fromWire({ revision: 99, state: 'FUTURE', axes: [], assignments: [] });
-    store.syncOptionSnapshot({ sku: 'SKU', snapshot: unknown });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.unknown('SKU', 5, unknown));
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Unknown);
+    store.load(); oldAfterUnknown.next(products); oldAfterUnknown.complete();
+    expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Unknown);
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Unknown);
+    expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
+    const recovered = AdminProductOptionsMapper.fromWire({ revision: 6, state: 'ABSENT', cause: null, axes: [],
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
+    store.syncOptionSnapshot(ProductOptionsAuthorityObservation.known('SKU', recovered));
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Absent);
+    expect(store.snapshot.draft.optionSchemaRevision).toBe(6);
     store.ngOnDestroy();
   });
 
