@@ -5,7 +5,7 @@ import { AdminProductOptionsMapper, OptionEditorPhase } from '../../domain/catal
 import { ProductOptionsWriteResult } from '../../domain/catalog/admin-product-options';
 import { ManageProductOptionsUseCase } from '../../domain/catalog/product-options.repository';
 import { UserRole } from '../../domain/user/user-role';
-import { AdminProductOptionsStore } from './admin-product-options.store';
+import { AdminProductOptionsStore, verifiedOptionsSnapshot } from './admin-product-options.store';
 
 const projection = (revision: number, label = 'Color') => AdminProductOptionsMapper.fromWire({ revision, state: 'VALID', cause: null,
   axes: [{ code: 'color', label, presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }],
@@ -22,6 +22,7 @@ describe('AdminProductOptionsStore', () => {
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Conflict);
     expect(store.snapshot.base?.revision).toBe(1); expect(store.snapshot.remote?.revision).toBe(2);
     expect(store.snapshot.draft?.axes[0].label).toBe('Color local'); expect(manager.write).toHaveBeenCalledTimes(1); expect(manager.read).toHaveBeenCalledTimes(2);
+    expect(verifiedOptionsSnapshot(store.snapshot)?.revision).toBe(2);
     store.ngOnDestroy();
   });
 
@@ -59,6 +60,21 @@ describe('AdminProductOptionsStore', () => {
     expect(manager.read).toHaveBeenCalledTimes(2);
     afterWrite.next(projection(2));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Success);
+    store.ngOnDestroy();
+  });
+
+  it('detects and preserves a Map-only assignment edit until it is reverted explicitly', () => {
+    const initial = new Subject<ReturnType<typeof projection>>(), reload = new Subject<ReturnType<typeof projection>>();
+    const manager = { read: vi.fn().mockReturnValueOnce(initial).mockReturnValueOnce(reload), write: vi.fn() } as unknown as ManageProductOptionsUseCase;
+    const store = new AdminProductOptionsStore(manager);
+    store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); initial.next(projection(1));
+    const base = store.snapshot.draft!;
+    store.setDraft({ ...base, assignments: [{ ...base.assignments[0], optionValues: new Map([['color', 'blue']]) }] });
+    store.refresh();
+    expect(store.snapshot.pendingSku).toBe('PRODUCT');
+    expect(manager.read).toHaveBeenCalledTimes(1);
+    store.setDraft(base); store.keepCurrent(); store.refresh();
+    expect(manager.read).toHaveBeenCalledTimes(2);
     store.ngOnDestroy();
   });
 

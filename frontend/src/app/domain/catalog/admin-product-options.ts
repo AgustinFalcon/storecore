@@ -216,6 +216,10 @@ function flatten(draft: AdminProductOptionsDraft): Map<string, FlatValue> {
     result.set(`${root}/sku`, row.sku); result.set(`${root}/label`, row.label); }
   return result;
 }
+export function optionDraftEquals(left: AdminProductOptionsDraft, right: AdminProductOptionsDraft): boolean {
+  const leftFlat = flatten(left), rightFlat = flatten(right);
+  return leftFlat.size === rightFlat.size && [...leftFlat].every(([path, value]) => Object.is(value, rightFlat.get(path)));
+}
 function display(value: FlatValue | undefined): string { return value === undefined ? '—' : String(value); }
 function pathLabel(path: string): string {
   const parts = path.split('/').map(decodeURIComponent), property = parts.at(-1);

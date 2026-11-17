@@ -15,7 +15,8 @@ import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-ca
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import { DomainReadonlyMap } from '../../domain/catalog/option-schema';
-import { VerifiedProductOptionsSnapshot } from '../../domain/catalog/admin-product-options';
+import { AdminProductOptionsSnapshot, VerifiedProductOptionsSnapshot } from '../../domain/catalog/admin-product-options';
+import { VariantStatus } from '../../domain/catalog/catalog-states';
 
 export interface AdminCatalogState {
   readonly loading: boolean;
@@ -37,6 +38,7 @@ const emptyFacet: CatalogFacet = { id: '', name: '' };
 export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   private actorKey: string | null = null;
   private generation = 0;
+  private readonly verifiedOptionsBySku = new Map<string, AdminProductOptionsSnapshot>();
   private readonly actorChanged = new Subject<void>();
 
   setActor(principal: UserSessionResult | null): boolean {
@@ -44,6 +46,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map(role => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
     this.actorKey = actorKey; this.generation++; this.actorChanged.next();
+    this.verifiedOptionsBySku.clear();
     this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: newCatalogProductDraft(), brandDraft: emptyFacet, categoryDraft: emptyFacet, query: emptyCatalogQuery, queryDirty: false });
     return true;
   }
@@ -93,13 +96,11 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
   readonly syncOptionSnapshot = this.updater((s, verified: VerifiedProductOptionsSnapshot) => {
-    const optionSnapshot = Object.freeze({ schema: verified.snapshot.schema, variants: Object.freeze(verified.snapshot.assignments.map(assignment => Object.freeze({
-      variantId: assignment.variantId, sku: assignment.variantSku, values: new DomainReadonlyMap(assignment.optionValues),
-    }))) });
+    this.verifiedOptionsBySku.set(verified.sku, verified.snapshot);
     return {
       ...s,
-      products: s.products.map(product => product.sku === verified.sku ? { ...product, optionSnapshot } : product),
-      draft: s.draft.sku === verified.sku ? { ...s.draft, optionSchemaState: verified.snapshot.schema.state } : s.draft,
+      products: s.products.map(product => product.sku === verified.sku ? this.withVerifiedOptions(product, verified.snapshot) : product),
+      draft: s.draft.sku === verified.sku ? this.withVerifiedDraft(s.draft, verified.snapshot) : s.draft,
     };
   });
   readonly setEditError = this.updater((s, errorMessage: string) => ({ ...s, errorMessage }));
@@ -128,7 +129,10 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       }),
       takeUntil(this.actorChanged),
       tapResponse({
-        next: products => { if (generation === this.generation) this.patchState({ products, list: products.metadata, loading: false }); },
+        next: products => { if (generation === this.generation) this.patchState({ products: products.map(product => {
+          const verified = this.verifiedOptionsBySku.get(product.sku);
+          return verified ? this.withVerifiedOptions(product, verified) : product;
+        }), list: products.metadata, loading: false }); },
         error: (error: unknown) => { if (generation === this.generation) this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }); },
       }),
     );
@@ -199,6 +203,26 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const draft = this.snapshot.draft;
     return isArsAmount(draft.productBasePrice) && draft.variants.every(variant => variant.priceCommand.known
       && (!variant.priceCommand.requiresBase || isArsAmount(variant.priceInput)));
+  }
+
+  private withVerifiedOptions(product: ProductDetail, snapshot: AdminProductOptionsSnapshot): ProductDetail {
+    const activity = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active]));
+    const optionSnapshot = Object.freeze({ schema: snapshot.schema, variants: Object.freeze(snapshot.assignments.map(assignment => Object.freeze({
+      variantId: assignment.variantId, sku: assignment.variantSku, values: new DomainReadonlyMap(assignment.optionValues),
+    }))) });
+    return { ...product, optionSnapshot, variants: product.variants.map(variant => {
+      const active = activity.get(variant.id);
+      return active === undefined ? variant : { ...variant, status: active ? VariantStatus.Active : VariantStatus.Inactive };
+    }) };
+  }
+
+  private withVerifiedDraft(draft: CatalogProductDraft, snapshot: AdminProductOptionsSnapshot): CatalogProductDraft {
+    const activity = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active]));
+    return { ...draft, optionSchemaState: snapshot.schema.state, variants: draft.variants.map(variant => {
+      if (!variant.id) return snapshot.schema.state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
+      const active = activity.get(variant.id);
+      return active === undefined ? variant : { ...variant, status: active ? VariantStatus.Active : VariantStatus.Inactive };
+    }) };
   }
 
   readonly persistBrand = this.effect<void>((trigger$) =>

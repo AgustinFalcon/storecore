@@ -81,22 +81,31 @@ describe('bounded administrative catalog', () => {
   it('synchronizes verified option transitions without discarding the open product draft', () => {
     const products = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Original', status: 'ACTIVE', productBasePrice: 10,
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false });
-    const product = products[0];
-    const store = new AdminCatalogStore({ list: () => of(products) } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
+    const product = products[0], lateList = new Subject<typeof products>();
+    const list = vi.fn().mockReturnValueOnce(of(products)).mockReturnValueOnce(lateList);
+    const store = new AdminCatalogStore({ list } as unknown as ManageAdminCatalogUseCase, {} as ListCatalogFacetsUseCase);
     store.setActor({ id: 'actor', roles: [UserRole.Admin] }); store.load(); store.beginEdit(product);
-    store.setDraft({ ...store.snapshot.draft, name: 'Edición sin publicar' });
+    store.setDraft({ ...store.snapshot.draft, name: 'Edición sin publicar', variants: [...store.snapshot.draft.variants,
+      { ...newCatalogProductDraft().variants[0], sku: 'NEW', name: 'Nueva', status: VariantStatus.Active }] });
+    store.load();
     const valid = AdminProductOptionsMapper.fromWire({ revision: 2, state: 'VALID', cause: null,
       axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }],
-      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: { color: 'red' } }] });
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: valid });
     expect(store.snapshot.draft.name).toBe('Edición sin publicar');
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Valid);
+    expect(store.snapshot.draft.variants.map(variant => variant.status)).toEqual([VariantStatus.Inactive, VariantStatus.Inactive]);
+    expect(store.snapshot.products).toHaveLength(0);
+    lateList.next(products); lateList.complete();
+    expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
+    expect(store.snapshot.products[0].variants[0].status).toBe(VariantStatus.Inactive);
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
     const absent = AdminProductOptionsMapper.fromWire({ revision: 3, state: 'ABSENT', cause: null, axes: [],
-      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: absent });
     expect(store.snapshot.draft.name).toBe('Edición sin publicar');
     expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Absent);
+    expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Absent);
     store.ngOnDestroy();
   });

@@ -7,7 +7,7 @@ import {
   AdminProductOptionsDraft, ConflictResolutionChoice, OptionAssignmentDraft, OptionAxisDraft, OptionSchemaCommandOperation, OptionValueDraft, VerifiedProductOptionsSnapshot, optionAssignmentValue,
 } from '../../domain/catalog/admin-product-options';
 import { DomainReadonlyMap, OptionPresentation } from '../../domain/catalog/option-schema';
-import { AdminProductOptionsStore } from './admin-product-options.store';
+import { AdminProductOptionsStore, verifiedOptionsSnapshot } from './admin-product-options.store';
 import { distinctUntilChanged, filter, map } from 'rxjs';
 
 @Component({
@@ -45,7 +45,10 @@ export class AdminProductOptionsComponent {
       if (changed && this.requestedSku) this.store.open(this.requestedSku, true);
     });
     this.store.state$.pipe(
-      map(state => state.sku && state.base ? { sku: state.sku, snapshot: state.base } : null),
+      map(state => {
+        const snapshot = verifiedOptionsSnapshot(state);
+        return state.sku && snapshot ? { sku: state.sku, snapshot } : null;
+      }),
       filter((value): value is VerifiedProductOptionsSnapshot => value !== null),
       distinctUntilChanged((left, right) => left.sku === right.sku && left.snapshot.revision === right.snapshot.revision
         && left.snapshot.schema.state === right.snapshot.schema.state),

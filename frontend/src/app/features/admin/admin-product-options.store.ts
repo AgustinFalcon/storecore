@@ -6,7 +6,7 @@ import { ApiErrorCode } from '../../core/api/api-error-code';
 import { getApiErrorCode, getApiErrorMessage } from '../../core/api/http-error.util';
 import {
   AdminProductOptionsDraft, AdminProductOptionsSnapshot, ConflictResolutionChoice, OptionConflictEntry,
-  OptionDraftRebase, OptionEditorPhase, OptionSchemaCommandOperation, optionCommand, optionDraft, validateOptionDraft,
+  OptionDraftRebase, OptionEditorPhase, OptionSchemaCommandOperation, optionCommand, optionDraft, optionDraftEquals, validateOptionDraft,
 } from '../../domain/catalog/admin-product-options';
 import { OptionSchemaState } from '../../domain/catalog/option-schema';
 import { ManageProductOptionsUseCase } from '../../domain/catalog/product-options.repository';
@@ -34,6 +34,10 @@ const initialState: AdminProductOptionsState = {
   sku: '', canRead: false, canWrite: false, phase: OptionEditorPhase.Idle, message: '', base: null, draft: null,
   remote: null, conflicts: [], choices: new Map(), pendingSku: '', clearPending: false, conflictOperation: null, uncertainOperation: null,
 };
+
+export function verifiedOptionsSnapshot(state: Pick<AdminProductOptionsState, 'remote' | 'base'>): AdminProductOptionsSnapshot | null {
+  return state.remote ?? state.base;
+}
 
 @Injectable()
 export class AdminProductOptionsStore extends ComponentStore<AdminProductOptionsState> implements OnDestroy {
@@ -227,7 +231,7 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
     });
   }
 
-  private isDirty(): boolean { const state = this.snapshot; return !!state.base && !!state.draft && JSON.stringify(optionDraft(state.base)) !== JSON.stringify(state.draft); }
+  private isDirty(): boolean { const state = this.snapshot; return !!state.base && !!state.draft && !optionDraftEquals(optionDraft(state.base), state.draft); }
   private accepts(generation: number, sku: string): boolean { return !!this.actorKey && generation === this.generation && sku === this.snapshot.sku; }
   private invalidate(): void { this.generation++; this.request?.unsubscribe(); this.request = undefined; }
   override ngOnDestroy(): void { this.invalidate(); super.ngOnDestroy(); }
