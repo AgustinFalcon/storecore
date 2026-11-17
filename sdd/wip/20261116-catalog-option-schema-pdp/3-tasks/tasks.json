@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 4, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 5, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -32,7 +32,7 @@
       "references": ["Technical: Proyección pública y wire"], "design_decisions": ["DD-fail-closed-projection"]
     },
     {
-      "id": "TASK-005", "title": "Add public and admin catalog search", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-004"],
+      "id": "TASK-005", "title": "Add public and admin catalog search", "status": "done", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-004"],
       "description": "Wire normalized literal search through both controllers, services, readers and Angular stores for name, case-insensitive SKU and nullable category.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "frontend/src/app", "backend/src/test"],
       "acceptance_criteria": ["AC-1: items and count share authorization/predicate", "AC-2: public excludes inactive while admin keeps its authorized visibility", "GATE: two-page search tests pass"],

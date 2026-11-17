@@ -236,8 +236,11 @@ lo transportan explícitamente. La cláusula queda:
 `lower(product.name) LIKE ? OR lower(authorized_variant.sku) LIKE ? OR
 lower(category.name) LIKE ?`.
 
-El query se normaliza/limita antes de SQL, usa parámetros y escapa comodines con
-semántica literal. Items y count reutilizan el mismo predicado `EXISTS`/joins,
+El query se normaliza NFKC, recorta extremos y colapsa whitespace; admite hasta
+120 code points normalizados con un techo de transporte de 2.048. Controles no
+whitespace y excesos se rechazan con `CATALOG_QUERY_INVALID`, nunca se truncan.
+Antes de SQL se escapan `!`, `%` y `_`, se usa `ESCAPE '!'` y el case-fold se
+evalúa en PostgreSQL sobre ambos operandos. Items y count reutilizan el mismo predicado `EXISTS`/joins,
 incluida categoría nullable, sin alias ausentes. Público aplica producto ACTIVE y
 variante ACTIVE; SKU se compara case-insensitive. Admin conserva su visibilidad
 actual e incluye SKU inactivo sólo

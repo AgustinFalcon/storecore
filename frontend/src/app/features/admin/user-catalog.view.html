@@ -7,8 +7,8 @@
   <sc-feature-status
     [loading]="state.loading"
     [error]="state.errorMessage"
-    [empty]="!state.loading && state.products.length === 0"
-    emptyText="No hay productos en esta instalación."
+    [empty]="!state.loading && !state.queryDirty && state.products.length === 0"
+    emptyText="No hay productos para estos filtros."
     (retry)="retry.emit()"
   />
 
@@ -16,6 +16,26 @@
     <div class="sc-workbench__main">
       <h2>Productos</h2>
       <button type="button" class="sc-btn sc-btn--primary" [disabled]="state.loading" (click)="createProduct.emit()">Nuevo producto</button>
+      <form class="sc-panel sc-panel--grid" aria-label="Buscar productos" (submit)="$event.preventDefault(); searchSubmit.emit()">
+        <label>Buscar por nombre, SKU o categoría
+          <input name="catalogQuery" maxlength="120" [disabled]="state.loading" [ngModel]="state.query.query" (ngModelChange)="patchQuery({ query: $event })" />
+        </label>
+        <label>Marca
+          <select name="catalogBrand" [disabled]="state.loading" [ngModel]="state.query.brand" (ngModelChange)="patchQuery({ brand: $event })">
+            <option value="">Todas</option>
+            @for (brand of state.brands; track brand.id) { <option [value]="brand.id">{{ brand.name }}</option> }
+          </select>
+        </label>
+        <label>Categoría
+          <select name="catalogCategory" [disabled]="state.loading" [ngModel]="state.query.category" (ngModelChange)="patchQuery({ category: $event })">
+            <option value="">Todas</option>
+            @for (category of state.categories; track category.id) { <option [value]="category.id">{{ category.name }}</option> }
+          </select>
+        </label>
+        <label><input type="checkbox" name="catalogOffers" [disabled]="state.loading" [ngModel]="state.query.offersOnly" (ngModelChange)="patchQuery({ offersOnly: $event })" /> Sólo con oferta activa</label>
+        <button type="submit" class="sc-btn sc-btn--primary" [disabled]="state.loading">Buscar</button>
+      </form>
+      @if (state.queryDirty) { <p role="status">Aplicá Buscar para consultar estos filtros.</p> }
       @if (state.list) { <p role="status">{{ state.products.length }} en esta página de {{ state.list.total }} productos. @if (state.list.truncated) { Lectura parcial; hay más productos. }</p> }
   @if (state.products.length) {
     <div class="sc-table-wrap">

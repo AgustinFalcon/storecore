@@ -1,6 +1,7 @@
 import { BoundedPageRequest } from '../catalog/bounded-page';
 import { CapabilityStateIntent } from './capability-state-intent';
 import { BoundedRows } from '../catalog/bounded-rows';
+import { CatalogQuery } from '../catalog/catalog-query.entity';
 import { CreateManualPromo, PolicyTransition } from './channel-pricing';
 import { Observable } from 'rxjs';
 import { CatalogFacet } from '../catalog/catalog-facet.entity';
@@ -26,7 +27,7 @@ export interface IUserRepository {
   listPromos(page?: number): Observable<BoundedRows<ManualPromo>>;
   savePromo(promo: CreateManualPromo): Observable<ManualPromo>;
   transitionPromo(id: string, transition: PolicyTransition): Observable<ManualPromo>;
-  listCatalog(page?: BoundedPageRequest): Observable<BoundedRows<ProductDetail>>;
+  listCatalog(query?: CatalogQuery): Observable<BoundedRows<ProductDetail>>;
   saveProduct(product: CatalogProductDraft): Observable<ProductDetail>;
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet>;
   saveCategory(facet: CatalogFacet): Observable<CatalogFacet>;

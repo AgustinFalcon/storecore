@@ -8,6 +8,7 @@ import { AdminCatalogState } from './admin-catalog.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
 import { parseArsAmountInput, VariantPriceCommand } from '../../domain/catalog/variant-price';
+import { CatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 @Component({
   selector: 'sc-user-catalog-view',
@@ -53,6 +54,12 @@ export class UserCatalogViewComponent {
   @Output() readonly pageChange = new EventEmitter<number>();
   @Output() readonly retry = new EventEmitter<void>();
   @Output() readonly editError = new EventEmitter<string>();
+  @Output() readonly queryChange = new EventEmitter<CatalogQuery>();
+  @Output() readonly searchSubmit = new EventEmitter<void>();
+
+  patchQuery(partial: Partial<CatalogQuery>): void {
+    this.queryChange.emit({ ...this.state.query, ...partial });
+  }
 
   get imagesText(): string {
     return this.state.draft.images.join('\n');

@@ -13,6 +13,7 @@ import { CatalogProductDraft, catalogProductDraftFromDetail, newCatalogProductDr
 import { isArsAmount } from '../../domain/catalog/variant-price';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
+import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 export interface AdminCatalogState {
   readonly loading: boolean;
@@ -24,6 +25,8 @@ export interface AdminCatalogState {
   readonly draft: CatalogProductDraft;
   readonly brandDraft: CatalogFacet;
   readonly categoryDraft: CatalogFacet;
+  readonly query: CatalogQuery;
+  readonly queryDirty: boolean;
 }
 
 const emptyFacet: CatalogFacet = { id: '', name: '' };
@@ -32,15 +35,14 @@ const emptyFacet: CatalogFacet = { id: '', name: '' };
 export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   private actorKey: string | null = null;
   private generation = 0;
-  private page = BoundedPageRequest.first();
   private readonly actorChanged = new Subject<void>();
 
   setActor(principal: UserSessionResult | null): boolean {
     const roles = principal?.roles.filter(role => role === UserRole.Admin || role === UserRole.Operator) ?? [];
     const actorKey = principal?.id.trim() && roles.length ? JSON.stringify([principal.id, roles.map(role => role.wire).sort()]) : null;
     if (actorKey === this.actorKey) return false;
-    this.actorKey = actorKey; this.generation++; this.actorChanged.next(); this.page = BoundedPageRequest.first();
-    this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: newCatalogProductDraft(), brandDraft: emptyFacet, categoryDraft: emptyFacet });
+    this.actorKey = actorKey; this.generation++; this.actorChanged.next();
+    this.patchState({ loading: false, errorMessage: '', products: [], list: null, brands: [], categories: [], draft: newCatalogProductDraft(), brandDraft: emptyFacet, categoryDraft: emptyFacet, query: emptyCatalogQuery, queryDirty: false });
     return true;
   }
 
@@ -48,7 +50,7 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     if (this.snapshot.loading || !this.snapshot.list) return;
     const navigation = boundedPageNavigation(this.snapshot.list);
     if (page !== navigation.page - 1 && page !== navigation.page + 1 || page < 0 || page >= navigation.totalPages) return;
-    this.page = BoundedPageRequest.at(page); this.load();
+    this.patchState({ query: { ...this.snapshot.query, pagination: BoundedPageRequest.at(page, this.snapshot.query.pagination.size) } }); this.load();
   }
 
   constructor(
@@ -64,6 +66,8 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
       draft: newCatalogProductDraft(),
       brandDraft: emptyFacet,
       categoryDraft: emptyFacet,
+      query: emptyCatalogQuery,
+      queryDirty: false,
     });
   }
 
@@ -78,6 +82,11 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly categories$ = this.select((s) => s.categories);
   readonly empty$ = this.select((s) => !s.loading && s.products.length === 0);
 
+  setQuery(query: CatalogQuery): void {
+    this.generation++;
+    this.patchState({ query: { ...query, pagination: BoundedPageRequest.first(query.pagination.size) }, products: [], list: null, loading: false, queryDirty: true, errorMessage: '' });
+  }
+
   readonly setDraft = this.updater((s, draft: CatalogProductDraft) => s.loading ? s : ({ ...s, draft }));
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
@@ -88,14 +97,16 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly load = this.effect<void>(trigger$ => trigger$.pipe(switchMap(() => {
     if (!this.actorKey) return EMPTY;
     const generation = ++this.generation;
-    const requested = this.page;
-    this.patchState({ loading: true, errorMessage: '', products: [] });
+    const requested = this.snapshot.query;
+    this.patchState({ loading: true, errorMessage: '', products: [], queryDirty: false });
     return this.catalog.list(requested).pipe(
       switchMap(products => {
+        if (generation !== this.generation) return EMPTY;
         const recovery = boundedPageNavigation(products.metadata).recoveryPage;
         if (!products.length && recovery !== null) {
-          this.page = BoundedPageRequest.at(recovery, requested.size);
-          return this.catalog.list(this.page).pipe(
+          const recovered = { ...requested, pagination: BoundedPageRequest.at(recovery, requested.pagination.size) };
+          this.patchState({ query: recovered });
+          return this.catalog.list(recovered).pipe(
             switchMap(retried => !retried.length && boundedPageNavigation(retried.metadata).recoveryPage !== null
               ? throwError(() => new Error('La lista cambió nuevamente. Volvé a intentar.'))
               : of(retried)),

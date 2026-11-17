@@ -17,6 +17,8 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.net.URI
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
 
@@ -92,8 +94,44 @@ class CatalogProjectionHttpIntegrationTest(
         val complete=data(get("/api/v1/catalog?query=$name&size=50"))
         assertEquals(2,complete.path("items").size());assertFalse(complete.path("truncated").asBoolean())
         assertEquals(400,get("/api/v1/user/catalog?size=51",session.cookie).statusCode.value())
-        val all=reader.list(true,query=name).items;assertEquals(4,all.size);assertEquals(4,all.map{it.id}.distinct().size);assertTrue(all.any{it.status==ProductStatus.ARCHIVED});assertTrue(all.any{it.status==ProductStatus.DRAFT})
+        val all=reader.list(true,query=CatalogSearchTerm.fromWire(name)).items;assertEquals(4,all.size);assertEquals(4,all.map{it.id}.distinct().size);assertTrue(all.any{it.status==ProductStatus.ARCHIVED});assertTrue(all.any{it.status==ProductStatus.DRAFT})
         assertEquals(400,get("/api/v1/catalog?size=51").statusCode.value());assertEquals(400,get("/api/v1/catalog?page=-1").statusCode.value())
+    }
+    @Test fun `public and admin search remain literal authorized and stable across pages`() {
+        val session=provision();activate("STOREFRONT",session);activate("CATALOG",session)
+        val marker=UUID.randomUUID().toString();val categoryName="Herramientas $marker"
+        val categoryId=jdbc.queryForObject("INSERT INTO categories(name,slug,active) VALUES (?,?,TRUE) RETURNING id",Long::class.java,categoryName,"tools-$marker")!!
+        val firstProduct=product("Taladro uno $marker");val secondProduct=product("Taladro dos $marker")
+        jdbc.update("UPDATE products SET category_id=? WHERE id IN (?,?)",categoryId,firstProduct,secondProduct)
+        val first=variant(firstProduct,"First");variant(secondProduct,"Second")
+        fun encoded(value:String)=URLEncoder.encode(value,StandardCharsets.UTF_8)
+
+        val firstPage=data(get("/api/v1/catalog?query=${encoded(categoryName.uppercase())}&size=1&page=0"))
+        val secondPage=data(get("/api/v1/catalog?query=${encoded(categoryName.lowercase())}&size=1&page=1"))
+        assertEquals(2,firstPage.path("total").asInt());assertEquals(2,secondPage.path("total").asInt())
+        assertNotEquals(firstPage.path("items").first().path("id").asText(),secondPage.path("items").first().path("id").asText())
+        assertTrue(firstPage.path("truncated").asBoolean());assertFalse(secondPage.path("truncated").asBoolean())
+        assertEquals(firstProduct.toString(),data(get("/api/v1/catalog?query=${encoded(first.second.lowercase())}")).path("items").single().path("id").asText())
+        val adminPage0=data(get("/api/v1/user/catalog?query=${encoded(categoryName)}&size=1&page=0",session.cookie))
+        val adminPage1=data(get("/api/v1/user/catalog?query=${encoded(categoryName)}&size=1&page=1",session.cookie))
+        assertEquals(2,adminPage0.path("total").asInt());assertEquals(2,adminPage1.path("total").asInt())
+        assertNotEquals(adminPage0.path("items").first().path("id").asText(),adminPage1.path("items").first().path("id").asText())
+
+        val literalProduct=product("Literal %_! $marker");variant(literalProduct,"Literal")
+        val broadProduct=product("Literal ordinary $marker");variant(broadProduct,"Broad")
+        val literal=data(get("/api/v1/catalog?query=${encoded("%_!")}"))
+        assertEquals(1,literal.path("total").asInt());assertEquals(literalProduct.toString(),literal.path("items").single().path("id").asText())
+        assertFalse(literal.toString().contains(broadProduct.toString()))
+
+        val mixedProduct=product("Mixed visibility $marker");variant(mixedProduct,"Public")
+        val hidden=variant(mixedProduct,"Private",false)
+        assertEquals(0,data(get("/api/v1/catalog?query=${encoded(hidden.second)}")).path("total").asInt())
+        val admin=data(get("/api/v1/user/catalog?query=${encoded(hidden.second)}",session.cookie))
+        assertEquals(1,admin.path("total").asInt());assertEquals(mixedProduct.toString(),admin.path("items").single().path("id").asText())
+        assertTrue(admin.path("items").single().path("variants").any { it.path("sku").asText()==hidden.second })
+
+        assertEquals(400,get("/api/v1/catalog?query=${"x".repeat(121)}").statusCode.value())
+        assertEquals(400,get("/api/v1/user/catalog?query=${"x".repeat(121)}",session.cookie).statusCode.value())
     }
     @Test fun `HTTP writer preserves archived and inactive closed statuses and rejects unknown atomically`() {
         val session=provision();activate("CATALOG",session)
@@ -130,7 +168,7 @@ class CatalogProjectionHttpIntegrationTest(
             }
         }
         val batchReader=JdbcCatalogProjectionReader(JdbcTemplate(source),mapper)
-        val page=batchReader.list(true,query=name)
+        val page=batchReader.list(true,query=CatalogSearchTerm.fromWire(name))
         assertEquals(12,page.items.size);assertTrue(page.items.all{it.variants.size==3});assertEquals(6,count.get())
     }
     @Test fun `public and admin option projections share integrity while visibility stays authorized`() {
@@ -162,8 +200,8 @@ class CatalogProjectionHttpIntegrationTest(
 
         val invalidIdentityName="Invalid identity ${UUID.randomUUID()}";val invalidIdentityProduct=product(invalidIdentityName)
         jdbc.update("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,'','Invalid',TRUE)",invalidIdentityProduct)
-        val publicInvalid=reader.list(false,query=invalidIdentityName).items.single().optionSchema
-        val adminInvalid=reader.list(true,query=invalidIdentityName).items.single().optionSchema
+        val publicInvalid=reader.list(false,query=CatalogSearchTerm.fromWire(invalidIdentityName)).items.single().optionSchema
+        val adminInvalid=reader.list(true,query=CatalogSearchTerm.fromWire(invalidIdentityName)).items.single().optionSchema
         assertEquals(OptionSchemaState.UNKNOWN,publicInvalid.state);assertEquals(OptionResolutionCause.CORRUPT,publicInvalid.cause)
         assertEquals(publicInvalid,adminInvalid)
 

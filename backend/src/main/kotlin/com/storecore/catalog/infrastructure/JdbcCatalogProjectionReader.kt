@@ -17,11 +17,16 @@ import java.sql.ResultSet
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 open class JdbcCatalogProjectionReader(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
-    open fun list(admin: Boolean, query: String = "", brand: Long? = null, category: Long? = null, offers: Boolean = false, page: Int = 0, size: Int = 50): BoundedPage<CatalogProduct> {
+    open fun list(admin: Boolean, query: CatalogSearchTerm = CatalogSearchTerm.fromWire(null), brand: Long? = null, category: Long? = null, offers: Boolean = false, page: Int = 0, size: Int = 50): BoundedPage<CatalogProduct> {
         validatePage(page, size)
         val clauses = mutableListOf(if(admin) "TRUE" else "p.status='ACTIVE' AND EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id AND v.active)")
         val args = mutableListOf<Any>()
-        if(query.isNotBlank()) { clauses += "(lower(p.name) LIKE lower(?) OR EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id AND ${if(admin) "TRUE" else "v.active"} AND lower(v.sku) LIKE lower(?)))"; args += "%$query%"; args += "%$query%" }
+        if(query.present) {
+            clauses += """(lower(p.name) LIKE lower(?) ESCAPE '!' OR
+                EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id=p.id AND ${if(admin) "TRUE" else "v.active"} AND lower(v.sku) LIKE lower(?) ESCAPE '!') OR
+                EXISTS (SELECT 1 FROM categories search_category WHERE search_category.id=p.category_id AND lower(search_category.name) LIKE lower(?) ESCAPE '!'))""".trimIndent()
+            repeat(3) { args += query.literalLikePattern }
+        }
         if(brand != null) { clauses += "p.brand_id=?"; args += brand }
         if(category != null) { clauses += "p.category_id=?"; args += category }
         if(offers) clauses += "EXISTS (SELECT 1 FROM offer_products op JOIN offers o ON o.id=op.offer_id WHERE op.product_id=p.id AND o.status='ACTIVE' AND now() BETWEEN o.starts_at AND o.ends_at)"

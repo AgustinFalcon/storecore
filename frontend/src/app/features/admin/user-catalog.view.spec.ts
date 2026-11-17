@@ -7,6 +7,7 @@ import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-ca
 import { AdminCatalogStore } from './admin-catalog.store';
 import { UserCatalogViewComponent } from './user-catalog.view';
 import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
+import { emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 describe('bounded administrative catalog', () => {
   it('keeps one product with multiple variants, closed statuses and exact partial totals', async () => {
@@ -34,7 +35,7 @@ describe('bounded administrative catalog', () => {
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
 
     const renamedEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.patchVariant(0, { name: 'Renombrada' });
@@ -57,7 +58,7 @@ describe('bounded administrative catalog', () => {
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Weight: 2, Enabled: true, Nested: { a: 1 }, Color: 'Negro' }, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false })[0];
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [product], brands: [], categories: [], draft: catalogProductDraftFromDetail(product), brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
 
     const valueEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.patchAttributeValue(0, 3, 'Azul');
@@ -76,7 +77,7 @@ describe('bounded administrative catalog', () => {
     const draft = newCatalogProductDraft();
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
     const statusEvent = firstValueFrom(fixture.componentInstance.draftChange);
     fixture.componentInstance.setProductStatus('ARCHIVED');
     expect((await statusEvent).status.label).toBe('Archivado');
@@ -86,7 +87,7 @@ describe('bounded administrative catalog', () => {
     const draft = newCatalogProductDraft();
     TestBed.configureTestingModule({ imports: [UserCatalogViewComponent] });
     const fixture = TestBed.createComponent(UserCatalogViewComponent);
-    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' } });
+    fixture.componentRef.setInput('state', { loading: false, errorMessage: '', list: null, products: [], brands: [], categories: [], draft, brandDraft: { id: '', name: '' }, categoryDraft: { id: '', name: '' }, query: emptyCatalogQuery, queryDirty: false });
     const emitted: typeof draft[] = [];
     fixture.componentInstance.draftChange.subscribe(value => emitted.push(value));
 

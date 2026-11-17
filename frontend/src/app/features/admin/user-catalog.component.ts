@@ -24,6 +24,8 @@ import { UserCatalogViewComponent } from './user-catalog.view';
         (saveCategory)="store.persistCategory()"
         (retry)="reload()"
         (pageChange)="store.goToPage($event)"
+        (queryChange)="store.setQuery($event)"
+        (searchSubmit)="store.load()"
       />
     }
   `,

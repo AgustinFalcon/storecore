@@ -85,3 +85,28 @@
   cabeza corregida sin P0–P3. La matriz final de blast radius TASK-002/003/004
   pasó 47/47 (suma 13 migración V24 y 6 parser). CI del PR continúa como gate
   independiente.
+- TASK-005 implementada con `CatalogSearchTerm` como frontera única normalizada,
+  acotada y literal. Público y admin comparten el mismo predicado y argumentos
+  para `count`/items; nombre, SKU case-insensitive y categoría nullable usan
+  parámetros y `EXISTS`, sin duplicar productos ni ampliar resultados con `%`
+  o `_`. Público conserva producto/variante activos; admin conserva visibilidad
+  autorizada bajo `CATALOG/READ`.
+- Angular transporta los mismos criterios en storefront y consola, reinicia la
+  página cuando cambian filtros, conserva criterios al paginar y descarta
+  respuestas antiguas. La consola distingue filtros editados de resultados
+  aplicados y limita el input visible a 120 caracteres.
+- Evidencia local inicial TASK-005: 19 pruebas backend verdes (17 HTTP reales
+  con PostgreSQL 16 y 2 del value object) y 30 pruebas Angular focales verdes.
+  Incluye dos páginas por categoría, SKU con distinto case, comodines literales,
+  categoría nullable por construcción, límite 120/121 y SKU inactivo visible
+  sólo en admin. Dos revisores GPT-6.1 Sol no encontraron P0/P1 de diseño luego
+  de incorporar sus controles; revisión exact-head final permanece separada.
+- Gate local ampliado TASK-005: matriz backend TASK-002→005 50/50, suite
+  Angular completa 1.551/1.551 en 219 archivos y build Angular de producción
+  exitoso. El port legacy `searchActive` también reutiliza el mismo traductor y
+  patrón literal para no mantener una segunda superficie permisiva.
+- La revisión exacta Sol detectó y cerró tres P2 y un P3: recovery admin obsoleto,
+  dependencia domain→application, falta de dos páginas HTTP admin y whitespace
+  Unicode divergente. Tras las correcciones, 29/29 pruebas Angular afectadas y
+  19/19 backend HTTP/value-object volvieron a pasar. Ronda final de arquitectura
+  y seguridad: APPROVE, sin P0–P3 pendientes; CI hosted queda como gate del PR.
