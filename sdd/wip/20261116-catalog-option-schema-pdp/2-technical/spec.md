@@ -175,6 +175,11 @@ No publica labels o CSS crudos sin value objects.
 `JdbcCatalogProjectionReader` mantiene query count fijo: agrega dos consultas
 bulk acotadas (axes/values y assignments) para los products de la página, sin
 N+1. Límite excedido falla con código cerrado; no trunca identidad.
+La página no vacía ejecuta seis consultas y el detalle existente cinco,
+independientemente de productos, variantes o ejes. Ambas lecturas validan el
+agregado completo —incluidas variantes inactivas y ownership producto/eje/valor—
+antes de aplicar la visibilidad pública. El GET administrativo reutiliza el
+mismo proyector puro y expone causa cerrada cuando el resultado es `UNKNOWN`.
 
 El contrato BlackStore conserva su catálogo actual sin option schema en este
 corte; el agregado público es backward-compatible y no cambia su autoridad.
@@ -231,8 +236,11 @@ lo transportan explícitamente. La cláusula queda:
 `lower(product.name) LIKE ? OR lower(authorized_variant.sku) LIKE ? OR
 lower(category.name) LIKE ?`.
 
-El query se normaliza/limita antes de SQL, usa parámetros y escapa comodines con
-semántica literal. Items y count reutilizan el mismo predicado `EXISTS`/joins,
+El query se normaliza NFKC, recorta extremos y colapsa whitespace; admite hasta
+120 code points normalizados con un techo de transporte de 2.048. Controles no
+whitespace y excesos se rechazan con `CATALOG_QUERY_INVALID`, nunca se truncan.
+Antes de SQL se escapan `!`, `%` y `_`, se usa `ESCAPE '!'` y el case-fold se
+evalúa en PostgreSQL sobre ambos operandos. Items y count reutilizan el mismo predicado `EXISTS`/joins,
 incluida categoría nullable, sin alias ausentes. Público aplica producto ACTIVE y
 variante ACTIVE; SKU se compara case-insensitive. Admin conserva su visibilidad
 actual e incluye SKU inactivo sólo

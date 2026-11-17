@@ -2,6 +2,7 @@ package com.storecore.catalog.infrastructure
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.domain.ArsAmount
+import com.storecore.catalog.domain.CatalogSearchTerm
 import com.storecore.catalog.domain.VariantPriceCommand
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
@@ -21,11 +22,15 @@ data class CatalogFacet(val id: Long, val name: String)
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper, private val inventory: JdbcInventoryService, private val projections: JdbcCatalogProjectionReader, transactionManager: PlatformTransactionManager) : CatalogQueryPort {
     private val transactions = TransactionTemplate(transactionManager)
-    override fun searchActive(query: String): List<CatalogSearchResult> = jdbc.query("""SELECT v.sku,p.name FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE p.status='ACTIVE' AND v.active AND (lower(p.name) LIKE lower(?) OR lower(v.sku) LIKE lower(?) OR lower(coalesce(b.name,'')) LIKE lower(?) OR lower(coalesce(c.name,'')) LIKE lower(?)) ORDER BY p.name,p.id,v.id LIMIT 100""", { rs, _ -> CatalogSearchResult(com.storecore.catalog.domain.ProductSku(rs.getString("sku")), rs.getString("name")) }, "%$query%", "%$query%", "%$query%", "%$query%")
+    override fun searchActive(query: String): List<CatalogSearchResult> {
+        val pattern=CatalogSearchTerm.fromWire(query).literalLikePattern
+        return jdbc.query("""SELECT v.sku,p.name FROM product_variants v JOIN products p ON p.id=v.product_id LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id WHERE p.status='ACTIVE' AND v.active AND (lower(p.name) LIKE lower(?) ESCAPE '!' OR lower(v.sku) LIKE lower(?) ESCAPE '!' OR lower(coalesce(b.name,'')) LIKE lower(?) ESCAPE '!' OR lower(coalesce(c.name,'')) LIKE lower(?) ESCAPE '!') ORDER BY p.name,p.id,v.id LIMIT 100""", { rs, _ -> CatalogSearchResult(com.storecore.catalog.domain.ProductSku(rs.getString("sku")), rs.getString("name")) }, pattern, pattern, pattern, pattern)
+    }
     fun facets(kind: String): List<CatalogFacet> = jdbc.query("SELECT id,name FROM ${if (kind == "brands") "brands" else "categories"} WHERE active ORDER BY name,id LIMIT 100", { rs, _ -> CatalogFacet(rs.getLong("id"), rs.getString("name")) })
-    fun search(query: String, brand: Long?, category: Long?, offers: Boolean, page: Int = 0, size: Int = 50) = projections.list(false, query, brand, category, offers, page, size)
+    fun search(query: String, brand: Long?, category: Long?, offers: Boolean, page: Int = 0, size: Int = 50) = projections.list(false, CatalogSearchTerm.fromWire(query), brand, category, offers, page, size)
     fun product(sku: String, admin: Boolean = false) = projections.product(sku, admin)
-    fun adminList(page: Int = 0, size: Int = 50) = projections.list(true, page = page, size = size)
+    fun adminList(query: String, brand: Long?, category: Long?, offers: Boolean, page: Int = 0, size: Int = 50) =
+        projections.list(true, CatalogSearchTerm.fromWire(query), brand, category, offers, page, size)
     fun saveProduct(sku: String, name: String, description: String, brand: String, category: String, images: List<String>, variants: List<Map<String, Any?>>, price: Map<String, Any?>, active: Boolean?, actor: Long, status: String? = null, productBasePrice: com.fasterxml.jackson.databind.JsonNode = com.fasterxml.jackson.databind.node.MissingNode.getInstance()): com.storecore.catalog.domain.CatalogProduct =
         transactions.execute { saveProductTransactional(sku, name, description, brand, category, images, variants, price, active, actor, status, productBasePrice) }!!
 

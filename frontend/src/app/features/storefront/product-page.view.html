@@ -32,13 +32,15 @@
       <div class="sc-buybox">
         <p class="sc-buybox__meta">{{ product.brand }} · {{ product.category }}</p>
         <h1 id="product-title">{{ product.name }}</h1>
-        <p class="sc-mono">SKU {{ product.sku }}</p>
+        @if (selectedSku) { <p class="sc-mono">SKU {{ selectedSku }}</p> }
+        @else if (hasValidSchema && selectionState === selectionIncompleteState) { <p class="sc-mono">Completá las opciones para conocer el SKU</p> }
         <p>{{ product.description }}</p>
         <div class="sc-price-stack">
           @if (hasDiscount) {
             <p class="sc-price__was">{{ selectedPrice?.original }}</p>
           }
-          @if (selectedPrice) { <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ selectedPrice.effective }}</p> } @else { <p role="status">Precio no disponible</p> }
+          @if (selectedPrice) { <p class="sc-price sc-price--hero"><span class="sc-price__kind">Efectivo</span>{{ selectedPrice.effective }}</p> }
+          @else if (selectedVariant) { <p role="status">{{ selectionCause?.label || 'Precio no disponible' }}</p> }
         </div>
         @if (selectedPrice?.offer?.id) {
           <span class="sc-badge sc-badge--warn">oferta {{ selectedPrice.offer.id }}</span>
@@ -48,26 +50,33 @@
         @if (!product.status.isPublic) {
           <span class="sc-badge sc-badge--warn">{{ product.status.label }}</span>
         }
-        <ul class="sc-pdp__variants">
-          @for (variant of product.variants; track variant.id) {
-            <li>{{ variant.name }} · {{ variant.availability.label }}
-              @if (variant.inventory.saleable !== null) { · {{ variant.inventory.saleable }} unidades vendibles }
-              <dl>@for (attribute of attributes(variant.attributes); track attribute[0]) { <dt>{{ attribute[0] }}</dt><dd>{{ attribute[1] }}</dd> }</dl>
-            </li>
-          }
-        </ul>
+        @if (selectedVariant) {
+          <p>{{ selectedVariant.name }} · {{ selectedVariant.availability.label }}
+            @if (selectedVariant.inventory.saleable !== null) { · {{ selectedVariant.inventory.saleable }} unidades vendibles }
+          </p>
+          <dl class="sc-pdp__attributes">@for (attribute of attributes(selectedVariant.attributes); track attribute[0]) { <dt>{{ attribute[0] }}</dt><dd>{{ attribute[1] }}</dd> }</dl>
+        }
         <form class="sc-buybox__form" (submit)="$event.preventDefault(); submit(product.sku)">
-          <label>Variante<select name="variant" [ngModel]="selectedVariant?.id" (ngModelChange)="selectVariant($event)">
-            @for (variant of product.variants; track variant.id) { <option [value]="variant.id">{{ variant.name }} · {{ variant.availability.label }}</option> }
-          </select></label>
+          @if (hasValidSchema) {
+            <sc-product-option-selector [axes]="optionAxes" [selectionState]="selectionState" [selectionCause]="selectionCause" [disabled]="intentBusy || loading || !!error" (choose)="chooseOption($event)" (retry)="retry.emit()" />
+          } @else if (hasAbsentSchema) {
+            <sc-generic-variant-selector [choices]="genericChoices" [selectedId]="selectedVariant?.id || ''" [disabled]="intentBusy || loading || !!error" (choose)="selectVariant($event)" />
+          } @else {
+            <div class="sc-notice" role="status">
+              <p>{{ selectionCause?.label || selectionState.label }}</p>
+              <button type="button" class="sc-btn sc-btn--ghost" (click)="retry.emit()">Reintentar opciones</button>
+            </div>
+          }
           @if (!product.variants.length) { <p role="status">Sin variantes disponibles.</p> }
-          <label>Cantidad
+          <div class="sc-quantity-field">
+            <label for="pdp-quantity">Cantidad</label>
             <span class="sc-stepper">
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(-1)" [disabled]="quantity <= 1" aria-label="Quitar una unidad">−</button>
-              <input type="number" name="quantity" min="1" required [ngModel]="quantity" (ngModelChange)="setQuantity($event)" (change)="commitQuantityRevision()" />
+              <input id="pdp-quantity" type="number" name="quantity" min="1" required [attr.aria-describedby]="quantityMessage ? 'pdp-quantity-message' : null" [ngModel]="quantity" (ngModelChange)="setQuantity($event)" (change)="commitQuantityRevision()" />
               <button type="button" class="sc-btn sc-btn--ghost" (click)="changeQty(1)" [disabled]="!canIncrease" aria-label="Agregar una unidad">+</button>
             </span>
-          </label>
+          </div>
+          @if (quantityMessage) { <p id="pdp-quantity-message" class="sc-field-error" role="status">{{ quantityMessage }}</p> }
           @if (intentMessage) {
             <div class="sc-notice" aria-live="polite" aria-atomic="true">
               <p>{{ intentMessage }}</p>
@@ -90,13 +99,13 @@
           }
         </form>
         <a class="sc-btn sc-btn--ghost sc-btn--block" routerLink="/cart">Ver carrito</a>
-        @if (access.canMutate) {
+        @if (access.canMutate && selectedVariant && !loading && !error) {
           <button
             type="button"
             class="sc-btn sc-btn--ghost sc-btn--block"
             [class.is-on]="favorite"
             [disabled]="favoriteBusy"
-            (click)="toggleFavorite.emit(product.sku)"
+            (click)="toggleFavorite.emit(selectedVariant.sku)"
           >
             {{ favoriteBusy ? 'Actualizando…' : favorite ? '♥ Quitar de favoritos' : '♡ Guardar en favoritos' }}
           </button>

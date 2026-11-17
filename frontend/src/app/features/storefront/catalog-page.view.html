@@ -6,7 +6,7 @@
   </header>
   <form class="sc-card sc-filters sc-filters--toolbar" (submit)="$event.preventDefault(); searchSubmit.emit()">
     <label>Búsqueda
-      <input name="query" [ngModel]="state.query.query" (ngModelChange)="queryChange.emit($event)" />
+      <input name="query" maxlength="120" placeholder="Nombre, SKU o categoría" [ngModel]="state.query.query" (ngModelChange)="queryChange.emit($event)" />
     </label>
     <label>Marca
       <select name="brand" [ngModel]="state.query.brand" (ngModelChange)="brandChange.emit($event)">

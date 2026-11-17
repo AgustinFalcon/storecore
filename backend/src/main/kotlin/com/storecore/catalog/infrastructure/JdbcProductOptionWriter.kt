@@ -21,79 +21,64 @@ open class JdbcProductOptionWriter(
     override fun read(sku: String): ProductOptionAdminSnapshot {
         val product = productBySku(sku, lock = false) ?: throw CatalogOptionNotFound()
         val axes = jdbc.query(
-            "SELECT id,code,label,presentation,sort_order FROM product_option_axes WHERE product_id=? ORDER BY sort_order,id",
+            "SELECT id,code,label,presentation,sort_order FROM product_option_axes WHERE product_id=? ORDER BY sort_order,id LIMIT ?",
             { rs, _ -> StoredAxis(rs.getLong("id"), rs.getString("code"), rs.getString("label"), rs.getString("presentation"), rs.getInt("sort_order")) },
-            product.id,
+            product.id, OptionLimits.MAX_AXES + 1,
         )
-        val values = if (axes.isEmpty()) emptyMap() else jdbc.query(
-            "SELECT axis_id,code,label,swatch_color,sort_order FROM product_option_values WHERE product_id=? ORDER BY axis_id,sort_order,id",
-            { rs, _ -> rs.getLong("axis_id") to StoredValue(rs.getString("code"), rs.getString("label"), rs.getString("swatch_color"), rs.getInt("sort_order")) },
-            product.id,
+        val values = jdbc.query(
+            "SELECT id,axis_id,code,label,swatch_color,sort_order FROM product_option_values WHERE product_id=? ORDER BY axis_id,sort_order,id LIMIT ?",
+            { rs, _ -> rs.getLong("axis_id") to StoredValue(rs.getLong("id"), rs.getString("code"), rs.getString("label"), rs.getString("swatch_color"), rs.getInt("sort_order")) },
+            product.id, OptionLimits.MAX_AXES * OptionLimits.MAX_VALUES_PER_AXIS + 1,
         ).groupBy({ it.first }, { it.second })
-        val assignments = jdbc.query(
-            """SELECT v.id,v.sku,v.active,a.code axis_code,o.code value_code
-               FROM product_variants v
-               LEFT JOIN variant_option_values av ON av.variant_id=v.id
-               LEFT JOIN product_option_axes a ON a.id=av.axis_id
-               LEFT JOIN product_option_values o ON o.id=av.value_id
-               WHERE v.product_id=? ORDER BY v.id,a.sort_order""",
-            { rs, _ -> AssignmentRow(rs.getLong("id"), rs.getString("sku"), rs.getBoolean("active"), rs.getString("axis_code"), rs.getString("value_code")) },
-            product.id,
-        ).groupBy { it.id }.values.map { rows ->
-            val first = rows.first()
-            ProductOptionAssignmentView(first.id.toString(), first.sku, first.active,
-                rows.mapNotNull { row -> row.axisCode?.let { it to row.valueCode!! } }.toMap())
-        }
-        val revision = SchemaRevision.of(product.revision)
-        val domainAxes = axes.map axisMap@ { axis ->
-            val domainValues = values[axis.id].orEmpty().map valueMap@ { value -> try {
-                OptionValue(
-                    OptionCode.of(value.code) ?: return@valueMap null,
-                    OptionLabel.of(value.label) ?: return@valueMap null,
-                    value.order,
-                    value.swatchColor?.let { SwatchColor.of(it) ?: return@valueMap null },
-                )
-            } catch (_: IllegalArgumentException) { null } }
-            if (domainValues.any { it == null }) null else OptionAxis.create(
-                OptionCode.of(axis.code) ?: return@axisMap null,
-                OptionLabel.of(axis.label) ?: return@axisMap null,
-                OptionPresentation.fromWire(axis.presentation),
-                axis.order,
-                domainValues.filterNotNull(),
-            )
-        }
-        val schema = when {
-            revision == null -> ProductOptionSchema.Unknown()
-            !product.present && (domainAxes.isNotEmpty() || assignments.any { it.optionValues.isNotEmpty() }) -> ProductOptionSchema.Unknown(revision, OptionResolutionCause.CORRUPT)
-            !product.present -> ProductOptionSchema.Absent(revision)
-            domainAxes.any { it == null } -> ProductOptionSchema.Unknown(revision, OptionResolutionCause.CORRUPT)
-            else -> ProductOptionSchema.Valid.create(revision, domainAxes.filterNotNull()).let {
-                if (it is ProductOptionSchema.Valid) it else ProductOptionSchema.Unknown(revision, OptionResolutionCause.CORRUPT)
-            }
-        }
-        val domainAssignments = assignments.map { assignment ->
-                val optionValues = linkedMapOf<OptionCode, OptionCode>()
-                val valid = assignment.optionValues.all { (rawAxis, rawValue) ->
-                    val axis = OptionCode.of(rawAxis)
-                    val value = OptionCode.of(rawValue)
-                    axis != null && value != null && optionValues.put(axis, value) == null
-                }
-                if (!valid) null else VariantOptionAssignment(
-                    assignment.variantId,
-                    if (assignment.active) VariantStatus.ACTIVE else VariantStatus.INACTIVE,
-                    optionValues,
-                )
-            }
-        val assignmentValidation = if (schema is ProductOptionSchema.Valid && domainAssignments.none { it == null })
-            ValidateVariantAssignmentsStep().execute(schema, domainAssignments.filterNotNull()) else null
-        val state = if (schema is ProductOptionSchema.Valid && assignmentValidation !is OptionAssignmentValidation.Valid)
-            OptionSchemaState.UNKNOWN else schema.state
-        val safeAxes = if (state == OptionSchemaState.VALID) domainAxes.filterNotNull().map { axis ->
+        val assignmentRows = jdbc.query(
+            """SELECT * FROM (SELECT v.id,v.product_id,v.sku,v.active,av.variant_id assignment_variant_id,av.product_id assignment_product_id,
+                      a.product_id axis_product_id,o.product_id value_product_id,av.axis_id assignment_axis_id,o.axis_id value_axis_id,a.code axis_code,o.code value_code,
+                      row_number() OVER (ORDER BY v.id,av.axis_id,av.value_id) rn
+               FROM product_variants v LEFT JOIN variant_option_values av ON av.variant_id=v.id
+               LEFT JOIN product_option_axes a ON a.id=av.axis_id LEFT JOIN product_option_values o ON o.id=av.value_id
+               WHERE v.product_id=?) option_assignments WHERE rn<=? ORDER BY id,rn""",
+            { rs, _ ->
+                val present=rs.getObject("assignment_variant_id") != null;val productId=rs.getLong("product_id")
+                val ownershipValid=!present || (rs.getLong("assignment_product_id")==productId && rs.getLong("axis_product_id")==productId &&
+                    rs.getLong("value_product_id")==productId && rs.getLong("assignment_axis_id")==rs.getLong("value_axis_id"))
+                AssignmentRow(rs.getLong("id"), rs.getString("sku"), rs.getBoolean("active"), present, ownershipValid, rs.getString("axis_code"), rs.getString("value_code"))
+            },
+            product.id, OptionLimits.MAX_ASSIGNMENTS + 1,
+        )
+        if (axes.size > OptionLimits.MAX_AXES || values.values.sumOf { it.size } > OptionLimits.MAX_AXES * OptionLimits.MAX_VALUES_PER_AXIS ||
+            values.values.any { it.size > OptionLimits.MAX_VALUES_PER_AXIS } ||
+            assignmentRows.size > OptionLimits.MAX_ASSIGNMENTS || assignmentRows.map { it.id }.distinct().size > OptionLimits.MAX_VARIANTS)
+            throw CatalogOptionInvalid("CATALOG_PRODUCT_COLLECTION_LIMIT_EXCEEDED")
+        val malformedStructure=values.keys.any { axisId -> axes.none { it.id==axisId } }
+        val axisSources=if(malformedStructure) listOf(OptionAxisSource("", "", "", null, -1, emptyList())) else axes.map { axis -> OptionAxisSource(axis.id.toString(),axis.code,axis.label,axis.presentation,axis.order,values[axis.id].orEmpty().map { value ->
+            OptionValueSource(value.id.toString(),value.code,value.label,value.swatchColor,value.order)
+        }) }
+        val projection = ProjectProductOptionsStep().execute(
+            product.present,
+            product.revision,
+            axisSources,
+            assignmentRows.groupBy { it.id }.values.map { rows ->
+                val first=rows.first()
+                VariantOptionSource(first.id.toString(),first.sku,if(first.active) VariantStatus.ACTIVE else VariantStatus.INACTIVE,
+                    rows.filter { it.assignmentPresent }.map { row -> if(row.ownershipValid) row.axisCode to row.valueCode else null to null })
+            },
+        )
+        val safeAxes = if (projection.schema is ProductOptionSchema.Valid) projection.schema.axes.map { axis ->
             ProductOptionAxisView(axis.code.value, axis.label.value, axis.presentation, axis.order, axis.values.map { value ->
                 ProductOptionValueView(value.code.value, value.label.value, value.swatchColor?.value, value.order)
             })
         } else emptyList()
-        return ProductOptionAdminSnapshot(product.revision, state, safeAxes, if (state == OptionSchemaState.UNKNOWN) emptyList() else assignments)
+        val assignments = if (projection.schema.state == OptionSchemaState.UNKNOWN) emptyList() else assignmentRows.groupBy { it.id }.values.map { rows ->
+            val first=rows.first();val safe=projection.assignments[first.id.toString()].orEmpty()
+            ProductOptionAssignmentView(first.id.toString(),first.sku,first.active,safe.mapKeys { it.key.value }.mapValues { it.value.value })
+        }
+        return ProductOptionAdminSnapshot(
+            projection.schema.revision?.value,
+            projection.schema.state,
+            projection.schema.cause,
+            safeAxes,
+            assignments,
+        )
     }
 
     @Transactional
@@ -240,6 +225,6 @@ open class JdbcProductOptionWriter(
     private data class ProductRow(val id: Long, val present: Boolean, val revision: Long)
     private data class VariantRow(val id: Long, val productId: Long, val sku: String, val label: String, val active: Boolean)
     private data class StoredAxis(val id: Long, val code: String, val label: String, val presentation: String, val order: Int)
-    private data class StoredValue(val code: String, val label: String, val swatchColor: String?, val order: Int)
-    private data class AssignmentRow(val id: Long, val sku: String, val active: Boolean, val axisCode: String?, val valueCode: String?)
+    private data class StoredValue(val id: Long, val code: String, val label: String, val swatchColor: String?, val order: Int)
+    private data class AssignmentRow(val id: Long, val sku: String, val active: Boolean, val assignmentPresent: Boolean, val ownershipValid: Boolean, val axisCode: String?, val valueCode: String?)
 }

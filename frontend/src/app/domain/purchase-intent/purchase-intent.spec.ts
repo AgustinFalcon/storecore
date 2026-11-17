@@ -1,4 +1,4 @@
-import { CartLineConfirmationResult, PURCHASE_INTENT_TTL_MS, PurchaseIntent, PurchaseIntentKind, PurchaseIntentStage, RestoredPurchaseAvailability, validPurchaseFlowId } from './purchase-intent';
+import { CartLineConfirmationResult, PURCHASE_INTENT_TTL_MS, PurchaseIntent, PurchaseIntentKind, PurchaseIntentResolutionResult, PurchaseIntentStage, RestoredPurchaseAvailability, validPurchaseFlowId } from './purchase-intent';
 
 describe('PurchaseIntent closed wire boundary', () => {
   const now = 1000000;
@@ -33,7 +33,7 @@ describe('PurchaseIntent closed wire boundary', () => {
   it('translates every closed state and fails closed on future strings', () => {
     expect(PurchaseIntentKind.fromWire('ADD_CART_LINE')).toBe(PurchaseIntentKind.AddCartLine);
     expect(PurchaseIntentKind.fromWire('NONE')).toBe(PurchaseIntentKind.None);
-    for (const type of [PurchaseIntentKind, PurchaseIntentStage, CartLineConfirmationResult, RestoredPurchaseAvailability]) expect(type.fromWire('FUTURE')).toBe(type.Unknown);
+    for (const type of [PurchaseIntentKind, PurchaseIntentStage, CartLineConfirmationResult, RestoredPurchaseAvailability, PurchaseIntentResolutionResult]) expect(type.fromWire('FUTURE')).toBe(type.Unknown);
     for (const stage of [PurchaseIntentStage.Captured, PurchaseIntentStage.AwaitingCustomer, PurchaseIntentStage.Restoring, PurchaseIntentStage.ReadyForConfirmation, PurchaseIntentStage.Unavailable, PurchaseIntentStage.Expired, PurchaseIntentStage.Completed]) expect(PurchaseIntentStage.fromWire(stage.wire)).toBe(stage);
     for (const result of [CartLineConfirmationResult.Idle, CartLineConfirmationResult.Pending, CartLineConfirmationResult.Accepted, CartLineConfirmationResult.Rejected, CartLineConfirmationResult.OutcomeUnknown]) expect(CartLineConfirmationResult.fromWire(result.wire)).toBe(result);
     for (const availability of [RestoredPurchaseAvailability.Ready, RestoredPurchaseAvailability.ProductUnavailable, RestoredPurchaseAvailability.VariantUnavailable, RestoredPurchaseAvailability.QuantityUnavailable]) expect(RestoredPurchaseAvailability.fromWire(availability.wire)).toBe(availability);

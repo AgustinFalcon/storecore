@@ -6,6 +6,7 @@ import com.storecore.catalog.application.ManageProductOptionsUseCase
 import com.storecore.catalog.domain.CatalogOptionInvalid
 import com.storecore.catalog.domain.CatalogOptionNotFound
 import com.storecore.catalog.domain.CatalogOptionRevisionConflict
+import com.storecore.catalog.domain.CatalogSearchInvalid
 import com.storecore.identity.infrastructure.web.BaseResponse
 import com.storecore.identity.infrastructure.web.IdentityMutationCoordinator
 import com.storecore.identity.infrastructure.web.RequestAuth
@@ -42,7 +43,7 @@ class CatalogController(
     @GetMapping("/catalog/products/{sku}") fun product(@PathVariable sku: String): ResponseEntity<BaseResponse<Any?>> { capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public); return catalog.product(sku)?.let { ResponseEntity.ok(BaseResponse.ok(it)) } ?: ResponseEntity.status(HttpStatus.NOT_FOUND).body(BaseResponse(404, null, "Not found", "RESOURCE_NOT_FOUND", false, null)) }
     @GetMapping("/catalog/brands") fun brands(): BaseResponse<Any?> { capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public); return BaseResponse.ok(catalog.facets("brands")) }
     @GetMapping("/catalog/categories") fun categories(): BaseResponse<Any?> { capabilities.decide("STOREFRONT", "SERVE", CapabilityActor.Public); return BaseResponse.ok(catalog.facets("categories")) }
-    @GetMapping("/user/catalog") fun adminCatalog(http: HttpServletRequest, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "50") size: Int): BaseResponse<Any?> { val actor = auth.operatorOrAdmin(http); capabilities.decide("CATALOG", "READ", CapabilityActor.Internal(actor)); return BaseResponse.ok(catalog.adminList(page, size)) }
+    @GetMapping("/user/catalog") fun adminCatalog(http: HttpServletRequest, @RequestParam(defaultValue = "") query: String, @RequestParam(required = false) brand: Long?, @RequestParam(required = false) category: Long?, @RequestParam(defaultValue = "false") offers: Boolean, @RequestParam(defaultValue = "0") page: Int, @RequestParam(defaultValue = "50") size: Int): BaseResponse<Any?> { val actor = auth.operatorOrAdmin(http); capabilities.decide("CATALOG", "READ", CapabilityActor.Internal(actor)); return BaseResponse.ok(catalog.adminList(query, brand, category, offers, page, size)) }
     @GetMapping("/user/catalog/products/{sku}") fun adminProduct(http: HttpServletRequest, @PathVariable sku: String): ResponseEntity<BaseResponse<Any?>> {
         val actor = auth.operatorOrAdmin(http); capabilities.decide("CATALOG", "READ", CapabilityActor.Internal(actor))
         return catalog.product(sku, true)?.let { ResponseEntity.ok(BaseResponse.ok(it)) } ?: ResponseEntity.status(HttpStatus.NOT_FOUND).body(BaseResponse(404, null, "Not found", "RESOURCE_NOT_FOUND", false, null))
@@ -89,6 +90,8 @@ data class ProductDetailRequest(val sku: String = "", val name: String = "", val
 
 @RestControllerAdvice(assignableTypes = [CatalogController::class])
 class CatalogOptionExceptionAdvice {
+    @ExceptionHandler(CatalogSearchInvalid::class)
+    fun invalidSearch() = error(HttpStatus.BAD_REQUEST, "CATALOG_QUERY_INVALID")
     @ExceptionHandler(CatalogOptionInvalid::class)
     fun invalid(exception: CatalogOptionInvalid) = error(HttpStatus.BAD_REQUEST, exception.code)
     @ExceptionHandler(CatalogOptionNotFound::class)

@@ -48,7 +48,7 @@ for (const entry of cases) {
           { provide: ActivatedRoute, useValue: { paramMap: params.asObservable(), queryParamMap: queryParams.asObservable() } },
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
             cart$: of({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }), loading$: of(false), viewState$: of({ cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] } } } },
-          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
+          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), selectSku: vi.fn(), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
       const fixture = TestBed.createComponent(entry.component);
@@ -72,7 +72,7 @@ for (const entry of cases) {
           provideRouter([{ path: entry.path, component: entry.component }]),
           { provide: CartStore, useValue: { load: vi.fn(), authority: () => CustomerCartAccess.SignIn,
             cart$: of({ revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }), loading$: of(false), viewState$: of({ cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] }, loading: false, errorMessage: '' }), snapshot: { cart: { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [] } } } },
-          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), add: vi.fn(), remove: vi.fn() } },
+          { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(() => false), selectSku: vi.fn(), add: vi.fn(), remove: vi.fn() } },
         ],
       }).compileComponents();
       const harness = await RouterTestingHarness.create();
