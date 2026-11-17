@@ -6,7 +6,6 @@ import java.text.Normalizer
 enum class OptionPresentation(val label: String) {
     SELECT("Lista"), SWATCH("Muestras"), UNKNOWN("Presentación desconocida");
     val supported: Boolean get() = this != UNKNOWN
-    companion object { fun fromWire(value: String?) = entries.firstOrNull { it.name == value } ?: UNKNOWN }
 }
 
 enum class OptionSchemaState(val label: String) {

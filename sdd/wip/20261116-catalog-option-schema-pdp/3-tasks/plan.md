@@ -5,7 +5,7 @@
 - [x] TASK-001 Tipos cerrados y pasos independientes de schema/selección.
 - [x] TASK-002 Migración PostgreSQL, vectores diferibles e interlock legacy.
 - [x] TASK-003 Writer único/CAS para schema, asignaciones y actividad.
-- [ ] TASK-004 Proyección pública/admin y contrato wire fail-closed.
+- [x] TASK-004 Proyección pública/admin y contrato wire fail-closed.
 - [ ] TASK-005 Búsqueda pública/admin por nombre, SKU y categoría.
 
 ## Corte B — experiencia Angular

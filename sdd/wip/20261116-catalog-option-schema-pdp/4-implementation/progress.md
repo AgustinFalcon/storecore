@@ -69,3 +69,19 @@
 - Dos revisiones GPT-6.1 Sol: APPROVE sin P0–P3. La revisión de cobertura pidió
   casos negativos adicionales; se incorporaron, quedaron verdes y fueron
   revalidados antes del commit publicado. CI del PR sigue siendo gate separado.
+- TASK-004 implementada con proyector puro fail-closed compartido por catálogo y
+  lectura administrativa. El wire público agrega `optionSchema` y cada variante
+  agrega `optionValues`; sólo `ABSENT` habilita fallback, mientras corrupción,
+  identidad/SKU inválida, ownership inconsistente o presentación futura producen
+  `UNKNOWN/CORRUPT` sin publicar labels, colores ni asignaciones crudas.
+- El reader valida primero el agregado completo —incluidas variantes inactivas—
+  y recién después aplica visibilidad. Dos consultas bulk con centinelas fijan
+  el presupuesto en seis consultas por página no vacía y cinco por detalle, sin
+  N+1 ni truncamiento; admin aplica los mismos límites de 4 ejes, 50 valores por
+  eje, 1.000 variantes y 4.000 asignaciones.
+- Evidencia local TASK-004: compilación backend completa y matriz focal con 28
+  pruebas, 0 fallos y 0 errores (16 HTTP/PostgreSQL, 8 dominio, 4 proyector).
+  Dos revisiones GPT-6.1 Sol cerraron dos P2 de límites/ownership y aprobaron la
+  cabeza corregida sin P0–P3. La matriz final de blast radius TASK-002/003/004
+  pasó 47/47 (suma 13 migración V24 y 6 parser). CI del PR continúa como gate
+  independiente.

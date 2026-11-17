@@ -131,7 +131,50 @@ class CatalogProjectionHttpIntegrationTest(
         }
         val batchReader=JdbcCatalogProjectionReader(JdbcTemplate(source),mapper)
         val page=batchReader.list(true,query=name)
-        assertEquals(12,page.items.size);assertTrue(page.items.all{it.variants.size==3});assertEquals(4,count.get())
+        assertEquals(12,page.items.size);assertTrue(page.items.all{it.variants.size==3});assertEquals(6,count.get())
+    }
+    @Test fun `public and admin option projections share integrity while visibility stays authorized`() {
+        val admin=provision();activate("CATALOG",admin);activate("STOREFRONT",admin)
+        val p=product("Projected options");val active=variant(p,"Active");val inactive=variant(p,"Inactive",false)
+        val path="/api/v1/user/catalog/products/${active.second}/options"
+        val body="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SWATCH","order":0,"values":[{"code":"red","label":"Rojo","order":0,"swatchColor":"#ff0000"},{"code":"blue","label":"Azul","order":1,"swatchColor":"#0000ff"}]}],"assignments":[{"variantSku":"${active.second}","optionValues":{"color":"red"}},{"variantSku":"${inactive.second}","optionValues":{"color":"blue"}}],"variantOperations":[]}"""
+        assertEquals(200,exchange(path,HttpMethod.PUT,body,admin.cookie,admin.csrf).statusCode.value())
+
+        val public=data(get("/api/v1/catalog/products/${active.second}"))
+        val internal=data(get("/api/v1/user/catalog/products/${active.second}",admin.cookie))
+        for(projected in listOf(public,internal)) {
+            val schema=projected.path("optionSchema")
+            assertEquals(2,schema.path("revision").asInt());assertEquals("VALID",schema.path("state").asText())
+            assertTrue(schema.path("cause").isNull);assertEquals("SWATCH",schema.path("axes").first().path("presentation").asText())
+            assertEquals("#ff0000",schema.path("axes").first().path("values").first().path("swatchColor").asText())
+        }
+        assertEquals(1,public.path("variants").size());assertEquals("red",public.path("variants").first().path("optionValues").path("color").asText())
+        assertEquals(2,internal.path("variants").size())
+        assertEquals("blue",internal.path("variants").single { it.path("sku").asText()==inactive.second }.path("optionValues").path("color").asText())
+    }
+    @Test fun `legacy is explicitly absent while corrupt labels fail closed without leaking raw option data`() {
+        val admin=provision();activate("CATALOG",admin);activate("STOREFRONT",admin)
+        val legacyProduct=product("Legacy options");val legacy=variant(legacyProduct,"Legacy")
+        jdbc.update("UPDATE product_variants SET attributes=?::jsonb WHERE id=?","""{"color":"not-an-option-schema"}""",legacy.first)
+        val legacyWire=data(get("/api/v1/catalog/products/${legacy.second}"))
+        assertEquals("ABSENT",legacyWire.path("optionSchema").path("state").asText());assertTrue(legacyWire.path("optionSchema").path("cause").isNull)
+        assertEquals(0,legacyWire.path("optionSchema").path("axes").size());assertEquals(0,legacyWire.path("variants").first().path("optionValues").size())
+
+        val invalidIdentityName="Invalid identity ${UUID.randomUUID()}";val invalidIdentityProduct=product(invalidIdentityName)
+        jdbc.update("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,'','Invalid',TRUE)",invalidIdentityProduct)
+        val publicInvalid=reader.list(false,query=invalidIdentityName).items.single().optionSchema
+        val adminInvalid=reader.list(true,query=invalidIdentityName).items.single().optionSchema
+        assertEquals(OptionSchemaState.UNKNOWN,publicInvalid.state);assertEquals(OptionResolutionCause.CORRUPT,publicInvalid.cause)
+        assertEquals(publicInvalid,adminInvalid)
+
+        val p=product("Corrupt options");val v=variant(p,"Corrupt")
+        val body="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"size","label":"Tamaño","presentation":"SELECT","order":0,"values":[{"code":"m","label":"Mediano","order":0,"swatchColor":null},{"code":"l","label":"Grande","order":1,"swatchColor":null}]}],"assignments":[{"variantSku":"${v.second}","optionValues":{"size":"m"}}],"variantOperations":[]}"""
+        assertEquals(200,exchange("/api/v1/user/catalog/products/${v.second}/options",HttpMethod.PUT,body,admin.cookie,admin.csrf).statusCode.value())
+        jdbc.update("UPDATE product_option_values SET label='MEDIANO' WHERE product_id=? AND code='l'",p)
+        val corrupt=data(get("/api/v1/catalog/products/${v.second}"))
+        val schema=corrupt.path("optionSchema")
+        assertEquals("UNKNOWN",schema.path("state").asText());assertEquals("CORRUPT",schema.path("cause").asText())
+        assertEquals(0,schema.path("axes").size());assertFalse(corrupt.toString().contains("MEDIANO"));assertEquals(0,corrupt.path("variants").first().path("optionValues").size())
     }
     @Test fun `writer preserves attribute order and direct legacy writes get stable canonical order`() {
         val p=product();val v=variant(p,"Attributes")

@@ -31,7 +31,7 @@ class ProductOptionCommandParser {
         fields(node, AXIS_FIELDS)
         val values = array(node, "values", OptionLimits.MAX_VALUES_PER_AXIS).map(::value)
         return OptionAxis.create(
-            code(node, "code"), label(node, "label"), OptionPresentation.fromWire(text(node, "presentation")),
+            code(node, "code"), label(node, "label"), OptionWireMapper.presentation(text(node, "presentation")),
             integer(node, "order"), values,
         ) ?: invalid()
     }

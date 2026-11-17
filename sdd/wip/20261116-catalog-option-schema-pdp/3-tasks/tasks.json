@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 3, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 4, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -25,7 +25,7 @@
       "references": ["Technical: Comando administrativo y concurrencia"], "design_decisions": ["DD-single-writer-protocol"]
     },
     {
-      "id": "TASK-004", "title": "Project fail-closed option wire", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003"],
+      "id": "TASK-004", "title": "Project fail-closed option wire", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002", "TASK-003"],
       "description": "Expose ABSENT/VALID/UNKNOWN with closed cause and bounded bulk axes/assignment reads without N+1.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: only Absent enables generic fallback", "AC-2: corrupt/duplicate data blocks purchase", "GATE: projection and query-count tests pass"],
