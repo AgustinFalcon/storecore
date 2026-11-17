@@ -9,7 +9,7 @@ import { PurchaseIntentCoordinator, PurchaseIntentSnapshot } from '../../core/pu
 import { mapProductDetail } from '../../data/mappers/http-mappers';
 import { CartCurrency } from '../../domain/cart/cart-currency';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
-import { CartLineConfirmationResult, PurchaseIntent, PurchaseIntentStage, RestoredPurchaseAvailability } from '../../domain/purchase-intent/purchase-intent';
+import { CartLineConfirmationResult, PurchaseIntent, PurchaseIntentResolutionResult, PurchaseIntentStage, RestoredPurchaseAvailability } from '../../domain/purchase-intent/purchase-intent';
 import { PurchaseIntentStorageResult } from '../../domain/purchase-intent/purchase-intent-storage.port';
 import { CartStore } from '../cart/cart.store';
 import { CustomerFavoritesStore } from '../identity/customer-favorites.store';
@@ -20,8 +20,9 @@ import { ProductPageViewComponent } from './product-page.view';
 describe('ProductPage restored quantity integration', () => {
   it('keeps the parent selection stable between the 1 and 2 keystrokes', async () => {
     const product = mapProductDetail({ id: 'p', sku: 'PRODUCT', name: 'Producto', status: 'ACTIVE', images: [],
+      optionSchema: { revision: 1, state: 'ABSENT', cause: null, axes: [] },
       productBasePrice: 1, price: { base: 1, effective: 1, original: 1, offer: null }, variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku: 'VARIANT', name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE',
-        attributes: {}, inventory: { variantId: 'v', sku: 'VARIANT', state: 'KNOWN', available: 20, reserved: 0, onHand: 20, safety: 0, saleable: 20 } }] });
+        optionValues: {}, attributes: {}, inventory: { variantId: 'v', sku: 'VARIANT', state: 'KNOWN', available: 20, reserved: 0, onHand: 20, safety: 0, saleable: 20 } }] });
     const cart = { revision: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', lines: [], currency: CartCurrency.Ars };
     const flow = PurchaseIntent.capture('opaque-flow-id-001', 'PRODUCT', 'VARIANT', 2, 1);
     const snapshot: PurchaseIntentSnapshot = { intent: flow, stage: PurchaseIntentStage.ReadyForConfirmation,
@@ -33,11 +34,12 @@ describe('ProductPage restored quantity integration', () => {
     const cartStore = { cart$: of(cart), loading$: of(false), errorMessage$: of(''), snapshot: { cart },
       viewState$: of({ cart, loading: false, errorMessage: '' }), authority: () => CustomerCartAccess.Ready, load: vi.fn(), add: vi.fn() };
     const intents = { snapshot: intentState.asReadonly(), validatedResumeReference: () => flow.flowId, invalidateAuthority: vi.fn(),
-      resumeSelection: vi.fn(), revise: vi.fn(() => snapshot), beginConfirmation: vi.fn(), markAccepted: vi.fn(),
-      markRejected: vi.fn(), markUnknown: vi.fn(), cancel: vi.fn() };
+      resumeSelection: vi.fn(), revise: vi.fn(() => snapshot), suspendForSelectionChange: vi.fn(() => snapshot), beginConfirmation: vi.fn(),
+      markAccepted: vi.fn(() => PurchaseIntentResolutionResult.Applied), markRejected: vi.fn(() => PurchaseIntentResolutionResult.Applied),
+      markUnknown: vi.fn(() => PurchaseIntentResolutionResult.Applied), cancel: vi.fn() };
     TestBed.overrideComponent(ProductPageComponent, { set: { providers: [
       { provide: CatalogStore, useValue: catalog }, { provide: CustomerFavoritesStore, useValue: { isFavorite: () => false,
-        viewState$: of({ mutationSku: '' }), errorMessage$: of(''), feedback$: of(''), load: vi.fn(), add: vi.fn(), remove: vi.fn() } },
+        viewState$: of({ mutationSku: '' }), errorMessage$: of(''), feedback$: of(''), load: vi.fn(), selectSku: vi.fn(), add: vi.fn(), remove: vi.fn() } },
     ] } });
     await TestBed.configureTestingModule({ imports: [ProductPageComponent], providers: [provideRouter([]),
       { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ sku: 'PRODUCT' })),

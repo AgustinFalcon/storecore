@@ -3,6 +3,7 @@ import { CatalogEditorMode, catalogProductDraftFromDetail, newCatalogProductDraf
 import { ProductStatus, VariantStatus, InventoryState } from './catalog-states';
 import { InventoryAvailability } from '../user/inventory-availability';
 import { ProductDetail } from './product-detail.entity';
+import { OptionWireMapper } from './option-wire.mapper';
 
 describe('catalog product draft', () => {
   it('uses a closed editor mode with Unknown at the wire boundary', () => {
@@ -16,6 +17,7 @@ describe('catalog product draft', () => {
     expect(created.variants).toEqual([expect.objectContaining({ id: '', initialAvailableQuantity: 0 })]);
     const detail: ProductDetail = {
       productBasePrice: 10, id: 'p', sku: 'SKU', name: 'Producto', description: '', brand: '', category: '', images: [], media: [], offerRef: null,
+      optionSnapshot: OptionWireMapper.fromWire({ revision: 1, state: 'ABSENT', cause: null, axes: [] }, [{ id: 'v', sku: 'SKU', optionValues: {} }]),
       price: { base: 10, original: 10, effective: 10, offer: null }, status: ProductStatus.Active, active: true,
       variants: [{ price: SkuPriceResolution.Unknown, pricePolicy: VariantPricePolicy.Inherited, basePriceOverride: null, id: 'v', sku: 'SKU', name: 'Principal', status: VariantStatus.Active, attributes: {}, availableQuantity: 3, availability: InventoryAvailability.Normal,
         inventory: { variantId: 'v', productName: 'Producto', variantLabel: 'Principal', onHand: 3, saleable: 3, updatedAt: null, state: InventoryState.Known, sku: 'SKU', availableQuantity: 3, reservedQuantity: 0, safetyStock: 0, availability: InventoryAvailability.Normal } }],

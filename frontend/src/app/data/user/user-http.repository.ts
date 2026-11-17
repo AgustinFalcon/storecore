@@ -11,6 +11,7 @@ import { readApiBody } from '../../core/api/base-response';
 import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
 import { ProductDetail } from '../../domain/catalog/product-detail.entity';
 import { CatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
+import { CatalogQuery, emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 import {
   CapabilityModule,
   InventoryRow,
@@ -29,8 +30,8 @@ import {
   mapFacet,
   mapInventory,
   mapPreview,
-  mapProductDetail,
-  mapProductDetails,
+  mapAdminProductDetail,
+  mapAdminProductDetails,
   mapUserSession,
 } from '../mappers/http-mappers';
 
@@ -78,10 +79,15 @@ export class UserHttpRepository implements IUserRepository {
       .pipe(map(body => mapPricePolicy(readApiBody(body))));
   }
 
-  listCatalog(page = BoundedPageRequest.first()): Observable<BoundedRows<ProductDetail>> {
+  listCatalog(query: CatalogQuery = emptyCatalogQuery): Observable<BoundedRows<ProductDetail>> {
+    let params: Record<string, string | number | boolean> = { page: query.pagination.page, size: query.pagination.size };
+    if (query.query) params = { ...params, query: query.query };
+    if (query.brand) params = { ...params, brand: query.brand };
+    if (query.category) params = { ...params, category: query.category };
+    if (query.offersOnly) params = { ...params, offers: true };
     return this.http
-      .get<unknown>(`${environment.apiBaseUrl}/user/catalog`, { params: { page: page.page, size: page.size } })
-      .pipe(map((body) => mapProductDetails(readApiBody<unknown>(body))));
+      .get<unknown>(`${environment.apiBaseUrl}/user/catalog`, { params })
+      .pipe(map((body) => mapAdminProductDetails(readApiBody<unknown>(body))));
   }
 
   saveProduct(product: CatalogProductDraft): Observable<ProductDetail> {
@@ -95,7 +101,7 @@ export class UserHttpRepository implements IUserRepository {
         })),
         productBasePrice: product.productBasePrice, status: product.status.wire,
       })
-      .pipe(map((body) => mapProductDetail(readApiBody<unknown>(body))));
+      .pipe(map((body) => mapAdminProductDetail(readApiBody<unknown>(body))));
   }
 
   saveBrand(facet: CatalogFacet): Observable<CatalogFacet> {
