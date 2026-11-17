@@ -185,3 +185,28 @@
   ESLint focal, suite Angular 1.584/1.584 en 224 archivos y build productivo
   pasan. GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico aprobaron el diff final
   sin P0–P3. CI hosted y PR son gates separados.
+- TASK-011 completada sobre `82da298565266fa003231e027a32f243f22d24d4`.
+  La revisión acumulativa cerró las carreras de autoridad entre el editor general
+  y el editor de opciones: acuse y conflicto 409 bloquean de inmediato, cada
+  `Unknown` eleva el highwater, respuestas anteriores no rehabilitan escritura,
+  una lectura iniciada después del bloqueo puede recuperar la misma revisión y
+  el delta local de actividad bajo `Absent` se conserva por identidad.
+- Los rechazos intermedios quedaron preservados como evidencia: detectaron la
+  ventana post-PUT, listados tardíos, recuperación a igual revisión, highwater
+  interno y el requisito `expectedRevision + 1` del conflicto tipado. Astra y
+  Sol aprobaron el SHA final sin P0–P3. El gate local final pasó 1.595/1.595
+  pruebas Angular en 224 archivos, lint, arquitectura 9/9 y build productivo de
+  699,99 kB dentro del presupuesto.
+- TASK-012 completada. `OptionDraftRebase.inflate` dejó de escanear todos los
+  paths por cada variante y construye índices en una única pasada O(K). La
+  regresión cubre 1.000 variantes y cuatro ejes; Sol midió diez corridas en
+  Chromium entre 7,7 y 16,4 ms, frente a 713–758 ms antes del cambio, y aprobó
+  el corte sin P0–P3. Seguridad, CI, PR y post-merge siguen abiertos en
+  TASK-013/TASK-014; el feature permanece en `sdd/wip` y no se declara merge.
+- TASK-013 completada sobre `240a4ce7d6d5cfb499a2f60629ec8ff827f8add9`.
+  GPT-6.1 Sol revisó autorización ADMIN/OPERATOR, CSRF/origin, ownership, CAS y
+  replay, serialización explícita, `Unknown` fail-closed, labels/colores,
+  cardinalidad, exposición de datos, logging y secretos. Emitió `APPROVE` sin
+  P0–P3; `git diff --check 5cba1ec 240a4ce` quedó limpio y el barrido focal no
+  encontró credenciales hardcodeadas. TASK-014 permanece abierto y no se
+  declara CI, PR, merge ni post-merge hasta obtener evidencia independiente.

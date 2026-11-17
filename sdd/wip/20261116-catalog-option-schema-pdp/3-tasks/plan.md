@@ -21,9 +21,9 @@
 
 ## Corte D — evidencia
 
-- [ ] TASK-011 Review exact-head de código, producto y arquitectura.
-- [ ] TASK-012 Review exact-head de performance PostgreSQL/Angular.
-- [ ] TASK-013 Review exact-head de seguridad.
+- [x] TASK-011 Review exact-head de código, producto y arquitectura.
+- [x] TASK-012 Review exact-head de performance PostgreSQL/Angular.
+- [x] TASK-013 Review exact-head de seguridad.
 - [ ] TASK-014 CI, PR, merge y post-merge con evidencia separada.
 
 La implementación se realiza en PR separado de este contrato documental y no
