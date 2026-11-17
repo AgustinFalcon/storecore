@@ -1,5 +1,8 @@
 package com.storecore.catalog
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.catalog.infrastructure.JdbcProductOptionWriter
+import com.storecore.catalog.infrastructure.ProductOptionCommandParser
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.*
@@ -9,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.testcontainers.containers.PostgreSQLContainer
+import java.io.ByteArrayInputStream
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -78,8 +82,10 @@ class CatalogOptionSchemaMigrationTest {
             )!!,
         )
         assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','products','SELECT,UPDATE')", Boolean::class.java)!!)
-        assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','SELECT')", Boolean::class.java)!!)
-        assertFalse(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','INSERT,UPDATE,DELETE')", Boolean::class.java)!!)
+        assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','SELECT,INSERT,UPDATE')", Boolean::class.java)!!)
+        assertFalse(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','DELETE')", Boolean::class.java)!!)
+        assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','audit_events','INSERT')", Boolean::class.java)!!)
+        assertFalse(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','audit_events','SELECT,UPDATE,DELETE')", Boolean::class.java)!!)
         listOf("product_option_axes_id_seq", "product_option_values_id_seq").forEach { sequence ->
             assertTrue(
                 sql.queryForObject(
@@ -107,6 +113,53 @@ class CatalogOptionSchemaMigrationTest {
                 statement.execute("RESET ROLE")
             }
         }
+    }
+
+    @Test fun `real CAS writer clears adds activates deactivates and audits as runtime`() {
+        val fixture = configuredProduct()
+        val sql = jdbc()
+        val skus = sql.queryForList(
+            "SELECT sku FROM product_variants WHERE product_id=? ORDER BY id",
+            String::class.java,
+            fixture.product,
+        )
+        val firstSku = skus[0]
+        val secondSku = skus[1]
+        val addedSku = "runtime-added-${UUID.randomUUID()}"
+
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            connection.createStatement().use { it.execute("SET ROLE storecore_runtime") }
+            val writer = JdbcProductOptionWriter(
+                JdbcTemplate(SingleConnectionDataSource(connection, true)),
+                ObjectMapper().findAndRegisterModules(),
+            )
+            val parser = ProductOptionCommandParser()
+            fun command(raw: String) = parser.parse(ByteArrayInputStream(raw.toByteArray()))
+
+            writer.replace(
+                firstSku,
+                command(
+                    """{"expectedRevision":1,"operation":"Clear","axes":[],"assignments":[],"variantOperations":[{"operation":"AddInactive","sku":"$addedSku","label":"Runtime added"}]}""",
+                ),
+                1,
+            )
+            connection.commit()
+
+            writer.replace(
+                secondSku,
+                command(
+                    """{"expectedRevision":2,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SELECT","order":0,"values":[{"code":"red","label":"Red","order":0,"swatchColor":null},{"code":"blue","label":"Blue","order":1,"swatchColor":null}]}],"assignments":[{"variantSku":"$firstSku","optionValues":{"color":"red"}},{"variantSku":"$secondSku","optionValues":{"color":"blue"}},{"variantSku":"$addedSku","optionValues":{"color":"red"}}],"variantOperations":[{"operation":"Deactivate","variantSku":"$firstSku"},{"operation":"Activate","variantSku":"$addedSku"}]}""",
+                ),
+                1,
+            )
+            connection.commit()
+        }
+
+        assertEquals(3L, sql.queryForObject("SELECT option_schema_revision FROM products WHERE id=?", Long::class.java, fixture.product))
+        assertFalse(sql.queryForObject("SELECT active FROM product_variants WHERE sku=?", Boolean::class.java, firstSku)!!)
+        assertTrue(sql.queryForObject("SELECT active FROM product_variants WHERE sku=?", Boolean::class.java, addedSku)!!)
+        assertEquals(2, sql.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?", Int::class.java, fixture.product))
     }
 
     @Test fun `runtime trigger validation cannot be bypassed with a shadow temporary guard`() {

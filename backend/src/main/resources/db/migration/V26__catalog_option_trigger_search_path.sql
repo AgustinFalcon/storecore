@@ -13,4 +13,6 @@ ALTER FUNCTION protect_product_option_validation_guard()
 -- SECURITY INVOKER validation locks and reads the owning aggregate, and bumps
 -- only the product tuple version while preserving the logical revision.
 GRANT SELECT, UPDATE ON products TO storecore_runtime;
-GRANT SELECT ON product_variants TO storecore_runtime;
+GRANT SELECT, INSERT, UPDATE ON product_variants TO storecore_runtime;
+GRANT INSERT ON audit_events TO storecore_runtime;
+GRANT USAGE, SELECT ON SEQUENCE product_variants_id_seq, audit_events_id_seq TO storecore_runtime;
