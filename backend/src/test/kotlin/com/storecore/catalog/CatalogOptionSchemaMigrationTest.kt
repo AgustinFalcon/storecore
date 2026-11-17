@@ -77,6 +77,9 @@ class CatalogOptionSchemaMigrationTest {
                 Boolean::class.java,
             )!!,
         )
+        assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','products','SELECT,UPDATE')", Boolean::class.java)!!)
+        assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','SELECT')", Boolean::class.java)!!)
+        assertFalse(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','product_variants','INSERT,UPDATE,DELETE')", Boolean::class.java)!!)
         listOf("product_option_axes_id_seq", "product_option_values_id_seq").forEach { sequence ->
             assertTrue(
                 sql.queryForObject(
@@ -106,6 +109,36 @@ class CatalogOptionSchemaMigrationTest {
         }
     }
 
+    @Test fun `runtime trigger validation cannot be bypassed with a shadow temporary guard`() {
+        val fixture = configuredProduct()
+
+        DriverManager.getConnection(postgres.jdbcUrl, postgres.username, postgres.password).use { connection ->
+            connection.autoCommit = false
+            try {
+                connection.createStatement().use { statement ->
+                    statement.execute("SET ROLE storecore_runtime")
+                    statement.execute("CREATE TEMP TABLE product_option_validation_guard(product_id BIGINT NOT NULL, transaction_id XID8 NOT NULL, PRIMARY KEY(product_id,transaction_id))")
+                }
+                connection.prepareStatement("DELETE FROM variant_option_values WHERE variant_id=?").use { statement ->
+                    statement.setLong(1, fixture.firstVariant)
+                    assertEquals(1, statement.executeUpdate())
+                }
+                assertThrows(SQLException::class.java) { connection.commit() }
+            } finally {
+                connection.rollback()
+            }
+        }
+
+        assertEquals(
+            1,
+            jdbc().queryForObject(
+                "SELECT count(*) FROM variant_option_values WHERE variant_id=?",
+                Int::class.java,
+                fixture.firstVariant,
+            ),
+        )
+    }
+
     @Test fun `V23 upgrade preserves all legal legacy data and published migration checksums`() {
         val database = "option_upgrade_" + UUID.randomUUID().toString().replace("-", "")
         postgres.createConnection("").use { connection -> connection.createStatement().use { it.execute("CREATE DATABASE $database") } }
@@ -123,7 +156,7 @@ class CatalogOptionSchemaMigrationTest {
         val beforeVariants = variantDigest(sql, product)
         val beforeBalances = sql.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id")
         val history = sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("25", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("26", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history WHERE version::int<=23 ORDER BY installed_rank"))
         val afterProduct = sql.queryForMap("SELECT * FROM products WHERE id=?", product)
         beforeProduct.forEach { (column, value) -> assertEquals(value, afterProduct[column], column) }
@@ -147,7 +180,7 @@ class CatalogOptionSchemaMigrationTest {
 
         val result = CatalogSchemaMigrationRunner.migrate(url, postgres.username, postgres.password)
 
-        assertEquals("25", result.targetSchemaVersion.toString())
+        assertEquals("26", result.targetSchemaVersion.toString())
         assertEquals(2, jdbc(url).queryForObject(
             "SELECT version FROM catalog_schema_compatibility_version WHERE singleton",
             Int::class.java,
