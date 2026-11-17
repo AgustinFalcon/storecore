@@ -1,5 +1,5 @@
 import {
-  AdminProductOptionsMapper, ConflictResolutionChoice, OptionDraftRebase, optionCommand, optionDraft, validateOptionDraft,
+  AdminProductOptionsMapper, ConflictResolutionChoice, OptionDraftRebase, optionAssignmentValue, optionCommand, optionDraft, validateOptionDraft,
 } from './admin-product-options';
 import { OptionPresentation, OptionSchemaState } from './option-schema';
 
@@ -40,6 +40,28 @@ describe('admin product options closed domain', () => {
     expect(command.assignments).not.toContainEqual(expect.objectContaining({ variantSku: 'NEW-1' }));
   });
 
+  it('treats inherited axis names as unassigned and enforces the total variant cap', () => {
+    expect(optionAssignmentValue({ optionValues: new Map() }, 'constructor')).toBe('');
+    const base = optionDraft(AdminProductOptionsMapper.fromWire(wire()));
+    const rows = Array.from({ length: 1000 }, (_, index) => ({ ...base.assignments[1], variantId: String(index), variantSku: `SKU-${index}` }));
+    expect(validateOptionDraft({ ...base, assignments: rows.slice(0, 999), pendingAdditions: [{ localId: 'ok', sku: 'NEW', label: 'Nueva' }] }).valid).toBe(true);
+    const overflow = validateOptionDraft({ ...base, assignments: rows, pendingAdditions: [{ localId: 'overflow', sku: 'EXTRA', label: 'Extra' }] });
+    expect(overflow.valid).toBe(false);
+    expect(overflow.message).toContain('1.000');
+  });
+
+  it('roundtrips an own constructor assignment through Map and the wire object', () => {
+    const base = AdminProductOptionsMapper.fromWire({ revision: 1, state: 'VALID', cause: null,
+      axes: [{ code: 'constructor', label: 'Constructor', presentation: 'SELECT', order: 0, values: [{ code: 'own', label: 'Propio', order: 0, swatchColor: null }] }],
+      assignments: [{ variantId: '1', variantSku: 'SKU', active: true, optionValues: { constructor: 'own' } }] });
+    const draft = optionDraft(base);
+    expect(optionAssignmentValue(draft.assignments[0], 'constructor')).toBe('own');
+    const command = optionCommand(base, draft);
+    const serialized = command.assignments[0] as { optionValues: Record<string, string> };
+    expect(Object.hasOwn(serialized.optionValues, 'constructor')).toBe(true);
+    expect(serialized.optionValues.constructor).toBe('own');
+  });
+
   it('makes remove-versus-edit hierarchical and honors the explicit choice', () => {
     const base = optionDraft(AdminProductOptionsMapper.fromWire(wire()));
     const mine = { ...base, axes: [{ ...base.axes[0], values: base.axes[0].values.map(value => value.code === 'red' ? { ...value, label: 'Rojo mío' } : value) }] };
@@ -50,5 +72,20 @@ describe('admin product options closed domain', () => {
     const remoteResult = OptionDraftRebase.merge(base, mine, remote, new Map([['axis/color/exists', ConflictResolutionChoice.Remote]]));
     expect(mineResult?.axes[0].values[0].label).toBe('Rojo mío');
     expect(remoteResult?.axes).toHaveLength(0);
+  });
+
+  it('rebases the maximum supported assignment cardinality without a per-variant path scan', () => {
+    const axes = ['color', 'size', 'material', 'finish'].map((code, order) => ({ code, label: code, presentation: 'SELECT', order,
+      values: [{ code: 'only', label: 'Único', order: 0, swatchColor: null }] }));
+    const assignments = Array.from({ length: 1000 }, (_, index) => ({ variantId: String(index), variantSku: `SKU-${index}`, active: false,
+      optionValues: Object.fromEntries(axes.map(axis => [axis.code, 'only'])) }));
+    const base = optionDraft(AdminProductOptionsMapper.fromWire({ revision: 1, state: 'VALID', cause: null, axes, assignments }));
+    const mine = { ...base, axes: base.axes.map((axis, index) => index ? axis : { ...axis, label: 'Color local' }) };
+    const remote = { ...base, assignments: base.assignments.map((row, index) => index === 999 ? { ...row, active: true } : row) };
+    const started = performance.now();
+    const merged = OptionDraftRebase.merge(base, mine, remote, new Map());
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(merged?.axes[0].label).toBe('Color local');
+    expect(merged?.assignments[999].active).toBe(true);
   });
 });

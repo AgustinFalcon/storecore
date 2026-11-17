@@ -36,7 +36,7 @@
           <article class="option-assignment"><header><strong>{{ row.variantSku }}</strong><label><input type="checkbox" [disabled]="!state.canWrite || !state.phase.allowsDraft" [name]="'active-' + row.variantId" [ngModel]="row.active" (ngModelChange)="patchAssignment(draft, rowIndex, { active: $event })" /> Activa</label></header>
           @if (missingAxes(draft, row); as missing) { <p class="option-editor__error" role="alert">Faltan: {{ missing }}</p> }
           @if (duplicateActiveSkus(draft, row); as duplicates) { <p class="option-editor__error" role="alert">Repite combinación con: {{ duplicates }}</p> }
-          <div class="option-editor__grid">@for (axis of draft.axes; track axis.code) { <label>{{ axis.label }}<select [disabled]="!state.canWrite || !state.phase.allowsDraft" [name]="'assignment-' + row.variantId + '-' + axis.code" [ngModel]="row.optionValues[axis.code] || ''" (ngModelChange)="setAssignmentValue(draft, rowIndex, axis.code, $event)"><option value="">Sin asignar</option>@for (value of axis.values; track value.code) { <option [value]="value.code">{{ value.label }}</option> }</select></label> }</div></article>
+          <div class="option-editor__grid">@for (axis of draft.axes; track axis.code) { <label>{{ axis.label }}<select [disabled]="!state.canWrite || !state.phase.allowsDraft" [name]="'assignment-' + row.variantId + '-' + axis.code" [ngModel]="assignmentValue(row, axis.code)" (ngModelChange)="setAssignmentValue(draft, rowIndex, axis.code, $event)"><option value="">Sin asignar</option>@for (value of axis.values; track value.code) { <option [value]="value.code">{{ value.label }}</option> }</select></label> }</div></article>
         }
         </div>
         <div class="option-editor__toolbar"><button type="button" class="sc-btn sc-btn--ghost" [disabled]="assignmentPage() === 0" (click)="assignmentPage.set(assignmentPage() - 1)">Anteriores</button><span>Página {{ assignmentPage() + 1 }}</span><button type="button" class="sc-btn sc-btn--ghost" [disabled]="(assignmentPage() + 1) * assignmentPageSize >= assignmentCount(draft)" (click)="assignmentPage.set(assignmentPage() + 1)">Siguientes</button></div>
@@ -44,7 +44,8 @@
 
       <fieldset [disabled]="!state.canWrite || !state.phase.allowsDraft"><legend class="sr-only">Variantes nuevas inactivas</legend><section class="option-pending" aria-labelledby="pending-title"><h3 id="pending-title">Variantes nuevas inactivas</h3><p>Se crean inactivas; después del guardado y la relectura podrás asignarlas y activarlas.</p>
         @for (row of draft.pendingAdditions; track row.localId; let rowIndex = $index) { <div class="option-value"><label>SKU <input [name]="'pending-sku-' + row.localId" maxlength="128" [ngModel]="row.sku" (ngModelChange)="patchPending(draft, rowIndex, { sku: $event })" /></label><label>Nombre <input [name]="'pending-label-' + row.localId" maxlength="200" [ngModel]="row.label" (ngModelChange)="patchPending(draft, rowIndex, { label: $event })" /></label><button type="button" class="sc-btn sc-btn--ghost" (click)="removePending(draft, rowIndex)">Quitar</button></div> }
-        <button type="button" class="sc-btn sc-btn--ghost" (click)="addInactive(draft)">Agregar variante inactiva</button>
+        @if (!canAddInactive(draft)) { <p class="option-editor__notice" role="status">Alcanzaste el máximo de 1.000 variantes, incluidas las altas pendientes.</p> }
+        <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!canAddInactive(draft)" (click)="addInactive(draft)">Agregar variante inactiva</button>
       </section>
     </fieldset>
 

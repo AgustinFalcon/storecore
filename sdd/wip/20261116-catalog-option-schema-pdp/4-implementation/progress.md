@@ -169,3 +169,53 @@
   que se ejecuta en CI Ubuntu. GPT-6.1 Sol técnico y GPT-6.1 Astra UX/Product
   aprobaron la cabeza corregida sin P0–P3. CI hosted y PR permanecen como gates
   separados; no se declara merge.
+- TASK-010 completada con journeys browser deterministas de comprador y consola.
+  El producto simple `Absent` no muestra selector redundante, conserva cantidad
+  a través del acceso CUSTOMER y confirma exactamente un PUT de carrito con el
+  SKU/cantidad visibles. El escenario no cartesiano conserva el sufijo compatible,
+  retira SKU/precio/favorito/submit antiguos y prueba el tombstone en un documento
+  nuevo antes de permitir una intención explícita distinta.
+- El editor ADMIN prueba 409→GET remoto→elección→reaplicación explícita→segundo
+  PUT con revisión nueva; conserva el reordenamiento remoto independiente y la
+  etiqueta local elegida. La búsqueda transporta nombre, SKU secundario y
+  categoría en público/admin y demuestra que un SKU de variante inactiva sólo
+  aparece en consola.
+- Evidencia exacta TASK-010: 17/17 Playwright con cero retries; matriz 0/1/2/4
+  ejes a 390/768/1.440, overflow controlado y Axe sin impactos serious/critical.
+  ESLint focal, suite Angular 1.584/1.584 en 224 archivos y build productivo
+  pasan. GPT-6.1 Astra UX/Product y GPT-6.1 Sol técnico aprobaron el diff final
+  sin P0–P3. CI hosted y PR son gates separados.
+- TASK-011 completada sobre `82da298565266fa003231e027a32f243f22d24d4`.
+  La revisión acumulativa cerró las carreras de autoridad entre el editor general
+  y el editor de opciones: acuse y conflicto 409 bloquean de inmediato, cada
+  `Unknown` eleva el highwater, respuestas anteriores no rehabilitan escritura,
+  una lectura iniciada después del bloqueo puede recuperar la misma revisión y
+  el delta local de actividad bajo `Absent` se conserva por identidad.
+- Los rechazos intermedios quedaron preservados como evidencia: detectaron la
+  ventana post-PUT, listados tardíos, recuperación a igual revisión, highwater
+  interno y el requisito `expectedRevision + 1` del conflicto tipado. Astra y
+  Sol aprobaron el SHA final sin P0–P3. El gate local final pasó 1.595/1.595
+  pruebas Angular en 224 archivos, lint, arquitectura 9/9 y build productivo de
+  699,99 kB dentro del presupuesto.
+- TASK-012 completada. `OptionDraftRebase.inflate` dejó de escanear todos los
+  paths por cada variante y construye índices en una única pasada O(K). La
+  regresión cubre 1.000 variantes y cuatro ejes; Sol midió diez corridas en
+  Chromium entre 7,7 y 16,4 ms, frente a 713–758 ms antes del cambio, y aprobó
+  el corte sin P0–P3. Seguridad, CI, PR y post-merge siguen abiertos en
+  TASK-013/TASK-014; el feature permanece en `sdd/wip` y no se declara merge.
+- TASK-013 completada sobre `240a4ce7d6d5cfb499a2f60629ec8ff827f8add9`.
+  GPT-6.1 Sol revisó autorización ADMIN/OPERATOR, CSRF/origin, ownership, CAS y
+  replay, serialización explícita, `Unknown` fail-closed, labels/colores,
+  cardinalidad, exposición de datos, logging y secretos. Emitió `APPROVE` sin
+  P0–P3; `git diff --check 5cba1ec 240a4ce` quedó limpio y el barrido focal no
+  encontró credenciales hardcodeadas. TASK-014 permanece abierto y no se
+  declara CI, PR, merge ni post-merge hasta obtener evidencia independiente.
+- TASK-014 — evidencia parcial del PR correctivo: #296 se abrió desde
+  `fix/storecore-option-review-findings-20261117` hacia
+  `feat/storecore-option-browser-journeys-20261117`. El run pre-merge
+  `44116184857` aprobó `repository-hygiene`, `frontend`, `backend` y
+  `unified-access-real-e2e`. Tras autorización explícita, GitHub creó el merge
+  commit `05ea7521a4223abafc1d623b3ccd4467bcba1121`; el run post-merge
+  `44118012266` volvió a aprobar los cuatro jobs.
+- El PR apilado #295 permanece abierto, limpio y sin autorización de merge;
+  TASK-014 continúa abierta hasta completar su propio CI, merge y post-merge.
