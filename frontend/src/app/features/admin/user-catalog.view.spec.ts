@@ -1,7 +1,7 @@
 import { UserRole } from '../../domain/user/user-role';
 import { TestBed } from '@angular/core/testing';
 import { firstValueFrom, of, Subject } from 'rxjs';
-import { mapProductDetails } from '../../data/mappers/http-mappers';
+import { mapAdminProductDetails as mapProductDetails } from '../../data/mappers/http-mappers';
 import { ManageAdminCatalogUseCase } from '../../domain/user/use-cases/manage-admin-catalog.usecase';
 import { ListCatalogFacetsUseCase } from '../../domain/catalog/use-cases/list-catalog-facets.usecase';
 import { AdminCatalogStore } from './admin-catalog.store';
@@ -92,8 +92,14 @@ describe('bounded administrative catalog', () => {
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} }] });
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: unchangedAbsent });
     expect(store.snapshot.draft.variants.map(variant => variant.status)).toEqual([VariantStatus.Inactive, VariantStatus.Active]);
+    const independentRemote = AdminProductOptionsMapper.fromWire({ revision: 2, state: 'ABSENT', cause: null, axes: [],
+      assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: true, optionValues: {} },
+        { variantId: 'remote-b', variantSku: 'REMOTE-B', active: false, optionValues: {} }] });
+    store.syncOptionSnapshot({ sku: 'SKU', snapshot: independentRemote });
+    expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
+    expect(store.snapshot.draft.variantPublishedStatuses.get('remote-b')).toBe(VariantStatus.Inactive);
     store.load();
-    const valid = AdminProductOptionsMapper.fromWire({ revision: 2, state: 'VALID', cause: null,
+    const valid = AdminProductOptionsMapper.fromWire({ revision: 3, state: 'VALID', cause: null,
       axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0, values: [{ code: 'red', label: 'Rojo', order: 0, swatchColor: null }] }],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: valid });
@@ -105,7 +111,7 @@ describe('bounded administrative catalog', () => {
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
     expect(store.snapshot.products[0].variants[0].status).toBe(VariantStatus.Inactive);
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Valid);
-    const absent = AdminProductOptionsMapper.fromWire({ revision: 3, state: 'ABSENT', cause: null, axes: [],
+    const absent = AdminProductOptionsMapper.fromWire({ revision: 4, state: 'ABSENT', cause: null, axes: [],
       assignments: [{ variantId: 'variant-id', variantSku: 'VAR-1', active: false, optionValues: {} }] });
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: absent });
     expect(store.snapshot.draft.name).toBe('Edición sin publicar');
@@ -113,16 +119,19 @@ describe('bounded administrative catalog', () => {
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Inactive);
     expect(store.snapshot.products[0].optionSnapshot.schema.state).toBe(OptionSchemaState.Absent);
     const newerProducts = mapProductDetails({ items: [{ id: 'p', sku: 'SKU', name: 'Servidor nuevo', status: 'ACTIVE', productBasePrice: 10,
-      optionSchema: { revision: 4, state: 'ABSENT', cause: null, axes: [] },
+      optionSchema: { revision: 5, state: 'ABSENT', cause: null, axes: [] },
       variants: [{ id: 'variant-id', sku: 'VAR-1', name: 'Original', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: {}, inventory: { sku: 'VAR-1', state: 'KNOWN', available: 2, reserved: 0, safety: 0, onHand: 2, saleable: 2 } }] }], total: 1, page: 0, size: 50, truncated: false });
     store.load(); newerList.next(newerProducts); newerList.complete();
-    expect(store.snapshot.products[0].optionSnapshot.schema.revision?.value).toBe(4);
+    expect(store.snapshot.products[0].optionSnapshot.schema.revision?.value).toBe(5);
     expect(store.snapshot.products[0].variants[0].status).toBe(VariantStatus.Active);
-    expect(store.snapshot.draft.optionSchemaRevision).toBe(4);
+    expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Active);
     store.syncOptionSnapshot({ sku: 'SKU', snapshot: unchangedAbsent });
-    expect(store.snapshot.draft.optionSchemaRevision).toBe(4);
+    expect(store.snapshot.draft.optionSchemaRevision).toBe(5);
     expect(store.snapshot.draft.variants[0].status).toBe(VariantStatus.Active);
+    const unknown = AdminProductOptionsMapper.fromWire({ revision: 99, state: 'FUTURE', axes: [], assignments: [] });
+    store.syncOptionSnapshot({ sku: 'SKU', snapshot: unknown });
+    expect(store.snapshot.draft.optionSchemaState).toBe(OptionSchemaState.Unknown);
     store.ngOnDestroy();
   });
 

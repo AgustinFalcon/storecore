@@ -96,6 +96,13 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
   readonly beginCreate = this.updater((s) => s.loading ? s : ({ ...s, errorMessage: '', draft: newCatalogProductDraft() }));
   readonly beginEdit = this.updater((s, product: ProductDetail) => s.loading ? s : ({ ...s, errorMessage: '', draft: catalogProductDraftFromDetail(product) }));
   readonly syncOptionSnapshot = this.updater((s, verified: VerifiedProductOptionsSnapshot) => {
+    if (verified.snapshot.schema.state === OptionSchemaState.Unknown) {
+      this.verifiedOptionsBySku.delete(verified.sku);
+      const unknownOptionSnapshot = Object.freeze({ schema: verified.snapshot.schema, variants: Object.freeze([]) });
+      return { ...s,
+        products: s.products.map(product => product.sku === verified.sku ? { ...product, optionSnapshot: unknownOptionSnapshot } : product),
+        draft: s.draft.sku === verified.sku ? { ...s.draft, optionSchemaState: OptionSchemaState.Unknown, optionSchemaRevision: null } : s.draft };
+    }
     const productRevision = s.products.find(product => product.sku === verified.sku)?.optionSnapshot.schema.revision?.value ?? 0;
     const draftRevision = s.draft.sku === verified.sku ? s.draft.optionSchemaRevision ?? 0 : 0;
     const cachedRevision = this.verifiedOptionsBySku.get(verified.sku)?.revision ?? 0;
@@ -235,12 +242,8 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     const samePublishedRevision = draft.optionSchemaRevision !== null && snapshot.revision <= draft.optionSchemaRevision
       && draft.optionSchemaState === snapshot.schema.state;
     if (samePublishedRevision) return { ...draft, optionSchemaState: snapshot.schema.state, optionSchemaRevision: Math.max(draft.optionSchemaRevision!, snapshot.revision) };
-    const activity = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active]));
-    return { ...draft, optionSchemaState: snapshot.schema.state, optionSchemaRevision: snapshot.revision, variants: draft.variants.map(variant => {
-      if (!variant.id) return snapshot.schema.state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
-      const active = activity.get(variant.id);
-      return active === undefined ? variant : { ...variant, status: active ? VariantStatus.Active : VariantStatus.Inactive };
-    }) };
+    const statuses = new Map(snapshot.assignments.map(assignment => [assignment.variantId, assignment.active ? VariantStatus.Active : VariantStatus.Inactive]));
+    return this.reconcileDraft(draft, snapshot.schema.state, snapshot.revision, statuses);
   }
 
   private withListedDraft(draft: CatalogProductDraft, product: ProductDetail): CatalogProductDraft {
@@ -248,11 +251,21 @@ export class AdminCatalogStore extends ComponentStore<AdminCatalogState> {
     if (schema.state === OptionSchemaState.Unknown) return { ...draft, optionSchemaState: OptionSchemaState.Unknown, optionSchemaRevision: null };
     const revision = schema.revision?.value;
     if (revision === undefined || revision === null || draft.optionSchemaRevision !== null && revision <= draft.optionSchemaRevision) return draft;
-    const statuses = new Map(product.variants.map(variant => [variant.id, variant.status]));
-    return { ...draft, optionSchemaState: schema.state, optionSchemaRevision: revision, variants: draft.variants.map(variant => {
-      if (!variant.id) return schema.state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
-      return { ...variant, status: statuses.get(variant.id) ?? variant.status };
-    }) };
+    return this.reconcileDraft(draft, schema.state, revision, new Map(product.variants.map(variant => [variant.id, variant.status])));
+  }
+
+  private reconcileDraft(draft: CatalogProductDraft, state: OptionSchemaState, revision: number,
+    published: ReadonlyMap<string, VariantStatus>): CatalogProductDraft {
+    const preserveIndependentAbsentDelta = draft.optionSchemaState === OptionSchemaState.Absent && state === OptionSchemaState.Absent;
+    return { ...draft, optionSchemaState: state, optionSchemaRevision: revision,
+      variantPublishedStatuses: new DomainReadonlyMap(published), variants: draft.variants.map(variant => {
+        if (!variant.id) return state.allowsGeneric ? variant : { ...variant, status: VariantStatus.Inactive };
+        const remote = published.get(variant.id); if (!remote) return variant;
+        const previous = draft.variantPublishedStatuses.get(variant.id);
+        const localChanged = previous !== undefined && variant.status !== previous;
+        const remoteChanged = previous !== undefined && remote !== previous;
+        return preserveIndependentAbsentDelta && localChanged && !remoteChanged ? variant : { ...variant, status: remote };
+      }) };
   }
 
   readonly persistBrand = this.effect<void>((trigger$) =>

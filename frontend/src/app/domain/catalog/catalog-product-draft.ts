@@ -3,6 +3,7 @@ import { ProductDetail } from './product-detail.entity';
 import { ProductStatus, VariantStatus } from './catalog-states';
 import { VariantPricePolicy, VariantPriceCommand } from './variant-price';
 import { OptionSchemaState } from './option-schema';
+import { DomainReadonlyMap } from './option-schema';
 
 export class CatalogEditorMode {
   private constructor(readonly wire: string, readonly label: string, readonly canCreate: boolean) {}
@@ -31,6 +32,7 @@ export interface CatalogVariantDraft {
 export interface CatalogProductDraft {
   readonly optionSchemaState: OptionSchemaState;
   readonly optionSchemaRevision: number | null;
+  readonly variantPublishedStatuses: ReadonlyMap<string, VariantStatus>;
   readonly productBasePrice: number | null;
   readonly productBasePriceRaw: string;
   readonly mode: CatalogEditorMode;
@@ -52,7 +54,7 @@ export function newCatalogVariant(sku = ''): CatalogVariantDraft {
 
 export function newCatalogProductDraft(): CatalogProductDraft {
   return {
-    optionSchemaState: OptionSchemaState.Absent, optionSchemaRevision: null,
+    optionSchemaState: OptionSchemaState.Absent, optionSchemaRevision: null, variantPublishedStatuses: new DomainReadonlyMap([]),
     mode: CatalogEditorMode.Create, id: '', sku: '', name: '', description: '', brand: '', category: '', images: [],
     variants: [newCatalogVariant()], productBasePrice: 0, productBasePriceRaw: '0', status: ProductStatus.Draft,
   };
@@ -61,6 +63,7 @@ export function newCatalogProductDraft(): CatalogProductDraft {
 export function catalogProductDraftFromDetail(product: ProductDetail): CatalogProductDraft {
   return {
     optionSchemaState: product.optionSnapshot.schema.state, optionSchemaRevision: product.optionSnapshot.schema.revision?.value ?? null,
+    variantPublishedStatuses: new DomainReadonlyMap(product.variants.map(variant => [variant.id, variant.status] as const)),
     mode: CatalogEditorMode.Edit, id: product.id, sku: product.sku, name: product.name, description: product.description,
     brand: product.brand, category: product.category, images: product.images, productBasePrice: product.productBasePrice,
     productBasePriceRaw: product.productBasePrice === null ? '' : String(product.productBasePrice),

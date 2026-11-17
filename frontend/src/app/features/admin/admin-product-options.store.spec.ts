@@ -46,6 +46,7 @@ describe('AdminProductOptionsStore', () => {
     expect(manager.write).toHaveBeenCalledTimes(1); write.next({ revision: 2, state: projection(2).schema.state });
     afterWrite.next(AdminProductOptionsMapper.fromWire({ revision: 2, state: 'FUTURE', axes: [], assignments: [] }));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.RefreshRequired); expect(store.snapshot.draft?.axes).toHaveLength(1);
+    expect(verifiedOptionsSnapshot(store.snapshot)?.schema.state.wire).toBe('UNKNOWN');
     store.save(); expect(manager.write).toHaveBeenCalledTimes(1); store.ngOnDestroy();
   });
 

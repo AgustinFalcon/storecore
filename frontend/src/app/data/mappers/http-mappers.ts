@@ -8,6 +8,7 @@ import { ProductDetail, ProductPrice, ProductVariant } from '../../domain/catalo
 import { ProductSummary, summarizeProduct } from '../../domain/catalog/product-summary.entity';
 import { isArsAmount, SkuPriceResolution, VariantPricePolicy } from '../../domain/catalog/variant-price';
 import { OptionWireMapper } from '../../domain/catalog/option-wire.mapper';
+import { OptionSnapshot } from '../../domain/catalog/option-schema';
 import { CustomerAddress, CustomerProfile, CustomerSessionResult } from '../../domain/customer/customer.entity';
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from '../../domain/order/commerce-states';
 import { AdminOrder, CustomerOrder } from '../../domain/order/order.entity';
@@ -164,17 +165,25 @@ function mapVariant(value: unknown, productBase: unknown): ProductVariant {
     pricePolicy, basePriceOverride: pricePolicy.isOverride ? base as number : null,
     price };
 }
-export function mapProductDetail(value: unknown): ProductDetail {
+type ProductOptionsMapper = (schema: unknown, variants: readonly { readonly id: unknown; readonly sku: unknown; readonly optionValues: unknown; readonly active: unknown }[]) => OptionSnapshot;
+function mapProductDetailWith(value: unknown, mapOptions: ProductOptionsMapper): ProductDetail {
   const row = asRecord(value); const status = ProductStatus.fromWire(row['status']);
   const rawVariants = items(row['variants']);
   const variants = rawVariants.map(value => mapVariant(value, row['productBasePrice']));
+  const optionVariants = rawVariants.map((value, index) => { const variant = asRecord(value); return {
+    id: variant['id'], sku: variant['sku'], optionValues: variant['optionValues'], active: variants[index].status === VariantStatus.Active
+      ? true : variants[index].status === VariantStatus.Inactive ? false : null,
+  }; });
   return { id: text(row['id']), sku: text(row['sku']), name: text(row['name']), description: text(row['description']), brand: text(row['brand']), category: text(row['category']), images: items(row['images']).map(text),
     media: items(row['media']).map(value => { const media = asRecord(value); return { id: text(media['id']), url: text(media['url']), sortOrder: num(media['sortOrder']), primary: media['primary'] === true }; }),
-    variants, optionSnapshot: OptionWireMapper.fromWire(row['optionSchema'], rawVariants.map(value => { const variant = asRecord(value); return { id: variant['id'], sku: variant['sku'], optionValues: variant['optionValues'] }; })),
+    variants, optionSnapshot: mapOptions(row['optionSchema'], optionVariants),
     productBasePrice: isArsAmount(row['productBasePrice']) ? row['productBasePrice'] : null,
     price: row['price'] == null ? null : mapPrice(row['price']), offerRef: text(row['offerRef']) || null, status, active: status.isPublic };
 }
+export function mapProductDetail(value: unknown): ProductDetail { return mapProductDetailWith(value, OptionWireMapper.fromWire); }
 export function mapProductDetails(value: unknown): BoundedRows<ProductDetail> { return mapBoundedRows(value, mapProductDetail); }
+export function mapAdminProductDetail(value: unknown): ProductDetail { return mapProductDetailWith(value, OptionWireMapper.fromAdminWire); }
+export function mapAdminProductDetails(value: unknown): BoundedRows<ProductDetail> { return mapBoundedRows(value, mapAdminProductDetail); }
 
 function mapCartLine(value: unknown): CartLine {
   const row = requiredRecord(value);
