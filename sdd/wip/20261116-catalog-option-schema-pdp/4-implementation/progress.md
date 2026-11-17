@@ -53,3 +53,19 @@
   mediante `PropertiesLauncher` sin iniciar Spring. La
   equivalencia Unicode de labels queda explícitamente en TASK-003 y cualquier
   dato no validado fallará cerrado en TASK-004.
+- TASK-003 implementada con parser cerrado y acotado, endpoint ADMIN CAS,
+  locks producto→variantes, operaciones `Replace/Clear/Keep/AddInactive/
+  Activate/Deactivate`, auditoría redacted y rotación CSRF sólo al commit.
+- `saveProduct` participa del mismo protocolo transaccional: preserva actividad
+  con schema válido, fuerza altas inactivas, incrementa revisión por membresía o
+  actividad y revierte íntegramente ante revisión agotada o límite de variantes.
+- El GET administrativo traduce presentación con tipo cerrado y falla cerrado a
+  `UNKNOWN` ante datos persistidos corruptos; no publica labels/colors crudos de
+  un schema inválido.
+- Evidencia local TASK-003: blast-radius de dominio, migración V24, parser y HTTP/
+  PostgreSQL con 41 pruebas, 0 fallos y 0 errores; suite HTTP ampliada 14/14 con
+  CUSTOMER/OPERATOR/ADMIN, capability, origin/CSRF, ownership 404, revisión
+  agotada, concurrencia CAS, límite 1.000, activación/desactivación y rollback.
+- Dos revisiones GPT-6.1 Sol: APPROVE sin P0–P3. La revisión de cobertura pidió
+  casos negativos adicionales; se incorporaron, quedaron verdes y fueron
+  revalidados antes del commit publicado. CI del PR sigue siendo gate separado.

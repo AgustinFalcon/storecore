@@ -165,11 +165,166 @@ class CatalogProjectionHttpIntegrationTest(
         jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},admin.userId,sessionId,"CATALOG",version,"DISABLED","{}",UUID.randomUUID(),"test")
         assertEquals(409,get("/api/v1/user/catalog",admin.cookie).statusCode.value());activate("CATALOG",admin)
     }
+    @Test fun `option writer enforces admin origin csrf cas redacted audit and closed read model`() {
+        val admin=provision();val operator=provision("OPERATOR");activate("CATALOG",admin)
+        val p=product();val v=variant(p,"Schema variant")
+        val path="/api/v1/user/catalog/products/${v.second}/options"
+        val body="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SWATCH","order":0,"values":[{"code":"red","label":"Rojo confidencial","order":0,"swatchColor":"#ff0000"}]}],"assignments":[{"variantSku":"${v.second}","optionValues":{"color":"red"}}],"variantOperations":[{"operation":"Keep","variantSku":"${v.second}"}]}"""
+
+        assertEquals(401,exchange(path,HttpMethod.PUT,body,null,"invalid").statusCode.value())
+        assertEquals(403,exchange(path,HttpMethod.PUT,body,operator.cookie,operator.csrf).statusCode.value())
+        assertEquals(403,exchange(path,HttpMethod.PUT,body,admin.cookie,admin.csrf,"https://foreign.invalid").statusCode.value())
+        assertEquals(403,exchange(path,HttpMethod.PUT,body,admin.cookie,"invalid").statusCode.value())
+        assertEquals(200,get(path,operator.cookie).statusCode.value())
+
+        val saved=exchange(path,HttpMethod.PUT,body,admin.cookie,admin.csrf)
+        val savedData=data(saved)
+        assertEquals(2,savedData.path("revision").asInt());assertEquals("VALID",savedData.path("state").asText())
+        val nextCsrf=saved.headers.getFirst("X-CSRF-Token")!!;assertNotEquals(admin.csrf,nextCsrf)
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM product_option_axes WHERE product_id=?",Int::class.java,p))
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM variant_option_values WHERE variant_id=?",Int::class.java,v.first))
+        val payload=jdbc.queryForObject("SELECT payload_redacted::text FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=? ORDER BY id DESC LIMIT 1",String::class.java,p)!!
+        assertTrue(payload.contains("color"));assertFalse(payload.contains("Rojo confidencial"));assertFalse(payload.contains("#ff0000"))
+
+        val read=get(path,admin.cookie)
+        assertEquals("no-store",read.headers.cacheControl)
+        val readData=data(read);assertEquals("VALID",readData.path("state").asText());assertEquals("SWATCH",readData.path("axes").first().path("presentation").asText())
+        val auditsBefore=jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p)
+        val stale=exchange(path,HttpMethod.PUT,body,admin.cookie,nextCsrf)
+        assertEquals(409,stale.statusCode.value());assertNull(stale.headers.getFirst("X-CSRF-Token"))
+        assertEquals(auditsBefore,jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p))
+        assertEquals(2,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+
+        val addedSku="OPTION-${UUID.randomUUID()}"
+        val addition=body.replace("\"expectedRevision\":1","\"expectedRevision\":2")
+            .replace("\"variantOperations\":[{\"operation\":\"Keep\",\"variantSku\":\"${v.second}\"}]","\"variantOperations\":[{\"operation\":\"AddInactive\",\"sku\":\"$addedSku\",\"label\":\"Nueva variante\"}]")
+        val added=exchange(path,HttpMethod.PUT,addition,admin.cookie,nextCsrf)
+        assertEquals(200,added.statusCode.value(),added.body)
+        assertFalse(jdbc.queryForObject("SELECT active FROM product_variants WHERE sku=?",Boolean::class.java,addedSku)!!)
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM variant_option_values a JOIN product_variants v ON v.id=a.variant_id WHERE v.sku=?",Int::class.java,addedSku))
+        val clear="""{"expectedRevision":3,"operation":"Clear","axes":[],"assignments":[],"variantOperations":[]}"""
+        val cleared=exchange(path,HttpMethod.PUT,clear,admin.cookie,added.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(200,cleared.statusCode.value(),cleared.body)
+        assertEquals("ABSENT",data(cleared).path("state").asText())
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM product_option_axes WHERE product_id=?",Int::class.java,p))
+        assertEquals(4,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+    }
+    @Test fun `concurrent option writers serialize and exactly one wins the same revision`() {
+        val first=provision();val second=provision();activate("CATALOG",first)
+        val p=product();val v=variant(p,"Concurrent")
+        val path="/api/v1/user/catalog/products/${v.second}/options"
+        fun body(value:String,label:String)="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SELECT","order":0,"values":[{"code":"$value","label":"$label","order":0,"swatchColor":null}]}],"assignments":[{"variantSku":"${v.second}","optionValues":{"color":"$value"}}],"variantOperations":[]}"""
+        val ready=java.util.concurrent.CountDownLatch(2);val start=java.util.concurrent.CountDownLatch(1)
+        val pool=java.util.concurrent.Executors.newFixedThreadPool(2)
+        try {
+            val calls=listOf(first to body("red","Rojo"),second to body("blue","Azul")).map { (session,command) ->
+                pool.submit<Int> { ready.countDown();start.await();exchange(path,HttpMethod.PUT,command,session.cookie,session.csrf).statusCode.value() }
+            }
+            assertTrue(ready.await(10,java.util.concurrent.TimeUnit.SECONDS));start.countDown()
+            assertEquals(listOf(200,409),calls.map { it.get(20,java.util.concurrent.TimeUnit.SECONDS) }.sorted())
+        } finally { pool.shutdownNow() }
+        assertEquals(2,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p))
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM product_option_values WHERE product_id=?",Int::class.java,p))
+    }
+    @Test fun `option and catalog writers reject aggregate growth beyond variant limit atomically`() {
+        val admin=provision();activate("CATALOG",admin)
+        val p=product();val primary=variant(p,"Limit primary")
+        try {
+            repeat(OptionLimits.MAX_VARIANTS-1) { index ->
+                jdbc.update("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,FALSE)",p,"LIMIT-$p-$index","Limit $index")
+            }
+            val path="/api/v1/user/catalog/products/${primary.second}/options"
+            val add="""{"expectedRevision":1,"operation":"Clear","axes":[],"assignments":[],"variantOperations":[{"operation":"AddInactive","sku":"LIMIT-$p-over","label":"Overflow"}]}"""
+            val response=exchange(path,HttpMethod.PUT,add,admin.cookie,admin.csrf)
+            assertEquals(400,response.statusCode.value(),response.body)
+            assertEquals("CATALOG_OPTION_VARIANT_LIMIT_EXCEEDED",mapper.readTree(response.body!!).path("errorCode").asText())
+            assertEquals(OptionLimits.MAX_VARIANTS,jdbc.queryForObject("SELECT count(*) FROM product_variants WHERE product_id=?",Int::class.java,p))
+            assertEquals(1,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+            assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p))
+            val beforeName=jdbc.queryForObject("SELECT name FROM products WHERE id=?",String::class.java,p)
+            assertThrows(com.storecore.commerce.application.CommerceValidation::class.java) {
+                catalog.saveProduct(primary.second,"Must rollback limit","","","",emptyList(),listOf(mapOf("sku" to primary.second),mapOf("sku" to "CATALOG-$p-over")),mapOf("base" to 100),true,admin.userId)
+            }
+            assertEquals(beforeName,jdbc.queryForObject("SELECT name FROM products WHERE id=?",String::class.java,p))
+            assertEquals(OptionLimits.MAX_VARIANTS,jdbc.queryForObject("SELECT count(*) FROM product_variants WHERE product_id=?",Int::class.java,p))
+        } finally {
+            jdbc.update("DELETE FROM product_variants WHERE product_id=?",p)
+            jdbc.update("DELETE FROM products WHERE id=?",p)
+        }
+    }
+    @Test fun `option endpoint rejects customer disabled capability foreign references and exhausted revision without effects`() {
+        val admin=provision();val customer=provisionCustomer();activate("CATALOG",admin)
+        val p=product();val own=variant(p,"Own");val foreignProduct=product();val foreign=variant(foreignProduct,"Foreign")
+        val path="/api/v1/user/catalog/products/${own.second}/options"
+        val valid="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"size","label":"Tamaño","presentation":"SELECT","order":0,"values":[{"code":"m","label":"M","order":0,"swatchColor":null}]}],"assignments":[{"variantSku":"${own.second}","optionValues":{"size":"m"}}],"variantOperations":[]}"""
+        assertEquals(401,exchange(path,HttpMethod.PUT,valid,customer.cookie,customer.csrf).statusCode.value())
+
+        changeCapability("CATALOG","DISABLED",admin)
+        val disabled=exchange(path,HttpMethod.PUT,valid,admin.cookie,admin.csrf)
+        assertEquals(409,disabled.statusCode.value());assertNull(disabled.headers.getFirst("X-CSRF-Token"))
+        activate("CATALOG",admin)
+
+        val foreignBody=valid.replace("${own.second}",foreign.second)
+        val denied=exchange(path,HttpMethod.PUT,foreignBody,admin.cookie,admin.csrf)
+        assertEquals(404,denied.statusCode.value());assertNull(denied.headers.getFirst("X-CSRF-Token"))
+        assertEquals(1,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p))
+
+        jdbc.update("UPDATE products SET option_schema_revision=? WHERE id=?",Int.MAX_VALUE,p)
+        val exhausted="""{"expectedRevision":${Int.MAX_VALUE},"operation":"Clear","axes":[],"assignments":[],"variantOperations":[]}"""
+        val conflict=exchange(path,HttpMethod.PUT,exhausted,admin.cookie,admin.csrf)
+        assertEquals(409,conflict.statusCode.value());assertEquals("CATALOG_OPTION_REVISION_EXHAUSTED",mapper.readTree(conflict.body!!).path("errorCode").asText())
+        assertNull(conflict.headers.getFirst("X-CSRF-Token"));assertEquals(Int.MAX_VALUE,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM audit_events WHERE event_type='CATALOG_OPTION_SCHEMA_REPLACED' AND aggregate_id=?",Int::class.java,p))
+    }
+    @Test fun `option writer activates only with a complete unique vector and deactivates atomically`() {
+        val admin=provision();activate("CATALOG",admin)
+        val p=product();val active=variant(p,"Active");val inactive=variant(p,"Inactive",false)
+        val path="/api/v1/user/catalog/products/${active.second}/options"
+        fun body(revision:Int,assignments:String,operations:String)="""{"expectedRevision":$revision,"operation":"Replace","axes":[{"code":"color","label":"Color","presentation":"SELECT","order":0,"values":[{"code":"red","label":"Rojo","order":0,"swatchColor":null},{"code":"blue","label":"Azul","order":1,"swatchColor":null}]}],"assignments":$assignments,"variantOperations":$operations}"""
+        val initial=exchange(path,HttpMethod.PUT,body(1,"""[{"variantSku":"${active.second}","optionValues":{"color":"red"}}]""","[]"),admin.cookie,admin.csrf)
+        assertEquals(200,initial.statusCode.value(),initial.body)
+        val activated=exchange(path,HttpMethod.PUT,body(2,"""[{"variantSku":"${active.second}","optionValues":{"color":"red"}},{"variantSku":"${inactive.second}","optionValues":{"color":"blue"}}]""","""[{"operation":"Activate","variantSku":"${inactive.second}"}]"""),admin.cookie,initial.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(200,activated.statusCode.value(),activated.body);assertTrue(jdbc.queryForObject("SELECT active FROM product_variants WHERE id=?",Boolean::class.java,inactive.first)!!)
+        val deactivated=exchange(path,HttpMethod.PUT,body(3,"""[{"variantSku":"${active.second}","optionValues":{"color":"red"}}]""","""[{"operation":"Deactivate","variantSku":"${inactive.second}"}]"""),admin.cookie,activated.headers.getFirst("X-CSRF-Token")!!)
+        assertEquals(200,deactivated.statusCode.value(),deactivated.body);assertFalse(jdbc.queryForObject("SELECT active FROM product_variants WHERE id=?",Boolean::class.java,inactive.first)!!)
+        assertEquals(4,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+    }
+    @Test fun `catalog editor preserves valid option activity forces additions inactive and rolls back exhausted revision`() {
+        val admin=provision();activate("CATALOG",admin)
+        val p=product("Option protocol");val primary=variant(p,"Primary")
+        val optionsPath="/api/v1/user/catalog/products/${primary.second}/options"
+        val schema="""{"expectedRevision":1,"operation":"Replace","axes":[{"code":"size","label":"Tamaño","presentation":"SELECT","order":0,"values":[{"code":"m","label":"M","order":0,"swatchColor":null}]}],"assignments":[{"variantSku":"${primary.second}","optionValues":{"size":"m"}}],"variantOperations":[]}"""
+        val schemaSaved=exchange(optionsPath,HttpMethod.PUT,schema,admin.cookie,admin.csrf)
+        assertEquals(200,schemaSaved.statusCode.value(),schemaSaved.body)
+        var csrf=schemaSaved.headers.getFirst("X-CSRF-Token")!!
+        val addedSku="ADDED-${UUID.randomUUID()}"
+        val productBody="""{"name":"Updated option product","status":"ACTIVE","price":{"base":100},"variants":[{"sku":"${primary.second}","name":"Primary","status":"INACTIVE"},{"sku":"$addedSku","name":"Added","status":"ACTIVE"}]}"""
+        val saved=exchange("/api/v1/user/catalog/products/${primary.second}",HttpMethod.PUT,productBody,admin.cookie,csrf)
+        assertEquals(200,saved.statusCode.value(),saved.body);csrf=saved.headers.getFirst("X-CSRF-Token")!!
+        assertTrue(jdbc.queryForObject("SELECT active FROM product_variants WHERE id=?",Boolean::class.java,primary.first)!!)
+        assertFalse(jdbc.queryForObject("SELECT active FROM product_variants WHERE sku=?",Boolean::class.java,addedSku)!!)
+        assertEquals(3,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+
+        val textOnly=productBody.replace("Updated option product","Text only")
+        assertEquals(200,exchange("/api/v1/user/catalog/products/${primary.second}",HttpMethod.PUT,textOnly,admin.cookie,csrf).statusCode.value())
+        assertEquals(3,jdbc.queryForObject("SELECT option_schema_revision FROM products WHERE id=?",Int::class.java,p))
+
+        jdbc.update("UPDATE products SET option_schema_revision=? WHERE id=?",Int.MAX_VALUE,p)
+        val beforeCount=jdbc.queryForObject("SELECT count(*) FROM product_variants WHERE product_id=?",Int::class.java,p)
+        val failure=assertThrows(com.storecore.catalog.domain.CatalogOptionRevisionConflict::class.java) {
+            catalog.saveProduct(primary.second,"Must rollback","","","",emptyList(),listOf(mapOf("sku" to primary.second,"status" to "ACTIVE"),mapOf("sku" to "ROLLBACK-${UUID.randomUUID()}","status" to "ACTIVE")),mapOf("base" to 100),true,admin.userId)
+        }
+        assertEquals("CATALOG_OPTION_REVISION_EXHAUSTED",failure.code)
+        assertEquals("Text only",jdbc.queryForObject("SELECT name FROM products WHERE id=?",String::class.java,p))
+        assertEquals(beforeCount,jdbc.queryForObject("SELECT count(*) FROM product_variants WHERE product_id=?",Int::class.java,p))
+    }
     private fun product(name:String="PARITY-${UUID.randomUUID()}",status:String="ACTIVE")=jdbc.queryForObject("INSERT INTO products(name,slug,base_price,status) VALUES (?,?,100,?) RETURNING id",Long::class.java,name,"parity-${UUID.randomUUID()}",status)!!
     private fun variant(product:Long,label:String,active:Boolean=true):Pair<Long,String> { val sku="PARITY-${UUID.randomUUID()}";return jdbc.queryForObject("INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,?) RETURNING id",Long::class.java,product,sku,label,active)!! to sku }
     private fun data(response:ResponseEntity<String>):com.fasterxml.jackson.databind.JsonNode { assertEquals(200,response.statusCode.value(),response.body);return mapper.readTree(response.body!!).path("data") }
     private fun get(path:String,cookie:String?=null)=exchange(path,HttpMethod.GET,null,cookie)
-    private fun exchange(path:String,method:HttpMethod,body:String?=null,cookie:String?=null,csrf:String?=null)=http.exchange(URI("http://localhost:$port$path"),method,HttpEntity(body,HttpHeaders().apply{contentType=MediaType.APPLICATION_JSON;set(HttpHeaders.ORIGIN,"http://localhost:4200");cookie?.let{set(HttpHeaders.COOKIE,it)};csrf?.let{set("X-CSRF-Token",it)}}),String::class.java)
+    private fun exchange(path:String,method:HttpMethod,body:String?=null,cookie:String?=null,csrf:String?=null,origin:String="http://localhost:4200")=http.exchange(URI("http://localhost:$port$path"),method,HttpEntity(body,HttpHeaders().apply{contentType=MediaType.APPLICATION_JSON;set(HttpHeaders.ORIGIN,origin);cookie?.let{set(HttpHeaders.COOKIE,it)};csrf?.let{set("X-CSRF-Token",it)}}),String::class.java)
     private data class Session(val cookie:String,val userId:Long,val csrf:String)
     private fun provision(role:String="ADMIN"):Session {
         val email="parity-${UUID.randomUUID()}@example.invalid";val hash=passwords.hash("a-very-long-password".toCharArray())
@@ -179,11 +334,21 @@ class CatalogProjectionHttpIntegrationTest(
         assertEquals(200,login.statusCode.value(),login.body)
         return Session(login.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';'),id,login.headers.getFirst("X-CSRF-Token")!!)
     }
-    private fun activate(module:String,admin:Session) {
-        if(jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?",String::class.java,module)=="ACTIVE") return
+    private fun provisionCustomer():Session {
+        val email="customer-${UUID.randomUUID()}@example.invalid";val hash=passwords.hash("a-very-long-password".toCharArray())
+        val id=jdbc.queryForObject("INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Catalog','Customer') RETURNING id",Long::class.java,email,hash)!!
+        val login=exchange("/api/v1/customer/auth/login",HttpMethod.POST,"""{"email":"$email","password":"a-very-long-password"}""")
+        assertEquals(200,login.statusCode.value(),login.body)
+        return Session(login.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';'),id,login.headers.getFirst("X-CSRF-Token")!!)
+    }
+    private fun changeCapability(module:String,state:String,admin:Session) {
         val version=jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code=?",Int::class.java,module)!!
         val session=jdbc.queryForObject("SELECT id FROM identity_sessions WHERE user_id=? AND revoked_at IS NULL",UUID::class.java,admin.userId)!!
-        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},admin.userId,session,module,version,"ACTIVE",jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module),UUID.randomUUID(),"test")
+        jdbc.query("SELECT capability_session_change_configuration(?,?,?,?,?,?::jsonb,?,?)",{_,_->},admin.userId,session,module,version,state,jdbc.queryForObject("SELECT config::text FROM module_configurations WHERE module_code=?",String::class.java,module),UUID.randomUUID(),"test")
+    }
+    private fun activate(module:String,admin:Session) {
+        if(jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code=?",String::class.java,module)=="ACTIVE") return
+        changeCapability(module,"ACTIVE",admin)
     }
     companion object {
         private val postgres=PostgreSQLContainer<Nothing>("postgres:16-alpine")

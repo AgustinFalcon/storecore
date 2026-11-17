@@ -1,7 +1,7 @@
 {
   "feature": "catalog-option-schema-pdp",
   "local_config": { "postgresql": "container", "browser": "chromium" },
-  "stats": { "total": 14, "done": 2, "by_layer": { "1": 11, "2": 0, "3": 3 } },
+  "stats": { "total": 14, "done": 3, "by_layer": { "1": 11, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed option domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -18,7 +18,7 @@
       "references": ["Technical: Persistencia"], "design_decisions": ["DD-deferred-vector", "DD-external-interlock"]
     },
     {
-      "id": "TASK-003", "title": "Implement option CAS and writer protocol", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
+      "id": "TASK-003", "title": "Implement option CAS and writer protocol", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
       "description": "Implement Replace/Clear and closed variant operations under product-to-variant locks while preserving authorized Absent legacy behavior.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: stale or invalid commands change no data, audit or CSRF", "AC-2: only ADMIN activates assignments for Valid schema", "AC-3: Absent price/stock/active regression passes", "GATE: concurrency tests pass"],

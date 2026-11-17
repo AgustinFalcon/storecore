@@ -98,8 +98,28 @@ y `Deactivate` preservan identidad/precio/stock. `AddInactive` crea sin vector n
 exposición. Eliminar el último eje sólo se expresa como `Clear`, nunca como un
 `Replace` vacío ambiguo.
 
+El wire usa exactamente los discriminadores documentales
+`Replace/Clear/Keep/AddInactive/Activate/Deactivate`. Las operaciones de
+variante son sparse: una variante existente omitida equivale a `Keep`.
+`AddInactive` tiene `{operation,sku,label}`, crea una variante nueva inactiva y
+no puede aparecer en assignments. Las demás operaciones y cada assignment usan
+exactamente una referencia `{variantId}` o `{variantSku}`; repetir una referencia
+o usar ambas formas es inválido. `assignments` representa el estado completo que
+quedará tras `Replace`: toda variante finalmente activa debe aparecer completa;
+una inactiva puede omitirse o conservar una asignación parcial válida.
+
+Toda orden válida —incluido `Clear` sobre `Absent` o un `Replace` equivalente—
+incrementa `option_schema_revision` exactamente una vez y audita el intento
+aceptado. La revisión no hace wrap: `2147483647` devuelve 409
+`CATALOG_OPTION_REVISION_EXHAUSTED` sin efectos.
+
 El parser impone límite de bytes, profundidad, cantidad de ejes/valores/
 asignaciones y claves duplicadas antes de materializar objetos o combinaciones.
+El presupuesto es 2 MiB inclusive, profundidad máxima 12, hasta 1.000
+`variantOperations`, 4.000 assignments y strings de transporte de hasta 2.048
+code points antes de aplicar los límites más estrechos del dominio. Body mayor,
+chunked incluido, trailing JSON, clave duplicada o límite excedido responde 400
+sin rotar CSRF.
 `ReplaceProductOptionSchema` valida el payload completo en dominio. El repositorio
 toma locks siempre producto→variantes, compara revisión y reemplaza ejes, valores
 y asignaciones dentro de una transacción. Incrementa revisión una vez, registra
