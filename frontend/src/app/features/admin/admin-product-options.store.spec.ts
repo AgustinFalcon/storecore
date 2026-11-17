@@ -13,18 +13,22 @@ const projection = (revision: number, label = 'Color') => AdminProductOptionsMap
 
 describe('AdminProductOptionsStore', () => {
   it('preserves base and draft, performs one read and zero automatic rewrites after 409', () => {
-    const firstRead = new Subject<ReturnType<typeof projection>>(), conflictRead = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
-    const manager = { read: vi.fn().mockReturnValueOnce(firstRead).mockReturnValueOnce(conflictRead), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
+    const firstRead = new Subject<ReturnType<typeof projection>>(), conflictRead = new Subject<ReturnType<typeof projection>>(), retryRead = new Subject<ReturnType<typeof projection>>(), write = new Subject<ProductOptionsWriteResult>();
+    const manager = { read: vi.fn().mockReturnValueOnce(firstRead).mockReturnValueOnce(conflictRead).mockReturnValueOnce(retryRead), write: vi.fn().mockReturnValue(write) } as unknown as ManageProductOptionsUseCase;
     const store = new AdminProductOptionsStore(manager);
     store.setActor({ id: 'admin', roles: [UserRole.Admin] }, 'epoch-1'); store.open('PRODUCT'); firstRead.next(projection(1));
     const draft = store.snapshot.draft!; store.setDraft({ ...draft, axes: [{ ...draft.axes[0], label: 'Color local' }] }); store.save();
     write.error(new HttpErrorResponse({ status: 409, error: { errorCode: 'CATALOG_OPTION_REVISION_CONFLICT' } }));
     expect(store.snapshot.verificationUnknown).toBe(true);
+    expect(store.snapshot.revisionHighwater).toBe(2);
     expect(verifiedOptionsSnapshot(store.snapshot)?.revision).toBe(1);
-    conflictRead.next(projection(2, 'Color remoto'));
+    conflictRead.next(projection(1, 'Color obsoleto'));
+    expect(store.snapshot.phase).toBe(OptionEditorPhase.ConflictReadRequired);
+    expect(store.snapshot.verificationUnknown).toBe(true);
+    store.refresh(); retryRead.next(projection(2, 'Color remoto'));
     expect(store.snapshot.phase).toBe(OptionEditorPhase.Conflict);
     expect(store.snapshot.base?.revision).toBe(1); expect(store.snapshot.remote?.revision).toBe(2);
-    expect(store.snapshot.draft?.axes[0].label).toBe('Color local'); expect(manager.write).toHaveBeenCalledTimes(1); expect(manager.read).toHaveBeenCalledTimes(2);
+    expect(store.snapshot.draft?.axes[0].label).toBe('Color local'); expect(manager.write).toHaveBeenCalledTimes(1); expect(manager.read).toHaveBeenCalledTimes(3);
     expect(verifiedOptionsSnapshot(store.snapshot)?.revision).toBe(2);
     store.ngOnDestroy();
   });

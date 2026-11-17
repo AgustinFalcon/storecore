@@ -172,10 +172,13 @@ export class AdminProductOptionsStore extends ComponentStore<AdminProductOptions
   private writeError(error: unknown, localDraft: AdminProductOptionsDraft, operation: OptionSchemaCommandOperation): void {
     const state = this.snapshot;
     if (error instanceof HttpErrorResponse && error.status === 409) {
-      if (getApiErrorCode(error) === ApiErrorCode.CatalogOptionRevisionExhausted) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode === ApiErrorCode.CatalogOptionRevisionExhausted) {
         this.patchState({ phase: OptionEditorPhase.RevisionExhausted, message: ApiErrorCode.CatalogOptionRevisionExhausted.label }); return;
       }
-      this.patchState({ verificationUnknown: true, phase: OptionEditorPhase.Loading, conflictOperation: operation, message: 'La configuración cambió. Cargando la versión publicada para comparar…' });
+      const revisionHighwater = errorCode === ApiErrorCode.CatalogOptionRevisionConflict && state.base
+        ? Math.max(state.revisionHighwater, state.base.revision + 1) : state.revisionHighwater;
+      this.patchState({ revisionHighwater, verificationUnknown: true, phase: OptionEditorPhase.Loading, conflictOperation: operation, message: 'La configuración cambió. Cargando la versión publicada para comparar…' });
       const generation = this.generation, sku = state.sku;
       this.request = this.manager.read(sku).subscribe({
         next: remote => { if (this.accepts(generation, sku)) this.acceptRemoteConflict(remote, localDraft, operation); },
