@@ -68,6 +68,36 @@ describe('PurchaseIntentCoordinator', () => {
     expect(coordinator.snapshot().intent.expiresAt).toBe(expiry);
     expect(coordinator.beginConfirmation(actor)).toBe(claim);
   });
+  it('durably suspends an option change and creates a different flow only on a later explicit capture', () => {
+    const old = ready();
+    const suspended = coordinator.suspendForSelectionChange();
+    expect(suspended.stage).toBe(PurchaseIntentStage.Completed);
+    expect(coordinator.validatedResumeReference(old.flowId)).toBeNull();
+    coordinator.restore(old, product, cart);
+    expect(coordinator.beginConfirmation(actor)).toBeNull();
+    const fresh = new PurchaseIntentCoordinator(storage, { now: () => now }, { next: () => 'opaque-flow-id-new' });
+    expect(fresh.validatedResumeReference(old.flowId)).toBeNull();
+    const next = fresh.capture('PRODUCT-1', 'FIRST', 2);
+    expect(next.intent.flowId).toBe('opaque-flow-id-new');
+    expect(next.intent.flowId).not.toBe(old.flowId);
+  });
+  it('retires a durable resume reference before it has been claimed into memory', () => {
+    const flow = coordinator.capture('PRODUCT-1', 'VARIANT-2', 2).intent.flowId;
+    const fresh = new PurchaseIntentCoordinator(storage, { now: () => now }, { next: () => 'opaque-flow-id-new' });
+    expect(fresh.snapshot().intent).toBe(PurchaseIntent.Unknown);
+    expect(fresh.suspendForSelectionChange(flow).storageResult).toBe(PurchaseIntentStorageResult.Cleared);
+    const reload = new PurchaseIntentCoordinator(storage, { now: () => now }, { next: () => 'opaque-flow-id-next' });
+    expect(reload.validatedResumeReference(flow)).toBeNull();
+  });
+  it('blocks suspension when a previously validated durable reference can no longer be read', () => {
+    const flow = coordinator.capture('PRODUCT-1', 'VARIANT-2', 2).intent.flowId;
+    const fresh = new PurchaseIntentCoordinator(storage, { now: () => now }, { next: () => 'opaque-flow-id-new' });
+    expect(fresh.validatedResumeReference(flow)).toBe(flow);
+    storage.load = () => ({ intent: PurchaseIntent.Unknown, result: PurchaseIntentStorageResult.Unavailable });
+    const suspended = fresh.suspendForSelectionChange(flow);
+    expect(suspended.stage).toBe(PurchaseIntentStage.Unavailable);
+    expect(suspended.storageResult).toBe(PurchaseIntentStorageResult.Unavailable);
+  });
   it('expires at the final pre-send check and fences actor/revision changes', () => {
     ready();
     expect(coordinator.beginConfirmation({ ...actor, revision: 2 })).toBeNull();

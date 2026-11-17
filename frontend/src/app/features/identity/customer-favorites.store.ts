@@ -13,10 +13,12 @@ export interface CustomerFavoritesState {
   readonly mutationSku: string;
   readonly items: readonly FavoriteItem[];
   readonly errorMessage: string;
+  readonly errorSku: string;
   readonly feedback: string;
+  readonly selectionSku: string | null;
 }
 
-const INITIAL: CustomerFavoritesState = { loading: false, mutationSku: '', items: [], errorMessage: '', feedback: '' };
+const INITIAL: CustomerFavoritesState = { loading: false, mutationSku: '', items: [], errorMessage: '', errorSku: '', feedback: '', selectionSku: null };
 
 @Injectable()
 export class CustomerFavoritesStore extends ComponentStore<CustomerFavoritesState> {
@@ -25,6 +27,8 @@ export class CustomerFavoritesStore extends ComponentStore<CustomerFavoritesStat
   readonly loading$ = this.select((state) => state.loading);
   readonly errorMessage$ = this.select((state) => state.errorMessage);
   readonly feedback$ = this.select((state) => state.feedback);
+  readonly selectedMessage$ = this.select((state) => state.selectionSku === null ? '' : state.feedback
+    || (state.errorSku === state.selectionSku ? state.errorMessage : ''));
 
   constructor(
     private readonly listFavorites: ListFavoritesUseCase,
@@ -33,40 +37,50 @@ export class CustomerFavoritesStore extends ComponentStore<CustomerFavoritesStat
   ) { super(INITIAL); }
 
   isFavorite(sku: string): boolean { return this.get((state) => state.items.some((item) => item.sku === sku)); }
+  selectSku(sku: string): void { this.patchState({ selectionSku: sku, feedback: '', errorMessage: '', errorSku: '' }); }
 
   readonly load = this.effect<void>((trigger$) => trigger$.pipe(
-    tap(() => this.patchState({ loading: true, errorMessage: '', feedback: '' })),
+    tap(() => this.patchState({ loading: true, errorMessage: '', errorSku: '', feedback: '' })),
     switchMap(() => this.listFavorites.execute().pipe(tapResponse({
       next: (items) => this.patchState({ items, loading: false }),
-      error: (error: unknown) => this.patchState({ loading: false, errorMessage: getApiErrorMessage(error) }),
+      error: (error: unknown) => this.patchState((state) => ({ loading: false, errorMessage: getApiErrorMessage(error), errorSku: state.selectionSku ?? '' })),
     }))),
   ));
 
   readonly add = this.effect<string>((sku$) => sku$.pipe(
     filter((sku) => Boolean(sku.trim())),
-    tap((sku) => this.patchState({ mutationSku: sku, errorMessage: '', feedback: '' })),
-    concatMap((sku) => this.addFavorite.execute(sku).pipe(tapResponse({
+    concatMap((sku) => {
+      this.patchState({ mutationSku: sku, errorMessage: '', errorSku: '', feedback: '' });
+      return this.addFavorite.execute(sku).pipe(tapResponse({
       next: (result) => {
-        this.patchState({ mutationSku: '', feedback: result.outcome.label });
+        this.patchState((state) => ({ mutationSku: state.mutationSku === sku ? '' : state.mutationSku,
+          feedback: state.selectionSku === null || state.selectionSku === sku ? result.outcome.label : '' }));
         if (result.outcome.accepted) this.load();
       },
-      error: (error: unknown) => this.patchState({ mutationSku: '', errorMessage: getApiErrorMessage(error) }),
-    }))),
+      error: (error: unknown) => this.patchState((state) => ({ mutationSku: state.mutationSku === sku ? '' : state.mutationSku,
+        errorMessage: state.selectionSku === null || state.selectionSku === sku ? getApiErrorMessage(error) : '',
+        errorSku: state.selectionSku === sku ? sku : '' })),
+      }));
+    }),
   ));
 
   readonly remove = this.effect<string>((sku$) => sku$.pipe(
     filter((sku) => Boolean(sku.trim())),
     filter((sku) => this.get((state) => state.items.find((item) => item.sku === sku)?.availability.canRemove ?? false)),
-    tap((sku) => this.patchState({ mutationSku: sku, errorMessage: '', feedback: '' })),
-    concatMap((sku) => this.removeFavorite.execute(sku).pipe(tapResponse({
+    concatMap((sku) => {
+      this.patchState({ mutationSku: sku, errorMessage: '', errorSku: '', feedback: '' });
+      return this.removeFavorite.execute(sku).pipe(tapResponse({
       next: (result) => {
         this.patchState((state) => ({
-          mutationSku: '',
-          feedback: result.outcome.label,
+          mutationSku: state.mutationSku === sku ? '' : state.mutationSku,
+          feedback: state.selectionSku === null || state.selectionSku === sku ? result.outcome.label : '',
           items: result.outcome.accepted ? state.items.filter((item) => item.sku !== sku) : state.items,
         }));
       },
-      error: (error: unknown) => this.patchState({ mutationSku: '', errorMessage: getApiErrorMessage(error) }),
-    }))),
+      error: (error: unknown) => this.patchState((state) => ({ mutationSku: state.mutationSku === sku ? '' : state.mutationSku,
+        errorMessage: state.selectionSku === null || state.selectionSku === sku ? getApiErrorMessage(error) : '',
+        errorSku: state.selectionSku === sku ? sku : '' })),
+      }));
+    }),
   ));
 }

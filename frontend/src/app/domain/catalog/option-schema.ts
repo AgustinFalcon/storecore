@@ -6,6 +6,7 @@ export class OptionPresentation {
   static readonly Select = Object.freeze(new OptionPresentation('SELECT', 'Lista'));
   static readonly Swatch = Object.freeze(new OptionPresentation('SWATCH', 'Muestras'));
   static readonly Unknown = Object.freeze(new OptionPresentation('UNKNOWN', 'Presentación no disponible'));
+  get usesColor(): boolean { return this === OptionPresentation.Swatch; }
 }
 
 export class OptionSchemaState {

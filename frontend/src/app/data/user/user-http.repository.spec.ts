@@ -11,6 +11,7 @@ import { UserHttpRepository } from './user-http.repository';
 import { mapProductDetail } from '../mappers/http-mappers';
 import { ProductStatus, VariantStatus } from '../../domain/catalog/catalog-states';
 import { catalogProductDraftFromDetail, newCatalogProductDraft } from '../../domain/catalog/catalog-product-draft';
+import { emptyCatalogQuery } from '../../domain/catalog/catalog-query.entity';
 
 describe('UserHttpRepository capabilities', () => {
   beforeEach(() => TestBed.configureTestingModule({
@@ -48,12 +49,16 @@ describe('UserHttpRepository capabilities', () => {
   it('serializes explicit bounded pages for protected catalog and inventory reads', async () => {
     const repository = TestBed.inject(UserHttpRepository); const http = TestBed.inject(HttpTestingController);
     for (const [path, read] of [
-      ['catalog', () => repository.listCatalog(BoundedPageRequest.at(2, 25))],
+      ['catalog', () => repository.listCatalog({ ...emptyCatalogQuery, query: 'taladro', brand: '3', category: '7', offersOnly: true, pagination: BoundedPageRequest.at(2, 25) })],
       ['inventory', () => repository.listInventory(BoundedPageRequest.at(2, 25))],
     ] as const) {
       const pending = firstValueFrom<unknown>(read());
       const request = http.expectOne(req => req.url === '/api/v1/user/' + path);
       expect(request.request.params.get('page')).toBe('2'); expect(request.request.params.get('size')).toBe('25');
+      if (path === 'catalog') {
+        expect(request.request.params.get('query')).toBe('taladro'); expect(request.request.params.get('brand')).toBe('3');
+        expect(request.request.params.get('category')).toBe('7'); expect(request.request.params.get('offers')).toBe('true');
+      }
       request.flush({ items: [], page: 2, size: 25, total: 0, truncated: false }); await pending;
     }
     http.verify();

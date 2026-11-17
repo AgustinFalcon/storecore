@@ -40,6 +40,16 @@ export class RestoredPurchaseAvailability {
   static fromWire(raw: unknown): RestoredPurchaseAvailability { return [this.Ready, this.ProductUnavailable, this.VariantUnavailable, this.QuantityUnavailable].find(value => value.wire === raw) ?? this.Unknown; }
 }
 
+export class PurchaseIntentResolutionResult {
+  private constructor(readonly wire: 'APPLIED' | 'STALE' | 'UNKNOWN', readonly applied: boolean) {}
+  static readonly Applied = Object.freeze(new PurchaseIntentResolutionResult('APPLIED', true));
+  static readonly Stale = Object.freeze(new PurchaseIntentResolutionResult('STALE', false));
+  static readonly Unknown = Object.freeze(new PurchaseIntentResolutionResult('UNKNOWN', false));
+  static fromWire(raw: unknown): PurchaseIntentResolutionResult {
+    return raw === this.Applied.wire ? this.Applied : raw === this.Stale.wire ? this.Stale : this.Unknown;
+  }
+}
+
 export const PURCHASE_INTENT_TTL_MS = 15 * 60 * 1000;
 export function validPurchaseFlowId(raw: unknown): raw is string { return typeof raw === 'string' && /^[A-Za-z0-9_-]{16,80}$/.test(raw); }
 function validSku(raw: unknown): raw is string {

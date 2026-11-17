@@ -22,7 +22,6 @@ import { CustomerOrderDetailComponent } from './features/orders/customer-order-d
 import { CustomerOrdersComponent } from './features/orders/customer-orders.component';
 import { ShellComponent } from './features/shell/shell.component';
 import { CatalogPageComponent } from './features/storefront/catalog-page.component';
-import { ProductPageComponent } from './features/storefront/product-page.component';
 import { StorefrontHomeComponent } from './features/storefront/storefront-home.component';
 import { NotFoundComponent } from './features/navigation/not-found.component';
 
@@ -42,7 +41,7 @@ export const routes: Routes = [
       { path: 'reset-password', component: PasswordResetComponent, title: 'Nueva contraseña' },
       { path: 'verify-email', component: EmailVerificationComponent, title: 'Verificar correo' },
       { path: 'catalog', component: CatalogPageComponent, title: 'Catálogo' },
-      { path: 'catalog/:sku', component: ProductPageComponent, title: 'Producto' },
+      { path: 'catalog/:sku', loadComponent: () => import('./features/storefront/product-page.component').then(module => module.ProductPageComponent), title: 'Producto' },
       { path: 'cart', component: CartPageComponent, title: 'Carrito', canActivate: [customerGuard] },
       { path: 'checkout', component: CheckoutPageComponent, title: 'Checkout', canActivate: [customerGuard] },
       { path: 'checkout/result/:orderId', component: CheckoutResultComponent, title: 'Pedido', canActivate: [customerGuard] },
