@@ -29,6 +29,8 @@ import { ICustomerAdminRepository } from '../../domain/customer-admin/customer-a
 import { OVERVIEW_REPOSITORY } from '../tokens/overview.tokens';
 import { IOverviewRepository } from '../../domain/overview/overview.repository';
 import { USER_REPOSITORY } from '../tokens/user.tokens';
+import { PRODUCT_OPTIONS_REPOSITORY } from '../tokens/product-options.tokens';
+import { IProductOptionsRepository, ManageProductOptionsUseCase } from '../../domain/catalog/product-options.repository';
 import { IUserRepository } from '../../domain/user/user.repository';
 import { AddCartLineUseCase } from '../../domain/cart/use-cases/add-cart-line.usecase';
 import { CheckoutCartUseCase } from '../../domain/cart/use-cases/checkout-cart.usecase';
@@ -74,6 +76,7 @@ import { SignOutUserUseCase } from '../../domain/user/use-cases/sign-out-user.us
 
 /** Angular composition lives outside the framework-free use cases. */
 export const USE_CASE_PROVIDERS: Provider[] = [
+  { provide: ManageProductOptionsUseCase, useFactory: (repo: IProductOptionsRepository) => new ManageProductOptionsUseCase(repo), deps: [PRODUCT_OPTIONS_REPOSITORY] },
   { provide: ReadStoreBrandingUseCase, useFactory: (repo: IBrandingRepository) => new ReadStoreBrandingUseCase(repo), deps: [BRANDING_REPOSITORY] },
   { provide: ManageBrandingUseCase, useFactory: (repo: IBrandingRepository) => new ManageBrandingUseCase(repo), deps: [BRANDING_REPOSITORY] },
   { provide: AdjustAvailableStockUseCase, useFactory: (repository: IInventoryAdjustmentRepository) => new AdjustAvailableStockUseCase(repository), deps: [INVENTORY_ADJUSTMENT_REPOSITORY] },

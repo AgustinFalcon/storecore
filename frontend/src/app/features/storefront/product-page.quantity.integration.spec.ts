@@ -39,7 +39,7 @@ describe('ProductPage restored quantity integration', () => {
       markUnknown: vi.fn(() => PurchaseIntentResolutionResult.Applied), cancel: vi.fn() };
     TestBed.overrideComponent(ProductPageComponent, { set: { providers: [
       { provide: CatalogStore, useValue: catalog }, { provide: CustomerFavoritesStore, useValue: { isFavorite: () => false,
-        viewState$: of({ mutationSku: '' }), errorMessage$: of(''), feedback$: of(''), load: vi.fn(), add: vi.fn(), remove: vi.fn() } },
+        viewState$: of({ mutationSku: '' }), errorMessage$: of(''), feedback$: of(''), load: vi.fn(), selectSku: vi.fn(), add: vi.fn(), remove: vi.fn() } },
     ] } });
     await TestBed.configureTestingModule({ imports: [ProductPageComponent], providers: [provideRouter([]),
       { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ sku: 'PRODUCT' })),

@@ -65,7 +65,7 @@ describe('ProductPage purchase-intent scope', () => {
     navigate = vi.fn(() => Promise.resolve(true));
     reconcile = vi.fn(() => of({}));
     TestBed.overrideComponent(ProductPageComponent, { set: { template: '', providers: [
-      { provide: CatalogStore, useValue: catalog }, { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(), add: vi.fn(), remove: vi.fn() } },
+      { provide: CatalogStore, useValue: catalog }, { provide: CustomerFavoritesStore, useValue: { load: vi.fn(), isFavorite: vi.fn(), selectSku: vi.fn(), add: vi.fn(), remove: vi.fn() } },
     ] } });
     await TestBed.configureTestingModule({ imports: [ProductPageComponent], providers: [
       { provide: ActivatedRoute, useValue: { paramMap: new BehaviorSubject(convertToParamMap({ sku: 'B' })), queryParamMap: query, snapshot: { paramMap: convertToParamMap({ sku: 'B' }) } } },
