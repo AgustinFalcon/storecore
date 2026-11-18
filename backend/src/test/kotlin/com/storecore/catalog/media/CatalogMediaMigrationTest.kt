@@ -311,7 +311,7 @@ class CatalogMediaMigrationTest {
     }
 
     private fun user(sql: JdbcTemplate, email: String): Long = sql.queryForObject(
-        "INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,'\$2a\$10\$01234567890123456789012345678901234567890123456789012','Media','Owner') RETURNING id",
+        "INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,'${'$'}argon2id${'$'}fixture','Media','Owner') RETURNING id",
         Long::class.java,
         email,
     )!!
