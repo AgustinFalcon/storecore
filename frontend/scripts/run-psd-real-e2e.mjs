@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import https from 'node:https';
 import net from 'node:net';
 import assert from 'node:assert/strict';
+import evidenceWire from '../route-evidence-wire.json' with { type: 'json' };
 import { databaseEnvironment, query } from './ua-real-database.mjs';
 import { ShowcaseConfig, ShowcaseLoader, ShowcaseDiscountKind, ShowcaseAdapterMode,
   ShowcaseExternalCapability, ShowcaseCapabilityState } from './showcase/load-storecore-showcase.mjs';
@@ -60,57 +61,54 @@ class PublicationValue {
     Object.assign(this, { wire, accepted }); Object.freeze(this);
   }
   static fromWire(raw, values) { return values.find(value => value.wire === raw) ?? this.Unknown; }
-  static Unknown = new PublicationValue(PUBLICATION_TOKEN, 'UNKNOWN', false);
+  static Unknown = new PublicationValue(PUBLICATION_TOKEN, evidenceWire.routeGateResult.unknown, false);
 }
 class PublishedGateResult extends PublicationValue {
-  static Accepted = new PublishedGateResult(PUBLICATION_TOKEN, 'ACCEPTED', true);
-  static Rejected = new PublishedGateResult(PUBLICATION_TOKEN, 'REJECTED', false);
+  static Accepted = new PublishedGateResult(PUBLICATION_TOKEN, evidenceWire.routeGateResult.accepted, true);
+  static Rejected = new PublishedGateResult(PUBLICATION_TOKEN, evidenceWire.routeGateResult.rejected, false);
   static values = [this.Accepted, this.Rejected];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
 class PublishedActor extends PublicationValue {
-  static Anonymous = new PublishedActor(PUBLICATION_TOKEN, 'ANONYMOUS', true);
-  static Customer = new PublishedActor(PUBLICATION_TOKEN, 'CUSTOMER', true);
-  static Admin = new PublishedActor(PUBLICATION_TOKEN, 'ADMIN', true);
-  static ForeignCustomer = new PublishedActor(PUBLICATION_TOKEN, 'FOREIGN_CUSTOMER', true);
-  static Operator = new PublishedActor(PUBLICATION_TOKEN, 'OPERATOR', true);
+  static Anonymous = new PublishedActor(PUBLICATION_TOKEN, evidenceWire.routeActor.anonymous, true);
+  static Customer = new PublishedActor(PUBLICATION_TOKEN, evidenceWire.routeActor.customer, true);
+  static Admin = new PublishedActor(PUBLICATION_TOKEN, evidenceWire.routeActor.admin, true);
+  static ForeignCustomer = new PublishedActor(PUBLICATION_TOKEN, evidenceWire.routeActor.foreignCustomer, true);
+  static Operator = new PublishedActor(PUBLICATION_TOKEN, evidenceWire.routeActor.operator, true);
   static values = [this.Anonymous, this.Customer, this.Admin, this.ForeignCustomer, this.Operator];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
 class PublishedActionKind extends PublicationValue {
-  static Read = new PublishedActionKind(PUBLICATION_TOKEN, 'READ', true);
-  static Mutation = new PublishedActionKind(PUBLICATION_TOKEN, 'MUTATION', true);
-  static Rejection = new PublishedActionKind(PUBLICATION_TOKEN, 'REJECTION', true);
+  static Read = new PublishedActionKind(PUBLICATION_TOKEN, evidenceWire.routeActionClass.read, true);
+  static Mutation = new PublishedActionKind(PUBLICATION_TOKEN, evidenceWire.routeActionClass.mutation, true);
+  static Rejection = new PublishedActionKind(PUBLICATION_TOKEN, evidenceWire.routeActionClass.rejection, true);
   static values = [this.Read, this.Mutation, this.Rejection];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
 class PublishedReadTerminal extends PublicationValue {
-  static Pending = new PublishedReadTerminal(PUBLICATION_TOKEN, 'pending', true);
-  static Finished = new PublishedReadTerminal(PUBLICATION_TOKEN, 'finished', true);
-  static Failed = new PublishedReadTerminal(PUBLICATION_TOKEN, 'failed', true);
+  static Pending = new PublishedReadTerminal(PUBLICATION_TOKEN, evidenceWire.readTerminal.pending, true);
+  static Finished = new PublishedReadTerminal(PUBLICATION_TOKEN, evidenceWire.readTerminal.finished, true);
+  static Failed = new PublishedReadTerminal(PUBLICATION_TOKEN, evidenceWire.readTerminal.failed, true);
   static values = [this.Pending, this.Finished, this.Failed];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
 class PublishedReadFailure extends PublicationValue {
-  static Aborted = new PublishedReadFailure(PUBLICATION_TOKEN, 'aborted', true);
-  static Connection = new PublishedReadFailure(PUBLICATION_TOKEN, 'connection', true);
-  static UnknownFailure = new PublishedReadFailure(PUBLICATION_TOKEN, 'unknown', true);
+  static Aborted = new PublishedReadFailure(PUBLICATION_TOKEN, evidenceWire.readFailure.aborted, true);
+  static Connection = new PublishedReadFailure(PUBLICATION_TOKEN, evidenceWire.readFailure.connection, true);
+  static UnknownFailure = new PublishedReadFailure(PUBLICATION_TOKEN, evidenceWire.readFailure.unknown, true);
   static values = [this.Aborted, this.Connection, this.UnknownFailure];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
 class PublishedAxeImpact extends PublicationValue {
-  static Minor = new PublishedAxeImpact(PUBLICATION_TOKEN, 'minor', true);
-  static Moderate = new PublishedAxeImpact(PUBLICATION_TOKEN, 'moderate', true);
-  static Serious = new PublishedAxeImpact(PUBLICATION_TOKEN, 'serious', true);
-  static Critical = new PublishedAxeImpact(PUBLICATION_TOKEN, 'critical', true);
-  static UnknownImpact = new PublishedAxeImpact(PUBLICATION_TOKEN, 'unknown', true);
+  static Minor = new PublishedAxeImpact(PUBLICATION_TOKEN, evidenceWire.axeImpact.minor, true);
+  static Moderate = new PublishedAxeImpact(PUBLICATION_TOKEN, evidenceWire.axeImpact.moderate, true);
+  static Serious = new PublishedAxeImpact(PUBLICATION_TOKEN, evidenceWire.axeImpact.serious, true);
+  static Critical = new PublishedAxeImpact(PUBLICATION_TOKEN, evidenceWire.axeImpact.critical, true);
+  static UnknownImpact = new PublishedAxeImpact(PUBLICATION_TOKEN, evidenceWire.axeImpact.unknown, true);
   static values = [this.Minor, this.Moderate, this.Serious, this.Critical, this.UnknownImpact];
   static fromWire(raw) { return super.fromWire(raw, this.values); }
 }
-const publishedActionIds = new Set(['registration', 'catalog-discovery', 'profile', 'addresses-ownership', 'favorites',
-  'cart-checkout-order-ownership', 'unpaid-order-rejection', 'catalog-inventory', 'offers', 'promos',
-  'branding-conflict', 'content', 'profile-import', 'customer-revocation', 'operator-permissions-csrf',
-  'external-unavailable', 'local-capability-command']);
+const publishedActionIds = new Set(Object.values(evidenceWire.actionIds));
 const publishedSurfaces = new Set([
   ...Array.from({ length: 27 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
   'RD-VERIFY-EMAIL', 'RD-USER-ACCOUNT',
