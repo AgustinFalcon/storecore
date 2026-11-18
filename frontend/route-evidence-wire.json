@@ -1,0 +1,58 @@
+{
+  "routeActor": {
+    "anonymous": "ANONYMOUS",
+    "customer": "CUSTOMER",
+    "admin": "ADMIN",
+    "foreignCustomer": "FOREIGN_CUSTOMER",
+    "operator": "OPERATOR",
+    "unknown": "UNKNOWN"
+  },
+  "routeActionClass": {
+    "read": "READ",
+    "mutation": "MUTATION",
+    "rejection": "REJECTION",
+    "unknown": "UNKNOWN"
+  },
+  "routeGateResult": {
+    "accepted": "ACCEPTED",
+    "rejected": "REJECTED",
+    "unknown": "UNKNOWN"
+  },
+  "readTerminal": {
+    "pending": "pending",
+    "finished": "finished",
+    "failed": "failed",
+    "unknown": "unknown"
+  },
+  "readFailure": {
+    "aborted": "aborted",
+    "connection": "connection",
+    "unknown": "unknown"
+  },
+  "axeImpact": {
+    "minor": "minor",
+    "moderate": "moderate",
+    "serious": "serious",
+    "critical": "critical",
+    "unknown": "unknown"
+  },
+  "actionIds": {
+    "registration": "registration",
+    "catalogDiscovery": "catalog-discovery",
+    "profile": "profile",
+    "addresses": "addresses-ownership",
+    "favorites": "favorites",
+    "checkout": "cart-checkout-order-ownership",
+    "pendingOrder": "unpaid-order-rejection",
+    "catalog": "catalog-inventory",
+    "offers": "offers",
+    "promos": "promos",
+    "branding": "branding-conflict",
+    "content": "content",
+    "profileImport": "profile-import",
+    "customerSuspension": "customer-revocation",
+    "permissions": "operator-permissions-csrf",
+    "externalCapability": "external-unavailable",
+    "localCapability": "local-capability-command"
+  }
+}

@@ -11,6 +11,7 @@ import { ListCatalogFacetsUseCase } from '../domain/catalog/use-cases/list-catal
 import { CustomerOrderDetailStore } from './orders/customer-order-detail.store';
 import { CatalogStore } from './storefront/catalog.store';
 import { ProductStatus } from '../domain/catalog/catalog-states';
+import { OptionWireMapper } from '../domain/catalog/option-wire.mapper';
 
 describe('detail reads across route identities', () => {
   it('keeps customer order B when the cancelled A read responds late', () => {
@@ -40,6 +41,7 @@ describe('detail reads across route identities', () => {
       { execute } as unknown as GetProductUseCase, {} as ListCatalogFacetsUseCase);
     const product: ProductDetail = { id: 'p', status: ProductStatus.Active, media: [], sku: 'A', name: 'A', description: '', brand: '', category: '',
       productBasePrice: 0, images: [], variants: [], price: { base: 0, original: 0, offer: null, effective: 0 },
+      optionSnapshot: OptionWireMapper.fromWire({ revision: 1, state: 'ABSENT', cause: null, axes: [] }, []),
       offerRef: null, active: true };
     store.loadProduct('A');
     old.next(product);

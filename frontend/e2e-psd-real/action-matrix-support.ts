@@ -3,29 +3,30 @@ import { expect, test, type Browser, type BrowserContext, type Page, type Reques
 import { AccessContext } from '../src/app/domain/access/access-context';
 import { readApiBody } from '../src/app/core/api/base-response';
 import { RouteActionClass, RouteActor, RouteEvidenceMode } from '../src/app/features/navigation/route-evidence';
+import evidenceWire from '../route-evidence-wire.json';
 import { origin } from './support';
 
 /** Each case owns its responsibility and declares the route/actor/action evidence. */
 export class RealActionCase {
   private constructor(readonly id: string, readonly routes: readonly string[], readonly actor: RouteActor,
     readonly kind: RouteActionClass, readonly evidence = RouteEvidenceMode.RealBackend) {}
-  static readonly Registration = new RealActionCase('registration', ['/customer/register', '/login'], RouteActor.Anonymous, RouteActionClass.Mutation);
-  static readonly CatalogDiscovery = new RealActionCase('catalog-discovery', ['/catalog'], RouteActor.Anonymous, RouteActionClass.Mutation);
-  static readonly Profile = new RealActionCase('profile', ['/customer/profile'], RouteActor.Customer, RouteActionClass.Mutation);
-  static readonly Addresses = new RealActionCase('addresses-ownership', ['/customer/addresses'], RouteActor.Customer, RouteActionClass.Mutation);
-  static readonly Favorites = new RealActionCase('favorites', ['/catalog/:sku', '/customer/favorites'], RouteActor.Customer, RouteActionClass.Mutation);
-  static readonly Checkout = new RealActionCase('cart-checkout-order-ownership', ['/catalog/:sku', '/cart', '/checkout', '/checkout/result/:orderId', '/customer/orders', '/customer/orders/:id'], RouteActor.Customer, RouteActionClass.Mutation);
-  static readonly Pending = new RealActionCase('unpaid-order-rejection', ['/user/orders', '/user/orders/:id'], RouteActor.Admin, RouteActionClass.Rejection);
-  static readonly Catalog = new RealActionCase('catalog-inventory', ['/user/catalog', '/user/inventory'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Offers = new RealActionCase('offers', ['/user/offers'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Promos = new RealActionCase('promos', ['/user/promos'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Branding = new RealActionCase('branding-conflict', ['/user/settings', '/'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Content = new RealActionCase('content', ['/user/content', '/'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Import = new RealActionCase('profile-import', ['/user/profile-import'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Suspension = new RealActionCase('customer-revocation', ['/user/customers'], RouteActor.Admin, RouteActionClass.Mutation);
-  static readonly Permissions = new RealActionCase('operator-permissions-csrf', ['/user/customers', '/user/capabilities'], RouteActor.Operator, RouteActionClass.Rejection);
-  static readonly External = new RealActionCase('external-unavailable', ['/user/mercadolibre', '/user/capabilities'], RouteActor.Admin, RouteActionClass.Read);
-  static readonly Capability = new RealActionCase('local-capability-command', ['/user/capabilities'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Registration = new RealActionCase(evidenceWire.actionIds.registration, ['/customer/register', '/login'], RouteActor.Anonymous, RouteActionClass.Mutation);
+  static readonly CatalogDiscovery = new RealActionCase(evidenceWire.actionIds.catalogDiscovery, ['/catalog'], RouteActor.Anonymous, RouteActionClass.Mutation);
+  static readonly Profile = new RealActionCase(evidenceWire.actionIds.profile, ['/customer/profile'], RouteActor.Customer, RouteActionClass.Mutation);
+  static readonly Addresses = new RealActionCase(evidenceWire.actionIds.addresses, ['/customer/addresses'], RouteActor.Customer, RouteActionClass.Mutation);
+  static readonly Favorites = new RealActionCase(evidenceWire.actionIds.favorites, ['/catalog/:sku', '/customer/favorites'], RouteActor.Customer, RouteActionClass.Mutation);
+  static readonly Checkout = new RealActionCase(evidenceWire.actionIds.checkout, ['/catalog/:sku', '/cart', '/checkout', '/checkout/result/:orderId', '/customer/orders', '/customer/orders/:id'], RouteActor.Customer, RouteActionClass.Mutation);
+  static readonly Pending = new RealActionCase(evidenceWire.actionIds.pendingOrder, ['/user/orders', '/user/orders/:id'], RouteActor.Admin, RouteActionClass.Rejection);
+  static readonly Catalog = new RealActionCase(evidenceWire.actionIds.catalog, ['/user/catalog', '/user/inventory'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Offers = new RealActionCase(evidenceWire.actionIds.offers, ['/user/offers'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Promos = new RealActionCase(evidenceWire.actionIds.promos, ['/user/promos'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Branding = new RealActionCase(evidenceWire.actionIds.branding, ['/user/settings', '/'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Content = new RealActionCase(evidenceWire.actionIds.content, ['/user/content', '/'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Import = new RealActionCase(evidenceWire.actionIds.profileImport, ['/user/profile-import'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Suspension = new RealActionCase(evidenceWire.actionIds.customerSuspension, ['/user/customers'], RouteActor.Admin, RouteActionClass.Mutation);
+  static readonly Permissions = new RealActionCase(evidenceWire.actionIds.permissions, ['/user/customers', '/user/capabilities'], RouteActor.Operator, RouteActionClass.Rejection);
+  static readonly External = new RealActionCase(evidenceWire.actionIds.externalCapability, ['/user/mercadolibre', '/user/capabilities'], RouteActor.Admin, RouteActionClass.Read);
+  static readonly Capability = new RealActionCase(evidenceWire.actionIds.localCapability, ['/user/capabilities'], RouteActor.Admin, RouteActionClass.Mutation);
   static readonly Unknown = new RealActionCase('unknown', [], RouteActor.Unknown, RouteActionClass.Unknown, RouteEvidenceMode.Unknown);
   static readonly all = [this.Registration, this.CatalogDiscovery, this.Profile, this.Addresses, this.Favorites, this.Checkout, this.Pending,
     this.Catalog, this.Offers, this.Promos, this.Branding, this.Content, this.Import, this.Suspension,
@@ -42,8 +43,8 @@ export enum WriteMethod { Post = 'POST', Put = 'PUT', Delete = 'DELETE' }
 
 export class ActionTransportTerminal {
   private constructor(readonly wire: string) {}
-  static readonly Finished = new ActionTransportTerminal('finished');
-  static readonly Failed = new ActionTransportTerminal('failed');
+  static readonly Finished = new ActionTransportTerminal(evidenceWire.readTerminal.finished);
+  static readonly Failed = new ActionTransportTerminal(evidenceWire.readTerminal.failed);
 }
 
 export async function body<T = Record<string, unknown>>(page: Page, path: string): Promise<T> {

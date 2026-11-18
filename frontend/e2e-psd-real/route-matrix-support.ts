@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { ProductiveRouteAcceptance } from '../src/app/features/navigation/productive-route-manifest';
 import type { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
 import { ApiErrorCode } from '../src/app/core/api/api-error-code';
+import evidenceWire from '../route-evidence-wire.json';
 
 const api = '/api/v1/';
 
@@ -31,10 +32,10 @@ export class RealReadRequirement {
 
 export class RealReadTerminal {
   private constructor(readonly wire: string) {}
-  static readonly Pending = new RealReadTerminal('pending');
-  static readonly Finished = new RealReadTerminal('finished');
-  static readonly Failed = new RealReadTerminal('failed');
-  static readonly Unknown = new RealReadTerminal('unknown');
+  static readonly Pending = new RealReadTerminal(evidenceWire.readTerminal.pending);
+  static readonly Finished = new RealReadTerminal(evidenceWire.readTerminal.finished);
+  static readonly Failed = new RealReadTerminal(evidenceWire.readTerminal.failed);
+  static readonly Unknown = new RealReadTerminal(evidenceWire.readTerminal.unknown);
   static fromWire(raw: unknown): RealReadTerminal {
     return [this.Pending, this.Finished, this.Failed].find(value => value.wire === raw) ?? this.Unknown;
   }
@@ -42,9 +43,9 @@ export class RealReadTerminal {
 
 export class RealReadFailure {
   private constructor(readonly wire: string) {}
-  static readonly Aborted = new RealReadFailure('aborted');
-  static readonly Connection = new RealReadFailure('connection');
-  static readonly Unknown = new RealReadFailure('unknown');
+  static readonly Aborted = new RealReadFailure(evidenceWire.readFailure.aborted);
+  static readonly Connection = new RealReadFailure(evidenceWire.readFailure.connection);
+  static readonly Unknown = new RealReadFailure(evidenceWire.readFailure.unknown);
   static fromTransport(raw: unknown): RealReadFailure {
     if (typeof raw !== 'string') return this.Unknown;
     if (raw.includes('ERR_ABORTED') || raw.includes('NS_BINDING_ABORTED') || raw.toLowerCase().includes('cancel')) return this.Aborted;
@@ -56,11 +57,11 @@ export class RealReadFailure {
 
 export class AccessibilityImpact {
   private constructor(readonly wire: string, readonly blocking: boolean) {}
-  static readonly Minor = new AccessibilityImpact('minor', false);
-  static readonly Moderate = new AccessibilityImpact('moderate', false);
-  static readonly Serious = new AccessibilityImpact('serious', true);
-  static readonly Critical = new AccessibilityImpact('critical', true);
-  static readonly Unknown = new AccessibilityImpact('unknown', true);
+  static readonly Minor = new AccessibilityImpact(evidenceWire.axeImpact.minor, false);
+  static readonly Moderate = new AccessibilityImpact(evidenceWire.axeImpact.moderate, false);
+  static readonly Serious = new AccessibilityImpact(evidenceWire.axeImpact.serious, true);
+  static readonly Critical = new AccessibilityImpact(evidenceWire.axeImpact.critical, true);
+  static readonly Unknown = new AccessibilityImpact(evidenceWire.axeImpact.unknown, true);
   static fromWire(raw: unknown): AccessibilityImpact {
     return [this.Minor, this.Moderate, this.Serious, this.Critical].find(value => value.wire === raw) ?? this.Unknown;
   }
