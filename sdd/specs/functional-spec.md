@@ -156,7 +156,7 @@ StoreCore es una plataforma de e-commerce dedicada para emprendedores y PyMEs ar
 | RN-10 | Los campos `document_type` y `document_number` son opcionales en Fase 1. El modelo los prepara para AFIP en Fase 2. | Compliance |
 | RN-11 | El estado de ORDER sigue al estado de SHIPMENT: cuando el staff actualiza el envío a DELIVERED, la ORDER pasa a DELIVERED automáticamente. | Pedidos |
 | RN-12 | No se emiten facturas electrónicas en Fase 1. El onboarding fiscal con el contador del cliente es prerequisito antes del primer deploy. | Compliance |
-| RN-13 | Las imágenes de productos se almacenan como URLs externas. El backend no gestiona archivos binarios en Fase 1. | Catálogo |
+| RN-13 | El baseline vigente conserva URLs externas legacy. El upload administrado, staging privado y asociación por variante se rigen por `20261116-catalog-media-upload-and-variant-gallery` y sólo sustituyen URL-only después de implementación, gates y GO; este cambio documental no acredita runtime ni proveedor live. | Catálogo |
 | RN-14 | Las opciones comprables provienen de un schema cerrado por producto. Sólo `Absent` usa el selector legacy; schema desconocido o corrupto bloquea compra. | Catálogo |
 
 ---
