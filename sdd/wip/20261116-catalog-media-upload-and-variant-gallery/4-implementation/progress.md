@@ -63,3 +63,39 @@
 - Reviews preliminares GPT-6.1 Sol detectaron outcome nullable, write-skew,
   ausencia de `SET ROLE` y evidencia sintética; los cuatro puntos fueron
   corregidos. El dictamen final y TASK-002 `done` requieren SHA congelado y CI.
+
+## 2026-11-18 — persistencia integrada y comandos durables en progreso
+
+- PR #299 quedó fusionado en `master` como `37560b8`. El SHA candidato
+  `1ffdc0bb189901d1054b125dcdeb5b23c2f0720f` recibió APPROVE funcional y de
+  seguridad GPT-6.1 Sol, sin P0–P3; Verify #800 terminó 5/5, incluido backend
+  con 527 tests, PostgreSQL 16, interlock real, frontend y ambas matrices E2E.
+- TASK-002 pasa a `done`. TASK-003 continúa `in_progress` en
+  `feat/catalog-media-commands-20261118`.
+- V28 agrega una cola de borrado separada del upload, con propósito/estado/
+  outcome cerrados, lease, fence, intentos y tombstone durable. V27 permanece
+  inmutable.
+- La cola no declara ausencia remota permanente: un `put` viejo puede terminar
+  después de perder su fence. Por eso `TOMBSTONED` sigue siendo reclamable y
+  reconcilia periódicamente mediante `head` + `deleteIfDigest`.
+- El corte actual implementa registro/replay estable, ownership de staging,
+  leases/fencing de upload, Tx-B validada, recovery sin inventar bytes y worker
+  delete/GC sin I/O externo dentro de transacciones.
+- La revisión preliminar Sol detectó y se corrigió: reclaim de leases delete
+  vencidos, settlement atómico bajo lock/fence/deadline, rollback obligatorio de
+  transiciones dobles, outcomes terminales no nulos y replay independiente del
+  `assetId`/key regenerado por el cliente.
+- La huella del upload ahora se construye canónicamente en el dominio desde el
+  scope y todos los metadatos inmutables. El flujo separa registro humano de
+  ejecución post-commit y un guard explícito rechaza I/O remoto con una
+  transacción activa.
+- La prueba PostgreSQL se ejecuta con `SET ROLE storecore_runtime` y cubre crash
+  y reclaim, claimant stale, tombstone reconciliable, checks terminales y el
+  guard transaccional. Evidencia local: compile/test-compile verde y 9/9 tests
+  focales sin Docker; Testcontainers queda para el CI alojado porque Docker no
+  está disponible en este host.
+- La tercera ronda coordinada GPT-6.1 Sol (arquitectura/funcional y
+  concurrencia/seguridad) aprobó el subcorte sin P0–P3 abiertos. La aprobación
+  es estática y deberá repetirse sobre el SHA exacto después del CI.
+- El CAS de composición y sus locks attach/delete/GC permanecen pendientes en
+  el siguiente subcorte de TASK-003. HTTP, decoder y proveedor live siguen fuera.

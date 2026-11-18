@@ -10,6 +10,7 @@ import com.storecore.catalog.application.media.PutOutcome
 import com.storecore.catalog.domain.media.ContentDigest
 import com.storecore.catalog.domain.media.PrivateReadTtl
 import com.storecore.catalog.domain.media.ProviderObjectKey
+import com.storecore.catalog.domain.media.MediaProviderKind
 import java.net.URI
 import java.security.MessageDigest
 import java.time.Clock
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Deterministic in-memory adapter available only to tests. Bytes require a valid, unexpired grant. */
 class TestMediaObjectStore(private val clock: Clock) : MediaObjectStore {
+    override val kind = MediaProviderKind.TEST_STUB
     private data class StoredObject(val bytes: ByteArray, val digest: ContentDigest, val metadata: MediaObjectMetadata)
     private data class IssuedGrant(val key: String, val digest: String, val expiry: Long)
     private val objects = ConcurrentHashMap<String, StoredObject>()
@@ -56,6 +58,8 @@ class TestMediaObjectStore(private val clock: Clock) : MediaObjectStore {
         if (current.digest != digest || sha256(current.bytes) != digest.value) return ObjectDeleteOutcome.TerminalFailure
         return if (objects.remove(providerKey.value, current)) ObjectDeleteOutcome.Deleted else ObjectDeleteOutcome.RetryableFailure
     }
+
+    fun size(): Int = objects.size
 
     fun readAuthorised(grant: URI): ByteArray? {
         if (grant.scheme != "test-private" || grant.host != "media") return null

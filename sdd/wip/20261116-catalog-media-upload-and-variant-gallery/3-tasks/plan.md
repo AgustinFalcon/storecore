@@ -3,10 +3,11 @@
 ## Corte A — dominio y persistencia
 
 - [x] TASK-001 Tipos cerrados, value objects y pasos del flujo.
-- [ ] TASK-002 Migración forward-only en el próximo número libre (V27 sobre la
+- [x] TASK-002 Migración forward-only en el próximo número libre (V27 sobre la
   base aprobada `41948a6`; recalcular contra `master`) compatible con todas las
   filas legales de V1, sin reutilizar migraciones publicadas.
-- [ ] TASK-003 Repositorios, CAS, ownership, lease/fencing y workers.
+- [ ] TASK-003 Repositorios, CAS, ownership, lease/fencing y workers (en
+  progreso: upload/delete durable; composición CAS queda en el siguiente corte).
 - [x] TASK-004 Puerto privado y adapter determinista de prueba.
 
 ## Corte B — seguridad y API

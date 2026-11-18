@@ -52,7 +52,7 @@ class CatalogMediaMigrationTest {
 
         val result = flyway(url).migrate()
 
-        assertEquals("27", result.targetSchemaVersion.toString())
+        assertEquals("28", result.targetSchemaVersion.toString())
         assertEquals(preserved, sql.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=26 ORDER BY installed_rank"))
         assertEquals(25, sql.queryForObject("SELECT count(*) FROM product_images WHERE product_id=?", Int::class.java, product))
         assertEquals((0 until 25).toList(), sql.queryForList("SELECT sort_order FROM product_images WHERE product_id=? ORDER BY sort_order", Int::class.java, product))
@@ -299,13 +299,15 @@ class CatalogMediaMigrationTest {
             )
         }
 
-        for (table in listOf("catalog_media_drafts", "media_assets", "media_upload_commands", "variant_images", "product_images")) {
+        for (table in listOf("catalog_media_drafts", "media_assets", "media_upload_commands", "media_delete_commands", "variant_images", "product_images")) {
             assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime', ?, 'SELECT,INSERT,UPDATE,DELETE')", Boolean::class.java, table)!!, table)
         }
         assertTrue(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','catalog_schema_compatibility_version','SELECT')", Boolean::class.java)!!)
         assertFalse(sql.queryForObject("SELECT has_table_privilege('storecore_runtime','catalog_schema_compatibility_version','UPDATE')", Boolean::class.java)!!)
         assertTrue(sql.queryForObject("SELECT has_sequence_privilege('storecore_runtime','product_images_id_seq','USAGE,SELECT')", Boolean::class.java)!!)
-        for (table in listOf("catalog_media_drafts", "media_assets", "media_upload_commands", "variant_images")) {
+        assertTrue(sql.queryForObject("SELECT has_function_privilege('storecore_runtime','catalog_media_owner_exists(bigint)','EXECUTE')", Boolean::class.java)!!)
+        assertFalse(sql.queryForObject("SELECT has_function_privilege('public','catalog_media_owner_exists(bigint)','EXECUTE')", Boolean::class.java)!!)
+        for (table in listOf("catalog_media_drafts", "media_assets", "media_upload_commands", "media_delete_commands", "variant_images")) {
             assertFalse(sql.queryForObject("SELECT has_table_privilege('public', ?, 'SELECT,INSERT,UPDATE,DELETE')", Boolean::class.java, table)!!, table)
         }
     }

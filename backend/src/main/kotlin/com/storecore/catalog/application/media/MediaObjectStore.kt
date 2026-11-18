@@ -2,6 +2,7 @@ package com.storecore.catalog.application.media
 
 import com.storecore.catalog.domain.media.ContentDigest
 import com.storecore.catalog.domain.media.MediaFormat
+import com.storecore.catalog.domain.media.MediaProviderKind
 import com.storecore.catalog.domain.media.PixelDimensions
 import com.storecore.catalog.domain.media.PrivateReadTtl
 import com.storecore.catalog.domain.media.ProviderObjectKey
@@ -53,6 +54,7 @@ sealed interface ObjectDeleteOutcome {
 }
 
 interface MediaObjectStore {
+    val kind: MediaProviderKind
     fun putIfAbsent(bytes: NormalizedMediaBytes, deterministicKey: ProviderObjectKey, digest: ContentDigest, metadata: MediaObjectMetadata): PutOutcome
     fun head(deterministicKey: ProviderObjectKey): ObjectLookupOutcome
     fun signedPrivateRead(providerKey: ProviderObjectKey, digest: ContentDigest, ttl: PrivateReadTtl): PrivateReadOutcome
@@ -60,6 +62,7 @@ interface MediaObjectStore {
 }
 
 class UnconfiguredMediaObjectStore : MediaObjectStore {
+    override val kind = MediaProviderKind.UNCONFIGURED
     override fun putIfAbsent(bytes: NormalizedMediaBytes, deterministicKey: ProviderObjectKey, digest: ContentDigest, metadata: MediaObjectMetadata) = PutOutcome.Unavailable
     override fun head(deterministicKey: ProviderObjectKey) = ObjectLookupOutcome.Unavailable
     override fun signedPrivateRead(providerKey: ProviderObjectKey, digest: ContentDigest, ttl: PrivateReadTtl) = PrivateReadOutcome.Unavailable
