@@ -145,6 +145,28 @@ capability/kill switch y scope técnico, pero no reutilizan CSRF humano. Revocar
 ADMIN impide comandos nuevos; un comando previo sólo completa compensación
 segura, no publicación posterior.
 
+## Subcorte TASK-003: expiración y limpieza durable de drafts
+
+Un puerto separado de mantenimiento expira únicamente drafts `OPEN` cuyo
+`expires_at` venció según `clock_timestamp()` de PostgreSQL. Cada lote acepta
+entre 1 y 100 elementos. La expiración y el registro de GC son transacciones
+cortas separadas: un reinicio entre ambas recupera assets de drafts `EXPIRED`,
+`ABANDONED` o `CLAIMED` sin borrar drafts, assets ni comandos históricos.
+El worker no obtiene locks de producto y nunca adquiere draft después de asset.
+
+El barrido toma assets en orden UUID con `SKIP LOCKED`, luego upload y delete.
+Revalida el estado cerrado del draft, la ausencia de `product_images` y un
+estado de asset elegible. Una lease upload viva posterga el asset; cuando vence,
+el barrido incrementa fence y limpia lease antes de registrar `ORPHAN_GC` en
+V28. Assets `ATTACHED`, referenciados, ya pendientes o borrados se preservan.
+No hay I/O remoto en estas transacciones; el worker delete existente ejecuta y
+reconcilia tombstones, incluido un put tardío. Claims upload nuevos toman lock
+draft antes de asset y fallan cerrados si el draft está cerrado o vencido.
+V29 agrega índices parciales globales `(expires_at,id) WHERE state='OPEN'` y
+assets UUID en estados candidatos, para excluir historial retenido del barrido;
+V27/V28 permanecen inmutables. `CLAIMED` de draft es el claim final y atómico
+de alta, no una lease upload: sus referencias publicadas siempre se preservan.
+
 ## Inspección y normalización
 
 - un `OncePerRequestFilter` anterior al `DispatcherServlet` valida Origin,

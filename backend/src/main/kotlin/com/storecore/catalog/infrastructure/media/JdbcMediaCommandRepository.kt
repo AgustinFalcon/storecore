@@ -93,7 +93,19 @@ class JdbcMediaCommandRepository(
         duration: Duration,
     ): MediaUploadClaimResult = isolated.execute {
         require(!duration.isNegative && !duration.isZero)
+        // Match composition's draft -> asset -> upload order. Expiry closes new work,
+        // while an existing live claimant may settle until cleanup fences its lease.
+        val draft = jdbc.queryForList(
+            "SELECT owner_user_id,state,expires_at FROM catalog_media_drafts WHERE id=? FOR UPDATE",
+            draftId.value,
+        ).singleOrNull() ?: return@execute MediaUploadClaimResult.Missing
+        if ((draft["owner_user_id"] as Number).toLong() != ownerId.value) return@execute MediaUploadClaimResult.ScopeDenied
+        if (CatalogMediaDraftState.fromWire(draft["state"] as? String) != CatalogMediaDraftState.OPEN)
+            return@execute MediaUploadClaimResult.Busy
         val row = uploadRow(draftId, uploadId, forUpdate = true) ?: return@execute MediaUploadClaimResult.Missing
+        // Any of the draft, asset or upload locks can have waited past expiry.
+        val draftCheckedAt = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
+        if (draft.instant("expires_at") <= draftCheckedAt) return@execute MediaUploadClaimResult.Busy
         if ((row["owner_user_id"] as Number).toLong() != ownerId.value) return@execute MediaUploadClaimResult.ScopeDenied
         val state = MediaCommandState.fromWire(row["command_state"] as? String)
         if (state == MediaCommandState.COMPLETED && MediaAssetState.fromWire(row["asset_state"] as? String) == MediaAssetState.STORED_PRIVATE)
@@ -106,7 +118,9 @@ class JdbcMediaCommandRepository(
             """UPDATE media_upload_commands SET state='CLAIMED',lease_owner=?,
                    lease_until=GREATEST(clock_timestamp(),?::timestamptz)+?*interval '1 millisecond',
                    fence_version=fence_version+1,updated_at=clock_timestamp()
-               WHERE draft_id=? AND upload_id=? AND (state='AWAITING_BYTES' OR (state='CLAIMED' AND lease_until<=GREATEST(clock_timestamp(),?::timestamptz)))""",
+               WHERE draft_id=? AND upload_id=? AND (state='AWAITING_BYTES' OR (state='CLAIMED' AND lease_until<=GREATEST(clock_timestamp(),?::timestamptz)))
+                 AND EXISTS(SELECT 1 FROM catalog_media_drafts d WHERE d.id=media_upload_commands.draft_id
+                   AND d.state='OPEN' AND d.expires_at>clock_timestamp())""",
             leaseOwner.toString(), Timestamp.from(now), duration.toMillis(), draftId.value, uploadId.value, Timestamp.from(now),
         )
         if (updated != 1) return@execute MediaUploadClaimResult.Busy

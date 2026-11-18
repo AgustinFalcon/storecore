@@ -6,6 +6,7 @@ interface MediaWireType {
 
 enum class CatalogMediaDraftState(override val wire: String) : MediaWireType {
     OPEN("OPEN"), CLAIMED("CLAIMED"), EXPIRED("EXPIRED"), ABANDONED("ABANDONED"), UNKNOWN("UNKNOWN");
+    val permitsOrphanCleanup: Boolean get() = this == CLAIMED || this == EXPIRED || this == ABANDONED
     companion object { fun fromWire(raw: String?): CatalogMediaDraftState = entries.firstOrNull { it.wire == raw && it != UNKNOWN } ?: UNKNOWN }
 }
 
