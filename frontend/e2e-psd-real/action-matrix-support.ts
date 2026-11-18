@@ -43,8 +43,8 @@ export enum WriteMethod { Post = 'POST', Put = 'PUT', Delete = 'DELETE' }
 
 export class ActionTransportTerminal {
   private constructor(readonly wire: string) {}
-  static readonly Finished = new ActionTransportTerminal('finished');
-  static readonly Failed = new ActionTransportTerminal('failed');
+  static readonly Finished = new ActionTransportTerminal(evidenceWire.readTerminal.finished);
+  static readonly Failed = new ActionTransportTerminal(evidenceWire.readTerminal.failed);
 }
 
 export async function body<T = Record<string, unknown>>(page: Page, path: string): Promise<T> {
