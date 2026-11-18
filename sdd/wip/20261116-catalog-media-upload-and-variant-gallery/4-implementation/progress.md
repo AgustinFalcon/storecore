@@ -99,3 +99,31 @@
   es estática y deberá repetirse sobre el SHA exacto después del CI.
 - El CAS de composición y sus locks attach/delete/GC permanecen pendientes en
   el siguiente subcorte de TASK-003. HTTP, decoder y proveedor live siguen fuera.
+
+## 2026-11-18 — composición CAS y protocolo de locks en validación
+
+- PR #300 quedó fusionado en `master` como `07a0717`. Su candidato exacto
+  `a6d39499a18c2432fb0956db0a0da6d9432814a8` recibió dos APPROVE GPT-6.1 Sol
+  sin P0–P3 y Verify #802 terminó 5/5: higiene, backend PostgreSQL/interlock,
+  frontend y ambas matrices E2E reales.
+- El nuevo subcorte de TASK-003 agrega un puerto separado de composición para
+  productos existentes, revisión positiva segura, referencias selladas a
+  imágenes publicadas o assets de staging, validación 20/12, orden contiguo y
+  una portada exacta por galería no vacía.
+- El CAS conserva `productImageId`, reemplaza asociaciones y auditoría en una
+  transacción, permite a otro ADMIN mantener una asociación publicada sin leer
+  staging ajeno y exige ownership exacto para adjuntar staging nuevo.
+- Se normalizó el orden global de locks a producto → draft → variantes → assets
+  UUID → upload commands → delete commands. Los joins `FOR UPDATE OF` dejaron
+  de usarse como supuesto de orden; claim delete conserva su transacción corta
+  command-only antes de I/O.
+- Las revisiones preliminares detectaron y se corrigió: detach no re-adjuntable,
+  traducción duplicada de source, `SET CONSTRAINTS ALL` filtrado a la transacción
+  caller y alt legacy legal en DB pero inválido para el dominio estricto.
+- La evidencia agregada cubre dos CAS con igual revisión, dos CAS en una
+  transacción externa, rollback por fallo de auditoría, detach/reattach,
+  attach frente a delete/GC, rol runtime y fallback legacy fail-closed.
+- Evidencia local disponible: compilación completa verde y 10/10 tests de
+  dominio. PostgreSQL/Testcontainers queda para CI alojado porque Docker no está
+  disponible en este host. El subcorte todavía no es cierre de TASK-003 ni
+  autoriza HTTP, decoder, proveedor live, deploy u homologación.

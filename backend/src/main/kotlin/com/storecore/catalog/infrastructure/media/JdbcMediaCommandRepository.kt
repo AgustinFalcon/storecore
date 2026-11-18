@@ -167,12 +167,7 @@ class JdbcMediaCommandRepository(
 
     override fun requestDelete(ownerId: MediaOwnerId, assetId: MediaAssetId, purpose: MediaDeletePurpose, now: Instant): MediaDeleteRequestResult = required.execute {
         if (purpose == MediaDeletePurpose.UNKNOWN) return@execute MediaDeleteRequestResult.ScopeDenied
-        val row = jdbc.queryForList(
-            """SELECT a.*,c.state command_state,c.lease_owner,c.fence_version
-               FROM media_assets a JOIN media_upload_commands c ON c.asset_id=a.id
-               WHERE a.id=? FOR UPDATE OF a,c""",
-            assetId.value,
-        ).singleOrNull() ?: return@execute MediaDeleteRequestResult.Missing
+        val row = lockedAssetUpload(assetId) ?: return@execute MediaDeleteRequestResult.Missing
         if ((row["owner_user_id"] as Number).toLong() != ownerId.value) return@execute MediaDeleteRequestResult.ScopeDenied
         if (jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM product_images WHERE media_asset_id=?)", Boolean::class.java, assetId.value) == true ||
             MediaAssetState.fromWire(row["state"] as? String) == MediaAssetState.ATTACHED
@@ -234,14 +229,7 @@ class JdbcMediaCommandRepository(
 
     override fun settleDelete(lease: MediaDeleteLease, outcome: MediaDeleteOutcome, now: Instant, retryAfter: Duration): Boolean = isolated.execute {
         require(!retryAfter.isNegative && !retryAfter.isZero)
-        val locked = jdbc.queryForList(
-            """SELECT q.state,q.lease_owner,q.lease_until,q.fence_version,a.state asset_state,
-                      a.normalized_sha256,COALESCE(a.provider_key,c.deterministic_key) provider_key
-               FROM media_assets a JOIN media_upload_commands c ON c.asset_id=a.id
-               JOIN media_delete_commands q ON q.asset_id=a.id
-               WHERE a.id=? FOR UPDATE OF a,q""",
-            lease.assetId.value,
-        ).singleOrNull() ?: return@execute false
+        val locked = lockedAssetUploadDelete(lease.assetId) ?: return@execute false
         val live = MediaDeleteState.fromWire(locked["state"] as? String) == MediaDeleteState.CLAIMED &&
             locked["lease_owner"] == lease.leaseOwner &&
             (locked["fence_version"] as Number).toLong() == lease.fenceVersion &&
@@ -284,23 +272,60 @@ class JdbcMediaCommandRepository(
         }
     } == true
 
-    private fun lockedLiveUpload(lease: MediaUploadLease, now: Instant): Map<String, Any?>? = jdbc.queryForList(
-        """SELECT c.*,a.state asset_state FROM media_upload_commands c JOIN media_assets a ON a.id=c.asset_id
-           WHERE c.draft_id=? AND c.upload_id=? AND c.state='CLAIMED' AND c.lease_owner=? AND c.fence_version=?
-             AND c.lease_until>GREATEST(clock_timestamp(),?::timestamptz) FOR UPDATE OF c,a""",
-        lease.snapshot.draftId.value, lease.snapshot.uploadId.value, lease.leaseOwner.toString(), lease.fenceVersion, Timestamp.from(now),
-    ).singleOrNull()?.takeIf {
-        MediaAssetState.fromWire(it["asset_state"] as? String) == MediaAssetState.AWAITING_BYTES &&
-            it.instant("lease_until") > databaseNow(now)
+    private fun lockedLiveUpload(lease: MediaUploadLease, now: Instant): Map<String, Any?>? =
+        uploadRow(lease.snapshot.draftId, lease.snapshot.uploadId, forUpdate = true)?.takeIf {
+            MediaCommandState.fromWire(it["command_state"] as? String) == MediaCommandState.CLAIMED &&
+                it["lease_owner"] == lease.leaseOwner.toString() &&
+                (it["fence_version"] as Number).toLong() == lease.fenceVersion &&
+                it.instant("lease_until") > databaseNow(now) &&
+                MediaAssetState.fromWire(it["asset_state"] as? String) == MediaAssetState.AWAITING_BYTES
+        }
+
+    private fun uploadRow(draftId: CatalogMediaDraftId, uploadId: UploadId, forUpdate: Boolean): Map<String, Any?>? {
+        if (forUpdate) {
+            val assetId = jdbc.queryForList(
+                "SELECT asset_id FROM media_upload_commands WHERE draft_id=? AND upload_id=?",
+                draftId.value, uploadId.value,
+            ).singleOrNull()?.get("asset_id") as? UUID ?: return null
+            if (jdbc.queryForList("SELECT id FROM media_assets WHERE id=? FOR UPDATE", assetId).isEmpty()) return null
+            if (jdbc.queryForList(
+                    "SELECT upload_id FROM media_upload_commands WHERE draft_id=? AND upload_id=? FOR UPDATE",
+                    draftId.value, uploadId.value,
+                ).isEmpty()
+            ) return null
+        }
+        return jdbc.queryForList(
+            """SELECT c.state command_state,c.*,a.state asset_state,a.original_sha256,a.normalized_sha256,a.format,a.width,a.height,
+                      a.normalized_size,a.provider_kind,a.provider_key
+               FROM media_upload_commands c JOIN media_assets a ON a.id=c.asset_id
+               WHERE c.draft_id=? AND c.upload_id=?""",
+            draftId.value, uploadId.value,
+        ).singleOrNull()
     }
 
-    private fun uploadRow(draftId: CatalogMediaDraftId, uploadId: UploadId, forUpdate: Boolean): Map<String, Any?>? = jdbc.queryForList(
-        """SELECT c.state command_state,c.*,a.state asset_state,a.original_sha256,a.normalized_sha256,a.format,a.width,a.height,
-                  a.normalized_size,a.provider_kind,a.provider_key
-           FROM media_upload_commands c JOIN media_assets a ON a.id=c.asset_id
-           WHERE c.draft_id=? AND c.upload_id=?${if (forUpdate) " FOR UPDATE OF c,a" else ""}""",
-        draftId.value, uploadId.value,
-    ).singleOrNull()
+    /** Global media lock order: asset, upload command, then delete command. */
+    private fun lockedAssetUpload(assetId: MediaAssetId): Map<String, Any?>? {
+        if (jdbc.queryForList("SELECT id FROM media_assets WHERE id=? FOR UPDATE", assetId.value).isEmpty()) return null
+        if (jdbc.queryForList("SELECT asset_id FROM media_upload_commands WHERE asset_id=? FOR UPDATE", assetId.value).isEmpty()) return null
+        return jdbc.queryForList(
+            """SELECT a.*,c.state command_state,c.lease_owner,c.fence_version,c.deterministic_key
+               FROM media_assets a JOIN media_upload_commands c ON c.asset_id=a.id WHERE a.id=?""",
+            assetId.value,
+        ).singleOrNull()
+    }
+
+    private fun lockedAssetUploadDelete(assetId: MediaAssetId): Map<String, Any?>? {
+        val assetAndUpload = lockedAssetUpload(assetId) ?: return null
+        if (jdbc.queryForList("SELECT asset_id FROM media_delete_commands WHERE asset_id=? FOR UPDATE", assetId.value).isEmpty()) return null
+        val queue = jdbc.queryForList(
+            "SELECT state,lease_owner,lease_until,fence_version FROM media_delete_commands WHERE asset_id=?",
+            assetId.value,
+        ).singleOrNull() ?: return null
+        return assetAndUpload + queue + mapOf(
+            "asset_state" to assetAndUpload["state"],
+            "provider_key" to (assetAndUpload["provider_key"] ?: assetAndUpload["deterministic_key"]),
+        )
+    }
 
     private fun mapSnapshot(row: Map<String, Any?>) = MediaUploadSnapshot(
         requireNotNull(CatalogMediaDraftId.fromWire((row["draft_id"] as UUID).toString())),

@@ -1,5 +1,17 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-18, comandos media durables
+
+`master 07a07178214d9e6d0e679356cedad0c5e939ffde` integra PR #300. El
+candidato exacto `a6d39499a18c2432fb0956db0a0da6d9432814a8` pasó Verify #802
+5/5 (higiene, backend PostgreSQL/interlock, frontend y ambas matrices E2E) y
+dos revisiones independientes GPT-6.1 Sol aprobaron sin P0–P3.
+
+El corte integra registro/replay, leases/fencing y borrado/GC durable de media
+privada con tombstones reconciliables. TASK-003 permanece en progreso; la
+composición CAS se desarrolla en un PR sucesor. No acredita HTTP media,
+decoder, Cloudinary live, secretos, deploy ni homologación externa.
+
 ## Master vigente — 2026-11-18
 
 `master dc32a3ecbcf65557c670679376a678e6dee1e4ab` integra los cortes #274–#284
