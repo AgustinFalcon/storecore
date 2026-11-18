@@ -330,6 +330,46 @@ rollback. Rollback de aplicación no elimina DDL ni objetos.
 - CI sin red externa para tests; adapter Cloudinary sólo contract-test con fake
   local. E2E real del proveedor requiere credenciales fuera del repo y GO aparte.
 
+## Subcorte TASK-003/TASK-008: alta atómica local de catálogo
+
+El alta usa un puerto separado `MediaProductCreationRepository`. Es
+estrictamente create-only y no reutiliza `JdbcCatalogService.saveProduct`, que
+es un upsert legacy y reemplaza galerías. El dominio recibe un comando validado
+con nombre, slug, estado cerrado, precio ARS, variantes, stock inicial,
+`clientVariantRef` y una composición formada únicamente por assets staged del
+draft. Todos los campos mutables participan de una canonicalización binaria
+versionada y de un SHA-256; no se hashea JSON cuya forma dependa del mapper.
+
+La operación local completa una sola transacción `REQUIRED`: serializa el draft,
+crea producto y variantes, inserta balances iniciales, bloquea assets por UUID y
+sus comandos upload/delete, revalida `clock_timestamp()`, publica imágenes y
+galerías, cambia assets/upload a `ATTACHED`, reclama `OPEN→CLAIMED`, escribe
+auditoría y persiste el receipt. No llama object storage, HTTP ni otro proveedor.
+Las variantes se insertan en orden SKU estable y los assets se bloquean por UUID.
+
+V30 agrega un ledger durable único por draft. Ante una fila existente se toma
+su lock antes del draft: mismo hash devuelve el snapshot persistido aunque el
+draft ya esté CLAIMED o vencido; otro hash devuelve conflicto sin revelar datos.
+Cuando no existe fila, se bloquea el draft y se consulta nuevamente el ledger
+antes de insertar el claim transaccional, cerrando la carrera del caso ausente.
+La fila sólo se hace visible junto con el agregado completo; cualquier fallo de
+validación, unicidad, asociación, auditoría o receipt revierte todo. El snapshot
+versionado contiene `productId`, mapa `clientVariantRef→variantId`, imágenes,
+composición y `mediaRevision`; replay nunca reconstruye desde la proyección
+actual. Versión, estado o forma desconocidos producen `Unknown` fail-closed.
+
+El draft debe pertenecer al USER, estar OPEN, no tener target y no haber vencido.
+Cada asset debe pertenecer al mismo USER/draft, estar `STORED_PRIVATE`, tener
+upload `COMPLETED`, proveedor válido y ninguna orden delete. La expiración se
+consulta con reloj PostgreSQL después de todos los locks y de cualquier espera
+de unicidad. El orden global queda ledger existente → draft → producto nuevo →
+variantes → assets UUID → upload → delete; cleanup nunca adquiere draft después
+de asset y la creación nunca adquiere un lock de rango anterior después de asset.
+
+Los errores de unicidad de slug/SKU se traducen fuera de la transacción abortada
+a un conflicto cerrado. No se crea ni reutiliza una entidad parcial. El corte
+mantiene single-tenant, USER/CUSTOMER separados y no habilita proveedor live.
+
 ## Decisiones pendientes antes de implementar adapter live
 
 - cuenta y plan Cloudinary titular

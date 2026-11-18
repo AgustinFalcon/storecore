@@ -7,8 +7,8 @@
   base aprobada `41948a6`; recalcular contra `master`) compatible con todas las
   filas legales de V1, sin reutilizar migraciones publicadas.
 - [ ] TASK-003 Repositorios, CAS, ownership, lease/fencing y workers (en
-  progreso: upload/delete durable y composición CAS integrados; expiración y
-  limpieza durable en validación; alta atómica pendiente).
+  progreso: upload/delete durable, composición CAS y expiración/limpieza
+  durable integrados; alta atómica en implementación).
 - [x] TASK-004 Puerto privado y adapter determinista de prueba.
 
 ## Corte B — seguridad y API
@@ -17,6 +17,21 @@
 - [ ] TASK-006 Filtro multipart, cuotas y límites de recursos.
 - [ ] TASK-007 API drafts/uploads/recovery/preview/delete/composition/delivery.
 - [ ] TASK-008 Compatibilidad de catálogo, alta atómica y lectores existentes.
+
+### Subcorte aprobado — alta atómica local
+
+- [x] MEDIA-CREATE-001 Definir comando create-only, referencias de variante de
+  cliente, resultado cerrado y hash canónico versionado.
+- [x] MEDIA-CREATE-002 Agregar ledger V30 de idempotencia por draft con
+  ownership compuesto, snapshot durable y privilegios runtime mínimos.
+- [x] MEDIA-CREATE-003 Implementar una única transacción local para producto,
+  variantes, stock inicial, claim de draft, asociaciones, auditoría y receipt.
+- [ ] MEDIA-CREATE-004 Cubrir replay, hash distinto, ownership/TTL/estado,
+  rollback, colisiones, carreras con cleanup y upgrade V29→V30.
+
+El subcorte no agrega HTTP, decoder, proveedor live, secretos, deploy ni
+homologación. TASK-003 y TASK-008 sólo se cierran cuando sus residuales
+posteriores queden implementados y reciban los gates exact-head.
 
 ## Corte C — experiencia Angular
 

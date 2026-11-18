@@ -1,5 +1,40 @@
 # Progreso
 
+## 2026-11-18 — alta atómica local en implementación
+
+- Baseline `master@a48ac15525f1443f65897883a87a4840da9b0fd6`, merge de PR
+  #302; incluye composición CAS #301 y cleanup durable #302.
+- Dos revisiones preventivas GPT-6.1 Sol confirmaron el corte create-only y
+  exigieron receipt durable, replay independiente de la proyección, revalidación
+  temporal posterior a esperas y ausencia de I/O externo.
+- MEDIA-CREATE-001..004 quedan habilitadas. No se declara cierre ni evidencia
+  exact-head hasta completar implementación, CI y reviews finales.
+- MEDIA-CREATE-001..003 quedaron implementadas en el dirty tree: comando y
+  ledger con estados cerrados, hash length-prefixed, codec estricto, V30 y
+  adapter `REQUIRED` sin I/O externo. Los rechazos posteriores al primer write
+  abortan la transacción; replay/scope previos retornan sin marcar rollback-only.
+- Dos revisiones preventivas Sol detectaron y se corrigió replay dentro de
+  transacción caller, mutabilidad de attributes, versión decimal/receipts sin
+  límites, strings de estado y una fixture TTL inválida. La segunda pasada no
+  encontró P0–P2; su P3 de evidencia se cerró observando el lock real mediante
+  `pg_stat_activity` antes de dejar vencer el draft.
+- `test-compile` completo verde y corpus de dominio/codec `4/4` verde. La clase
+  PostgreSQL compila y contiene creación/replay histórico, rollback, permisos,
+  expiración, asset inválido, duplicado concurrente, espera de asset y upgrade
+  V29→V30; Testcontainers se omitió localmente porque Docker no está disponible.
+  MEDIA-CREATE-004 y el gate exact-head permanecen abiertos hasta CI alojado y
+  cobertura adicional de races cleanup/delete/settlement y constraint diferida.
+- Candidato funcional `021d2bf36df1f544d671e992b24f6de033316002`:
+  Verify #812, run `44412770320`, terminó 5/5 verde (higiene, backend
+  PostgreSQL/interlock, frontend y ambas matrices E2E reales). Dos revisiones
+  independientes GPT-6.1 Sol medium sobre base `a48ac155` y ese head exacto
+  dieron APPROVE sin P0–P3. Los dictámenes quedan registrados en
+  `sdd/reviews/20261118-sol-pr303-architecture.md` y
+  `sdd/reviews/20261118-sol-pr303-security.md`.
+- Este close-out sólo acredita el subcorte create-only. MEDIA-CREATE-004,
+  TASK-003 y TASK-008 continúan abiertas por sus residuales expresos; no se
+  habilita HTTP media, proveedor live, deploy ni homologación.
+
 ## 2026-11-18 — expiración y barrido durable de drafts en validación
 
 - Subcorte de TASK-003 basado en `master@1506027aadab43b860c661017d20f9543da6bbab`,

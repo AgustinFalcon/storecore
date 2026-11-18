@@ -255,7 +255,7 @@ class MediaDraftCleanupPostgresTest {
         fixture("28").use { f ->
             val upload = f.upload().also(f::expire)
             val history = f.jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
-            val migration = f.flyway().migrate()
+            val migration = f.flyway("29").migrate()
             assertEquals("29", migration.targetSchemaVersion.toString())
             assertEquals(history, f.jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=28 ORDER BY installed_rank"))
             assertEquals(MediaAssetState.AWAITING_BYTES, f.assetState(upload))
@@ -265,8 +265,8 @@ class MediaDraftCleanupPostgresTest {
             assertTrue(index.any { it.contains("(expires_at, id)") && it.contains("OPEN") }, index.toString())
             val assetIndexes = f.jdbc.queryForList("SELECT indexdef FROM pg_indexes WHERE tablename='media_assets'", String::class.java)
             assertTrue(assetIndexes.any { it.contains("(id)") && it.contains("WHERE") && it.contains("AWAITING_BYTES") && it.contains("STORED_PRIVATE") && it.contains("FAILED") }, assetIndexes.toString())
-            f.flyway().validate()
-            assertEquals(0, f.flyway().migrate().migrationsExecuted)
+            f.flyway("29").validate()
+            assertEquals(0, f.flyway("29").migrate().migrationsExecuted)
         }
     }
 
