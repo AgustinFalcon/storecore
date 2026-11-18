@@ -5,7 +5,7 @@ import { DeliveryMode } from '../src/app/domain/cart/delivery';
 const envelope=(data:unknown)=>({code:200,data,message:null});
 const pickup={mode:DeliveryMode.Pickup.wire,label:'Retiro en local',cost:0,currency:'ARS',minDays:0,maxDays:1,requiresAddress:false,configurationVersion:7,destination:'Local Córdoba · Calle Central 42',instructions:'Traé tu confirmación de compra.'};
 const local={...pickup,mode:DeliveryMode.LocalDelivery.wire,label:'Entrega local',cost:4500,minDays:2,maxDays:5,requiresAddress:true,destination:null,instructions:null};
-for(const width of [390,768,1440]) {
+for(const width of [390,768,1023,1024,1440]) {
   test(`delivery total and accessible pickup with unavailable addresses at ${width}`,async({page})=>{
     await page.setViewportSize({width,height:1000});
     let checkout:Record<string,unknown>|null=null;
@@ -14,7 +14,7 @@ for(const width of [390,768,1440]) {
       if(path.endsWith('/internal/me'))return route.fulfill({status:401,json:{}});
       if(path.endsWith('/customer/me'))return route.fulfill({json:envelope({id:'buyer',email:'buyer@example.test',firstName:'Buyer',lastName:'Test',phone:''})});
       if(path.endsWith('/customer/auth/csrf'))return route.fulfill({json:envelope({}),headers:{'X-CSRF-Token':'csrf'}});
-      if(path.endsWith('/customer/cart'))return route.fulfill({json:envelope({revision:'a'.repeat(64),currency:'ARS',deliveryOptions:[pickup,local],lines:[{sku:'A',name:'Producto',quantity:2,originalUnitPrice:100,discountAmount:0,effectiveUnitPrice:100,offerRef:null,campaignRef:null}]})});
+      if(path.endsWith('/customer/cart'))return route.fulfill({json:envelope({revision:'a'.repeat(64),currency:'ARS',deliveryOptions:[pickup,local],lines:[{sku:'A',name:'Electroherramientas profesionales',quantity:2,originalUnitPrice:100,discountAmount:0,effectiveUnitPrice:100,offerRef:null,campaignRef:null}]})});
       if(path.endsWith('/customer/me/addresses'))return route.fulfill({status:503,json:{}});
       if(path.endsWith('/customer/checkout')){
         checkout=request.postDataJSON() as Record<string,unknown>;

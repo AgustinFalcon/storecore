@@ -1,77 +1,122 @@
-# Productive surface real integration gate
+# Productive routes real integration gate
 
-Run against an empty disposable PostgreSQL **16** database named
-`storecore_ua_e2e`. Never point this gate at an operator database. The runner
-rejects another database name, non-loopback host, non-16 server and nonempty
-public schema. It never resets or drops a database.
+The canonical execution is the independent `productive-routes-real-e2e` job in
+`.github/workflows/verify.yml`. It owns a fresh PostgreSQL **16** service, packages
+the exact checked-out backend SHA, builds Production and Demo, checks the matrix,
+and runs Spring, production Angular HTTPS and Chromium against real HTTP.
+No API response interception or provider simulator belongs to this gate.
 
-Build the exact working snapshot first:
+The runner accepts only a disposable database named `storecore_ua_e2e` on loopback,
+PostgreSQL 16, and an empty public schema. It never resets or drops a database.
+The job's database is independent of UA/recovery despite using the same name.
+Never target an operator database.
 
-```powershell
+## Build and static checks
+
+Build the working snapshot before runtime:
+
+```sh
 # backend
 mvn -B -DskipTests package
 # frontend
+npm ci
+npm run build
 npm run build:demo
 npm run check:psd-real
-npm run test:psd-real
 ```
 
-Prerequisites: Java, Node/npm dependencies, Chromium installed for Playwright,
-`psql`, `openssl`, and a running disposable PG16 server. Use
-`STORECORE_UA_JAVA`, `STORECORE_UA_PSQL`, `STORECORE_UA_OPENSSL` to select explicit
-executable paths. PG environment defaults are loopback:5434, user/password
-`storecore`; they are disposable fixtures, never installation credentials.
+`check:psd-real` includes syntax, environment/evidence security checks, typecheck,
+lint and discovery. It does not claim runtime evidence. `npm run verify` remains
+the separate frontend architecture/unit/build gate. `test:productive-routes-real`
+and `test:psd-real` invoke the same hardened runner.
 
-A container can be provisioned explicitly (Docker access required):
+## Linux runtime isolation
 
-```powershell
-docker run --name storecore-psd-t08 -e POSTGRES_DB=storecore_ua_e2e -e POSTGRES_USER=storecore -e POSTGRES_PASSWORD=storecore -p 127.0.0.1:5434:5432 -d postgres:16-alpine
+Runtime fails closed outside Linux, as root, or without a root-owned,
+non-writable attestation for its exact UID. Native Windows execution is not an
+equivalent security gate; use the Linux job or reproduce its provisioning steps.
+
+The workflow installs dependencies before isolation, creates a dedicated
+`storecore-psd` user and inserts first-match IPv4 and IPv6 OUTPUT owner rules
+rejecting every non-loopback destination for that UID. It verifies both rules
+before writing `/run/storecore-psd-egress.json`:
+
+```json
+{"uid":12345,"ipv4":"reject-non-loopback","ipv6":"reject-non-loopback"}
 ```
 
-The operator owns the container lifecycle. After collecting evidence, stop and
-remove **only that named disposable container**. The runner owns and stops its
-Spring/Angular/Demo/Playwright processes and removes its temporary certificate.
-Ports 8080, 4301 and 4390 must be free. Port 4302 is unused.
+`uid` must be the actual dedicated user ID, not the illustrative value above.
+Only root may create this proof after checking the installed rules. Runtime is
+launched with `setpriv --no-new-privs`, an empty initial environment and an
+allowlist of process/database/tool paths. Proxy variables, JVM preload options,
+Spring configuration and provider credentials are not inherited. The Actions
+runner UID and upload step are not blocked. An `always()` cleanup removes only
+the two dedicated owner rules and their attestation.
 
-The runner migrates clean V1–V14 and obtains a real Argon2id hash through
-registration before inserting synthetic test-only ADMIN/installation fixtures.
-The installation guard is enabled for both loading and browser stages.
-It preserves the unchanged ShowcaseConfig HTTP-only boundary while running the
-updated loader twice, checks first/replay
-order creation, unchanged order count/inventory, and preservation of an unrelated
-offer created through the API. It then stops Spring and restarts over the same
-database with HTTPS installation Origin. No ShowcaseConfig boundary is relaxed.
-The adapter stays explicitly `unconfigured`; the safety endpoint and external
-capabilities are checked again after restart. No provider simulator runs.
-Safety reads are ADMIN-only and noncacheable. They expose only closed adapter
-and external-module states, including hidden BlackStore, without console controls
-or credentials. These reads are snapshots, not an atomic lock against concurrent
-ADMIN changes; the loader is a sequential local operator tool, not a concurrent
-installation provisioning service.
+Before Spring starts, Node, JVM and Chromium each pass a loopback positive
+control and external connection probes. Numeric IPv4/IPv6 and a reserved hostname
+mapped to an external address are checked; Chromium also checks WebSocket
+failure. The TCP barrier covers HTTP and WebSocket handshakes for the process
+tree. Chromium DNS filtering is additional defense. Failed or unavailable
+isolation aborts the gate. The proof is an administrator attestation, not an
+independent firewall query by the unprivileged process.
 
-The eight browser cases exercise actual Angular and HTTP with no API mocks:
-favorite removal/add/reload and realm separation; OPERATOR read/denied mutation,
-foreign-realm CSRF rejection; offer creation/end/reload;
-overview/inventory at 390/768/1440 with axe/reflow; customer search/detail and
-suspension/reactivation with irreversible old-session revocation; and separate
-optimized Production/Demo entrypoints. Browser DNS is restricted to loopback so
-fixture images cannot initiate external provider traffic.
+For local Linux execution, reproduce the workflow's dedicated user, owner rules,
+reserved-host mapping and proof, then run its exact runtime command. Required
+tools: Java 21, Node, Chromium, `psql`, `openssl`, `iptables`, `ip6tables` and
+`setpriv`. PG defaults are loopback:5434 and disposable user/password `storecore`.
+`STORECORE_UA_JAVA`, `STORECORE_UA_PSQL`, `STORECORE_UA_OPENSSL` may select tools.
+Ports 8080, 4301 and 4390 must be free. No provider runs on 4302.
 
-Production is served using Angular's production configuration. Demo uses the
-separately built `dist/storecore-demo` static output. Run `npm run verify` for
-source architecture boundaries and normal production build as a separate gate.
-This targeted suite is not the entire PSD-T06 acceptance matrix or a full Demo
-regression suite. Existing UA/CFE browser tests remain separate and use a local
-official-provider simulator; they do not prove this disabled-adapter gate.
+## Preparation and external safety
 
-Migration matrix (backend, Docker/Testcontainers PG16):
+Flyway applies the current chain (V1–V22 at this cut). Real registration supplies
+an Argon2id hash for synthetic identities; SQL bootstrap is limited to installation
+and USER roles. The route matrix uses `psd-route-admin@storecore.invalid` separately
+from existing journeys. The installation guard protects loading and browsers.
 
-```powershell
-mvn -B "-Dtest=CoreSchemaMigrationTest,CatalogAttributeOrderMigrationTest,CfeBaselineUpgradeMigrationTest,CapabilityDefinerMigrationTest,CapabilitySessionAdministrationMigrationTest" test
-```
+The loader configures V22 manual delivery policy, reads current cart/address
+revisions and creates one pending, unaccredited order. Replay validates stable
+receipt identities, order count, balances, ledger and preservation of an unrelated
+API-created offer. Production restarts with the exact HTTPS installation Origin;
+ShowcaseConfig remains HTTP-only.
 
-This covers clean V1–V14, V11→V14 with published checksum/history preservation,
-V13→V14 with historical row preservation, validate/no-op replay and capability
-migration hardening. Reports/logs from this browser gate live under ignored
-`frontend/psd-real-results/`. Discovery/typecheck is not runtime evidence. Record
-the exact Git SHA and fresh package/build commands alongside runtime results.
+Mercado Pago is `unconfigured`; identity delivery is `UNCONFIGURED` and its worker
+is disabled. The ADMIN safety endpoint verifies every external capability is
+`DISABLED`, with no duplicate/missing modules, before and after browser execution.
+Loader checks also bracket preparation. These are sequential snapshot checks
+inside a disposable installation.
+
+## Acceptance and evidence
+
+The matrix adds 30 leaves at 390/768/1440 px to existing focal PSD cases, plus
+redirect/wildcard cases. It checks exact resource readiness, surface identity,
+final URL, Axe and reflow. Success requires 90 route acceptance attachments and
+no failed/incomplete browser case. The UA/CFE provider-local journey remains
+separately classified; it cannot count as disabled-adapter or live coverage.
+The skip link must retain that URL and surface before Axe/reflow. Required data
+reads require a finished HTTP 200. Only the two Mercado Libre reads accept a
+finished HTTP 409 with the closed `CAPABILITY_DISABLED` code, together with the
+disabled-module UI; they do not claim an account or provider snapshot.
+
+Only allowlisted evidence under `frontend/psd-real-results/` is uploaded:
+
+- `fixture-receipt.json`: synthetic IDs and readiness data;
+- `egress.json`: successful isolation probes;
+- `route-census.json`: route/viewport/actor/surface, URL paths, HTTP method/path/status
+  and Axe counts;
+- `action-census.json`: the 17 closed action identities with owned routes, actor,
+  action class, strict evidence mode and browser outcome;
+- `runtime-summary.json`: SHA, external safety and outcome counts;
+- `route-diagnostics.json`: also on failed route cases, final pathname and request
+  method/path/status/terminal phase; no query, fragment, body or request identity;
+- sanitized JUnit/HTML: generated case IDs, source locations and closed outcomes;
+- process lifecycle logs: names and exit status only.
+
+Raw process logs and Playwright JSON remain in temporary scratch and are removed
+at completion. Error bodies, headers, cookies, CSRF, credentials, private TLS,
+password hashes, traces and screenshots are not uploaded. Explicit upload paths
+exclude Playwright's raw test output; missing required evidence fails the job.
+Reproduce failures using the recorded SHA and safe case source locations.
+Discovery/typecheck and historical PSD runs are not current runtime evidence.
+This gate makes no live provider, production email, deployment or homologation claim.

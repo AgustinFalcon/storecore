@@ -10,7 +10,8 @@
     "experimentalDecorators": true,
     "target": "ES2022",
     "module": "preserve",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true
   },
   "angularCompilerOptions": {
     "strictTemplates": true,

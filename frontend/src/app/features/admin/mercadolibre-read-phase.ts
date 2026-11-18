@@ -8,6 +8,7 @@ export class MercadoLibreReadPhase {
   static readonly Stale = new MercadoLibreReadPhase('STALE', 'Se conserva la última lectura');
   static readonly Error = new MercadoLibreReadPhase('ERROR', 'No se pudo leer Mercado Libre');
   static readonly AccessDenied = new MercadoLibreReadPhase('ACCESS_DENIED', 'Acceso no disponible');
+  static readonly Disabled = new MercadoLibreReadPhase('DISABLED', 'Módulo de Mercado Libre deshabilitado');
   static readonly Unknown = new MercadoLibreReadPhase('UNKNOWN', 'Estado de lectura no reconocido');
 
   static fromWire(raw: unknown): MercadoLibreReadPhase {
@@ -20,6 +21,7 @@ export class MercadoLibreReadPhase {
   get isStale(): boolean { return this === MercadoLibreReadPhase.Stale; }
   get isError(): boolean { return this === MercadoLibreReadPhase.Error; }
   get isAccessDenied(): boolean { return this === MercadoLibreReadPhase.AccessDenied; }
+  get isDisabled(): boolean { return this === MercadoLibreReadPhase.Disabled; }
 }
 
 const VALUES = [
@@ -30,5 +32,6 @@ const VALUES = [
   MercadoLibreReadPhase.Stale,
   MercadoLibreReadPhase.Error,
   MercadoLibreReadPhase.AccessDenied,
+  MercadoLibreReadPhase.Disabled,
   MercadoLibreReadPhase.Unknown,
 ];

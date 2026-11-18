@@ -81,6 +81,16 @@ describe('AccessCoordinator', () => {
     http.expectNone(url('internal/me'));
   });
 
+  it('joins an authoritative rehydration flight instead of cancelling and duplicating its CUSTOMER probe', async () => {
+    const rehydration = firstValueFrom(access.rehydrate());
+    const inspection = firstValueFrom(access.inspectCustomerAccess());
+    flushCustomer();
+    absent('internal/me');
+    expect(await inspection).toBe(ContextAuthorityInspection.Accepted);
+    expect((await rehydration).activeContext).toBe(AccessContext.Customer);
+    http.expectNone(url('customer/me'));
+  });
+
   it('fails closed when CUSTOMER inspection is unavailable and preserves an accepted USER', async () => {
     hint = AccessContext.User;
     const initial = firstValueFrom(access.rehydrate());

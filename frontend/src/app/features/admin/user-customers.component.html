@@ -11,7 +11,7 @@
   @if (!state.loading && !state.errorMessage && !state.page.items.length) { <div class="sc-empty"><h2>No hay clientes para mostrar</h2><p>Quitá los filtros o buscá con otro texto.</p></div> }
   @if (state.page.items.length) {
     <p role="status">{{ state.page.total }} clientes · página {{ state.page.page + 1 }}</p>
-    <div class="sc-table-wrap"><table class="sc-table"><thead><tr><th>Cliente</th><th>Contacto</th><th>Estado</th><th>Pedidos</th><th>Último pedido</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
+    <div class="sc-table-wrap" tabindex="0" role="region" aria-label="Clientes encontrados"><table class="sc-table"><thead><tr><th>Cliente</th><th>Contacto</th><th>Estado</th><th>Pedidos</th><th>Último pedido</th><th><span class="sr-only">Acciones</span></th></tr></thead><tbody>
       @for (customer of state.page.items; track customer.id) {
         <tr><td><strong>{{ customer.firstName }} {{ customer.lastName }}</strong><br /><small>#{{ customer.id }} · desde {{ customer.createdAt | date:'mediumDate' }}</small></td><td>{{ customer.email }}<br /><small>{{ customer.phone || 'Sin teléfono' }}</small></td><td><span class="sc-badge" [class.sc-badge--ok]="customer.state === states[0]" [class.sc-badge--warn]="customer.state === states[1]">{{ customer.state.label }}</span></td><td>{{ customer.orderCount }}</td><td>{{ customer.lastOrderAt ? (customer.lastOrderAt | date:'short') : 'Sin pedidos' }}</td><td><button type="button" class="sc-btn" (click)="open(customer, $event)">Ver detalle</button></td></tr>
       }

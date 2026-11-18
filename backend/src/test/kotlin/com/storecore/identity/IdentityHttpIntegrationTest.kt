@@ -94,6 +94,27 @@ class IdentityHttpIntegrationTest(
     }
 
     @Test
+    fun `customer profile phone survives a fresh read and null clears it without crossing realms`() {
+        val registered = exchange("/api/v1/customer/auth/register", HttpMethod.POST, """{"email":"profile-phone@example.com","password":"a-very-long-password","firstName":"Profile","lastName":"Owner"}""")
+        assertEquals(201, registered.statusCode.value())
+        val cookie = registered.headers.getFirst(HttpHeaders.SET_COOKIE)!!.substringBefore(';')
+        var csrf = registered.headers.getFirst("X-CSRF-Token")!!
+        for (phone in listOf("\"1133334444\"", "null")) {
+            val updated = exchange("/api/v1/customer/me", HttpMethod.PUT, """{"email":"profile-phone@example.com","firstName":"Profile","lastName":"Owner","phone":$phone}""", cookie, csrf)
+            assertEquals(200, updated.statusCode.value())
+            csrf = updated.headers.getFirst("X-CSRF-Token")!!
+            val readback = exchange("/api/v1/customer/me", HttpMethod.GET, null, cookie)
+            assertEquals(200, readback.statusCode.value())
+            val mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
+            val data = mapper.readTree(readback.body)["data"]
+            assertEquals(mapper.readTree(updated.body)["data"], data)
+            assertEquals(mapper.readTree(phone), data["phone"])
+            assertEquals("no-store", readback.headers.cacheControl)
+        }
+        assertEquals(401, exchange("/api/v1/internal/me", HttpMethod.GET, null, cookie).statusCode.value())
+    }
+
+    @Test
     fun `malformed and invalid auth requests use the response envelope`() {
         val malformed = exchange("/api/v1/customer/auth/login", HttpMethod.POST, "{")
         assertEquals(400, malformed.statusCode.value())

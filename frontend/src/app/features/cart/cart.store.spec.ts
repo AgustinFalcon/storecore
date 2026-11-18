@@ -61,6 +61,19 @@ describe('CartStore actor isolation', () => {
     ] });
     store = TestBed.inject(CartStore);
   });
+  it('coalesces concurrent initial cart reads and permits a later refresh', () => {
+    const pending = new Subject<Cart>();
+    get.execute.mockReturnValue(pending);
+
+    store.ensureLoaded();
+    store.ensureLoaded();
+
+    expect(get.execute).toHaveBeenCalledOnce();
+    pending.next(cart);
+    pending.complete();
+    store.load();
+    expect(get.execute).toHaveBeenCalledTimes(2);
+  });
   it('requires an explicit quote and lets pickup pay despite a failed address read', () => {
     const pickup = DeliveryQuote.fromWire({mode:DeliveryMode.Pickup.wire,label:'Retiro',cost:0,currency:'ARS',minDays:0,maxDays:1,requiresAddress:false,configurationVersion:2,destination:'Local',instructions:'Traé tu confirmación'});
     get.execute.mockReturnValue(of({...cart,deliveryOptions:[pickup,localDelivery]}));

@@ -1,4 +1,4 @@
-<a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
+<a class="skip-link" [attr.href]="skipLinkHref" (click)="skipToContent($event)">Saltar al contenido</a>
 
 <div class="shell" [attr.aria-busy]="store.loading$ | async">
   @if (consoleMode$ | async) {

@@ -21,7 +21,8 @@
     "check:recovery-success-real": "node --check scripts/run-recovery-success-e2e.mjs && tsc -p tsconfig.recovery-browser.json --noEmit && eslint e2e-recovery-real/browser.mts",
     "check:recovery-real": "node --check scripts/run-recovery-unconfigured-e2e.mjs && tsc -p tsconfig.recovery-real.json && eslint e2e-recovery-real playwright.recovery-real.config.ts && playwright test --config playwright.recovery-real.config.ts --list",
     "test:psd-real": "node scripts/run-psd-real-e2e.mjs",
-    "check:psd-real": "node --check scripts/run-psd-real-e2e.mjs && tsc -p tsconfig.psd-real.json && eslint e2e-psd-real playwright.psd-real.config.ts && playwright test --config playwright.psd-real.config.ts --list",
+    "test:productive-routes-real": "node scripts/run-psd-real-e2e.mjs",
+    "check:psd-real": "node --check scripts/run-psd-real-e2e.mjs && node scripts/run-psd-real-e2e.mjs --check-security && node --test scripts/real-read-trace.test.mjs && tsc -p tsconfig.psd-real.json && eslint e2e-psd-real playwright.psd-real.config.ts && playwright test --config playwright.psd-real.config.ts --list",
     "check:ua-real": "node --check scripts/run-ua-real-e2e.mjs && node --check scripts/ua-real-database.mjs && node --check scripts/cfe-official-provider.mjs && tsc -p tsconfig.ua-real.json && playwright test --config playwright.ua-real.config.ts --list",
     "showcase:load": "node scripts/showcase/load-storecore-showcase.mjs",
     "showcase:test": "node --test scripts/showcase/load-storecore-showcase.test.mjs",
@@ -49,7 +50,7 @@
     "@angular/cli": "~22.2.7",
     "@angular/compiler-cli": "~22.2.6",
     "@axe-core/playwright": "~4.13.0",
-    "@playwright/test": "~1.63.0",
+    "@playwright/test": "~1.65.1",
     "@types/node": "^22.20.5",
     "angular-eslint": "~22.6.0",
     "eslint": "^9.0.0",
@@ -59,6 +60,9 @@
     "vitest": "~4.1.12"
   },
   "overrides": {
+    "@axe-core/playwright": {
+      "playwright-core": "1.65.1"
+    },
     "@typescript-eslint/typescript-estree@8.72.2": {
       "minimatch": "11.0.1"
     }

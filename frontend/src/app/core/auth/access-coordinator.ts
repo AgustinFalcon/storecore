@@ -155,6 +155,12 @@ export class AccessCoordinator {
       this.selectContext(AccessContext.Customer);
       return of(ContextAuthorityInspection.Accepted);
     }
+    if (this.flight) {
+      return this.flight.pipe(
+        map(() => this.customerInspection()),
+        defaultIfEmpty(ContextAuthorityInspection.Unavailable),
+      );
+    }
     this.supersedeProbes(AccessContext.Customer);
     const generation = this.generation;
     const revision = this.revision(AccessContext.Customer);
@@ -180,6 +186,16 @@ export class AccessCoordinator {
       }
       return ContextAuthorityInspection.Unavailable;
     }), defaultIfEmpty(ContextAuthorityInspection.Unavailable));
+  }
+
+  private customerInspection(): ContextAuthorityInspection {
+    if (this.state().permits(AccessContext.Customer)) {
+      this.selectContext(AccessContext.Customer);
+      return ContextAuthorityInspection.Accepted;
+    }
+    return this.customerProbe.outcome === ProbeOutcome.Anonymous
+      ? ContextAuthorityInspection.Absent
+      : ContextAuthorityInspection.Unavailable;
   }
 
   /** Choosing between already accepted sessions is local; no challenge POST. */

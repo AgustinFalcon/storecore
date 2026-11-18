@@ -26,7 +26,8 @@ export class CheckoutPageComponent implements OnInit {
   constructor(readonly store: CartStore) {}
 
   ngOnInit(): void {
-    this.reload();
+    this.store.ensureLoaded();
+    this.store.loadAddresses();
   }
 
   reload(): void {

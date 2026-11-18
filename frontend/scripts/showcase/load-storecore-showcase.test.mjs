@@ -51,6 +51,8 @@ test('config accepts only explicit loopback targets', () => {
 test('config requires admin authority and synthetic customer identity', () => {
   assert.throws(() => new ShowcaseConfig({ ...valid, adminPassword: '' }), /ADMIN_PASSWORD_REQUIRED/);
   assert.throws(() => new ShowcaseConfig({ ...valid, customerEmail: 'real@example.com' }), /INVALID_TLD/);
+  assert.equal(new ShowcaseConfig(valid).requireRealRouteReceipt, false);
+  assert.throws(() => new ShowcaseConfig({ ...valid, requireRealRouteReceipt: true }), /REQUIRES_PENDING_ORDER/);
 });
 
 const SKUS = ['SHOW-TALADRO-18V', 'SHOW-AMOLADORA-850', 'SHOW-SET-MANUAL'];
@@ -73,7 +75,7 @@ async function api(t, options = {}) {
     })),
     safety: { mpOrdersAdapter: ShowcaseAdapterMode.Unconfigured.wire, externalCheckoutDisabled: true,
       externalCapabilities: domain.ShowcaseExternalCapability.values.map(capability => ({ module: capability.wire, state: ShowcaseCapabilityState.Disabled.wire })) },
-    home: { revision: 0, sections: [] }, products: {}, customer: null, addresses: [], orders: [], cart: { lines: [], deliveryOptions:[{mode:domain.ShowcaseDeliveryMode.LocalDelivery.wire,label:'Entrega fixture',cost:0,currency:'ARS',minDays:1,maxDays:2,requiresAddress:true,configurationVersion:2,destination:null,instructions:null}] },
+    home: { revision: 0, sections: [] }, products: {}, customer: null, addresses: [], orders: [], cart: { revision: 'cart-empty', lines: [], deliveryOptions:[{mode:domain.ShowcaseDeliveryMode.LocalDelivery.wire,label:'Entrega fixture',cost:0,currency:'ARS',minDays:1,maxDays:2,requiresAddress:true,configurationVersion:2,destination:null,instructions:null}] },
     favorites: [], offers: [], csrf: { user: '', customer: '' }, tokens: { user: 0, customer: 0 }, requests: [], writes: [], errors: [],
     overview: overview(),
   };
@@ -144,7 +146,7 @@ async function api(t, options = {}) {
         } else if (path.startsWith('/api/v1/user/catalog/products/')) {
           const sku = decodeURIComponent(path.split('/').at(-1));
           if (method === 'PUT') {
-            const id = String(Object.keys(state.products).length + 1);
+            const id = String(509 + Object.keys(state.products).length * 31);
             const variant = body.variants[0];
             state.products[sku] = { id, sku, name: body.name, description: body.description, brand: body.brand, category: body.category,
               status: domain.ShowcaseProductStatus.Active.wire, active: true,
@@ -161,7 +163,7 @@ async function api(t, options = {}) {
           if (data === null) { status = 404; errorCode = 'RESOURCE_NOT_FOUND'; }
         } else if (path === '/api/v1/customer/me') data = state.customer;
         else if (path === '/api/v1/customer/me/addresses') {
-          if (method === 'POST') { const address = { id: 1, ...body }; state.addresses.push(address); data = address; }
+          if (method === 'POST') { const address = { id: 73, revision: '2026-01-01T01:02:03.123456Z', ...body }; state.addresses.push(address); data = address; }
           else data = state.addresses;
         } else if (path === '/api/v1/customer/orders') data = page(state.orders, url);
         else if (path.startsWith('/api/v1/customer/orders/')) data = state.orders.find((order) => String(order.id) === path.split('/').at(-1));
@@ -169,12 +171,15 @@ async function api(t, options = {}) {
         else if (path.endsWith('/cart/items')) {
           const line = state.cart.lines.find((item) => item.sku === body.sku);
           if (line) line.quantity = body.quantity; else state.cart.lines.push(clone(body));
+          state.cart.revision = `cart-${state.cart.revision}-changed`;
           data = state.cart;
         } else if (path.endsWith('/checkout')) {
           assert.deepEqual(state.cart.lines, [{ sku: SKUS[0], quantity: 1 }]);
-          const order = { id: String(state.orders.length + 1), paymentStatus: ShowcasePaymentStatus.Pending.wire,
+          assert.equal(body.cartRevision, state.cart.revision);
+          assert.equal(body.addressRevision, state.addresses[0].revision);
+          const order = { id: String(601 + state.orders.length * 29), paymentStatus: ShowcasePaymentStatus.Pending.wire,
             orderStatus: ShowcaseOrderStatus.PendingPayment.wire, lines: clone(state.cart.lines) };
-          state.orders.push(order); state.cart.lines = []; state.customer.orderCount++;
+          state.orders.push(order); state.cart.lines = []; state.cart.revision = 'cart-after-checkout'; state.customer.orderCount++;
           const variant = state.products[SKUS[0]].variants[0];
           variant.availableQuantity--; variant.inventory.available--; variant.inventory.saleable--; variant.inventory.reserved++;
           state.customer.lastOrderAt = '2026-01-02T00:00:00Z';
@@ -211,7 +216,7 @@ async function api(t, options = {}) {
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); assert.deepEqual(state.errors, []); });
-  const config = new ShowcaseConfig({ ...valid, baseUrl: `http://127.0.0.1:${server.address().port}`, includePendingOrder: options.includePendingOrder ?? true, manualFulfillmentPolicy: options.manualFulfillmentPolicy });
+  const config = new ShowcaseConfig({ ...valid, baseUrl: `http://127.0.0.1:${server.address().port}`, includePendingOrder: options.includePendingOrder ?? true, manualFulfillmentPolicy: options.manualFulfillmentPolicy, requireRealRouteReceipt: options.requireRealRouteReceipt });
   return { state, run: () => new ShowcaseLoader(config, () => {}).run() };
 }
 
@@ -230,13 +235,20 @@ test('every new wire type is closed and translates unknown values fail-closed', 
 });
 
 test('first load and replay use actual HTTP, isolated cookies and rotating CSRF with stable fixture counts', async (t) => {
-  const { state, run } = await api(t);
-  assert.deepEqual(await run(), { products: 3, pendingOrderCreated: true });
+  const { state, run } = await api(t, { requireRealRouteReceipt: true });
+  const first = await run();
+  assert.equal(first.products, 3); assert.equal(first.pendingOrderCreated, true);
+  assert.equal(first.receipt.addressId, '73');
+  assert.equal(first.receipt.addressRevision, state.addresses[0].revision);
+  assert.equal(first.receipt.pendingOrderId, state.orders[0].id);
+  assert.deepEqual(first.receipt.products.map(product => product.productId), SKUS.map(sku => state.products[sku].id));
   assert.equal(Object.keys(state.products).length, 3);
   assert.equal(state.addresses.length, 1); assert.equal(state.orders.length, 1);
   assert.equal(state.favorites.length, 1); assert.equal(state.offers.length, 1);
   const writes = state.writes.length;
-  assert.deepEqual(await run(), { products: 3, pendingOrderCreated: false });
+  const replay = await run();
+  assert.equal(replay.pendingOrderCreated, false);
+  assert.deepEqual(replay.receipt, first.receipt);
   assert.equal(state.writes.length, writes, 'replay makes no domain/capability writes');
   assert.equal(state.requests.filter((request) => request.path.endsWith('/showcase-safety')).length, 4);
 });
@@ -256,6 +268,48 @@ test('replay preserves operator home, inactive product, stock, price, address, c
   await run();
   assert.deepEqual({ home: state.home, products: state.products, addresses: state.addresses, cart: state.cart, offers: state.offers, favorites: state.favorites }, before);
   assert.equal(state.writes.length, count);
+});
+
+test('strict receipt refuses incoherent retained data while general showcase preserves it', async (t) => {
+  const general = await api(t);
+  assert.deepEqual(await general.run(), { products: 3, pendingOrderCreated: true });
+  const strict = await api(t, { requireRealRouteReceipt: true });
+  await strict.run();
+  strict.state.cart.lines = [{ sku: 'OPERATOR', quantity: 8 }];
+  const before = clone(strict.state.cart);
+  const count = strict.state.writes.length;
+  await assert.rejects(strict.run(), /SHOWCASE_REAL_RECEIPT_INVALID/);
+  assert.deepEqual(strict.state.cart, before);
+  assert.equal(strict.state.writes.length, count);
+});
+
+test('checkout consumes the cart readback and keeps timestamp precision in authoritative revisions', async (t) => {
+  const { state, run } = await api(t, { requireRealRouteReceipt: true, response: result => {
+    if (result.path.endsWith('/cart/items') && result.method === 'PUT') {
+      // Mutation response is deliberately stale. Only the following GET is authoritative.
+      result.payload.data.revision = 'stale-mutation-response';
+      return { status: result.status, payload: result.payload };
+    }
+  } });
+  const result = await run();
+  const checkoutIndex = state.requests.findIndex(request => request.path.endsWith('/checkout'));
+  const checkout = state.requests[checkoutIndex];
+  assert.equal(state.requests[checkoutIndex - 1].path, '/api/v1/customer/cart');
+  assert.notEqual(checkout.body.cartRevision, 'stale-mutation-response');
+  assert.equal(checkout.body.addressRevision, '2026-01-01T01:02:03.123456Z');
+  assert.equal(result.receipt.cart.revision, state.cart.revision);
+});
+
+test('missing checkout revisions fail before creating an order', async (t) => {
+  for (const field of ['cart', 'address']) await t.test(field, async t => {
+    const { state, run } = await api(t, { response: result => {
+      if (field === 'cart' && result.path === '/api/v1/customer/cart') delete result.payload.data.revision;
+      if (field === 'address' && result.path === '/api/v1/customer/me/addresses' && result.method === 'POST') delete result.payload.data.revision;
+      return { status: result.status, payload: result.payload };
+    } });
+    await assert.rejects(run(), /SHOWCASE_(CART_VERIFICATION_FAILED|ADDRESSES_INVALID)/);
+    assert.equal(state.orders.length, 0);
+  });
 });
 
 test('later customer/order pages are scanned; catalog verification uses direct admin identity regardless of list size', async (t) => {
@@ -390,7 +444,7 @@ test('optional pending order remains optional and existing customer collections 
   const { state, run } = await api(t, { includePendingOrder: false, prepare: (state) => {
     state.customer = { id: 42, email: 'showcase.customer@storecore.invalid', firstName: 'Operator', lastName: 'Edited', phone: null,
       state: domain.ShowcaseCustomerState.Active.wire, createdAt: '2026-01-01T00:00:00Z', orderCount: 0, lastOrderAt: null };
-    state.addresses = [{ id: 9, street: 'Operator', number: '1', isDefault: true }];
+    state.addresses = [{ id: 9, revision: '2026-01-01T00:00:00Z', street: 'Operator', number: '1', isDefault: true }];
     state.cart = { lines: [{ sku: 'OPERATOR', quantity: 10 }] };
     state.modules.push({ module: 'UNRELATED_FUTURE', state: 'future', configVersion: 1 });
   } });
@@ -415,8 +469,8 @@ test('corrupt mutation/readback identities and closed values fail loader verific
     ['customer id', '/api/v1/user/customers/42', 'GET', (data) => { data.id = 99; }],
     ['customer email', '/api/v1/user/customers/42', 'GET', (data) => { data.email = 'OTHER'; }],
     ['receipt identity', '/api/v1/customer/checkout', 'POST', (data) => { delete data.orderId; }],
-    ['order lines', '/api/v1/customer/orders/1', 'GET', (data) => { data.lines[0].sku = 'OTHER'; }],
-    ['cart quantity', '/api/v1/customer/cart/items', 'PUT', (data) => { data.lines.forEach((line) => { line.quantity = 99; }); }],
+    ['order lines', '/api/v1/customer/orders/601', 'GET', (data) => { data.lines[0].sku = 'OTHER'; }],
+    ['cart quantity', '/api/v1/customer/cart', 'GET', (data) => { data.lines.forEach((line) => { line.quantity = 99; }); }],
     ['overview timezone', '/api/v1/user/overview', 'GET', (data) => { data.timezone = 'garbage'; }],
     ['overview period', '/api/v1/user/overview', 'GET', (data) => { data.period = 'future'; }],
     ['overview fact', '/api/v1/user/overview', 'GET', (data) => { data.orderCount.value = null; }],
@@ -456,7 +510,10 @@ test('manual policy opt-in uses exact baseline CAS and refuses operator drift wi
   const checkout=first.state.requests.find(row=>row.path.endsWith('/checkout'));
   assert.equal(checkout.body.deliveryMode,domain.ShowcaseDeliveryMode.LocalDelivery.wire);
   assert.equal(checkout.body.deliveryConfigurationVersion,4);
-  const drift=await api(t,{manualFulfillmentPolicy:policy,prepare:state=>{const row=state.modules.find(row=>row.module===ShowcaseCapability.ManualFulfillment.wire);row.configVersion=3;row.state=ShowcaseCapabilityState.Active.wire;}});
+  const count=first.state.writes.length;
+  await first.run();
+  assert.equal(first.state.writes.length,count,'configured active policy is preserved during replay');
+  const drift=await api(t,{manualFulfillmentPolicy:policy,prepare:state=>{const row=state.modules.find(row=>row.module===ShowcaseCapability.ManualFulfillment.wire);row.configVersion=3;}});
   await assert.rejects(drift.run(),/SHOWCASE_DELIVERY_POLICY_DRIFT/);
   assert.equal(drift.state.requests.filter(row=>row.path.startsWith('/api/v1/user/capabilities/')&&row.method!=='GET').length,0);
 });

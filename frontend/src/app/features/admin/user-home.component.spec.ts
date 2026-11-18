@@ -17,6 +17,17 @@ const overview = {
 };
 
 describe('UserHomeComponent', () => {
+  it('does not cancel the initial overview read when the select writes its initial closed period', () => {
+    const execute = vi.fn(() => of(overview));
+    TestBed.configureTestingModule({ imports: [UserHomeComponent], providers: [provideRouter([]), { provide: ReadOverviewUseCase, useValue: { execute } }] });
+    const fixture = TestBed.createComponent(UserHomeComponent); fixture.detectChanges();
+    expect(execute).toHaveBeenCalledTimes(1);
+    fixture.componentInstance.changePeriod(OverviewPeriod.Today);
+    expect(execute).toHaveBeenCalledTimes(1);
+    fixture.componentInstance.changePeriod(OverviewPeriod.Last7Days);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it('refreshes links when current roles change and removes all actions on session loss', () => {
     TestBed.configureTestingModule({ imports: [UserHomeComponent], providers: [provideRouter([]), { provide: ReadOverviewUseCase, useValue: { execute: vi.fn(() => of(overview)) } }] });
     const session = TestBed.inject(UserSession);

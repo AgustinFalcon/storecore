@@ -119,6 +119,7 @@ textarea:focus-visible {
   margin: var(--sc-space-5) 0;
 }
 
+.sc-card h3 { overflow-wrap: anywhere; }
 .sc-card-grid { display: grid; gap: var(--sc-space-4); }
 .sc-card header,
 .sc-page-head--compact,
@@ -1139,8 +1140,7 @@ sc-generic-variant-selector {
   }
 
   .sc-pdp__layout,
-  .sc-bag__layout,
-  .sc-checkout__layout {
+  .sc-bag__layout {
     grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
     align-items: start;
   }
@@ -1151,6 +1151,13 @@ sc-generic-variant-selector {
 
   .sc-home__tiles {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .sc-checkout__layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.7fr);
+    align-items: start;
   }
 }
 

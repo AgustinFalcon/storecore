@@ -27,6 +27,15 @@ describe('User Mercado Libre read-only presentation', () => {
     expect(fixture.nativeElement.querySelectorAll('form')).toHaveLength(0);
   });
 
+  it('announces a disabled module without claiming a snapshot or missing permissions', () => {
+    const fixture = render({ account: null, listings: [], hasSnapshot: false, readPhase: MercadoLibreReadPhase.Disabled });
+    expect(fixture.nativeElement.querySelector('#ml-disabled-title').textContent).toBe(MercadoLibreReadPhase.Disabled.label);
+    expect(fixture.nativeElement.querySelector('[role=status]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('#ml-account-title')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[role=alert]')).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain('Necesitás una sesión ADMIN');
+  });
+
   it('filters by publication, variation or SKU and recovers from no results', () => {
     const fixture = render({ query: 'var-1' }); expect(fixture.componentInstance.presentation.visibleListings).toHaveLength(1);
     expect(fixture.nativeElement.querySelector('tbody').textContent).toContain('MLA-100');

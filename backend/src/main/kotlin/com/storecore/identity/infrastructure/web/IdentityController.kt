@@ -62,7 +62,7 @@ class IdentityController(
     fun customerMe(http: HttpServletRequest): ResponseEntity<BaseResponse<PrincipalView>> {
         val principal = auth.customer(http)
         val profile = identity.customerProfile(principal)
-        return cachedOk(CustomerView(profile.id, profile.email, profile.firstName, profile.lastName))
+        return cachedOk(CustomerProfileView(profile.id, profile.email, profile.firstName, profile.lastName, profile.phone))
     }
 
     @GetMapping("/internal/me")
@@ -156,5 +156,5 @@ data class RevokeRequest(@field:NotBlank val reason: String, val correlationId: 
 sealed interface PrincipalView
 data class CustomerView(val id: Long, val email: String?, val firstName: String?, val lastName: String?) : PrincipalView { constructor(principal: CustomerPrincipal, email: String?, firstName: String?, lastName: String?) : this(principal.customerId, email, firstName, lastName) }
 data class InternalView(val id: Long, val roles: List<String>) : PrincipalView
-data class CustomerProfileView(val id: Long, val email: String, val firstName: String, val lastName: String, val phone: String?)
+data class CustomerProfileView(val id: Long, val email: String, val firstName: String, val lastName: String, val phone: String?) : PrincipalView
 data class AddressView(val id: Long, val street: String, val number: String, val city: String, val province: String, val postalCode: String, val isDefault: Boolean, val revision: java.time.Instant?)

@@ -187,6 +187,8 @@ function closedWireType(name, cases) {
   return Object.freeze(ClosedValue);
 }
 
+export const ShowcaseReceiptScenario = closedWireType('ShowcaseReceiptScenario', { Populated: 'POPULATED', InvalidSecret: 'INVALID_SECRET' });
+export const ShowcaseReceiptEvidence = closedWireType('ShowcaseReceiptEvidence', { RealBackend: 'REAL_BACKEND' });
 export const ShowcaseOfferStatus = closedWireType('ShowcaseOfferStatus', { Draft: 'DRAFT', Active: 'ACTIVE', Paused: 'PAUSED', Ended: 'ENDED' });
 export const ShowcaseDiscountKind = closedWireType('ShowcaseDiscountKind', { Percent: 'PERCENT', Fixed: 'FIXED' });
 export const ShowcaseFavoriteOutcome = closedWireType('ShowcaseFavoriteOutcome', { Added: 'ADDED', AlreadyPresent: 'ALREADY_PRESENT' });
@@ -228,7 +230,7 @@ const SHOWCASE_HOME = Object.freeze({ key: 'showcase-home-v1', kind: ShowcaseHom
 const SHOWCASE_OFFER_NAME = 'SHOWCASE_LOCAL_OFFER_V1';
 
 export class ShowcaseConfig {
-  constructor({ baseUrl, origin, adminEmail, adminPassword, customerEmail, customerPassword, includePendingOrder, manualFulfillmentPolicy }) {
+  constructor({ baseUrl, origin, adminEmail, adminPassword, customerEmail, customerPassword, includePendingOrder, manualFulfillmentPolicy, scenarioPrefix, requireRealRouteReceipt }) {
     const target = new URL(required(baseUrl, 'STORECORE_SHOWCASE_BASE_URL'));
     const allowedHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
     if (target.protocol !== 'http:' || !allowedHosts.has(target.hostname)) throw new Error('SHOWCASE_LOOPBACK_TARGET_REQUIRED');
@@ -242,6 +244,12 @@ export class ShowcaseConfig {
     if (!this.customerEmail.endsWith('.invalid')) throw new Error('SHOWCASE_CUSTOMER_MUST_USE_INVALID_TLD');
     this.customerPassword = customerPassword?.trim() || 'StoreCore-showcase-2026!';
     this.includePendingOrder = includePendingOrder === true || includePendingOrder === 'true';
+    // Existing showcase imports preserve arbitrary operator data. The real route
+    // runner opts into a populated, internally coherent receipt and fails closed.
+    this.requireRealRouteReceipt = requireRealRouteReceipt === true || requireRealRouteReceipt === 'true';
+    if (this.requireRealRouteReceipt && !this.includePendingOrder) throw new Error('SHOWCASE_REAL_RECEIPT_REQUIRES_PENDING_ORDER');
+    this.scenarioPrefix = scenarioPrefix?.trim() || 'showcase-v1';
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,79}$/.test(this.scenarioPrefix)) throw new Error('SHOWCASE_SCENARIO_PREFIX_INVALID');
     this.manualFulfillmentPolicy = manualFulfillmentPolicy == null || manualFulfillmentPolicy === '' ? null
       : typeof manualFulfillmentPolicy === 'string' ? JSON.parse(manualFulfillmentPolicy) : manualFulfillmentPolicy;
     if (this.manualFulfillmentPolicy !== null && (typeof this.manualFulfillmentPolicy !== 'object' || Array.isArray(this.manualFulfillmentPolicy))) throw new Error('SHOWCASE_DELIVERY_POLICY_INVALID');
@@ -258,6 +266,8 @@ export class ShowcaseConfig {
       customerPassword: env.STORECORE_SHOWCASE_CUSTOMER_PASSWORD,
       includePendingOrder: env.STORECORE_SHOWCASE_INCLUDE_PENDING_ORDER,
       manualFulfillmentPolicy: env.STORECORE_SHOWCASE_DELIVERY_POLICY,
+      scenarioPrefix: env.STORECORE_SHOWCASE_SCENARIO_PREFIX,
+      requireRealRouteReceipt: env.STORECORE_SHOWCASE_REQUIRE_REAL_ROUTE_RECEIPT,
     });
   }
 }
@@ -308,6 +318,9 @@ class ShowcaseContext {
     this.admin = new HttpSession(config);
     this.customer = new HttpSession(config);
     this.addressId = null;
+    this.addressRevision = null;
+    this.addressStreet = null;
+    this.products = [];
     this.orderReceipt = null;
     this.customerId = null;
     this.offerId = null;
@@ -481,7 +494,8 @@ const STEPS = Object.freeze([
       if (state === ShowcaseCapabilityState.Active) continue;
       if (state !== ShowcaseCapabilityState.Disabled) throw new Error(`SHOWCASE_CAPABILITY_STATE_UNSUPPORTED:${capability.wire}`);
     }
-    if (ctx.config.manualFulfillmentPolicy !== null) {
+    if (ctx.config.manualFulfillmentPolicy !== null &&
+        ShowcaseCapabilityState.fromWire(byModule.get(ShowcaseCapability.ManualFulfillment).state) !== ShowcaseCapabilityState.Active) {
       const manual = byModule.get(ShowcaseCapability.ManualFulfillment);
       if (manual.configVersion !== 2 || ShowcaseCapabilityState.fromWire(manual.state) !== ShowcaseCapabilityState.Disabled) throw new Error('SHOWCASE_DELIVERY_POLICY_DRIFT');
       const result = await ctx.admin.request('/api/v1/user/capabilities/MANUAL_FULFILLMENT/policy', {
@@ -538,6 +552,9 @@ const STEPS = Object.freeze([
     const address = addresses[0] ?? await ctx.customer.request('/api/v1/customer/me/addresses', { method: 'POST', csrf: true, body: SHOWCASE_ADDRESS });
     if (address?.id == null) throw new Error('SHOWCASE_ADDRESSES_INVALID');
     ctx.addressId = String(address.id);
+    if (!validOrderId(address.id) || typeof address.revision !== 'string' || !Number.isFinite(Date.parse(address.revision))) throw new Error('SHOWCASE_ADDRESSES_INVALID');
+    ctx.addressRevision = address.revision;
+    ctx.addressStreet = address.street;
   }),
   step(ShowcaseStage.PendingOrder, async (ctx) => {
     if (!ctx.config.includePendingOrder) return;
@@ -551,12 +568,15 @@ const STEPS = Object.freeze([
       ctx.orderId = existing.id;
       return;
     }
-    const cart = await ctx.customer.request('/api/v1/customer/cart');
+    let cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(cart?.lines) || cart.lines.length !== 0) throw new Error('SHOWCASE_CHECKOUT_REQUIRES_EMPTY_CART');
     await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[0].sku, quantity: 1 } });
+    cart = await ctx.customer.request('/api/v1/customer/cart');
+    if (!Array.isArray(cart?.lines) || cart.lines.length !== 1 || cart.lines[0].sku !== PRODUCTS[0].sku || cart.lines[0].quantity !== 1 ||
+        typeof cart.revision !== 'string' || !cart.revision.trim()) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
     const delivery = requireArray(cart.deliveryOptions, 'SHOWCASE_DELIVERY_OPTIONS_REQUIRED').find(option => ShowcaseDeliveryMode.fromWire(option.mode) === ShowcaseDeliveryMode.LocalDelivery);
     if (!delivery || !Number.isSafeInteger(delivery.configurationVersion) || delivery.configurationVersion < 1 || delivery.currency !== 'ARS' || delivery.requiresAddress !== true) throw new Error('SHOWCASE_DELIVERY_OPTIONS_REQUIRED');
-    const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, currency: 'ARS', deliveryMode: ShowcaseDeliveryMode.LocalDelivery.wire, deliveryConfigurationVersion: delivery.configurationVersion } });
+    const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, addressRevision: ctx.addressRevision, cartRevision: cart.revision, currency: 'ARS', deliveryMode: ShowcaseDeliveryMode.LocalDelivery.wire, deliveryConfigurationVersion: delivery.configurationVersion } });
     requirePendingOrder(receipt);
     if (!validOrderId(receipt?.orderId) || receipt.checkoutUrl != null) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
     ctx.orderReceipt = receipt;
@@ -567,7 +587,8 @@ const STEPS = Object.freeze([
     if (!Array.isArray(ctx.cart?.lines)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
     if (ctx.cart.lines.length !== 0) return;
     await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[1].sku, quantity: 1 } });
-    ctx.cart = await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[2].sku, quantity: 2 } });
+    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[2].sku, quantity: 2 } });
+    ctx.cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(ctx.cart?.lines) || ctx.cart.lines.length !== 2 ||
         !ctx.cart.lines.some((line) => line.sku === PRODUCTS[1].sku && line.quantity === 1) ||
         !ctx.cart.lines.some((line) => line.sku === PRODUCTS[2].sku && line.quantity === 2)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
@@ -619,6 +640,9 @@ const STEPS = Object.freeze([
     for (const product of PRODUCTS) {
       const actual = await ctx.admin.request(`/api/v1/user/catalog/products/${encodeURIComponent(product.sku)}`);
       if (actual?.sku !== product.sku || !Array.isArray(actual.variants) || !actual.variants.some((variant) => variant.sku === product.sku)) throw new Error('SHOWCASE_CATALOG_VERIFICATION_FAILED');
+      const variant = actual.variants.find((item) => item.sku === product.sku);
+      if (!validOrderId(actual.id) || !validOrderId(variant?.id) || typeof actual.name !== 'string' || !actual.name.trim()) throw new Error('SHOWCASE_CATALOG_VERIFICATION_FAILED');
+      ctx.products.push(Object.freeze({ productId: String(actual.id), variantId: String(variant.id), sku: product.sku, name: actual.name }));
       const identity = ctx.createdProducts.get(product.sku);
       if (identity) requireCreatedProduct(actual, product, ctx.orderReceipt !== null && product === PRODUCTS[0] ? 1 : 0, identity);
     }
@@ -649,6 +673,25 @@ function requireOrderIdentity(order, id) {
       order.lines[0]?.sku !== PRODUCTS[0].sku || order.lines[0].quantity !== 1) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
 }
 
+function requireRealReceipt(receipt) {
+  const text = value => typeof value === 'string' && value.trim().length > 0;
+  const unique = values => new Set(values).size === values.length;
+  const products = receipt.products;
+  if (!Number.isSafeInteger(receipt.customerId) || receipt.customerId <= 0 ||
+      !Number.isSafeInteger(receipt.offerId) || receipt.offerId <= 0 ||
+      !validOrderId(receipt.pendingOrderId) || !validOrderId(receipt.addressId) ||
+      !text(receipt.addressStreet) || !text(receipt.homeTitle) ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receipt.customerEmail) ||
+      !text(receipt.cart.revision) || receipt.cart.skus.length === 0 || !unique(receipt.cart.skus) ||
+      products.length !== PRODUCTS.length || !unique(products.map(product => product.productId)) ||
+      !unique(products.map(product => product.variantId)) || !unique(products.map(product => product.sku)) ||
+      products.some(product => !validOrderId(product.productId) || !validOrderId(product.variantId) ||
+        !text(product.name) || !text(product.sku) || product.sku.startsWith('ROUTE-')) ||
+      receipt.cart.skus.some(sku => !products.some(product => product.sku === sku))) {
+    throw new Error('SHOWCASE_REAL_RECEIPT_INVALID');
+  }
+}
+
 export class ShowcaseLoader {
   constructor(config, onProgress = (stage) => console.log(`[showcase] ${stage.label}: OK`)) {
     this.context = new ShowcaseContext(config);
@@ -660,7 +703,19 @@ export class ShowcaseLoader {
       await current.run(this.context);
       this.onProgress(current.stage);
     }
-    return Object.freeze({ products: PRODUCTS.length, pendingOrderCreated: this.context.orderReceipt !== null });
+    const ctx = this.context;
+    const summary = { products: PRODUCTS.length, pendingOrderCreated: ctx.orderReceipt !== null };
+    if (!ctx.config.requireRealRouteReceipt) return Object.freeze(summary);
+    const receipt = Object.freeze({ schemaVersion: 1, scenarioPrefix: ctx.config.scenarioPrefix,
+      products: Object.freeze(ctx.products), customerId: ctx.customerId, customerEmail: ctx.config.customerEmail,
+      addressId: ctx.addressId, addressRevision: ctx.addressRevision, addressStreet: ctx.addressStreet,
+      pendingOrderId: ctx.orderId === null ? null : String(ctx.orderId), offerId: ctx.offerId,
+      homeTitle: ctx.home.sections.find(section => section.active && typeof section.content?.title === 'string')?.content.title ?? null,
+      cart: Object.freeze({ revision: ctx.cart.revision, skus: Object.freeze(ctx.cart.lines.map(line => line.sku)) }),
+      scenarios: Object.freeze(ShowcaseReceiptScenario.values.map(scenario => Object.freeze({ scenario: scenario.wire, evidence: ShowcaseReceiptEvidence.RealBackend.wire }))),
+    });
+    requireRealReceipt(receipt);
+    return Object.freeze({ ...summary, receipt });
   }
 }
 

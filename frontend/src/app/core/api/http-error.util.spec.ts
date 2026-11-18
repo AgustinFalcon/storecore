@@ -1,7 +1,14 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { getApiErrorMessage } from './http-error.util';
+import { getApiErrorCode, getApiErrorMessage } from './http-error.util';
+import { ApiErrorCode } from './api-error-code';
 
 describe('getApiErrorMessage', () => {
+  it('translates the disabled capability boundary once and keeps future codes unknown', () => {
+    const error = new HttpErrorResponse({ status: 409, error: { errorCode: 'CAPABILITY_DISABLED', message: 'Request rejected' } });
+    expect(getApiErrorCode(error)).toBe(ApiErrorCode.CapabilityDisabled);
+    expect(getApiErrorMessage(error)).toBe(ApiErrorCode.CapabilityDisabled.label);
+    expect(ApiErrorCode.fromWire('FUTURE_CAPABILITY')).toBe(ApiErrorCode.Unknown);
+  });
   it('prefers the API message on an HTTP error body', () => {
     expect(
       getApiErrorMessage(

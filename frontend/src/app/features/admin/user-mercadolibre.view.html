@@ -3,7 +3,9 @@
     <div><p class="sc-kicker">Canales · Sólo lectura</p><h1 id="ml-title">Mercado Libre</h1><p class="sc-page__lede">Verificá la cuenta vinculada y cómo se relacionan las publicaciones con tu catálogo.</p></div>
     @if (!state.readPhase.isAccessDenied) { <button type="button" class="ml__refresh" [disabled]="state.loading" (click)="refresh.emit()">{{ state.readPhase.isRefreshing ? 'Actualizando…' : 'Actualizar datos' }}</button> }
   </header>
-  @if (state.readPhase.isAccessDenied) {
+  @if (state.readPhase.isDisabled) {
+    <div class="ml__notice" role="status"><h2 id="ml-disabled-title">{{ state.readPhase.label }}</h2><p>La integración externa permanece deshabilitada. No se consultó ni sincronizó el proveedor.</p></div>
+  } @else if (state.readPhase.isAccessDenied) {
     <div class="ml__notice ml__notice--error" role="alert"><h2>Acceso no disponible</h2><p>Necesitás una sesión ADMIN con permiso para consultar Mercado Libre.</p></div>
   } @else if (unknownReadPhase) {
     <div class="ml__notice ml__notice--error" role="alert"><h2>Estado de lectura no reconocido</h2><p>Actualizá los datos para volver a consultar el canal de forma segura.</p></div>

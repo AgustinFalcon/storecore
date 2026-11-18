@@ -11,7 +11,7 @@ import { OrderFactsComponent } from '../orders/order-facts.component';
   imports: [FormsModule, RouterLink, FeatureStatusComponent, OrderFactsComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-order-detail.view.html',
-  styles: ['.sc-pdp__crumb a { color: var(--sc-color-muted-ink); }'],
+  styles: [':host { display: block; min-width: 0; } .sc-page { min-width: 0; grid-template-columns: minmax(0, 1fr); } .sc-page-head .sc-price__meta, .sc-pdp__crumb a { color: var(--sc-color-muted-ink); }'],
 })
 export class UserOrderDetailViewComponent implements OnChanges {
   @Input() order: AdminOrder | null = null;

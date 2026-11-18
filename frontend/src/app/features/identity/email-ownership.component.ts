@@ -1,5 +1,5 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, Input, OnChanges, effect, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnChanges, SimpleChanges, effect, inject, input } from '@angular/core';
 import { CustomerSession } from '../../core/auth/customer-session';
 import { UserSession } from '../../core/auth/user-session';
 import { UserRole } from '../../domain/user/user-role';
@@ -24,5 +24,8 @@ export class EmailOwnershipComponent implements OnChanges {
       this.store.bind(realm, actor);
     });
   }
-  ngOnChanges(): void { this.store.refresh(true); }
+  ngOnChanges(changes: SimpleChanges): void {
+    const revision = changes['revision'];
+    if (revision && !revision.firstChange) this.store.refresh(true);
+  }
 }

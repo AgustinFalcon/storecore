@@ -11,6 +11,7 @@ const INITIAL: UserHomeState = { loading: false, period: OverviewPeriod.Today, o
 export class UserHomeStore extends ComponentStore<UserHomeState> {
   readonly vm$ = this.select((state) => state);
   constructor(private readonly readOverview: ReadOverviewUseCase) { super(INITIAL); }
+  get snapshot(): UserHomeState { return this.get((state) => state); }
   readonly load = this.effect<OverviewPeriod>((period$) => period$.pipe(
     tap((period) => this.patchState({ loading: true, period, errorMessage: '' })),
     switchMap((period) => this.readOverview.execute(period).pipe(tapResponse({

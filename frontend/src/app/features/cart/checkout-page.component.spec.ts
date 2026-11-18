@@ -2,6 +2,21 @@ import { CartStore } from './cart.store';
 import { CheckoutPageComponent } from './checkout-page.component';
 
 describe('CheckoutPageComponent retry routing', () => {
+  it('loads the cart and checkout-owned addresses on initialization', () => {
+    const store = {
+      load: vi.fn(),
+      ensureLoaded: vi.fn(),
+      loadAddresses: vi.fn(),
+    };
+    const component = new CheckoutPageComponent(store as unknown as CartStore);
+
+    component.ngOnInit();
+
+    expect(store.ensureLoaded).toHaveBeenCalledOnce();
+    expect(store.load).not.toHaveBeenCalled();
+    expect(store.loadAddresses).toHaveBeenCalledOnce();
+  });
+
   it('reloads both reads without replaying a checkout', () => {
     const store = {
       submitCheckout: vi.fn(),
