@@ -86,7 +86,7 @@ class JdbcMediaCompositionRepository(
             val row = lockedAssets.getValue(assetId)
             if ((row["owner_user_id"] as Number).toLong() != command.ownerId.value ||
                 row["draft_id"] != command.draftId.value ||
-                (row["upload_state"] as? String) != MediaCommandState.COMPLETED.wire ||
+                MediaCommandState.fromWire(row["upload_state"] as? String) != MediaCommandState.COMPLETED ||
                 MediaAssetState.fromWire(row["state"] as? String) != MediaAssetState.STORED_PRIVATE ||
                 MediaProviderKind.fromWire(row["provider_kind"] as? String) in setOf(MediaProviderKind.UNKNOWN, MediaProviderKind.UNCONFIGURED) ||
                 row["delete_state"] != null

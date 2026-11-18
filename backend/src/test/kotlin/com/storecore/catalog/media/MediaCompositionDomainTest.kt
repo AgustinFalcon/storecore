@@ -120,4 +120,3 @@ class MediaCompositionDomainTest {
         assertEquals(ProductMediaSource.Unknown, ProductMediaSource.fromWire(MediaSourceKind.LEGACY_URL.wire, null, "https://other.test/front.jpg", hosts))
     }
 }
-
