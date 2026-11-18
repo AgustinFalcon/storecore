@@ -137,9 +137,10 @@ class MediaProductCreationPostgresTest {
         fixture().use { f ->
             val command = f.command("cleanup-race", 2)
             f.jdbc.update(
-                "UPDATE catalog_media_drafts SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",
+                "UPDATE catalog_media_drafts SET expires_at=created_at+interval '10 milliseconds' WHERE id=?",
                 command.draftId.value,
             )
+            Thread.sleep(50)
             val pool = Executors.newFixedThreadPool(2)
             val start = CountDownLatch(1)
             try {
