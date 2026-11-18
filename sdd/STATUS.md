@@ -1,5 +1,19 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-18
+
+`master dc32a3ecbcf65557c670679376a678e6dee1e4ab` integra los cortes #274–#284
+y #297. PR #282 quedó fusionado como `214140d0779b8d53505f3e121339b2760aeae185`;
+su Verify exact-head `44320781327` y el post-merge `44323153644` terminaron 5/5
+verdes, incluido el E2E real de rutas productivas, y #106 quedó cerrado. PR #283
+agrega exclusivamente el SDD de media privada sobre ese baseline.
+
+`sdd/wip/20261116-storefront-fulfillment-backlog-reconciliation/` ya apunta a
+`master` y reconcilia #8/#13 contra el runtime integrado. No acredita guest cart,
+carrier, emails logísticos, Mercado Pago live, ARCA, integración live con
+BlackStore, deploy, homologación o release; #8/#13 permanecen abiertos con esos
+residuales. Los bloques previos basados en `94d005a` y `dc45c59` son históricos.
+
 ## Master vigente — 2026-11-14
 
 `master dc45c5942009d0f80eaf252054a54b8f51182f22` integra PR #271–#273.

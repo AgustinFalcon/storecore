@@ -1,5 +1,19 @@
 # StoreCore documentation baseline 1.0.0
 
+## Master vigente — 2026-11-18
+
+`master dc32a3e` integra PR #282 (`214140d`) y el SDD documental #283. Verify
+exact-head de #282 `44320781327` y post-merge `44323153644` terminaron 5/5
+verdes. La matriz real queda integrada y #106 cerrado; los bloques basados en
+`94d005a`/`dc45c59` son históricos.
+
+## Reconciliación documental #8/#13 — 2026-11-18
+
+El PR documental de reconciliación ya fue retargeteado a `master` y debe cerrar
+sus nuevas reviews y CI exact-head antes de fusionar. No altera el gate de
+release: carrier, email logístico, guest cart y retornos Mercado Pago live siguen
+fuera del core homologado y no se habilitan por documentación.
+
 ## Master vigente — 2026-11-14
 
 `master dc45c59` contiene el checkout de entrega/retiro fusionado por PR #272
