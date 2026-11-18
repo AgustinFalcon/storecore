@@ -1,27 +1,18 @@
 # Estado canónico del SDD — StoreCore
 
-## Master vigente — 2026-11-16
+## Master vigente — 2026-11-18
 
-`master 94d005a2f2d5ae6ef4433102ba511f6aba0eb317` integra PR #274–#281.
-Sobre el cierre checkout #272 agrega reconciliación documental, capacidad de
-login aislada por realm, manifiesto/a11y de rutas productivas, dependencias sin
-advisories conocidos, escritura Mercado Pago post-commit, higiene de secretos,
-branding merchant runtime y comandos tipados de capabilities. Este bloque
-prevalece sobre el bloque 2026-11-14 basado en `dc45c59`, que queda histórico.
+`master dc32a3ecbcf65557c670679376a678e6dee1e4ab` integra los cortes #274–#284
+y #297. PR #282 quedó fusionado como `214140d0779b8d53505f3e121339b2760aeae185`;
+su Verify exact-head `44320781327` y el post-merge `44323153644` terminaron 5/5
+verdes, incluido el E2E real de rutas productivas, y #106 quedó cerrado. PR #283
+agrega exclusivamente el SDD de media privada sobre ese baseline.
 
-No acredita el PR #282 todavía abierto ni proveedores live, carrier, ARCA,
-StoreCore↔BlackStore, deploy, homologación o release.
-
-## Candidato pendiente — PR #282 y reconciliación #8/#13 — 2026-11-16
-
-PR #282 head `067921e13a316e2a6d72c1636f8f93fa131740dc` está abierto,
-mergeable/CLEAN y Verify `43812281889` terminó 5/5 verde. No forma parte de
-`master` hasta merge/post-merge; #106 continúa abierto.
-
-`sdd/wip/20261116-storefront-fulfillment-backlog-reconciliation/` documenta,
-apilado sobre ese head, que fulfillment local y storefront CUSTOMER ya existen.
-No acredita guest cart, carrier, emails logísticos ni Mercado Pago live y no
-cierra #8/#13. Este bloque de candidato no reemplaza `master 94d005a`.
+`sdd/wip/20261116-storefront-fulfillment-backlog-reconciliation/` ya apunta a
+`master` y reconcilia #8/#13 contra el runtime integrado. No acredita guest cart,
+carrier, emails logísticos, Mercado Pago live, ARCA, integración live con
+BlackStore, deploy, homologación o release; #8/#13 permanecen abiertos con esos
+residuales. Los bloques previos basados en `94d005a` y `dc45c59` son históricos.
 
 ## Master vigente — 2026-11-14
 

@@ -31,8 +31,9 @@
   `PaymentStatus`/`OrderStatus` cerrados y nunca interpreta el retorno como pago.
 - `OfficialOrderApiAdapter` no configura back URLs; ese transporte permanece en
   el WIP Mercado Pago live.
-- PR #282 head `067921e` pasó Verify `43812281889` con cinco jobs verdes y agrega
-  matriz real de rutas, no funcionalidades de proveedor.
+- PR #282 se fusionó como `214140d`; Verify exact-head `44320781327` y
+  post-merge `44323153644` pasaron cinco jobs verdes y agregan matriz real de
+  rutas, no funcionalidades de proveedor.
 
 ## Reglas de arquitectura
 
@@ -63,5 +64,6 @@
 - `git diff --check` y validación de referencias/rutas.
 - Dos reviews GPT-6.1 Sol independientes sobre head exacto.
 - CI alojado completo aunque el cambio sea documental.
-- Tras merge de #282: rebase/retarget, CI y reviews nuevos; evidencia anterior no
-  se reutiliza como si fuera del nuevo SHA/base.
+- El retarget a `master` ya ocurrió; CI y reviews deben ejecutarse sobre el head
+  final actualizado contra `dc32a3e`. La evidencia del stack histórico no se
+  reutiliza como si fuera del nuevo SHA/base.

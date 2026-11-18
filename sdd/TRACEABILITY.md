@@ -1,12 +1,12 @@
 # RTM canónica — `storecore-core-v1.0.0`
 
-## Reconciliación pendiente #8/#13 — 2026-11-16
+## Reconciliación pendiente #8/#13 — 2026-11-18
 
 | Issue/capacidad | Evidencia local | Residual honesto |
 |---|---|---|
 | #8 métodos de entrega y separación logística | `20261114-checkout-delivery-decision`, Delivery/Fulfillment domain y E2E real | carrier y emails; `PREPARING` es el estado vigente, no `READY_TO_SHIP` |
 | #13 shell/PDP/cart/checkout | branding, continuidad PDP/acceso, CUSTOMER cart y resultado autoritativo | guest cart no aprobado; refresh UX opcional; MP back URLs en MP-LIVE-05 |
-| #106 matriz real | PR #282 head `067921e`, Verify `43812281889` 5/5 | merge, post-merge y cierre todavía pendientes |
+| #106 matriz real | PR #282 merge `214140d`; Verify `44320781327` y post-merge `44323153644`, ambos 5/5 | cerrado por #282; no acredita proveedores externos |
 
 Fuente detallada:
 `sdd/wip/20261116-storefront-fulfillment-backlog-reconciliation/`.
