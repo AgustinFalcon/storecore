@@ -39,16 +39,15 @@ class JdbcMediaCompositionRepository(
         val nextRevision = revision.next() ?: return@execute MediaCompositionResult.RevisionExhausted
 
         val draft = jdbc.queryForList(
-            """SELECT owner_user_id,target_product_id,state,expires_at,clock_timestamp() checked_at
+            """SELECT owner_user_id,target_product_id,state,expires_at
                FROM catalog_media_drafts WHERE id=? FOR UPDATE""",
             command.draftId.value,
         ).singleOrNull() ?: return@execute MediaCompositionResult.ScopeDenied
         if ((draft["owner_user_id"] as Number).toLong() != command.ownerId.value ||
             (draft["target_product_id"] as? Number)?.toLong() != command.productId.value
         ) return@execute MediaCompositionResult.ScopeDenied
-        if (CatalogMediaDraftState.fromWire(draft["state"] as? String) != CatalogMediaDraftState.OPEN ||
-            (draft["expires_at"] as Timestamp).toInstant() <= (draft["checked_at"] as Timestamp).toInstant()
-        ) return@execute MediaCompositionResult.DraftClosed
+        if (CatalogMediaDraftState.fromWire(draft["state"] as? String) != CatalogMediaDraftState.OPEN)
+            return@execute MediaCompositionResult.DraftClosed
 
         val productVariantIds = jdbc.queryForList(
             "SELECT id FROM product_variants WHERE product_id=? ORDER BY id FOR UPDATE",
@@ -82,6 +81,9 @@ class JdbcMediaCompositionRepository(
             val deletion = jdbc.queryForList("SELECT state FROM media_delete_commands WHERE asset_id=? FOR UPDATE", assetId.value).singleOrNull()
             lockedAssets[assetId] = asset + upload.mapKeys { "upload_${it.key}" } + mapOf("delete_state" to deletion?.get("state"))
         }
+        val checkedAt = requireNotNull(jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)).toInstant()
+        if ((draft["expires_at"] as Timestamp).toInstant() <= checkedAt)
+            return@execute MediaCompositionResult.DraftClosed
         for (assetId in stagedAssetIds) {
             val row = lockedAssets.getValue(assetId)
             if ((row["owner_user_id"] as Number).toLong() != command.ownerId.value ||

@@ -427,6 +427,44 @@ class MediaCommandPostgresTest {
         }
     }
 
+    @Test fun `composition rejects a draft that expires while waiting for the asset lock`() {
+        val fixture = fixture()
+        val productId = fixture.product()
+        val upload = fixture.storedUpload(productId)
+        fixture.jdbc.update(
+            "UPDATE catalog_media_drafts SET expires_at=clock_timestamp()+interval '400 milliseconds' WHERE id=?",
+            upload.draftId.value,
+        )
+        val composition = validComposition(listOf(
+            ProductMediaCompositionEntry(MediaImageReference.StagedAsset(upload.assetId), 0, true, AltText.fromWire("Producto")!!),
+        ))
+        DriverManager.getConnection(fixture.url, postgres.username, postgres.password).use { blocker ->
+            blocker.autoCommit = false
+            blocker.prepareStatement("SELECT id FROM media_assets WHERE id=? FOR UPDATE").use {
+                it.setObject(1, upload.assetId.value)
+                it.executeQuery().use { rows -> assertTrue(rows.next()) }
+            }
+            val pool = Executors.newSingleThreadExecutor()
+            try {
+                val result = pool.submit<MediaCompositionResult> {
+                    runtimeCompositionRepository(fixture.url).replace(MediaCompositionCommand(
+                        fixture.owner, upload.draftId, productId, MediaCompositionRevision.fromWire(1)!!, composition,
+                    ))
+                }
+                fixture.jdbc.execute("SELECT pg_sleep(0.7)")
+                assertFalse(result.isDone, "composition must still be waiting on the asset lock")
+                blocker.commit()
+                assertEquals(MediaCompositionResult.DraftClosed, result.get())
+                assertEquals(0, fixture.jdbc.queryForObject(
+                    "SELECT count(*) FROM product_images WHERE media_asset_id=?", Int::class.java, upload.assetId.value,
+                ))
+            } finally {
+                pool.shutdownNow()
+                blocker.rollback()
+            }
+        }
+    }
+
     @Test fun `audit failure rolls back composition associations states and revision`() {
         val fixture = fixture()
         val productId = fixture.product()

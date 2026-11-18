@@ -275,7 +275,7 @@ class JdbcMediaCommandRepository(
     private fun lockedLiveUpload(lease: MediaUploadLease, now: Instant): Map<String, Any?>? =
         uploadRow(lease.snapshot.draftId, lease.snapshot.uploadId, forUpdate = true)?.takeIf {
             MediaCommandState.fromWire(it["command_state"] as? String) == MediaCommandState.CLAIMED &&
-                it["lease_owner"] == lease.leaseOwner.toString() &&
+                it["lease_owner"] == lease.leaseOwner &&
                 (it["fence_version"] as Number).toLong() == lease.fenceVersion &&
                 it.instant("lease_until") > databaseNow(now) &&
                 MediaAssetState.fromWire(it["asset_state"] as? String) == MediaAssetState.AWAITING_BYTES
