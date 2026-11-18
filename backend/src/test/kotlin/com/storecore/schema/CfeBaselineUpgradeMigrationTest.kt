@@ -34,7 +34,7 @@ class CfeBaselineUpgradeMigrationTest {
 
             val historyBefore = history(postgres)
             val upgrade = flyway.migrate()
-            assertEquals("28", upgrade.targetSchemaVersion.toString())
+            assertEquals("29", upgrade.targetSchemaVersion.toString())
             assertEquals(historyBefore, history(postgres).take(historyBefore.size))
             flyway.validate()
             val noOp = flyway.migrate()

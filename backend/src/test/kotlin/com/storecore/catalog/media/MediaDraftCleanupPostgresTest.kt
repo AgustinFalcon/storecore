@@ -292,7 +292,7 @@ class MediaDraftCleanupPostgresTest {
         val cleanup get() = JdbcMediaDraftCleanupRepository(sql)
         val bytes = "cleanup-fixture".toByteArray()
         fun initialize() {
-            owner = MediaOwnerId.fromWire(jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES ('cleanup@example.test','fixture','Cleanup','Owner') RETURNING id", Long::class.java))!!
+            owner = MediaOwnerId.fromWire(jdbc.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES ('cleanup@example.test','${'$'}argon2id${'$'}fixture','Cleanup','Owner') RETURNING id", Long::class.java))!!
             sql = runtime()
         }
         fun flyway(target: String? = null): Flyway = Flyway.configure().dataSource(url, postgres.username, postgres.password).locations("classpath:db/migration").apply { if (target != null) target(target) }.load()
