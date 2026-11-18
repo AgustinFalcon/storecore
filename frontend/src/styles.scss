@@ -728,6 +728,138 @@ pre {
   gap: var(--sc-space-4);
 }
 
+.sc-option-selector {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  gap: var(--sc-space-4);
+}
+
+sc-product-option-selector,
+sc-select-option-axis,
+sc-swatch-option-axis,
+sc-generic-variant-selector {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sc-option-selector__status,
+.sc-option-axis__help,
+.sc-swatch__reason {
+  margin: 0;
+  color: var(--sc-color-faint-ink);
+  font-size: var(--sc-text-sm);
+}
+
+.sc-option-axis {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sc-option-axis__label {
+  font-weight: 700;
+  color: var(--sc-color-ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sc-option-axis legend {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.sc-option-axis__help {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sc-option-axis select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+.sc-quantity-field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.sc-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.sc-swatch {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 7rem;
+  max-width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--sc-color-line);
+  border-radius: 0.75rem;
+  background: var(--sc-color-surface);
+  cursor: pointer;
+}
+
+.sc-swatch:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--sc-color-accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.sc-swatch.is-selected {
+  border-color: var(--sc-color-accent);
+  box-shadow: inset 0 0 0 1px var(--sc-color-accent);
+}
+
+.sc-swatch.is-disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.sc-swatch input {
+  margin: 0;
+}
+
+.sc-swatch__color {
+  grid-row: 1 / span 2;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--sc-color-line);
+  border-radius: 50%;
+  background: var(--sc-swatch-color);
+}
+
+.sc-swatch__text,
+.sc-swatch__reason {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sc-swatch__reason {
+  grid-column: 2;
+}
+
+.sc-pdp__attributes {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) 1fr;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+}
+
+.sc-pdp__attributes dt { font-weight: 700; }
+.sc-pdp__attributes dd { margin: 0; overflow-wrap: anywhere; }
+
 .sc-btn--block {
   width: 100%;
   justify-content: center;

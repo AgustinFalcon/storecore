@@ -3,11 +3,19 @@ import { provideRouter } from '@angular/router';
 import { CustomerCartAccess } from '../../domain/cart/customer-cart-access';
 import { ProductPageViewComponent } from './product-page.view';
 import { mapProductDetail } from '../../data/mappers/http-mappers';
+import { OptionWireMapper } from '../../domain/catalog/option-wire.mapper';
+import { OptionSelectionState } from '../../domain/catalog/option-schema';
+import { SkuPriceResolution } from '../../domain/catalog/variant-price';
 
-const productFixture = (sku: string, images: string[] = []) => mapProductDetail({ id: 'p', sku, name: sku, status: 'ACTIVE', images,
+const absentOptionSchema = { revision: 1, state: 'ABSENT', cause: null, axes: [] };
+const productFixture = (sku: string, images: string[] = []) => mapProductDetail({ id: 'p', sku, name: sku, status: 'ACTIVE', images, optionSchema: absentOptionSchema,
   productBasePrice: 1, price: { base: 1, effective: 1, original: 1, offer: null },
-  variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku, name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE', attributes: { Material: 'Acero', Color: 'Negro' },
+  variants: [{ pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 1, original: 1, effective: 1, offer: null } }, id: 'v', sku, name: 'Variante', status: 'ACTIVE', availability: 'AVAILABLE', optionValues: {}, attributes: { Material: 'Acero', Color: 'Negro' },
     inventory: { variantId: 'v', sku, state: 'KNOWN', available: 4, reserved: 2, onHand: 6, safety: 1, saleable: 3 } }] });
+function withVariants(sku: string, variants: readonly (ReturnType<typeof productFixture>['variants'][number])[]) {
+  return { ...productFixture(sku), variants,
+    optionSnapshot: OptionWireMapper.fromWire(absentOptionSchema, variants.map(variant => ({ id: variant.id, sku: variant.sku, optionValues: {} }))) };
+}
 
 describe('ProductPage closed cart controls', () => {
   it('binds price and offer to the exact selection and blocks unknown variant prices', async () => {
@@ -17,18 +25,18 @@ describe('ProductPage closed cart controls', () => {
     const base=productFixture('A');
     const raw=(sku:string,amount:number,effective=amount)=>({...base.variants[0],id:sku,sku,status:'ACTIVE',availability:'AVAILABLE',
       inventory:{sku,state:'KNOWN',available:4,reserved:0,safety:0,onHand:4,saleable:4},pricePolicy:{mode:'OVERRIDE',base:amount},price:quote(amount,effective)});
-    fixture.componentRef.setInput('product',mapProductDetail({...base,status:'ACTIVE',productBasePrice:1,variants:[raw('A',100),raw('B',200,150)]}));
+    fixture.componentRef.setInput('product',mapProductDetail({...base,optionSchema:absentOptionSchema,status:'ACTIVE',productBasePrice:1,variants:[raw('A',100),raw('B',200,150)]}));
     fixture.componentRef.setInput('access',CustomerCartAccess.Ready);
     fixture.detectChanges(); await fixture.whenStable();
     fixture.componentInstance.quantity=3;
     fixture.componentInstance.selectVariant('B'); fixture.detectChanges();
-    expect(fixture.componentInstance.quantity).toBe(1);
+    expect(fixture.componentInstance.quantity).toBe(3);
     expect(fixture.componentInstance.selectedPrice?.effective).toBe(150);
     expect(fixture.nativeElement.querySelector('.sc-price--hero').textContent).toContain('150');
     expect(fixture.nativeElement.querySelector('.sc-price__was').textContent).toContain('200');
     const add=vi.fn();fixture.componentInstance.add.subscribe(add);fixture.componentInstance.submit('A');
-    expect(add).toHaveBeenCalledWith({sku:'B',quantity:1});
-    fixture.componentRef.setInput('product',mapProductDetail({...base,status:'ACTIVE',productBasePrice:1,variants:[{...raw('A',100),price:undefined}]}));
+    expect(add).toHaveBeenCalledWith({sku:'B',quantity:3});
+    fixture.componentRef.setInput('product',mapProductDetail({...base,optionSchema:absentOptionSchema,status:'ACTIVE',productBasePrice:1,variants:[{...raw('A',100),price:undefined}]}));
     fixture.componentInstance.selectVariant('A'); fixture.detectChanges();
     expect(fixture.componentInstance.canPurchase).toBe(false);
     expect(fixture.nativeElement.textContent).toContain('Precio no disponible');
@@ -38,7 +46,7 @@ describe('ProductPage closed cart controls', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(ProductPageViewComponent);
     const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
-    const product = (sku: string) => ({ ...productFixture(sku), variants });
+    const product = (sku: string) => withVariants(sku, variants);
     fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
     fixture.componentRef.setInput('product', product('B')); fixture.detectChanges(); await fixture.whenStable();
     expect(fixture.componentInstance.selectedVariant?.sku).toBe('B');
@@ -50,7 +58,7 @@ describe('ProductPage closed cart controls', () => {
     expect(fixture.componentInstance.quantity).toBe(1);
     fixture.componentInstance.submit('A'); expect(add).toHaveBeenLastCalledWith({ sku: 'A', quantity: 1 });
     fixture.componentInstance.selectedVariantId = 'stale';
-    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.selectedVariant?.sku).toBe('A');
   });
   it('resets product-local gallery and quantity state when the reused route changes SKU', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
@@ -88,19 +96,20 @@ describe('ProductPage closed cart controls', () => {
     expect(add).toHaveBeenCalledWith({ sku: 'sku', quantity: 1 });
   });
 
-  it('restores only the exact variant and reports explicit corrections', () => {
+  it('restores only the exact variant and announces option changes before applying them', () => {
     TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(ProductPageViewComponent);
     const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
-    fixture.componentRef.setInput('product', { ...productFixture('A'), variants });
-    fixture.componentRef.setInput('restoredSelection', { variantSku: 'B', quantity: 2, revision: 1 });
+    fixture.componentRef.setInput('product', withVariants('A', variants));
+    fixture.componentRef.setInput('restoredSelection', { variantId: 'B', variantSku: 'B', optionValues: new Map(), quantity: 2, revision: 1 });
     fixture.detectChanges();
     expect(fixture.componentInstance.selectedVariant?.sku).toBe('B');
     expect(fixture.componentInstance.quantity).toBe(2);
-    const revise = vi.fn(); fixture.componentInstance.reviseIntent.subscribe(revise);
+    const before = vi.fn(); fixture.componentInstance.requestSelectionChange.subscribe(request => { before(); request.apply(); });
     fixture.componentInstance.selectVariant('A');
-    expect(revise).toHaveBeenCalledWith({ sku: 'A', quantity: 1 });
-    fixture.componentRef.setInput('restoredSelection', { variantSku: 'missing', quantity: 2, revision: 2 });
+    expect(before).toHaveBeenCalledOnce();
+    expect(fixture.componentInstance.quantity).toBe(2);
+    fixture.componentRef.setInput('restoredSelection', { variantId: '', variantSku: 'missing', optionValues: new Map(), quantity: 2, revision: 2 });
     fixture.detectChanges();
     expect(fixture.componentInstance.selectedVariant).toBeNull();
   });
@@ -110,7 +119,7 @@ describe('ProductPage closed cart controls', () => {
     const fixture = TestBed.createComponent(ProductPageViewComponent);
     fixture.componentRef.setInput('product', productFixture('sku'));
     fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
-    fixture.componentRef.setInput('restoredSelection', { variantSku: 'sku', quantity: 2, revision: 1 });
+    fixture.componentRef.setInput('restoredSelection', { variantId: 'v', variantSku: 'sku', optionValues: new Map(), quantity: 2, revision: 1 });
     const revise = vi.fn(); fixture.componentInstance.reviseIntent.subscribe(revise);
     fixture.detectChanges(); await fixture.whenStable();
     const input = fixture.nativeElement.querySelector('input[name=quantity]') as HTMLInputElement;
@@ -121,6 +130,21 @@ describe('ProductPage closed cart controls', () => {
     expect(revise).not.toHaveBeenCalled();
     input.dispatchEvent(new Event('change', { bubbles: true }));
     expect(revise).toHaveBeenCalledExactlyOnceWith({ sku: 'sku', quantity: 12 });
+  });
+
+  it('does not expose a different variant while intent confirmation is pending', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
+    fixture.componentRef.setInput('product', withVariants('A', variants));
+    fixture.componentRef.setInput('intentBusy', true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const before = vi.fn(); fixture.componentInstance.requestSelectionChange.subscribe(() => before());
+    fixture.componentInstance.selectVariant('B');
+    expect(fixture.componentInstance.selectedVariant?.sku).toBe('A');
+    expect(before).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('select[name=variant]').disabled).toBe(true);
   });
 
   it('preserves attribute order and blocks missing stock and quantities above saleable', async () => {
@@ -139,9 +163,132 @@ describe('ProductPage closed cart controls', () => {
     const add = vi.fn(); fixture.componentInstance.add.subscribe(add);
     fixture.componentInstance.quantity = 4; fixture.componentInstance.submit('sku');
     expect(add).not.toHaveBeenCalled();
-    fixture.componentRef.setInput('product', mapProductDetail({ ...product, status: 'ACTIVE', variants: [{ id: 'v', sku: 'sku', status: 'ACTIVE', availability: 'UNAVAILABLE', inventory: { sku: 'sku', state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] }));
+    fixture.componentRef.setInput('product', mapProductDetail({ ...product, optionSchema: absentOptionSchema, status: 'ACTIVE', variants: [{ id: 'v', sku: 'sku', status: 'ACTIVE', availability: 'UNAVAILABLE', optionValues: {}, inventory: { sku: 'sku', state: 'MISSING', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] }));
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Sin saldo registrado');
     expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(true);
+  });
+
+  it('fails closed for unknown schemas and keeps a valid partial vector incomplete', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const variant = { ...productFixture('A').variants[0], id: 'A' };
+    const unknown = { ...withVariants('A', [variant]), optionSnapshot: OptionWireMapper.fromWire(
+      { revision: 1, state: 'UNKNOWN', cause: 'UNKNOWN', axes: [] }, [{ id: 'A', sku: 'A', optionValues: {} }]) };
+    fixture.componentRef.setInput('product', unknown); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+
+    const schema = { revision: 1, state: 'VALID', cause: null, axes: [{ code: 'color', label: 'Color', presentation: 'SELECT', order: 0,
+      values: [{ code: 'red', label: 'Rojo', order: 0 }, { code: 'blue', label: 'Azul', order: 1 }] }] };
+    const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
+    const partial = { ...withVariants('PRODUCT', variants), optionSnapshot: OptionWireMapper.fromWire(schema,
+      variants.map((value, index) => ({ id: value.id, sku: value.sku, optionValues: { color: index === 0 ? 'red' : 'blue' } }))) };
+    fixture.componentRef.setInput('product', partial); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+  });
+
+  it('offers retry instead of an impossible completion instruction when a valid selection cannot be verified', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const schema = { revision: 1, state: 'VALID', cause: null, axes: [{ code: 'size', label: 'Talle', presentation: 'SELECT', order: 0,
+      values: [{ code: 'only', label: 'Único', order: 0 }] }] };
+    const product = mapProductDetail({ id: 'p', sku: 'A', name: 'Producto', status: 'ACTIVE', productBasePrice: 100, images: [], media: [],
+      optionSchema: schema, variants: [{ id: 'v', sku: 'A', name: 'Única', status: 'ACTIVE', availability: 'UNKNOWN', attributes: {}, optionValues: { size: 'only' },
+        pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 100, original: 100, effective: 100, offer: null } },
+        inventory: { sku: 'A', state: 'UNKNOWN', available: null, reserved: null, safety: null, onHand: null, saleable: null } }] });
+    fixture.componentRef.setInput('product', product); fixture.detectChanges();
+    expect(fixture.componentInstance.selectionState).toBe(OptionSelectionState.Unknown);
+    expect(fixture.nativeElement.textContent).not.toContain('Completá las opciones para conocer el SKU');
+    expect(fixture.nativeElement.textContent).toContain('Disponibilidad no verificada');
+    expect(fixture.nativeElement.querySelector('.sc-option-selector .sc-notice button').textContent).toContain('Reintentar opciones');
+  });
+
+  it('revalidates the same SKU when stock, price or schema changes', () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    fixture.componentRef.setInput('product', productFixture('sku')); fixture.detectChanges();
+    expect(fixture.componentInstance.canPurchase).toBe(true);
+    const base = productFixture('sku');
+    const depleted = mapProductDetail({ ...base, optionSchema: absentOptionSchema, variants: [{ ...base.variants[0], optionValues: {},
+      availability: 'OUT_OF_STOCK', inventory: { sku: 'sku', state: 'KNOWN', available: 0, reserved: 0, safety: 0, onHand: 0, saleable: 0 } }] });
+    fixture.componentRef.setInput('product', depleted); fixture.detectChanges();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    const noPrice = { ...base, variants: [{ ...base.variants[0], price: SkuPriceResolution.Unknown }] };
+    fixture.componentRef.setInput('product', noPrice); fixture.detectChanges();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    const unknown = { ...productFixture('sku'), optionSnapshot: OptionWireMapper.fromWire(
+      { revision: 2, state: 'UNKNOWN', cause: 'UNKNOWN', axes: [] }, [{ id: 'v', sku: 'sku', optionValues: {} }]) };
+    fixture.componentRef.setInput('product', unknown); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+  });
+
+  it('keeps compatible later options and quantity while removing every stale purchase fact', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const axes = ['a', 'b', 'c'].map((code, order) => ({ code, label: `Eje ${code}`, presentation: order === 2 ? 'SWATCH' : 'SELECT', order,
+      values: ['x', 'y'].map((value, valueOrder) => ({ code: value, label: `Valor ${value}`, order: valueOrder, swatchColor: order === 2 ? (value === 'x' ? '#111111' : null) : undefined })) }));
+    const variant = (id: string, sku: string, optionValues: Record<string, string>, saleable: number) => ({ id, sku, name: sku, status: 'ACTIVE', availability: saleable ? 'AVAILABLE' : 'OUT_OF_STOCK', optionValues,
+      pricePolicy: { mode: 'INHERITED', base: null }, price: { state: 'KNOWN', price: { base: 100, original: 100, effective: 100, offer: null } }, attributes: {},
+      inventory: { variantId: id, sku, state: 'KNOWN', available: saleable, reserved: 0, onHand: saleable, safety: 0, saleable } });
+    const product = mapProductDetail({ id: 'p', sku: 'sku2', name: 'Configurable', status: 'ACTIVE', productBasePrice: 100,
+      optionSchema: { revision: 1, state: 'VALID', cause: null, axes }, variants: [
+        variant('1', 'sku1', { a: 'x', b: 'x', c: 'x' }, 2), variant('2', 'sku2', { a: 'y', b: 'y', c: 'x' }, 10),
+        variant('3', 'sku3', { a: 'y', b: 'x', c: 'y' }, 10),
+      ] });
+    fixture.componentRef.setInput('product', product);
+    fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
+    fixture.detectChanges(); await fixture.whenStable();
+    fixture.componentInstance.setQuantity(3);
+    fixture.componentInstance.requestSelectionChange.subscribe(request => request.apply());
+    fixture.componentInstance.chooseOption({ axisCode: 'a', valueCode: 'x' });
+    expect(fixture.componentInstance.quantity).toBe(3);
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.selectedSku).toBe('');
+    expect(fixture.componentInstance.selectedPrice).toBeNull();
+    expect(fixture.componentInstance.optionAxes.find(axis => axis.code === 'b')?.selectedValue).toBeNull();
+    expect(fixture.componentInstance.optionAxes.find(axis => axis.code === 'c')?.selectedValue).toBe('x');
+    fixture.componentInstance.chooseOption({ axisCode: 'b', valueCode: 'x' });
+    expect(fixture.componentInstance.selectedSku).toBe('sku1');
+    expect(fixture.componentInstance.quantity).toBe(3);
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    expect(fixture.componentInstance.quantityMessage).toContain('(2)');
+    fixture.componentInstance.setQuantity(2);
+    expect(fixture.componentInstance.canPurchase).toBe(true);
+  });
+
+  it('withdraws stale purchase identity while a sibling SKU read is loading or failed', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    fixture.componentRef.setInput('product', productFixture('A'));
+    fixture.componentRef.setInput('access', CustomerCartAccess.Ready);
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.nativeElement.textContent).toContain('SKU A');
+    fixture.componentRef.setInput('loading', true); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('SKU A');
+    expect(fixture.nativeElement.querySelector('button[type=submit]').disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('button.is-on')).toBeNull();
+    fixture.componentRef.setInput('loading', false);
+    fixture.componentRef.setInput('error', 'No disponible'); fixture.detectChanges();
+    expect(fixture.componentInstance.selectedVariant).toBeNull();
+    expect(fixture.componentInstance.canPurchase).toBe(false);
+  });
+
+  it('restores the authoritative visible value when intent retirement denies a native change', async () => {
+    TestBed.configureTestingModule({ imports: [ProductPageViewComponent], providers: [provideRouter([])] });
+    const fixture = TestBed.createComponent(ProductPageViewComponent);
+    const variants = ['A', 'B'].map(sku => ({ ...productFixture(sku).variants[0], id: sku }));
+    fixture.componentRef.setInput('product', withVariants('A', variants));
+    fixture.componentInstance.requestSelectionChange.subscribe(() => undefined);
+    fixture.detectChanges(); await fixture.whenStable();
+    const select = fixture.nativeElement.querySelector('select[name=variant]') as HTMLSelectElement;
+    select.value = 'B'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    fixture.detectChanges(); await fixture.whenStable();
+    expect(fixture.componentInstance.selectedVariant?.sku).toBe('A');
+    expect(select.value).toBe('A');
   });
 });
