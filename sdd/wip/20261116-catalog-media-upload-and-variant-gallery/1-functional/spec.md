@@ -71,8 +71,11 @@ traducen a `Unknown` y fallan cerrados; nunca se imprimen como estados válidos.
 - PDP consume la misma selección autoritativa y tipada que precio, stock e
   intención. Sólo usa media de variante cuando el option schema resuelve una
   variante: un SKU de ruta no se interpreta por separado en la galería.
-  `Incomplete`, `Unknown` y `Absent` con múltiples variantes mantienen la
-  galería general sin autocompletar prefijos ni elegir la primera variante.
+  `Incomplete`, `Unknown` y `Absent` con múltiples variantes **sin variante
+  resuelta** mantienen la galería general sin autocompletar prefijos ni elegir
+  la primera variante. Si el motor resuelve una variante autoritativa mediante
+  selección explícita, intención restaurada o `selectGeneric(SKU)`, se usa su
+  galería aunque el schema sea `Absent`.
   `Absent` con exactamente una variante conserva la autoelección ya definida
   por el motor autoritativo. La imagen nunca crea una segunda selección.
 - Al elegir/restaurar una variante con media propia, PDP reemplaza la galería
@@ -151,10 +154,11 @@ strings wire.
   crear un asset listo.
 - PDP muestra la galería por `sortOrder`, cambia a media de variante y aplica el
   fallback general definido.
-- Selecciones `Incomplete`, `Unknown` y `Absent` multivariante no inventan un
-  SKU ni una variante: mantienen galería general, precio, stock e intención
-  coherentes con el option schema; sólo `Absent` univariante puede autoelegirse
-  mediante el motor autoritativo.
+- Selecciones `Incomplete`, `Unknown` y `Absent` multivariante sin variante
+  resuelta no inventan un SKU ni una variante: mantienen galería general,
+  precio, stock e intención coherentes con el option schema. Una variante ya
+  resuelta por selección explícita, intención o `selectGeneric(SKU)` usa su
+  media; `Absent` univariante puede autoelegirse mediante el mismo motor.
 - Portada y órdenes son deterministas; índices duplicados, asset ajeno, estado
   no listo o dos portadas se rechazan atómicamente.
 - Conflicto concurrente no pierde la composición más nueva ni el borrador local.

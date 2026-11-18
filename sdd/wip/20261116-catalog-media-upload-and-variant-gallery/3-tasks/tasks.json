@@ -83,7 +83,7 @@
       "id": "TASK-011", "title": "Render deterministic storefront galleries", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-008", "TASK-009"],
       "description": "Integrate PDP variant gallery and safe product-card media without changing price, quantity, stock or purchase intent.",
       "files": ["frontend/src/app/features/storefront", "frontend/src/app/shared"],
-      "acceptance_criteria": ["AC-1: Only an OptionSelectionEngine-resolved variant selects variant media; Incomplete, Unknown and multivariant Absent preserve the general gallery without inventing SKU or variant", "AC-2: Failed images fall back once then show accessible placeholder", "AC-3: Restored intent and single-variant Absent follow the authoritative option-selection result without changing price, stock or purchase intent", "GATE: storefront tests pass at 390/768/1440"],
+      "acceptance_criteria": ["AC-1: Only an OptionSelectionEngine-resolved variant selects variant media; Incomplete, Unknown and multivariant Absent without a resolved variant preserve the general gallery without inventing SKU or variant", "AC-2: Failed images fall back once then show accessible placeholder", "AC-3: Explicit selection, restored intent, selectGeneric(SKU) and single-variant Absent follow the authoritative option-selection result without changing price, stock or purchase intent", "GATE: storefront tests pass at 390/768/1440"],
       "references": ["Functional: Experiencia storefront"], "design_decisions": ["DD-variant-media-selection"]
     },
     {

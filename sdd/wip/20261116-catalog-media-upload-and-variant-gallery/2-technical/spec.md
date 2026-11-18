@@ -245,8 +245,10 @@ asociación por variante. La PDP consume `VariantMediaSelection`, un objeto que
 recibe el resultado cerrado del `OptionSelectionEngine` y decide galería
 específica o fallback general sin switches de strings. No vuelve a interpretar
 el SKU de ruta ni completa una selección parcial: `Incomplete`, `Unknown` y
-`Absent` multivariante producen galería general; `Absent` univariante sólo
-puede usar la variante resuelta por ese motor autoritativo.
+`Absent` multivariante **sin variante resuelta** producen galería general. Si
+el motor ya resolvió una variante por selección explícita, intención restaurada
+o `selectGeneric(SKU)`, usa su galería incluso bajo schema `Absent`; el caso
+univariante conserva la autoelección del mismo motor.
 
 El adapter público versiona el DTO para `productImageId`, portada, orden y alt.
 Todos los consumidores actuales (`JdbcCatalogProjectionReader`, listado/home,
