@@ -44,3 +44,13 @@ mediante inventario, E2E real y revisión de un cambio separado.
 ## Compliance boundary
 
 No ocultar ventas, alterar montos, evadir ni bypass fiscal. El adapter fiscal no se implementa en StoreCore core: queda como integración/biblioteca externa diferida y auditable.
+
+## PostgreSQL runtime integrity
+
+Los triggers que protegen invariantes fijan `search_path = public, pg_temp` (o
+un conjunto aún más estrecho) para que una tabla temporal no sombree relaciones
+autoritativas. Las migraciones conceden al rol runtime sólo los permisos que el
+writer `SECURITY INVOKER` necesita, incluidas secuencias, y las pruebas ejecutan
+el writer real mediante `SET ROLE`; no alcanza con probar como owner de la base.
+
+_Agregado 2026-11-17 desde `catalog-option-schema-pdp`._

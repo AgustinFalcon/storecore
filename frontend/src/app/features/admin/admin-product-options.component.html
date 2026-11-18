@@ -1,0 +1,58 @@
+@if (store.state$ | async; as state) {
+<section class="option-editor sc-panel" [attr.aria-busy]="state.phase.busy" aria-labelledby="product-options-title">
+  <header class="option-editor__head">
+    <div><p class="sc-kicker">Catálogo · configuración independiente</p><h2 #panelTitle id="product-options-title" tabindex="-1">Opciones de compra · {{ state.sku }}</h2>
+      <p>Definí ejes, valores y combinaciones sin mezclar este guardado con los datos generales del producto.</p></div>
+    <span class="sc-badge">{{ state.phase.label }}</span>
+  </header>
+  @if (state.message) { <p class="option-editor__notice" role="status">{{ state.message }}</p> }
+  @if (state.pendingSku) { <div class="option-editor__notice" role="alert"><button type="button" class="sc-btn sc-btn--primary" (click)="store.discardAndOpen()">Descartar y abrir {{ state.pendingSku }}</button><button type="button" class="sc-btn sc-btn--ghost" (click)="store.keepCurrent()">Seguir editando {{ state.sku }}</button></div> }
+  @if (!state.canWrite && state.draft) { <p class="option-editor__readonly">Vista de consulta. Sólo ADMIN puede publicar opciones.</p> }
+  @if (state.draft; as draft) {
+    <fieldset [disabled]="!state.canWrite || !state.phase.allowsDraft">
+      <legend class="sr-only">Editor de opciones</legend>
+      <div class="option-editor__toolbar"><strong>{{ draft.axes.length }} ejes · {{ draft.assignments.length }} variantes</strong><button type="button" class="sc-btn sc-btn--ghost" [disabled]="draft.axes.length >= 4" (click)="addAxis(draft)">Agregar eje</button></div>
+      <div class="option-editor__axes">
+      @for (axis of draft.axes; track axis.code; let axisIndex = $index) {
+        <article class="option-axis">
+          <header><h3>{{ axis.label || axis.code }}</h3><div><button type="button" class="sc-btn sc-btn--ghost" [disabled]="axisIndex === 0" (click)="moveAxis(draft, axisIndex, -1)" aria-label="Mover eje arriba">↑</button><button type="button" class="sc-btn sc-btn--ghost" [disabled]="axisIndex === draft.axes.length - 1" (click)="moveAxis(draft, axisIndex, 1)" aria-label="Mover eje abajo">↓</button><button type="button" class="sc-btn sc-btn--ghost" (click)="removeAxis(draft, axisIndex)">Quitar</button></div></header>
+          <div class="option-editor__grid"><label>Nombre <input [name]="'axis-label-' + axis.code" maxlength="80" [ngModel]="axis.label" (ngModelChange)="patchAxis(draft, axisIndex, { label: $event })" /></label><label>Código estable <input [name]="'axis-code-' + axis.code" [ngModel]="axis.code" readonly /></label><label>Presentación <select [name]="'axis-presentation-' + axis.code" [ngModel]="axis.presentation.wire" (ngModelChange)="setPresentation(draft, axisIndex, $event)">@for (presentation of presentations; track presentation.wire) { <option [value]="presentation.wire">{{ presentation.label }}</option> }</select></label></div>
+          <div class="option-values">
+          @for (value of axis.values; track value.code; let valueIndex = $index) {
+            <div class="option-value"><label>Valor <input [name]="'value-label-' + axis.code + '-' + value.code" maxlength="80" [ngModel]="value.label" (ngModelChange)="patchValue(draft, axisIndex, valueIndex, { label: $event })" /></label><label>Código <input [name]="'value-code-' + axis.code + '-' + value.code" [ngModel]="value.code" readonly /></label>@if (axis.presentation.usesColor) { <label>Color opcional <input type="text" placeholder="#rrggbb" pattern="#[0-9a-f]{6}" [name]="'value-color-' + axis.code + '-' + value.code" [ngModel]="value.swatchColor" (ngModelChange)="patchValue(draft, axisIndex, valueIndex, { swatchColor: $event })" /></label> }<div class="option-value__actions"><button type="button" class="sc-btn sc-btn--ghost" [disabled]="valueIndex === 0" (click)="moveValue(draft, axisIndex, valueIndex, -1)" aria-label="Mover valor arriba">↑</button><button type="button" class="sc-btn sc-btn--ghost" [disabled]="valueIndex === axis.values.length - 1" (click)="moveValue(draft, axisIndex, valueIndex, 1)" aria-label="Mover valor abajo">↓</button><button type="button" class="sc-btn sc-btn--ghost" [disabled]="axis.values.length === 1" (click)="removeValue(draft, axisIndex, valueIndex)">Quitar valor</button></div></div>
+          }
+          </div><button type="button" class="sc-btn sc-btn--ghost" [disabled]="axis.values.length >= 50" (click)="addValue(draft, axisIndex)">Agregar valor</button>
+        </article>
+      }
+      </div>
+    </fieldset>
+
+      <section aria-labelledby="assignment-title"><h3 id="assignment-title">Combinaciones por variante</h3><p>Las activas deben completar todos los ejes y no pueden repetir una combinación activa.</p>
+        @if (!draft.axes.length) { <p class="option-editor__notice">Sin opciones configuradas. Un ADMIN puede crear el primer eje; las variantes siguen disponibles para consulta.</p> }
+        <label class="option-assignment-search">Buscar variante por SKU <input name="assignment-query" [ngModel]="assignmentQuery()" (ngModelChange)="setAssignmentQuery($event)" /></label>
+        <p role="status">Mostrando hasta {{ assignmentPageSize }} de {{ assignmentCount(draft) }} variantes.</p>
+        <div class="option-assignments">
+        @for (item of visibleAssignments(draft); track item.row.variantId) { @let row = item.row; @let rowIndex = item.index;
+          <article class="option-assignment"><header><strong>{{ row.variantSku }}</strong><label><input type="checkbox" [disabled]="!state.canWrite || !state.phase.allowsDraft" [name]="'active-' + row.variantId" [ngModel]="row.active" (ngModelChange)="patchAssignment(draft, rowIndex, { active: $event })" /> Activa</label></header>
+          @if (missingAxes(draft, row); as missing) { <p class="option-editor__error" role="alert">Faltan: {{ missing }}</p> }
+          @if (duplicateActiveSkus(draft, row); as duplicates) { <p class="option-editor__error" role="alert">Repite combinación con: {{ duplicates }}</p> }
+          <div class="option-editor__grid">@for (axis of draft.axes; track axis.code) { <label>{{ axis.label }}<select [disabled]="!state.canWrite || !state.phase.allowsDraft" [name]="'assignment-' + row.variantId + '-' + axis.code" [ngModel]="assignmentValue(row, axis.code)" (ngModelChange)="setAssignmentValue(draft, rowIndex, axis.code, $event)"><option value="">Sin asignar</option>@for (value of axis.values; track value.code) { <option [value]="value.code">{{ value.label }}</option> }</select></label> }</div></article>
+        }
+        </div>
+        <div class="option-editor__toolbar"><button type="button" class="sc-btn sc-btn--ghost" [disabled]="assignmentPage() === 0" (click)="assignmentPage.set(assignmentPage() - 1)">Anteriores</button><span>Página {{ assignmentPage() + 1 }}</span><button type="button" class="sc-btn sc-btn--ghost" [disabled]="(assignmentPage() + 1) * assignmentPageSize >= assignmentCount(draft)" (click)="assignmentPage.set(assignmentPage() + 1)">Siguientes</button></div>
+      </section>
+
+      <fieldset [disabled]="!state.canWrite || !state.phase.allowsDraft"><legend class="sr-only">Variantes nuevas inactivas</legend><section class="option-pending" aria-labelledby="pending-title"><h3 id="pending-title">Variantes nuevas inactivas</h3><p>Se crean inactivas; después del guardado y la relectura podrás asignarlas y activarlas.</p>
+        @for (row of draft.pendingAdditions; track row.localId; let rowIndex = $index) { <div class="option-value"><label>SKU <input [name]="'pending-sku-' + row.localId" maxlength="128" [ngModel]="row.sku" (ngModelChange)="patchPending(draft, rowIndex, { sku: $event })" /></label><label>Nombre <input [name]="'pending-label-' + row.localId" maxlength="200" [ngModel]="row.label" (ngModelChange)="patchPending(draft, rowIndex, { label: $event })" /></label><button type="button" class="sc-btn sc-btn--ghost" (click)="removePending(draft, rowIndex)">Quitar</button></div> }
+        @if (!canAddInactive(draft)) { <p class="option-editor__notice" role="status">Alcanzaste el máximo de 1.000 variantes, incluidas las altas pendientes.</p> }
+        <button type="button" class="sc-btn sc-btn--ghost" [disabled]="!canAddInactive(draft)" (click)="addInactive(draft)">Agregar variante inactiva</button>
+      </section>
+    </fieldset>
+
+    @if (state.phase.isConflict) { <section class="option-conflicts" aria-labelledby="conflicts-title"><h3 id="conflicts-title">Comparar cambios</h3>@if (state.conflictOperation === clearOperation) { <p>La versión publicada ahora tiene {{ state.remote?.schema?.axes?.length || 0 }} ejes y {{ state.remote?.assignments?.length || 0 }} asignaciones.</p><button type="button" class="sc-btn sc-btn--primary" (click)="store.prepareConflictedClear()">Revisar eliminación actualizada</button> } @else { @if (!state.conflicts.length) { <p>No hay campos superpuestos; los cambios publicados independientes se conservarán.</p> }@for (conflict of state.conflicts; track conflict.path) { <fieldset><legend>{{ conflict.label }}</legend><p>Base: {{ conflict.base }}</p><label><input type="radio" [name]="'conflict-' + conflict.path" [checked]="conflict.choice === mine" (change)="store.choose(conflict.path, mine)" /> Conservar mi borrador: {{ conflict.mine }}</label><label><input type="radio" [name]="'conflict-' + conflict.path" [checked]="conflict.choice === remote" (change)="store.choose(conflict.path, remote)" /> Conservar publicado: {{ conflict.remote }}</label></fieldset> }<button type="button" class="sc-btn sc-btn--primary" (click)="store.reapply()">Preparar reaplicación</button> }</section> }
+    <footer class="option-editor__actions"><button type="button" class="sc-btn sc-btn--primary" [disabled]="!state.canWrite || !state.phase.allowsPublish" (click)="store.save()">Guardar opciones</button><button #clearTrigger type="button" class="sc-btn sc-btn--ghost" [disabled]="!state.canWrite || !state.phase.allowsPublish" (click)="requestClear()">Quitar configuración</button></footer>
+    @if (state.clearPending) { <section class="option-conflicts" role="group" aria-labelledby="clear-options-title"><h3 id="clear-options-title">¿Quitar toda la configuración?</h3><p>Se quitarán {{ state.base?.schema?.axes?.length || 0 }} ejes y {{ state.base?.assignments?.length || 0 }} asignaciones publicadas del producto {{ state.sku }}. Las variantes no se eliminan.</p><div><button #clearConfirm type="button" class="sc-btn sc-btn--primary" (click)="store.confirmClear()">Sí, quitar configuración</button><button type="button" class="sc-btn sc-btn--ghost" (click)="cancelClear()">Cancelar</button></div></section> }
+  }
+  <button type="button" class="sc-btn sc-btn--ghost" [disabled]="state.phase.busy" (click)="store.refresh()">Volver a cargar opciones</button>
+</section>
+}

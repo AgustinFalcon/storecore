@@ -44,6 +44,8 @@ import { OfferHttpRepository } from './data/offer/offer-http.repository';
 import { CustomerAdminHttpRepository } from './data/customer-admin/customer-admin-http.repository';
 import { OverviewHttpRepository } from './data/overview/overview-http.repository';
 import { UserHttpRepository } from './data/user/user-http.repository';
+import { ProductOptionsHttpRepository } from './data/catalog/product-options-http.repository';
+import { PRODUCT_OPTIONS_REPOSITORY } from './core/tokens/product-options.tokens';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -72,6 +74,7 @@ export const appConfig: ApplicationConfig = {
     { provide: CUSTOMER_ADMIN_REPOSITORY, useClass: CustomerAdminHttpRepository },
     { provide: OVERVIEW_REPOSITORY, useClass: OverviewHttpRepository },
     { provide: USER_REPOSITORY, useClass: UserHttpRepository },
+    { provide: PRODUCT_OPTIONS_REPOSITORY, useClass: ProductOptionsHttpRepository },
     { provide: INVENTORY_ADJUSTMENT_REPOSITORY, useClass: InventoryAdjustmentHttpRepository },
     { provide: ACCESS_REPOSITORY, useClass: AccessHttpRepository },
     { provide: RECOVERY_REPOSITORY, useClass: RecoveryHttpRepository },

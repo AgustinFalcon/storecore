@@ -40,7 +40,7 @@ StoreCore es una plataforma de e-commerce dedicada para emprendedores y PyMEs ar
 
 ### CU-01: Navegar catálogo
 **Actor:** VISITOR / CUSTOMER  
-**Descripción:** Ver página de inicio, listado de productos por categoría, búsqueda básica. Ver detalle de producto con fotos, descripción, variantes (talle/color), stock disponible.  
+**Descripción:** Ver página de inicio, listado y búsqueda por nombre/SKU/categoría. Ver detalle con fotos, descripción y opciones declaradas por el schema del producto, sin perfiles comerciales hardcodeados.
 **Resultado:** Información del producto visible; botón "Agregar al carrito" activo si hay stock.
 
 ### CU-02: Gestionar carrito
@@ -80,7 +80,7 @@ StoreCore es una plataforma de e-commerce dedicada para emprendedores y PyMEs ar
 
 ### CU-08: Gestionar catálogo
 **Actor:** ADMIN / OPERATOR  
-**Descripción:** CRUD de categorías, productos (con fotos como URLs), variantes (talle/color/precio/stock), estado del producto (DRAFT/ACTIVE/ARCHIVED).  
+**Descripción:** CRUD de categorías, productos, variantes (opciones configurables/precio/stock) y estado (DRAFT/ACTIVE/ARCHIVED). El ADMIN configura ejes Select/Swatch y asignaciones con CAS; OPERATOR conserva las operaciones autorizadas del catálogo legacy.
 **Resultado:** Catálogo disponible en el storefront en tiempo real.
 
 ### CU-09: Gestionar pedidos
@@ -157,6 +157,7 @@ StoreCore es una plataforma de e-commerce dedicada para emprendedores y PyMEs ar
 | RN-11 | El estado de ORDER sigue al estado de SHIPMENT: cuando el staff actualiza el envío a DELIVERED, la ORDER pasa a DELIVERED automáticamente. | Pedidos |
 | RN-12 | No se emiten facturas electrónicas en Fase 1. El onboarding fiscal con el contador del cliente es prerequisito antes del primer deploy. | Compliance |
 | RN-13 | El baseline vigente conserva URLs externas legacy. El upload administrado, staging privado y asociación por variante se rigen por `20261116-catalog-media-upload-and-variant-gallery` y sólo sustituyen URL-only después de implementación, gates y GO; este cambio documental no acredita runtime ni proveedor live. | Catálogo |
+| RN-14 | Las opciones comprables provienen de un schema cerrado por producto. Sólo `Absent` usa el selector legacy; schema desconocido o corrupto bloquea compra. | Catálogo |
 
 ---
 
