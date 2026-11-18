@@ -1,5 +1,31 @@
 # Progreso
 
+## 2026-11-18 — expiración y barrido durable de drafts en validación
+
+- Subcorte de TASK-003 basado en `master@1506027aadab43b860c661017d20f9543da6bbab`,
+  merge de PR #301 cuyo candidato final fue
+  `ad077964f957a421178ea5a0703b8fe0980e0f1b`.
+- El contrato técnico se amplió antes de implementar. Un puerto separado
+  compone expiración OPEN→EXPIRED y registro durable de ORPHAN_GC como fases
+  recuperables; ambas usan reloj PostgreSQL y lotes tipados de 1–100.
+- El barrido conserva drafts, assets y comandos históricos, omite referencias
+  productivas y leases upload vivas, fencea leases vencidas y reutiliza V28.
+  El worker delete existente hace I/O externo y reconcilia puts tardíos.
+- Locks de cleanup: assets UUID → upload → delete, sin adquirir producto ni
+  draft después del asset. Claim upload toma draft antes del asset y consulta
+  el reloj después de obtener el lock para rechazar expiración durante espera.
+- V29 agrega índices parciales de drafts abiertos por expiry y assets candidatos
+  por UUID; V1–V28 permanecen inmutables. No cambia permisos runtime.
+- Compilación main/test completa aprobada; dominio focal `18/18` verde. La
+  ejecución focal PostgreSQL terminó con `0` failures y `3` errores de setup:
+  Docker no está disponible, por lo que no ejecutó los cuerpos de pruebas.
+  Incluye tests escritos de runtime role, dos sweepers, espera draft/asset,
+  attach/cleanup, rollback, reinicio, fencing/put tardío y upgrade V28→V29.
+- Review estática preventiva aprobada sin P0–P3 tras corregir el cutoff del
+  reloj después de todos los locks; no acredita CI ni review sobre SHA congelado.
+- TASK-003 sigue abierta por alta atómica. Sin HTTP, decoder, proveedor live,
+  secretos, deploy ni homologación.
+
 ## 2026-11-16
 
 - Issue #7 y baseline single-tenant auditados.
