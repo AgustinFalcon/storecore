@@ -592,6 +592,7 @@ class MediaCommandPostgresTest {
         fun storedUpload(productId: MediaProductId): MediaUploadRegistration {
             val command = command(targetProductId = productId)
             assertEquals(MediaDraftRegistrationResult.Created, repository.registerDraft(draft(command)))
+            assertTrue(repository.registerUpload(command) is MediaUploadRegistrationResult.Created)
             assertTrue(MediaUploadWorker(repository, objects, SpringExternalMediaIoGuard(), clock).executeRegistered(
                 command, NormalizedMediaBytes.from(bytes)!!, UUID.randomUUID(),
             ) is MediaUploadRun.Stored)
