@@ -24,6 +24,16 @@
   V29→V30; Testcontainers se omitió localmente porque Docker no está disponible.
   MEDIA-CREATE-004 y el gate exact-head permanecen abiertos hasta CI alojado y
   cobertura adicional de races cleanup/delete/settlement y constraint diferida.
+- Candidato funcional `021d2bf36df1f544d671e992b24f6de033316002`:
+  Verify #812, run `44412770320`, terminó 5/5 verde (higiene, backend
+  PostgreSQL/interlock, frontend y ambas matrices E2E reales). Dos revisiones
+  independientes GPT-6.1 Sol medium sobre base `a48ac155` y ese head exacto
+  dieron APPROVE sin P0–P3. Los dictámenes quedan registrados en
+  `sdd/reviews/20261118-sol-pr303-architecture.md` y
+  `sdd/reviews/20261118-sol-pr303-security.md`.
+- Este close-out sólo acredita el subcorte create-only. MEDIA-CREATE-004,
+  TASK-003 y TASK-008 continúan abiertas por sus residuales expresos; no se
+  habilita HTTP media, proveedor live, deploy ni homologación.
 
 ## 2026-11-18 — expiración y barrido durable de drafts en validación
 
