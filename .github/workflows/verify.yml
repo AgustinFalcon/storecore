@@ -41,6 +41,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -50,6 +52,16 @@ jobs:
       - name: Test backend
         working-directory: backend
         run: mvn -B test
+      - name: Install real schema interlock prerequisites
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client unzip
+      - name: Reject the previous real artifact against managed media schema
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          STORECORE_DB_URL: jdbc:postgresql://127.0.0.1:5434/storecore
+          STORECORE_DB_USERNAME: storecore
+          STORECORE_DB_PASSWORD: storecore
+          STORECORE_PSQL_URL: postgresql://storecore:storecore@127.0.0.1:5434/storecore
+        run: bash backend/scripts/test-catalog-media-real-interlock.sh "$BASE_SHA"
 
   frontend:
     needs: repository-hygiene

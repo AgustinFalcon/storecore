@@ -1,8 +1,9 @@
-import { LegacyMediaState, MediaAssetState, MediaAssociationKind, MediaCommandState, MediaFailureCode, MediaFormat, MediaProviderKind, MediaUploadOutcome } from './media-types';
+import { CatalogMediaDraftState, LegacyMediaState, MediaAssetState, MediaAssociationKind, MediaCommandState, MediaFailureCode, MediaFormat, MediaProviderKind, MediaUploadOutcome } from './media-types';
 import { AltText, CatalogMediaDraftId, ContentDigest, ManagedMediaPath, MediaAssetId, PixelDimensions, PublicMediaUrl, UploadId } from './media-values';
 
 describe('catalog media closed domain', () => {
   it('maps exact known states and fails unknown values closed', () => {
+    expect(CatalogMediaDraftState.fromWire('CLAIMED')).toBe(CatalogMediaDraftState.Claimed);
     expect(MediaAssetState.fromWire('ATTACHED')).toBe(MediaAssetState.Attached);
     expect(MediaFormat.fromWire('WEBP')).toBe(MediaFormat.Webp);
     expect(MediaProviderKind.fromWire('TEST_STUB')).toBe(MediaProviderKind.TestStub);
@@ -12,6 +13,7 @@ describe('catalog media closed domain', () => {
     expect(MediaCommandState.fromWire('CLAIMED')).toBe(MediaCommandState.Claimed);
     expect(MediaFailureCode.fromWire('CORRUPT_BYTES')).toBe(MediaFailureCode.CorruptBytes);
     for (const raw of [null, '', 'attached', ' ATTACHED', 'FUTURE', 1]) {
+      expect(CatalogMediaDraftState.fromWire(raw)).toBe(CatalogMediaDraftState.Unknown);
       expect(MediaAssetState.fromWire(raw)).toBe(MediaAssetState.Unknown);
       expect(MediaFormat.fromWire(raw)).toBe(MediaFormat.Unknown);
       expect(MediaProviderKind.fromWire(raw)).toBe(MediaProviderKind.Unknown);

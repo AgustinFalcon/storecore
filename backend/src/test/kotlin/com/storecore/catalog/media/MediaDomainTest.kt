@@ -7,6 +7,7 @@ import java.time.Duration
 
 class MediaDomainTest {
     @Test fun `all finite wire types reject unknown and non canonical values`() {
+        assertEquals(CatalogMediaDraftState.CLAIMED, CatalogMediaDraftState.fromWire("CLAIMED"))
         assertEquals(MediaAssetState.ATTACHED, MediaAssetState.fromWire("ATTACHED"))
         assertEquals(MediaFormat.WEBP, MediaFormat.fromWire("WEBP"))
         assertEquals(MediaProviderKind.TEST_STUB, MediaProviderKind.fromWire("TEST_STUB"))
@@ -16,6 +17,7 @@ class MediaDomainTest {
         assertEquals(MediaCommandState.CLAIMED, MediaCommandState.fromWire("CLAIMED"))
         assertEquals(MediaFailureCode.CORRUPT_BYTES, MediaFailureCode.fromWire("CORRUPT_BYTES"))
         listOf(null, "", "attached", " ATTACHED", "FUTURE").forEach {
+            assertEquals(CatalogMediaDraftState.UNKNOWN, CatalogMediaDraftState.fromWire(it))
             assertEquals(MediaAssetState.UNKNOWN, MediaAssetState.fromWire(it))
             assertEquals(MediaFormat.UNKNOWN, MediaFormat.fromWire(it))
             assertEquals(MediaProviderKind.UNKNOWN, MediaProviderKind.fromWire(it))

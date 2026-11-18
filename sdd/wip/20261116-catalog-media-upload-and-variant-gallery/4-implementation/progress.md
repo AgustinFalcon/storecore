@@ -38,3 +38,28 @@
   corregido sin P0–P3 abiertos.
 - No se agregó migración, endpoint, secreto, dependencia de decoder ni adapter
   Cloudinary. El gate externo continúa cerrado.
+
+## 2026-11-18 — corte de persistencia V27 en validación
+
+- Rama `feat/catalog-media-schema-20261118` basada en el merge de PR #298
+  (`b95913ce19e2ebbe344a1012a309284debb02a5c`).
+- TASK-002 está `in_progress`: se agregó V27 forward-only sin modificar V1–V26,
+  con drafts/assets/comandos, ownership compuesto, identidad inmutable,
+  outcome terminal cerrado, leases/fencing, revisión positiva y asociaciones
+  producto/variante.
+- El upgrade legacy preserva todas las filas legales, normaliza empates por
+  `(sort_order,id)`, conserva portada existente o elige la primera, mantiene
+  galerías de más de veinte elementos y backfillea alt desde el nombre.
+- Portadas de producto y variante se validan al commit y serializan por el padre
+  autoritativo para cerrar write-skew; las pruebas incluyen dos conexiones y
+  operaciones reales bajo `SET ROLE storecore_runtime`.
+- El marcador catálogo avanza de 2 a 3. El gate CI construye el artefacto real
+  del SHA base, migra PostgreSQL 16, persiste media `MANAGED`, exige rechazo 78
+  antes del JVM y comprueba que la galería no cambió.
+- Evidencia local disponible: compilación backend y test-compile aprobados;
+  dominio media `3/3`; frontend arquitectura/smoke/lint, `225` archivos y
+  `1613` tests, y build productivo aprobados. Docker local continúa ausente, por
+  lo que clean/upgrade/concurrencia/interlock real quedan pendientes de CI.
+- Reviews preliminares GPT-6.1 Sol detectaron outcome nullable, write-skew,
+  ausencia de `SET ROLE` y evidencia sintética; los cuatro puntos fueron
+  corregidos. El dictamen final y TASK-002 `done` requieren SHA congelado y CI.

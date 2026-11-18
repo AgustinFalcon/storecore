@@ -14,24 +14,32 @@ class CatalogSchemaInterlockTest {
 
     @Test fun `matching artifact and database marker launches the declared jar`() {
         linuxOnly()
-        val jar = artifact("current.jar", "2\n")
-        val result = run(jar, databaseVersion = "2", extraArguments = listOf("--server.port=0"))
+        val jar = artifact("current.jar", "3\n")
+        val result = run(jar, databaseVersion = "3", extraArguments = listOf("--server.port=0"))
         assertEquals(0, result.exitCode, result.output)
         assertEquals("-jar|$jar|--server.port=0", Files.readString(temporary.resolve("java.log")).trim())
     }
 
     @Test fun `previous artifact without declaration is denied before database and java`() {
         linuxOnly()
-        val result = run(artifact("previous.jar", null), databaseVersion = "2")
+        val result = run(artifact("previous.jar", null), databaseVersion = "3")
         assertEquals(78, result.exitCode)
         assertTrue(result.output.contains("artifact has no catalog compatibility declaration"))
         assertFalse(Files.exists(temporary.resolve("psql.log")))
         assertFalse(Files.exists(temporary.resolve("java.log")))
     }
 
+    @Test fun `previous declared artifact is denied before java against managed media schema`() {
+        linuxOnly()
+        val result = run(artifact("previous-declared.jar", "2\n"), databaseVersion = "3")
+        assertEquals(78, result.exitCode)
+        assertTrue(result.output.contains("artifact/database compatibility mismatch"))
+        assertFalse(Files.exists(temporary.resolve("java.log")))
+    }
+
     @Test fun `offline migration invokes only the dedicated runner before admission`() {
         linuxOnly()
-        val jar = artifact("current.jar", "2\n")
+        val jar = artifact("current.jar", "3\n")
         val result = migrate(jar)
         assertEquals(0, result.exitCode, result.output)
         assertEquals(
@@ -42,7 +50,7 @@ class CatalogSchemaInterlockTest {
 
     @Test fun `offline migration rejects JVM options that can replace its main class`() {
         linuxOnly()
-        val jar = artifact("current.jar", "2\n")
+        val jar = artifact("current.jar", "3\n")
         for (name in listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) {
             Files.deleteIfExists(temporary.resolve("java.log"))
             val result = migrate(jar, mapOf(name to "-Dloader.main=com.storecore.StoreCoreApplicationKt"))
@@ -53,8 +61,8 @@ class CatalogSchemaInterlockTest {
 
     @Test fun `mismatch missing corrupt or unreachable database marker never launches java`() {
         linuxOnly()
-        val jar = artifact("current.jar", "2\n")
-        for ((databaseVersion, psqlExit) in listOf("1" to 0, "" to 0, "future" to 0, "2" to 9)) {
+        val jar = artifact("current.jar", "3\n")
+        for ((databaseVersion, psqlExit) in listOf("1" to 0, "2" to 0, "" to 0, "future" to 0, "3" to 9)) {
             Files.deleteIfExists(temporary.resolve("java.log"))
             val result = run(jar, databaseVersion, psqlExit = psqlExit)
             assertEquals(78, result.exitCode, "$databaseVersion/$psqlExit: ${result.output}")
@@ -64,16 +72,16 @@ class CatalogSchemaInterlockTest {
 
     @Test fun `invalid artifact declaration and jdbc url fail closed`() {
         linuxOnly()
-        val corrupt = run(artifact("corrupt.jar", "future\n"), databaseVersion = "2")
+        val corrupt = run(artifact("corrupt.jar", "future\n"), databaseVersion = "3")
         assertEquals(78, corrupt.exitCode)
-        val invalidUrl = run(artifact("current.jar", "2\n"), databaseVersion = "2", databaseUrl = "http://database")
+        val invalidUrl = run(artifact("current.jar", "3\n"), databaseVersion = "3", databaseUrl = "http://database")
         assertEquals(78, invalidUrl.exitCode)
         assertFalse(Files.exists(temporary.resolve("java.log")))
     }
 
     @Test fun `runtime datasource and configuration overrides fail before database and java`() {
         linuxOnly()
-        val jar = artifact("current.jar", "2\n")
+        val jar = artifact("current.jar", "3\n")
         val arguments = listOf(
             "--spring.datasource.url=jdbc:postgresql://other/storecore",
             "--spring.datasource.hikari.jdbc-url=jdbc:postgresql://other/storecore",
@@ -84,7 +92,7 @@ class CatalogSchemaInterlockTest {
         for (argument in arguments) {
             Files.deleteIfExists(temporary.resolve("psql.log"))
             Files.deleteIfExists(temporary.resolve("java.log"))
-            val result = run(jar, databaseVersion = "2", extraArguments = listOf(argument))
+            val result = run(jar, databaseVersion = "3", extraArguments = listOf(argument))
             assertEquals(78, result.exitCode, argument)
             assertFalse(Files.exists(temporary.resolve("psql.log")), argument)
             assertFalse(Files.exists(temporary.resolve("java.log")), argument)
@@ -101,7 +109,7 @@ class CatalogSchemaInterlockTest {
         )) {
             Files.deleteIfExists(temporary.resolve("psql.log"))
             Files.deleteIfExists(temporary.resolve("java.log"))
-            val result = run(jar, databaseVersion = "2", extraEnvironment = mapOf(name to "unsafe"))
+            val result = run(jar, databaseVersion = "3", extraEnvironment = mapOf(name to "unsafe"))
             assertEquals(78, result.exitCode, name)
             assertFalse(Files.exists(temporary.resolve("psql.log")), name)
             assertFalse(Files.exists(temporary.resolve("java.log")), name)
