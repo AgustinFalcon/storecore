@@ -43,7 +43,7 @@ psql_url=${STORECORE_PSQL_URL:-postgresql://storecore:storecore@127.0.0.1:5434/s
 sh backend/scripts/migrate-catalog-schema.sh "$current_jar"
 psql "$psql_url" -X -v ON_ERROR_STOP=1 <<'SQL'
 INSERT INTO users(email,password_hash,first_name,last_name)
-VALUES ('media-interlock@example.test','$2a$10$01234567890123456789012345678901234567890123456789012','Media','Interlock');
+VALUES ('media-interlock@example.test','$argon2id$fixture','Media','Interlock');
 INSERT INTO products(name,slug,base_price,status) VALUES ('Media interlock','media-interlock',100,'ACTIVE');
 INSERT INTO catalog_media_drafts(id,owner_user_id,target_product_id,expires_at)
 VALUES ('10000000-0000-4000-8000-000000000001',1,1,clock_timestamp()+interval '1 hour');
