@@ -7,10 +7,10 @@
     "secret manager and credential rotation",
     "non-production provider evidence and security GO"
   ],
-  "stats": { "total": 15, "done": 0, "by_layer": { "1": 12, "2": 0, "3": 3 } },
+  "stats": { "total": 15, "done": 2, "by_layer": { "1": 12, "2": 0, "3": 3 } },
   "tasks": [
     {
-      "id": "TASK-001", "title": "Model closed media domain", "status": "pending", "layer": 1, "complexity": "High", "depends_on": [],
+      "id": "TASK-001", "title": "Model closed media domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
       "description": "Implement closed states, value objects and independent flow steps with one wire translator per boundary.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "frontend/src/app/domain/catalog"],
       "acceptance_criteria": ["AC-1: Unknown values fail closed in Kotlin and Angular", "AC-2: Flow steps have one responsibility", "GATE: domain tests pass"],
@@ -31,7 +31,7 @@
       "references": ["Technical: Upload y consistencia externa"], "design_decisions": ["DD-durable-command", "DD-scope-authority"]
     },
     {
-      "id": "TASK-004", "title": "Build private object-store port", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-001"],
+      "id": "TASK-004", "title": "Build private object-store port", "status": "done", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-001"],
       "description": "Implement put-if-absent, head, signed private read and digest-guarded delete plus an isolated deterministic test adapter.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: Test adapter never serves unauthorised bytes", "AC-2: Outcomes are closed and idempotent", "GATE: contract tests pass without external network"],
