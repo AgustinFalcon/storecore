@@ -4,6 +4,11 @@ interface MediaWireType {
     val wire: String
 }
 
+enum class CatalogMediaDraftState(override val wire: String) : MediaWireType {
+    OPEN("OPEN"), CLAIMED("CLAIMED"), EXPIRED("EXPIRED"), ABANDONED("ABANDONED"), UNKNOWN("UNKNOWN");
+    companion object { fun fromWire(raw: String?): CatalogMediaDraftState = entries.firstOrNull { it.wire == raw && it != UNKNOWN } ?: UNKNOWN }
+}
+
 enum class MediaAssetState(override val wire: String) : MediaWireType {
     AWAITING_BYTES("AWAITING_BYTES"), STORED_PRIVATE("STORED_PRIVATE"), ATTACHED("ATTACHED"),
     DELETE_PENDING("DELETE_PENDING"), DELETED("DELETED"), FAILED("FAILED"), UNKNOWN("UNKNOWN");

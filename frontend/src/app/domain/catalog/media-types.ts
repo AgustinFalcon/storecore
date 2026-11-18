@@ -2,6 +2,17 @@ function exact<T>(raw: unknown, values: readonly T[], wire: (value: T) => string
   return typeof raw === 'string' ? values.find(value => wire(value) === raw) : undefined;
 }
 
+export class CatalogMediaDraftState {
+  private constructor(readonly wire: string, readonly editable: boolean, readonly known = true) {}
+  static readonly Open = new CatalogMediaDraftState('OPEN', true);
+  static readonly Claimed = new CatalogMediaDraftState('CLAIMED', false);
+  static readonly Expired = new CatalogMediaDraftState('EXPIRED', false);
+  static readonly Abandoned = new CatalogMediaDraftState('ABANDONED', false);
+  static readonly Unknown = new CatalogMediaDraftState('UNKNOWN', false, false);
+  static readonly values = [this.Open, this.Claimed, this.Expired, this.Abandoned] as const;
+  static fromWire(raw: unknown): CatalogMediaDraftState { return exact(raw, this.values, value => value.wire) ?? this.Unknown; }
+}
+
 export class MediaAssetState {
   private constructor(readonly wire: string, readonly label: string, readonly known = true) {}
   static readonly AwaitingBytes = new MediaAssetState('AWAITING_BYTES', 'Esperando archivo');

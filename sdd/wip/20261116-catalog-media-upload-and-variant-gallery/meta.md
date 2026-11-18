@@ -3,8 +3,8 @@
 - Estado: `implementation_in_progress`
 - Fecha: 2026-11-16
 - Issue: #7
-- Base: `master@3284aa68f4b6cd354a02046915c92326c2421c7e`
-- Rama: `feat/catalog-media-domain-storage-20261118`
+- Base: `master@b95913ce19e2ebbe344a1012a309284debb02a5c`
+- Rama: `feat/catalog-media-schema-20261118`
 - Perfil: técnico
 - Relación: reemplaza únicamente el diseño media del antiguo WIP multi-tenant;
   no reabre tenancy ni agrega `store_id`.
@@ -22,5 +22,6 @@ Las especificaciones y las 15 tareas están aprobadas: existe GO local para el
 adapter determinista y la implementación en PR separado. No existe GO live para
 Cloudinary, credenciales, deploy ni homologación externa hasta cerrar su gate.
 
-El primer corte implementa únicamente TASK-001 y TASK-004. No activa DDL, HTTP,
-Cloudinary ni configuración productiva.
+El primer corte TASK-001/TASK-004 quedó integrado por PR #298. El segundo corte
+implementa TASK-002 y activa exclusivamente persistencia/compatibilidad V27;
+no activa HTTP, decoder, Cloudinary ni configuración productiva.

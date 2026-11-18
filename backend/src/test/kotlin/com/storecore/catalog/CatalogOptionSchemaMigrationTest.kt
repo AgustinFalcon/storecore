@@ -38,7 +38,7 @@ class CatalogOptionSchemaMigrationTest {
 
     @Test fun `clean install creates compatibility marker and leaves legacy products absent without vectors`() {
         val sql = jdbc()
-        assertEquals(2, sql.queryForObject("SELECT version FROM catalog_schema_compatibility_version WHERE singleton", Int::class.java))
+        assertEquals(3, sql.queryForObject("SELECT version FROM catalog_schema_compatibility_version WHERE singleton", Int::class.java))
         val product = product(sql)
         repeat(3) { variant(sql, product, active = it != 2) }
         assertFalse(sql.queryForObject("SELECT has_option_schema FROM products WHERE id=?", Boolean::class.java, product)!!)
@@ -102,7 +102,7 @@ class CatalogOptionSchemaMigrationTest {
                 statement.execute("SET ROLE storecore_runtime")
                 assertTrue(
                     statement.executeQuery(
-                        "SELECT version=2 FROM catalog_schema_compatibility_version WHERE singleton",
+                        "SELECT version=3 FROM catalog_schema_compatibility_version WHERE singleton",
                     ).use { result -> result.next() && result.getBoolean(1) },
                 )
                 runtimeTables.forEach { table ->
@@ -209,7 +209,7 @@ class CatalogOptionSchemaMigrationTest {
         val beforeVariants = variantDigest(sql, product)
         val beforeBalances = sql.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id")
         val history = sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("26", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("27", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history WHERE version::int<=23 ORDER BY installed_rank"))
         val afterProduct = sql.queryForMap("SELECT * FROM products WHERE id=?", product)
         beforeProduct.forEach { (column, value) -> assertEquals(value, afterProduct[column], column) }
@@ -233,8 +233,8 @@ class CatalogOptionSchemaMigrationTest {
 
         val result = CatalogSchemaMigrationRunner.migrate(url, postgres.username, postgres.password)
 
-        assertEquals("26", result.targetSchemaVersion.toString())
-        assertEquals(2, jdbc(url).queryForObject(
+        assertEquals("27", result.targetSchemaVersion.toString())
+        assertEquals(3, jdbc(url).queryForObject(
             "SELECT version FROM catalog_schema_compatibility_version WHERE singleton",
             Int::class.java,
         ))
