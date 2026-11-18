@@ -2,8 +2,9 @@
 
 ## 2026-11-18 — expiración y barrido durable de drafts en validación
 
-- Subcorte de TASK-003 basado en PR #301, SHA
-  `9878f15403f8d5e9d353a8cc7bead9974bd83e3d`.
+- Subcorte de TASK-003 basado en `master@1506027aadab43b860c661017d20f9543da6bbab`,
+  merge de PR #301 cuyo candidato final fue
+  `ad077964f957a421178ea5a0703b8fe0980e0f1b`.
 - El contrato técnico se amplió antes de implementar. Un puerto separado
   compone expiración OPEN→EXPIRED y registro durable de ORPHAN_GC como fases
   recuperables; ambas usan reloj PostgreSQL y lotes tipados de 1–100.

@@ -3,7 +3,8 @@
 - Estado: `implementation_in_progress`
 - Fecha: 2026-11-16
 - Issue: #7
-- Base: PR #301 `9878f15403f8d5e9d353a8cc7bead9974bd83e3d`
+- Base: `master@1506027aadab43b860c661017d20f9543da6bbab`
+  (merge PR #301; candidato final `ad077964f957a421178ea5a0703b8fe0980e0f1b`)
 - Rama: `feat/catalog-media-draft-cleanup-20261118`
 - Perfil: técnico
 - Relación: reemplaza únicamente el diseño media del antiguo WIP multi-tenant;
