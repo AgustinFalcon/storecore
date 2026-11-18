@@ -3,6 +3,7 @@ package com.storecore.catalog.domain.media
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
 import java.time.Duration
 import java.util.UUID
 
@@ -22,6 +23,42 @@ private val ENCODED_DANGEROUS_OCTET = Regex("%(0[0-9a-f]|1[0-9a-f]|7f|2f|5c)", R
 }
 @JvmInline value class ContentDigest private constructor(val value: String) {
     companion object { fun fromWire(raw: String?): ContentDigest? = raw?.takeIf(SHA256::matches)?.let(::ContentDigest) }
+}
+@JvmInline value class MediaRequestHash private constructor(val value: String) {
+    companion object {
+        fun fromWire(raw: String?): MediaRequestHash? = raw?.takeIf(SHA256::matches)?.let(::MediaRequestHash)
+
+        fun forUpload(
+            draftId: CatalogMediaDraftId,
+            ownerId: MediaOwnerId,
+            targetProductId: MediaProductId?,
+            uploadId: UploadId,
+            originalDigest: ContentDigest,
+            normalizedDigest: ContentDigest,
+            format: MediaFormat,
+            dimensions: PixelDimensions,
+            normalizedSize: MediaByteSize,
+        ): MediaRequestHash {
+            require(format != MediaFormat.UNKNOWN)
+            val canonical = listOf(
+                "media-upload-v1", draftId.value, ownerId.value, targetProductId?.value ?: "-", uploadId.value,
+                originalDigest.value, normalizedDigest.value, format.wire, dimensions.width, dimensions.height,
+                normalizedSize.value,
+            ).joinToString("\u001f")
+            val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(StandardCharsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            return MediaRequestHash(digest)
+        }
+    }
+}
+@JvmInline value class MediaOwnerId private constructor(val value: Long) {
+    companion object { fun fromWire(raw: Any?): MediaOwnerId? = (raw as? Number)?.toLong()?.takeIf { it > 0 }?.let(::MediaOwnerId) }
+}
+@JvmInline value class MediaProductId private constructor(val value: Long) {
+    companion object { fun fromWire(raw: Any?): MediaProductId? = (raw as? Number)?.toLong()?.takeIf { it > 0 }?.let(::MediaProductId) }
+}
+@JvmInline value class MediaByteSize private constructor(val value: Long) {
+    companion object { fun fromWire(raw: Any?): MediaByteSize? = (raw as? Number)?.toLong()?.takeIf { it > 0 }?.let(::MediaByteSize) }
 }
 @JvmInline value class ProviderObjectKey private constructor(val value: String) {
     companion object { fun fromWire(raw: String?): ProviderObjectKey? = raw?.takeIf { SAFE_KEY.matches(it) && "//" !in it && !it.endsWith('/') }?.let(::ProviderObjectKey) }

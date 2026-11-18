@@ -7,7 +7,7 @@
     "secret manager and credential rotation",
     "non-production provider evidence and security GO"
   ],
-  "stats": { "total": 15, "done": 2, "by_layer": { "1": 12, "2": 0, "3": 3 } },
+  "stats": { "total": 15, "done": 3, "by_layer": { "1": 12, "2": 0, "3": 3 } },
   "tasks": [
     {
       "id": "TASK-001", "title": "Model closed media domain", "status": "done", "layer": 1, "complexity": "High", "depends_on": [],
@@ -17,14 +17,14 @@
       "references": ["Functional: Estados visibles cerrados", "Technical: Dominio cerrado"], "design_decisions": ["DD-closed-domain", "DD-step-objects"]
     },
     {
-      "id": "TASK-002", "title": "Migrate media persistence safely", "status": "in_progress", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
+      "id": "TASK-002", "title": "Migrate media persistence safely", "status": "done", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
       "description": "Add the forward-only media migration at the next free Flyway version (V27 on approved base 41948a6; recalculate against master without reusing a published version), including drafts, assets, commands and variant associations while migrating every legal V1 image deterministically.",
       "files": ["backend/src/main/resources/db/migration", "backend/src/test"],
       "acceptance_criteria": ["AC-1: Clean and upgrade PostgreSQL 16 paths pass", "AC-2: Legacy ties, missing primary, 200-char names and galleries over 20 are preserved", "AC-3: external interlock denies the previous artifact before traffic against migrated managed media", "GATE: migration and compatibility tests pass"],
       "references": ["Technical: Persistencia"], "design_decisions": ["DD-source-kind", "DD-managed-path"]
     },
     {
-      "id": "TASK-003", "title": "Implement durable media commands", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
+      "id": "TASK-003", "title": "Implement durable media commands", "status": "in_progress", "layer": 1, "complexity": "High", "depends_on": ["TASK-002"],
       "description": "Implement draft ownership, replay hashes, CAS, leases, fencing, attach/delete/GC locks and recovery workers.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "backend/src/test"],
       "acceptance_criteria": ["AC-1: Crash points replay without duplicate object or row", "AC-2: Cross actor/draft/product access is denied", "GATE: PostgreSQL concurrency tests pass"],
