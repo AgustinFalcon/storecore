@@ -18,7 +18,7 @@
     },
     {
       "id": "TASK-002", "title": "Migrate media persistence safely", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-001"],
-      "description": "Add V24 drafts, assets, commands and variant associations while migrating every legal V1 image deterministically.",
+      "description": "Add the forward-only media migration at the next free Flyway version (V27 on approved base 41948a6; recalculate against master without reusing a published version), including drafts, assets, commands and variant associations while migrating every legal V1 image deterministically.",
       "files": ["backend/src/main/resources/db/migration", "backend/src/test"],
       "acceptance_criteria": ["AC-1: Clean and upgrade PostgreSQL 16 paths pass", "AC-2: Legacy ties, missing primary, 200-char names and galleries over 20 are preserved", "AC-3: external interlock denies the previous artifact before traffic against migrated managed media", "GATE: migration and compatibility tests pass"],
       "references": ["Technical: Persistencia"], "design_decisions": ["DD-source-kind", "DD-managed-path"]
@@ -83,7 +83,7 @@
       "id": "TASK-011", "title": "Render deterministic storefront galleries", "status": "pending", "layer": 1, "complexity": "Medium", "depends_on": ["TASK-008", "TASK-009"],
       "description": "Integrate PDP variant gallery and safe product-card media without changing price, quantity, stock or purchase intent.",
       "files": ["frontend/src/app/features/storefront", "frontend/src/app/shared"],
-      "acceptance_criteria": ["AC-1: Route SKU and restored intent select the matching gallery", "AC-2: Failed images fall back once then show accessible placeholder", "GATE: storefront tests pass at 390/768/1440"],
+      "acceptance_criteria": ["AC-1: Only an OptionSelectionEngine-resolved variant selects variant media; Incomplete, Unknown and multivariant Absent preserve the general gallery without inventing SKU or variant", "AC-2: Failed images fall back once then show accessible placeholder", "AC-3: Restored intent and single-variant Absent follow the authoritative option-selection result without changing price, stock or purchase intent", "GATE: storefront tests pass at 390/768/1440"],
       "references": ["Functional: Experiencia storefront"], "design_decisions": ["DD-variant-media-selection"]
     },
     {

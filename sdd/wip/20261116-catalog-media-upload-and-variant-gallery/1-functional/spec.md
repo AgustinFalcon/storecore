@@ -68,9 +68,13 @@ traducen a `Unknown` y fallan cerrados; nunca se imprimen como estados válidos.
 
 ### Experiencia storefront
 
-- Sin variante elegida, PDP usa la misma selección autoritativa que precio,
-  stock e intención: SKU de ruta cuando corresponda o primera variante activa.
-  La imagen no crea una segunda selección.
+- PDP consume la misma selección autoritativa y tipada que precio, stock e
+  intención. Sólo usa media de variante cuando el option schema resuelve una
+  variante: un SKU de ruta no se interpreta por separado en la galería.
+  `Incomplete`, `Unknown` y `Absent` con múltiples variantes mantienen la
+  galería general sin autocompletar prefijos ni elegir la primera variante.
+  `Absent` con exactamente una variante conserva la autoelección ya definida
+  por el motor autoritativo. La imagen nunca crea una segunda selección.
 - Al elegir/restaurar una variante con media propia, PDP reemplaza la galería
   por su conjunto exclusivo; portada es la marcada, no la primera por accidente.
   Cambiar galería no altera cantidad, precio ni intención.
@@ -147,6 +151,10 @@ strings wire.
   crear un asset listo.
 - PDP muestra la galería por `sortOrder`, cambia a media de variante y aplica el
   fallback general definido.
+- Selecciones `Incomplete`, `Unknown` y `Absent` multivariante no inventan un
+  SKU ni una variante: mantienen galería general, precio, stock e intención
+  coherentes con el option schema; sólo `Absent` univariante puede autoelegirse
+  mediante el motor autoritativo.
 - Portada y órdenes son deterministas; índices duplicados, asset ajeno, estado
   no listo o dos portadas se rechazan atómicamente.
 - Conflicto concurrente no pierde la composición más nueva ni el borrador local.

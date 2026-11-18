@@ -48,7 +48,10 @@ El recorrido los ordena; agregar otro proveedor no reescribe los pasos.
 
 ## Persistencia
 
-Migración propuesta `V24__catalog_media_assets.sql`:
+Migración propuesta `V27__catalog_media_assets.sql` sobre la base aprobada en
+`41948a6`, donde V24–V26 pertenecen al option schema. Antes de implementar se
+vuelve a calcular el próximo número libre contra `master`; nunca se reutiliza,
+renombra ni modifica una migración publicada:
 
 - `catalog_media_drafts`: id UUID, owner_user_id, target_product_id nullable,
   estado, revisión positiva, created_at y expires_at. Un draft de alta se reclama
@@ -239,7 +242,11 @@ Un componente `MediaGalleryEditor` reusable muestra dropzone accesible, progreso
 en live region discreta, errores asociados al archivo, reintento y foco restaurado,
 reordenamiento por teclado/botones además de drag, portada, alt text y
 asociación por variante. La PDP consume `VariantMediaSelection`, un objeto que
-decide galería específica o fallback general sin switches de strings.
+recibe el resultado cerrado del `OptionSelectionEngine` y decide galería
+específica o fallback general sin switches de strings. No vuelve a interpretar
+el SKU de ruta ni completa una selección parcial: `Incomplete`, `Unknown` y
+`Absent` multivariante producen galería general; `Absent` univariante sólo
+puede usar la variante resuelta por ese motor autoritativo.
 
 El adapter público versiona el DTO para `productImageId`, portada, orden y alt.
 Todos los consumidores actuales (`JdbcCatalogProjectionReader`, listado/home,
