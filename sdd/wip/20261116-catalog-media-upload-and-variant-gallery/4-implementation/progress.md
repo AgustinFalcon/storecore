@@ -12,6 +12,19 @@
 - Worker, decoder, corpus adversarial completo, multipart, HTTP, persistencia,
   proveedor live y homologación permanecen fuera. TASK-005 continúa abierta
   hasta MEDIA-NORMALIZE-003..004 y los gates exact-head del subcorte completo.
+- El candidato `ad6b5bf7cb0ad9234a65bd58f9d0f2b2002aa623` pasó Verify
+  #821, run `44439086194`, con 5/5 jobs: higiene, backend
+  PostgreSQL/interlock, frontend y ambas matrices E2E reales. La evidencia
+  focal local fue `14/14` y `test-compile` verde.
+- Cuatro rondas preventivas corrigieron límites de geometría/salida, factories
+  con `copy`, framing PNG, flags/orden WebP, markers JPEG y fuerza de sus
+  regresiones. Las revisiones exact-head de arquitectura/producto y seguridad
+  aprobaron sin P0–P3; quedan registradas en
+  `sdd/reviews/20261118-sol-pr305-architecture.md` y
+  `sdd/reviews/20261118-sol-pr305-security.md`.
+- MEDIA-NORMALIZE-001 y MEDIA-NORMALIZE-002 quedan cerradas. El commit
+  documental de cierre debe repetir CI y revisiones exact-head antes del merge;
+  MEDIA-NORMALIZE-003/004 y TASK-005 continúan abiertos.
 
 ## 2026-11-18 — cierre de carreras de alta atómica en validación
 

@@ -20,11 +20,9 @@
 
 ### Subcorte aprobado — normalización segura
 
-- [ ] MEDIA-NORMALIZE-001 ADR, límites tipados, estados/resultados cerrados y
-  puerto de aplicación fail-closed (implementado localmente; pendiente de los
-  gates exact-head del subcorte).
-- [ ] MEDIA-NORMALIZE-002 Parser estructural JPEG/PNG/WebP y corpus de framing
-  (implementado localmente; pendiente de los gates exact-head del subcorte).
+- [x] MEDIA-NORMALIZE-001 ADR, límites tipados, estados/resultados cerrados y
+  puerto de aplicación fail-closed.
+- [x] MEDIA-NORMALIZE-002 Parser estructural JPEG/PNG/WebP y corpus de framing.
 - [ ] MEDIA-NORMALIZE-003 Helper JVM aislado, normalización determinista y
   límites efectivos de proceso/temporales.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.
