@@ -1,5 +1,31 @@
 # Progreso
 
+## 2026-11-18 — contrato de normalización segura en implementación
+
+- `MEDIA-NORMALIZE-001` fija mediante ADR un helper JVM aislado y perfil
+  versionado, sin agregar todavía librerías ni binarios.
+- Se agregan límites numéricos inmutables, perfiles/rechazos cerrados, decisión
+  de dimensiones fail-closed y un puerto de normalización con artefacto opaco.
+- `MEDIA-NORMALIZE-002` agrega un parser estructural puro y acotado para
+  JPEG/PNG/WebP con EOF exacto, animación, límites de segmentos/metadata y
+  dimensiones tipadas. Permanece en validación hasta completar sus gates.
+- Worker, decoder, corpus adversarial completo, multipart, HTTP, persistencia,
+  proveedor live y homologación permanecen fuera. TASK-005 continúa abierta
+  hasta MEDIA-NORMALIZE-003..004 y los gates exact-head del subcorte completo.
+- El candidato `ad6b5bf7cb0ad9234a65bd58f9d0f2b2002aa623` pasó Verify
+  #821, run `44439086194`, con 5/5 jobs: higiene, backend
+  PostgreSQL/interlock, frontend y ambas matrices E2E reales. La evidencia
+  focal local fue `14/14` y `test-compile` verde.
+- Cuatro rondas preventivas corrigieron límites de geometría/salida, factories
+  con `copy`, framing PNG, flags/orden WebP, markers JPEG y fuerza de sus
+  regresiones. Las revisiones exact-head de arquitectura/producto y seguridad
+  aprobaron sin P0–P3; quedan registradas en
+  `sdd/reviews/20261118-sol-pr305-architecture.md` y
+  `sdd/reviews/20261118-sol-pr305-security.md`.
+- MEDIA-NORMALIZE-001 y MEDIA-NORMALIZE-002 quedan cerradas. El commit
+  documental de cierre debe repetir CI y revisiones exact-head antes del merge;
+  MEDIA-NORMALIZE-003/004 y TASK-005 continúan abiertos.
+
 ## 2026-11-18 — cierre de carreras de alta atómica en validación
 
 - Subcorte `MEDIA-CREATE-004` basado en `master@311098a9615643898de606a6f13412ebb1873f22`,

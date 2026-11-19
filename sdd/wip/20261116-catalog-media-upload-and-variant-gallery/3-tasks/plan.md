@@ -18,6 +18,18 @@
 - [ ] TASK-007 API drafts/uploads/recovery/preview/delete/composition/delivery.
 - [ ] TASK-008 Compatibilidad de catálogo, alta atómica y lectores existentes.
 
+### Subcorte aprobado — normalización segura
+
+- [x] MEDIA-NORMALIZE-001 ADR, límites tipados, estados/resultados cerrados y
+  puerto de aplicación fail-closed.
+- [x] MEDIA-NORMALIZE-002 Parser estructural JPEG/PNG/WebP y corpus de framing.
+- [ ] MEDIA-NORMALIZE-003 Helper JVM aislado, normalización determinista y
+  límites efectivos de proceso/temporales.
+- [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.
+
+TASK-005 sólo se cierra cuando los cuatro subcortes queden aprobados. Ninguno
+habilita HTTP, proveedor live, secretos, deploy u homologación.
+
 ### Subcorte aprobado — alta atómica local
 
 - [x] MEDIA-CREATE-001 Definir comando create-only, referencias de variante de
