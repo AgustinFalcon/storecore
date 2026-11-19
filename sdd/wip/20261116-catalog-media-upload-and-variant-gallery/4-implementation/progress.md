@@ -25,6 +25,14 @@
   observadas en `pg_stat_activity` y causa PostgreSQL `P0001` con mensaje
   exclusivo. La segunda pasada quedó APPROVED sin P0–P3; no sustituye los
   gates exact-head posteriores al CI.
+- Verify #817 ejecutó el primer candidato completo: 5/5 jobs verdes y 583
+  pruebas backend, incluido PostgreSQL 16 e interlock. La primera revisión
+  exact-head posterior rechazó un P2 probatorio: el caso cleanup aún podía
+  recorrer sólo órdenes seriales. Se reemplazó por un interlock determinista:
+  creación retiene draft y espera asset, cleanup demuestra `SKIP LOCKED=0`,
+  luego creación revierte y la reconciliación exige `1/1`. Este cambio invalida
+  el SHA/review previo; CI y ambas revisiones deben repetirse sobre el nuevo
+  candidato antes del cierre.
 
 ## 2026-11-18 — alta atómica local en implementación
 

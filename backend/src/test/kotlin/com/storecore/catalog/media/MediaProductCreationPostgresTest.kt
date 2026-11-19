@@ -136,41 +136,43 @@ class MediaProductCreationPostgresTest {
     @Test fun `expiry cleanup racing creation leaves one closed draft and no partial aggregate`() {
         fixture().use { f ->
             val command = f.command("cleanup-race", 2)
+            val assetId = command.productImages.single().assetId
             f.jdbc.update(
                 "UPDATE catalog_media_drafts SET expires_at=created_at+interval '10 milliseconds' WHERE id=?",
                 command.draftId.value,
             )
             Thread.sleep(50)
-            val pool = Executors.newFixedThreadPool(2)
-            val start = CountDownLatch(1)
-            try {
-                val creation = pool.submit<MediaProductCreationResult> {
-                    start.await()
-                    f.repositoryHandle().use { it.repository.create(command) }
+            DriverManager.getConnection(f.url, postgres.username, postgres.password).use { blocker ->
+                blocker.autoCommit = false
+                blocker.prepareStatement("SELECT id FROM media_assets WHERE id=? FOR UPDATE").use {
+                    it.setObject(1, assetId.value); it.executeQuery().close()
                 }
-                val cleanup = pool.submit<Pair<Int, Int>> {
-                    start.await()
-                    f.cleanupRepositoryHandle().use {
+                val pool = Executors.newSingleThreadExecutor()
+                try {
+                    val creation = pool.submit<MediaProductCreationResult> {
+                        f.repositoryHandle().use { it.repository.create(command) }
+                    }
+                    f.awaitBlocked("media_assets")
+                    val skipped = f.cleanupRepositoryHandle().use {
                         val batch = MediaCleanupBatchSize.fromWire(10)!!
                         it.repository.expireDrafts(batch) to it.repository.enqueueOrphanDeletes(batch)
                     }
-                }
-                start.countDown()
-                assertEquals(MediaProductCreationResult.DraftClosed, creation.get(15, TimeUnit.SECONDS))
-                val firstPass = cleanup.get(15, TimeUnit.SECONDS)
-                val reconciled = f.cleanupRepositoryHandle().use {
-                    val batch = MediaCleanupBatchSize.fromWire(10)!!
-                    it.repository.expireDrafts(batch) to it.repository.enqueueOrphanDeletes(batch)
-                }
-                assertEquals(1, firstPass.first + reconciled.first)
-                assertEquals(1, firstPass.second + reconciled.second)
-                assertEquals(0, f.count("products")); assertEquals(0, f.count("product_variants"))
-                assertEquals(0, f.count("inventory_balances")); assertEquals(0, f.count("inventory_ledger"))
-                assertEquals(0, f.count("catalog_media_product_creation_commands"))
-                assertEquals("EXPIRED", f.jdbc.queryForObject("SELECT state FROM catalog_media_drafts", String::class.java))
-                assertEquals("DELETE_PENDING", f.jdbc.queryForObject("SELECT state FROM media_assets", String::class.java))
-                assertEquals(1, f.count("media_delete_commands"))
-            } finally { pool.shutdownNow() }
+                    assertEquals(0 to 0, skipped)
+                    blocker.commit()
+                    assertEquals(MediaProductCreationResult.DraftClosed, creation.get(15, TimeUnit.SECONDS))
+                    val reconciled = f.cleanupRepositoryHandle().use {
+                        val batch = MediaCleanupBatchSize.fromWire(10)!!
+                        it.repository.expireDrafts(batch) to it.repository.enqueueOrphanDeletes(batch)
+                    }
+                    assertEquals(1 to 1, reconciled)
+                    assertEquals(0, f.count("products")); assertEquals(0, f.count("product_variants"))
+                    assertEquals(0, f.count("inventory_balances")); assertEquals(0, f.count("inventory_ledger"))
+                    assertEquals(0, f.count("catalog_media_product_creation_commands"))
+                    assertEquals("EXPIRED", f.jdbc.queryForObject("SELECT state FROM catalog_media_drafts", String::class.java))
+                    assertEquals("DELETE_PENDING", f.jdbc.queryForObject("SELECT state FROM media_assets", String::class.java))
+                    assertEquals(1, f.count("media_delete_commands"))
+                } finally { pool.shutdownNow(); blocker.rollback() }
+            }
         }
     }
 
