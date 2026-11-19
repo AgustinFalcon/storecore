@@ -25,6 +25,15 @@
 - [x] MEDIA-NORMALIZE-002 Parser estructural JPEG/PNG/WebP y corpus de framing.
 - [ ] MEDIA-NORMALIZE-003 Helper JVM aislado, normalización determinista y
   límites efectivos de proceso/temporales.
+  - [ ] `MEDIA-NORMALIZE-003A`: protocolo binario cerrado, workspace privado y
+    puertos de supervisor testeables. Un launcher ProcessBuilder best-effort y
+    el helper genérico viven sólo en test para validar el contrato; no son una
+    garantía productiva de contención. Continúa abierto hasta CI alojado y
+    reviews exact-head.
+  - [ ] `MEDIA-NORMALIZE-003B`: worker real en el artefacto firmado,
+    TwelveMonkeys fijado, JPEG/PNG determinista, self-test y attestación de
+    aislamiento Linux poseído por el SO. Debe aportar el launcher productivo y
+    su attestación; no se habilita en Windows productivo sin Job Object.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.
 
 TASK-005 sólo se cierra cuando los cuatro subcortes queden aprobados. Ninguno

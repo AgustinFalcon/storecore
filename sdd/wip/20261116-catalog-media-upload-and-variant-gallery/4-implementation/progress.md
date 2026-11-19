@@ -1,5 +1,33 @@
 # Progreso
 
+## 2026-11-18 — protocolo del worker aislado en implementación
+
+- `MEDIA-NORMALIZE-003A` agrega un manifest binario V1 con framing y consumo
+  exactos, UUID y nonce de 256 bits, perfil/límites/digests tipados, bytes
+  reservados en cero y estados/rechazos cerrados con `Unknown` fail-closed.
+- La orquestación publica la fuente una sola vez bajo límite real, compara el
+  tamaño declarado, liga la respuesta a UUID+nonce, lee la respuesta mediante
+  el lease validado, exige digest/tamaño al reclamar el artefacto y traduce
+  timeout, aislamiento y fallo mediante resultados cerrados.
+- Los contratos compartidos separan workspace, lanzamiento y normalización.
+  Producción contiene esos puertos pero no un launcher concreto: la capacidad
+  permanece `Unavailable`. Un adapter ProcessBuilder sólo de test ejecuta un
+  helper genérico controlado con argumentos fijos, entorno vacío, diagnóstico
+  acotado, deadline y kill-tree best-effort. Sus pruebas no convierten la
+  enumeración de descendientes en una garantía contra la carrera inobservable
+  de un proceso que nace y se desacopla entre sondeos.
+- El workspace cubre symlinks, jerarquía, sweep, ownership y lifecycle mediante
+  handles `NOFOLLOW`; response y output se leen y verifican dentro del lease.
+  El worker/decoder real y la contención/attestación poseída por el SO permanecen
+  diferidos a `MEDIA-NORMALIZE-003B`.
+- Evidencia local actual: `test-compile` verde y `22/22` tests focales verdes:
+  protocolo, orquestación, workspace privado y launcher controlado de test. El
+  subcorte permanece abierto hasta CI alojado y reviews exact-head.
+- `MEDIA-NORMALIZE-003B` conserva fuera del corte el launcher productivo, worker
+  ImageIO real, TwelveMonkeys, salida JPEG/PNG, self-test/SBOM y attestación
+  Linux. HTTP, base, proveedor live, secretos, deploy y homologación siguen
+  fuera.
+
 ## 2026-11-18 — contrato de normalización segura en implementación
 
 - `MEDIA-NORMALIZE-001` fija mediante ADR un helper JVM aislado y perfil
