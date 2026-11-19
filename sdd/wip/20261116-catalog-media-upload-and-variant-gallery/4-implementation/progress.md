@@ -1,5 +1,21 @@
 # Progreso
 
+## 2026-11-19 — cierre exact-head del protocolo del worker aislado
+
+- PR #306 congela `MEDIA-NORMALIZE-003A` sobre head
+  `6fc0312df977d2d88aa06665362a8c52b0092ec0`, basado en
+  `878e17e5d745db53de0699ca1b0b62ca4a3e5ddf`.
+- Verify #824, run `44546311203`, terminó 5/5 verde: higiene, backend con
+  PostgreSQL/interlock, frontend y ambas matrices E2E reales.
+- Las revisiones finales independientes de arquitectura y seguridad aprobaron
+  el mismo SHA sin P0–P3. Los dictámenes están en
+  `sdd/reviews/20261119-sol-pr306-architecture.md` y
+  `sdd/reviews/20261119-sol-pr306-security.md`.
+- `MEDIA-NORMALIZE-003A` queda cerrada. `MEDIA-NORMALIZE-003`, `003B`, `004` y
+  TASK-005 continúan abiertas. No se acredita decoder/encoder real, launcher
+  productivo, contención del SO, HTTP, base, proveedor live, secretos, deploy
+  ni homologación.
+
 ## 2026-11-18 — protocolo del worker aislado en implementación
 
 - `MEDIA-NORMALIZE-003A` agrega un manifest binario V1 con framing y consumo
@@ -20,9 +36,9 @@
   handles `NOFOLLOW`; response y output se leen y verifican dentro del lease.
   El worker/decoder real y la contención/attestación poseída por el SO permanecen
   diferidos a `MEDIA-NORMALIZE-003B`.
-- Evidencia local actual: `test-compile` verde y `22/22` tests focales verdes:
+- Evidencia local previa al gate: `test-compile` verde y `22/22` tests focales verdes:
   protocolo, orquestación, workspace privado y launcher controlado de test. El
-  subcorte permanece abierto hasta CI alojado y reviews exact-head.
+  cierre exact-head está registrado en la entrada del 19 de noviembre.
 - `MEDIA-NORMALIZE-003B` conserva fuera del corte el launcher productivo, worker
   ImageIO real, TwelveMonkeys, salida JPEG/PNG, self-test/SBOM y attestación
   Linux. HTTP, base, proveedor live, secretos, deploy y homologación siguen
