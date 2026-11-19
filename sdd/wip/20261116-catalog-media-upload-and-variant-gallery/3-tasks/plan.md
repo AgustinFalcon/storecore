@@ -26,7 +26,7 @@
   ownership compuesto, snapshot durable y privilegios runtime mínimos.
 - [x] MEDIA-CREATE-003 Implementar una única transacción local para producto,
   variantes, stock inicial, claim de draft, asociaciones, auditoría y receipt.
-- [ ] MEDIA-CREATE-004 Cubrir replay, hash distinto, ownership/TTL/estado,
+- [x] MEDIA-CREATE-004 Cubrir replay, hash distinto, ownership/TTL/estado,
   rollback, colisiones, carreras con cleanup y upgrade V29→V30.
 
 El subcorte no agrega HTTP, decoder, proveedor live, secretos, deploy ni

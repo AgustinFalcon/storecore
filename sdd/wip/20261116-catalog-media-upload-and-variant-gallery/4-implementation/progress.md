@@ -1,5 +1,50 @@
 # Progreso
 
+## 2026-11-18 — cierre de carreras de alta atómica en validación
+
+- Subcorte `MEDIA-CREATE-004` basado en `master@311098a9615643898de606a6f13412ebb1873f22`,
+  merge del PR #303. No cambia el contrato productivo ni agrega HTTP, proveedor
+  live, secretos, deploy u homologación.
+- El corpus PostgreSQL de alta atómica crece de 7 a 11 escenarios y agrega
+  carreras reales contra expiración/cleanup, borrado humano y settlement de
+  upload. Cada carrera exige un único resultado serializable y comprueba que
+  producto, variantes, stock, ledger, receipt, draft, asset y delete queue no
+  queden en una combinación parcial.
+- Se agregó una constraint trigger `DEFERRABLE INITIALLY DEFERRED` aislada en
+  la base de prueba para demostrar que un fallo en commit revierte el agregado,
+  el receipt y las transiciones de staging completas.
+- `test-compile` quedó verde. El corpus de dominio quedó `4/4`; los 11 casos
+  PostgreSQL compilaron y fueron omitidos localmente porque Docker no está
+  disponible. `MEDIA-CREATE-004` permanece abierta hasta que el CI alojado
+  ejecute PostgreSQL 16 sobre el SHA candidato y las revisiones exact-head den
+  APPROVE.
+- Dos revisiones preventivas independientes encontraron tres P2 sólo en la
+  fuerza probatoria de los tests: resultado `SKIP LOCKED` demasiado rígido,
+  sleeps sin concurrencia observable y excepción diferida demasiado amplia.
+  Se corrigieron con pasada de reconciliación, dos sesiones bloqueadas
+  observadas en `pg_stat_activity` y causa PostgreSQL `P0001` con mensaje
+  exclusivo. La segunda pasada quedó APPROVED sin P0–P3; no sustituye los
+  gates exact-head posteriores al CI.
+- Verify #817 ejecutó el primer candidato completo: 5/5 jobs verdes y 583
+  pruebas backend, incluido PostgreSQL 16 e interlock. La primera revisión
+  exact-head posterior rechazó un P2 probatorio: el caso cleanup aún podía
+  recorrer sólo órdenes seriales. Se reemplazó por un interlock determinista:
+  creación retiene draft y espera asset, cleanup demuestra `SKIP LOCKED=0`,
+  luego creación revierte y la reconciliación exige `1/1`. Este cambio invalida
+  el SHA/review previo; CI y ambas revisiones deben repetirse sobre el nuevo
+  candidato antes del cierre.
+- El candidato corregido `b60d664be48fee4462a62508d66ea89bb6d6d2a1`
+  quedó 5/5 verde en Verify #818, intento 2. El primer intento sólo falló antes
+  del código por resolución transitoria de Maven Central; se reintentó el job
+  fallido sin mover el SHA. Backend ejecutó el corpus PostgreSQL 16 de 11 casos
+  y las dos matrices E2E reales quedaron verdes.
+- Dos revisiones exact-head independientes de arquitectura/concurrencia y
+  seguridad/TOCTOU aprobaron sin P0–P3. Sus dictámenes están en
+  `sdd/reviews/20261118-sol-pr304-architecture.md` y
+  `sdd/reviews/20261118-sol-pr304-security.md`. MEDIA-CREATE-004 queda cerrada;
+  TASK-003 y TASK-008 siguen abiertas por sus residuales posteriores. El commit
+  documental de cierre debe repetir CI y revisión exact-head antes del merge.
+
 ## 2026-11-18 — alta atómica local en implementación
 
 - Baseline `master@a48ac15525f1443f65897883a87a4840da9b0fd6`, merge de PR
