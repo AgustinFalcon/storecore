@@ -191,6 +191,16 @@ de alta, no una lease upload: sus referencias publicadas siempre se preservan.
 La librería concreta de decode/encode debe elegirse en implementación mediante
 ADR y revisión de CVEs/licencia; el spec no fuerza una dependencia sin evaluar.
 
+### Subcorte MEDIA-NORMALIZE-001/002 — contrato y framing estructural
+
+ADR-001 selecciona un helper JVM aislado y un perfil versionado, pero no lo
+activa. Dominio y aplicación exponen límites numéricos inmutables, perfil y
+rechazos cerrados, decisiones de dimensión fail-closed y un puerto que entrega
+un artefacto temporal opaco. `Unknown`/`Unavailable` nunca producen bytes
+aceptados. Un parser puro acotado valida framing JPEG/PNG/WebP, EOF exacto,
+animación, dimensiones, segmentos y metadata antes del futuro decoder. El corte
+no implementa decoder, proceso, multipart, HTTP, persistencia ni proveedor.
+
 ## HTTP
 
 - `POST /api/v1/user/catalog/media-drafts`: draft de alta/edición con target
