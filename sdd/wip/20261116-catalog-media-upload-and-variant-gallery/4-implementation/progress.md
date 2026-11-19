@@ -33,6 +33,17 @@
   luego creación revierte y la reconciliación exige `1/1`. Este cambio invalida
   el SHA/review previo; CI y ambas revisiones deben repetirse sobre el nuevo
   candidato antes del cierre.
+- El candidato corregido `b60d664be48fee4462a62508d66ea89bb6d6d2a1`
+  quedó 5/5 verde en Verify #818, intento 2. El primer intento sólo falló antes
+  del código por resolución transitoria de Maven Central; se reintentó el job
+  fallido sin mover el SHA. Backend ejecutó el corpus PostgreSQL 16 de 11 casos
+  y las dos matrices E2E reales quedaron verdes.
+- Dos revisiones exact-head independientes de arquitectura/concurrencia y
+  seguridad/TOCTOU aprobaron sin P0–P3. Sus dictámenes están en
+  `sdd/reviews/20261118-sol-pr304-architecture.md` y
+  `sdd/reviews/20261118-sol-pr304-security.md`. MEDIA-CREATE-004 queda cerrada;
+  TASK-003 y TASK-008 siguen abiertas por sus residuales posteriores. El commit
+  documental de cierre debe repetir CI y revisión exact-head antes del merge.
 
 ## 2026-11-18 — alta atómica local en implementación
 
