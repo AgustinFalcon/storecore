@@ -1,0 +1,9 @@
+[
+  {"id":"CRR-001","title":"Audit checkout result authority","status":"done","depends_on":[]},
+  {"id":"CRR-002","title":"Specify behavior and architecture","status":"done","depends_on":["CRR-001"]},
+  {"id":"CRR-003","title":"Add closed refresh states and commands","status":"done","depends_on":["CRR-002"]},
+  {"id":"CRR-004","title":"Implement authoritative refresh lifecycle","status":"done","depends_on":["CRR-003"]},
+  {"id":"CRR-005","title":"Implement accessible checkout result UX","status":"done","depends_on":["CRR-004"]},
+  {"id":"CRR-006","title":"Run local gates","status":"done","depends_on":["CRR-005"]},
+  {"id":"CRR-007","title":"Deliver exact-head evidence","status":"pending","depends_on":["CRR-006"]}
+]

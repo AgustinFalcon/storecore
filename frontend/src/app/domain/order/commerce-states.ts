@@ -17,14 +17,14 @@ export class OrderStatus {
 
 export class PaymentStatus {
   private readonly nominal!: 'PaymentStatus';
-  private constructor(readonly wire: string, readonly label: string) {}
-  static readonly Pending = new PaymentStatus('PENDING', 'Pendiente');
-  static readonly Approved = new PaymentStatus('APPROVED', 'Acreditado');
-  static readonly Rejected = new PaymentStatus('REJECTED', 'Rechazado');
-  static readonly Cancelled = new PaymentStatus('CANCELLED', 'Cancelado');
-  static readonly Refunded = new PaymentStatus('REFUNDED', 'Reembolsado');
-  static readonly ChargedBack = new PaymentStatus('CHARGED_BACK', 'Contracargo');
-  static readonly Unknown = new PaymentStatus('UNKNOWN', 'Estado desconocido');
+  private constructor(readonly wire: string, readonly label: string, readonly permitsAuthoritativeRefresh: boolean) {}
+  static readonly Pending = new PaymentStatus('PENDING', 'Pendiente', true);
+  static readonly Approved = new PaymentStatus('APPROVED', 'Acreditado', false);
+  static readonly Rejected = new PaymentStatus('REJECTED', 'Rechazado', false);
+  static readonly Cancelled = new PaymentStatus('CANCELLED', 'Cancelado', false);
+  static readonly Refunded = new PaymentStatus('REFUNDED', 'Reembolsado', false);
+  static readonly ChargedBack = new PaymentStatus('CHARGED_BACK', 'Contracargo', false);
+  static readonly Unknown = new PaymentStatus('UNKNOWN', 'Estado desconocido', false);
   private static readonly cases = [PaymentStatus.Pending, PaymentStatus.Approved, PaymentStatus.Rejected, PaymentStatus.Cancelled, PaymentStatus.Refunded, PaymentStatus.ChargedBack, PaymentStatus.Unknown];
   static fromWire(value: unknown): PaymentStatus {
     return PaymentStatus.cases.find((state) => state.wire === value) ?? PaymentStatus.Unknown;

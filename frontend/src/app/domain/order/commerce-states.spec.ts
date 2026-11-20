@@ -1,6 +1,14 @@
 import { FulfillmentEligibility, OrderStatus, PaymentStatus, RmaStatus, RmaTransition, ShipmentStatus, ShipmentTransition } from './commerce-states';
 
 describe('commerce wire boundary', () => {
+  it('permits authoritative payment refresh only while pending', () => {
+    expect(PaymentStatus.Pending.permitsAuthoritativeRefresh).toBe(true);
+    for (const payment of [PaymentStatus.Approved, PaymentStatus.Rejected, PaymentStatus.Cancelled,
+      PaymentStatus.Refunded, PaymentStatus.ChargedBack, PaymentStatus.Unknown]) {
+      expect(payment.permitsAuthoritativeRefresh).toBe(false);
+    }
+  });
+
   it('preserves authoritative blockers while requiring approved payment for eligibility', () => {
     for (const payment of [PaymentStatus.Pending, PaymentStatus.Unknown, PaymentStatus.Approved]) {
       expect(FulfillmentEligibility.OrderNotPaid.withPaymentStatus(payment)).toBe(FulfillmentEligibility.OrderNotPaid);
