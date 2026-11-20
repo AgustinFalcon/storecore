@@ -91,7 +91,7 @@ class DeterministicImageEncoder {
 
     private fun explicitWriter(format: MediaFormat): ImageWriterSpi? {
         val expected = when (format) {
-            MediaFormat.JPEG -> "com.twelvemonkeys.imageio.plugins.jpeg.JPEGImageWriterSpi"
+            MediaFormat.JPEG -> "com.sun.imageio.plugins.jpeg.JPEGImageWriterSpi"
             MediaFormat.PNG -> "com.sun.imageio.plugins.png.PNGImageWriterSpi"
             else -> return null
         }
