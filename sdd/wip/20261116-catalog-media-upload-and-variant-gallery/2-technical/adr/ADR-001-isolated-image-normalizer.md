@@ -4,9 +4,32 @@
 
 Aceptado para el contrato `MEDIA-NORMALIZE-001`. El parser estructural de
 `MEDIA-NORMALIZE-002` está implementado. `MEDIA-NORMALIZE-003A` está fusionado.
-`MEDIA-NORMALIZE-003B-1` fija TwelveMonkeys `3.15.3` y Temurin `21.0.13+9` en
-CI, sin activar decoder, worker productivo ni capability `Ready`. Upload
-continúa deshabilitado.
+`MEDIA-NORMALIZE-003B-1` está fusionado. `MEDIA-NORMALIZE-003B-2` agrega el
+engine determinista y `MediaNormalizerWorkerMain` en el artefacto del worker,
+todavía inactivo: sin factory `Ready`, sin launcher productivo, sin HTTP.
+Upload continúa deshabilitado.
+
+### Parámetros deterministas IMAGE_IO_V1 (003B-2)
+
+Estos valores son parte del perfil. Cambiar cualquiera exige un perfil nuevo;
+los goldens no se actualizan automáticamente.
+
+- JPEG quality: `0.90` explícito.
+- JPEG progressive: no (`MODE_DISABLED`).
+- JPEG chroma subsampling: `4:4:4` (sin submuestreo).
+- PNG: Deflate, compression quality `0.0` (máxima compresión del writer JDK),
+  sin metadata de texto.
+- Imagen sin ICC: se interpreta como sRGB 8-bit. ICC distinto de sRGB, CMYK
+  o metadata incompatible: `UNSUPPORTED_COLOR_PROFILE` fail-closed.
+- Orientación EXIF 1–8 mediante tipo cerrado; cualquier otro valor es
+  `Unknown` y rechaza. Tras aplicar, se elimina EXIF/XMP/ICC del output.
+- Alpha: si algún píxel tiene alpha ≠ 255, salida PNG; si es opaco, JPEG.
+  RGB bajo alpha=0 se fuerza a (0,0,0) antes de encodear.
+- Lanzamiento documentado del worker: CWD = workspace; sin argumentos;
+  `java -Xmx<heap> -XX:MaxDirectMemorySize=<maxOutput> -Djava.io.tmpdir=<workspace> -jar storecore-media-worker.jar`.
+  El FQCN fijo es `com.storecore.catalog.infrastructure.media.worker.MediaNormalizerWorkerMainKt`.
+  El `PropertiesLauncher` del backend permanece test-only (003A) y no es
+  contención productiva.
 
 ## Contexto
 

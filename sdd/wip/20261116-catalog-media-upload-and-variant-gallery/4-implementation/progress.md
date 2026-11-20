@@ -1,5 +1,43 @@
 # Progreso
 
+## 2026-11-20 — MEDIA-NORMALIZE-003B-2 implementado, todavía inactivo
+
+- `backend/media-worker` incorpora el protocolo V1 y tipos mínimos worker-local,
+  preflight estructural, workspace `NOFOLLOW`/`CREATE_NEW`, decoder por SPI
+  explícito, orientación EXIF cerrada, raster sRGB 8-bit, política sin metadata,
+  encoder JPEG 0.90 baseline 4:4:4 / PNG Deflate y `WorkerMain` con el FQCN
+  contractual.
+- El fat jar fusiona servicios ImageIO y declara
+  `MediaNormalizerWorkerMainKt`; Spring no depende del módulo. No se agregó
+  `ProcessBuilder` productivo, factory, `Ready`, HTTP, DB, store, vendor,
+  systemd ni activación.
+- `mvn -B test` quedó verde con `24` pruebas, `0` failures, `0` errors y `1`
+  skip por symlink no disponible en Windows. Incluye JPEG/PNG serial y
+  concurrente, un WebP lossless real, framing adversarial, límites,
+  `WorkerMain`, workspace y las pruebas supply-chain preexistentes.
+- El host local es Microsoft JDK `21.0.12.1+1-LTS`, no Temurin
+  `21.0.13+9`; por eso no se registran hashes golden nuevos. Se exige
+  determinismo intra-run y el golden exacto queda para el runtime fijado.
+- `MEDIA-NORMALIZE-003B-2` permanece abierta hasta CI y doble review exact-head.
+  `003`, `003B`, `003B-3`, `003B-4`, `004` y TASK-005 siguen abiertos.
+  `Ready`, launcher productivo y contención/attestación pertenecen a cortes
+  posteriores.
+
+## 2026-11-20 — merge PR #307 y arranque de MEDIA-NORMALIZE-003B-2
+
+- PR #307 quedó fusionado. Head revisado
+  `ffaaab4ebf19020d2d95845bbb0e067d7597eba4`. Merge
+  `ee1fa96edc0eb1c2722000b3980acecb15706ef7` (padre adicional `96449fa` de
+  PR #308). `master` contiene `ffaaab4`.
+- Verify #828, run `44784133698`, 5/5 sobre `ffaaab4`. Reviews exact-head
+  de arquitectura y seguridad aprobaron sin P0–P3; dictámenes en
+  `sdd/reviews/20261120-sol-pr307-architecture.md` y
+  `sdd/reviews/20261120-sol-pr307-security.md` fuera de ese SHA.
+- `MEDIA-NORMALIZE-003B-1` queda cerrada. `MEDIA-NORMALIZE-003`, `003B`,
+  `003B-2..4`, `004` y TASK-005 continúan abiertas.
+- Verify post-merge #832, run `44787086178`, terminó 5/5 verde sobre
+  `ee1fa96`.
+
 ## 2026-11-20 — merge PR #306 y arranque de MEDIA-NORMALIZE-003B-1
 
 - PR #306 quedó fusionado en `master`. Head revisado
