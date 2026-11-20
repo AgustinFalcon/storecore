@@ -3,9 +3,9 @@
 - Estado: `implementation_in_progress`
 - Fecha: 2026-11-16
 - Issue: #7
-- Base: `master@e0fef1054f8629b8b51a6fd03e5a47b6726d36ab`
-  (merge PR #315; candidato final `104a6dc6e658a3cd1b91a7d9bccdee6549e0ad08`)
-- Rama: `feat/media-isolation-broker-contract-20261120`
+- Base: `master@df13f2dda89440a77bd7bcec7b48f1b1c139fe25`
+  (merge PR #316; candidato final `be7b822581aff1f7c26463c938e6eef35fe81c02`)
+- Rama: `feat/media-normalize-003b4b2-20261120`
 - Perfil: técnico
 - Relación: reemplaza únicamente el diseño media del antiguo WIP multi-tenant;
   no reabre tenancy ni agrega `store_id`.
@@ -23,14 +23,12 @@ Las especificaciones y las 15 tareas siguen vigentes. TASK-001/002/004 están
 integradas; TASK-003 continúa abierto aunque el claim atómico MEDIA-CREATE y los
 subcortes durables previos ya fueron entregados. No se reimplementan.
 
-MEDIA-NORMALIZE-003B-1/2/3 están integrados. PR #313 entrega únicamente
-`003B-4A`: factory/lifecycle fail-closed y retención insegura, sin capacidad
-productiva porque el workspace privado no cruza al UID dedicado. El diseño
-corregido separa `003B-4B` (broker/handoff/quota/restart) y `003B-4C` (harness
-Linux real). Antes de código privilegiado, 4B se divide en contrato/transporte,
-journal, daemon systemd y adapter backend. Todos permanecen pendientes y
-requieren sus gates propios antes de que `003B-4`, TASK-005 o #7 puedan
-cerrarse.
+MEDIA-NORMALIZE-003B-1/2/3 y `003B-4A` están integrados. PR #316 cierra
+`003B-4B-1` (codec/transporte/snapshot sin privilegios). Siguen abiertos
+`003B-4B-2` journal/CAS/budgets, `003B-4B-3` daemon/mounts, `003B-4B-4`
+adapter backend, `003B-4C` y por tanto `003B-4`, TASK-005 y #7. Cada subcorte
+exige sus gates propios. El workspace privado de 4A permanece incompatible
+con el UID dedicado y no habilita `Ready`.
 
 No existe GO live para Cloudinary, credenciales, HTTP upload, deploy ni
 homologación externa hasta cerrar sus gates separados.

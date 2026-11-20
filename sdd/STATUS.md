@@ -1,8 +1,18 @@
 # Estado canónico del SDD — StoreCore
 
-## Master vigente — 2026-11-20
+## Master vigente — 2026-11-20, contrato broker 4B-1
 
-`master d824e0751010a5f3a5f7e3522329832f02018bd6` integra PR #313. Su
+`master df13f2dda89440a77bd7bcec7b48f1b1c139fe25` integra PR #316. Su
+candidato exacto `be7b822581aff1f7c26463c938e6eef35fe81c02` pasó Verify
+`44826977557` 6/6 (hygiene, backend, media-broker, frontend y ambas matrices
+E2E) y dos reviews independientes GPT-6.1 Sol sin P0–P3. El post-merge
+`44828593553` terminó 6/6. El corte entrega codec/transporte/snapshot
+sin privilegios; no instala daemon root, mount, D-Bus ni wiring Spring, y no
+devuelve `Ready`. `003B-4B-2..4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos.
+
+El baseline anterior `master d824e0751010a5f3a5f7e3522329832f02018bd6`
+integra PR #313. Su
 candidato exacto `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó Verify de PR
 `44814135015` 5/5, tests focales 23/23 y dos reviews independientes GPT-6.1
 Sol sin P0–P3. El primer intento posmerge `44816056376` recibió HTTP 429 de

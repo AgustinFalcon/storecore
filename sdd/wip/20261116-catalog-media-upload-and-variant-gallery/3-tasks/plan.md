@@ -65,10 +65,14 @@
         mínima, handoff cross-UID sellado, tmpfs por job con cuota agregada,
         runtime/JAR root-owned versionado y reconciliación durable de
         unit/mount/quarantine. Requiere ADR/spec aprobados antes de código.
-        - [ ] `003B-4B-1`: workspace Rust y toolchain/lockfile; codec compartido
+        - [x] `003B-4B-1`: workspace Rust y toolchain/lockfile; codec compartido
           Kotlin/Rust, helper sin privilegios, Unix peer credentials,
           `SCM_RIGHTS` de exactamente un FD y snapshot broker-owned. CI Linux,
-          sin root, mount, D-Bus, wiring Spring ni `Ready`.
+          sin root, mount, D-Bus, wiring Spring ni `Ready`. PR #316 head
+          `be7b822581aff1f7c26463c938e6eef35fe81c02` pasó Verify
+          `44826977557` 6/6 y dos reviews exact-head sin P0–P3. Merge
+          `df13f2dda89440a77bd7bcec7b48f1b1c139fe25`. Post-merge Verify
+          `44828593553` 6/6.
         - [ ] `003B-4B-2`: máquina durable/CAS, budgets globales, journal
           atómico y reconciliación con adapters fake; corrupción cierra
           admisión.

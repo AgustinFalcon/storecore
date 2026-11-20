@@ -1,5 +1,30 @@
 # Progreso
 
+## 2026-11-20 — MEDIA-NORMALIZE-003B-4B-2 en implementación
+
+- Máquina durable con estados cerrados `Allocated | InputSealed | Starting |
+  Running | Terminating | Terminal | Quarantined | Unknown` y operaciones
+  allocate/seal/start/terminate/inspect/acknowledge/quarantine.
+- Journal `create_new` + fsync + rename + dir fsync; SHA-256 del cuerpo;
+  corrupción o `Unknown` cierra admisión. CAS de revisión; UUID repetido no
+  transfiere autoridad. Presupuesto global jobs/mounts/bytes/inodos/cuarentena.
+- Reconciliación contra adapters fake de pid/cgroup/mount/unit. Sin daemon
+  root, D-Bus, mount real, Spring ni `Ready`.
+
+## 2026-11-20 — MEDIA-NORMALIZE-003B-4B-1 cerrado
+
+- PR #316 head `be7b822581aff1f7c26463c938e6eef35fe81c02` pasó Verify
+  `44826977557` 6/6 y dos reviews exact-head GPT-6.1 Sol sin P0–P3. Merge
+  `df13f2dda89440a77bd7bcec7b48f1b1c139fe25`. Post-merge Verify
+  `44828593553` 6/6, incluido el job `media-broker`.
+- Dictámenes fuera del SHA revisado:
+  `sdd/reviews/20261120-sol-pr316-architecture.md` y
+  `sdd/reviews/20261120-sol-pr316-security.md`.
+- Cierra sólo `003B-4B-1`. El helper/daemon ejecutable, journal durable,
+  mounts, D-Bus, adapter Spring y `Ready` permanecen en 4B-2..4 y 4C.
+- PR #314 se cerró sin merge: el handoff POSIX de paths contradice el ADR del
+  broker Rust.
+
 ## 2026-11-20 — 003B-4B descompuesto antes de código privilegiado
 
 - Dos auditorías GPT-6.1 Sol sobre `master e0fef105` confirmaron que JDK 21 no
