@@ -4,7 +4,10 @@
 
 - PR #313 head `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó tests focales
   23/23, Verify `44814135015` 5/5 y dos reviews independientes GPT-6.1 Sol
-  sin P0–P3. Merge `d824e0751010a5f3a5f7e3522329832f02018bd6`.
+  sin P0–P3. Los dictámenes persistidos son
+  `sdd/reviews/20261120-sol-pr313-security.md` y
+  `sdd/reviews/20261120-sol-pr313-architecture.md`. Merge
+  `d824e0751010a5f3a5f7e3522329832f02018bd6`.
 - El primer intento posmerge `44816056376` falló antes de compilar un job por
   HTTP 429 de Maven Central. El rerun del mismo SHA terminó 5/5 verde, incluido
   `productive-routes-real-e2e`; no hubo cambio de código para ocultar el fallo.
