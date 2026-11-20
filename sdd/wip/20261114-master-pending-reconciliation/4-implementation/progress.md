@@ -15,3 +15,5 @@
   registrados en el SDD de paridad de Fase 1.
 - Una revisión GPT-6.1 Sol independiente aprobó el diff documental exacto sin
   P0–P3 y contrastó en GitHub el Verify post-merge `43553571761`.
+- PR #274 fusionado como `0c4d2fe96a4dff29120cb1931e69b13b666d8b0a`.
+  Verify exact-head `43556963381` y post-merge `43557580114` exitosos.

@@ -27,3 +27,12 @@
   quedó limpio.
 - CRR-003..006 quedan completos. CRR-007 permanece abierto hasta CI alojado,
   dos reviews exact-head, PR, merge y post-merge.
+
+## Cierre remoto 2026-11-20
+
+- PR #308 revisado sobre `2a20a0e0eda3a779c218ba57129e95db9173b525`:
+  Bugbot y Security Review aprobaron sin P0-P3.
+- Verify exact-head `44785063663`: 5/5 exitoso.
+- Merge `96449faa28a305a2a45a5e725696d5a8a3f7ba67` y Verify post-merge
+  `44786925900`: 5/5 exitoso.
+- CRR-007 queda completo. El cierre no acredita proveedor live ni webhook.

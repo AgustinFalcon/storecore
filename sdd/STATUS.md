@@ -1,5 +1,29 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-20
+
+`master 17aadc84fbaf6a762d17414311b8a6559ed19d3b` integra PR #309. Su
+candidato exacto `b41fc7ea369da338e07427c837518aa518dfe398` pasó Verify
+`44795354530` 5/5 y el post-merge `44797525642` terminó exitoso. El corte
+agrega un engine determinista de media **inactivo**; no cierra TASK-003 ni el
+issue #7 y no acredita HTTP media, proveedor live, secretos, deploy u
+homologación.
+
+PR #308 quedó fusionado como
+`96449faa28a305a2a45a5e725696d5a8a3f7ba67`: su head exacto
+`2a20a0e0eda3a779c218ba57129e95db9173b525` pasó Verify `44785063663`
+5/5, dos reviews independientes aprobaron sin P0–P3 y el post-merge
+`44786925900` terminó 5/5. El refresh autoritativo del resultado de checkout
+cerró #13; #8 conserva Correo Argentino y notificaciones productivas como
+residuales explícitos.
+
+El inventario inicial de este corte no registraba PRs abiertos. Antes de
+congelar esta reconciliación se abrió PR #310 para un subcorte independiente de
+media; no se lo evalúa ni se lo presenta como entrega aquí. Permanecen abiertos
+#7, #8, #104 y #128. Este estado no acredita Mercado Pago live, ARCA, Correo
+Argentino, SMTP productivo, StoreCore↔BlackStore activo, deploy ni
+`release/1.0`.
+
 ## Master vigente — 2026-11-18, comandos media durables
 
 `master 07a07178214d9e6d0e679356cedad0c5e939ffde` integra PR #300. El

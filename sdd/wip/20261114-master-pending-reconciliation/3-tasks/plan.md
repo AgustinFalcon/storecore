@@ -7,4 +7,4 @@
 - [x] Corregir la clasificación de evidencia mock vs E2E real.
 - [x] Registrar la segunda review exact-head de paridad Fase 1.
 - [x] Revisar el diff documental exacto sin P0–P3.
-- [ ] Crear PR, ejecutar CI, fusionar y comprobar post-merge.
+- [x] Crear PR, ejecutar CI, fusionar y comprobar post-merge.

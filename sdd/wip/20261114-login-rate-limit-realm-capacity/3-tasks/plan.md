@@ -6,4 +6,4 @@
 - [x] Agregar regresiones de aislamiento, saturación local y expiración.
 - [x] Ejecutar pruebas focales y backend completo.
 - [x] Ejecutar dos reviews exact-diff sin P0–P3.
-- [ ] PR, CI, merge y post-merge.
+- [x] PR, CI, merge y post-merge.

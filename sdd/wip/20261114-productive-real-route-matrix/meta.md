@@ -1,6 +1,6 @@
 # Matriz productiva real de rutas y acciones
 
-- Estado: `implementation_review`
+- Estado: `delivered`
 - Fecha: 2026-11-14
 - Base: `master@94d005a2f2d5ae6ef4433102ba511f6aba0eb317`
 - Issue: #106
@@ -22,8 +22,7 @@ El cierre acredita comercio web local. No acredita Mercado Pago live, Mercado
 Libre live, ARCA, Correo Argentino, BlackStore, correo productivo, despliegue,
 release ni homologación externa.
 
-## Gate restante
+## Cierre
 
-La implementación, la matriz real aislada, las revisiones exact-head y el CI del
-PR están acreditados. Permanecen abiertos el merge, la verificación post-merge
-sobre `master` y el cierre de #106; este documento no los da por realizados.
+La matriz, las revisiones, el CI exact-head, el merge, el post-merge y el cierre
+de #106 están acreditados. Los proveedores externos continúan fuera de alcance.

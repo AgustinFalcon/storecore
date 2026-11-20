@@ -18,3 +18,5 @@
   0 errors, 0 skipped. Al terminar no quedó proceso Java de la suite activo.
 - Reviews GPT-6.1 Sol de bugs/contrato y seguridad: `APPROVE` exact-diff,
   sin hallazgos P0–P3 residuales.
+- PR #275 fusionado como `86d01ac562b73c97678fa5999457c1a00b014fc0`.
+  Verify exact-head `43559033106` y post-merge `43562771784` exitosos.

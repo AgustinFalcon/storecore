@@ -28,4 +28,4 @@
 - [x] PRM-014 Ejecutar gates locales completos.
 - [x] PRM-015 Obtener reviews exact-head producto/UX y seguridad.
 - [x] PRM-016A Crear PR y acreditar CI exact-head.
-- [ ] PRM-016B Fusionar el PR, ejecutar post-merge y cerrar el issue #106.
+- [x] PRM-016B Fusionar el PR, ejecutar post-merge y cerrar el issue #106.

@@ -8,4 +8,4 @@
 - [x] Ejecutar aceptación por ruta en desktop/mobile con axe.
 - [x] Ejecutar gates frontend locales.
 - [x] Ejecutar reviews exact-head.
-- [ ] PR, CI, merge y post-merge.
+- [x] PR, CI, merge y post-merge.

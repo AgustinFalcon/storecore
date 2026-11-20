@@ -23,3 +23,10 @@
   runtime ni cerrar #8/#13.
 - Pendiente: reviews exact-head y CI del SHA final; después, merge, post-merge y
   comentario honesto de residuales en #8/#13.
+
+## Cierre remoto 2026-11-18 / 2026-11-20
+
+- PR #285 fusionado como `3284aa68f4b6cd354a02046915c92326c2421c7e`.
+- Verify exact-head `44325275802` y post-merge `44343264475`: 5/5 exitosos.
+- #8 conserva explícitamente Correo/notificaciones como residual externo.
+- #13 se cerró el 2026-11-20 sólo después del PR #308 y su post-merge 5/5.
