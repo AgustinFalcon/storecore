@@ -9,7 +9,6 @@ import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption.READ
 import java.security.MessageDigest
-import java.util.Properties
 import java.util.zip.ZipFile
 
 enum class MediaWorkerOperatingSystem(val wire: String) {
@@ -72,17 +71,6 @@ class MediaWorkerRuntimeFingerprint private constructor(
         const val PNG_COMPRESSION_QUALITY = 0.0f
         const val TWELVEMONKEYS_VERSION = "3.15.3"
 
-        private val expectedDependencies = listOf(
-            "org.jetbrains.kotlin" to "kotlin-stdlib",
-            "org.jetbrains" to "annotations",
-            "com.twelvemonkeys.common" to "common-image",
-            "com.twelvemonkeys.common" to "common-io",
-            "com.twelvemonkeys.common" to "common-lang",
-            "com.twelvemonkeys.imageio" to "imageio-core",
-            "com.twelvemonkeys.imageio" to "imageio-jpeg",
-            "com.twelvemonkeys.imageio" to "imageio-metadata",
-            "com.twelvemonkeys.imageio" to "imageio-webp",
-        )
         private val profilePolicy = listOf(
             "profile=IMAGE_IO_V1",
             "inputs=JPEG,PNG,WEBP_STATIC",
@@ -108,11 +96,9 @@ class MediaWorkerRuntimeFingerprint private constructor(
             val os = MediaWorkerOperatingSystem.fromWire(System.getProperty("os.name"))
             val arch = MediaWorkerArchitecture.fromWire(System.getProperty("os.arch"))
             if (!allowedPlatform(os, arch)) return null
-            val versions = expectedDependencies.map { (group, module) ->
-                val version = moduleVersion(group, module) ?: return null
-                if (group.startsWith("com.twelvemonkeys.") && version != TWELVEMONKEYS_VERSION) return null
-                MediaWorkerModuleVersion("$group:$module", version)
-            }
+            val versions = MediaWorkerDependencyInventory.load()?.modules ?: return null
+            if (versions.filter { it.module.startsWith("com.twelvemonkeys.") }
+                    .any { it.version != TWELVEMONKEYS_VERSION }) return null
             val inventory = ImageIoProviderInventory.evaluate()
             val providers = (inventory as? ImageIoProviderInventoryResult.Matched)?.providers ?: return null
             val jarDigest = executingJarDigest() ?: return null
@@ -163,16 +149,6 @@ class MediaWorkerRuntimeFingerprint private constructor(
         private fun allowedPlatform(os: MediaWorkerOperatingSystem, arch: MediaWorkerArchitecture): Boolean =
             (os == MediaWorkerOperatingSystem.LINUX && arch in setOf(MediaWorkerArchitecture.AMD64, MediaWorkerArchitecture.ARM64)) ||
                 (os == MediaWorkerOperatingSystem.WINDOWS && arch == MediaWorkerArchitecture.AMD64)
-
-        private fun moduleVersion(group: String, module: String): String? {
-            if (group == "org.jetbrains.kotlin" && module == "kotlin-stdlib") {
-                return KotlinVersion.CURRENT.toString()
-            }
-            val resource = "META-INF/maven/$group/$module/pom.properties"
-            return MediaWorkerRuntimeFingerprint::class.java.classLoader.getResourceAsStream(resource)?.use {
-                Properties().apply { load(it) }.getProperty("version")
-            }
-        }
 
         private fun executingJarDigest(): ByteArray? {
             val configured = System.getProperty(JAR_PATH_PROPERTY)?.takeIf { it.isNotBlank() }?.let { raw ->

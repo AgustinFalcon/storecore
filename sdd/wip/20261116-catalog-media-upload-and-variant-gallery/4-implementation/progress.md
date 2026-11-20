@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-20 — MEDIA-NORMALIZE-003B-4 en implementación
+
+- `MEDIA-NORMALIZE-003B-3` quedó cerrada por PR #310: head `f6bb3a3`, Verify
+  `44801937465` 5/5, dos reviews exact-head y merge `28b99b7`. Post-merge
+  Verify `44804049350` 5/5.
+- Este corte agrega `MediaWorkerCapability` cerrado (`Ready`/`Unavailable`/
+  `Unknown`), `LinuxMediaWorkerIsolationAttestor`, `SystemdMediaWorkerLauncher`
+  y `MediaWorkerCapabilityFactory`. `Ready` sólo sale de un aislamiento Linux
+  cgroup v2 atestado más SELF_TEST `Matched` dentro de `systemd-run`. No hay
+  fallback a `java` vía ProcessBuilder. Windows queda `Unavailable`.
+- Sin HTTP, Spring bean de upload, secretos, deploy ni homologación.
+
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-3 implementado, gate abierto
 
 - El protocolo V1 agrega la operación cerrada `SELF_TEST(2)` sin cambiar el
@@ -26,10 +38,8 @@
   actualizará tras el verify completo del candidato.
 - `MEDIA-NORMALIZE-003B-2` quedó cerrada por PR #309: head `b41fc7e`, Verify
   #837 5/5, dos reviews exact-head y merge `17aadc8`.
-  `MEDIA-NORMALIZE-003B-3` permanece abierta hasta CI alojado y dos reviews
-  GPT-6.1 Sol exact-head. `003B-4`, `003B`, `003`, `004` y TASK-005 siguen
-  abiertos; sin Spring en el worker, launcher/`ProcessBuilder` productivo,
-  systemd, secretos, deploy ni activación.
+  `MEDIA-NORMALIZE-003B-3` quedó cerrada por PR #310. `003B-4`, `003B`, `003`,
+  `004` y TASK-005 siguen abiertos.
 
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-2 implementado, todavía inactivo
 
@@ -399,3 +409,43 @@
   dominio. PostgreSQL/Testcontainers queda para CI alojado porque Docker no está
   disponible en este host. El subcorte todavía no es cierre de TASK-003 ni
   autoriza HTTP, decoder, proveedor live, deploy u homologación.
+
+## 2026-11-20 — 003B-4 corregido tras reviews preliminares
+
+- PR #313 permanece abierto y sin autorización de merge. Las dos reviews
+  GPT-6.1 Sol del head `9c996d259859e4931ce13738c3624e4e592820cf`
+  detectaron cuatro bloqueos: unidad systemd huérfana, workspace 0700
+  incompatible con el UID dedicado, expectativa runtime auto-derivada del
+  reporte y metadata Kotlin ficticia.
+- La corrección local asigna unidad systemd propia, deadlines administrados,
+  kill/stop y verificación terminal con `systemctl` atestado. Si la terminación
+  no se prueba, el launcher queda cerrado, el workspace se retiene y no se
+  libera admisión.
+- `PrivateMediaWorkerWorkspace` conserva 0700/0600 y declara `Unavailable` para
+  el principal dedicado. Por lo tanto este adapter no finge `Ready`; el handoff
+  cross-UID real sigue siendo un corte posterior explícito.
+- La expectativa Java es un `ApprovedMediaWorkerRuntime` independiente del
+  SELF_TEST. Las pruebas negativas cubren drift de vendor, versión, OS y
+  arquitectura.
+- El worker empaqueta `META-INF/storecore/media-worker-runtime.properties` con
+  nueve dependencias cerradas. La factory lo lee del JAR real; Kotlin ya no
+  depende de un `pom.properties` inexistente.
+- Evidencia local previa al SHA candidato: backend focal `30/30`; worker `36`
+  ejecutados, `0` fallos y `2` skips de plataforma + IT del JAR `1/1`; factory
+  contra el JAR sombreado real `1/1`. La suite backend completa alcanzó `547`
+  tests con `0` failures y `218` errores de infraestructura por Docker local
+  ausente (`20` skips), por lo que la evidencia PostgreSQL queda para CI.
+  Falta congelar SHA, CI alojado y repetir ambas reviews exact-head antes de
+  marcar `MEDIA-NORMALIZE-003B-4` como completado.
+
+- La revisión del candidato `767d4c19fed759930bf8e47611d60efa3f0d8ee7`
+  detectó un P2 adicional: si la retención insegura fallaba o lanzaba una
+  excepción, `use` todavía podía cerrar y borrar un workspace cuyo proceso no
+  tenía terminación confirmada. El flujo ya inhibe `close` antes de intentar
+  la retención, bloquea permanentemente nuevas admisiones en normalización y
+  mantiene la entrada activa si el movimiento a cuarentena no puede probarse.
+- Evidencia focal posterior: `23/23` pruebas verdes para normalizador,
+  capability factory y workspace privado, incluyendo retención
+  `Unavailable`, `Unknown` y excepción. Esta evidencia tampoco autoriza el
+  merge: el próximo commit vuelve a requerir CI y dos reviews independientes
+  sobre su SHA exacto.

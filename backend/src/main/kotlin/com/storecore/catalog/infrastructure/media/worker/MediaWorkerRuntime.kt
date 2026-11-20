@@ -13,6 +13,29 @@ import java.util.UUID
 interface MediaWorkerWorkspaceManager {
     fun create(requestId: UUID): MediaWorkerWorkspaceResult
     fun sweep(now: Instant, staleAfter: Duration): MediaWorkerSweepResult
+    fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess = MediaWorkerWorkspaceAccess.Unknown
+}
+
+enum class MediaWorkerPrincipal {
+    DEDICATED_WORKER,
+    UNKNOWN;
+
+    companion object {
+        fun fromWire(raw: String?): MediaWorkerPrincipal =
+            entries.firstOrNull { it.name == raw && it != UNKNOWN } ?: UNKNOWN
+    }
+}
+
+sealed interface MediaWorkerWorkspaceAccess {
+    data object Compatible : MediaWorkerWorkspaceAccess
+    data object Unavailable : MediaWorkerWorkspaceAccess
+    data object Unknown : MediaWorkerWorkspaceAccess
+}
+
+sealed interface MediaWorkerWorkspaceRetention {
+    data object Retained : MediaWorkerWorkspaceRetention
+    data object Unavailable : MediaWorkerWorkspaceRetention
+    data object Unknown : MediaWorkerWorkspaceRetention
 }
 
 sealed interface MediaWorkerWorkspaceResult {
@@ -47,7 +70,29 @@ interface MediaWorkerWorkspaceLease : AutoCloseable {
     fun publishInput(source: InputStream, maxBytes: Long): MediaPublishedInput?
     fun readResult(maxBytes: Long): ByteArray?
     fun claimArtifact(expectedSize: MediaByteSize, digest: ContentDigest): MediaNormalizationArtifact?
+    fun retainUnsafe(): MediaWorkerWorkspaceRetention = MediaWorkerWorkspaceRetention.Unknown
     override fun close()
+}
+
+class ApprovedMediaWorkerRuntime private constructor(
+    val javaVendor: String,
+    val javaRuntimeVersion: String,
+    val operatingSystem: MediaWorkerOperatingSystem,
+    val architecture: MediaWorkerArchitecture,
+) {
+    companion object {
+        fun create(
+            javaVendor: String?,
+            javaRuntimeVersion: String?,
+            operatingSystem: MediaWorkerOperatingSystem,
+            architecture: MediaWorkerArchitecture,
+        ): ApprovedMediaWorkerRuntime? {
+            if (javaVendor.isNullOrBlank() || javaRuntimeVersion.isNullOrBlank()) return null
+            if (operatingSystem != MediaWorkerOperatingSystem.LINUX) return null
+            if (architecture !in setOf(MediaWorkerArchitecture.AMD64, MediaWorkerArchitecture.ARM64)) return null
+            return ApprovedMediaWorkerRuntime(javaVendor, javaRuntimeVersion, operatingSystem, architecture)
+        }
+    }
 }
 
 data class MediaPublishedInput(val size: MediaByteSize, val digest: ContentDigest)
@@ -74,6 +119,8 @@ sealed interface MediaWorkerExecution {
         init { require(exitCode in 0..255); require(stdout.size <= 65_536); require(stderr.size <= 65_536) }
     }
     data object TimedOut : MediaWorkerExecution
+    /** The manager could not prove the entire service stopped; callers must retain the workspace. */
+    data object TerminationUnknown : MediaWorkerExecution
     data object IsolationUnavailable : MediaWorkerExecution
     data object Failed : MediaWorkerExecution
     data object Unknown : MediaWorkerExecution

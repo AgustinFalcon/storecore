@@ -47,11 +47,11 @@
       PR #309 head `b41fc7ea369da338e07427c837518aa518dfe398` pasó Verify
       #837 run `44795354530` 5/5 y dos reviews exact-head sin P0–P3. Merge
       `17aadc84fbaf6a762d17414311b8a6559ed19d3b`.
-    - [ ] `MEDIA-NORMALIZE-003B-3`: self-test y attestación offline.
-      Implementado localmente con operación cerrada `SELF_TEST`, fingerprint
-      del jar/runtime/plataforma/dependencias/providers/política/corpus y
-      evaluador fail-closed. Abierto hasta CI y dos reviews exact-head; no
-      declara `Ready`.
+    - [x] `MEDIA-NORMALIZE-003B-3`: self-test y attestación offline.
+      PR #310 head `f6bb3a326ddfab23cfe2162ad21c6d805f3c04e5` pasó Verify
+      run `44801937465` 5/5 y dos reviews exact-head sin P0–P3. Merge
+      `28b99b75cb3d683f60f2c1ca547986ef4b8fe0a8`. Post-merge Verify run
+      `44804049350` 5/5. No declara `Ready`.
     - [ ] `MEDIA-NORMALIZE-003B-4`: contención Linux real y factory fail-closed.
       Único corte que puede devolver `Ready`.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.

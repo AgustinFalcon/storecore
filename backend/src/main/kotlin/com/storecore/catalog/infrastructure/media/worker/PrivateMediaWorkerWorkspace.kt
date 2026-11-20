@@ -28,6 +28,16 @@ class PrivateMediaWorkerWorkspace(root: Path) : MediaWorkerWorkspaceManager {
     private val root = root.toAbsolutePath().normalize()
     private val active = ConcurrentHashMap.newKeySet<Path>()
 
+    /**
+     * This manager deliberately grants access only to the backend owner. A worker running under a
+     * dedicated Unix account therefore cannot use it; a future Linux handoff manager must model
+     * and verify that second principal without weakening these private-workspace guarantees.
+     */
+    override fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess = when (principal) {
+        MediaWorkerPrincipal.DEDICATED_WORKER -> MediaWorkerWorkspaceAccess.Unavailable
+        MediaWorkerPrincipal.UNKNOWN -> MediaWorkerWorkspaceAccess.Unknown
+    }
+
     override fun create(requestId: UUID): MediaWorkerWorkspaceResult = runCatching {
         ensureRoot() ?: return MediaWorkerWorkspaceResult.Unavailable
         val directory = root.resolve(requestId.toString()).normalize()
@@ -144,6 +154,19 @@ class PrivateMediaWorkerWorkspace(root: Path) : MediaWorkerWorkspaceManager {
             return ClaimedArtifact(this, expectedSize, digest, fileIdentity)
         }
 
+        override fun retainUnsafe(): MediaWorkerWorkspaceRetention {
+            if (closed || !validDirectory()) return MediaWorkerWorkspaceRetention.Unknown
+            // From this point cleanup is forbidden even when quarantine itself cannot be moved.
+            // The active entry intentionally keeps the original workspace fenced in-process.
+            closed = true
+            val quarantined = quarantine(directory) ?: return MediaWorkerWorkspaceRetention.Unavailable
+            if (quarantined.parent != root || !quarantined.fileName.toString().startsWith(QUARANTINE_PREFIX)) {
+                return MediaWorkerWorkspaceRetention.Unknown
+            }
+            active.remove(directory)
+            return MediaWorkerWorkspaceRetention.Retained
+        }
+
         override fun close() {
             if (closed) return
             closed = true
@@ -257,14 +280,13 @@ class PrivateMediaWorkerWorkspace(root: Path) : MediaWorkerWorkspaceManager {
         return unsafe(reason)
     }
 
-    private fun quarantine(path: Path) {
+    private fun quarantine(path: Path): Path? =
         runCatching {
             if (path.toAbsolutePath().normalize().parent == root && Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
                 val target = root.resolve("$QUARANTINE_PREFIX${UUID.randomUUID()}")
                 Files.move(path, target, StandardCopyOption.ATOMIC_MOVE)
-            }
-        }
-    }
+            } else null
+        }.getOrNull()
 
     private fun unsafe(reason: MediaWorkerWorkspaceUnsafeReason): MediaWorkerSweepResult =
         requireNotNull(MediaWorkerSweepResult.Unsafe.create(reason))

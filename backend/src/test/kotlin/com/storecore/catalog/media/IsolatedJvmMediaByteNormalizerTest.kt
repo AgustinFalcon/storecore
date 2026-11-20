@@ -62,6 +62,48 @@ class IsolatedJvmMediaByteNormalizerTest {
     }
 
     @Test
+    fun `unconfirmed manager termination retains workspace and permanently closes admission`() {
+        val input = byteArrayOf(1, 2, 3)
+        val workspace = FakeWorkspace(temp.resolve("termination-unknown"), byteArrayOf(1))
+        val normalizer = normalizer(
+            workspace,
+            MediaWorkerLauncher { _, _, _ -> MediaWorkerExecution.TerminationUnknown },
+        )
+        val short = shortLimits()
+        assertSame(MediaNormalizationResult.Unavailable, normalizer.normalize(source(input), short))
+        assertTrue(workspace.retained)
+        val second = normalizer.normalize(source(input), short) as MediaNormalizationResult.Rejected
+        assertEquals(MediaNormalizationRejectReason.RESOURCE_LIMIT_EXCEEDED, second.reason)
+    }
+
+    @Test
+    fun `failed retention never closes or cleans a possibly live workspace`() {
+        listOf(MediaWorkerWorkspaceRetention.Unavailable, MediaWorkerWorkspaceRetention.Unknown).forEachIndexed { index, retention ->
+            val workspace = FakeWorkspace(temp.resolve("retention-failed-$index"), byteArrayOf(1), retention)
+            val result = normalizer(
+                workspace,
+                MediaWorkerLauncher { _, _, _ -> MediaWorkerExecution.TerminationUnknown },
+            ).normalize(source(byteArrayOf(1, 2, 3)), shortLimits())
+            assertTrue(result == MediaNormalizationResult.Unavailable || result == MediaNormalizationResult.Unknown)
+            assertTrue(workspace.retained)
+            assertFalse(workspace.closed, "lease close must not run after unconfirmed process termination")
+        }
+        val throwing = FakeWorkspace(
+            temp.resolve("retention-throws"),
+            byteArrayOf(1),
+            retentionFailure = IllegalStateException("quarantine unavailable"),
+        )
+        val normalizer = normalizer(
+            throwing,
+            MediaWorkerLauncher { _, _, _ -> MediaWorkerExecution.TerminationUnknown },
+        )
+        assertSame(MediaNormalizationResult.Unavailable, normalizer.normalize(source(byteArrayOf(1)), shortLimits()))
+        assertFalse(throwing.closed)
+        val second = normalizer.normalize(source(byteArrayOf(1)), shortLimits()) as MediaNormalizationResult.Rejected
+        assertEquals(MediaNormalizationRejectReason.RESOURCE_LIMIT_EXCEEDED, second.reason)
+    }
+
+    @Test
     fun `declared size mismatch and oversized source are rejected before acceptance`() {
         val workspace = FakeWorkspace(temp.resolve("size"), byteArrayOf(1))
         val never = MediaWorkerLauncher { _, _, _ -> fail("launcher must not run") }
@@ -94,7 +136,30 @@ class IsolatedJvmMediaByteNormalizerTest {
         override val size = byteSize(bytes); override fun openStream() = ByteArrayInputStream(bytes)
     }
 
-    private class FakeWorkspace(private val root: Path, private val outputBytes: ByteArray) : MediaWorkerWorkspaceLease {
+    private fun shortLimits(): MediaNormalizationLimits {
+        val standard = MediaNormalizationLimits.standard()
+        return requireNotNull(MediaNormalizationLimits.create(
+            standard.maxInputBytes,
+            standard.maxOutputBytes,
+            standard.minSide,
+            standard.maxSide,
+            standard.maxPixels,
+            standard.workerHeapBytes,
+            standard.workspaceBytes,
+            MediaDurationLimit.fromWire(25),
+            standard.maxConcurrency,
+            standard.maxDiagnosticBytes,
+            standard.maxContainerSegments,
+            standard.maxMetadataBytes,
+        ))
+    }
+
+    private class FakeWorkspace(
+        private val root: Path,
+        private val outputBytes: ByteArray,
+        private val retentionResult: MediaWorkerWorkspaceRetention = MediaWorkerWorkspaceRetention.Retained,
+        private val retentionFailure: RuntimeException? = null,
+    ) : MediaWorkerWorkspaceLease {
         override val directory: Path = root
         override val input: Path = root.resolve("input.bin")
         override val request: Path = root.resolve("request.bin")
@@ -102,6 +167,7 @@ class IsolatedJvmMediaByteNormalizerTest {
         override val output: Path = root.resolve("output.bin")
         override val diagnostic: Path = root.resolve("diagnostic.bin")
         var closed = false
+        var retained = false
         init { Files.createDirectories(root) }
         override fun publishInput(source: InputStream, maxBytes: Long): MediaPublishedInput? {
             val bytes = source.readNBytes((maxBytes + 1).toInt()); if (bytes.size.toLong() > maxBytes) return null
@@ -116,6 +182,12 @@ class IsolatedJvmMediaByteNormalizerTest {
             return object : MediaNormalizationArtifact {
                 override val size = byteSize(copy); override fun openStream() = ByteArrayInputStream(copy); override fun close() = Unit
             }
+        }
+        override fun retainUnsafe(): MediaWorkerWorkspaceRetention {
+            retained = true
+            retentionFailure?.let { throw it }
+            if (retentionResult == MediaWorkerWorkspaceRetention.Retained) closed = true
+            return retentionResult
         }
         override fun close() { closed = true }
     }

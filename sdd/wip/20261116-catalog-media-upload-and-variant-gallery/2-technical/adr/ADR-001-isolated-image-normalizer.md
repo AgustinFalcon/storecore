@@ -5,8 +5,10 @@
 Aceptado para el contrato `MEDIA-NORMALIZE-001`. El parser estructural de
 `MEDIA-NORMALIZE-002` está implementado. `MEDIA-NORMALIZE-003A` está fusionado.
 `MEDIA-NORMALIZE-003B-1` y `MEDIA-NORMALIZE-003B-2` están fusionados.
-`MEDIA-NORMALIZE-003B-3` agrega self-test y evaluación de attestación offline,
-todavía sin factory `Ready`, launcher productivo ni HTTP. Upload continúa
+`MEDIA-NORMALIZE-003B-3` está fusionado. `MEDIA-NORMALIZE-003B-4` agrega la
+factory fail-closed, `systemd-run` y attestación cgroup v2. `Ready` sólo
+existe cuando el aislamiento Linux está atestado y el SELF_TEST corre dentro
+del sandbox. Windows permanece `Unavailable` sin Job Object. Upload continúa
 deshabilitado.
 
 ### Parámetros deterministas IMAGE_IO_V1 (003B-2)
@@ -47,8 +49,30 @@ los goldens no se actualizan automáticamente.
   parámetros `IMAGE_IO_V1`; y hashes de un corpus built-in versionado.
 - El padre compara nonce y digests con `MessageDigest.isEqual`, además de
   igualdad exacta del resto. Drift o `Unknown` produce `Unavailable`. El único
-  vocabulario de evaluación es `Matched | Unavailable | Unknown`; `Ready` no
-  existe en este corte.
+  vocabulario de evaluación es `Matched | Unavailable | Unknown`.
+
+### Contención Linux y factory (003B-4)
+
+- El launcher productivo invoca únicamente `/usr/bin/systemd-run` o
+  `/bin/systemd-run` root-owned. No hay fallback a `ProcessBuilder` de `java`.
+- `Ready` exige Linux amd64/arm64, cgroup v2, usuario `storecore-media-worker`,
+  `NoNewPrivileges`, namespaces, sin AF_INET/AF_INET6, `KillMode=control-group`,
+  `MemorySwapMax=0`, `memory.oom.group`, `TasksMax`, `CPUQuota`, RLIMIT y
+  SELF_TEST `Matched` dentro de esa unidad. Cualquier fallo es `Unavailable`.
+- Cada ejecución usa una unidad con nombre propio, `RuntimeMaxSec` y
+  `TimeoutStopSec`. El padre ordena kill/stop mediante `systemctl` atestado y
+  sólo libera admisión y workspace tras verificar estado terminal sin PID,
+  cgroup ni job. Una terminación no verificable retiene el workspace y cierra
+  nuevas admisiones hasta intervención/reinicio.
+- El workspace privado backend-only (0700/0600) declara incompatibilidad con
+  el UID dedicado y nunca puede producir `Ready`. El futuro handoff Linux será
+  otro adapter que pruebe ambos principals; no se relajan permisos ni checks
+  de owner del manager privado.
+- Vendor/versión Java esperados provienen de un perfil aprobado independiente;
+  OS/arquitectura deben coincidir con la attestación del padre. El worker lleva
+  un inventario de dependencias filtrado y versionado dentro del JAR sombreado,
+  validado por la factory sobre el artefacto real.
+- Windows productivo permanece `Unavailable` hasta un Job Object equivalente.
 
 ## Contexto
 

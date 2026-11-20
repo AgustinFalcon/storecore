@@ -3,6 +3,8 @@ package com.storecore.catalog.media
 import com.storecore.catalog.domain.media.ContentDigest
 import com.storecore.catalog.domain.media.MediaByteSize
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerSweepResult
+import com.storecore.catalog.infrastructure.media.worker.MediaWorkerPrincipal
+import com.storecore.catalog.infrastructure.media.worker.MediaWorkerWorkspaceAccess
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerWorkspaceResult
 import com.storecore.catalog.infrastructure.media.worker.PrivateMediaWorkerWorkspace
 import org.junit.jupiter.api.Assertions.*
@@ -22,6 +24,13 @@ import java.util.UUID
 
 class PrivateMediaWorkerWorkspaceTest {
     @TempDir lateinit var temporary: Path
+
+    @Test
+    fun `private backend workspace fails closed for the dedicated worker principal`() {
+        val manager = PrivateMediaWorkerWorkspace(temporary.resolve("worker"))
+        assertSame(MediaWorkerWorkspaceAccess.Unavailable, manager.accessFor(MediaWorkerPrincipal.DEDICATED_WORKER))
+        assertSame(MediaWorkerWorkspaceAccess.Unknown, manager.accessFor(MediaWorkerPrincipal.UNKNOWN))
+    }
 
     @Test
     fun `publishes with create-new and transfers artifact ownership until artifact close`() {

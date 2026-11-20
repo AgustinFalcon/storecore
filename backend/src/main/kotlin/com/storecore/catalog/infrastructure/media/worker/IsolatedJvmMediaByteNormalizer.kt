@@ -28,6 +28,7 @@ class IsolatedJvmMediaByteNormalizer(
         val waitMillis = limits.timeout.value.toMillis()
         val acquired = runCatching { admission.tryAcquire(waitMillis, TimeUnit.MILLISECONDS) }.getOrDefault(false)
         if (!acquired) return rejected(MediaNormalizationRejectReason.RESOURCE_LIMIT_EXCEEDED)
+        var releaseAdmission = true
         try {
             val requestId = UUID.randomUUID()
             val workspace = when (val result = workspaceManager.create(requestId)) {
@@ -35,7 +36,9 @@ class IsolatedJvmMediaByteNormalizer(
                 MediaWorkerWorkspaceResult.Unavailable -> return MediaNormalizationResult.Unavailable
                 MediaWorkerWorkspaceResult.Unknown -> return MediaNormalizationResult.Unknown
             }
-            workspace.use { lease ->
+            val lease = workspace
+            var closeLease = true
+            try {
                 val published = runCatching { source.openStream().use { lease.publishInput(it, limits.maxInputBytes.value) } }.getOrNull()
                     ?: return rejected(MediaNormalizationRejectReason.INPUT_LIMIT_EXCEEDED)
                 if (published.size != source.size) return rejected(MediaNormalizationRejectReason.CORRUPT_CONTAINER)
@@ -57,13 +60,21 @@ class IsolatedJvmMediaByteNormalizer(
                         rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
                     }
                     MediaWorkerExecution.TimedOut -> rejected(MediaNormalizationRejectReason.DECODE_TIMEOUT)
+                    MediaWorkerExecution.TerminationUnknown -> {
+                        closeLease = false
+                        releaseAdmission = false
+                        runCatching { lease.retainUnsafe() }
+                        MediaNormalizationResult.Unavailable
+                    }
                     MediaWorkerExecution.IsolationUnavailable -> MediaNormalizationResult.Unavailable
                     MediaWorkerExecution.Failed -> rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
                     MediaWorkerExecution.Unknown -> MediaNormalizationResult.Unknown
                 }
+            } finally {
+                if (closeLease) lease.close()
             }
         } finally {
-            admission.release()
+            if (releaseAdmission) admission.release()
         }
     }
 
