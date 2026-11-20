@@ -40,7 +40,11 @@ class DedicatedUnixMediaWorkerWorkspaceTest {
         val created = manager.create(UUID.randomUUID())
         assertTrue(created is MediaWorkerWorkspaceResult.Created, created.toString())
         val lease = (created as MediaWorkerWorkspaceResult.Created).lease
+        val before = Files.getPosixFilePermissions(lease.directory)
+        assertTrue(PosixFilePermission.GROUP_WRITE !in before)
+        assertTrue(PosixFilePermission.GROUP_EXECUTE !in before)
         Files.writeString(lease.request, "self-test")
+        assertTrue(PosixFilePermission.GROUP_READ !in Files.getPosixFilePermissions(lease.request))
         assertSame(MediaWorkerWorkspaceAccess.Compatible, manager.grantWorker(lease))
         val directoryView = Files.getFileAttributeView(lease.directory, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
         val requestView = Files.getFileAttributeView(lease.request, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)

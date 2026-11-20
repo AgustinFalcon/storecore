@@ -341,43 +341,30 @@ class PrivateMediaWorkerWorkspace(
             ?: return false
         view.setGroup(dedicated.identity.group)
         view.setPermissions(sharedPermissions(directory))
-        verifyPrivacy(path, directory, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name)
+        verifyAccess(path, directory, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name, shared = true)
     }.getOrDefault(false)
 
+    private fun privatePermissions(directory: Boolean) = if (directory) {
+        setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
+    } else {
+        setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
+    }
+
     private fun sharedPermissions(directory: Boolean) = if (directory) {
-        setOf(
-            PosixFilePermission.OWNER_READ,
-            PosixFilePermission.OWNER_WRITE,
-            PosixFilePermission.OWNER_EXECUTE,
+        privatePermissions(true) + setOf(
             PosixFilePermission.GROUP_READ,
             PosixFilePermission.GROUP_WRITE,
             PosixFilePermission.GROUP_EXECUTE,
         )
     } else {
-        setOf(
-            PosixFilePermission.OWNER_READ,
-            PosixFilePermission.OWNER_WRITE,
-            PosixFilePermission.GROUP_READ,
-            PosixFilePermission.GROUP_WRITE,
-        )
+        privatePermissions(false) + setOf(PosixFilePermission.GROUP_READ, PosixFilePermission.GROUP_WRITE)
     }
 
     private fun restrict(path: Path, directory: Boolean): Boolean {
         val view = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
         if (view != null) {
-            val dedicated = policy as? MediaWorkerWorkspacePolicy.DedicatedUnix
-            if (dedicated != null) {
-                view.setGroup(dedicated.identity.group)
-                view.setPermissions(sharedPermissions(directory))
-            } else {
-                val permissions = if (directory) {
-                    setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
-                } else {
-                    setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
-                }
-                view.setPermissions(permissions)
-            }
-            return verifyPrivacy(path, directory, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name)
+            view.setPermissions(privatePermissions(directory))
+            return verifyAccess(path, directory, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name, shared = false)
         }
         val aclView = Files.getFileAttributeView(path, AclFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
             ?: return false
@@ -388,25 +375,24 @@ class PrivateMediaWorkerWorkspace(
             .setPermissions(AclEntryPermission.entries.toSet())
             .build()
         aclView.acl = listOf(ownerEntry)
-        return verifyPrivacy(path, directory, owner.name)
+        return verifyAccess(path, directory, owner.name, shared = false)
     }
 
-    private fun verifyPrivacy(path: Path, directory: Boolean, owner: String): Boolean = runCatching {
+    private fun verifyPrivacy(path: Path, directory: Boolean, owner: String): Boolean =
+        verifyAccess(path, directory, owner, shared = false)
+
+    private fun verifyAccess(path: Path, directory: Boolean, owner: String, shared: Boolean): Boolean = runCatching {
         val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
         if (posix != null) {
             val attributes = posix.readAttributes()
-            val actual = attributes.permissions()
-            val expected = when (policy) {
-                MediaWorkerWorkspacePolicy.PrivateBackend -> if (directory) {
-                    setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
-                } else setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)
-                is MediaWorkerWorkspacePolicy.DedicatedUnix -> sharedPermissions(directory)
+            val expected = if (shared) sharedPermissions(directory) else privatePermissions(directory)
+            val groupMatches = if (!shared) true else {
+                val dedicated = policy as? MediaWorkerWorkspacePolicy.DedicatedUnix ?: return@runCatching false
+                attributes.group() == dedicated.identity.group
             }
-            val groupMatches = when (val current = policy) {
-                MediaWorkerWorkspacePolicy.PrivateBackend -> true
-                is MediaWorkerWorkspacePolicy.DedicatedUnix -> attributes.group() == current.identity.group
-            }
-            return@runCatching actual == expected && attributes.owner().name == owner && groupMatches
+            return@runCatching actualPermissions(attributes) == expected &&
+                attributes.owner().name == owner &&
+                groupMatches
         }
         val acl = Files.getFileAttributeView(path, AclFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
             ?: return@runCatching false
@@ -414,6 +400,8 @@ class PrivateMediaWorkerWorkspace(
             acl.acl.filter { it.type() == AclEntryType.ALLOW }
                 .all { it.principal().name.equals(owner, ignoreCase = true) }
     }.getOrDefault(false)
+
+    private fun actualPermissions(attributes: java.nio.file.attribute.PosixFileAttributes) = attributes.permissions()
 
     private fun inspectVerified(path: Path, owner: String, expected: FileIdentity, expectedSize: Long): FileInspection? {
         val channel = openVerified(path, owner, expected) ?: return null
