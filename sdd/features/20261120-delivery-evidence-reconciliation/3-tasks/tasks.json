@@ -3,5 +3,5 @@
   {"id":"DER-002","title":"Verify exact-head delivery evidence","status":"done","depends_on":["DER-001"]},
   {"id":"DER-003","title":"Verify post-merge evidence","status":"done","depends_on":["DER-002"]},
   {"id":"DER-004","title":"Reconcile documentary state","status":"done","depends_on":["DER-003"]},
-  {"id":"DER-005","title":"Deliver reconciliation","status":"pending","depends_on":["DER-004"]}
+  {"id":"DER-005","title":"Deliver reconciliation","status":"done","depends_on":["DER-004"]}
 ]
