@@ -216,6 +216,21 @@ reconcilia durablemente units/mounts tras reinicio. Java y worker provienen de
 una instalación root-owned versionada, sin symlinks, con ejecutables `0555`,
 jar/datos `0444` y digest aprobado.
 
+La implementación 4B es un workspace Rust separado con daemon root-owned y un
+helper cliente root-owned pero ejecutado sin privilegios por el UID backend. El
+adapter Kotlin habla un protocolo stdio acotado con el helper; éste es dueño del
+transporte Unix/`SCM_RIGHTS`. Así Spring no carga FFI nativo y el daemon recibe
+un peer kernel-authenticated del mismo principal. Dominio/application conservan
+`MediaByteNormalizer`; `BrokeredMediaByteNormalizer` y todos los detalles del SO
+viven en infrastructure.
+
+El orden implementable es: 4B-1 codec/transporte/snapshot sin privilegios;
+4B-2 estado durable/CAS/budgets; 4B-3 daemon systemd, mounts y runtime; 4B-4
+adapter backend/ACK. Los mounts tmpfs por job son unidades `.mount` transitorias
+de PID 1 creadas por D-Bus y derivadas internamente, no templates ni paths del
+cliente. Ningún subcorte aislado habilita `Ready`; 4C sigue siendo el gate Linux
+real posterior.
+
 Los estados del broker, resultados de handoff y attestación son tipos cerrados;
 un wire desconocido se traduce una sola vez a `Unknown` y bloquea admisión. La
 attestación lee propiedades efectivas y cgroup v2, incluida la cuota/mount real,

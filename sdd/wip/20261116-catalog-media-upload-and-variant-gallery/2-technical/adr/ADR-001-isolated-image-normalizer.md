@@ -90,6 +90,64 @@ cortes trazables:
   efectivos, SELF_TEST/NORMALIZE, terminación, cleanup y recuperación. Sólo el
   conjunto `4A+4B+4C` puede completar `003B-4`.
 
+##### Implementación aprobada para 003B-4B
+
+El broker y su transporte nativo se implementan como workspace Rust standalone,
+fuera del JAR Spring. Produce dos binarios root-owned versionados:
+
+- `storecore-media-broker`, daemon local cuya única autoridad privilegiada es
+  la API cerrada de jobs y los métodos systemd D-Bus allowlisted;
+- `storecore-media-broker-client`, helper **sin privilegios** ejecutado por el
+  UID backend con argv fijo. Recibe por stdin un envelope/stream acotado,
+  construye el FD de ingress y usa `SCM_RIGHTS` contra el daemon.
+
+Spring no carga JNA/JNI ni implementa ancillary messages. Un adapter
+`BrokeredMediaByteNormalizer` en infrastructure ejecuta el helper root-owned,
+traduce una sola vez su wire y conserva el puerto de aplicación
+`MediaByteNormalizer`; dominio/application no conocen UID, socket, mount,
+systemd ni D-Bus. El workspace privado y su factory existente permanecen como
+adapter separado y no se presentan como compatibles.
+
+Rust usa enums exhaustivos propios. Cualquier variante futura de una dependencia
+`non_exhaustive` (incluidos mensajes auxiliares) se traduce a `Unknown` y falla
+cerrado. La primera dependencia de syscall candidata es `rustix` sólo con
+features mínimas: su API tipa `SCM_RIGHTS` recibido como `OwnedFd`. `zbus`
+bloqueante se incorpora recién en el corte systemd, no al codec/transporte
+inicial. Toolchain exacta, `Cargo.lock`, `--locked`, features, licencias, SBOM y
+vulnerabilidades son gates del artefacto; no se acepta un lockfile inventado o
+sin resolución reproducible.
+
+`003B-4B` se entrega por subcortes que no habilitan `Ready` individualmente:
+
+1. `4B-1`: codec Kotlin/Rust, vectores compartidos, helper/daemon de prueba sin
+   privilegios, peer credentials, exactamente un FD regular `CLOEXEC`, rechazo
+   de truncado/exceso y snapshot nuevo. CI Linux; sin mount, D-Bus o wiring.
+2. `4B-2`: máquina durable/CAS, budgets, journal fsync/rename/dir-fsync y
+   reconciliación con adapters fake; corrupción o transición desconocida cierra
+   admisión.
+3. `4B-3`: daemon endurecido, runtime aprobado y unidades transitorias `.mount`
+   y worker administradas por PID 1 mediante D-Bus. Los nombres/path/properties
+   se derivan internamente; el cliente no los suministra.
+4. `4B-4`: adapter Kotlin `BrokeredMediaByteNormalizer`, lifecycle de artefacto
+   con ACK y capability aún fail-closed hasta el harness `4C`.
+
+Las unidades `.mount` por job no son templates. PID 1 crea el mount visible al
+worker; el broker no depende de mounts creados dentro de un namespace privado y
+no recibe `CAP_SYS_ADMIN` cuando D-Bus/PID 1 puede poseer esa operación. La
+attestación verifica el mount efectivo y su unidad, no sólo el pedido.
+
+Referencias primarias de implementación:
+
+- `rustix` ancillary messages (`ScmRights`/`OwnedFd`):
+  https://docs.rs/rustix/latest/rustix/net/enum.RecvAncillaryMessage.html
+- Cargo reproducible con `--locked`:
+  https://doc.rust-lang.org/cargo/commands/cargo-build.html
+- zbus blocking D-Bus:
+  https://docs.rs/zbus/latest/zbus/blocking/index.html
+- unidades mount y API D-Bus de systemd:
+  https://www.freedesktop.org/software/systemd/man/latest/systemd.mount.html y
+  https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html
+
 El broker es un servicio local root-owned con una API Unix tipada y cerrada. El
 socket es root-owned, no es world-accessible y autentica cada conexión mediante
 `SO_PEERCRED` contra el UID/GID backend configurado en un archivo root-owned.
@@ -110,8 +168,9 @@ Cada job usa un mount `tmpfs` propio, `nosuid,nodev,noexec`, con límite total d
 48 MiB, límite de inodos y directorio raíz no reutilizable. `LimitFSIZE` se
 conserva como defensa por archivo, pero no cuenta como cuota agregada.
 `SealInput` no hace `chmod` o `chown` del inode escrito por el backend: un
-FD/mmap previo seguiría siendo writeable. El backend pasa exactamente un FD
-regular por `SCM_RIGHTS`; el broker valida tipo/size, copia con límite hacia un
+FD/mmap previo seguiría siendo writeable. El helper no privilegiado pasa
+exactamente un FD regular por `SCM_RIGHTS`; el broker valida peer, tipo/size y
+copia con límite hacia un
 inode nuevo `CREATE_EXCL` nunca abierto por el backend, sincroniza, vuelve a
 medir, verifica digest y recién entonces lo publica root-owned/worker-readable.
 Cambio de tamaño/metadata durante la copia, FD extra, device, directorio o
