@@ -3,14 +3,13 @@ package com.storecore.catalog.infrastructure.media.worker
 import com.storecore.catalog.domain.media.MediaFormat
 import com.storecore.catalog.domain.media.PixelDimensions
 import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import javax.imageio.IIOImage
 import javax.imageio.ImageTypeSpecifier
 import javax.imageio.ImageWriteParam
 import javax.imageio.metadata.IIOMetadataNode
 import javax.imageio.spi.IIORegistry
 import javax.imageio.spi.ImageWriterSpi
-import javax.imageio.stream.MemoryCacheImageOutputStream
+import javax.imageio.stream.ImageOutputStreamImpl
 
 data class NormalizedRaster(val image: BufferedImage, val alpha: RasterAlpha, val dimensions: PixelDimensions)
 
@@ -55,15 +54,43 @@ object RasterNormalizer {
 
 class OutputLimitExceeded : RuntimeException()
 
-class BoundedByteArrayOutputStream(private val maxBytes: Int) : ByteArrayOutputStream() {
+class BoundedSeekableImageOutputStream(private val maxBytes: Int) : ImageOutputStreamImpl() {
+    private var buffer = ByteArray(4_096.coerceAtMost(maxBytes))
+    private var length = 0
+
     override fun write(b: Int) {
-        if (count + 1 > maxBytes) throw OutputLimitExceeded()
-        super.write(b)
+        val pos = streamPos.toInt()
+        ensure(pos + 1)
+        buffer[pos] = b.toByte()
+        streamPos++
+        if (streamPos > length) length = streamPos.toInt()
     }
 
     override fun write(b: ByteArray, off: Int, len: Int) {
-        if (count + len > maxBytes) throw OutputLimitExceeded()
-        super.write(b, off, len)
+        val pos = streamPos.toInt()
+        ensure(pos + len)
+        System.arraycopy(b, off, buffer, pos, len)
+        streamPos += len
+        if (streamPos > length) length = streamPos.toInt()
+    }
+
+    override fun read(): Int = throw IllegalStateException("write-only")
+    override fun read(b: ByteArray, off: Int, len: Int): Int = throw IllegalStateException("write-only")
+    override fun length(): Long = length.toLong()
+    override fun seek(pos: Long) {
+        if (pos < flushedPos || pos > maxBytes) throw OutputLimitExceeded()
+        streamPos = pos
+    }
+
+    fun toByteArray(): ByteArray = buffer.copyOf(length)
+
+    private fun ensure(size: Int) {
+        if (size > maxBytes) throw OutputLimitExceeded()
+        if (size > buffer.size) {
+            val grown = buffer.size.toLong() * 2
+            val next = minOf(maxBytes.toLong(), maxOf(grown, size.toLong())).toInt()
+            buffer = buffer.copyOf(next)
+        }
     }
 }
 
@@ -74,8 +101,7 @@ class DeterministicImageEncoder {
         val writer = runCatching { spi.createWriterInstance() }.getOrNull() ?: return null
         val cap = maxOutputBytes.toInt().coerceAtMost(Int.MAX_VALUE)
         return try {
-            val bytes = BoundedByteArrayOutputStream(cap)
-            MemoryCacheImageOutputStream(bytes).use { output ->
+            BoundedSeekableImageOutputStream(cap).use { output ->
                 writer.output = output
                 val param = writer.defaultWriteParam
                 val metadata = when (format) {
@@ -95,8 +121,8 @@ class DeterministicImageEncoder {
                 }
                 writer.write(null, IIOImage(raster.image, null, metadata), param)
                 output.flush()
+                format to output.toByteArray()
             }
-            format to bytes.toByteArray()
         } catch (_: OutputLimitExceeded) {
             throw OutputLimitExceeded()
         } catch (_: Throwable) {
