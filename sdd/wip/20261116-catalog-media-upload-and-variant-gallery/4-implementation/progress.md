@@ -1,5 +1,36 @@
 # Progreso
 
+## 2026-11-20 — MEDIA-NORMALIZE-003B-3 implementado, gate abierto
+
+- El protocolo V1 agrega la operación cerrada `SELF_TEST(2)` sin cambiar el
+  framing ni los codecs de `NORMALIZE(1)`. El challenge contiene UUID y nonce
+  de 256 bits; `WorkerMain` conserva cero argumentos y escribe `result.bin`
+  con `CREATE_NEW`/`NOFOLLOW`, sin crear output.
+- El reporte offline toma SHA-256 del jar realmente ejecutado mediante
+  `ProtectionDomain/CodeSource`. Un jar empaquetado válido es autoritativo; la
+  propiedad documentada `storecore.media.worker.jar` sólo cubre tests in-process
+  cuando CodeSource no es un jar, y exige estructura ZIP con entradas. Ruta
+  ausente, directorio, symlink, no-jar o propiedad distinta del CodeSource
+  empaquetado falla cerrado (`Unavailable`). Incluye vendor y versión Java exactos, plataforma cerrada
+  (Linux amd64/arm64 y Windows amd64 sólo para prueba), inventario exacto de
+  nueve dependencias runtime, módulos TwelveMonkeys `3.15.3`, providers
+  ImageIO, fingerprint de `IMAGE_IO_V1` y hashes del corpus built-in.
+- `MediaWorkerAttestationEvaluator` sólo retorna `Matched`, `Unavailable` o
+  `Unknown`; drift o datos desconocidos quedan `Unavailable`. Nonces y todos
+  los digests se comparan mediante `MessageDigest.isEqual`. No existe resultado
+  `Ready`: pertenece exclusivamente a `MEDIA-NORMALIZE-003B-4`.
+- El backend CI conserva `mvn -B verify` y después ejecuta el fat jar con
+  `java -jar` sobre un workspace temporal `SELF_TEST`. Evidencia local:
+  `mvn -B test` inicialmente 30 tests, 0 failures/errors y 1 skip de symlink;
+  el fat jar devolvió exit 0 y `result.bin` no vacío. La evidencia final se
+  actualizará tras el verify completo del candidato.
+- `MEDIA-NORMALIZE-003B-2` quedó cerrada por PR #309: head `b41fc7e`, Verify
+  #837 5/5, dos reviews exact-head y merge `17aadc8`.
+  `MEDIA-NORMALIZE-003B-3` permanece abierta hasta CI alojado y dos reviews
+  GPT-6.1 Sol exact-head. `003B-4`, `003B`, `003`, `004` y TASK-005 siguen
+  abiertos; sin Spring en el worker, launcher/`ProcessBuilder` productivo,
+  systemd, secretos, deploy ni activación.
+
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-2 implementado, todavía inactivo
 
 - `backend/media-worker` incorpora el protocolo V1 y tipos mínimos worker-local,

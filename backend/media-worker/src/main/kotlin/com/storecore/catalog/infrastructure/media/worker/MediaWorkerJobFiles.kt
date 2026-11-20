@@ -52,7 +52,13 @@ class MediaWorkerJobFiles private constructor(private val root: Path) {
         private const val DIAGNOSTIC = "diagnostic.bin"
         private val ALLOWED = setOf(INPUT, REQUEST, RESULT, OUTPUT, DIAGNOSTIC)
 
-        fun open(workspace: Path): MediaWorkerJobFiles {
+        fun readRequest(workspace: Path): ByteArray {
+            val root = workspace.toAbsolutePath().normalize()
+            require(Files.isDirectory(root, NOFOLLOW_LINKS) && !Files.isSymbolicLink(root))
+            return MediaWorkerJobFiles(root).readRequest()
+        }
+
+        fun open(workspace: Path, requireInput: Boolean = true): MediaWorkerJobFiles {
             val root = workspace.toAbsolutePath().normalize()
             require(Files.isDirectory(root, NOFOLLOW_LINKS) && !Files.isSymbolicLink(root))
             Files.newDirectoryStream(root).use { entries ->
@@ -63,7 +69,11 @@ class MediaWorkerJobFiles private constructor(private val root: Path) {
                 }
             }
             val files = MediaWorkerJobFiles(root)
-            require(Files.isRegularFile(files.input, NOFOLLOW_LINKS) && !Files.isSymbolicLink(files.input))
+            if (requireInput) {
+                require(Files.isRegularFile(files.input, NOFOLLOW_LINKS) && !Files.isSymbolicLink(files.input))
+            } else {
+                require(!Files.exists(files.input, NOFOLLOW_LINKS))
+            }
             require(Files.isRegularFile(files.request, NOFOLLOW_LINKS) && !Files.isSymbolicLink(files.request))
             require(!Files.exists(files.result, NOFOLLOW_LINKS))
             require(!Files.exists(files.output, NOFOLLOW_LINKS))

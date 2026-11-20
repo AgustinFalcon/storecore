@@ -43,11 +43,15 @@
       pasó Verify #828 run `44784133698` 5/5 y dos reviews exact-head
       independientes sin P0–P3. Merge
       `ee1fa96edc0eb1c2722000b3980acecb15706ef7`.
-    - [ ] `MEDIA-NORMALIZE-003B-2`: engine determinista y WorkerMain inactivo.
-      Implementado en `backend/media-worker` (fat jar, SPI explícito, JPEG
-      0.90/4:4:4, PNG Deflate, sin Spring ni `Ready`). Abierto hasta CI y
-      reviews exact-head.
+    - [x] `MEDIA-NORMALIZE-003B-2`: engine determinista y WorkerMain inactivo.
+      PR #309 head `b41fc7ea369da338e07427c837518aa518dfe398` pasó Verify
+      #837 run `44795354530` 5/5 y dos reviews exact-head sin P0–P3. Merge
+      `17aadc84fbaf6a762d17414311b8a6559ed19d3b`.
     - [ ] `MEDIA-NORMALIZE-003B-3`: self-test y attestación offline.
+      Implementado localmente con operación cerrada `SELF_TEST`, fingerprint
+      del jar/runtime/plataforma/dependencias/providers/política/corpus y
+      evaluador fail-closed. Abierto hasta CI y dos reviews exact-head; no
+      declara `Ready`.
     - [ ] `MEDIA-NORMALIZE-003B-4`: contención Linux real y factory fail-closed.
       Único corte que puede devolver `Ready`.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.

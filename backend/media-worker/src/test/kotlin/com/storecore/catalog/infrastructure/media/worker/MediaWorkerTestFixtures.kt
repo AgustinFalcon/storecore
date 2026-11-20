@@ -11,6 +11,8 @@ import java.nio.file.Path
 import java.util.UUID
 import java.util.zip.CRC32
 import java.util.zip.Deflater
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import javax.imageio.ImageIO
 
 internal object MediaWorkerTestFixtures {
@@ -41,6 +43,15 @@ internal object MediaWorkerTestFixtures {
 
     fun golden(name: String): ByteArray =
         requireNotNull(javaClass.getResourceAsStream("/goldens/$name")) { "missing golden $name" }.use { it.readAllBytes() }
+
+    fun minimalJar(path: Path, entryName: String = "META-INF/MANIFEST.MF"): Path {
+        ZipOutputStream(Files.newOutputStream(path)).use { zip ->
+            zip.putNextEntry(ZipEntry(entryName))
+            zip.write("Manifest-Version: 1.0\n".toByteArray())
+            zip.closeEntry()
+        }
+        return path
+    }
 
     fun workspace(root: Path, input: ByteArray): MediaWorkerRequest {
         val request = request(input)

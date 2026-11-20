@@ -107,14 +107,20 @@ class DeterministicImageEncoder {
                 val metadata = when (format) {
                     MediaFormat.JPEG -> {
                         param.compressionMode = ImageWriteParam.MODE_EXPLICIT
-                        param.compressionQuality = 0.90f
-                        param.progressiveMode = ImageWriteParam.MODE_DISABLED
+                        param.compressionQuality = MediaWorkerRuntimeFingerprint.JPEG_QUALITY
+                        param.progressiveMode = if (MediaWorkerRuntimeFingerprint.JPEG_PROGRESSIVE) {
+                            ImageWriteParam.MODE_DEFAULT
+                        } else {
+                            ImageWriteParam.MODE_DISABLED
+                        }
                         jpeg444Metadata(writer.getDefaultImageMetadata(ImageTypeSpecifier(raster.image), param))
                     }
                     MediaFormat.PNG -> {
                         param.compressionMode = ImageWriteParam.MODE_EXPLICIT
-                        param.compressionTypes?.firstOrNull { it.equals("Deflate", true) }?.let { param.compressionType = it }
-                        param.compressionQuality = 0.0f
+                        param.compressionTypes
+                            ?.firstOrNull { it.equals(MediaWorkerRuntimeFingerprint.PNG_COMPRESSION, true) }
+                            ?.let { param.compressionType = it }
+                        param.compressionQuality = MediaWorkerRuntimeFingerprint.PNG_COMPRESSION_QUALITY
                         null
                     }
                     else -> return null
@@ -151,6 +157,7 @@ class DeterministicImageEncoder {
     }
 
     private fun jpeg444Metadata(metadata: javax.imageio.metadata.IIOMetadata): javax.imageio.metadata.IIOMetadata {
+        require(MediaWorkerRuntimeFingerprint.JPEG_CHROMA == "4:4:4")
         val format = "javax_imageio_jpeg_image_1.0"
         val root = metadata.getAsTree(format) as IIOMetadataNode
         val sof = find(root, "sof") ?: return metadata
