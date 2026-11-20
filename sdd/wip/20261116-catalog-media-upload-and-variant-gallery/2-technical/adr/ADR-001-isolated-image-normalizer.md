@@ -3,8 +3,10 @@
 ## Estado
 
 Aceptado para el contrato `MEDIA-NORMALIZE-001`. El parser estructural de
-`MEDIA-NORMALIZE-002` está implementado y en validación; el worker permanece
-pendiente y upload continúa deshabilitado.
+`MEDIA-NORMALIZE-002` está implementado. `MEDIA-NORMALIZE-003A` está fusionado.
+`MEDIA-NORMALIZE-003B-1` fija TwelveMonkeys `3.15.3` y Temurin `21.0.13+9` en
+CI, sin activar decoder, worker productivo ni capability `Ready`. Upload
+continúa deshabilitado.
 
 ## Contexto
 

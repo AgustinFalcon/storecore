@@ -28,12 +28,22 @@
   - [x] `MEDIA-NORMALIZE-003A`: protocolo binario cerrado, workspace privado y
     puertos de supervisor testeables. Un launcher ProcessBuilder best-effort y
     el helper genérico viven sólo en test para validar el contrato; no son una
-    garantía productiva de contención. PR #306 head `6fc0312` pasó Verify #824
-    5/5 y dos reviews exact-head independientes sin P0–P3.
+    garantía productiva de contención. PR #306 head `4efbee490736627ff6185fef4d8a99cee358d125`
+    pasó Verify #825 run `44548801998` 5/5 y dos reviews exact-head independientes
+    sin P0–P3. Merge `e2571fdff4784542dabbc45918f0d2cae703e42f`.
   - [ ] `MEDIA-NORMALIZE-003B`: worker real en el artefacto firmado,
     TwelveMonkeys fijado, JPEG/PNG determinista, self-test y attestación de
     aislamiento Linux poseído por el SO. Debe aportar el launcher productivo y
     su attestación; no se habilita en Windows productivo sin Job Object.
+    - [ ] `MEDIA-NORMALIZE-003B-1`: supply chain y providers, sin engine ni
+      activación. TwelveMonkeys 3.15.3 (`imageio-core`, `imageio-jpeg`,
+      `imageio-webp`), Enforcer, SBOM CycloneDX, allowlist de licencias, CVE
+      high/critical fail-closed e inventario ImageIO cerrado. CI fija Temurin
+      `21.0.13+9`.
+    - [ ] `MEDIA-NORMALIZE-003B-2`: engine determinista y WorkerMain inactivo.
+    - [ ] `MEDIA-NORMALIZE-003B-3`: self-test y attestación offline.
+    - [ ] `MEDIA-NORMALIZE-003B-4`: contención Linux real y factory fail-closed.
+      Único corte que puede devolver `Ready`.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.
 
 TASK-005 sólo se cierra cuando los cuatro subcortes queden aprobados. Ninguno

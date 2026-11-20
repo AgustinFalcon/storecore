@@ -1,5 +1,25 @@
 # Progreso
 
+## 2026-11-20 — merge PR #306 y arranque de MEDIA-NORMALIZE-003B-1
+
+- PR #306 quedó fusionado en `master`. Head revisado
+  `4efbee490736627ff6185fef4d8a99cee358d125`. Merge
+  `e2571fdff4784542dabbc45918f0d2cae703e42f`.
+- Verify #825, run `44548801998`, 5/5 sobre `4efbee4`. Las reviews finales
+  exact-head de arquitectura y seguridad aprobaron ese SHA sin P0–P3; los
+  dictámenes se registran en `sdd/reviews/20261120-sol-pr306-architecture.md` y
+  `sdd/reviews/20261120-sol-pr306-security.md` para no invalidar el SHA
+  fusionado. Las reviews de `6fc0312` no son evidencia de merge.
+- Verify post-merge #826, run `44781802512`, terminó 5/5 verde sobre
+  `e2571fd`: higiene, backend, frontend y ambas matrices E2E reales.
+- `MEDIA-NORMALIZE-003A` queda cerrada. `MEDIA-NORMALIZE-003`, `003B`,
+  `003B-1..4`, `004` y TASK-005 continúan abiertas.
+- `MEDIA-NORMALIZE-003B-1` agrega el módulo `backend/media-worker` fuera del
+  classpath de Spring: TwelveMonkeys 3.15.3 mínimo, Enforcer, SBOM CycloneDX
+  JSON con hashes, allowlist de licencias, inventario ImageIO cerrado y pin
+  Temurin `21.0.13+9` en CI. No hay bean, caller, endpoint, engine ni
+  activación. El corte no acredita `Ready`.
+
 ## 2026-11-19 — cierre exact-head del protocolo del worker aislado
 
 - PR #306 congela `MEDIA-NORMALIZE-003A` sobre head
