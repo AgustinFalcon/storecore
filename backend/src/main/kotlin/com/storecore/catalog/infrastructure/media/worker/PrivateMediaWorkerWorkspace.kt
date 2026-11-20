@@ -48,6 +48,7 @@ class PrivateMediaWorkerWorkspace(
             ?: return MediaWorkerWorkspaceAccess.Unavailable
         val directory = lease.directory.toAbsolutePath().normalize()
         if (directory.parent != root) return MediaWorkerWorkspaceAccess.Unknown
+        if (!shareRootTraversal(root, dedicated)) return MediaWorkerWorkspaceAccess.Unavailable
         if (!shareWithWorker(directory, dedicated, directory = true)) return MediaWorkerWorkspaceAccess.Unavailable
         listOf(lease.input, lease.request, lease.result, lease.output, lease.diagnostic).forEach { path ->
             if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) return@forEach
@@ -249,7 +250,7 @@ class PrivateMediaWorkerWorkspace(
             if (!restrict(root, directory = true)) return null
         }
         if (hierarchy.any { (path, expected) -> identity(path) != expected }) return null
-        identity(root)?.takeIf { it.directory && verifyPrivacy(root, directory = true, owner = it.owner) }
+        identity(root)?.takeIf { it.directory && verifyRoot(root, it.owner) }
     }.getOrNull()
 
     /**
@@ -344,6 +345,17 @@ class PrivateMediaWorkerWorkspace(
             actual == directoryOwner || actual == current.identity.user.name
     }
 
+    private fun shareRootTraversal(
+        path: Path,
+        dedicated: MediaWorkerWorkspacePolicy.DedicatedUnix,
+    ): Boolean = runCatching {
+        val view = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
+            ?: return false
+        view.setGroup(dedicated.identity.group)
+        view.setPermissions(traversePermissions())
+        verifyRootTraversal(path, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name, dedicated)
+    }.getOrDefault(false)
+
     private fun shareWithWorker(
         path: Path,
         dedicated: MediaWorkerWorkspacePolicy.DedicatedUnix,
@@ -355,6 +367,13 @@ class PrivateMediaWorkerWorkspace(
         view.setPermissions(sharedPermissions(directory))
         verifyAccess(path, directory, Files.getOwner(path, LinkOption.NOFOLLOW_LINKS).name, shared = true)
     }.getOrDefault(false)
+
+    private fun traversePermissions() = setOf(
+        PosixFilePermission.OWNER_READ,
+        PosixFilePermission.OWNER_WRITE,
+        PosixFilePermission.OWNER_EXECUTE,
+        PosixFilePermission.GROUP_EXECUTE,
+    )
 
     private fun privatePermissions(directory: Boolean) = if (directory) {
         setOf(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE)
@@ -392,6 +411,27 @@ class PrivateMediaWorkerWorkspace(
 
     private fun verifyPrivacy(path: Path, directory: Boolean, owner: String): Boolean =
         verifyAccess(path, directory, owner, shared = false)
+
+    private fun verifyRoot(path: Path, owner: String): Boolean {
+        if (policy !is MediaWorkerWorkspacePolicy.DedicatedUnix) {
+            return verifyPrivacy(path, directory = true, owner)
+        }
+        val dedicated = policy
+        return verifyPrivacy(path, directory = true, owner) || verifyRootTraversal(path, owner, dedicated)
+    }
+
+    private fun verifyRootTraversal(
+        path: Path,
+        owner: String,
+        dedicated: MediaWorkerWorkspacePolicy.DedicatedUnix,
+    ): Boolean = runCatching {
+        val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
+            ?: return false
+        val attributes = posix.readAttributes()
+        attributes.permissions() == traversePermissions() &&
+            attributes.owner().name == owner &&
+            attributes.group() == dedicated.identity.group
+    }.getOrDefault(false)
 
     private fun verifyAccess(path: Path, directory: Boolean, owner: String, shared: Boolean): Boolean = runCatching {
         val posix = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)

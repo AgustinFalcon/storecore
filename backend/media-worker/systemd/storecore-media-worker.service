@@ -32,6 +32,7 @@ RuntimeMaxSec=12s
 TimeoutStopSec=2s
 SendSIGKILL=yes
 KillSignal=SIGKILL
+UMask=0007
 CapabilityBoundingSet=
 AmbientCapabilities=
 WorkingDirectory=%d

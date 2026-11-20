@@ -8,6 +8,8 @@ import java.nio.file.Path
 import java.nio.file.StandardOpenOption.CREATE_NEW
 import java.nio.file.StandardOpenOption.READ
 import java.nio.file.StandardOpenOption.WRITE
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermission
 
 class MediaWorkerJobFiles private constructor(private val root: Path) {
     val input: Path = root.resolve(INPUT)
@@ -41,6 +43,22 @@ class MediaWorkerJobFiles private constructor(private val root: Path) {
             val buffer = ByteBuffer.wrap(bytes)
             while (buffer.hasRemaining()) channel.write(buffer)
         }
+        shareWithWorkspaceGroup(path)
+    }
+
+    private fun shareWithWorkspaceGroup(path: Path) {
+        val view = Files.getFileAttributeView(path, PosixFileAttributeView::class.java, NOFOLLOW_LINKS) ?: return
+        view.setPermissions(
+            setOf(
+                PosixFilePermission.OWNER_READ,
+                PosixFilePermission.OWNER_WRITE,
+                PosixFilePermission.GROUP_READ,
+                PosixFilePermission.GROUP_WRITE,
+            ),
+        )
+        val directory = Files.getFileAttributeView(path.parent, PosixFileAttributeView::class.java, NOFOLLOW_LINKS)
+            ?: return
+        view.setGroup(directory.readAttributes().group())
     }
 
     companion object {

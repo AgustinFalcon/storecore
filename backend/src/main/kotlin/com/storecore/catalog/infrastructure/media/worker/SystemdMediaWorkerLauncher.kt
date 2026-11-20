@@ -121,6 +121,7 @@ class SystemdMediaWorkerLauncher(
                 "--property=CapabilityBoundingSet=",
                 "--property=AmbientCapabilities=",
                 "--property=NoExecPaths=$directory",
+                "--property=UMask=0007",
                 "--property=MemoryMax=${properties.memoryMaxBytes}",
                 "--property=MemorySwapMax=${properties.memorySwapMaxBytes}",
                 "--property=MemoryOOMGroup=yes",

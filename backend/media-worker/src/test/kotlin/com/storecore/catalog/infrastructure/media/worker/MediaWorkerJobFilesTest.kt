@@ -1,12 +1,16 @@
 package com.storecore.catalog.infrastructure.media.worker
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Files
+import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFileAttributeView
+import java.nio.file.attribute.PosixFilePermission
 
 class MediaWorkerJobFilesTest {
     @TempDir lateinit var workspace: Path
@@ -21,6 +25,29 @@ class MediaWorkerJobFilesTest {
         files.writeResult(byteArrayOf(4, 5))
         assertThrows(Exception::class.java) { files.writeOutput(byteArrayOf(9)) }
         assertThrows(Exception::class.java) { files.writeResult(byteArrayOf(9)) }
+    }
+
+    @Test
+    fun `posix worker artifacts are group-readable 0660 and inherit the workspace group`() {
+        val posix = Files.getFileAttributeView(workspace, PosixFileAttributeView::class.java)
+        assumeTrue(posix != null, "POSIX attributes are required for worker 0660 artifacts")
+        val input = MediaWorkerTestFixtures.image("png")
+        MediaWorkerTestFixtures.workspace(workspace, input)
+        val files = MediaWorkerJobFiles.open(workspace)
+        files.writeOutput(byteArrayOf(1, 2, 3))
+        files.writeResult(byteArrayOf(4, 5))
+        val expected = setOf(
+            PosixFilePermission.OWNER_READ,
+            PosixFilePermission.OWNER_WRITE,
+            PosixFilePermission.GROUP_READ,
+            PosixFilePermission.GROUP_WRITE,
+        )
+        val outputView = Files.getFileAttributeView(workspace.resolve("output.bin"), PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
+        val resultView = Files.getFileAttributeView(workspace.resolve("result.bin"), PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
+        assertEquals(expected, outputView.readAttributes().permissions())
+        assertEquals(expected, resultView.readAttributes().permissions())
+        assertEquals(posix.readAttributes().group(), outputView.readAttributes().group())
+        assertEquals(posix.readAttributes().group(), resultView.readAttributes().group())
     }
 
     @Test
