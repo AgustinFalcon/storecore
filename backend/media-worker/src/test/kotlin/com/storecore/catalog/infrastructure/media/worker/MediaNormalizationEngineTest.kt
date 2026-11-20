@@ -74,18 +74,22 @@ class MediaNormalizationEngineTest {
     }
 
     @Test
-    fun `PNG eXIf and JPEG APP1 orientation 6 rotate the raster`() {
-        val source = MediaWorkerTestFixtures.image("png", width = 320, height = 400)
-        val png = MediaWorkerTestFixtures.withPngExif(source, 6)
-        val pngAccepted = engine.normalize(MediaWorkerTestFixtures.request(png), png) as MediaEngineResult.Accepted
-        assertEquals(400, pngAccepted.dimensions.width)
-        assertEquals(320, pngAccepted.dimensions.height)
-
+    fun `PNG eXIf and JPEG APP1 honor closed orientations 1 through 8`() {
+        val pngSource = MediaWorkerTestFixtures.image("png", width = 320, height = 400)
         val jpegSource = MediaWorkerTestFixtures.image("jpeg", width = 320, height = 400)
-        val jpeg = MediaWorkerTestFixtures.withJpegExif(jpegSource, 6)
-        val jpegAccepted = engine.normalize(MediaWorkerTestFixtures.request(jpeg), jpeg) as MediaEngineResult.Accepted
-        assertEquals(400, jpegAccepted.dimensions.width)
-        assertEquals(320, jpegAccepted.dimensions.height)
+        (1..8).forEach { orientation ->
+            val swapped = orientation in 5..8
+            val expectedWidth = if (swapped) 400 else 320
+            val expectedHeight = if (swapped) 320 else 400
+            val png = MediaWorkerTestFixtures.withPngExif(pngSource, orientation)
+            val pngAccepted = engine.normalize(MediaWorkerTestFixtures.request(png), png) as MediaEngineResult.Accepted
+            assertEquals(expectedWidth, pngAccepted.dimensions.width, "png orientation $orientation")
+            assertEquals(expectedHeight, pngAccepted.dimensions.height, "png orientation $orientation")
+            val jpeg = MediaWorkerTestFixtures.withJpegExif(jpegSource, orientation)
+            val jpegAccepted = engine.normalize(MediaWorkerTestFixtures.request(jpeg), jpeg) as MediaEngineResult.Accepted
+            assertEquals(expectedWidth, jpegAccepted.dimensions.width, "jpeg orientation $orientation")
+            assertEquals(expectedHeight, jpegAccepted.dimensions.height, "jpeg orientation $orientation")
+        }
     }
 
     @Test
