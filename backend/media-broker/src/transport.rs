@@ -97,7 +97,7 @@ pub fn receive_request<Fd: AsFd>(
     let mut slices = [IoSliceMut::new(&mut payload)];
     let mut space = [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(2))];
     let mut ancillary = RecvAncillaryBuffer::new(&mut space);
-    let received = recvmsg(socket, &mut slices, &mut ancillary, RecvFlags::empty())
+    let received = recvmsg(socket, &mut slices, &mut ancillary, RecvFlags::CMSG_CLOEXEC)
         .map_err(|_| TransportError::Io)?;
     if received
         .flags

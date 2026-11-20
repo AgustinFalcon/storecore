@@ -66,6 +66,18 @@ fn oversized_claim_is_rejected_before_creating_a_destination() {
     assert!(!destination.exists());
 }
 
+#[test]
+fn source_size_must_match_before_the_snapshot_is_created() {
+    let fixture = Fixture::new();
+    let source = fixture.source(b"actual");
+    let destination = fixture.root.join("snapshot.bin");
+
+    let result = copy_snapshot(source.as_fd(), &destination, 5, sha256(b"actua"));
+
+    assert_eq!(result, Err(SnapshotError::SizeMismatch));
+    assert!(!destination.exists());
+}
+
 use std::os::fd::AsFd;
 
 struct Fixture {

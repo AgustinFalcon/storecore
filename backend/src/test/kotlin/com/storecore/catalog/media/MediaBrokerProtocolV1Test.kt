@@ -63,9 +63,20 @@ class MediaBrokerProtocolV1Test {
         assertNull(MediaBrokerProtocolV1.decodeRequest(unknownOperation.copyOf(unknownOperation.size - 1)))
     }
 
+    @Test
+    fun `revision range matches Rust at signed maximum and overflow boundary`() {
+        val maxRequest = requireNotNull(MediaBrokerProtocolV1.decodeRequest(hex(vectors.getProperty("request_max_revision"))))
+        val maxResponse = requireNotNull(MediaBrokerProtocolV1.decodeResponse(hex(vectors.getProperty("response_max_revision"))))
+        assertEquals(Long.MAX_VALUE, maxRequest.revision)
+        assertEquals(Long.MAX_VALUE, maxResponse.revision)
+        assertNull(MediaBrokerProtocolV1.decodeRequest(hex(vectors.getProperty("request_revision_overflow"))))
+        assertNull(MediaBrokerProtocolV1.decodeResponse(hex(vectors.getProperty("response_revision_overflow"))))
+        assertNull(MediaBrokerRequest.create(MediaBrokerOperation.SEAL_INPUT, ByteArray(16), 0, ByteArray(32), 1))
+        assertNull(MediaBrokerResponse.create(MediaBrokerResult.SNAPSHOT_ACCEPTED, ByteArray(16), 0))
+    }
+
     private fun hex(raw: String): ByteArray {
         require(raw.length % 2 == 0)
         return raw.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     }
 }
-

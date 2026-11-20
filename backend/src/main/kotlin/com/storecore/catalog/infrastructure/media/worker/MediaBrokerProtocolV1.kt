@@ -13,7 +13,6 @@ enum class MediaBrokerOperation(private val wire: Byte) {
         fun fromWire(raw: Byte): MediaBrokerOperation = entries.firstOrNull { it != UNKNOWN && it.wire == raw } ?: UNKNOWN
     }
 }
-
 enum class MediaBrokerResult(private val wire: Byte) {
     SNAPSHOT_ACCEPTED(1),
     REJECTED(2),
@@ -127,4 +126,3 @@ object MediaBrokerProtocolV1 {
     private fun ByteBuffer.read(size: Int): ByteArray = ByteArray(size).also(::get)
     private fun ByteBuffer.readMagic(expected: ByteArray): Boolean = read(expected.size).contentEquals(expected)
 }
-

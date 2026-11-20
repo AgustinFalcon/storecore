@@ -7,6 +7,8 @@ use std::fs::File;
 use std::io::{IoSlice, Read};
 use std::mem::MaybeUninit;
 use std::os::fd::AsFd;
+use std::os::fd::AsRawFd;
+use std::process::Command;
 use storecore_media_broker::protocol::{BrokerOperation, BrokerRequest};
 use storecore_media_broker::transport::{
     ExpectedPeer, TransportError, receive_request, send_request,
@@ -22,6 +24,12 @@ fn authentic_peer_can_send_exactly_one_descriptor() {
     let received = receive_request(&broker, current_peer()).expect("receive request");
 
     assert_eq!(received.request(), request);
+    assert!(
+        rustix::io::fcntl_getfd(received.input())
+            .expect("read descriptor flags")
+            .contains(rustix::io::FdFlags::CLOEXEC)
+    );
+    assert_descriptor_is_not_inherited(received.input().as_raw_fd());
     let duplicate = rustix::io::dup(received.input()).expect("duplicate received descriptor");
     let mut received_file = File::from(duplicate);
     let mut prefix = [0_u8; 7];
@@ -29,6 +37,22 @@ fn authentic_peer_can_send_exactly_one_descriptor() {
         .read_exact(&mut prefix)
         .expect("read descriptor");
     assert_eq!(&prefix, b"request");
+}
+
+fn assert_descriptor_is_not_inherited(raw_fd: i32) {
+    let expected = std::fs::canonicalize("vectors/v1.properties")
+        .expect("canonical fixture")
+        .to_string_lossy()
+        .into_owned();
+    let status = Command::new("/bin/sh")
+        .arg("-c")
+        .arg(format!(
+            "actual=$(readlink /proc/self/fd/{raw_fd} 2>/dev/null || true); test \"$actual\" != \"$EXPECTED_TARGET\""
+        ))
+        .env("EXPECTED_TARGET", expected)
+        .status()
+        .expect("execute inheritance probe");
+    assert!(status.success(), "received descriptor leaked across exec");
 }
 
 #[test]

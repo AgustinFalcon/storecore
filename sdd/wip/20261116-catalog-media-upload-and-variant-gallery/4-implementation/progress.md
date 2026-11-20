@@ -512,3 +512,16 @@
   `x86_64-unknown-linux-gnu`. Los tests Linux ejecutables, SBOM/CVE y reviews
   exact-head quedan pendientes de CI alojado; por eso `003B-4B-1` sigue
   abierto y no habilita root, mount, D-Bus, wiring Spring ni `Ready`.
+- Las tres reviews independientes del primer candidato
+  `f3dba8f083b316ec10b241eeb48fbdb5918f1322` devolvieron REQUEST_CHANGES con
+  tres P2 coincidentes: descriptores sin `CLOEXEC`, rango wire `u64` no
+  representable por Kotlin y ausencia de fingerprint de metadata fuente
+  antes/después del snapshot. El CI general de ese SHA se canceló para no
+  consumir recursos; sólo el job `media-broker` había terminado verde.
+- La corrección usa `CMSG_CLOEXEC` y `F_DUPFD_CLOEXEC`, prueba flag y no
+  herencia tras `exec`, limita revisión a `1..Long.MAX_VALUE` con vectores
+  compartidos de frontera, usa `pread` para no compartir offset y compara
+  identidad, owner, modo, links, tamaño, mtime y ctime del FD antes/después.
+  Una mutación determinista durante copia devuelve `SourceChanged` y elimina
+  el parcial. El próximo SHA requiere nuevamente CI completo y reviews
+  exact-head; los dictámenes del candidato anterior no lo aprueban.

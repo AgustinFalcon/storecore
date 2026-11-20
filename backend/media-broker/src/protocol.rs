@@ -1,6 +1,7 @@
 pub const REQUEST_LENGTH: usize = 72;
 pub const RESPONSE_LENGTH: usize = 32;
 pub const MAX_INPUT_BYTES: u64 = 10 * 1024 * 1024;
+pub const MAX_REVISION: u64 = i64::MAX as u64;
 
 const REQUEST_MAGIC: [u8; 4] = *b"SCMB";
 const RESPONSE_MAGIC: [u8; 4] = *b"SCMR";
@@ -93,6 +94,7 @@ impl BrokerRequest {
     ) -> Option<Self> {
         if matches!(operation, BrokerOperation::Unknown)
             || revision == 0
+            || revision > MAX_REVISION
             || size == 0
             || size > MAX_INPUT_BYTES
         {
@@ -176,7 +178,7 @@ impl BrokerRequest {
         size_bytes.copy_from_slice(&bytes[64..72]);
         let size = u64::from_be_bytes(size_bytes);
         Self::create(operation, job_id, revision, digest, size).ok_or({
-            if revision == 0 {
+            if revision == 0 || revision > MAX_REVISION {
                 ProtocolError::InvalidRevision
             } else {
                 ProtocolError::InvalidSize
@@ -195,7 +197,7 @@ pub struct BrokerResponse {
 impl BrokerResponse {
     #[must_use]
     pub const fn create(result: BrokerResult, job_id: [u8; 16], revision: u64) -> Option<Self> {
-        if matches!(result, BrokerResult::Unknown) || revision == 0 {
+        if matches!(result, BrokerResult::Unknown) || revision == 0 || revision > MAX_REVISION {
             return None;
         }
         Some(Self {

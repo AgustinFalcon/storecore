@@ -48,6 +48,26 @@ fn decoder_fails_closed_for_unknown_and_malformed_wire_values() {
     );
 }
 
+#[test]
+fn revision_range_is_identical_to_the_signed_kotlin_wire_model() {
+    let max_request = BrokerRequest::decode(&vector("request_max_revision"))
+        .expect("signed maximum request is valid");
+    let max_response = BrokerResponse::decode(&vector("response_max_revision"))
+        .expect("signed maximum response is valid");
+    assert_eq!(max_request.revision(), i64::MAX as u64);
+    assert_eq!(max_response.revision(), i64::MAX as u64);
+    assert_eq!(
+        BrokerRequest::decode(&vector("request_revision_overflow")),
+        Err(ProtocolError::InvalidRevision)
+    );
+    assert_eq!(
+        BrokerResponse::decode(&vector("response_revision_overflow")),
+        Err(ProtocolError::InvalidRevision)
+    );
+    assert!(BrokerRequest::create(BrokerOperation::SealInput, job_id(), 0, digest(), 5).is_none());
+    assert!(BrokerResponse::create(BrokerResult::SnapshotAccepted, job_id(), 0).is_none());
+}
+
 fn vector(key: &str) -> Vec<u8> {
     let raw = VECTORS
         .lines()
