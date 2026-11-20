@@ -2,25 +2,22 @@
 
 ## Master vigente — 2026-11-20
 
-`master 17aadc84fbaf6a762d17414311b8a6559ed19d3b` integra PR #309. Su
-candidato exacto `b41fc7ea369da338e07427c837518aa518dfe398` pasó Verify
-`44795354530` 5/5 y el post-merge `44797525642` terminó exitoso. El corte
-agrega un engine determinista de media **inactivo**; no cierra TASK-003 ni el
-issue #7 y no acredita HTTP media, proveedor live, secretos, deploy u
-homologación.
+`master 28b99b75cb3d683f60f2c1ca547986ef4b8fe0a8` integra PR #310. Su
+candidato exacto `f6bb3a326ddfab23cfe2162ad21c6d805f3c04e5` pasó Verify
+`44801937465` 5/5 y el post-merge `44804049350` terminó 5/5. El corte agrega
+attestation offline del worker de media; no cierra TASK-003 ni #7 y no acredita
+HTTP media, proveedor live, secretos, deploy u homologación.
 
-PR #308 quedó fusionado como
-`96449faa28a305a2a45a5e725696d5a8a3f7ba67`: su head exacto
-`2a20a0e0eda3a779c218ba57129e95db9173b525` pasó Verify `44785063663`
-5/5, dos reviews independientes aprobaron sin P0–P3 y el post-merge
-`44786925900` terminó 5/5. El refresh autoritativo del resultado de checkout
-cerró #13; #8 conserva Correo Argentino y notificaciones productivas como
-residuales explícitos.
+PR #311 reconcilió exclusivamente evidencia documental: head
+`2f1c6e6d1d6aade37931caaabe4db29301fc61d4`, dos reviews GPT-6.1 Sol
+APPROVE sin P0–P3, Verify `44801449968` 5/5, merge
+`0c02c01cd9887584c20c615d330bfb0b6af2e008` y post-merge `44803001533`
+5/5. Ese corte registró como entregados los gates históricos acreditados de
+#274, #275, #276, #282, #285 y #308; no amplió su alcance.
 
-El inventario inicial de este corte no registraba PRs abiertos. Antes de
-congelar esta reconciliación se abrió PR #310 para un subcorte independiente de
-media; no se lo evalúa ni se lo presenta como entrega aquí. Permanecen abiertos
-#7, #8, #104 y #128. Este estado no acredita Mercado Pago live, ARCA, Correo
+El refresh autoritativo de checkout de PR #308 cerró #13. Permanecen abiertos
+#7, #8, #104 y #128; #8 conserva Correo Argentino y notificaciones productivas
+como residuales. Este estado no acredita Mercado Pago live, ARCA, Correo
 Argentino, SMTP productivo, StoreCore↔BlackStore activo, deploy ni
 `release/1.0`.
 

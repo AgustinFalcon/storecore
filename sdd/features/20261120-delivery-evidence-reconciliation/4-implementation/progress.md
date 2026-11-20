@@ -14,3 +14,14 @@
 - #8 conserva carrier/notificaciones como residual de Correo/homologación.
 - #7 y su SDD de media permanecen en ejecución; #104, #128 y BlackStore #16
   permanecen diferidos explícitamente.
+
+## Entrega 2026-11-20
+
+- PR #311 revisado sobre `2f1c6e6d1d6aade37931caaabe4db29301fc61d4`
+  por Producto/Evidencia y Seguridad/Gobernanza GPT-6.1 Sol medium: ambos
+  APPROVE, sin P0–P3.
+- Verify exact-head `44801449968`: 5/5 exitoso.
+- Merge `0c02c01cd9887584c20c615d330bfb0b6af2e008` y Verify post-merge
+  `44803001533`: 5/5 exitoso.
+- DER-005 queda completo. El cierre archiva únicamente esta reconciliación y
+  no modifica los residuales funcionales o externos enumerados arriba.
