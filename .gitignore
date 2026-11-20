@@ -35,6 +35,7 @@
 # Build and dependency outputs stay out of the allowlist
 backend/target/
 backend/media-worker/target/
+backend/media-broker/target/
 frontend/node_modules/
 frontend/.npm-cache/
 frontend/dist/

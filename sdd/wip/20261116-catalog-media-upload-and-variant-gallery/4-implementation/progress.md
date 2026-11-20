@@ -1,5 +1,20 @@
 # Progreso
 
+## 2026-11-20 — 003B-4B descompuesto antes de código privilegiado
+
+- Dos auditorías GPT-6.1 Sol sobre `master e0fef105` confirmaron que JDK 21 no
+  aporta una API estándar completa para `SCM_RIGHTS`; no se fingirá el handoff
+  mediante paths ni JNA dentro de Spring.
+- El diseño elige un workspace Rust standalone: daemon root-owned y helper
+  cliente root-owned ejecutado sin privilegios. Kotlin usa un adapter de
+  infrastructure y conserva el puerto `MediaByteNormalizer`.
+- PID 1, no un namespace privado del broker, será dueño de las unidades `.mount`
+  transitorias por job vía D-Bus. Esas unidades no son templates y el cliente no
+  proporciona nombres, paths, comandos ni properties.
+- `003B-4B` queda dividido en 4B-1..4B-4. El primer corte sólo prueba
+  codec/transporte/FD/snapshot en Linux sin root; no instala servicio, no monta,
+  no integra Spring y no habilita `Ready`.
+
 ## 2026-11-20 — 003B-4A integrado; 003B-4B/4C permanecen abiertos
 
 - PR #313 head `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó tests focales
@@ -472,3 +487,28 @@
   `Unavailable`, `Unknown` y excepción. Esta evidencia tampoco autoriza el
   merge: el próximo commit vuelve a requerir CI y dos reviews independientes
   sobre su SHA exacto.
+
+## 2026-11-20 — 003B-4B-1 en implementación
+
+- El post-merge de PR #315 quedó confirmado en el SHA
+  `e0fef1054f8629b8b51a6fd03e5a47b6726d36ab`: Verify `44821934780`
+  terminó 5/5. Ese PR sólo documentó y aprobó el corte implementable; no cerró
+  4B ni 4C.
+- El primer corte sin privilegios vive en
+  `feat/media-isolation-broker-contract-20261120`. Agrega un crate Rust
+  separado con toolchain 1.100.0, lockfile real, dependencias/features exactas,
+  formato/lints/tests Linux, revisión de licencias, SBOM CycloneDX y gate CVE.
+- El wire v1 es binario y de longitud fija, con tipos cerrados Kotlin/Rust,
+  `Unknown` sólo en el traductor y rechazo fail-closed en el borde. Ambas
+  implementaciones consumen los mismos golden vectors.
+- El transporte valida `SO_PEERCRED`, acepta exactamente un `SCM_RIGHTS`,
+  rechaza truncamiento/ancillary inesperado y conserva la propiedad del FD en
+  un objeto dedicado. El snapshot duplica el FD recibido, exige archivo
+  regular, crea destino 0400 con `create_new`, limita bytes, verifica SHA-256 y
+  tamaño, sincroniza y borra parciales ante fallo.
+- Evidencia local hasta ahora: test Kotlin focal verde; `Cargo.lock` generado
+  por Cargo 1.100; metadata y 16 licencias revisadas; `cargo fmt` verde;
+  `cargo check --all-targets` y `cargo clippy -D warnings` verdes contra
+  `x86_64-unknown-linux-gnu`. Los tests Linux ejecutables, SBOM/CVE y reviews
+  exact-head quedan pendientes de CI alojado; por eso `003B-4B-1` sigue
+  abierto y no habilita root, mount, D-Bus, wiring Spring ni `Ready`.

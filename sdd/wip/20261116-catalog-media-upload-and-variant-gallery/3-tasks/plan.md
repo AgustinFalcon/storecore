@@ -65,6 +65,18 @@
         mínima, handoff cross-UID sellado, tmpfs por job con cuota agregada,
         runtime/JAR root-owned versionado y reconciliación durable de
         unit/mount/quarantine. Requiere ADR/spec aprobados antes de código.
+        - [ ] `003B-4B-1`: workspace Rust y toolchain/lockfile; codec compartido
+          Kotlin/Rust, helper sin privilegios, Unix peer credentials,
+          `SCM_RIGHTS` de exactamente un FD y snapshot broker-owned. CI Linux,
+          sin root, mount, D-Bus, wiring Spring ni `Ready`.
+        - [ ] `003B-4B-2`: máquina durable/CAS, budgets globales, journal
+          atómico y reconciliación con adapters fake; corrupción cierra
+          admisión.
+        - [ ] `003B-4B-3`: daemon endurecido, runtime aprobado y unidades
+          transitorias `.mount`/worker administradas por PID 1 vía D-Bus, sin
+          aceptar comandos, paths o properties del cliente.
+        - [ ] `003B-4B-4`: `BrokeredMediaByteNormalizer`, traducción wire única,
+          lifecycle/ACK del artefacto y capability todavía bloqueada hasta 4C.
       - [ ] `MEDIA-NORMALIZE-003B-4C`: harness Linux real con UID A/UID B,
         SELF_TEST/NORMALIZE dentro de la unidad, attestación efectiva de cgroup
         v2/mount/quota, aislamiento entre jobs, fallos y reinicios. Mocks o

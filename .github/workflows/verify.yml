@@ -98,6 +98,42 @@ jobs:
           STORECORE_PSQL_URL: postgresql://storecore:storecore@127.0.0.1:5434/storecore
         run: bash backend/scripts/test-catalog-media-real-interlock.sh "$BASE_SHA"
 
+  media-broker:
+    needs: repository-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned Rust toolchain
+        run: >-
+          rustup toolchain install 1.100.0
+          --profile minimal
+          --component clippy,rustfmt
+      - name: Verify broker format, lints and Linux tests with the lockfile
+        working-directory: backend/media-broker
+        run: |
+          cargo +1.100.0 fmt --all -- --check
+          cargo +1.100.0 clippy --locked --all-targets -- -D warnings
+          cargo +1.100.0 test --locked --all-targets
+      - name: Verify broker dependency licenses
+        working-directory: backend/media-broker
+        run: node scripts/verify-license-policy.mjs
+      - name: Generate broker CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: backend/media-broker
+          format: cyclonedx
+          output: backend/media-broker/target/bom.json
+          exit-code: '1'
+      - name: Fail closed on HIGH and CRITICAL broker CVEs
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: backend/media-broker/target/bom.json
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: false
+
   frontend:
     needs: repository-hygiene
     runs-on: ubuntu-latest

@@ -3,9 +3,9 @@
 - Estado: `implementation_in_progress`
 - Fecha: 2026-11-16
 - Issue: #7
-- Base: `master@d824e0751010a5f3a5f7e3522329832f02018bd6`
-  (merge PR #313; candidato final `649f11242b47eca59ef28b9d87febfa85f3acab3`)
-- Rama: `docs/media-normalize-cross-uid-adr-20261120`
+- Base: `master@e0fef1054f8629b8b51a6fd03e5a47b6726d36ab`
+  (merge PR #315; candidato final `104a6dc6e658a3cd1b91a7d9bccdee6549e0ad08`)
+- Rama: `feat/media-isolation-broker-contract-20261120`
 - Perfil: técnico
 - Relación: reemplaza únicamente el diseño media del antiguo WIP multi-tenant;
   no reabre tenancy ni agrega `store_id`.
@@ -27,8 +27,10 @@ MEDIA-NORMALIZE-003B-1/2/3 están integrados. PR #313 entrega únicamente
 `003B-4A`: factory/lifecycle fail-closed y retención insegura, sin capacidad
 productiva porque el workspace privado no cruza al UID dedicado. El diseño
 corregido separa `003B-4B` (broker/handoff/quota/restart) y `003B-4C` (harness
-Linux real); ambos permanecen pendientes y requieren sus gates propios antes de
-que `003B-4`, TASK-005 o #7 puedan cerrarse.
+Linux real). Antes de código privilegiado, 4B se divide en contrato/transporte,
+journal, daemon systemd y adapter backend. Todos permanecen pendientes y
+requieren sus gates propios antes de que `003B-4`, TASK-005 o #7 puedan
+cerrarse.
 
 No existe GO live para Cloudinary, credenciales, HTTP upload, deploy ni
 homologación externa hasta cerrar sus gates separados.
