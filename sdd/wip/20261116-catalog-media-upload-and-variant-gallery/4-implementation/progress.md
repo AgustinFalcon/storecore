@@ -7,9 +7,11 @@
   de 256 bits; `WorkerMain` conserva cero argumentos y escribe `result.bin`
   con `CREATE_NEW`/`NOFOLLOW`, sin crear output.
 - El reporte offline toma SHA-256 del jar realmente ejecutado mediante
-  `ProtectionDomain/CodeSource`; para tests in-process admite la propiedad
-  documentada `storecore.media.worker.jar` y falla `Unknown` si no resuelve un
-  jar regular. Incluye vendor y versión Java exactos, plataforma cerrada
+  `ProtectionDomain/CodeSource`. Un jar empaquetado válido es autoritativo; la
+  propiedad documentada `storecore.media.worker.jar` sólo cubre tests in-process
+  cuando CodeSource no es un jar, y exige estructura ZIP con entradas. Ruta
+  ausente, directorio, symlink, no-jar o propiedad distinta del CodeSource
+  empaquetado falla cerrado (`Unavailable`). Incluye vendor y versión Java exactos, plataforma cerrada
   (Linux amd64/arm64 y Windows amd64 sólo para prueba), inventario exacto de
   nueve dependencias runtime, módulos TwelveMonkeys `3.15.3`, providers
   ImageIO, fingerprint de `IMAGE_IO_V1` y hashes del corpus built-in.

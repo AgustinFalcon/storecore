@@ -36,9 +36,11 @@ los goldens no se actualizan automáticamente.
 - `SELF_TEST(2)` comparte sólo el envelope V1; `NORMALIZE(1)` conserva bytes y
   semántica. El challenge es UUID + nonce de 256 bits y no agrega argumentos
   CLI.
-- El worker hashea el jar que ejecuta desde `ProtectionDomain/CodeSource`. La
-  propiedad `storecore.media.worker.jar` existe sólo como ruta documentada para
-  tests in-process; ruta ausente, directorio, symlink o no-jar falla cerrado.
+- El worker hashea el jar que ejecuta desde `ProtectionDomain/CodeSource`. Un
+  CodeSource empaquetado válido es autoritativo: la propiedad
+  `storecore.media.worker.jar` sólo cubre tests in-process cuando CodeSource no
+  es un jar; si la propiedad apunta a otra ruta, falta, es directorio, symlink,
+  no-jar o ZIP sin entradas, falla cerrado.
 - El fingerprint incluye vendor y versión runtime Java exactos; Linux
   amd64/arm64 y Windows amd64 (este último sólo para tests); inventario runtime
   exacto; módulos TwelveMonkeys 3.15.3; providers ImageIO cerrados; política y

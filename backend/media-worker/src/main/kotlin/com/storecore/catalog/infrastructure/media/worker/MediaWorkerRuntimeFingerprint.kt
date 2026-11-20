@@ -5,9 +5,12 @@ import com.storecore.catalog.media.worker.supply.ImageIoProviderInventoryResult
 import com.storecore.catalog.media.worker.supply.ImageIoProviderRecord
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
+import java.nio.file.OpenOption
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption.READ
 import java.security.MessageDigest
 import java.util.Properties
+import java.util.zip.ZipFile
 
 enum class MediaWorkerOperatingSystem(val wire: String) {
     LINUX("linux"),
@@ -172,27 +175,62 @@ class MediaWorkerRuntimeFingerprint private constructor(
         }
 
         private fun executingJarDigest(): ByteArray? {
-            val configured = System.getProperty(JAR_PATH_PROPERTY)?.takeIf { it.isNotBlank() }?.let(Path::of)
+            val configured = System.getProperty(JAR_PATH_PROPERTY)?.takeIf { it.isNotBlank() }?.let { raw ->
+                runCatching { Path.of(raw) }.getOrNull()
+            }
             val codeSource = runCatching {
                 Path.of(MediaWorkerRuntimeFingerprint::class.java.protectionDomain.codeSource.location.toURI())
             }.getOrNull()
-            val path = (configured ?: codeSource)?.toAbsolutePath()?.normalize() ?: return null
-            if (!path.fileName.toString().endsWith(".jar") || !Files.isRegularFile(path, NOFOLLOW_LINKS) || Files.isSymbolicLink(path)) {
-                return null
-            }
-            return runCatching {
-                val digest = MessageDigest.getInstance("SHA-256")
-                Files.newInputStream(path, NOFOLLOW_LINKS).use { input ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        digest.update(buffer, 0, count)
-                    }
-                }
-                digest.digest()
-            }.getOrNull()
+            val path = resolveExecutingJar(codeSource, configured) ?: return null
+            return hashRegularFile(path)
         }
+
+        internal fun resolveExecutingJar(codeSource: Path?, configured: Path?): Path? {
+            val packagedSource = packagedJarPath(codeSource) ?: return packagedJarPath(configured)
+            val configuredJar = configured?.let(::packagedJarPath)
+            if (configured != null && configuredJar != packagedSource) return null
+            return packagedSource
+        }
+
+        private fun packagedJarPath(path: Path?): Path? {
+            if (path == null) return null
+            val absolute = runCatching { path.toAbsolutePath().normalize() }.getOrNull() ?: return null
+            if (!absolute.fileName.toString().endsWith(".jar")) return null
+            if (!Files.isRegularFile(absolute, NOFOLLOW_LINKS) || Files.isSymbolicLink(absolute)) return null
+            if (!hasZipMagic(absolute) || !hasZipEntries(absolute)) return null
+            return absolute
+        }
+
+        private fun hasZipMagic(path: Path): Boolean = runCatching {
+            Files.newByteChannel(path, setOf<OpenOption>(READ, NOFOLLOW_LINKS)).use { channel ->
+                val header = ByteArray(4)
+                if (channel.read(java.nio.ByteBuffer.wrap(header)) != 4) return false
+                header[0] == 0x50.toByte() &&
+                    header[1] == 0x4B.toByte() &&
+                    (
+                        (header[2] == 0x03.toByte() && header[3] == 0x04.toByte()) ||
+                            (header[2] == 0x05.toByte() && header[3] == 0x06.toByte()) ||
+                            (header[2] == 0x07.toByte() && header[3] == 0x08.toByte())
+                    )
+            }
+        }.getOrDefault(false)
+
+        private fun hasZipEntries(path: Path): Boolean = runCatching {
+            ZipFile(path.toFile()).use { zip -> zip.entries().hasMoreElements() }
+        }.getOrDefault(false)
+
+        private fun hashRegularFile(path: Path): ByteArray? = runCatching {
+            val digest = MessageDigest.getInstance("SHA-256")
+            Files.newInputStream(path, NOFOLLOW_LINKS).use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            digest.digest()
+        }.getOrNull()
 
         internal fun sha256(bytes: ByteArray): ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
     }

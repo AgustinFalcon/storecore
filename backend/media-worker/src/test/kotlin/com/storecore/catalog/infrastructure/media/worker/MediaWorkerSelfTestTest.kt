@@ -93,8 +93,7 @@ class MediaWorkerSelfTestTest {
     private lateinit var executingJar: Path
 
     private fun <T> withExecutingJar(block: () -> T): T {
-        executingJar = Files.createTempFile("worker-under-test", ".jar")
-        Files.write(executingJar, "packaged-worker-fixture".toByteArray())
+        executingJar = MediaWorkerTestFixtures.minimalJar(Files.createTempFile("worker-under-test", ".jar"))
         val old = System.getProperty(MediaWorkerRuntimeFingerprint.JAR_PATH_PROPERTY)
         System.setProperty(MediaWorkerRuntimeFingerprint.JAR_PATH_PROPERTY, executingJar.toString())
         return try {
