@@ -128,6 +128,10 @@ class SystemdMediaWorkerLauncherTest {
         assertTrue(argv.contains("-XX:MaxDirectMemorySize=${limits.maxOutputBytes.value}"))
         assertTrue(argv.contains("--property=MemoryMax=${properties.memoryMaxBytes}"))
         assertTrue(properties.memoryMaxBytes > limits.workerHeapBytes.value + limits.maxOutputBytes.value)
+        assertEquals(requireNotNull(limits.processMemoryBytes()).value, properties.memoryMaxBytes)
+        val unit = Path.of("media-worker/systemd/storecore-media-worker.service")
+        assertTrue(Files.isRegularFile(unit), unit.toAbsolutePath().toString())
+        assertTrue(Files.readString(unit).contains("MemoryMax=${properties.memoryMaxBytes}"))
         assertNull(argv.firstOrNull { argv.indexOf(it) == 0 && (it == "java" || it.endsWith("java.exe")) })
     }
 

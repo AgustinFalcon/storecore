@@ -444,9 +444,9 @@ class PrivateMediaWorkerWorkspace(
         return FileInspection(size, digest.digest().toHex())
     }
 
-    private fun openVerified(path: Path, expectedOwner: String, expected: FileIdentity): java.nio.channels.SeekableByteChannel? =
+    private fun openVerified(path: Path, directoryOwner: String, expected: FileIdentity): java.nio.channels.SeekableByteChannel? =
         runCatching {
-            if (identity(path) != expected || expected.owner != expectedOwner || !expected.regularFile) return null
+            if (identity(path) != expected || !acceptedOwner(expected.owner, directoryOwner) || !expected.regularFile) return null
             val channel = Files.newByteChannel(
                 path,
                 setOf<java.nio.file.OpenOption>(StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS),

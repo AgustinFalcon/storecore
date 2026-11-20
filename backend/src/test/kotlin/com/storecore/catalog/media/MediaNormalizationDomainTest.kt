@@ -35,6 +35,7 @@ class MediaNormalizationDomainTest {
             processMemory.value,
         )
         assertTrue(processMemory.value > limits.workerHeapBytes.value)
+        assertEquals(289_406_976L, processMemory.value)
 
         assertEquals(MediaDimensionDecision.Unknown, limits.inspectDimensions("320", 320))
         assertEquals(

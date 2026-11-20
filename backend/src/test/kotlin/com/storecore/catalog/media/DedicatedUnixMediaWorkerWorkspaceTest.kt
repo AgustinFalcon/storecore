@@ -5,6 +5,7 @@ import com.storecore.catalog.infrastructure.media.worker.MediaWorkerPrincipal
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerWorkspaceAccess
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerWorkspaceResult
 import com.storecore.catalog.infrastructure.media.worker.WorkerUnixIdentity
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -47,6 +48,20 @@ class DedicatedUnixMediaWorkerWorkspaceTest {
         assertEquals(identity.group, requestView.readAttributes().group())
         assertTrue(PosixFilePermission.GROUP_WRITE in directoryView.readAttributes().permissions())
         assertTrue(PosixFilePermission.GROUP_READ in requestView.readAttributes().permissions())
+        val report = "matched-self-test".toByteArray()
+        Files.write(lease.result, report)
+        maybeAdoptWorkerOwner(lease.result, identity)
+        assertArrayEquals(report, lease.readResult(report.size.toLong()))
         lease.close()
+    }
+
+    private fun maybeAdoptWorkerOwner(path: Path, identity: WorkerUnixIdentity) {
+        val current = Files.getOwner(path, LinkOption.NOFOLLOW_LINKS)
+        if (current == identity.user) return
+        runCatching { Files.setOwner(path, identity.user) }
+        assumeTrue(
+            Files.getOwner(path, LinkOption.NOFOLLOW_LINKS) == identity.user,
+            "cross-UID consume requires chown to the dedicated worker",
+        )
     }
 }
