@@ -54,3 +54,10 @@
 - Estado remoto observado antes de esta sincronización documental: PR mergeable
   `MERGEABLE`, `mergeStateStatus=CLEAN`, cero threads sin resolver.
 - PRM-016B sigue abierto: no se acredita merge, post-merge ni cierre de #106.
+
+## Cierre remoto 2026-11-18
+
+- PR #282 fusionado como `214140d0779b8d53505f3e121339b2760aeae185`.
+- Verify exact-head `44320781327` y post-merge `44323153644`: 5/5 exitosos.
+- Issue #106 cerrado. PRM-016B queda completo sin ampliar la acreditación a
+  proveedores externos.

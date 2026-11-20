@@ -33,3 +33,5 @@
   de ancho para paneles, labels y controles. Los dos casos pasaron 10/10 en una
   repetición focal; luego `verify` y `test:a11y` volvieron a pasar completos.
 - Ninguna de estas cifras se presenta como evidencia de backend real.
+- PR #276 fusionado como `b768ce47bfdc3c3ac3dbe238b58faecb39d4b166`.
+  Verify exact-head `43562832665` y post-merge `43563401406` exitosos.

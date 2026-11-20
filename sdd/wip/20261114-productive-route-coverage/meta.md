@@ -1,9 +1,11 @@
 # Cobertura determinista de rutas productivas
 
-- Estado: `reviewed_local`
+- Estado: `delivered`
 - Fecha: 2026-11-14
 - Base: `master@0c4d2fe96a4dff29120cb1931e69b13b666d8b0a`
 - Issue: #148
+- PR: #276
+- Merge: `b768ce47bfdc3c3ac3dbe238b58faecb39d4b166`
 
 ## Objetivo
 
