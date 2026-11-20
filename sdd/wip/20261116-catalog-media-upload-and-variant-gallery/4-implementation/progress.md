@@ -618,3 +618,23 @@
   marker; el reinicio permanece bloqueado en el primer caso y no ocurre el
   efecto externo en el segundo. Este nuevo candidato vuelve a requerir CI 6/6
   y tres aprobaciones exact-head; 4B-2 continúa abierto hasta entonces.
+
+## 2026-11-20 — 003B-4B-2 implementado y verificado
+
+- El candidato final `9e77bcf8de7b2a874d0998cd43435f999050f85b`
+  persiste la intención durable antes de cualquier terminación o cuarentena que
+  pueda consumir evidencia. `RecoveryPending` permite completar sólo la
+  remediación interna; allocation y transición pública permanecen cerradas. Si
+  el latch no puede acreditarse, el adapter no recibe el efecto.
+- Verify exact-head `44837144576` terminó 6/6. El job `media-broker`
+  `136636396565` pasó 46 tests Linux, fmt/clippy, 16 licencias y el gate sin
+  HIGH/CRITICAL. Las tres reviews independientes GPT-6.1 Sol de
+  bug/arquitectura, arquitectura y seguridad aprobaron el SHA exacto sin
+  hallazgos P0–P3.
+- PR #319 fue fusionado en `master` mediante
+  `381296d6e267d4c2813345f3bb635ad927a1aff5`. El Verify post-merge
+  `44838436904` terminó 6/6 sobre ese merge commit.
+- Se cierra exclusivamente `003B-4B-2`. Permanecen abiertos `003B-4B-3`,
+  `003B-4B-4`, el agregado `003B-4B`, `003B-4C`,
+  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. Este corte no acredita daemon
+  privilegiado, mounts, D-Bus, wiring Spring ni capability `Ready`.
