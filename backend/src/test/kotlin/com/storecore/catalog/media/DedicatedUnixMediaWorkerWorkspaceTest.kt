@@ -30,14 +30,15 @@ class DedicatedUnixMediaWorkerWorkspaceTest {
 
     @Test
     fun `posix group handoff shares the workspace with the dedicated principal`() {
-        val root = Files.createDirectories(temporary.resolve("worker"))
-        val posix = Files.getFileAttributeView(root, PosixFileAttributeView::class.java)
+        val posix = Files.getFileAttributeView(temporary, PosixFileAttributeView::class.java)
         assumeTrue(posix != null, "POSIX attributes are required for the dedicated-user handoff")
         val attributes = posix.readAttributes()
         val identity = requireNotNull(WorkerUnixIdentity.create(attributes.owner(), attributes.group()))
-        val manager = DedicatedUnixMediaWorkerWorkspace(root, identity)
+        val manager = DedicatedUnixMediaWorkerWorkspace(temporary.resolve("worker"), identity)
         assertSame(MediaWorkerWorkspaceAccess.Compatible, manager.accessFor(MediaWorkerPrincipal.DEDICATED_WORKER))
-        val lease = (manager.create(UUID.randomUUID()) as MediaWorkerWorkspaceResult.Created).lease
+        val created = manager.create(UUID.randomUUID())
+        assertTrue(created is MediaWorkerWorkspaceResult.Created, created.toString())
+        val lease = (created as MediaWorkerWorkspaceResult.Created).lease
         Files.writeString(lease.request, "self-test")
         assertSame(MediaWorkerWorkspaceAccess.Compatible, manager.grantWorker(lease))
         val directoryView = Files.getFileAttributeView(lease.directory, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
