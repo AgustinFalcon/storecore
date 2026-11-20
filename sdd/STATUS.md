@@ -2,7 +2,18 @@
 
 ## Master vigente — 2026-11-20
 
-`master 28b99b75cb3d683f60f2c1ca547986ef4b8fe0a8` integra PR #310. Su
+`master d824e0751010a5f3a5f7e3522329832f02018bd6` integra PR #313. Su
+candidato exacto `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó Verify de PR
+`44814135015` 5/5, tests focales 23/23 y dos reviews independientes GPT-6.1
+Sol sin P0–P3. El primer intento posmerge `44816056376` recibió HTTP 429 de
+Maven Central antes de compilar `productive-routes-real-e2e`; el rerun del mismo
+SHA terminó 5/5 verde. El corte entrega factory/lifecycle fail-closed y retiene
+workspaces cuando no puede acreditar terminación. No devuelve `Ready`: el
+handoff cross-UID real (`003B-4B`) y el harness Linux (`003B-4C`) continúan
+abiertos, al igual que `003B-4`, TASK-005 y #7.
+
+El baseline anterior `master 28b99b75cb3d683f60f2c1ca547986ef4b8fe0a8`
+integra PR #310. Su
 candidato exacto `f6bb3a326ddfab23cfe2162ad21c6d805f3c04e5` pasó Verify
 `44801937465` 5/5 y el post-merge `44804049350` terminó 5/5. El corte agrega
 attestation offline del worker de media; no cierra TASK-003 ni #7 y no acredita

@@ -39,9 +39,9 @@
     },
     {
       "id": "TASK-005", "title": "Inspect and normalize image bytes", "status": "pending", "layer": 1, "complexity": "High", "depends_on": ["TASK-004"],
-      "description": "Choose the decoder in an ADR, then implement deterministic bounded inspection, metadata removal and re-encoding.",
+      "description": "Implement deterministic bounded inspection, metadata removal and re-encoding, then prove the approved worker through a minimal-authority Linux broker with sealed cross-UID handoff and effective isolation attestation.",
       "files": ["backend/src/main/kotlin/com/storecore/catalog", "sdd/wip/20261116-catalog-media-upload-and-variant-gallery/2-technical/adr"],
-      "acceptance_criteria": ["AC-1: Corrupt, polyglot, animated and oversized inputs are rejected", "AC-2: Temporaries are bounded and swept after abrupt termination", "GATE: file security corpus passes"],
+      "acceptance_criteria": ["AC-1: Corrupt, polyglot, animated and oversized inputs are rejected", "AC-2: Each job uses a kernel-authenticated broker, broker-owned sealed snapshot and aggregate-quota workspace; unknown ownership, mount, runtime or limit evidence fails closed", "AC-3: Admission enforces per-job and global job/mount/byte/inode/quarantine budgets; restart reconciliation retains unverifiable work and blocks admission until unit, cgroup and mount are terminal", "AC-4: A real Linux UID-A/UID-B harness proves SELF_TEST, NORMALIZE, held-FD/mmap sealing, isolation, quota, no-ACK exhaustion, OOM/timeout, termination and cleanup", "GATE: adversarial corpus and real Linux isolation evidence pass on the exact candidate SHA"],
       "references": ["Technical: Inspección y normalización"], "design_decisions": ["DD-deterministic-normalization"]
     },
     {

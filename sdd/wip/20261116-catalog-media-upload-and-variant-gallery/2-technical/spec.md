@@ -201,6 +201,36 @@ aceptados. Un parser puro acotado valida framing JPEG/PNG/WebP, EOF exacto,
 animación, dimensiones, segmentos y metadata antes del futuro decoder. El corte
 no implementa decoder, proceso, multipart, HTTP, persistencia ni proveedor.
 
+### Residual MEDIA-NORMALIZE-003B-4 — aislamiento Linux verificable
+
+`003B-4A` aporta factory y lifecycle fail-closed, pero el workspace privado
+backend-only no es consumible por el UID dedicado y por ello nunca acredita
+`Ready`. `003B-4B` agrega un broker local root-owned con protocolo cerrado,
+socket protegido autenticado por `SO_PEERCRED`, binding durable
+principal/job/revisión, handoff cross-UID y un `tmpfs` por job con cuota de bytes
+e inodos. La admisión reserva además presupuestos globales de jobs, mounts y
+cuarentena. El backend no recibe autoridad genérica sobre systemd ni puede
+elegir comandos, paths o límites. El broker deriva todo desde un perfil
+root-owned, crea un snapshot nuevo broker-owned para sellar el input y
+reconcilia durablemente units/mounts tras reinicio. Java y worker provienen de
+una instalación root-owned versionada, sin symlinks, con ejecutables `0555`,
+jar/datos `0444` y digest aprobado.
+
+Los estados del broker, resultados de handoff y attestación son tipos cerrados;
+un wire desconocido se traduce una sola vez a `Unknown` y bloquea admisión. La
+attestación lee propiedades efectivas y cgroup v2, incluida la cuota/mount real,
+en vez de repetir los valores solicitados. El output sólo se acepta tras estado
+terminal verificado y validación de owner, modo, tamaño y digest. Fallos de kill,
+unmount o reconciliación retienen workspace/evidencia y cierran el gate global.
+
+`003B-4C` ejecuta un harness Linux real con backend UID A y worker UID B. Debe
+probar SELF_TEST/NORMALIZE, aislamiento entre jobs, cuota por job y global,
+terminales sin ACK, FD/mmap conservados tras el seal, OOM/timeout, terminación
+del cgroup, rechazo de sustitución y recuperación por reinicio en cada
+transición durable. Mocks, ejecución directa del jar o ambos procesos con el
+mismo UID no satisfacen el gate. Sólo `003B-4A+4B+4C` permiten completar
+`003B-4`; HTTP, multipart y proveedor live siguen fuera de este residual.
+
 ## HTTP
 
 - `POST /api/v1/user/catalog/media-drafts`: draft de alta/edición con target
