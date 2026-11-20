@@ -48,12 +48,38 @@ class ImageIoProviderInventoryTest {
     }
 
     @Test
-    fun `matched factory rejects unknown members`() {
+    fun `matched factory rejects unknown incomplete and drifted inventories`() {
         assertEquals(
             null,
             ImageIoProviderInventoryResult.Matched.create(
                 setOf(ImageIoProviderRecord(ImageIoSpiCategory.READER, ImageIoProviderId.UNKNOWN)),
             ),
         )
+        assertEquals(
+            null,
+            ImageIoProviderInventoryResult.Matched.create(
+                setOf(ImageIoProviderRecord(ImageIoSpiCategory.READER, ImageIoProviderId.JDK_JPEG_READER)),
+            ),
+        )
+        assertEquals(
+            null,
+            ImageIoProviderInventoryResult.Matched.create(
+                ImageIoProviderInventory.imageIoV1Expected +
+                    ImageIoProviderRecord(ImageIoSpiCategory.WRITER, ImageIoProviderId.TM_WEBP_READER),
+            ),
+        )
+        val matched = ImageIoProviderInventoryResult.Matched.create(ImageIoProviderInventory.imageIoV1Expected)
+        assertEquals(ImageIoProviderInventory.imageIoV1Expected, matched?.providers)
+    }
+
+    @Test
+    fun `evaluate rejects a known but incomplete provider set`() {
+        val incomplete = listOf(
+            ImageIoProviderInventory.ObservedSpi(
+                ImageIoSpiCategory.READER,
+                ImageIoProviderId.JDK_JPEG_READER.wire,
+            ),
+        )
+        assertSame(ImageIoProviderInventoryResult.Unavailable, ImageIoProviderInventory.evaluate(incomplete))
     }
 }

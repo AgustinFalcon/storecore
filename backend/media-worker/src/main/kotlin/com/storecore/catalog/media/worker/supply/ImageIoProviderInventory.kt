@@ -47,11 +47,8 @@ object ImageIoProviderInventory {
         }
         val unique = mapped.toSet()
         if (unique.size != mapped.size) return ImageIoProviderInventoryResult.Unavailable
-        return if (unique == imageIoV1Expected) {
-            requireNotNull(ImageIoProviderInventoryResult.Matched.create(unique))
-        } else {
-            ImageIoProviderInventoryResult.Unavailable
-        }
+        return ImageIoProviderInventoryResult.Matched.create(unique)
+            ?: ImageIoProviderInventoryResult.Unavailable
     }
 
     fun observeRegistry(): List<ObservedSpi> {
