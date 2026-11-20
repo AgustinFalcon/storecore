@@ -618,3 +618,18 @@
   marker; el reinicio permanece bloqueado en el primer caso y no ocurre el
   efecto externo en el segundo. Este nuevo candidato vuelve a requerir CI 6/6
   y tres aprobaciones exact-head; 4B-2 continúa abierto hasta entonces.
+
+## 2026-11-20 — 003B-4B-2 mergeado; reviews Grok 4.7 APPROVED; post-merge pendiente
+
+- PR #319 candidato `9e77bcf8de7b2a874d0998cd43435f999050f85b` pasó Verify
+  `44837144576` 6/6 y se fusionó como
+  `381296d6e267d4c2813345f3bb635ad927a1aff5` sin archivos Sol persistidos
+  (cupo de gpt-5.6-sol-medium agotado).
+- Dos reviews independientes Grok 4.7 (autorizadas explícitamente como
+  sustituto de Sol) devolvieron APPROVED sin P0–P3 sobre el SHA exacto:
+  arquitectura y seguridad. El modelo, el cupo de Sol y la autorización
+  quedan en los archivos de evidencia.
+- El Verify post-merge `44838436904` sobre `381296d` aún no es un pass
+  (backend en curso al persistir esta nota). `003B-4B-2` no se marca cerrado
+  en `plan.md` hasta ese 6/6. 4B-3, 4B-4, 4C, TASK-005 e issue #7 siguen
+  abiertos. No hay `Ready`.
