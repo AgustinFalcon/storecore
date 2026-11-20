@@ -6,7 +6,7 @@
   </header>
   <sc-feature-status
     [loading]="loading"
-    [error]="error"
+    [error]="order ? '' : error"
     [empty]="!loading && order === null"
     emptyText="Todavía no hay orden para mostrar."
     (retry)="retry.emit()"
@@ -19,6 +19,21 @@
         <span class="sc-badge">orden {{ order.orderStatus.label }}</span>
       </p>
       <p class="sc-callout">El identificador de la orden no es un comprobante de pago.</p>
+      @if (order.paymentStatus.permitsAuthoritativeRefresh) {
+        <button
+          type="button"
+          class="sc-btn sc-btn--secondary"
+          [disabled]="refreshPhase.busy"
+          [attr.aria-busy]="refreshPhase.busy"
+          (click)="refresh.emit()"
+        >{{ refreshPhase.busy ? 'Actualizando…' : 'Actualizar estado' }}</button>
+      }
+      @if (refreshPhase !== Phase.Idle) {
+        <p class="sc-callout" aria-live="polite">
+          {{ refreshPhase.label }}
+          @if (refreshPhase === Phase.Failed && error) { <span>{{ error }}</span> }
+        </p>
+      }
       <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>
       <a class="sc-btn sc-btn--ghost" routerLink="/catalog">Seguir comprando</a>
     </div>
