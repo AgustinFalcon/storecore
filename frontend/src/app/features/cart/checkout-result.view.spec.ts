@@ -34,18 +34,19 @@ describe('CheckoutResultViewComponent', () => {
 
   it('announces progress and blocks repeated activation', () => {
     const fixture = TestBed.createComponent(CheckoutResultViewComponent);
-    fixture.componentRef.setInput('order', order(PaymentStatus.Pending));
     fixture.detectChanges();
     const liveRegion = fixture.nativeElement.querySelector('[aria-live="polite"]') as HTMLElement;
     expect(liveRegion).not.toBeNull();
-    expect(liveRegion.hidden).toBe(true);
+    expect(liveRegion.hasAttribute('hidden')).toBe(false);
+    expect(liveRegion.textContent?.trim()).toBe('');
 
+    fixture.componentRef.setInput('order', order(PaymentStatus.Pending));
     fixture.componentRef.setInput('refreshPhase', CustomerOrderRefreshPhase.Refreshing);
     fixture.detectChanges();
     const button = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(button.getAttribute('aria-busy')).toBe('true');
-    expect(liveRegion.hidden).toBe(false);
+    expect(fixture.nativeElement.querySelector('[aria-live="polite"]')).toBe(liveRegion);
     expect(liveRegion.textContent).toContain('Consultando');
   });
 });

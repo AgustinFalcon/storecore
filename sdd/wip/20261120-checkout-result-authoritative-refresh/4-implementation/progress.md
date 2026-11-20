@@ -15,8 +15,9 @@
 - La pantalla agrega `Actualizar estado`, `aria-busy` y anuncio `aria-live`, sin
   polling ni inferencia desde el retorno del navegador.
 - La primera revisión Bugbot detectó que la región viva nacía junto con su
-  primer mensaje. Se dejó montada desde el render inicial y sólo se oculta
-  mientras está inactiva, para que el cambio sea anunciado de forma fiable.
+  primer mensaje. Se dejó montada, vacía y accesible desde el render inicial,
+  incluso antes de tener una orden, para que el cambio sea anunciado de forma
+  fiable.
 - La regresión focal posterior a la corrección pasó 16/16.
 - Corpus focal: 18/18 verde. Corpus frontend completo: exit 0. `npm run lint` y
   `npm run build` pasaron; build conserva el warning no bloqueante del bundle

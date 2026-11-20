@@ -11,6 +11,12 @@
     emptyText="Todavía no hay orden para mostrar."
     (retry)="retry.emit()"
   />
+  <p class="sc-callout" role="status" aria-live="polite" aria-atomic="true">
+    @if (refreshPhase !== Phase.Idle) {
+      {{ refreshPhase.label }}
+      @if (refreshPhase === Phase.Failed && error) { <span>{{ error }}</span> }
+    }
+  </p>
   @if (order) {
     <div class="sc-panel sc-result__card">
       <p class="sc-result__id">Orden {{ order.id }}</p>
@@ -28,16 +34,6 @@
           (click)="refresh.emit()"
         >{{ refreshPhase.busy ? 'Actualizando…' : 'Actualizar estado' }}</button>
       }
-      <p
-        class="sc-callout"
-        aria-live="polite"
-        [hidden]="refreshPhase === Phase.Idle"
-      >
-        @if (refreshPhase !== Phase.Idle) {
-          {{ refreshPhase.label }}
-          @if (refreshPhase === Phase.Failed && error) { <span>{{ error }}</span> }
-        }
-      </p>
       <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>
       <a class="sc-btn sc-btn--ghost" routerLink="/catalog">Seguir comprando</a>
     </div>
