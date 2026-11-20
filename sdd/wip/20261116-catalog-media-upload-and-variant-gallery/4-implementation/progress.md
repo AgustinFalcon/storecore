@@ -19,6 +19,13 @@
   JSON con hashes, allowlist de licencias, inventario ImageIO cerrado y pin
   Temurin `21.0.13+9` en CI. No hay bean, caller, endpoint, engine ni
   activación. El corte no acredita `Ready`.
+- Verify #827, run `44783620909`, falló el step `Pin Temurin 21.0.13+9` en
+  backend y ambas matrices E2E: `setup-java` sí resolvió
+  `/opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.13-9/x64`, pero el probe
+  leía sólo stdout y `java -XshowSettings:properties` escribe a stderr, así
+  que `java.vendor` quedó vacío. El pin ahora consume stdout+stderr. No es
+  fallo del módulo ni de Trivy. `003B-1` permanece abierta hasta CI 5/5 y
+  reviews exact-head.
 
 ## 2026-11-19 — cierre exact-head del protocolo del worker aislado
 
