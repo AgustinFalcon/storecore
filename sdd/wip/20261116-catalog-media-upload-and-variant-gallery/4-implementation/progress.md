@@ -618,3 +618,18 @@
   marker; el reinicio permanece bloqueado en el primer caso y no ocurre el
   efecto externo en el segundo. Este nuevo candidato vuelve a requerir CI 6/6
   y tres aprobaciones exact-head; 4B-2 continúa abierto hasta entonces.
+
+## 2026-11-20 — 003B-4B-2 mergeado; close-out Sol pendiente; 4B-3 en implementación
+
+- PR #319 candidato `9e77bcf8de7b2a874d0998cd43435f999050f85b` pasó Verify
+  `44837144576` 6/6 y se fusionó en `master` como
+  `381296d6e267d4c2813345f3bb635ad927a1aff5`. El plan **no** marca 4B-2 cerrado:
+  no hay dictámenes Sol persistidos (cupo agotado; reviews Grok 4.7 en curso
+  por autorización explícita) y el Verify post-merge `44838436904` sigue.
+- `003B-4B-3` arranca en `feat/media-broker-daemon-4b3-20261120`: tipos cerrados
+  de unidad/D-Bus/runtime, nombres `.mount`/`.scope` derivados sólo del JobId,
+  runtime Java/jar `NOFOLLOW` 0555/0444 con digest, y daemon que arranca unidades
+  transitorias vía un controlador PID 1 testeable. El cliente no puede pasar
+  path, unit name ni ExecStart. No hay zbus todavía (lockfile); el adapter real
+  D-Bus queda para el mismo corte cuando Cargo Linux pueda resolverlo. No hay
+  `Ready`, wiring Spring ni helper privilegiado.
