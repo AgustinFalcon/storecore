@@ -30,4 +30,3 @@ rerun del mismo SHA terminó 5/5.
 
 Esta nota se registra en un PR documental posterior para no alterar el SHA de
 código revisado y fusionado.
-
