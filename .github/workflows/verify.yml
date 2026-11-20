@@ -281,7 +281,7 @@ jobs:
         run: mvn -B -DskipTests package
       - name: Prepare recovery test-only JVM classpath
         working-directory: backend
-        run: mvn -B dependency:build-classpath -DincludeScope=test -Dmdep.outputFile=target/recovery-e2e-classpath.txt
+        run: mvn -B org.apache.maven.plugins:maven-dependency-plugin:build-classpath -DincludeScope=test -Dmdep.outputFile=target/recovery-e2e-classpath.txt
       - name: Install browser dependencies
         working-directory: frontend
         run: |
