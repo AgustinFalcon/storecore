@@ -4,10 +4,10 @@
 
 Aceptado para el contrato `MEDIA-NORMALIZE-001`. El parser estructural de
 `MEDIA-NORMALIZE-002` está implementado. `MEDIA-NORMALIZE-003A` está fusionado.
-`MEDIA-NORMALIZE-003B-1` está fusionado. `MEDIA-NORMALIZE-003B-2` agrega el
-engine determinista y `MediaNormalizerWorkerMain` en el artefacto del worker,
-todavía inactivo: sin factory `Ready`, sin launcher productivo, sin HTTP.
-Upload continúa deshabilitado.
+`MEDIA-NORMALIZE-003B-1` y `MEDIA-NORMALIZE-003B-2` están fusionados.
+`MEDIA-NORMALIZE-003B-3` agrega self-test y evaluación de attestación offline,
+todavía sin factory `Ready`, launcher productivo ni HTTP. Upload continúa
+deshabilitado.
 
 ### Parámetros deterministas IMAGE_IO_V1 (003B-2)
 
@@ -30,6 +30,23 @@ los goldens no se actualizan automáticamente.
   El FQCN fijo es `com.storecore.catalog.infrastructure.media.worker.MediaNormalizerWorkerMainKt`.
   El `PropertiesLauncher` del backend permanece test-only (003A) y no es
   contención productiva.
+
+### Self-test y attestación offline (003B-3)
+
+- `SELF_TEST(2)` comparte sólo el envelope V1; `NORMALIZE(1)` conserva bytes y
+  semántica. El challenge es UUID + nonce de 256 bits y no agrega argumentos
+  CLI.
+- El worker hashea el jar que ejecuta desde `ProtectionDomain/CodeSource`. La
+  propiedad `storecore.media.worker.jar` existe sólo como ruta documentada para
+  tests in-process; ruta ausente, directorio, symlink o no-jar falla cerrado.
+- El fingerprint incluye vendor y versión runtime Java exactos; Linux
+  amd64/arm64 y Windows amd64 (este último sólo para tests); inventario runtime
+  exacto; módulos TwelveMonkeys 3.15.3; providers ImageIO cerrados; política y
+  parámetros `IMAGE_IO_V1`; y hashes de un corpus built-in versionado.
+- El padre compara nonce y digests con `MessageDigest.isEqual`, además de
+  igualdad exacta del resto. Drift o `Unknown` produce `Unavailable`. El único
+  vocabulario de evaluación es `Matched | Unavailable | Unknown`; `Ready` no
+  existe en este corte.
 
 ## Contexto
 

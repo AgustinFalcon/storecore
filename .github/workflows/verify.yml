@@ -60,6 +60,19 @@ jobs:
       - name: Verify media-worker supply chain
         working-directory: backend/media-worker
         run: mvn -B verify
+      - name: Run packaged media-worker SELF_TEST
+        run: |
+          worker_jar="$GITHUB_WORKSPACE/backend/media-worker/target/storecore-media-worker-0.1.0-SNAPSHOT.jar"
+          workspace="$(mktemp -d)"
+          trap 'rm -rf "$workspace"' EXIT
+          printf '%s' 'U0NNVwEAAAAAAAA0AQIAAJG51KydL0rZpy4IulMLV8AREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMA==' \
+            | base64 --decode > "$workspace/request.bin"
+          (
+            cd "$workspace"
+            java -jar "$worker_jar"
+          )
+          test -s "$workspace/result.bin"
+          test ! -e "$workspace/output.bin"
       - name: Fail closed on HIGH and CRITICAL media-worker CVEs
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

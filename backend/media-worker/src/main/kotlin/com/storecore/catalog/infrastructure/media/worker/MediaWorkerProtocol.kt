@@ -13,7 +13,7 @@ private const val DIGEST_BYTES = 32
 private const val MAX_MANIFEST_BYTES = 4_096
 
 enum class MediaWorkerProtocolVersion(val code: Int) { V1(1), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
-enum class MediaWorkerOperation(val code: Int) { NORMALIZE(1), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
+enum class MediaWorkerOperation(val code: Int) { NORMALIZE(1), SELF_TEST(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 enum class MediaWorkerFrameKind(val code: Int) { REQUEST(1), RESPONSE(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 enum class MediaWorkerStatus(val code: Int) { ACCEPTED(1), REJECTED(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 
@@ -80,6 +80,15 @@ object MediaWorkerProtocolCodec {
         val profile = profileFromCode(readUnsignedByte()); if (readUnsignedByte() != 0 || readUnsignedShort() != 0) return@parseFrame null
         val size = MediaByteSize.fromWire(readLong()) ?: return@parseFrame null; val digest = readDigest() ?: return@parseFrame null; val limits = readLimits() ?: return@parseFrame null
         MediaWorkerRequest.create(id, nonce, profile, size, digest, limits)
+    }
+    fun decodeOperation(bytes: ByteArray): MediaWorkerOperation {
+        val parsed = frame(bytes) ?: return MediaWorkerOperation.UNKNOWN
+        if (parsed.first != MediaWorkerFrameKind.REQUEST.code) return MediaWorkerOperation.UNKNOWN
+        return runCatching {
+            val version = MediaWorkerProtocolVersion.fromWire(parsed.second.readUnsignedByte())
+            val operation = MediaWorkerOperation.fromWire(parsed.second.readUnsignedByte())
+            if (version == MediaWorkerProtocolVersion.V1) operation else MediaWorkerOperation.UNKNOWN
+        }.getOrDefault(MediaWorkerOperation.UNKNOWN)
     }
     fun encodeResponse(response: MediaWorkerResponse): ByteArray = when (response) {
         is MediaWorkerResponse.Accepted -> framed(MediaWorkerFrameKind.RESPONSE.code) {

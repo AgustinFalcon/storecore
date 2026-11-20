@@ -54,6 +54,7 @@ class MediaWorkerProtocolTest {
     @Test
     fun `closed protocol translators fail unknown and response classes expose no copy`() {
         assertEquals(MediaWorkerProtocolVersion.UNKNOWN, MediaWorkerProtocolVersion.fromWire(99))
+        assertEquals(MediaWorkerOperation.SELF_TEST, MediaWorkerOperation.fromWire(2))
         assertEquals(MediaWorkerOperation.UNKNOWN, MediaWorkerOperation.fromWire(99))
         assertEquals(MediaWorkerFrameKind.UNKNOWN, MediaWorkerFrameKind.fromWire(99))
         assertEquals(MediaWorkerStatus.UNKNOWN, MediaWorkerStatus.fromWire(99))

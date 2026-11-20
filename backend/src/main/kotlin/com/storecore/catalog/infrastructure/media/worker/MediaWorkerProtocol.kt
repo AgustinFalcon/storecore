@@ -13,7 +13,7 @@ private const val DIGEST_BYTES = 32
 private const val MAX_MANIFEST_BYTES = 4_096
 
 enum class MediaWorkerProtocolVersion(val code: Int) { V1(1), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
-enum class MediaWorkerOperation(val code: Int) { NORMALIZE(1), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
+enum class MediaWorkerOperation(val code: Int) { NORMALIZE(1), SELF_TEST(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 enum class MediaWorkerFrameKind(val code: Int) { REQUEST(1), RESPONSE(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 enum class MediaWorkerStatus(val code: Int) { ACCEPTED(1), REJECTED(2), UNKNOWN(0); companion object { fun fromWire(raw: Int) = entries.firstOrNull { it.code == raw && it != UNKNOWN } ?: UNKNOWN } }
 
