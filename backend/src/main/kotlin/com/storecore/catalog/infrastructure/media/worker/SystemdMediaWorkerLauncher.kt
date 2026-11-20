@@ -6,21 +6,30 @@ import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import java.util.UUID
 
 class SystemdMediaWorkerLauncher(
     private val isolation: LinuxIsolationAttestation.Matched,
+    private val unitController: MediaWorkerUnitController = SystemdMediaWorkerUnitController(isolation.properties.systemctl),
     private val processStarter: (List<String>, Path) -> Process = ::launchSystemdRun,
 ) : MediaWorkerLauncher {
+    private enum class Availability { AVAILABLE, TERMINATION_UNKNOWN }
+    private var availability = Availability.AVAILABLE
+
+    @Synchronized
     override fun execute(
         command: MediaWorkerCommand,
         workspace: MediaWorkerWorkspaceLease,
         limits: MediaNormalizationLimits,
     ): MediaWorkerExecution {
-        val argv = commandLine(isolation.properties, command, workspace, limits) ?: return MediaWorkerExecution.IsolationUnavailable
+        if (availability != Availability.AVAILABLE) return MediaWorkerExecution.TerminationUnknown
+        val unit = MediaWorkerUnitName.create(UUID.randomUUID())
+        val argv = commandLine(isolation.properties, command, workspace, limits, unit) ?: return MediaWorkerExecution.IsolationUnavailable
         var process: Process? = null
         var stdout: BoundedDrain? = null
         var stderr: BoundedDrain? = null
-        return try {
+        var interrupted = false
+        val execution = try {
             val started = processStarter(argv, workspace.directory)
             process = started
             started.outputStream.close()
@@ -30,19 +39,16 @@ class SystemdMediaWorkerLauncher(
             stdout = outDrain
             stderr = errDrain
             val finished = started.waitFor(limits.timeout.value.toMillis(), TimeUnit.MILLISECONDS)
-            outDrain.join(JOIN_MILLIS)
-            errDrain.join(JOIN_MILLIS)
             if (!finished) {
-                started.destroyForcibly()
-                started.waitFor(JOIN_MILLIS, TimeUnit.MILLISECONDS)
                 MediaWorkerExecution.TimedOut
-            } else if (!outDrain.succeeded || !errDrain.succeeded) {
-                MediaWorkerExecution.Failed
             } else {
-                MediaWorkerExecution.Completed(started.exitValue(), outDrain.bytes(), errDrain.bytes())
+                outDrain.join(JOIN_MILLIS)
+                errDrain.join(JOIN_MILLIS)
+                if (!outDrain.succeeded || !errDrain.succeeded) MediaWorkerExecution.Failed
+                else MediaWorkerExecution.Completed(started.exitValue(), outDrain.bytes(), errDrain.bytes())
             }
         } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+            interrupted = true
             MediaWorkerExecution.Failed
         } catch (_: Exception) {
             MediaWorkerExecution.IsolationUnavailable
@@ -53,9 +59,20 @@ class SystemdMediaWorkerLauncher(
                 runCatching { started.inputStream.close() }
                 runCatching { started.errorStream.close() }
             }
-            stdout?.let { if (it.isAlive) runCatching { it.join(JOIN_MILLIS) } }
-            stderr?.let { if (it.isAlive) runCatching { it.join(JOIN_MILLIS) } }
         }
+        // Clear interruption while asking the manager to terminate the unit; restore it for the caller.
+        interrupted = Thread.interrupted() || interrupted
+        val terminated = if (process == null) MediaWorkerUnitTermination.Confirmed else runCatching {
+            unitController.terminate(unit, execution is MediaWorkerExecution.Completed && execution.exitCode == 0)
+        }.getOrDefault(MediaWorkerUnitTermination.Unknown)
+        stdout?.let { if (it.isAlive) runCatching { it.join(JOIN_MILLIS) } }
+        stderr?.let { if (it.isAlive) runCatching { it.join(JOIN_MILLIS) } }
+        if (interrupted) Thread.currentThread().interrupt()
+        if (terminated != MediaWorkerUnitTermination.Confirmed) {
+            availability = Availability.TERMINATION_UNKNOWN
+            return MediaWorkerExecution.TerminationUnknown
+        }
+        return execution
     }
 
     companion object {
@@ -67,6 +84,7 @@ class SystemdMediaWorkerLauncher(
             command: MediaWorkerCommand,
             workspace: MediaWorkerWorkspaceLease,
             limits: MediaNormalizationLimits,
+            unit: MediaWorkerUnitName = MediaWorkerUnitName.create(UUID.randomUUID()),
         ): List<String>? {
             if (properties.systemdRun.fileName.toString() != "systemd-run") return null
             if (!safeExecutable(command.javaExecutable) || !safeJar(command.applicationJar) || !safeWorkspace(workspace, properties.workspace)) {
@@ -76,12 +94,17 @@ class SystemdMediaWorkerLauncher(
             return listOf(
                 properties.systemdRun.toString(),
                 "--quiet",
-                "--collect",
+                "--unit=${unit.value}",
                 "--wait",
                 "--pipe",
                 "--working-directory=$directory",
                 "--uid=${properties.dedicatedUser}",
-                "--property=KillMode=cgroup",
+                "--property=Type=exec",
+                "--property=KillMode=control-group",
+                "--property=RuntimeMaxSec=${limits.timeout.value.toMillis()}ms",
+                "--property=TimeoutStopSec=2s",
+                "--property=SendSIGKILL=yes",
+                "--property=KillSignal=SIGKILL",
                 "--property=NoNewPrivileges=yes",
                 "--property=PrivateDevices=yes",
                 "--property=PrivateTmp=yes",

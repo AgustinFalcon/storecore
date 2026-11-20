@@ -21,6 +21,7 @@ class LinuxIsolationProperties private constructor(
     val architecture: MediaWorkerArchitecture,
     val cgroupVersion: CgroupVersion,
     val systemdRun: Path,
+    val systemctl: Path,
     val dedicatedUser: String,
     val memoryMaxBytes: Long,
     val memorySwapMaxBytes: Long,
@@ -43,6 +44,7 @@ class LinuxIsolationProperties private constructor(
             pidsMax: Long?,
             cpuQuota: String?,
             workspace: Path?,
+            systemctl: Path? = systemdRun?.resolveSibling("systemctl"),
         ): LinuxIsolationProperties? {
             if (operatingSystem != MediaWorkerOperatingSystem.LINUX) return null
             if (architecture != MediaWorkerArchitecture.AMD64 && architecture != MediaWorkerArchitecture.ARM64) return null
@@ -54,12 +56,15 @@ class LinuxIsolationProperties private constructor(
             if (cpuQuota != CPU_QUOTA) return null
             val absoluteWorkspace = workspace?.toAbsolutePath()?.normalize() ?: return null
             val absoluteSystemd = runCatching { systemdRun.toAbsolutePath().normalize() }.getOrNull() ?: return null
+            val absoluteSystemctl = systemctl?.toAbsolutePath()?.normalize() ?: return null
+            if (absoluteSystemctl.fileName.toString() != "systemctl") return null
             if (!absoluteWorkspace.isAbsolute || !Files.isDirectory(absoluteWorkspace, NOFOLLOW_LINKS)) return null
             return LinuxIsolationProperties(
                 operatingSystem,
                 architecture,
                 cgroupVersion,
                 absoluteSystemd,
+                absoluteSystemctl,
                 dedicatedUser,
                 memoryMaxBytes,
                 memorySwapMaxBytes,
@@ -87,6 +92,7 @@ open class LinuxMediaWorkerIsolationAttestor(
     private val osArch: () -> String? = { System.getProperty("os.arch") },
     private val cgroupControllers: Path = Path.of("/sys/fs/cgroup/cgroup.controllers"),
     private val systemdRunCandidates: List<Path> = listOf(Path.of("/usr/bin/systemd-run"), Path.of("/bin/systemd-run")),
+    private val systemctlCandidates: List<Path> = listOf(Path.of("/usr/bin/systemctl"), Path.of("/bin/systemctl")),
 ) {
     open fun attest(
         workspace: Path?,
@@ -100,7 +106,8 @@ open class LinuxMediaWorkerIsolationAttestor(
         }
         if (os == MediaWorkerOperatingSystem.WINDOWS) return LinuxIsolationAttestation.Unavailable
         if (os != MediaWorkerOperatingSystem.LINUX) return LinuxIsolationAttestation.Unavailable
-        val systemdRun = systemdRunCandidates.firstNotNullOfOrNull(::ownedSystemdRun) ?: return LinuxIsolationAttestation.Unavailable
+        val systemdRun = systemdRunCandidates.firstNotNullOfOrNull { ownedExecutable(it, "systemd-run") } ?: return LinuxIsolationAttestation.Unavailable
+        val systemctl = systemctlCandidates.firstNotNullOfOrNull { ownedExecutable(it, "systemctl") } ?: return LinuxIsolationAttestation.Unavailable
         if (!cgroupV2()) return LinuxIsolationAttestation.Unavailable
         val properties = LinuxIsolationProperties.create(
             os,
@@ -113,6 +120,7 @@ open class LinuxMediaWorkerIsolationAttestor(
             pidsMax,
             LinuxIsolationProperties.CPU_QUOTA,
             workspace,
+            systemctl,
         ) ?: return LinuxIsolationAttestation.Unavailable
         return LinuxIsolationAttestation.Matched.create(properties) ?: LinuxIsolationAttestation.Unknown
     }
@@ -122,9 +130,9 @@ open class LinuxMediaWorkerIsolationAttestor(
         return runCatching { Files.readString(cgroupControllers) }.getOrNull()?.isNotBlank() == true
     }
 
-    private fun ownedSystemdRun(path: Path): Path? {
+    private fun ownedExecutable(path: Path, name: String): Path? {
         val absolute = runCatching { path.toAbsolutePath().normalize() }.getOrNull() ?: return null
-        if (absolute.fileName.toString() != "systemd-run") return null
+        if (absolute.fileName.toString() != name) return null
         if (!Files.isRegularFile(absolute, NOFOLLOW_LINKS) || Files.isSymbolicLink(absolute)) return null
         if (!Files.isExecutable(absolute)) return null
         val view = Files.getFileAttributeView(absolute, PosixFileAttributeView::class.java, NOFOLLOW_LINKS) ?: return null

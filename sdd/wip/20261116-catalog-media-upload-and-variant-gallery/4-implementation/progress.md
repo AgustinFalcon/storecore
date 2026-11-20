@@ -409,3 +409,31 @@
   dominio. PostgreSQL/Testcontainers queda para CI alojado porque Docker no está
   disponible en este host. El subcorte todavía no es cierre de TASK-003 ni
   autoriza HTTP, decoder, proveedor live, deploy u homologación.
+
+## 2026-11-20 — 003B-4 corregido tras reviews preliminares
+
+- PR #313 permanece abierto y sin autorización de merge. Las dos reviews
+  GPT-6.1 Sol del head `9c996d259859e4931ce13738c3624e4e592820cf`
+  detectaron cuatro bloqueos: unidad systemd huérfana, workspace 0700
+  incompatible con el UID dedicado, expectativa runtime auto-derivada del
+  reporte y metadata Kotlin ficticia.
+- La corrección local asigna unidad systemd propia, deadlines administrados,
+  kill/stop y verificación terminal con `systemctl` atestado. Si la terminación
+  no se prueba, el launcher queda cerrado, el workspace se retiene y no se
+  libera admisión.
+- `PrivateMediaWorkerWorkspace` conserva 0700/0600 y declara `Unavailable` para
+  el principal dedicado. Por lo tanto este adapter no finge `Ready`; el handoff
+  cross-UID real sigue siendo un corte posterior explícito.
+- La expectativa Java es un `ApprovedMediaWorkerRuntime` independiente del
+  SELF_TEST. Las pruebas negativas cubren drift de vendor, versión, OS y
+  arquitectura.
+- El worker empaqueta `META-INF/storecore/media-worker-runtime.properties` con
+  nueve dependencias cerradas. La factory lo lee del JAR real; Kotlin ya no
+  depende de un `pom.properties` inexistente.
+- Evidencia local previa al SHA candidato: backend focal `30/30`; worker `36`
+  ejecutados, `0` fallos y `2` skips de plataforma + IT del JAR `1/1`; factory
+  contra el JAR sombreado real `1/1`. La suite backend completa alcanzó `547`
+  tests con `0` failures y `218` errores de infraestructura por Docker local
+  ausente (`20` skips), por lo que la evidencia PostgreSQL queda para CI.
+  Falta congelar SHA, CI alojado y repetir ambas reviews exact-head antes de
+  marcar `MEDIA-NORMALIZE-003B-4` como completado.

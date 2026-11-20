@@ -7,11 +7,11 @@ import java.nio.file.StandardOpenOption.CREATE_NEW
 import java.nio.file.StandardOpenOption.WRITE
 import java.security.SecureRandom
 import java.util.UUID
-import java.util.zip.ZipFile
 
 class MediaWorkerCapabilityFactory(
     private val attestor: LinuxMediaWorkerIsolationAttestor = LinuxMediaWorkerIsolationAttestor(),
     private val launcherFor: (LinuxIsolationAttestation.Matched) -> MediaWorkerLauncher = { SystemdMediaWorkerLauncher(it) },
+    private val approvedRuntime: ApprovedMediaWorkerRuntime? = null,
     private val random: SecureRandom = SecureRandom(),
 ) {
     fun observe(
@@ -25,6 +25,15 @@ class MediaWorkerCapabilityFactory(
         val matched = isolation as? LinuxIsolationAttestation.Matched ?: return when (isolation) {
             LinuxIsolationAttestation.Unknown -> MediaWorkerCapability.Unknown
             else -> MediaWorkerCapability.Unavailable
+        }
+        val runtime = approvedRuntime ?: return MediaWorkerCapability.Unavailable
+        if (runtime.operatingSystem != matched.properties.operatingSystem ||
+            runtime.architecture != matched.properties.architecture
+        ) return MediaWorkerCapability.Unavailable
+        when (workspaces.accessFor(MediaWorkerPrincipal.DEDICATED_WORKER)) {
+            MediaWorkerWorkspaceAccess.Compatible -> Unit
+            MediaWorkerWorkspaceAccess.Unavailable -> return MediaWorkerCapability.Unavailable
+            MediaWorkerWorkspaceAccess.Unknown -> return MediaWorkerCapability.Unknown
         }
         val launcher = launcherFor(matched)
         val challenge = UUID.randomUUID()
@@ -44,7 +53,7 @@ class MediaWorkerCapabilityFactory(
             return when (val execution = launcher.execute(command, lease, limits)) {
                 is MediaWorkerExecution.Completed -> if (execution.exitCode == 0) {
                     val report = MediaWorkerSelfTestCodec.decodeReport(lease.readResult(16_384) ?: return MediaWorkerCapability.Unknown)
-                    val expected = expectedFingerprint(command, report) ?: return MediaWorkerCapability.Unavailable
+                    val expected = expectedFingerprint(command, matched, runtime) ?: return MediaWorkerCapability.Unavailable
                     val attestation = MediaWorkerAttestationEvaluator.evaluate(
                         MediaWorkerSelfTestExpectation.create(challenge, nonce, expected),
                         report,
@@ -58,6 +67,11 @@ class MediaWorkerCapabilityFactory(
                 }
                 MediaWorkerExecution.IsolationUnavailable -> MediaWorkerCapability.Unavailable
                 MediaWorkerExecution.Unknown -> MediaWorkerCapability.Unknown
+                MediaWorkerExecution.TerminationUnknown -> when (lease.retainUnsafe()) {
+                    MediaWorkerWorkspaceRetention.Retained -> MediaWorkerCapability.Unavailable
+                    MediaWorkerWorkspaceRetention.Unavailable -> MediaWorkerCapability.Unavailable
+                    MediaWorkerWorkspaceRetention.Unknown -> MediaWorkerCapability.Unknown
+                }
                 MediaWorkerExecution.TimedOut, MediaWorkerExecution.Failed -> MediaWorkerCapability.Unavailable
             }
         }
@@ -65,17 +79,20 @@ class MediaWorkerCapabilityFactory(
 
     private fun expectedFingerprint(
         command: MediaWorkerCommand,
-        report: MediaWorkerSelfTestReport?,
+        isolation: LinuxIsolationAttestation.Matched,
+        runtime: ApprovedMediaWorkerRuntime,
     ): MediaWorkerRuntimeFingerprint? {
-        if (report == null) return null
+        if (runtime.operatingSystem != isolation.properties.operatingSystem ||
+            runtime.architecture != isolation.properties.architecture
+        ) return null
         val jarDigest = MediaWorkerRuntimeFingerprint.hashPackagedJar(command.applicationJar) ?: return null
-        val versions = moduleVersionsFromJar(command.applicationJar) ?: return null
+        val versions = MediaWorkerDependencyInventory.fromJar(command.applicationJar)?.modules ?: return null
         val providers = ImageIoProviderInventory.imageIoV1Expected
         return MediaWorkerRuntimeFingerprint.create(
-            report.fingerprint.javaVendor,
-            report.fingerprint.javaRuntimeVersion,
-            report.fingerprint.operatingSystem,
-            report.fingerprint.architecture,
+            runtime.javaVendor,
+            runtime.javaRuntimeVersion,
+            runtime.operatingSystem,
+            runtime.architecture,
             versions,
             providers,
             jarDigest,
@@ -84,28 +101,4 @@ class MediaWorkerCapabilityFactory(
         )
     }
 
-    private fun moduleVersionsFromJar(jar: java.nio.file.Path): List<MediaWorkerModuleVersion>? = runCatching {
-        ZipFile(jar.toFile()).use { zip ->
-            val versions = listOf(
-                "org.jetbrains.kotlin" to "kotlin-stdlib",
-                "org.jetbrains" to "annotations",
-                "com.twelvemonkeys.common" to "common-image",
-                "com.twelvemonkeys.common" to "common-io",
-                "com.twelvemonkeys.common" to "common-lang",
-                "com.twelvemonkeys.imageio" to "imageio-core",
-                "com.twelvemonkeys.imageio" to "imageio-jpeg",
-                "com.twelvemonkeys.imageio" to "imageio-metadata",
-                "com.twelvemonkeys.imageio" to "imageio-webp",
-            ).map { (group, module) ->
-                val entry = zip.getEntry("META-INF/maven/$group/$module/pom.properties") ?: return@use null
-                val version = zip.getInputStream(entry).use { java.util.Properties().apply { load(it) }.getProperty("version") }
-                    ?: return@use null
-                if (group.startsWith("com.twelvemonkeys.") && version != MediaWorkerRuntimeFingerprint.TWELVEMONKEYS_VERSION) {
-                    return@use null
-                }
-                MediaWorkerModuleVersion("$group:$module", version)
-            }
-            versions.sortedBy { it.module }
-        }
-    }.getOrNull()
 }

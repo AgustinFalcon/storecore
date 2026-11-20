@@ -3,7 +3,7 @@ Description=StoreCore isolated media worker
 Documentation=file:sdd/wip/20261116-catalog-media-upload-and-variant-gallery/2-technical/adr/ADR-001-isolated-image-normalizer.md
 
 [Service]
-Type=oneshot
+Type=exec
 User=storecore-media-worker
 Group=storecore-media-worker
 NoNewPrivileges=yes
@@ -27,7 +27,11 @@ CPUQuota=100%
 LimitCORE=0
 LimitNOFILE=64
 LimitNPROC=32
-KillMode=cgroup
+KillMode=control-group
+RuntimeMaxSec=12s
+TimeoutStopSec=2s
+SendSIGKILL=yes
+KillSignal=SIGKILL
 CapabilityBoundingSet=
 AmbientCapabilities=
 WorkingDirectory=%d

@@ -56,9 +56,22 @@ los goldens no se actualizan automáticamente.
 - El launcher productivo invoca únicamente `/usr/bin/systemd-run` o
   `/bin/systemd-run` root-owned. No hay fallback a `ProcessBuilder` de `java`.
 - `Ready` exige Linux amd64/arm64, cgroup v2, usuario `storecore-media-worker`,
-  `NoNewPrivileges`, namespaces, sin AF_INET/AF_INET6, `KillMode=cgroup`,
+  `NoNewPrivileges`, namespaces, sin AF_INET/AF_INET6, `KillMode=control-group`,
   `MemorySwapMax=0`, `memory.oom.group`, `TasksMax`, `CPUQuota`, RLIMIT y
   SELF_TEST `Matched` dentro de esa unidad. Cualquier fallo es `Unavailable`.
+- Cada ejecución usa una unidad con nombre propio, `RuntimeMaxSec` y
+  `TimeoutStopSec`. El padre ordena kill/stop mediante `systemctl` atestado y
+  sólo libera admisión y workspace tras verificar estado terminal sin PID,
+  cgroup ni job. Una terminación no verificable retiene el workspace y cierra
+  nuevas admisiones hasta intervención/reinicio.
+- El workspace privado backend-only (0700/0600) declara incompatibilidad con
+  el UID dedicado y nunca puede producir `Ready`. El futuro handoff Linux será
+  otro adapter que pruebe ambos principals; no se relajan permisos ni checks
+  de owner del manager privado.
+- Vendor/versión Java esperados provienen de un perfil aprobado independiente;
+  OS/arquitectura deben coincidir con la attestación del padre. El worker lleva
+  un inventario de dependencias filtrado y versionado dentro del JAR sombreado,
+  validado por la factory sobre el artefacto real.
 - Windows productivo permanece `Unavailable` hasta un Job Object equivalente.
 
 ## Contexto

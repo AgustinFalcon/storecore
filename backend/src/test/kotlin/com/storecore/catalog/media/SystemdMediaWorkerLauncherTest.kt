@@ -14,6 +14,8 @@ import com.storecore.catalog.infrastructure.media.worker.MediaWorkerExecution
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerOperatingSystem
 import com.storecore.catalog.infrastructure.media.worker.MediaWorkerWorkspaceLease
 import com.storecore.catalog.infrastructure.media.worker.SystemdMediaWorkerLauncher
+import com.storecore.catalog.infrastructure.media.worker.MediaWorkerUnitController
+import com.storecore.catalog.infrastructure.media.worker.MediaWorkerUnitTermination
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -27,6 +29,60 @@ import java.nio.file.Path
 
 class SystemdMediaWorkerLauncherTest {
     @TempDir lateinit var temp: Path
+
+    @Test
+    fun `timeout asks manager to terminate the service before returning`() {
+        val fixture = fixture()
+        val process = FakeProcess()
+        var terminated = false
+        val launcher = SystemdMediaWorkerLauncher(fixture.first, MediaWorkerUnitController { _, completed ->
+            assertTrue(!completed)
+            assertTrue(!process.isAlive)
+            terminated = true
+            MediaWorkerUnitTermination.Confirmed
+        }) { _, _ -> process }
+        assertSame(MediaWorkerExecution.TimedOut, launcher.execute(fixture.second, fixture.third, MediaNormalizationLimits.standard()))
+        assertTrue(terminated)
+    }
+
+    @Test
+    fun `unconfirmed manager termination poisons the launcher and prevents another service`() {
+        val fixture = fixture()
+        var starts = 0
+        val launcher = SystemdMediaWorkerLauncher(fixture.first, MediaWorkerUnitController { _, _ ->
+            MediaWorkerUnitTermination.Unknown
+        }) { _, _ -> starts++; FakeProcess() }
+        repeat(2) {
+            assertSame(MediaWorkerExecution.TerminationUnknown,
+                launcher.execute(fixture.second, fixture.third, MediaNormalizationLimits.standard()))
+        }
+        assertEquals(1, starts)
+    }
+
+    private fun fixture(): Triple<LinuxIsolationAttestation.Matched, MediaWorkerCommand, FakeLease> {
+        val root = Files.createDirectories(temp.resolve("root"))
+        val workspace = FakeLease(Files.createDirectory(root.resolve("job")))
+        val properties = requireNotNull(LinuxIsolationProperties.create(
+            MediaWorkerOperatingSystem.LINUX, MediaWorkerArchitecture.AMD64, CgroupVersion.V2,
+            Files.writeString(temp.resolve("systemd-run"), "unused"), LinuxIsolationProperties.DEDICATED_USER,
+            192L * 1024L * 1024L, 0L, 32L, LinuxIsolationProperties.CPU_QUOTA, root,
+        ))
+        return Triple(requireNotNull(LinuxIsolationAttestation.Matched.create(properties)),
+            requireNotNull(MediaWorkerCommand.create(javaExecutable(), Files.writeString(temp.resolve("worker.jar"), "pk"))), workspace)
+    }
+
+    private class FakeProcess : Process() {
+        private var alive = true
+        override fun getOutputStream() = java.io.ByteArrayOutputStream()
+        override fun getInputStream() = java.io.ByteArrayInputStream(byteArrayOf())
+        override fun getErrorStream() = java.io.ByteArrayInputStream(byteArrayOf())
+        override fun waitFor() = 0
+        override fun waitFor(timeout: Long, unit: java.util.concurrent.TimeUnit) = false
+        override fun exitValue() = 0
+        override fun destroy() { alive = false }
+        override fun destroyForcibly(): Process { alive = false; return this }
+        override fun isAlive() = alive
+    }
 
     @Test
     fun `productive argv is systemd-run then java jar with cgroup properties`() {
@@ -57,7 +113,10 @@ class SystemdMediaWorkerLauncherTest {
         assertTrue(separator > 0)
         assertEquals(command.javaExecutable.toString(), argv[separator + 1])
         assertEquals("-jar", argv[separator + 5])
-        assertTrue(argv.contains("--property=KillMode=cgroup"))
+        assertTrue(argv.contains("--property=KillMode=control-group"))
+        assertTrue(argv.contains("--property=Type=exec"))
+        assertTrue(argv.contains("--property=RuntimeMaxSec=12000ms"))
+        assertTrue(argv.single { it.startsWith("--unit=") }.matches(Regex("--unit=storecore-media-[0-9a-f-]{36}\\.service")))
         assertTrue(argv.contains("--property=NoNewPrivileges=yes"))
         assertTrue(argv.contains("--property=MemorySwapMax=0"))
         assertTrue(argv.contains("--property=IPAddressDeny=any"))

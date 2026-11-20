@@ -74,10 +74,57 @@ class MediaWorkerCapabilityFactoryTest {
                     MediaWorkerExecution.Completed(0, byteArrayOf(), byteArrayOf())
                 }
             },
+            approvedRuntime = approvedRuntime(),
         )
         val capability = factory.observe(command, manager(), MediaNormalizationLimits.standard(), root)
         assertTrue(capability is MediaWorkerCapability.Ready)
         assertEquals(MediaWorkerCapabilityState.READY, capability.state)
+    }
+
+    @Test
+    fun `runtime drift from the independently approved profile never becomes Ready`() {
+        val root = Files.createDirectories(temp.resolve("drift-workspaces"))
+        val jar = packagedJar(temp.resolve("drift-worker.jar"))
+        val command = requireNotNull(MediaWorkerCommand.create(javaExecutable(), jar))
+        val isolation = requireNotNull(matchedIsolation(root))
+        val observed = listOf(
+            ObservedRuntime("Unexpected Vendor", "21.0.13+9", MediaWorkerOperatingSystem.LINUX, MediaWorkerArchitecture.AMD64),
+            ObservedRuntime("Eclipse Adoptium", "21.0.14+1", MediaWorkerOperatingSystem.LINUX, MediaWorkerArchitecture.AMD64),
+            ObservedRuntime("Eclipse Adoptium", "21.0.13+9", MediaWorkerOperatingSystem.WINDOWS, MediaWorkerArchitecture.AMD64),
+            ObservedRuntime("Eclipse Adoptium", "21.0.13+9", MediaWorkerOperatingSystem.LINUX, MediaWorkerArchitecture.ARM64),
+        )
+        observed.forEach { drift ->
+            val factory = MediaWorkerCapabilityFactory(
+                attestor = object : LinuxMediaWorkerIsolationAttestor() {
+                    override fun attest(workspace: Path?, memoryMaxBytes: Long?, pidsMax: Long?) = isolation
+                },
+                launcherFor = {
+                    MediaWorkerLauncher { _, lease, _ ->
+                        val request = requireNotNull(MediaWorkerSelfTestCodec.decodeRequest(Files.readAllBytes(lease.request)))
+                        val fingerprint = requireNotNull(MediaWorkerRuntimeFingerprint.create(
+                            drift.vendor,
+                            drift.version,
+                            drift.os,
+                            drift.architecture,
+                            moduleVersions(),
+                            ImageIoProviderInventory.imageIoV1Expected,
+                            MediaWorkerRuntimeFingerprint.hashPackagedJar(jar),
+                            MediaWorkerRuntimeFingerprint.profileDigest(),
+                            MediaWorkerRuntimeFingerprint.corpusDigests(),
+                        ))
+                        Files.write(
+                            lease.result,
+                            MediaWorkerSelfTestCodec.encodeReport(
+                                requireNotNull(MediaWorkerSelfTestReport.create(request.challengeId, request.nonce(), fingerprint)),
+                            ),
+                        )
+                        MediaWorkerExecution.Completed(0, byteArrayOf(), byteArrayOf())
+                    }
+                },
+                approvedRuntime = approvedRuntime(),
+            )
+            assertSame(MediaWorkerCapability.Unavailable, factory.observe(command, manager(), MediaNormalizationLimits.standard(), root))
+        }
     }
 
     @Test
@@ -100,7 +147,24 @@ class MediaWorkerCapabilityFactoryTest {
     private fun manager(): MediaWorkerWorkspaceManager = object : MediaWorkerWorkspaceManager {
         override fun create(requestId: UUID) = MediaWorkerWorkspaceResult.Created(FakeLease(temp.resolve(requestId.toString())))
         override fun sweep(now: java.time.Instant, staleAfter: java.time.Duration) = MediaWorkerSweepResult.Completed(0)
+        override fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess =
+            if (principal == MediaWorkerPrincipal.DEDICATED_WORKER) MediaWorkerWorkspaceAccess.Compatible
+            else MediaWorkerWorkspaceAccess.Unknown
     }
+
+    private fun approvedRuntime(
+        vendor: String = "Eclipse Adoptium",
+        version: String = "21.0.13+9",
+        os: MediaWorkerOperatingSystem = MediaWorkerOperatingSystem.LINUX,
+        architecture: MediaWorkerArchitecture = MediaWorkerArchitecture.AMD64,
+    ): ApprovedMediaWorkerRuntime = requireNotNull(ApprovedMediaWorkerRuntime.create(vendor, version, os, architecture))
+
+    private data class ObservedRuntime(
+        val vendor: String,
+        val version: String,
+        val os: MediaWorkerOperatingSystem,
+        val architecture: MediaWorkerArchitecture,
+    )
 
     private fun matchedIsolation(root: Path): LinuxIsolationAttestation.Matched? {
         val systemd = Files.writeString(temp.resolve("systemd-run"), "#!/bin/sh\n")
@@ -124,22 +188,18 @@ class MediaWorkerCapabilityFactoryTest {
             zip.putNextEntry(ZipEntry("META-INF/MANIFEST.MF"))
             zip.write("Manifest-Version: 1.0\n".toByteArray())
             zip.closeEntry()
-            listOf(
-                "org.jetbrains.kotlin" to "kotlin-stdlib" to "1.9.25",
-                "org.jetbrains" to "annotations" to "13.0",
-                "com.twelvemonkeys.common" to "common-image" to "3.15.3",
-                "com.twelvemonkeys.common" to "common-io" to "3.15.3",
-                "com.twelvemonkeys.common" to "common-lang" to "3.15.3",
-                "com.twelvemonkeys.imageio" to "imageio-core" to "3.15.3",
-                "com.twelvemonkeys.imageio" to "imageio-jpeg" to "3.15.3",
-                "com.twelvemonkeys.imageio" to "imageio-metadata" to "3.15.3",
-                "com.twelvemonkeys.imageio" to "imageio-webp" to "3.15.3",
-            ).forEach { (coordinates, version) ->
-                val (group, module) = coordinates
-                zip.putNextEntry(ZipEntry("META-INF/maven/$group/$module/pom.properties"))
-                zip.write("version=$version\n".toByteArray())
-                zip.closeEntry()
+            zip.putNextEntry(ZipEntry(MediaWorkerDependencyInventory.RESOURCE))
+            val modules = moduleVersions()
+            val inventory = buildString {
+                appendLine("inventory.version=1")
+                appendLine("module.count=${modules.size}")
+                modules.forEachIndexed { index, module ->
+                    appendLine("module.$index.coordinate=${module.module}")
+                    appendLine("module.$index.version=${module.version}")
+                }
             }
+            zip.write(inventory.toByteArray())
+            zip.closeEntry()
         }
         return path
     }

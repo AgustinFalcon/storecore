@@ -60,6 +60,12 @@ jobs:
       - name: Verify media-worker supply chain
         working-directory: backend/media-worker
         run: mvn -B verify
+      - name: Verify backend factory against the packaged media-worker
+        working-directory: backend
+        run: >-
+          mvn -B -Dtest=MediaWorkerPackagedCapabilityIntegrationTest
+          -Dstorecore.media.worker.packagedJar="$GITHUB_WORKSPACE/backend/media-worker/target/storecore-media-worker-0.1.0-SNAPSHOT.jar"
+          test
       - name: Run packaged media-worker SELF_TEST
         run: |
           worker_jar="$GITHUB_WORKSPACE/backend/media-worker/target/storecore-media-worker-0.1.0-SNAPSHOT.jar"
