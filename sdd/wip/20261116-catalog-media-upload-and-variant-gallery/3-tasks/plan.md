@@ -35,12 +35,18 @@
     TwelveMonkeys fijado, JPEG/PNG determinista, self-test y attestación de
     aislamiento Linux poseído por el SO. Debe aportar el launcher productivo y
     su attestación; no se habilita en Windows productivo sin Job Object.
-    - [ ] `MEDIA-NORMALIZE-003B-1`: supply chain y providers, sin engine ni
+    - [x] `MEDIA-NORMALIZE-003B-1`: supply chain y providers, sin engine ni
       activación. TwelveMonkeys 3.15.3 (`imageio-core`, `imageio-jpeg`,
       `imageio-webp`), Enforcer, SBOM CycloneDX, allowlist de licencias, CVE
       high/critical fail-closed e inventario ImageIO cerrado. CI fija Temurin
-      `21.0.13+9`.
+      `21.0.13+9`. PR #307 head `ffaaab4ebf19020d2d95845bbb0e067d7597eba4`
+      pasó Verify #828 run `44784133698` 5/5 y dos reviews exact-head
+      independientes sin P0–P3. Merge
+      `ee1fa96edc0eb1c2722000b3980acecb15706ef7`.
     - [ ] `MEDIA-NORMALIZE-003B-2`: engine determinista y WorkerMain inactivo.
+      Implementado en `backend/media-worker` (fat jar, SPI explícito, JPEG
+      0.90/4:4:4, PNG Deflate, sin Spring ni `Ready`). Abierto hasta CI y
+      reviews exact-head.
     - [ ] `MEDIA-NORMALIZE-003B-3`: self-test y attestación offline.
     - [ ] `MEDIA-NORMALIZE-003B-4`: contención Linux real y factory fail-closed.
       Único corte que puede devolver `Ready`.

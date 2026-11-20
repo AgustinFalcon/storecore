@@ -6,7 +6,7 @@
   <version>0.1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>storecore-media-worker</name>
-  <description>MEDIA-NORMALIZE-003B-1 supply chain and ImageIO provider inventory. Not a Spring module and not a productive engine.</description>
+  <description>Inactive deterministic media normalization worker. Not a Spring module and not productively launched.</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.outputTimestamp>1763596800</project.build.outputTimestamp>
@@ -19,6 +19,7 @@
     <cyclonedx-maven-plugin.version>2.9.3</cyclonedx-maven-plugin.version>
     <maven-dependency-plugin.version>3.8.1</maven-dependency-plugin.version>
     <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+    <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
   </properties>
   <dependencies>
     <dependency>
@@ -69,6 +70,27 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>${maven-shade-plugin.version}</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <shadedArtifactAttached>false</shadedArtifactAttached>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.storecore.catalog.infrastructure.media.worker.MediaNormalizerWorkerMainKt</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
