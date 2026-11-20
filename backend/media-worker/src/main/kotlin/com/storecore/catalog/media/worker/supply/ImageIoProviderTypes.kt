@@ -78,8 +78,11 @@ sealed interface ImageIoProviderInventoryResult {
     class Matched private constructor(val providers: Set<ImageIoProviderRecord>) : ImageIoProviderInventoryResult {
         companion object {
             fun create(providers: Set<ImageIoProviderRecord>?): Matched? {
-                if (providers == null || providers.isEmpty()) return null
-                if (providers.any { it.category == ImageIoSpiCategory.UNKNOWN || it.provider == ImageIoProviderId.UNKNOWN }) return null
+                if (providers == null) return null
+                if (providers.any { it.category == ImageIoSpiCategory.UNKNOWN || it.provider == ImageIoProviderId.UNKNOWN }) {
+                    return null
+                }
+                if (providers != ImageIoProviderInventory.imageIoV1Expected) return null
                 return Matched(providers.toSet())
             }
         }
