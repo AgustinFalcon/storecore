@@ -5,7 +5,9 @@ import com.storecore.catalog.domain.media.ContentDigest
 import com.storecore.catalog.domain.media.MediaByteSize
 import com.storecore.catalog.domain.media.MediaNormalizationLimits
 import java.io.InputStream
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -69,6 +71,10 @@ interface MediaWorkerWorkspaceLease : AutoCloseable {
     val output: Path
     val diagnostic: Path
     fun publishInput(source: InputStream, maxBytes: Long): MediaPublishedInput?
+    fun writeRequest(bytes: ByteArray): Boolean = runCatching {
+        Files.write(request, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+        true
+    }.getOrDefault(false)
     fun readResult(maxBytes: Long): ByteArray?
     fun claimArtifact(expectedSize: MediaByteSize, digest: ContentDigest): MediaNormalizationArtifact?
     fun retainUnsafe(): MediaWorkerWorkspaceRetention = MediaWorkerWorkspaceRetention.Unknown

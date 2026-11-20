@@ -2,9 +2,6 @@ package com.storecore.catalog.infrastructure.media.worker
 
 import com.storecore.catalog.domain.media.MediaNormalizationLimits
 import com.storecore.catalog.media.worker.supply.ImageIoProviderInventory
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption.CREATE_NEW
-import java.nio.file.StandardOpenOption.WRITE
 import java.security.SecureRandom
 import java.util.UUID
 
@@ -48,10 +45,7 @@ class MediaWorkerCapabilityFactory(
         val lease = workspace
         var closeLease = true
         try {
-            val written = runCatching {
-                Files.write(lease.request, MediaWorkerSelfTestCodec.encodeRequest(request), CREATE_NEW, WRITE)
-                true
-            }.getOrDefault(false)
+            val written = lease.writeRequest(MediaWorkerSelfTestCodec.encodeRequest(request))
             if (!written) return MediaWorkerCapability.Unknown
             when (workspaces.grantWorker(lease)) {
                 MediaWorkerWorkspaceAccess.Compatible -> Unit

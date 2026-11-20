@@ -150,6 +150,18 @@ class PrivateMediaWorkerWorkspace(
             }
         }
 
+        override fun writeRequest(bytes: ByteArray): Boolean {
+            if (closed || bytes.isEmpty() || !validDirectory()) return false
+            return runCatching {
+                Files.write(request, bytes, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+                if (!restrict(request, directory = false)) {
+                    Files.deleteIfExists(request)
+                    return false
+                }
+                true
+            }.getOrDefault(false)
+        }
+
         override fun readResult(maxBytes: Long): ByteArray? {
             if (closed || maxBytes <= 0 || !validDirectory()) return null
             val expected = identity(result) ?: return null

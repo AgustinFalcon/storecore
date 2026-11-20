@@ -6,8 +6,6 @@ import com.storecore.catalog.application.media.MediaNormalizationSource
 import com.storecore.catalog.domain.media.MediaNormalizationLimits
 import com.storecore.catalog.domain.media.MediaNormalizationProfile
 import com.storecore.catalog.domain.media.MediaNormalizationRejectReason
-import java.nio.file.Files
-import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
@@ -47,10 +45,7 @@ class IsolatedJvmMediaByteNormalizer(
                 val request = MediaWorkerRequest.create(requestId, nonce, profile, published.size, published.digest, limits)
                     ?: return MediaNormalizationResult.Unknown
                 val encoded = MediaWorkerProtocolCodec.encodeRequest(request)
-                val requestWritten = runCatching {
-                    Files.write(lease.request, encoded, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
-                    true
-                }.getOrDefault(false)
+                val requestWritten = lease.writeRequest(encoded)
                 if (!requestWritten) return MediaNormalizationResult.Unknown
                 when (workspaceManager.grantWorker(lease)) {
                     MediaWorkerWorkspaceAccess.Compatible -> Unit

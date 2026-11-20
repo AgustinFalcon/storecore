@@ -43,7 +43,7 @@ class DedicatedUnixMediaWorkerWorkspaceTest {
         val before = Files.getPosixFilePermissions(lease.directory)
         assertTrue(PosixFilePermission.GROUP_WRITE !in before)
         assertTrue(PosixFilePermission.GROUP_EXECUTE !in before)
-        Files.writeString(lease.request, "self-test")
+        assertTrue(lease.writeRequest("self-test".toByteArray()))
         assertTrue(PosixFilePermission.GROUP_READ !in Files.getPosixFilePermissions(lease.request))
         assertSame(MediaWorkerWorkspaceAccess.Compatible, manager.grantWorker(lease))
         val directoryView = Files.getFileAttributeView(lease.directory, PosixFileAttributeView::class.java, LinkOption.NOFOLLOW_LINKS)
