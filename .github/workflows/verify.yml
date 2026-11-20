@@ -46,12 +46,28 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '21.0.13+9'
+          check-latest: false
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: |
+            backend/pom.xml
+            backend/media-worker/pom.xml
+      - name: Pin Temurin 21.0.13+9
+        run: node .github/scripts/assert-temurin-21.mjs
       - name: Test backend
         working-directory: backend
         run: mvn -B test
+      - name: Verify media-worker supply chain
+        working-directory: backend/media-worker
+        run: mvn -B verify
+      - name: Fail closed on HIGH and CRITICAL media-worker CVEs
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: sbom
+          scan-ref: backend/media-worker/target/bom.json
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          ignore-unfixed: false
       - name: Install real schema interlock prerequisites
         run: sudo apt-get update && sudo apt-get install -y postgresql-client unzip
       - name: Reject the previous real artifact against managed media schema
@@ -109,9 +125,14 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '21.0.13+9'
+          check-latest: false
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: |
+            backend/pom.xml
+            backend/media-worker/pom.xml
+      - name: Pin Temurin 21.0.13+9
+        run: node .github/scripts/assert-temurin-21.mjs
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22.22.3'
@@ -227,9 +248,14 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '21.0.13+9'
+          check-latest: false
           cache: maven
-          cache-dependency-path: backend/pom.xml
+          cache-dependency-path: |
+            backend/pom.xml
+            backend/media-worker/pom.xml
+      - name: Pin Temurin 21.0.13+9
+        run: node .github/scripts/assert-temurin-21.mjs
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22.22.3'
