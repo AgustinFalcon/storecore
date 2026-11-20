@@ -544,3 +544,77 @@
   el agregado `003B-4B`, `003B-4C`, `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue
   #7. Este corte no autoriza daemon root, mounts, D-Bus, wiring Spring ni
   capability `Ready`.
+
+## 2026-11-20 — 003B-4B-1 documentado; 003B-4B-2 en implementación
+
+- PR documental #317 head `ebee63611c26238c945ce1e75a977c090a635372`
+  registró exclusivamente el cierre de 4B-1. Pasó Verify `44830331207` 6/6,
+  fue fusionado mediante `444afd374e00c1416eeb72bbf412e184cfdfec0b` y
+  su post-merge `44831963810` terminó 6/6.
+- La rama `feat/media-broker-durable-state-20261120` implementa el alcance
+  puro de 4B-2: estados cerrados y transiciones monotónicas, binding durable
+  de job/principal/boot-id, CAS por revisión y presupuestos agregados de jobs,
+  mounts, bytes, inodos y cuarentena. Trabajo terminal sin ACK conserva su
+  reserva.
+- El journal v1 es binario, de longitud fija y checksum SHA-256. Abre un
+  directorio privado con `NOFOLLOW`, deriva nombres desde `JobId`, exige owner,
+  modo, archivo regular y un solo hardlink, y persiste mediante
+  `create_new`/file-fsync/rename/dir-fsync. Entrada desconocida, temporal de
+  crash, checksum, versión, estado o metadata inválidos fallan cerrados.
+- La reconciliación recibe un inventario exacto mediante un adapter testeable.
+  Termina runtimes esperados tras reinicio; huérfanos, duplicados, estados
+  desconocidos, ausencia inesperada o terminación no verificable bloquean
+  admisión y retienen/cuarentenan evidencia cuando corresponde.
+- Evidencia local previa al SHA candidato: `cargo fmt` verde y
+  `cargo check --all-targets`/`cargo clippy -D warnings` verdes contra
+  `x86_64-unknown-linux-gnu` con Rust 1.100 GNU. Los tests ejecutables Linux,
+  CI completo y reviews exact-head siguen pendientes; por eso 4B-2, 4B, 4C,
+  TASK-005 e issue #7 continúan abiertos. No existe daemon, mount, D-Bus,
+  wiring Spring ni capability `Ready` en este corte.
+- Las tres reviews exact-head del primer candidato
+  `6dca213d9f3307920154fa47ef63b87137e76413` devolvieron REQUEST_CHANGES con
+  cuatro P2 convergentes: journal sin escritor exclusivo, admisión abierta
+  antes de reconciliar y tras cuarentena durable, transiciones públicas
+  permitidas con el gate bloqueado, y apertura bloqueante de un FIFO con nombre
+  `.job` válido. El job Linux de ese SHA ejecutó 32 tests y quedó verde, pero
+  no cubría esos escenarios y por ello no autoriza merge.
+- La corrección mantiene un `flock` exclusivo durante toda la vida del journal,
+  abre entradas con `NONBLOCK`, introduce `RecoveryPending` y sólo habilita
+  admisión al terminar una reconciliación limpia. Cuarentena durable,
+  transición inválida/`Unknown` y commit incierto conservan el gate cerrado.
+  Las pruebas nuevas cubren doble store, FIFO, restart pendiente, cuarentena
+  tras restart y fallo inyectado después de `rename` antes de dir-fsync. El
+  siguiente SHA vuelve a requerir CI completo y las tres reviews exact-head.
+- El segundo candidato exact-head
+  `4a10f15b8164d978f5f74e18a7c374e1f2cab1fa` ejecutó 40 tests Linux verdes
+  en el job broker de Verify `44835298978`, pero las tres reviews independientes
+  volvieron a rechazarlo con dos P2 convergentes: la precondición
+  `RecoveryPending` se comprobaba después de efectos del adapter y un huérfano
+  sin `JobRecord` sólo bloqueaba RAM, por lo que un reinicio con inventario vacío
+  podía reabrir admisión. Ese SHA tampoco autoriza merge.
+- La corrección en curso mueve la precondición antes de enumerar el runtime y
+  agrega un latch global `admission.blocked`, binario, checksummed, persistido
+  con file-fsync/rename/dir-fsync y una razón cerrada traducida una sola vez en
+  el borde. Discrepancias, inventario no verificable y transición pública
+  inválida requieren intervención aun después de reiniciar; no existe operación
+  normal que elimine el latch. Las pruebas agregadas cubren rechazo antes de
+  cualquier efecto del adapter, huérfano activo que sigue bloqueado tras un
+  reinicio con inventario limpio y rechazo de una razón wire desconocida.
+  `cargo fmt`, `cargo check --all-targets` y `cargo clippy -D warnings` están
+  verdes localmente para `x86_64-unknown-linux-gnu`; CI exact-head y tres nuevas
+  aprobaciones siguen pendientes, por lo que `003B-4B-2` permanece abierto.
+- Las tres reviews exact-head del tercer candidato
+  `d3fa5f8c41b7cbb67db4c97856c8ef5985694ff8` convergieron en otro P2 de
+  ordering: el latch se escribía en `finish_reconciliation`, después de poder
+  terminar un huérfano o runtime inesperado. Un crash entre el efecto externo
+  y el latch podía consumir la evidencia. El job broker de Verify
+  `44836626734` pasó 44 tests, licencias y CVEs, pero el workflow se canceló
+  tras el rechazo para ahorrar recursos; ese SHA no autoriza merge.
+- La corrección en curso separa persistir la intención de bloquear de cerrar la
+  admisión: ante cada mismatch, acredita primero el latch durable mientras el
+  store sigue en `RecoveryPending`, y sólo después permite terminación o
+  cuarentena. Si crear el latch falla, no se invoca el adapter. Las regresiones
+  simulan un crash en la frontera de terminación y un fallo anterior a crear el
+  marker; el reinicio permanece bloqueado en el primer caso y no ocurre el
+  efecto externo en el segundo. Este nuevo candidato vuelve a requerir CI 6/6
+  y tres aprobaciones exact-head; 4B-2 continúa abierto hasta entonces.
