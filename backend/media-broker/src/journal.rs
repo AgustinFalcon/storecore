@@ -52,18 +52,7 @@ impl DurableJournal {
         let name = hex(record.job_id());
         let destination = self.directory.join(format!("{name}.rec"));
         let temporary = self.directory.join(format!("{name}.rec.tmp"));
-        let _ = fs::remove_file(&temporary);
-        {
-            let mut file = File::from(open(
-                &temporary,
-                OFlags::CREATE | OFlags::EXCL | OFlags::WRONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-                Mode::RUSR | Mode::WUSR,
-            ).map_err(|_| JournalError::Unavailable)?);
-            file.write_all(&bytes).map_err(|_| JournalError::Unavailable)?;
-            file.sync_all().map_err(|_| JournalError::Unavailable)?;
-        }
-        fs::rename(&temporary, &destination).map_err(|_| JournalError::Unavailable)?;
-        sync_directory(&self.directory)
+        durable_replace(&temporary, &destination, &self.directory, &bytes)
     }
 
     /// Removes a job record after a proven ACK and directory fsync.
@@ -114,21 +103,12 @@ pub fn persist_admission(root: &Path, admission: Admission) -> Result<(), Journa
     if matches!(admission, Admission::Unknown) {
         return Err(JournalError::Corrupt);
     }
-    let destination = root.join("admission.bin");
-    let temporary = root.join("admission.bin.tmp");
-    let _ = fs::remove_file(&temporary);
-    {
-        let mut file = File::from(open(
-            &temporary,
-            OFlags::CREATE | OFlags::EXCL | OFlags::WRONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-            Mode::RUSR | Mode::WUSR,
-        ).map_err(|_| JournalError::Unavailable)?);
-        file.write_all(&[admission.to_wire()])
-            .map_err(|_| JournalError::Unavailable)?;
-        file.sync_all().map_err(|_| JournalError::Unavailable)?;
-    }
-    fs::rename(&temporary, &destination).map_err(|_| JournalError::Unavailable)?;
-    sync_directory(root)
+    durable_replace(
+        &root.join("admission.bin.tmp"),
+        &root.join("admission.bin"),
+        root,
+        &[admission.to_wire()],
+    )
 }
 
 /// Reads the admission gate. A missing file is open; unknown bytes close it.
@@ -142,13 +122,11 @@ pub fn load_admission(root: &Path) -> Result<Admission, JournalError> {
     if !path.exists() {
         return Ok(Admission::Open);
     }
-    let mut file = File::from(open(
-        &path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-        Mode::empty(),
-    ).map_err(|_| JournalError::Unavailable)?);
+    let mut file = open_read(&path)?;
     let mut bytes = [0_u8; 2];
-    let read = file.read(&mut bytes).map_err(|_| JournalError::Unavailable)?;
+    let read = file
+        .read(&mut bytes)
+        .map_err(|_| JournalError::Unavailable)?;
     if read != 1 {
         return Err(JournalError::Corrupt);
     }
@@ -207,9 +185,9 @@ pub fn decode(bytes: &[u8]) -> Result<JobRecord, JournalError> {
     }
     let mut job_id = [0_u8; 16];
     job_id.copy_from_slice(&bytes[8..24]);
-    let revision = u64::from_be_bytes(bytes[24..32].try_into().map_err(|_| JournalError::Corrupt)?);
-    let uid = u32::from_be_bytes(bytes[32..36].try_into().map_err(|_| JournalError::Corrupt)?);
-    let gid = u32::from_be_bytes(bytes[36..40].try_into().map_err(|_| JournalError::Corrupt)?);
+    let revision = be_u64(&bytes[24..32])?;
+    let uid = be_u32(&bytes[32..36])?;
+    let gid = be_u32(&bytes[36..40])?;
     let mut boot_id = [0_u8; 16];
     boot_id.copy_from_slice(&bytes[40..56]);
     let profile = IsolationProfile::from_wire(bytes[56]);
@@ -218,8 +196,8 @@ pub fn decode(bytes: &[u8]) -> Result<JobRecord, JournalError> {
         1 => true,
         _ => return Err(JournalError::Corrupt),
     };
-    let size = u64::from_be_bytes(bytes[60..68].try_into().map_err(|_| JournalError::Corrupt)?);
-    let inodes = u64::from_be_bytes(bytes[68..76].try_into().map_err(|_| JournalError::Corrupt)?);
+    let size = be_u64(&bytes[60..68])?;
+    let inodes = be_u64(&bytes[68..76])?;
     JobRecord::create(
         operation,
         state,
@@ -240,32 +218,94 @@ fn read_record(path: &Path) -> Result<JobRecord, JournalError> {
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(JournalError::Corrupt);
     }
-    let mut file = File::from(open(
-        path,
-        OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-        Mode::empty(),
-    ).map_err(|_| JournalError::Unavailable)?);
+    let mut file = open_read(path)?;
     let mut bytes = [0_u8; RECORD_LENGTH + 1];
-    let read = file.read(&mut bytes).map_err(|_| JournalError::Unavailable)?;
+    let read = file
+        .read(&mut bytes)
+        .map_err(|_| JournalError::Unavailable)?;
     if read != RECORD_LENGTH {
         return Err(JournalError::Corrupt);
     }
     decode(&bytes[..RECORD_LENGTH])
 }
 
+fn durable_replace(
+    temporary: &Path,
+    destination: &Path,
+    directory: &Path,
+    bytes: &[u8],
+) -> Result<(), JournalError> {
+    let _ = fs::remove_file(temporary);
+    {
+        let mut file = exclusive_write(temporary)?;
+        file.write_all(bytes)
+            .map_err(|_| JournalError::Unavailable)?;
+        file.sync_all().map_err(|_| JournalError::Unavailable)?;
+    }
+    fs::rename(temporary, destination).map_err(|_| JournalError::Unavailable)?;
+    sync_directory(directory)
+}
+
+fn exclusive_write(path: &Path) -> Result<File, JournalError> {
+    Ok(File::from(
+        open(
+            path,
+            OFlags::CREATE
+                | OFlags::EXCL
+                | OFlags::WRONLY
+                | OFlags::CLOEXEC
+                | OFlags::NOFOLLOW,
+            Mode::RUSR | Mode::WUSR,
+        )
+        .map_err(|_| JournalError::Unavailable)?,
+    ))
+}
+
+fn open_read(path: &Path) -> Result<File, JournalError> {
+    Ok(File::from(
+        open(
+            path,
+            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+            Mode::empty(),
+        )
+        .map_err(|_| JournalError::Unavailable)?,
+    ))
+}
+
 fn sync_directory(path: &Path) -> Result<(), JournalError> {
-    let file = File::from(open(
-        path,
-        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-        Mode::empty(),
-    ).map_err(|_| JournalError::Unavailable)?);
+    let file = File::from(
+        open(
+            path,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
+            Mode::empty(),
+        )
+        .map_err(|_| JournalError::Unavailable)?,
+    );
     file.sync_all().map_err(|_| JournalError::Unavailable)?;
     Ok(())
 }
 
+fn be_u64(bytes: &[u8]) -> Result<u64, JournalError> {
+    Ok(u64::from_be_bytes(
+        bytes
+            .try_into()
+            .map_err(|_| JournalError::Corrupt)?,
+    ))
+}
+
+fn be_u32(bytes: &[u8]) -> Result<u32, JournalError> {
+    Ok(u32::from_be_bytes(
+        bytes
+            .try_into()
+            .map_err(|_| JournalError::Corrupt)?,
+    ))
+}
+
 fn hex(bytes: [u8; 16]) -> String {
-    bytes.iter().fold(String::with_capacity(32), |mut out, byte| {
-        out.push_str(&format!("{byte:02x}"));
-        out
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(32), |mut out, byte| {
+            out.push_str(&format!("{byte:02x}"));
+            out
+        })
 }

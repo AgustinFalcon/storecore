@@ -39,7 +39,11 @@ fn allocate_seal_start_terminate_ack_releases_budget() {
     fixture.store.inventory_mut().clear([1; 16]);
     let terminated = fixture
         .store
-        .apply(intent(DurableOperation::Terminate, [1; 16], started.revision()))
+        .apply(intent(
+            DurableOperation::Terminate,
+            [1; 16],
+            started.revision(),
+        ))
         .expect("terminate")
         .expect("record");
     assert_eq!(terminated.state(), JobState::Terminal);
@@ -53,11 +57,17 @@ fn allocate_seal_start_terminate_ack_releases_budget() {
         ApplyError::AdmissionClosed
     );
 
-    assert!(fixture
-        .store
-        .apply(intent(DurableOperation::Acknowledge, [1; 16], terminated.revision()))
-        .expect("ack")
-        .is_none());
+    assert!(
+        fixture
+            .store
+            .apply(intent(
+                DurableOperation::Acknowledge,
+                [1; 16],
+                terminated.revision()
+            ))
+            .expect("ack")
+            .is_none()
+    );
     assert_eq!(fixture.store.admission(), Admission::Open);
     assert!(fixture.store.inspect([1; 16]).is_none());
 }
@@ -76,10 +86,7 @@ fn replayed_uuid_does_not_transfer_authority() {
             .expect_err("replay"),
         ApplyError::StaleRevision
     );
-    assert_eq!(
-        fixture.store.inspect([9; 16]).expect("kept").revision(),
-        1
-    );
+    assert_eq!(fixture.store.inspect([9; 16]).expect("kept").revision(), 1);
 }
 
 #[test]
@@ -121,13 +128,8 @@ fn leftover_pid_after_seal_quarantines_and_closes_gate() {
         .expect("record");
     assert_eq!(sealed.state(), JobState::Quarantined);
     let leftover = fixture.store.inventory_mut().clone();
-    let reopened = DurableBroker::open(
-        &fixture.root,
-        [7; 16],
-        BudgetLimits::STANDARD,
-        leftover,
-    )
-    .expect("reopen");
+    let reopened = DurableBroker::open(&fixture.root, [7; 16], BudgetLimits::STANDARD, leftover)
+        .expect("reopen");
     assert_eq!(
         reopened.inspect([4; 16]).expect("job").state(),
         JobState::Quarantined
@@ -171,8 +173,9 @@ impl Fixture {
             std::process::id()
         ));
         fs::create_dir_all(&root).expect("root");
-        let store = DurableBroker::open(&root, [7; 16], BudgetLimits::STANDARD, FakeRuntime::empty())
-            .expect("open store");
+        let store =
+            DurableBroker::open(&root, [7; 16], BudgetLimits::STANDARD, FakeRuntime::empty())
+                .expect("open store");
         Self { root, store }
     }
 }

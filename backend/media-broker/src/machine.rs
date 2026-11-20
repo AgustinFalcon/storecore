@@ -1,5 +1,5 @@
 use crate::budget::{Budget, BudgetLimits, BudgetReservation};
-use crate::inventory::{complete_unit, leftover, RuntimeInventory};
+use crate::inventory::{RuntimeInventory, complete_unit, leftover};
 use crate::journal::{self, DurableJournal, JournalError};
 use crate::state::{
     Admission, DurableIntent, DurableOperation, IsolationProfile, JobRecord, JobState, Principal,
@@ -183,7 +183,9 @@ impl<I: RuntimeInventory> DurableBroker<I> {
             }
         };
         match result {
-            Err(ApplyError::InvalidTransition | ApplyError::UnknownOperation | ApplyError::Corrupt) => {
+            Err(
+                ApplyError::InvalidTransition | ApplyError::UnknownOperation | ApplyError::Corrupt,
+            ) => {
                 self.close_admission()?;
                 result
             }
@@ -241,7 +243,11 @@ impl<I: RuntimeInventory> DurableBroker<I> {
         to: JobState,
         operation: DurableOperation,
     ) -> Result<Option<JobRecord>, ApplyError> {
-        let current = self.jobs.get(&job_id).copied().ok_or(ApplyError::StaleRevision)?;
+        let current = self
+            .jobs
+            .get(&job_id)
+            .copied()
+            .ok_or(ApplyError::StaleRevision)?;
         self.authorize(current, expected_revision, principal)?;
         if current.state() != from {
             return Err(ApplyError::InvalidTransition);
@@ -258,7 +264,11 @@ impl<I: RuntimeInventory> DurableBroker<I> {
         expected_revision: u64,
         principal: Principal,
     ) -> Result<Option<JobRecord>, ApplyError> {
-        let current = self.jobs.get(&job_id).copied().ok_or(ApplyError::StaleRevision)?;
+        let current = self
+            .jobs
+            .get(&job_id)
+            .copied()
+            .ok_or(ApplyError::StaleRevision)?;
         self.authorize(current, expected_revision, principal)?;
         if !matches!(current.state(), JobState::Starting | JobState::Running) {
             return Err(ApplyError::InvalidTransition);
@@ -280,7 +290,11 @@ impl<I: RuntimeInventory> DurableBroker<I> {
         expected_revision: u64,
         principal: Principal,
     ) -> Result<Option<JobRecord>, ApplyError> {
-        let current = self.jobs.get(&job_id).copied().ok_or(ApplyError::StaleRevision)?;
+        let current = self
+            .jobs
+            .get(&job_id)
+            .copied()
+            .ok_or(ApplyError::StaleRevision)?;
         self.authorize(current, expected_revision, principal)?;
         if current.state() != JobState::Terminal {
             return Err(ApplyError::InvalidTransition);
@@ -292,7 +306,10 @@ impl<I: RuntimeInventory> DurableBroker<I> {
         let reservation = BudgetReservation::allocate(current.bytes(), current.inodes())
             .ok_or(ApplyError::Corrupt)?;
         self.journal.remove(job_id)?;
-        self.budget = self.budget.release(reservation).ok_or(ApplyError::Corrupt)?;
+        self.budget = self
+            .budget
+            .release(reservation)
+            .ok_or(ApplyError::Corrupt)?;
         self.jobs.remove(&job_id);
         if !self.has_unacked_terminal() && !self.has_quarantine() {
             self.admission = Admission::Open;
@@ -307,7 +324,11 @@ impl<I: RuntimeInventory> DurableBroker<I> {
         expected_revision: u64,
         principal: Principal,
     ) -> Result<Option<JobRecord>, ApplyError> {
-        let current = self.jobs.get(&job_id).copied().ok_or(ApplyError::StaleRevision)?;
+        let current = self
+            .jobs
+            .get(&job_id)
+            .copied()
+            .ok_or(ApplyError::StaleRevision)?;
         self.authorize(current, expected_revision, principal)?;
         if matches!(current.state(), JobState::Quarantined) {
             self.close_admission()?;
@@ -389,7 +410,10 @@ impl<I: RuntimeInventory> DurableBroker<I> {
                 current,
                 current.operation(),
                 state,
-                current.revision().checked_add(1).ok_or(ApplyError::Corrupt)?,
+                current
+                    .revision()
+                    .checked_add(1)
+                    .ok_or(ApplyError::Corrupt)?,
             )?;
             self.commit(next)?;
         }
@@ -403,9 +427,9 @@ impl<I: RuntimeInventory> DurableBroker<I> {
     }
 
     fn has_unacked_terminal(&self) -> bool {
-        self.jobs.values().any(|job| {
-            matches!(job.state(), JobState::Terminal) && !job.acknowledged()
-        })
+        self.jobs
+            .values()
+            .any(|job| matches!(job.state(), JobState::Terminal) && !job.acknowledged())
     }
 
     fn has_quarantine(&self) -> bool {
