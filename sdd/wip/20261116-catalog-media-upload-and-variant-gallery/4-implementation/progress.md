@@ -525,3 +525,22 @@
   Una mutación determinista durante copia devuelve `SourceChanged` y elimina
   el parcial. El próximo SHA requiere nuevamente CI completo y reviews
   exact-head; los dictámenes del candidato anterior no lo aprueban.
+
+## 2026-11-20 — 003B-4B-1 integrado con evidencia exacta
+
+- El candidato corregido `be7b822581aff1f7c26463c938e6eef35fe81c02`
+  pasó Verify `44826977557` 6/6. El job `media-broker` ejecutó 14 pruebas
+  Rust en Linux, revisó 16 licencias, generó el SBOM CycloneDX y no detectó
+  vulnerabilidades HIGH/CRITICAL. Backend, frontend, higiene y ambas matrices
+  reales también quedaron verdes.
+- Tres reviews exact-head independientes (bug/arquitectura, arquitectura y
+  seguridad) aprobaron sin P0–P3. Revalidaron `CMSG_CLOEXEC`/
+  `F_DUPFD_CLOEXEC`, el rango wire común `1..Long.MAX_VALUE` y el snapshot con
+  `pread`, fingerprint antes/después y limpieza del parcial ante mutación.
+- PR #316 fue fusionado en `master` mediante
+  `df13f2dda89440a77bd7bcec7b48f1b1c139fe25`. El Verify post-merge
+  `44828593553` terminó 6/6 sobre ese SHA.
+- Se cierra exclusivamente `003B-4B-1`. Permanecen abiertos `003B-4B-2..4`,
+  el agregado `003B-4B`, `003B-4C`, `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue
+  #7. Este corte no autoriza daemon root, mounts, D-Bus, wiring Spring ni
+  capability `Ready`.
