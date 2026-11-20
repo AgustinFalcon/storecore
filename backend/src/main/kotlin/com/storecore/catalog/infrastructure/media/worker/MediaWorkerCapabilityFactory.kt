@@ -21,7 +21,8 @@ class MediaWorkerCapabilityFactory(
         workspaceRoot: java.nio.file.Path?,
     ): MediaWorkerCapability {
         if (command == null || workspaces == null || limits == null || workspaceRoot == null) return MediaWorkerCapability.Unknown
-        val isolation = attestor.attest(workspaceRoot, limits.workerHeapBytes.value)
+        val processMemory = limits.processMemoryBytes() ?: return MediaWorkerCapability.Unknown
+        val isolation = attestor.attest(workspaceRoot, processMemory.value)
         val matched = isolation as? LinuxIsolationAttestation.Matched ?: return when (isolation) {
             LinuxIsolationAttestation.Unknown -> MediaWorkerCapability.Unknown
             else -> MediaWorkerCapability.Unavailable
@@ -52,6 +53,11 @@ class MediaWorkerCapabilityFactory(
                 true
             }.getOrDefault(false)
             if (!written) return MediaWorkerCapability.Unknown
+            when (workspaces.grantWorker(lease)) {
+                MediaWorkerWorkspaceAccess.Compatible -> Unit
+                MediaWorkerWorkspaceAccess.Unavailable -> return MediaWorkerCapability.Unavailable
+                MediaWorkerWorkspaceAccess.Unknown -> return MediaWorkerCapability.Unknown
+            }
             return when (val execution = launcher.execute(command, lease, limits)) {
                 is MediaWorkerExecution.Completed -> if (execution.exitCode == 0) {
                     val report = MediaWorkerSelfTestCodec.decodeReport(lease.readResult(16_384) ?: return MediaWorkerCapability.Unknown)

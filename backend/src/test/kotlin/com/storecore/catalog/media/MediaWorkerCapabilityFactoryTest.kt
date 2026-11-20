@@ -82,6 +82,49 @@ class MediaWorkerCapabilityFactoryTest {
     }
 
     @Test
+    fun `private backend workspace never becomes Ready for the dedicated worker`() {
+        val root = Files.createDirectories(temp.resolve("private-workspaces"))
+        val jar = packagedJar(temp.resolve("private-worker.jar"))
+        val command = requireNotNull(MediaWorkerCommand.create(javaExecutable(), jar))
+        val isolation = requireNotNull(matchedIsolation(root))
+        val factory = MediaWorkerCapabilityFactory(
+            attestor = object : LinuxMediaWorkerIsolationAttestor() {
+                override fun attest(workspace: Path?, memoryMaxBytes: Long?, pidsMax: Long?) = isolation
+            },
+            launcherFor = { MediaWorkerLauncher { _, _, _ -> MediaWorkerExecution.Completed(0, byteArrayOf(), byteArrayOf()) } },
+            approvedRuntime = approvedRuntime(),
+        )
+        assertSame(
+            MediaWorkerCapability.Unavailable,
+            factory.observe(command, PrivateMediaWorkerWorkspace(root), MediaNormalizationLimits.standard(), root),
+        )
+    }
+
+    @Test
+    fun `attestation uses the typed process memory budget not heap alone`() {
+        val root = Files.createDirectories(temp.resolve("budget-workspaces"))
+        val limits = MediaNormalizationLimits.standard()
+        val expected = requireNotNull(limits.processMemoryBytes()).value
+        var observed: Long? = null
+        val factory = MediaWorkerCapabilityFactory(
+            attestor = object : LinuxMediaWorkerIsolationAttestor() {
+                override fun attest(workspace: Path?, memoryMaxBytes: Long?, pidsMax: Long?): LinuxIsolationAttestation {
+                    observed = memoryMaxBytes
+                    return LinuxIsolationAttestation.Unavailable
+                }
+            },
+        )
+        factory.observe(
+            requireNotNull(MediaWorkerCommand.create(javaExecutable(), packagedJar(temp.resolve("budget-worker.jar")))),
+            manager(),
+            limits,
+            root,
+        )
+        assertEquals(expected, observed)
+        assertTrue(expected > limits.workerHeapBytes.value + limits.maxOutputBytes.value)
+    }
+
+    @Test
     fun `runtime drift from the independently approved profile never becomes Ready`() {
         val root = Files.createDirectories(temp.resolve("drift-workspaces"))
         val jar = packagedJar(temp.resolve("drift-worker.jar"))
@@ -160,6 +203,7 @@ class MediaWorkerCapabilityFactoryTest {
                 override fun create(requestId: UUID) = MediaWorkerWorkspaceResult.Created(lease)
                 override fun sweep(now: java.time.Instant, staleAfter: java.time.Duration) = MediaWorkerSweepResult.Completed(0)
                 override fun accessFor(principal: MediaWorkerPrincipal) = MediaWorkerWorkspaceAccess.Compatible
+                override fun grantWorker(lease: MediaWorkerWorkspaceLease) = MediaWorkerWorkspaceAccess.Compatible
             }
             val factory = MediaWorkerCapabilityFactory(
                 attestor = object : LinuxMediaWorkerIsolationAttestor() {
@@ -180,6 +224,7 @@ class MediaWorkerCapabilityFactoryTest {
         override fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess =
             if (principal == MediaWorkerPrincipal.DEDICATED_WORKER) MediaWorkerWorkspaceAccess.Compatible
             else MediaWorkerWorkspaceAccess.Unknown
+        override fun grantWorker(lease: MediaWorkerWorkspaceLease) = MediaWorkerWorkspaceAccess.Compatible
     }
 
     private fun approvedRuntime(

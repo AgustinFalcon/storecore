@@ -92,6 +92,7 @@ class SystemdMediaWorkerLauncherTest {
         val java = javaExecutable()
         val jar = Files.writeString(temp.resolve("worker.jar"), "pk")
         val command = requireNotNull(MediaWorkerCommand.create(java, jar))
+        val limits = MediaNormalizationLimits.standard()
         val properties = requireNotNull(
             LinuxIsolationProperties.create(
                 MediaWorkerOperatingSystem.LINUX,
@@ -99,14 +100,14 @@ class SystemdMediaWorkerLauncherTest {
                 CgroupVersion.V2,
                 systemd,
                 LinuxIsolationProperties.DEDICATED_USER,
-                192L * 1024L * 1024L,
+                requireNotNull(limits.processMemoryBytes()).value,
                 0L,
                 32L,
                 LinuxIsolationProperties.CPU_QUOTA,
                 root,
             ),
         )
-        val argv = requireNotNull(SystemdMediaWorkerLauncher.commandLine(properties, command, workspace, MediaNormalizationLimits.standard()))
+        val argv = requireNotNull(SystemdMediaWorkerLauncher.commandLine(properties, command, workspace, limits))
         assertEquals(systemd.toAbsolutePath().normalize().toString(), argv.first())
         assertTrue(argv.first().endsWith("systemd-run"))
         val separator = argv.indexOf("--")
@@ -118,8 +119,15 @@ class SystemdMediaWorkerLauncherTest {
         assertTrue(argv.contains("--property=RuntimeMaxSec=12000ms"))
         assertTrue(argv.single { it.startsWith("--unit=") }.matches(Regex("--unit=storecore-media-[0-9a-f-]{36}\\.service")))
         assertTrue(argv.contains("--property=NoNewPrivileges=yes"))
+        assertTrue(argv.contains("--property=CapabilityBoundingSet="))
+        assertTrue(argv.contains("--property=AmbientCapabilities="))
+        assertTrue(argv.contains("--property=NoExecPaths=${workspace.directory.toAbsolutePath().normalize()}"))
         assertTrue(argv.contains("--property=MemorySwapMax=0"))
         assertTrue(argv.contains("--property=IPAddressDeny=any"))
+        assertTrue(argv.contains("-Xmx${limits.workerHeapBytes.value}"))
+        assertTrue(argv.contains("-XX:MaxDirectMemorySize=${limits.maxOutputBytes.value}"))
+        assertTrue(argv.contains("--property=MemoryMax=${properties.memoryMaxBytes}"))
+        assertTrue(properties.memoryMaxBytes > limits.workerHeapBytes.value + limits.maxOutputBytes.value)
         assertNull(argv.firstOrNull { argv.indexOf(it) == 0 && (it == "java" || it.endsWith("java.exe")) })
     }
 

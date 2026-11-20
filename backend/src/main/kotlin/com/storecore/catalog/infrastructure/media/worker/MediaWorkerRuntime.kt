@@ -14,6 +14,7 @@ interface MediaWorkerWorkspaceManager {
     fun create(requestId: UUID): MediaWorkerWorkspaceResult
     fun sweep(now: Instant, staleAfter: Duration): MediaWorkerSweepResult
     fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess = MediaWorkerWorkspaceAccess.Unknown
+    fun grantWorker(lease: MediaWorkerWorkspaceLease): MediaWorkerWorkspaceAccess = MediaWorkerWorkspaceAccess.Unknown
 }
 
 enum class MediaWorkerPrincipal {

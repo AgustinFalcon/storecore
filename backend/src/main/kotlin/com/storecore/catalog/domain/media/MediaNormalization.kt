@@ -106,6 +106,16 @@ class MediaNormalizationLimits private constructor(
     fun acceptsInput(size: MediaByteSize): Boolean = size.value <= maxInputBytes.value
     fun acceptsOutput(size: MediaByteSize): Boolean = size.value <= maxOutputBytes.value
 
+    /** Cgroup MemoryMax: heap + direct + native reserve. Never equal to heap alone. */
+    fun processMemoryBytes(): MediaByteLimit? = runCatching {
+        MediaByteLimit.fromWire(
+            Math.addExact(
+                Math.addExact(workerHeapBytes.value, maxOutputBytes.value),
+                WORKER_NATIVE_RESERVE_BYTES,
+            ),
+        )
+    }.getOrNull()
+
     fun inspectDimensions(width: Any?, height: Any?): MediaDimensionDecision {
         val w = width as? Int ?: return MediaDimensionDecision.Unknown
         val h = height as? Int ?: return MediaDimensionDecision.Unknown
@@ -123,6 +133,7 @@ class MediaNormalizationLimits private constructor(
 
     companion object {
         private const val MIB = 1024L * 1024L
+        const val WORKER_NATIVE_RESERVE_BYTES = 64L * MIB
 
         fun standard(): MediaNormalizationLimits = requireNotNull(
             create(

@@ -202,4 +202,8 @@ private fun interface TestWorkspaceFactory { fun create(): MediaWorkerWorkspaceL
 private fun MediaWorkerWorkspaceManager(factory: TestWorkspaceFactory): MediaWorkerWorkspaceManager = object : MediaWorkerWorkspaceManager {
     override fun create(requestId: UUID) = MediaWorkerWorkspaceResult.Created(factory.create())
     override fun sweep(now: java.time.Instant, staleAfter: java.time.Duration) = MediaWorkerSweepResult.Completed(0)
+    override fun accessFor(principal: MediaWorkerPrincipal) =
+        if (principal == MediaWorkerPrincipal.DEDICATED_WORKER) MediaWorkerWorkspaceAccess.Compatible
+        else MediaWorkerWorkspaceAccess.Unknown
+    override fun grantWorker(lease: MediaWorkerWorkspaceLease) = MediaWorkerWorkspaceAccess.Compatible
 }

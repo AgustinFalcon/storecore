@@ -30,6 +30,9 @@ class PrivateMediaWorkerWorkspaceTest {
         val manager = PrivateMediaWorkerWorkspace(temporary.resolve("worker"))
         assertSame(MediaWorkerWorkspaceAccess.Unavailable, manager.accessFor(MediaWorkerPrincipal.DEDICATED_WORKER))
         assertSame(MediaWorkerWorkspaceAccess.Unknown, manager.accessFor(MediaWorkerPrincipal.UNKNOWN))
+        val lease = (manager.create(UUID.randomUUID()) as MediaWorkerWorkspaceResult.Created).lease
+        assertSame(MediaWorkerWorkspaceAccess.Unavailable, manager.grantWorker(lease))
+        lease.close()
     }
 
     @Test

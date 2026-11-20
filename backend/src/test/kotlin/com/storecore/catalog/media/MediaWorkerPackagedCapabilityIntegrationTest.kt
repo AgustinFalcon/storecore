@@ -93,6 +93,7 @@ class MediaWorkerPackagedCapabilityIntegrationTest {
         override fun accessFor(principal: MediaWorkerPrincipal): MediaWorkerWorkspaceAccess =
             if (principal == MediaWorkerPrincipal.DEDICATED_WORKER) MediaWorkerWorkspaceAccess.Compatible
             else MediaWorkerWorkspaceAccess.Unknown
+        override fun grantWorker(lease: MediaWorkerWorkspaceLease) = MediaWorkerWorkspaceAccess.Compatible
         override fun create(requestId: UUID): MediaWorkerWorkspaceResult =
             MediaWorkerWorkspaceResult.Created(Lease(Files.createDirectories(temp.resolve(requestId.toString()))))
         override fun sweep(now: Instant, staleAfter: Duration) = MediaWorkerSweepResult.Completed(0)

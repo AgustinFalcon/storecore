@@ -29,6 +29,12 @@ class MediaNormalizationDomainTest {
         assertEquals(20L * 1024 * 1024, limits.maxOutputBytes.value)
         assertEquals(1_024, limits.maxContainerSegments.value)
         assertEquals(1L * 1024 * 1024, limits.maxMetadataBytes.value)
+        val processMemory = requireNotNull(limits.processMemoryBytes())
+        assertEquals(
+            limits.workerHeapBytes.value + limits.maxOutputBytes.value + MediaNormalizationLimits.WORKER_NATIVE_RESERVE_BYTES,
+            processMemory.value,
+        )
+        assertTrue(processMemory.value > limits.workerHeapBytes.value)
 
         assertEquals(MediaDimensionDecision.Unknown, limits.inspectDimensions("320", 320))
         assertEquals(

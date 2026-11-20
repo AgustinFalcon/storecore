@@ -19,7 +19,7 @@ SystemCallArchitectures=native
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any
 DevicePolicy=closed
-MemoryMax=201326592
+MemoryMax=289407176
 MemorySwapMax=0
 MemoryOOMGroup=yes
 TasksMax=32
@@ -36,5 +36,6 @@ CapabilityBoundingSet=
 AmbientCapabilities=
 WorkingDirectory=%d
 ReadWritePaths=%d
+NoExecPaths=%d
 InaccessiblePaths=/home
 ExecStart=/usr/lib/jvm/temurin-21/bin/java -Xmx201326592 -XX:MaxDirectMemorySize=20971520 -Djava.io.tmpdir=%d -jar /usr/lib/storecore/storecore-media-worker.jar

@@ -52,6 +52,11 @@ class IsolatedJvmMediaByteNormalizer(
                     true
                 }.getOrDefault(false)
                 if (!requestWritten) return MediaNormalizationResult.Unknown
+                when (workspaceManager.grantWorker(lease)) {
+                    MediaWorkerWorkspaceAccess.Compatible -> Unit
+                    MediaWorkerWorkspaceAccess.Unavailable -> return MediaNormalizationResult.Unavailable
+                    MediaWorkerWorkspaceAccess.Unknown -> return MediaNormalizationResult.Unknown
+                }
 
                 return when (val execution = launcher.execute(command, lease, limits)) {
                     is MediaWorkerExecution.Completed -> if (execution.exitCode == 0) {
