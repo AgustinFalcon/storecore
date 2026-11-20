@@ -53,7 +53,22 @@
       `28b99b75cb3d683f60f2c1ca547986ef4b8fe0a8`. Post-merge Verify run
       `44804049350` 5/5. No declara `Ready`.
     - [ ] `MEDIA-NORMALIZE-003B-4`: contención Linux real y factory fail-closed.
-      Único corte que puede devolver `Ready`.
+      Único corte agregado que puede devolver `Ready`.
+      - [x] `MEDIA-NORMALIZE-003B-4A`: factory fail-closed, unidad transitoria,
+        attestación, terminación verificada y retención insegura. El workspace
+        privado backend-only permanece incompatible con el UID dedicado y no
+        devuelve `Ready`. PR #313 head
+        `649f11242b47eca59ef28b9d87febfa85f3acab3`, merge
+        `d824e0751010a5f3a5f7e3522329832f02018bd6`; tests focales 23/23 y dos
+        reviews exact-head independientes sin P0–P3.
+      - [ ] `MEDIA-NORMALIZE-003B-4B`: broker Linux root-owned de autoridad
+        mínima, handoff cross-UID sellado, tmpfs por job con cuota agregada,
+        runtime/JAR root-owned versionado y reconciliación durable de
+        unit/mount/quarantine. Requiere ADR/spec aprobados antes de código.
+      - [ ] `MEDIA-NORMALIZE-003B-4C`: harness Linux real con UID A/UID B,
+        SELF_TEST/NORMALIZE dentro de la unidad, attestación efectiva de cgroup
+        v2/mount/quota, aislamiento entre jobs, fallos y reinicios. Mocks o
+        ejecución directa del jar no cierran el gate.
 - [ ] MEDIA-NORMALIZE-004 Corpus adversarial, CI y reviews exact-head.
 
 TASK-005 sólo se cierra cuando los cuatro subcortes queden aprobados. Ninguno

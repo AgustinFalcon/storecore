@@ -1,5 +1,28 @@
 # Progreso
 
+## 2026-11-20 — 003B-4A integrado; 003B-4B/4C permanecen abiertos
+
+- PR #313 head `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó tests focales
+  23/23, Verify `44814135015` 5/5 y dos reviews independientes GPT-6.1 Sol
+  sin P0–P3. Los dictámenes persistidos son
+  `sdd/reviews/20261120-sol-pr313-security.md` y
+  `sdd/reviews/20261120-sol-pr313-architecture.md`. Merge
+  `d824e0751010a5f3a5f7e3522329832f02018bd6`.
+- El primer intento posmerge `44816056376` falló antes de compilar un job por
+  HTTP 429 de Maven Central. El rerun del mismo SHA terminó 5/5 verde, incluido
+  `productive-routes-real-e2e`; no hubo cambio de código para ocultar el fallo.
+- Este resultado cierra sólo `003B-4A`. El workspace privado sigue
+  intencionalmente incompatible con el UID dedicado y la capability no devuelve
+  `Ready`.
+- El residual aprobado se divide en `003B-4B` (broker Linux root-owned,
+  autenticación kernel, snapshot sellado cross-UID, cuotas por job/globales,
+  runtime versionado y reconciliación) y `003B-4C` (harness Linux UID A/UID B
+  con cgroup/mount/quota/fallos/reinicio reales). Ambos siguen sin implementar.
+- Dos revisiones SDD detectaron cuatro P2 en el primer borrador: autoridad del
+  socket/job, seal vulnerable a FD/mmap previos, Java sin execute y falta de
+  presupuesto global. El contrato fue corregido y ambas re-reviews dieron
+  `APPROVE` sin P0–P3. Es aprobación de diseño, no evidencia de runtime.
+
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-4 en implementación
 
 - `MEDIA-NORMALIZE-003B-3` quedó cerrada por PR #310: head `f6bb3a3`, Verify

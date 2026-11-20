@@ -74,6 +74,95 @@ los goldens no se actualizan automáticamente.
   validado por la factory sobre el artefacto real.
 - Windows productivo permanece `Unavailable` hasta un Job Object equivalente.
 
+#### Residual obligatorio: broker cross-UID y evidencia Linux real
+
+El launcher/factory fail-closed no completa por sí solo `003B-4`. El adapter de
+workspace privado backend-only conserva `0700/0600`, por lo que es
+intencionalmente incompatible con el UID dedicado. El cierre se divide en tres
+cortes trazables:
+
+- `003B-4A` — factory, unidad transitoria, terminación verificada y retención
+  insegura fail-closed. Este corte no puede devolver `Ready` mientras use el
+  workspace privado.
+- `003B-4B` — broker Linux cross-UID, workspace acotado y reconciliación de
+  reinicios. Es un adapter distinto; no relaja el manager privado.
+- `003B-4C` — harness Linux real que prueba principals distintos, límites
+  efectivos, SELF_TEST/NORMALIZE, terminación, cleanup y recuperación. Sólo el
+  conjunto `4A+4B+4C` puede completar `003B-4`.
+
+El broker es un servicio local root-owned con una API Unix tipada y cerrada. El
+socket es root-owned, no es world-accessible y autentica cada conexión mediante
+`SO_PEERCRED` contra el UID/GID backend configurado en un archivo root-owned.
+Rechaza al UID worker. Cada job queda ligado durablemente al principal, boot-id
+y revisión monotónica que lo creó; las mutaciones posteriores usan
+compare-and-set de revisión. UUID o mensajes repetidos no transfieren
+autoridad. El framing limita tamaño/cantidad de campos y traduce opcode/estado
+desconocido a `Unknown` antes de ejecutar efectos. La matriz cerrada de
+operaciones por estado incluye allocate, seal, start, terminate, inspect,
+acknowledge y quarantine. No acepta comandos, paths, nombres de unidad,
+propiedades systemd ni argumentos arbitrarios. El backend sólo envía un UUID de
+job, el digest esperado y un `MediaIsolationProfileId` permitido. El broker
+deriva todos los paths, nombres y límites desde configuración root-owned; llama
+systemd por D-Bus y nunca entrega `sudo`, `systemctl` o `systemd-run` genéricos
+al proceso Spring.
+
+Cada job usa un mount `tmpfs` propio, `nosuid,nodev,noexec`, con límite total de
+48 MiB, límite de inodos y directorio raíz no reutilizable. `LimitFSIZE` se
+conserva como defensa por archivo, pero no cuenta como cuota agregada.
+`SealInput` no hace `chmod` o `chown` del inode escrito por el backend: un
+FD/mmap previo seguiría siendo writeable. El backend pasa exactamente un FD
+regular por `SCM_RIGHTS`; el broker valida tipo/size, copia con límite hacia un
+inode nuevo `CREATE_EXCL` nunca abierto por el backend, sincroniza, vuelve a
+medir, verifica digest y recién entonces lo publica root-owned/worker-readable.
+Cambio de tamaño/metadata durante la copia, FD extra, device, directorio o
+archivo no regular rechaza y cuarentena el job. El worker sólo ve ese snapshot
+read-only en su mount namespace y escribe resultado/diag en paths `CREATE_NEW`
+propios. El harness mantiene FD y mmap del origen abiertos y prueba que
+escrituras, crecimiento y truncado posteriores no alteran el snapshot. Tras
+estado terminal, el backend lee únicamente artefactos cuyo owner, modo, tamaño
+y digest fueron atestados; el broker desmonta y elimina sólo después del ACK de
+consumo y de probar ausencia de procesos.
+
+Antes de montar o copiar, admisión reserva atómicamente presupuesto global de
+jobs, mounts, bytes e inodos, incluido un presupuesto separado de cuarentena.
+Trabajo terminal sin ACK conserva evidencia sólo hasta un TTL root-configured y
+se reconcilia con el estado durable del cliente; nunca se desaloja si
+terminación/unmount no están probados. Cliente muerto, ACK perdido o presupuesto
+agotado cierran nuevas admisiones. El harness cubre múltiples allocations y
+terminales sin ACK; no basta probar una cuota aislada por job.
+
+El runtime no se toma del checkout, `PATH`, symlinks ni un directorio escribible
+por la app. Java y el fat jar se instalan en una ruta versionada root-owned:
+directorios y ejecutables `0555`, jar/datos `0444`, sin symlinks y con SHA-256
+aprobado. El broker abre/valida la cadena con semántica `NOFOLLOW`, compara el
+digest y usa esa ruta exacta. El SELF_TEST vuelve a acreditar el jar realmente
+ejecutado y el harness prueba que el UID B puede ejecutar Java pero no escribir
+el runtime.
+
+El estado del broker es durable y monotónico:
+`Allocated | InputSealed | Starting | Running | Terminating | Terminal |
+Quarantined | Unknown`. Es un tipo cerrado; `Unknown` y cualquier transición
+inválida bloquean admisión. Antes de aceptar jobs tras un reinicio, el broker
+enumera su journal, mounts y unidades por identidad exacta. Mata/reconcilia lo
+que siga activo y sólo limpia cuando no quedan PID, cgroup ni mount. Cualquier
+discrepancia retiene evidencia, marca `Quarantined` y mantiene el gate global
+cerrado hasta intervención explícita.
+
+La attestación consulta la unidad efectiva por D-Bus y los archivos del cgroup
+v2 real; no confía sólo en propiedades solicitadas. Debe probar UID/GID,
+`NoNewPrivileges`, namespaces, familia de sockets, `KillMode`, swap, OOM group,
+memoria, pids, CPU, runtime, RLIMIT, mount/quota, ruta/digest del runtime y
+estado terminal. Ausencia, `Unknown`, valor más laxo o imposibilidad de leer
+cualquiera de ellos produce `Unavailable`.
+
+El harness `003B-4C` corre en Linux con backend UID A y worker UID B reales.
+Demuestra, como mínimo: SELF_TEST y NORMALIZE exitosos dentro de la unidad;
+denegación de acceso a otro job; cuota agregada; timeout/OOM/kill del cgroup;
+output falso o sustituido rechazado; reinicio en cada transición durable;
+retención ante terminación o unmount no verificables; y cleanup sólo después de
+estado terminal. Mocks de `systemctl`, un mismo UID o `java -jar` directo no son
+evidencia de cierre.
+
 ## Contexto
 
 Los bytes son controlados por un usuario y un decoder en el mismo proceso no
