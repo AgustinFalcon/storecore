@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-20 — MEDIA-NORMALIZE-003B-4 en implementación
+
+- `MEDIA-NORMALIZE-003B-3` quedó cerrada por PR #310: head `f6bb3a3`, Verify
+  `44801937465` 5/5, dos reviews exact-head y merge `28b99b7`. Post-merge
+  Verify `44804049350` 5/5.
+- Este corte agrega `MediaWorkerCapability` cerrado (`Ready`/`Unavailable`/
+  `Unknown`), `LinuxMediaWorkerIsolationAttestor`, `SystemdMediaWorkerLauncher`
+  y `MediaWorkerCapabilityFactory`. `Ready` sólo sale de un aislamiento Linux
+  cgroup v2 atestado más SELF_TEST `Matched` dentro de `systemd-run`. No hay
+  fallback a `java` vía ProcessBuilder. Windows queda `Unavailable`.
+- Sin HTTP, Spring bean de upload, secretos, deploy ni homologación.
+
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-3 implementado, gate abierto
 
 - El protocolo V1 agrega la operación cerrada `SELF_TEST(2)` sin cambiar el
@@ -26,10 +38,8 @@
   actualizará tras el verify completo del candidato.
 - `MEDIA-NORMALIZE-003B-2` quedó cerrada por PR #309: head `b41fc7e`, Verify
   #837 5/5, dos reviews exact-head y merge `17aadc8`.
-  `MEDIA-NORMALIZE-003B-3` permanece abierta hasta CI alojado y dos reviews
-  GPT-6.1 Sol exact-head. `003B-4`, `003B`, `003`, `004` y TASK-005 siguen
-  abiertos; sin Spring en el worker, launcher/`ProcessBuilder` productivo,
-  systemd, secretos, deploy ni activación.
+  `MEDIA-NORMALIZE-003B-3` quedó cerrada por PR #310. `003B-4`, `003B`, `003`,
+  `004` y TASK-005 siguen abiertos.
 
 ## 2026-11-20 — MEDIA-NORMALIZE-003B-2 implementado, todavía inactivo
 
