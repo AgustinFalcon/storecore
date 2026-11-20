@@ -36,7 +36,9 @@ class IsolatedJvmMediaByteNormalizer(
                 MediaWorkerWorkspaceResult.Unavailable -> return MediaNormalizationResult.Unavailable
                 MediaWorkerWorkspaceResult.Unknown -> return MediaNormalizationResult.Unknown
             }
-            workspace.use { lease ->
+            val lease = workspace
+            var closeLease = true
+            try {
                 val published = runCatching { source.openStream().use { lease.publishInput(it, limits.maxInputBytes.value) } }.getOrNull()
                     ?: return rejected(MediaNormalizationRejectReason.INPUT_LIMIT_EXCEEDED)
                 if (published.size != source.size) return rejected(MediaNormalizationRejectReason.CORRUPT_CONTAINER)
@@ -59,14 +61,17 @@ class IsolatedJvmMediaByteNormalizer(
                     }
                     MediaWorkerExecution.TimedOut -> rejected(MediaNormalizationRejectReason.DECODE_TIMEOUT)
                     MediaWorkerExecution.TerminationUnknown -> {
-                        lease.retainUnsafe()
+                        closeLease = false
                         releaseAdmission = false
+                        runCatching { lease.retainUnsafe() }
                         MediaNormalizationResult.Unavailable
                     }
                     MediaWorkerExecution.IsolationUnavailable -> MediaNormalizationResult.Unavailable
                     MediaWorkerExecution.Failed -> rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
                     MediaWorkerExecution.Unknown -> MediaNormalizationResult.Unknown
                 }
+            } finally {
+                if (closeLease) lease.close()
             }
         } finally {
             if (releaseAdmission) admission.release()

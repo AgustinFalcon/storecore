@@ -156,11 +156,13 @@ class PrivateMediaWorkerWorkspace(root: Path) : MediaWorkerWorkspaceManager {
 
         override fun retainUnsafe(): MediaWorkerWorkspaceRetention {
             if (closed || !validDirectory()) return MediaWorkerWorkspaceRetention.Unknown
+            // From this point cleanup is forbidden even when quarantine itself cannot be moved.
+            // The active entry intentionally keeps the original workspace fenced in-process.
+            closed = true
             val quarantined = quarantine(directory) ?: return MediaWorkerWorkspaceRetention.Unavailable
             if (quarantined.parent != root || !quarantined.fileName.toString().startsWith(QUARANTINE_PREFIX)) {
                 return MediaWorkerWorkspaceRetention.Unknown
             }
-            closed = true
             active.remove(directory)
             return MediaWorkerWorkspaceRetention.Retained
         }

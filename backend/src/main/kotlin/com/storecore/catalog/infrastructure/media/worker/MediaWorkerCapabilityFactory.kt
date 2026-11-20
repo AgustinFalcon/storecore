@@ -44,7 +44,9 @@ class MediaWorkerCapabilityFactory(
             MediaWorkerWorkspaceResult.Unavailable -> return MediaWorkerCapability.Unavailable
             MediaWorkerWorkspaceResult.Unknown -> return MediaWorkerCapability.Unknown
         }
-        workspace.use { lease ->
+        val lease = workspace
+        var closeLease = true
+        try {
             val written = runCatching {
                 Files.write(lease.request, MediaWorkerSelfTestCodec.encodeRequest(request), CREATE_NEW, WRITE)
                 true
@@ -67,13 +69,18 @@ class MediaWorkerCapabilityFactory(
                 }
                 MediaWorkerExecution.IsolationUnavailable -> MediaWorkerCapability.Unavailable
                 MediaWorkerExecution.Unknown -> MediaWorkerCapability.Unknown
-                MediaWorkerExecution.TerminationUnknown -> when (lease.retainUnsafe()) {
-                    MediaWorkerWorkspaceRetention.Retained -> MediaWorkerCapability.Unavailable
-                    MediaWorkerWorkspaceRetention.Unavailable -> MediaWorkerCapability.Unavailable
-                    MediaWorkerWorkspaceRetention.Unknown -> MediaWorkerCapability.Unknown
+                MediaWorkerExecution.TerminationUnknown -> {
+                    closeLease = false
+                    when (runCatching { lease.retainUnsafe() }.getOrDefault(MediaWorkerWorkspaceRetention.Unknown)) {
+                        MediaWorkerWorkspaceRetention.Retained -> MediaWorkerCapability.Unavailable
+                        MediaWorkerWorkspaceRetention.Unavailable -> MediaWorkerCapability.Unavailable
+                        MediaWorkerWorkspaceRetention.Unknown -> MediaWorkerCapability.Unknown
+                    }
                 }
                 MediaWorkerExecution.TimedOut, MediaWorkerExecution.Failed -> MediaWorkerCapability.Unavailable
             }
+        } finally {
+            if (closeLease) lease.close()
         }
     }
 

@@ -437,3 +437,15 @@
   ausente (`20` skips), por lo que la evidencia PostgreSQL queda para CI.
   Falta congelar SHA, CI alojado y repetir ambas reviews exact-head antes de
   marcar `MEDIA-NORMALIZE-003B-4` como completado.
+
+- La revisión del candidato `767d4c19fed759930bf8e47611d60efa3f0d8ee7`
+  detectó un P2 adicional: si la retención insegura fallaba o lanzaba una
+  excepción, `use` todavía podía cerrar y borrar un workspace cuyo proceso no
+  tenía terminación confirmada. El flujo ya inhibe `close` antes de intentar
+  la retención, bloquea permanentemente nuevas admisiones en normalización y
+  mantiene la entrada activa si el movimiento a cuarentena no puede probarse.
+- Evidencia focal posterior: `23/23` pruebas verdes para normalizador,
+  capability factory y workspace privado, incluyendo retención
+  `Unavailable`, `Unknown` y excepción. Esta evidencia tampoco autoriza el
+  merge: el próximo commit vuelve a requerir CI y dos reviews independientes
+  sobre su SHA exacto.
