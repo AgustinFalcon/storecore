@@ -28,12 +28,16 @@
           (click)="refresh.emit()"
         >{{ refreshPhase.busy ? 'Actualizando…' : 'Actualizar estado' }}</button>
       }
-      @if (refreshPhase !== Phase.Idle) {
-        <p class="sc-callout" aria-live="polite">
+      <p
+        class="sc-callout"
+        aria-live="polite"
+        [hidden]="refreshPhase === Phase.Idle"
+      >
+        @if (refreshPhase !== Phase.Idle) {
           {{ refreshPhase.label }}
           @if (refreshPhase === Phase.Failed && error) { <span>{{ error }}</span> }
-        </p>
-      }
+        }
+      </p>
       <a class="sc-btn sc-btn--primary" [routerLink]="['/customer/orders', order.id]">Ver detalle</a>
       <a class="sc-btn sc-btn--ghost" routerLink="/catalog">Seguir comprando</a>
     </div>
