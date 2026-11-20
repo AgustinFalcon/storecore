@@ -23,14 +23,11 @@ Las especificaciones y las 15 tareas siguen vigentes. TASK-001/002/004 están
 integradas; TASK-003 continúa abierto aunque el claim atómico MEDIA-CREATE y los
 subcortes durables previos ya fueron entregados. No se reimplementan.
 
-MEDIA-NORMALIZE-003B-1/2/3 están integrados. PR #313 entrega únicamente
-`003B-4A`: factory/lifecycle fail-closed y retención insegura, sin capacidad
-productiva porque el workspace privado no cruza al UID dedicado. El diseño
-corregido separa `003B-4B` (broker/handoff/quota/restart) y `003B-4C` (harness
-Linux real). Antes de código privilegiado, 4B se divide en contrato/transporte,
-journal, daemon systemd y adapter backend. Todos permanecen pendientes y
-requieren sus gates propios antes de que `003B-4`, TASK-005 o #7 puedan
-cerrarse.
+MEDIA-NORMALIZE-003B-1/2/3 y `003B-4A`/`003B-4B-1`/`003B-4B-2` están
+integrados. PR #319 entrega únicamente el journal/CAS/budgets/reconcile fake;
+no hay daemon D-Bus, mounts, adapter Spring ni `Ready`. Siguen abiertos
+`003B-4B-3`, `003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos gates
+propios deben cerrarse antes de que `003B-4`, TASK-005 o #7 puedan cerrarse.
 
 No existe GO live para Cloudinary, credenciales, HTTP upload, deploy ni
 homologación externa hasta cerrar sus gates separados.
