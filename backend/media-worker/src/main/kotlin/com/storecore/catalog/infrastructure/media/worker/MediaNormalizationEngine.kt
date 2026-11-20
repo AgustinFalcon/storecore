@@ -24,15 +24,21 @@ class MediaNormalizationEngine(
             if (ImageIoProviderInventory.evaluate() !is ImageIoProviderInventoryResult.Matched) {
                 return MediaEngineResult.Unavailable
             }
-            val decoded = when (val result = decoder.decode(input, preflight.format, preflight.dimensions)) {
+            val decoded = when (val result = decoder.decode(
+                input, preflight.format, preflight.dimensions, request.limits.maxMetadataBytes.value,
+            )) {
                 is RasterDecodeResult.Decoded -> result.raster
                 is RasterDecodeResult.Rejected -> return MediaEngineResult.Rejected(result.reason)
                 RasterDecodeResult.Unknown -> return MediaEngineResult.Unknown
             }
             val raster = RasterNormalizer.normalize(decoded)
                 ?: return MediaEngineResult.Rejected(MediaNormalizationRejectReason.INVALID_DIMENSIONS)
-            val encoded = encoder.encode(raster)
-                ?: return MediaEngineResult.Rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
+            val encoded = try {
+                encoder.encode(raster, request.limits.maxOutputBytes.value)
+                    ?: return MediaEngineResult.Rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
+            } catch (_: OutputLimitExceeded) {
+                return MediaEngineResult.Rejected(MediaNormalizationRejectReason.OUTPUT_LIMIT_EXCEEDED)
+            }
             val outputFormat = encoded.first
             val output = encoded.second
             if (!request.profile.permitsOutput(outputFormat)) return MediaEngineResult.Unknown

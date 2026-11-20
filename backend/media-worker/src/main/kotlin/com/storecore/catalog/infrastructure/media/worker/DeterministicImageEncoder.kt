@@ -53,13 +53,28 @@ object RasterNormalizer {
     }
 }
 
+class OutputLimitExceeded : RuntimeException()
+
+class BoundedByteArrayOutputStream(private val maxBytes: Int) : ByteArrayOutputStream() {
+    override fun write(b: Int) {
+        if (count + 1 > maxBytes) throw OutputLimitExceeded()
+        super.write(b)
+    }
+
+    override fun write(b: ByteArray, off: Int, len: Int) {
+        if (count + len > maxBytes) throw OutputLimitExceeded()
+        super.write(b, off, len)
+    }
+}
+
 class DeterministicImageEncoder {
-    fun encode(raster: NormalizedRaster): Pair<MediaFormat, ByteArray>? {
+    fun encode(raster: NormalizedRaster, maxOutputBytes: Long): Pair<MediaFormat, ByteArray>? {
         val format = if (raster.alpha == RasterAlpha.TRANSPARENT) MediaFormat.PNG else MediaFormat.JPEG
         val spi = explicitWriter(format) ?: return null
         val writer = runCatching { spi.createWriterInstance() }.getOrNull() ?: return null
+        val cap = maxOutputBytes.toInt().coerceAtMost(Int.MAX_VALUE)
         return try {
-            val bytes = ByteArrayOutputStream()
+            val bytes = BoundedByteArrayOutputStream(cap)
             MemoryCacheImageOutputStream(bytes).use { output ->
                 writer.output = output
                 val param = writer.defaultWriteParam
@@ -82,6 +97,8 @@ class DeterministicImageEncoder {
                 output.flush()
             }
             format to bytes.toByteArray()
+        } catch (_: OutputLimitExceeded) {
+            throw OutputLimitExceeded()
         } catch (_: Throwable) {
             null
         } finally {

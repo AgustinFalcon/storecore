@@ -74,6 +74,28 @@ class MediaNormalizationEngineTest {
     }
 
     @Test
+    fun `PNG eXIf and JPEG APP1 orientation 6 rotate the raster`() {
+        val source = MediaWorkerTestFixtures.image("png", width = 320, height = 400)
+        val png = MediaWorkerTestFixtures.withPngExif(source, 6)
+        val pngAccepted = engine.normalize(MediaWorkerTestFixtures.request(png), png) as MediaEngineResult.Accepted
+        assertEquals(400, pngAccepted.dimensions.width)
+        assertEquals(320, pngAccepted.dimensions.height)
+
+        val jpegSource = MediaWorkerTestFixtures.image("jpeg", width = 320, height = 400)
+        val jpeg = MediaWorkerTestFixtures.withJpegExif(jpegSource, 6)
+        val jpegAccepted = engine.normalize(MediaWorkerTestFixtures.request(jpeg), jpeg) as MediaEngineResult.Accepted
+        assertEquals(400, jpegAccepted.dimensions.width)
+        assertEquals(320, jpegAccepted.dimensions.height)
+    }
+
+    @Test
+    fun `inflated ICC metadata is bounded`() {
+        val png = MediaWorkerTestFixtures.pngWithInflatingIccp()
+        val result = engine.normalize(MediaWorkerTestFixtures.request(png), png) as MediaEngineResult.Rejected
+        assertEquals(MediaNormalizationRejectReason.METADATA_LIMIT_EXCEEDED, result.reason)
+    }
+
+    @Test
     fun `dimensions and output limits reject`() {
         assertRejected(MediaWorkerTestFixtures.image("png", width = 319), MediaNormalizationRejectReason.INVALID_DIMENSIONS)
         val input = MediaWorkerTestFixtures.image("jpeg")

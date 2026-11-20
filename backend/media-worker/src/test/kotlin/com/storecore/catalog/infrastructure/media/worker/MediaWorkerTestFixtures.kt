@@ -9,6 +9,8 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
+import java.util.zip.CRC32
+import java.util.zip.Deflater
 import javax.imageio.ImageIO
 
 internal object MediaWorkerTestFixtures {
@@ -45,6 +47,60 @@ internal object MediaWorkerTestFixtures {
         Files.write(root.resolve("input.bin"), input)
         Files.write(root.resolve("request.bin"), MediaWorkerProtocolCodec.encodeRequest(request))
         return request
+    }
+
+    fun withJpegExif(jpeg: ByteArray, orientation: Int): ByteArray {
+        val tiff = tiffOrientation(orientation)
+        val payload = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0, 0) + tiff
+        val app1 = ByteArrayOutputStream().apply {
+            write(0xff); write(0xe1)
+            write((payload.size + 2) ushr 8); write(payload.size + 2)
+            write(payload)
+        }.toByteArray()
+        return jpeg.copyOfRange(0, 2) + app1 + jpeg.copyOfRange(2, jpeg.size)
+    }
+
+    fun withPngExif(png: ByteArray, orientation: Int): ByteArray {
+        val ihdrEnd = 8 + 25
+        return png.copyOfRange(0, ihdrEnd) + pngChunk("eXIf", tiffOrientation(orientation)) + png.copyOfRange(ihdrEnd, png.size)
+    }
+
+    fun pngWithInflatingIccp(): ByteArray {
+        val png = image("png")
+        val raw = ByteArray(2 * 1024 * 1024)
+        val deflater = Deflater(Deflater.BEST_COMPRESSION)
+        deflater.setInput(raw)
+        deflater.finish()
+        val compressed = ByteArray(64 * 1024)
+        val size = deflater.deflate(compressed)
+        deflater.end()
+        val iccp = "bomb".toByteArray() + byteArrayOf(0, 0) + compressed.copyOf(size)
+        val ihdrEnd = 8 + 25
+        return png.copyOfRange(0, ihdrEnd) + pngChunk("iCCP", iccp) + png.copyOfRange(ihdrEnd, png.size)
+    }
+
+    private fun tiffOrientation(orientation: Int): ByteArray {
+        val tiff = ByteArray(26)
+        tiff[0] = 'I'.code.toByte(); tiff[1] = 'I'.code.toByte()
+        tiff[2] = 42; tiff[3] = 0
+        tiff[4] = 8
+        tiff[8] = 1; tiff[9] = 0
+        tiff[10] = 0x12; tiff[11] = 0x01
+        tiff[12] = 3; tiff[13] = 0
+        tiff[14] = 1
+        tiff[18] = orientation.toByte()
+        return tiff
+    }
+
+    private fun pngChunk(type: String, data: ByteArray): ByteArray {
+        val typeBytes = type.toByteArray(Charsets.US_ASCII)
+        val crc = CRC32().apply { update(typeBytes); update(data) }.value
+        return ByteArrayOutputStream().apply {
+            write(data.size ushr 24); write(data.size ushr 16); write(data.size ushr 8); write(data.size)
+            write(typeBytes)
+            write(data)
+            write((crc ushr 24).toInt()); write((crc ushr 16).toInt()); write((crc ushr 8).toInt()); write(crc.toInt())
+        }.toByteArray()
     }
 
     fun structurallyValidUndecodableWebp(): ByteArray {

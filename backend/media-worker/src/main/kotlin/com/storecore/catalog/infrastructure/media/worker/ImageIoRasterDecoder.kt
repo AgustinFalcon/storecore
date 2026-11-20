@@ -14,7 +14,12 @@ import javax.imageio.spi.ImageReaderSpi
 import javax.imageio.stream.MemoryCacheImageInputStream
 
 class ImageIoRasterDecoder {
-    fun decode(bytes: ByteArray, format: MediaFormat, expected: PixelDimensions): RasterDecodeResult {
+    fun decode(
+        bytes: ByteArray,
+        format: MediaFormat,
+        expected: PixelDimensions,
+        maxMetadataBytes: Long,
+    ): RasterDecodeResult {
         val spi = explicitReader(format) ?: return RasterDecodeResult.Unknown
         val reader = runCatching { spi.createReaderInstance() }.getOrNull() ?: return RasterDecodeResult.Unknown
         return try {
@@ -34,13 +39,21 @@ class ImageIoRasterDecoder {
                 }
                 val rawType = reader.getRawImageType(0)
                 val rawSpace = rawType?.colorModel?.colorSpace
+                when (EmbeddedColorProfile.inspect(bytes, format, maxMetadataBytes)) {
+                    ProfileInspection.Unsupported ->
+                        return RasterDecodeResult.Rejected(MediaNormalizationRejectReason.UNSUPPORTED_COLOR_PROFILE)
+                    ProfileInspection.LimitExceeded ->
+                        return RasterDecodeResult.Rejected(MediaNormalizationRejectReason.METADATA_LIMIT_EXCEEDED)
+                    ProfileInspection.Corrupt ->
+                        return RasterDecodeResult.Rejected(MediaNormalizationRejectReason.CORRUPT_CONTAINER)
+                    ProfileInspection.Absent, ProfileInspection.Srgb -> Unit
+                }
                 if (rawSpace?.type == ColorSpace.TYPE_CMYK ||
-                    (rawSpace is ICC_ColorSpace && !rawSpace.isCS_sRGB && rawSpace.type != ColorSpace.TYPE_GRAY) ||
-                    EmbeddedColorProfile.hasUnsupportedProfile(bytes, format)
+                    (rawSpace is ICC_ColorSpace && !rawSpace.isCS_sRGB && rawSpace.type != ColorSpace.TYPE_GRAY)
                 ) {
                     return RasterDecodeResult.Rejected(MediaNormalizationRejectReason.UNSUPPORTED_COLOR_PROFILE)
                 }
-                val orientation = ExifOrientationReader.read(bytes)
+                val orientation = ExifOrientationReader.read(bytes, format)
                 if (orientation == ExifOrientation.UNKNOWN) {
                     return RasterDecodeResult.Rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
                 }
@@ -83,6 +96,14 @@ class ImageIoRasterDecoder {
         if (colorSpace.isCS_sRGB || colorSpace.type == ColorSpace.TYPE_GRAY) RasterColor.SRGB else RasterColor.UNKNOWN
 }
 
+internal sealed interface ProfileInspection {
+    data object Absent : ProfileInspection
+    data object Srgb : ProfileInspection
+    data object Unsupported : ProfileInspection
+    data object LimitExceeded : ProfileInspection
+    data object Corrupt : ProfileInspection
+}
+
 private object EmbeddedColorProfile {
     private val JPEG_ICC = "ICC_PROFILE\u0000".toByteArray(Charsets.ISO_8859_1)
     private val SRGB = ICC_Profile.getInstance(ColorSpace.CS_sRGB).data
@@ -92,16 +113,20 @@ private object EmbeddedColorProfile {
      * cannot be proven without conversion fail closed; absent profiles use
      * the profile's documented sRGB interpretation.
      */
-    fun hasUnsupportedProfile(bytes: ByteArray, format: MediaFormat): Boolean {
+    fun inspect(bytes: ByteArray, format: MediaFormat, maxMetadataBytes: Long): ProfileInspection {
+        if (format == MediaFormat.UNKNOWN) return ProfileInspection.Unsupported
         val profile = runCatching {
             when (format) {
                 MediaFormat.JPEG -> jpegProfile(bytes)
-                MediaFormat.PNG -> pngProfile(bytes)
+                MediaFormat.PNG -> pngProfile(bytes, maxMetadataBytes)
                 MediaFormat.WEBP -> webpProfile(bytes)
-                MediaFormat.UNKNOWN -> return true
+                MediaFormat.UNKNOWN -> return ProfileInspection.Unsupported
             }
-        }.getOrElse { return true } ?: return false
-        return !profile.contentEquals(SRGB)
+        }.getOrElse { error ->
+            return if (error is MetadataLimitExceeded) ProfileInspection.LimitExceeded else ProfileInspection.Corrupt
+        } ?: return ProfileInspection.Absent
+        if (profile.size.toLong() > maxMetadataBytes) return ProfileInspection.LimitExceeded
+        return if (profile.contentEquals(SRGB)) ProfileInspection.Srgb else ProfileInspection.Unsupported
     }
 
     private fun jpegProfile(bytes: ByteArray): ByteArray? {
@@ -136,7 +161,7 @@ private object EmbeddedColorProfile {
         return ByteArrayOutputStream().also { out -> chunks.values.forEach(out::write) }.toByteArray()
     }
 
-    private fun pngProfile(bytes: ByteArray): ByteArray? {
+    private fun pngProfile(bytes: ByteArray, maxMetadataBytes: Long): ByteArray? {
         var offset = 8
         while (offset + 12 <= bytes.size) {
             val length = u32be(bytes, offset)
@@ -148,11 +173,28 @@ private object EmbeddedColorProfile {
                 val end = start + size
                 val zero = (start until end).firstOrNull { bytes[it] == 0.toByte() } ?: throw IllegalArgumentException()
                 if (zero == start || zero + 2 > end || bytes[zero + 1] != 0.toByte()) throw IllegalArgumentException()
-                return InflaterInputStream(ByteArrayInputStream(bytes, zero + 2, end - zero - 2)).use { it.readAllBytes() }
+                return inflateBounded(bytes, zero + 2, end - zero - 2, maxMetadataBytes)
             }
             offset += 12 + size
         }
         return null
+    }
+
+    private fun inflateBounded(bytes: ByteArray, offset: Int, length: Int, maxBytes: Long): ByteArray {
+        val cap = maxBytes.toInt().coerceAtMost(Int.MAX_VALUE)
+        return InflaterInputStream(ByteArrayInputStream(bytes, offset, length)).use { inflater ->
+            val out = ByteArrayOutputStream()
+            val buffer = ByteArray(4_096)
+            var total = 0
+            while (true) {
+                val count = inflater.read(buffer)
+                if (count < 0) break
+                total += count
+                if (total > cap) throw MetadataLimitExceeded()
+                out.write(buffer, 0, count)
+            }
+            out.toByteArray()
+        }
     }
 
     private fun webpProfile(bytes: ByteArray): ByteArray? {
@@ -178,19 +220,82 @@ private object EmbeddedColorProfile {
             ((bytes[at + 2].toLong() and 0xff) shl 16) or ((bytes[at + 3].toLong() and 0xff) shl 24)
 }
 
+internal class MetadataLimitExceeded : RuntimeException()
+
 private object ExifOrientationReader {
     private val EXIF = byteArrayOf(0x45, 0x78, 0x69, 0x66, 0, 0)
 
-    fun read(bytes: ByteArray): ExifOrientation {
-        val starts = mutableListOf<Int>()
-        var index = 0
-        while (index <= bytes.size - EXIF.size) {
-            if (EXIF.indices.all { bytes[index + it] == EXIF[it] }) starts += index + EXIF.size
-            index++
-        }
-        if (starts.isEmpty()) return ExifOrientation.NORMAL
-        val values = starts.map { parseTiff(bytes, it) ?: return ExifOrientation.UNKNOWN }.distinct()
+    fun read(bytes: ByteArray, format: MediaFormat): ExifOrientation {
+        val payloads = when (format) {
+            MediaFormat.JPEG -> jpegExifPayloads(bytes)
+            MediaFormat.PNG -> pngExifPayloads(bytes)
+            MediaFormat.WEBP -> webpExifPayloads(bytes)
+            MediaFormat.UNKNOWN -> return ExifOrientation.UNKNOWN
+        } ?: return ExifOrientation.UNKNOWN
+        if (payloads.isEmpty()) return ExifOrientation.NORMAL
+        val values = payloads.map { payload ->
+            parseTiff(payload, tiffBase(payload)) ?: return ExifOrientation.UNKNOWN
+        }.distinct()
         return if (values.size == 1) ExifOrientation.fromWire(values.single()) else ExifOrientation.UNKNOWN
+    }
+
+    private fun tiffBase(payload: ByteArray): Int =
+        if (payload.size >= EXIF.size && EXIF.indices.all { payload[it] == EXIF[it] }) EXIF.size else 0
+
+    private fun jpegExifPayloads(bytes: ByteArray): List<ByteArray>? {
+        val payloads = mutableListOf<ByteArray>()
+        var offset = 2
+        while (offset + 4 <= bytes.size) {
+            if (bytes[offset].toInt() and 0xff != 0xff) return null
+            while (offset < bytes.size && bytes[offset].toInt() and 0xff == 0xff) offset++
+            if (offset >= bytes.size) return null
+            val marker = bytes[offset++].toInt() and 0xff
+            if (marker == 0xda || marker == 0xd9) break
+            if (marker in 0xd0..0xd8 || marker == 0x01) continue
+            if (offset + 2 > bytes.size) return null
+            val length = ((bytes[offset].toInt() and 0xff) shl 8) or (bytes[offset + 1].toInt() and 0xff)
+            if (length < 2 || offset + length > bytes.size) return null
+            if (marker == 0xe1 && length - 2 >= EXIF.size &&
+                EXIF.indices.all { bytes[offset + 2 + it] == EXIF[it] }
+            ) {
+                payloads += bytes.copyOfRange(offset + 2, offset + length)
+            }
+            offset += length
+        }
+        return payloads
+    }
+
+    private fun pngExifPayloads(bytes: ByteArray): List<ByteArray>? {
+        if (bytes.size < 8) return null
+        val payloads = mutableListOf<ByteArray>()
+        var offset = 8
+        while (offset + 12 <= bytes.size) {
+            val length = ((bytes[offset].toLong() and 0xff) shl 24) or ((bytes[offset + 1].toLong() and 0xff) shl 16) or
+                ((bytes[offset + 2].toLong() and 0xff) shl 8) or (bytes[offset + 3].toLong() and 0xff)
+            if (length > Int.MAX_VALUE || offset.toLong() + 12 + length > bytes.size) return null
+            val type = String(bytes, offset + 4, 4, Charsets.US_ASCII)
+            if (type == "eXIf") {
+                payloads += bytes.copyOfRange(offset + 8, offset + 8 + length.toInt())
+            }
+            offset += 12 + length.toInt()
+        }
+        return payloads
+    }
+
+    private fun webpExifPayloads(bytes: ByteArray): List<ByteArray>? {
+        if (bytes.size < 12) return null
+        val payloads = mutableListOf<ByteArray>()
+        var offset = 12
+        while (offset + 8 <= bytes.size) {
+            val size = (bytes[offset + 4].toLong() and 0xff) or ((bytes[offset + 5].toLong() and 0xff) shl 8) or
+                ((bytes[offset + 6].toLong() and 0xff) shl 16) or ((bytes[offset + 7].toLong() and 0xff) shl 24)
+            if (size > Int.MAX_VALUE || offset.toLong() + 8 + size > bytes.size) return null
+            if (String(bytes, offset, 4, Charsets.US_ASCII) == "EXIF") {
+                payloads += bytes.copyOfRange(offset + 8, offset + 8 + size.toInt())
+            }
+            offset += 8 + size.toInt() + (size.toInt() and 1)
+        }
+        return payloads
     }
 
     private fun parseTiff(bytes: ByteArray, base: Int): Int? {
