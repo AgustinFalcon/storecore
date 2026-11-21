@@ -385,7 +385,8 @@ mod tests {
         );
         let stopped = systemd.stop(UnitKind::Mount, &spec).expect("stop");
         assert!(matches!(stopped, UnitState::Inactive | UnitState::Failed));
-        let mounts_after = fs::read_to_string("/proc/self/mountinfo").expect("mountinfo after stop");
+        let mounts_after =
+            fs::read_to_string("/proc/self/mountinfo").expect("mountinfo after stop");
         assert!(
             !mounts_after
                 .lines()
