@@ -7,7 +7,7 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use zbus::blocking::{Connection, Proxy, connection::Builder};
+use zbus::blocking::{connection::Builder, Connection, Proxy};
 use zbus::zvariant::{OwnedObjectPath, Value};
 
 use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
@@ -22,7 +22,7 @@ const UNIT_PATH_PREFIX: &str = "/org/freedesktop/systemd1/unit/";
 const START_MODE: &str = "fail";
 const STOP_MODE: &str = "fail";
 const NO_SUCH_UNIT: &str = "org.freedesktop.systemd1.NoSuchUnit";
-const METHOD_TIMEOUT: Duration = Duration::from_secs(5);
+const METHOD_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
@@ -247,7 +247,12 @@ pub(crate) fn worker_properties(
         ("WorkingDirectory", Value::from(workspace.clone())),
         ("NoNewPrivileges", Value::from(true)),
         ("ProtectSystem", Value::from("strict".to_owned())),
-        ("ReadWritePaths", Value::from(vec![workspace])),
+        ("ReadWritePaths", Value::from(vec![workspace.clone()])),
+        (
+            "Environment",
+            Value::from(vec![format!("TMPDIR={workspace}")]),
+        ),
+        ("RemainAfterExit", Value::from(true)),
     ])
 }
 
@@ -291,7 +296,7 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ZbusSystemd, classify_dbus_name, mount_properties, worker_properties};
+    use super::{classify_dbus_name, mount_properties, worker_properties, ZbusSystemd};
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
     use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
@@ -299,8 +304,20 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::fs::{self as unix_fs, OpenOptionsExt};
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::thread;
+    use std::time::{Duration, Instant};
+
+    /// Golden `SELF_TEST` request.bin used by Verify's packaged-worker step.
+    const SELF_TEST_REQUEST: [u8; 64] = [
+        0x53, 0x43, 0x4d, 0x57, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x01, 0x02, 0x00,
+        0x00, 0x91, 0xb9, 0xd4, 0xac, 0x9d, 0x2f, 0x4a, 0xd9, 0xa7, 0x2e, 0x08, 0xba, 0x53, 0x0b,
+        0x57, 0xc0, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d,
+        0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
+        0x2d, 0x2e, 0x2f, 0x30,
+    ];
 
     static NEXT: AtomicU64 = AtomicU64::new(1);
 
@@ -325,6 +342,8 @@ mod tests {
         assert!(worker_keys.contains(&"NoNewPrivileges"));
         assert!(worker_keys.contains(&"ProtectSystem"));
         assert!(worker_keys.contains(&"ReadWritePaths"));
+        assert!(worker_keys.contains(&"Environment"));
+        assert!(worker_keys.contains(&"RemainAfterExit"));
         let protect = worker
             .iter()
             .find(|(key, _)| *key == "ProtectSystem")
@@ -345,6 +364,16 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains(where_path)),
             "ReadWritePaths must be the derived Where {where_path}, got {writable:?}"
+        );
+        let environment = worker
+            .iter()
+            .find(|(key, _)| *key == "Environment")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            environment
+                .as_deref()
+                .is_some_and(|value| value.contains(&format!("TMPDIR={where_path}"))),
+            "TMPDIR must be the derived Where {where_path}, got {environment:?}"
         );
         assert!(keys.contains(&"DirectoryMode"));
         assert!(spec.mount().options().contains("mode=03770"));
@@ -427,6 +456,68 @@ mod tests {
         );
     }
 
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_starts_worker_self_test_on_derived_tmpfs() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x22; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, worker.gid());
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        let result_path = where_path.join("result.bin");
+        wait_for_worker_result(&result_path, worker.uid());
+        assert!(
+            !where_path.join("output.bin").exists(),
+            "SELF_TEST must not write output.bin"
+        );
+        assert_eq!(
+            started_worker.expect("start worker"),
+            UnitState::Active,
+            "RemainAfterExit keeps the worker Active after SELF_TEST exits"
+        );
+        assert_eq!(
+            systemd
+                .attest(UnitKind::Worker, &spec)
+                .expect("attest worker"),
+            UnitState::Active
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
     fn approved_runtime() -> ApprovedRuntime {
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
         let root = std::env::temp_dir().join(format!(
@@ -448,7 +539,7 @@ mod tests {
         .expect("runtime")
     }
 
-    fn write(path: &std::path::Path, mode: u32, bytes: &[u8]) -> [u8; 32] {
+    fn write(path: &Path, mode: u32, bytes: &[u8]) -> [u8; 32] {
         let mut file = OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -458,5 +549,54 @@ mod tests {
         file.write_all(bytes).expect("write");
         file.sync_all().expect("sync");
         Sha256::digest(bytes).into()
+    }
+
+    fn approved_pid1_runtime() -> ApprovedRuntime {
+        let java =
+            PathBuf::from(std::env::var("STORECORE_MEDIA_JAVA").expect("STORECORE_MEDIA_JAVA"));
+        let jar = PathBuf::from(std::env::var("STORECORE_MEDIA_JAR").expect("STORECORE_MEDIA_JAR"));
+        let java_digest = Sha256::digest(fs::read(&java).expect("java bytes")).into();
+        let jar_digest = Sha256::digest(fs::read(&jar).expect("jar bytes")).into();
+        ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime")
+    }
+
+    fn write_self_test_request(where_path: &Path, worker_gid: u32) {
+        let path = where_path.join("request.bin");
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o640)
+            .open(&path)
+            .expect("request.bin");
+        file.write_all(&SELF_TEST_REQUEST).expect("write request");
+        file.sync_all().expect("sync request");
+        drop(file);
+        unix_fs::chown(&path, Some(0), Some(worker_gid)).expect("chown request");
+    }
+
+    fn wait_for_worker_result(path: &Path, worker_uid: u32) {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if let Ok(descriptor) = rustix::fs::open(
+                path,
+                rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW,
+                rustix::fs::Mode::empty(),
+            ) {
+                let stat = rustix::fs::fstat(&descriptor).expect("fstat result.bin");
+                if stat.st_size > 0 {
+                    assert_eq!(
+                        stat.st_uid, worker_uid,
+                        "result.bin must be owned by the worker uid"
+                    );
+                    return;
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "worker did not write result.bin at {}",
+                path.display()
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
     }
 }

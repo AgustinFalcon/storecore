@@ -1,5 +1,23 @@
 # Estado canónico del SDD — StoreCore
 
+## En implementación — 2026-11-21, 4B-3 worker PID 1 SELF_TEST
+
+Este corte arranca el `.service` worker derivado contra PID 1. Instala
+Temurin 21.0.13+9 y el fat-jar root-owned (`0555`/`0444`, `nlink=1`),
+escribe el `SELF_TEST` `request.bin` en el tmpfs `03770` y atesta
+`result.bin` uid 2102. `RemainAfterExit` y `TMPDIR=<Where>` son
+properties internas. No cierra `003B-4B-3`: el harness no corre como
+UID A, no ejecuta `NORMALIZE`, no atesta cgroup/quota. `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay `Ready` ni
+HTTP.
+
+## Master vigente — 2026-11-21, 4B-3 persist reviews #331/#332
+
+`master a20b4adc20ea0e1538dc77eadc5863973fcc16d1` integra PR #334 sobre
+candidato `5fe84c7e4bd8f6647d38608e27bbbf5d9f082ed3`. Verify
+`44961959590` 7/7. Documentación: reviews APPROVED de #331 y #332.
+No cierra `003B-4B-3`.
+
 ## Master vigente — 2026-11-21, 4B-3 harness PID 1 tmpfs
 
 `master 0cccaaf2b2032414be79cb07bcf30f475fa47605` integra PR #332. Su

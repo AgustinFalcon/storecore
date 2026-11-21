@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-21 — 003B-4B-3 worker PID 1 SELF_TEST, 4B-3 sigue abierto
+
+- El job `media-broker-pid1` empaqueta el fat-jar, copia Temurin 21.0.13+9
+  y el jar a `/opt/storecore-media-runtime` root-owned, y corre los tests
+  ignored `pid1_`. Arranca el `.service` worker derivado, escribe el
+  vector `SELF_TEST` en el tmpfs y atesta `result.bin` uid 2102.
+- Properties internas nuevas: `TMPDIR=<Where>` y `RemainAfterExit=true`
+  para que `ProtectSystem=strict` no deje a la JVM sin tmp y el unit
+  siga `Active` tras el exit del proceso.
+- No se marca `003B-4B-3` ni `003B-4C`. No hay UID A, `NORMALIZE`,
+  cgroup, `Ready` ni HTTP.
+
 ## 2026-11-21 — PR #332 fusionado, 003B-4B-3 sigue abierto
 
 - PR #332 merge `0cccaaf2b2032414be79cb07bcf30f475fa47605` sobre candidato

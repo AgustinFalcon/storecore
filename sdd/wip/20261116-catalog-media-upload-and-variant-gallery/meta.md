@@ -35,7 +35,10 @@ PR #331 (head `32d6c7c`, merge `223513d`, Verify `44955708647` 6/6, dos
 Grok 4.7 APPROVED) deriva `ProtectSystem=strict` y `ReadWritePaths` del
 `Where` del job. PR #332 (head `d9f6dac`, merge `0cccaaf`, Verify
 `44960599616` 7/7, dos Grok 4.7 APPROVED) atesta el tmpfs derivado vía
-PID 1 en CI; no arranca el worker ni cierra UID A/B. PR #326 arranca
+PID 1 en CI. PR #334 (head `5fe84c7`, merge `a20b4ad`, Verify
+`44961959590` 7/7) persiste las reviews de #331/#332. El corte worker
+PID 1 SELF_TEST arranca el `.service` derivado con runtime Java/jar
+root-owned; no cierra UID A/B ni `NORMALIZE`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
