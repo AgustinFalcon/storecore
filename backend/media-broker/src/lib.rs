@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod budget;
+pub mod isolation;
 pub mod journal;
 pub mod protocol;
 pub mod reconcile;
