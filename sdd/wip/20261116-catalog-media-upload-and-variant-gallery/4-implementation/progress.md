@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-21 — 003B-4B-3 tmpfs no world-writable y NoNewPrivileges
+
+- Residual de seguridad de #328: el tmpfs deriva `mode=03770,uid=0,gid=<worker>`
+  y `DirectoryMode=03770`; el worker envía `NoNewPrivileges`. El cliente no
+  suministra esas properties. `003B-4B-3` sigue abierto: no hay PID 1 en CI,
+  cgroup, `Ready` ni HTTP.
+
 ## 2026-11-21 — 003B-4B-3 nombres PID 1 y adapter zbus
 
 - El residual de #320 queda explícito: una unidad `.mount` se nombra con el
