@@ -240,6 +240,7 @@ pub(crate) fn worker_properties(
         ),
         ("WorkingDirectory", Value::from(workspace)),
         ("NoNewPrivileges", Value::from(true)),
+        ("ProtectSystem", Value::from("strict".to_owned())),
     ])
 }
 
@@ -299,6 +300,7 @@ mod tests {
         let worker_keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(worker_keys.contains(&"ExecStart"));
         assert!(worker_keys.contains(&"NoNewPrivileges"));
+        assert!(worker_keys.contains(&"ProtectSystem"));
         assert!(keys.contains(&"DirectoryMode"));
         assert!(spec.mount().options().contains("mode=03770"));
         assert!(spec.mount().options().contains("gid=2000"));
