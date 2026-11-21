@@ -1,4 +1,5 @@
 use sha2::{Digest, Sha256};
+use std::io::Read;
 use std::os::fd::OwnedFd;
 use std::path::Path;
 
@@ -138,8 +139,7 @@ fn hash(descriptor: OwnedFd) -> Result<[u8; 32], RuntimeError> {
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 8192];
     loop {
-        let read = std::io::Read::read(&mut file, &mut buffer)
-            .map_err(|_| RuntimeError::Unavailable)?;
+        let read = file.read(&mut buffer).map_err(|_| RuntimeError::Unavailable)?;
         if read == 0 {
             break;
         }
