@@ -152,8 +152,7 @@ pub trait SystemdControl {
     /// # Errors
     ///
     /// Returns [`SystemdError`] when the inventory cannot be attested.
-    fn attest(&mut self, kind: UnitKind, spec: &TransientUnits)
-        -> Result<UnitState, SystemdError>;
+    fn attest(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError>;
 }
 
 #[derive(Default)]
@@ -183,7 +182,8 @@ impl SystemdControl for FakeSystemd {
             return Err(SystemdError::UnexpectedKind);
         }
         let name = name_for(kind, spec)?;
-        self.units.insert(name.as_bytes().to_vec(), UnitState::Active);
+        self.units
+            .insert(name.as_bytes().to_vec(), UnitState::Active);
         Ok(UnitState::Active)
     }
 
@@ -194,11 +194,7 @@ impl SystemdControl for FakeSystemd {
         Ok(UnitState::Inactive)
     }
 
-    fn attest(
-        &mut self,
-        kind: UnitKind,
-        spec: &TransientUnits,
-    ) -> Result<UnitState, SystemdError> {
+    fn attest(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError> {
         let name = name_for(kind, spec)?;
         match self.units.get(name.as_bytes()).copied() {
             Some(UnitState::Unknown) | None => Err(SystemdError::UnknownState),

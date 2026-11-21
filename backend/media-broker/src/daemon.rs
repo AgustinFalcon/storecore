@@ -84,12 +84,8 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
                 now_ms,
             )
             .map_err(DaemonError::Store)?;
-        let spec = TransientUnits::derive(
-            job_id,
-            self.mount_root.clone(),
-            self.worker,
-            self.runtime,
-        );
+        let spec =
+            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, self.runtime);
         self.start_kind(UnitKind::Mount, &spec)?;
         self.start_kind(UnitKind::Worker, &spec)?;
         self.store
@@ -106,11 +102,7 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
 }
 
 impl<Control: SystemdControl> BrokerDaemon<Control> {
-    fn start_kind(
-        &mut self,
-        kind: UnitKind,
-        spec: &TransientUnits,
-    ) -> Result<(), DaemonError> {
+    fn start_kind(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<(), DaemonError> {
         match self.systemd.start_transient(kind, spec) {
             Ok(UnitState::Active) => {}
             Ok(UnitState::Unknown) => return Err(DaemonError::Systemd(SystemdError::UnknownState)),
@@ -179,9 +171,7 @@ mod tests {
             .allocate([10; 16], principal(), [4; 16], reservation(), 1)
             .expect("allocate");
         assert_eq!(
-            fixture
-                .daemon
-                .start(allocated.job_id(), 1, principal(), 2),
+            fixture.daemon.start(allocated.job_id(), 1, principal(), 2),
             Err(DaemonError::NotSealed)
         );
         assert_eq!(
