@@ -1,5 +1,29 @@
 # Progreso
 
+## 2026-11-21 — PR #332 fusionado, 003B-4B-3 sigue abierto
+
+- PR #332 merge `0cccaaf2b2032414be79cb07bcf30f475fa47605` sobre candidato
+  `d9f6dacb006eb861544d24b29b9c301cfaf36c54`. Verify exact-head
+  `44960599616` terminó 7/7 (incluye `media-broker-pid1`). El P2 de
+  `a8e956a` (todo `Unavailable` → `Inactive`) se cerró en `d9f6dac`. Dos
+  reviews independientes Grok 4.7 aprobaron sin P0–P3:
+  `sdd/reviews/20261121-sol-pr332-architecture.md` y
+  `sdd/reviews/20261121-sol-pr332-security.md`.
+- El corte atesta el `.mount` tmpfs derivado contra PID 1. No arranca el
+  worker. No se marca `003B-4B-3` ni `003B-4C`. No hay `Ready` ni HTTP.
+
+## 2026-11-21 — PR #331 fusionado, 003B-4B-3 sigue abierto
+
+- PR #331 merge `223513d6788afe95b7525efef17281882e7d451e` sobre candidato
+  `32d6c7c8fceb981e9a038c55a878c64047052567`. Verify exact-head
+  `44955708647` terminó 6/6. El P1 de `2a3175b` (`ProtectSystem=strict`
+  sin `ReadWritePaths`) se cerró en ese SHA. Dos reviews independientes
+  Grok 4.7 aprobaron sin P0–P3:
+  `sdd/reviews/20261121-sol-pr331-architecture.md` y
+  `sdd/reviews/20261121-sol-pr331-security.md`.
+- El worker deriva `ProtectSystem=strict` y `ReadWritePaths` del `Where`
+  del job. No se marca `003B-4B-3`. No hay `Ready` ni HTTP.
+
 ## 2026-11-21 — 003B-4B-3 harness PID 1 del tmpfs derivado
 
 - CI alojado como root abre el system bus y arranca/para el `.mount` tmpfs
