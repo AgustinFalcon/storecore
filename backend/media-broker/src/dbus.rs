@@ -270,10 +270,11 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{mount_properties, worker_properties};
+    use super::{mount_properties, worker_properties, ZbusSystemd};
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
-    use crate::systemd::TransientUnits;
+    use crate::systemd::{SystemdControl, TransientUnits};
+    use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
@@ -334,6 +335,51 @@ mod tests {
         assert_eq!(spec.worker().argv()[1], "-jar");
         assert_eq!(spec.worker().argv()[0], spec.worker().java());
         assert_eq!(spec.worker().argv()[2], spec.worker().jar());
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, and the system bus"]
+    fn pid1_starts_and_stops_derived_tmpfs_mount() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x11; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2102, 2102),
+            &runtime,
+        )
+        .expect("spec");
+        let started = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started, UnitState::Active);
+        let where_path = spec.mount().where_path().display().to_string();
+        let mounts = fs::read_to_string("/proc/self/mountinfo").expect("mountinfo");
+        assert!(
+            mounts
+                .lines()
+                .any(|line| line.contains(&where_path) && line.contains("tmpfs")),
+            "effective tmpfs missing for {where_path}"
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec).expect("attest"),
+            UnitState::Active
+        );
+        let stopped = systemd.stop(UnitKind::Mount, &spec).expect("stop");
+        assert!(matches!(stopped, UnitState::Inactive | UnitState::Failed));
     }
 
     fn approved_runtime() -> ApprovedRuntime {

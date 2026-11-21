@@ -134,6 +134,25 @@ jobs:
           exit-code: '1'
           ignore-unfixed: false
 
+  media-broker-pid1:
+    needs: repository-hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the pinned Rust toolchain
+        run: >-
+          rustup toolchain install 1.100.0
+          --profile minimal
+          --component clippy,rustfmt
+      - name: Start a derived tmpfs mount through PID 1
+        working-directory: backend/media-broker
+        run: |
+          sudo useradd --system --no-create-home --uid 2101 storecore-backend
+          sudo useradd --system --no-create-home --uid 2102 storecore-worker
+          sudo --preserve-env=PATH,CARGO_HOME,RUSTUP_HOME \
+            "$(command -v cargo)" +1.100.0 test --locked --all-targets \
+            -- --ignored pid1_starts_and_stops_derived_tmpfs_mount
+
   frontend:
     needs: repository-hygiene
     runs-on: ubuntu-latest
