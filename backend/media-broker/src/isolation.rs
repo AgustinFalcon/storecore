@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::state::JobId;
 
 const JOB_ROOT: &str = "/run/storecore_media/jobs";
+const RUNTIME_INSTALL_ROOT: &str = "/usr/lib/storecore/media-runtime";
 const RUNTIME_ROOT: &str = "/usr/lib/storecore/media-runtime/image-io-v1";
 const JAVA_PATH: &str = "/usr/lib/storecore/media-runtime/image-io-v1/bin/java";
 const WORKER_JAR_PATH: &str =
@@ -14,6 +15,24 @@ const WORKSPACE_INODES: u64 = 4_096;
 pub enum MediaIsolationProfileId {
     ImageIoV1,
     Unknown,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorkerInvocation {
+    SelfTest,
+    Normalize,
+    Unknown,
+}
+
+impl WorkerInvocation {
+    #[must_use]
+    pub const fn from_wire(raw: u8) -> Self {
+        match raw {
+            1 => Self::SelfTest,
+            2 => Self::Normalize,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 impl MediaIsolationProfileId {
@@ -57,17 +76,24 @@ impl WorkerPrincipal {
 pub struct ApprovedRuntime {
     java_sha256: [u8; 32],
     worker_jar_sha256: [u8; 32],
+    runtime_tree_sha256: [u8; 32],
 }
 
 impl ApprovedRuntime {
     #[must_use]
-    pub fn create(java_sha256: [u8; 32], worker_jar_sha256: [u8; 32]) -> Option<Self> {
-        if java_sha256 == [0; 32] || worker_jar_sha256 == [0; 32] {
+    pub fn create(
+        java_sha256: [u8; 32],
+        worker_jar_sha256: [u8; 32],
+        runtime_tree_sha256: [u8; 32],
+    ) -> Option<Self> {
+        if java_sha256 == [0; 32] || worker_jar_sha256 == [0; 32] || runtime_tree_sha256 == [0; 32]
+        {
             None
         } else {
             Some(Self {
                 java_sha256,
                 worker_jar_sha256,
+                runtime_tree_sha256,
             })
         }
     }
@@ -97,6 +123,11 @@ impl ApprovedRuntime {
         self.worker_jar_sha256
     }
 
+    #[must_use]
+    pub const fn runtime_tree_sha256(self) -> [u8; 32] {
+        self.runtime_tree_sha256
+    }
+
     /// Verifies the fixed runtime chain against evidence collected without
     /// following symlinks.
     ///
@@ -108,34 +139,60 @@ impl ApprovedRuntime {
         self,
         source: &mut impl RuntimeEvidenceSource,
     ) -> Result<RuntimeAttestation, RuntimeAttestationError> {
+        for ancestor in [
+            Path::new("/usr"),
+            Path::new("/usr/lib"),
+            Path::new("/usr/lib/storecore"),
+        ] {
+            verify_node(
+                source,
+                ancestor,
+                RuntimeObjectKind::Directory,
+                RuntimePermissionPolicy::RootOwnedTraversal,
+                None,
+            )?;
+        }
+        verify_node(
+            source,
+            Path::new(RUNTIME_INSTALL_ROOT),
+            RuntimeObjectKind::Directory,
+            RuntimePermissionPolicy::Exact(0o555),
+            None,
+        )?;
         verify_node(
             source,
             self.root(),
             RuntimeObjectKind::Directory,
-            0o555,
+            RuntimePermissionPolicy::Exact(0o555),
             None,
         )?;
         verify_node(
             source,
             Path::new(RUNTIME_ROOT).join("bin").as_path(),
             RuntimeObjectKind::Directory,
-            0o555,
+            RuntimePermissionPolicy::Exact(0o555),
             None,
         )?;
         verify_node(
             source,
             self.java(),
             RuntimeObjectKind::RegularFile,
-            0o555,
+            RuntimePermissionPolicy::Exact(0o555),
             Some(self.java_sha256),
         )?;
         verify_node(
             source,
             self.worker_jar(),
             RuntimeObjectKind::RegularFile,
-            0o444,
+            RuntimePermissionPolicy::Exact(0o444),
             Some(self.worker_jar_sha256),
         )?;
+        let observed_tree = source
+            .tree_sha256(self.root())
+            .map_err(|_| RuntimeAttestationError::EvidenceUnavailable)?;
+        if observed_tree != self.runtime_tree_sha256 {
+            return Err(RuntimeAttestationError::RuntimeTreeMismatch);
+        }
         Ok(RuntimeAttestation::Matched)
     }
 }
@@ -192,6 +249,16 @@ pub trait RuntimeEvidenceSource {
     /// Returns [`RuntimeEvidenceError::Unavailable`] when complete evidence
     /// cannot be obtained.
     fn inspect(&mut self, path: &Path) -> Result<RuntimeNodeEvidence, RuntimeEvidenceError>;
+
+    /// Digests the complete, sorted runtime closure without following links.
+    /// The digest covers every relative path, object kind, owner, permission and
+    /// regular-file content; an unreadable or changing tree is unavailable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RuntimeEvidenceError::Unavailable`] unless completeness and a
+    /// stable snapshot can be proven.
+    fn tree_sha256(&mut self, root: &Path) -> Result<[u8; 32], RuntimeEvidenceError>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -209,13 +276,20 @@ pub enum RuntimeAttestationError {
     WrongPermissions,
     MissingDigest,
     DigestMismatch,
+    RuntimeTreeMismatch,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RuntimePermissionPolicy {
+    Exact(u32),
+    RootOwnedTraversal,
 }
 
 fn verify_node(
     source: &mut impl RuntimeEvidenceSource,
     path: &Path,
     expected_kind: RuntimeObjectKind,
-    expected_permissions: u32,
+    expected_permissions: RuntimePermissionPolicy,
     expected_digest: Option<[u8; 32]>,
 ) -> Result<(), RuntimeAttestationError> {
     let evidence = source
@@ -233,21 +307,25 @@ fn verify_node(
     if evidence.owner_uid != 0 {
         return Err(RuntimeAttestationError::WrongOwner);
     }
-    if evidence.permissions != expected_permissions {
+    let permissions_match = match expected_permissions {
+        RuntimePermissionPolicy::Exact(expected) => evidence.permissions == expected,
+        RuntimePermissionPolicy::RootOwnedTraversal => evidence.permissions & 0o022 == 0,
+    };
+    if !permissions_match {
         return Err(RuntimeAttestationError::WrongPermissions);
     }
     match (expected_digest, evidence.sha256) {
         (None, None) => Ok(()),
         (Some(expected), Some(observed)) if expected == observed => Ok(()),
         (Some(_), None) => Err(RuntimeAttestationError::MissingDigest),
-        (Some(_), Some(_)) => Err(RuntimeAttestationError::DigestMismatch),
-        (None, Some(_)) => Err(RuntimeAttestationError::DigestMismatch),
+        (Some(_), Some(_)) | (None, Some(_)) => Err(RuntimeAttestationError::DigestMismatch),
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum IsolationPolicyError {
     UnknownProfile,
+    UnknownInvocation,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -272,15 +350,19 @@ impl IsolationPolicy {
         self,
         job_id: JobId,
         profile: MediaIsolationProfileId,
+        invocation: WorkerInvocation,
     ) -> Result<IsolatedJobSpec, IsolationPolicyError> {
         if profile != MediaIsolationProfileId::ImageIoV1 {
             return Err(IsolationPolicyError::UnknownProfile);
+        }
+        if invocation == WorkerInvocation::Unknown {
+            return Err(IsolationPolicyError::UnknownInvocation);
         }
         let identity = RuntimeIdentity::derive(job_id, self.worker);
         Ok(IsolatedJobSpec {
             paths: identity.paths.clone(),
             mount: MountUnitSpec::derive(&identity, self.worker),
-            worker: WorkerUnitSpec::derive(&identity, self.worker, self.runtime),
+            worker: WorkerUnitSpec::derive(&identity, self.worker, self.runtime, invocation),
             runtime: self.runtime,
         })
     }
@@ -493,11 +575,48 @@ pub enum SystemCallArchitecturePolicy {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TemporaryFileSystemSpec {
+    path: PathBuf,
+    options: &'static str,
+}
+
+impl TemporaryFileSystemSpec {
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    #[must_use]
+    pub const fn options(&self) -> &'static str {
+        self.options
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorkspaceBindSpec {
+    source: PathBuf,
+    destination: PathBuf,
+}
+
+impl WorkspaceBindSpec {
+    #[must_use]
+    pub fn source(&self) -> &Path {
+        &self.source
+    }
+
+    #[must_use]
+    pub fn destination(&self) -> &Path {
+        &self.destination
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerUnitSpec {
     unit_name: String,
     mount_unit: String,
     workspace: PathBuf,
     read_only_paths: [PathBuf; 2],
+    invocation: WorkerInvocation,
     worker: WorkerPrincipal,
     runtime: ApprovedRuntime,
 }
@@ -507,12 +626,14 @@ impl WorkerUnitSpec {
         identity: &RuntimeIdentity,
         worker: WorkerPrincipal,
         runtime: ApprovedRuntime,
+        invocation: WorkerInvocation,
     ) -> Self {
         Self {
             unit_name: identity.worker_unit.clone(),
             mount_unit: identity.mount_unit.clone(),
             workspace: identity.paths.root.clone(),
             read_only_paths: [identity.paths.input.clone(), identity.paths.request.clone()],
+            invocation,
             worker,
             runtime,
         }
@@ -534,11 +655,31 @@ impl WorkerUnitSpec {
     }
 
     #[must_use]
-    pub fn read_only_paths(&self) -> [&Path; 2] {
-        [
-            self.read_only_paths[0].as_path(),
-            self.read_only_paths[1].as_path(),
-        ]
+    pub fn masked_job_root(&self) -> TemporaryFileSystemSpec {
+        TemporaryFileSystemSpec {
+            path: PathBuf::from(JOB_ROOT),
+            options: "ro,mode=000",
+        }
+    }
+
+    #[must_use]
+    pub fn visible_workspace(&self) -> WorkspaceBindSpec {
+        WorkspaceBindSpec {
+            source: self.workspace.clone(),
+            destination: self.workspace.clone(),
+        }
+    }
+
+    #[must_use]
+    pub fn read_only_paths(&self) -> Vec<&Path> {
+        match self.invocation {
+            WorkerInvocation::SelfTest => vec![self.read_only_paths[1].as_path()],
+            WorkerInvocation::Normalize => vec![
+                self.read_only_paths[0].as_path(),
+                self.read_only_paths[1].as_path(),
+            ],
+            WorkerInvocation::Unknown => Vec::new(),
+        }
     }
 
     #[must_use]
@@ -562,7 +703,7 @@ impl WorkerUnitSpec {
             self.java().to_string_lossy().into_owned(),
             format!("-Xmx{}", self.heap_bytes()),
             format!("-XX:MaxDirectMemorySize={}", self.direct_memory_bytes()),
-            "-Djava.io.tmpdir=/tmp".to_owned(),
+            format!("-Djava.io.tmpdir={}", self.workspace.display()),
             "-jar".to_owned(),
             self.worker_jar().to_string_lossy().into_owned(),
         ]
@@ -572,7 +713,7 @@ impl WorkerUnitSpec {
     pub fn environment(&self) -> Vec<String> {
         vec![
             format!("HOME={}", self.workspace.display()),
-            "TMPDIR=/tmp".to_owned(),
+            format!("TMPDIR={}", self.workspace.display()),
         ]
     }
 
@@ -742,15 +883,31 @@ mod tests {
     fn unknown_profile_fails_before_any_unit_spec_exists() {
         let policy = policy();
         assert_eq!(
-            policy.derive(job(), MediaIsolationProfileId::from_wire(99)),
+            policy.derive(
+                job(),
+                MediaIsolationProfileId::from_wire(99),
+                WorkerInvocation::Normalize,
+            ),
             Err(IsolationPolicyError::UnknownProfile)
+        );
+        assert_eq!(
+            policy.derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::from_wire(99),
+            ),
+            Err(IsolationPolicyError::UnknownInvocation)
         );
     }
 
     #[test]
     fn client_job_identity_derives_exact_non_reusable_units_and_paths() {
         let spec = policy()
-            .derive(job(), MediaIsolationProfileId::ImageIoV1)
+            .derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
             .expect("known profile");
         let suffix = "01010101010101010101010101010101";
         assert_eq!(
@@ -794,7 +951,11 @@ mod tests {
     #[test]
     fn tmpfs_policy_is_bounded_and_never_executable() {
         let spec = policy()
-            .derive(job(), MediaIsolationProfileId::ImageIoV1)
+            .derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
             .expect("known profile");
         assert_eq!(spec.mount().what(), "tmpfs");
         assert_eq!(spec.mount().file_system_type(), "tmpfs");
@@ -809,7 +970,11 @@ mod tests {
     #[test]
     fn worker_policy_has_no_network_capability_or_unbounded_resource() {
         let spec = policy()
-            .derive(job(), MediaIsolationProfileId::ImageIoV1)
+            .derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
             .expect("known profile");
         let worker = spec.worker();
         assert_eq!(
@@ -856,7 +1021,7 @@ mod tests {
                 JAVA_PATH.to_owned(),
                 "-Xmx201326592".to_owned(),
                 "-XX:MaxDirectMemorySize=20971520".to_owned(),
-                "-Djava.io.tmpdir=/tmp".to_owned(),
+                format!("-Djava.io.tmpdir={}", worker.workspace().display()),
                 "-jar".to_owned(),
                 WORKER_JAR_PATH.to_owned(),
             ]
@@ -865,21 +1030,74 @@ mod tests {
             worker.environment(),
             vec![
                 format!("HOME={}", worker.workspace().display()),
-                "TMPDIR=/tmp".to_owned(),
+                format!("TMPDIR={}", worker.workspace().display()),
             ]
         );
     }
 
     #[test]
+    fn self_test_has_no_input_bind_but_normalize_requires_sealed_input() {
+        let self_test = policy()
+            .derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::SelfTest,
+            )
+            .expect("self test");
+        let normalize = policy()
+            .derive(
+                job(),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
+            .expect("normalize");
+        assert_eq!(
+            self_test.worker().read_only_paths(),
+            vec![self_test.paths().request()]
+        );
+        assert_eq!(
+            normalize.worker().read_only_paths(),
+            vec![normalize.paths().input(), normalize.paths().request()]
+        );
+    }
+
+    #[test]
+    fn worker_namespace_masks_siblings_and_reexposes_only_its_workspace() {
+        let first = policy()
+            .derive(
+                JobId::create([1; 16]).expect("first"),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
+            .expect("first spec");
+        let second = policy()
+            .derive(
+                JobId::create([2; 16]).expect("second"),
+                MediaIsolationProfileId::ImageIoV1,
+                WorkerInvocation::Normalize,
+            )
+            .expect("second spec");
+        let mask = first.worker().masked_job_root();
+        assert_eq!(mask.path(), Path::new(JOB_ROOT));
+        assert_eq!(mask.options(), "ro,mode=000");
+        let visible = first.worker().visible_workspace();
+        assert_eq!(visible.source(), first.paths().root());
+        assert_eq!(visible.destination(), first.paths().root());
+        assert_ne!(visible.source(), second.paths().root());
+    }
+
+    #[test]
     fn runtime_paths_are_compiled_and_digests_cannot_be_empty() {
-        assert!(ApprovedRuntime::create([0; 32], [2; 32]).is_none());
-        assert!(ApprovedRuntime::create([1; 32], [0; 32]).is_none());
+        assert!(ApprovedRuntime::create([0; 32], [2; 32], [3; 32]).is_none());
+        assert!(ApprovedRuntime::create([1; 32], [0; 32], [3; 32]).is_none());
+        assert!(ApprovedRuntime::create([1; 32], [2; 32], [0; 32]).is_none());
         let runtime = runtime();
         assert_eq!(runtime.root(), Path::new(RUNTIME_ROOT));
         assert_eq!(runtime.java(), Path::new(JAVA_PATH));
         assert_eq!(runtime.worker_jar(), Path::new(WORKER_JAR_PATH));
         assert_eq!(runtime.java_sha256(), [1; 32]);
         assert_eq!(runtime.worker_jar_sha256(), [2; 32]);
+        assert_eq!(runtime.runtime_tree_sha256(), [3; 32]);
     }
 
     #[test]
@@ -892,11 +1110,45 @@ mod tests {
         assert_eq!(
             evidence.inspected,
             vec![
+                PathBuf::from("/usr"),
+                PathBuf::from("/usr/lib"),
+                PathBuf::from("/usr/lib/storecore"),
+                PathBuf::from(RUNTIME_INSTALL_ROOT),
                 PathBuf::from(RUNTIME_ROOT),
                 Path::new(RUNTIME_ROOT).join("bin"),
                 PathBuf::from(JAVA_PATH),
                 PathBuf::from(WORKER_JAR_PATH),
             ]
+        );
+    }
+
+    #[test]
+    fn runtime_attestation_rejects_untrusted_ancestors_and_tree_changes() {
+        let mut symlink = RuntimeFixture::matched();
+        symlink.nodes.insert(
+            PathBuf::from("/usr/lib/storecore"),
+            node(RuntimeObjectKind::Directory, 0, 0o755, true, None),
+        );
+        assert_eq!(
+            runtime().attest(&mut symlink),
+            Err(RuntimeAttestationError::SymbolicLink)
+        );
+
+        let mut writable = RuntimeFixture::matched();
+        writable.nodes.insert(
+            PathBuf::from("/usr/lib/storecore"),
+            node(RuntimeObjectKind::Directory, 0, 0o775, false, None),
+        );
+        assert_eq!(
+            runtime().attest(&mut writable),
+            Err(RuntimeAttestationError::WrongPermissions)
+        );
+
+        let mut changed_tree = RuntimeFixture::matched();
+        changed_tree.tree_sha256 = [9; 32];
+        assert_eq!(
+            runtime().attest(&mut changed_tree),
+            Err(RuntimeAttestationError::RuntimeTreeMismatch)
         );
     }
 
@@ -981,7 +1233,7 @@ mod tests {
     }
 
     fn runtime() -> ApprovedRuntime {
-        ApprovedRuntime::create([1; 32], [2; 32]).expect("runtime")
+        ApprovedRuntime::create([1; 32], [2; 32], [3; 32]).expect("runtime")
     }
 
     fn policy() -> IsolationPolicy {
@@ -994,12 +1246,29 @@ mod tests {
     struct RuntimeFixture {
         nodes: BTreeMap<PathBuf, RuntimeNodeEvidence>,
         inspected: Vec<PathBuf>,
+        tree_sha256: [u8; 32],
     }
 
     impl RuntimeFixture {
         fn matched() -> Self {
             Self {
                 nodes: BTreeMap::from([
+                    (
+                        PathBuf::from("/usr"),
+                        node(RuntimeObjectKind::Directory, 0, 0o755, false, None),
+                    ),
+                    (
+                        PathBuf::from("/usr/lib"),
+                        node(RuntimeObjectKind::Directory, 0, 0o755, false, None),
+                    ),
+                    (
+                        PathBuf::from("/usr/lib/storecore"),
+                        node(RuntimeObjectKind::Directory, 0, 0o755, false, None),
+                    ),
+                    (
+                        PathBuf::from(RUNTIME_INSTALL_ROOT),
+                        node(RuntimeObjectKind::Directory, 0, 0o555, false, None),
+                    ),
                     (
                         PathBuf::from(RUNTIME_ROOT),
                         node(RuntimeObjectKind::Directory, 0, 0o555, false, None),
@@ -1030,6 +1299,7 @@ mod tests {
                     ),
                 ]),
                 inspected: Vec::new(),
+                tree_sha256: [3; 32],
             }
         }
     }
@@ -1041,6 +1311,14 @@ mod tests {
                 .get(path)
                 .copied()
                 .ok_or(RuntimeEvidenceError::Unavailable)
+        }
+
+        fn tree_sha256(&mut self, root: &Path) -> Result<[u8; 32], RuntimeEvidenceError> {
+            if root == Path::new(RUNTIME_ROOT) {
+                Ok(self.tree_sha256)
+            } else {
+                Err(RuntimeEvidenceError::Unavailable)
+            }
         }
     }
 

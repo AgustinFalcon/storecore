@@ -657,3 +657,15 @@
   dependientes pasan localmente. Clippy y tests Linux exact-head siguen
   pendientes del CI; por eso `003B-4B-3A`, `003B-4B-3`, `003B-4B`, `4C`,
   TASK-005 e issue #7 permanecen abiertos.
+- El primer candidato exact-head
+  `d023ebd243c342d325ec3e26fd1b120e4e4c3892` fue rechazado por las tres
+  reviews independientes con cinco P2: temporales fuera de la cuota, runtime
+  sin ancestros ni cierre completo del JDK, binding incompatible con SELF_TEST
+  y lectura posible entre jobs del mismo UID. Verify `44842573727` además falló
+  en clippy antes de tests y se canceló para ahorrar recursos. Ese SHA no
+  autoriza merge ni cierre.
+- La corrección en curso tipa `SELF_TEST | NORMALIZE | Unknown`, mantiene tmpdir
+  dentro del tmpfs, modela una vista que enmascara el root agregado y reexpone
+  sólo el workspace actual, y exige un digest estable del árbol runtime completo
+  además de la cadena de ancestros, Java y JAR. El siguiente SHA vuelve a
+  requerir CI completo y tres reviews exact-head.
