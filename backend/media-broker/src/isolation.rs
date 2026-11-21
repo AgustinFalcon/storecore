@@ -74,8 +74,8 @@ impl WorkerPrincipal {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ApprovedRuntime {
-    java_digest: [u8; 32],
-    worker_jar_digest: [u8; 32],
+    java_hash: [u8; 32],
+    worker_jar_fingerprint: [u8; 32],
     runtime_tree_digest: [u8; 32],
 }
 
@@ -91,8 +91,8 @@ impl ApprovedRuntime {
             None
         } else {
             Some(Self {
-                java_digest: java_sha256,
-                worker_jar_digest: worker_jar_sha256,
+                java_hash: java_sha256,
+                worker_jar_fingerprint: worker_jar_sha256,
                 runtime_tree_digest: runtime_tree_sha256,
             })
         }
@@ -115,12 +115,12 @@ impl ApprovedRuntime {
 
     #[must_use]
     pub const fn java_sha256(self) -> [u8; 32] {
-        self.java_digest
+        self.java_hash
     }
 
     #[must_use]
     pub const fn worker_jar_sha256(self) -> [u8; 32] {
-        self.worker_jar_digest
+        self.worker_jar_fingerprint
     }
 
     #[must_use]
@@ -178,14 +178,14 @@ impl ApprovedRuntime {
             self.java(),
             RuntimeObjectKind::RegularFile,
             RuntimePermissionPolicy::Exact(0o555),
-            Some(self.java_digest),
+            Some(self.java_hash),
         )?;
         verify_node(
             source,
             self.worker_jar(),
             RuntimeObjectKind::RegularFile,
             RuntimePermissionPolicy::Exact(0o444),
-            Some(self.worker_jar_digest),
+            Some(self.worker_jar_fingerprint),
         )?;
         let observed_tree = source
             .tree_sha256(self.root())
