@@ -7,7 +7,7 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use zbus::blocking::{connection::Builder, Connection, Proxy};
+use zbus::blocking::{Connection, Proxy, connection::Builder};
 use zbus::zvariant::{OwnedObjectPath, Value};
 
 use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
@@ -296,7 +296,7 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_dbus_name, mount_properties, worker_properties, ZbusSystemd};
+    use super::{ZbusSystemd, classify_dbus_name, mount_properties, worker_properties};
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
     use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
