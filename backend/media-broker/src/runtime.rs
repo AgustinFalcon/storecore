@@ -151,7 +151,7 @@ fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
     }
     let last = parts.len() - 1;
     let mut current: Option<OwnedFd> = None;
-    for (index, component) in parts.iter().enumerate() {
+    for (index, component) in parts.into_iter().enumerate() {
         match component {
             Component::RootDir => {
                 if index != 0 {
