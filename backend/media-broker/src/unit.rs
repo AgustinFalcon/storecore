@@ -124,13 +124,13 @@ impl DerivedUnits {
     }
 
     #[must_use]
-    pub const fn mount(self) -> UnitName {
-        self.mount
+    pub const fn mount(&self) -> &UnitName {
+        &self.mount
     }
 
     #[must_use]
-    pub const fn worker(self) -> UnitName {
-        self.worker
+    pub const fn worker(&self) -> &UnitName {
+        &self.worker
     }
 }
 
@@ -242,18 +242,24 @@ mod tests {
     #[test]
     fn mount_unit_name_is_the_escaped_where_path() {
         assert_eq!(
-            utf8(mount_unit_name(Path::new("/home/lennart"))),
+            utf8(&mount_unit_name(Path::new("/home/lennart")).expect("name")),
             "home-lennart.mount"
         );
         assert_eq!(
-            utf8(mount_unit_name(Path::new("/tmp/foo-bar"))),
+            utf8(&mount_unit_name(Path::new("/tmp/foo-bar")).expect("name")),
             r"tmp-foo\x2dbar.mount"
         );
-        assert_eq!(utf8(mount_unit_name(Path::new("/"))), "-.mount");
         assert_eq!(
-            utf8(mount_unit_name(Path::new(
-                "/run/storecore_media/jobs/abababababababababababababababab"
-            ))),
+            utf8(&mount_unit_name(Path::new("/")).expect("name")),
+            "-.mount"
+        );
+        assert_eq!(
+            utf8(
+                &mount_unit_name(Path::new(
+                    "/run/storecore_media/jobs/abababababababababababababababab"
+                ))
+                .expect("name")
+            ),
             "run-storecore_media-jobs-abababababababababababababababab.mount"
         );
         assert!(mount_unit_name(Path::new("relative/mnt")).is_none());
@@ -275,7 +281,7 @@ mod tests {
         );
     }
 
-    fn utf8(name: Option<super::UnitName>) -> String {
-        name.expect("name").as_str().expect("utf8").to_owned()
+    fn utf8(name: &super::UnitName) -> String {
+        name.as_str().expect("utf8").to_owned()
     }
 }

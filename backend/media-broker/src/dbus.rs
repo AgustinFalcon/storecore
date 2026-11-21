@@ -241,7 +241,7 @@ pub(crate) fn worker_properties(
     ])
 }
 
-fn required_name(name: UnitName) -> Result<String, SystemdError> {
+fn required_name(name: &UnitName) -> Result<String, SystemdError> {
     name.as_str()
         .map(str::to_owned)
         .ok_or(SystemdError::Unavailable)

@@ -49,8 +49,8 @@ pub struct MountSpec {
 
 impl MountSpec {
     #[must_use]
-    pub const fn name(&self) -> UnitName {
-        self.name
+    pub const fn name(&self) -> &UnitName {
+        &self.name
     }
     #[must_use]
     pub const fn what(&self) -> &'static [u8] {
@@ -78,8 +78,8 @@ pub struct WorkerSpec {
 
 impl WorkerSpec {
     #[must_use]
-    pub const fn name(&self) -> UnitName {
-        self.name
+    pub const fn name(&self) -> &UnitName {
+        &self.name
     }
     #[must_use]
     pub const fn worker(&self) -> Principal {
@@ -139,13 +139,13 @@ impl TransientUnits {
         let names = DerivedUnits::derive(job_id, &where_path).ok_or(SystemdError::Unavailable)?;
         Ok(Self {
             mount: MountSpec {
-                name: names.mount(),
+                name: *names.mount(),
                 what: b"tmpfs",
                 options: TMPFS_OPTIONS,
                 where_path,
             },
             worker: WorkerSpec {
-                name: names.worker(),
+                name: *names.worker(),
                 worker,
                 java: runtime.java_path().to_path_buf(),
                 jar: runtime.jar_path().to_path_buf(),
@@ -227,7 +227,7 @@ impl FakeSystemd {
     }
 
     #[must_use]
-    pub fn recorded(&self, name: UnitName) -> Option<UnitState> {
+    pub fn recorded(&self, name: &UnitName) -> Option<UnitState> {
         self.units.get(name.as_bytes()).copied()
     }
 }
@@ -273,7 +273,7 @@ impl SystemdControl for FakeSystemd {
     }
 }
 
-fn name_for(kind: UnitKind, spec: &TransientUnits) -> Result<UnitName, SystemdError> {
+fn name_for(kind: UnitKind, spec: &TransientUnits) -> Result<&UnitName, SystemdError> {
     match kind {
         UnitKind::Mount => Ok(spec.mount().name()),
         UnitKind::Worker => Ok(spec.worker().name()),
