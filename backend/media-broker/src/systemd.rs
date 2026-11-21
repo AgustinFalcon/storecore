@@ -241,8 +241,7 @@ impl SystemdControl for FakeSystemd {
         }
         let name = name_for(kind, spec)?;
         if let Some(state) = self.stop_as {
-            self.units
-                .insert(name.as_bytes().to_vec(), state);
+            self.units.insert(name.as_bytes().to_vec(), state);
             return Ok(state);
         }
         self.units

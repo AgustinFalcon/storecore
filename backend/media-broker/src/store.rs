@@ -189,12 +189,8 @@ impl BrokerStore {
         now_ms: u64,
     ) -> Result<JobRecord, StoreError> {
         let current = self.record(job_id)?;
-        let quarantined = self.transition_internal(
-            current,
-            expected_revision,
-            JobState::Quarantined,
-            now_ms,
-        );
+        let quarantined =
+            self.transition_internal(current, expected_revision, JobState::Quarantined, now_ms);
         let latch = self.block_durably(
             DurableBlockReason::ReconciliationMismatch,
             AdmissionBlock::ReconciliationMismatch,
