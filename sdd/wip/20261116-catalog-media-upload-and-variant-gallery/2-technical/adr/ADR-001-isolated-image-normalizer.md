@@ -182,6 +182,16 @@ estado terminal, el backend lee únicamente artefactos cuyo owner, modo, tamaño
 y digest fueron atestados; el broker desmonta y elimina sólo después del ACK de
 consumo y de probar ausencia de procesos.
 
+La unidad aplica siempre el conjunto cerrado de `TemporaryFileSystem=` que
+enmascara el root agregado de jobs y `/dev/shm`, `/dev/mqueue` y
+`/dev/hugepages`; sólo vuelve a exponer el workspace del job actual. Además
+activa `PrivateIPC=` y `PrivatePIDs=`. La última propiedad fija systemd 257 como
+mínimo para este perfil: un manager anterior produce `Unavailable` y no un
+sandbox degradado. `ProtectProc=invisible` se conserva como defensa adicional,
+pero no es la frontera entre workers del mismo UID. El harness intenta leer el
+workspace peer tanto por el root agregado como por `/proc/<peerPID>/root`, y
+prueba que shared memory y message queues no crean un canal entre jobs.
+
 Antes de montar o copiar, admisión reserva atómicamente presupuesto global de
 jobs, mounts, bytes e inodos, incluido un presupuesto separado de cuarentena.
 Trabajo terminal sin ACK conserva evidencia sólo hasta un TTL root-configured y
@@ -211,7 +221,8 @@ La attestación consulta la unidad efectiva por D-Bus y los archivos del cgroup
 v2 real; no confía sólo en propiedades solicitadas. Debe probar UID/GID,
 `NoNewPrivileges`, namespaces, familia de sockets, `KillMode`, swap, OOM group,
 memoria, pids, CPU, runtime, RLIMIT, mount/quota, ruta/digest del runtime y
-estado terminal. Ausencia, `Unknown`, valor más laxo o imposibilidad de leer
+estado terminal, namespace PID/IPC y máscaras efectivas de las superficies IPC.
+Ausencia, `Unknown`, valor más laxo o imposibilidad de leer
 cualquiera de ellos produce `Unavailable`.
 
 El harness `003B-4C` corre en Linux con backend UID A y worker UID B reales.

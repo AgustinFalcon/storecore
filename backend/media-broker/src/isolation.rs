@@ -8,6 +8,9 @@ const RUNTIME_ROOT: &str = "/usr/lib/storecore/media-runtime/image-io-v1";
 const JAVA_PATH: &str = "/usr/lib/storecore/media-runtime/image-io-v1/bin/java";
 const WORKER_JAR_PATH: &str =
     "/usr/lib/storecore/media-runtime/image-io-v1/storecore-media-worker.jar";
+const SHARED_MEMORY_PATH: &str = "/dev/shm";
+const MESSAGE_QUEUE_PATH: &str = "/dev/mqueue";
+const HUGE_PAGES_PATH: &str = "/dev/hugepages";
 const WORKSPACE_BYTES: u64 = 48 * 1024 * 1024;
 const WORKSPACE_INODES: u64 = 4_096;
 
@@ -657,11 +660,25 @@ impl WorkerUnitSpec {
     }
 
     #[must_use]
-    pub fn masked_job_root(&self) -> TemporaryFileSystemSpec {
-        TemporaryFileSystemSpec {
-            path: PathBuf::from(JOB_ROOT),
-            options: "ro,mode=0711",
-        }
+    pub fn temporary_file_systems(&self) -> [TemporaryFileSystemSpec; 4] {
+        [
+            TemporaryFileSystemSpec {
+                path: PathBuf::from(JOB_ROOT),
+                options: "ro,mode=0711",
+            },
+            TemporaryFileSystemSpec {
+                path: PathBuf::from(SHARED_MEMORY_PATH),
+                options: "ro,mode=000",
+            },
+            TemporaryFileSystemSpec {
+                path: PathBuf::from(MESSAGE_QUEUE_PATH),
+                options: "ro,mode=000",
+            },
+            TemporaryFileSystemSpec {
+                path: PathBuf::from(HUGE_PAGES_PATH),
+                options: "ro,mode=000",
+            },
+        ]
     }
 
     #[must_use]
@@ -812,6 +829,16 @@ impl WorkerUnitSpec {
     #[must_use]
     pub const fn private_tmp(&self) -> bool {
         false
+    }
+
+    #[must_use]
+    pub const fn private_ipc(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub const fn private_pids(&self) -> bool {
+        true
     }
 
     #[must_use]
@@ -1000,6 +1027,8 @@ mod tests {
             !worker.private_tmp(),
             "the read-only host /tmp and /var/tmp must not be replaced by writable private mounts"
         );
+        assert!(worker.private_ipc());
+        assert!(worker.private_pids());
         assert!(worker.ip_address_deny_any());
         assert!(worker.no_new_privileges());
         assert!(worker.private_devices());
@@ -1082,9 +1111,15 @@ mod tests {
                 WorkerInvocation::Normalize,
             )
             .expect("second spec");
-        let mask = first.worker().masked_job_root();
-        assert_eq!(mask.path(), Path::new(JOB_ROOT));
-        assert_eq!(mask.options(), "ro,mode=0711");
+        let masks = first.worker().temporary_file_systems();
+        assert_eq!(masks[0].path(), Path::new(JOB_ROOT));
+        assert_eq!(masks[0].options(), "ro,mode=0711");
+        assert_eq!(masks[1].path(), Path::new(SHARED_MEMORY_PATH));
+        assert_eq!(masks[1].options(), "ro,mode=000");
+        assert_eq!(masks[2].path(), Path::new(MESSAGE_QUEUE_PATH));
+        assert_eq!(masks[2].options(), "ro,mode=000");
+        assert_eq!(masks[3].path(), Path::new(HUGE_PAGES_PATH));
+        assert_eq!(masks[3].options(), "ro,mode=000");
         let visible = first.worker().visible_workspace();
         assert_eq!(visible.source(), first.paths().root());
         assert_eq!(visible.destination(), first.paths().root());

@@ -216,6 +216,16 @@ reconcilia durablemente units/mounts tras reinicio. Java y worker provienen de
 una instalación root-owned versionada, sin symlinks, con ejecutables `0555`,
 jar/datos `0444` y digest aprobado.
 
+La separación entre jobs concurrentes del mismo UID no puede depender sólo de
+ocultar el root agregado. Cada unidad worker debe enmascarar de forma cerrada
+el root de jobs y las superficies IPC bajo `/dev` (`/dev/shm`, `/dev/mqueue`,
+`/dev/hugepages`), activar aislamiento IPC y usar un namespace PID privado. La
+attestación debe probar que esas propiedades son efectivas; repetir los valores
+solicitados no basta. El perfil requiere un systemd que soporte `PrivatePIDs=`
+(versión 257 o superior) y permanece `Unavailable` en managers anteriores; no
+existe fallback a `ProtectProc=invisible`, porque workers con el mismo UID
+podrían alcanzar la vista de mounts de otro job mediante `/proc/<pid>/root`.
+
 La implementación 4B es un workspace Rust separado con daemon root-owned y un
 helper cliente root-owned pero ejecutado sin privilegios por el UID backend. El
 adapter Kotlin habla un protocolo stdio acotado con el helper; éste es dueño del
@@ -239,7 +249,8 @@ terminal verificado y validación de owner, modo, tamaño y digest. Fallos de ki
 unmount o reconciliación retienen workspace/evidencia y cierran el gate global.
 
 `003B-4C` ejecuta un harness Linux real con backend UID A y worker UID B. Debe
-probar SELF_TEST/NORMALIZE, aislamiento entre jobs, cuota por job y global,
+probar SELF_TEST/NORMALIZE, aislamiento entre jobs —incluidos `/dev/shm`, IPC y
+`/proc/<peerPID>/root`—, cuota por job y global,
 terminales sin ACK, FD/mmap conservados tras el seal, OOM/timeout, terminación
 del cgroup, rechazo de sustitución y recuperación por reinicio en cada
 transición durable. Mocks, ejecución directa del jar o ambos procesos con el

@@ -690,3 +690,18 @@
   job. Rust 1.100 compila la metadata de todos los tests localmente; clippy y
   tests Linux completos requieren todavía un nuevo CI exact-head y tres nuevas
   aprobaciones. `003B-4B-3A` y todos sus agregados permanecen abiertos.
+- La revisión exact-head de `0d572b4cfd35647f38d284800edcdbac2fa75e22`
+  descubrió dos bypasses adicionales entre jobs del mismo UID: el bind
+  compartido de `/dev/shm` que `PrivateDevices` no vuelve read-only, y la vista
+  del mount namespace peer alcanzable mediante `/proc/<peerPID>/root` bajo
+  `ProtectProc=invisible`. También confirmó que el primer rename de campos aún
+  compartía sufijo y seguía fallando `struct_field_names`. Ese SHA queda
+  rechazado y sin CI acreditado.
+- La corrección en curso convierte las máscaras en un set obligatorio y cerrado
+  para el root de jobs, `/dev/shm`, `/dev/mqueue` y `/dev/hugepages`, activa
+  `PrivateIPC` y exige `PrivatePIDs`. La última propiedad fija systemd 257 como
+  mínimo y debe fallar cerrada como `Unavailable` si el manager no la soporta;
+  no se declara compatible con la VM Ubuntu 22.04 documentada. El harness real
+  de 4C deberá probar ambos bypasses adversariales. Los campos de digest ahora
+  tienen nombres sin un sufijo común. Todo continúa abierto hasta CI y reviews
+  sobre un nuevo SHA.
