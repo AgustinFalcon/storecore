@@ -51,6 +51,24 @@ class MediaBrokerProtocolV1Test {
     }
 
     @Test
+    fun `claim and ack frames match Rust golden vectors`() {
+        val jobId = hex("00112233445566778899aabbccddeeff")
+        val digest = ByteArray(32) { it.toByte() }
+        val ack = requireNotNull(MediaBrokerRequest.create(MediaBrokerOperation.ACK_OUTPUT, jobId, 7, digest, 5))
+        val claim = requireNotNull(MediaBrokerRequest.create(MediaBrokerOperation.CLAIM_OUTPUT, jobId, 7, digest, 5))
+        assertArrayEquals(hex(vectors.getProperty("request_ack")), MediaBrokerProtocolV1.encodeRequest(ack))
+        assertArrayEquals(hex(vectors.getProperty("request_claim")), MediaBrokerProtocolV1.encodeRequest(claim))
+        assertEquals(
+            MediaBrokerResult.ACK_ACCEPTED,
+            requireNotNull(MediaBrokerProtocolV1.decodeResponse(hex(vectors.getProperty("response_ack")))).result,
+        )
+        assertEquals(
+            MediaBrokerResult.ARTIFACT_READY,
+            requireNotNull(MediaBrokerProtocolV1.decodeResponse(hex(vectors.getProperty("response_artifact")))).result,
+        )
+    }
+
+    @Test
     fun `wire translators expose Unknown and decoders reject it at the boundary`() {
         assertSame(MediaBrokerOperation.UNKNOWN, MediaBrokerOperation.fromWire(99))
         assertSame(MediaBrokerResult.UNKNOWN, MediaBrokerResult.fromWire(99))
