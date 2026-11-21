@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-21 — 003B-4B-3 harness PID 1 del tmpfs derivado
+
+- CI alojado como root abre el system bus y arranca/para el `.mount` tmpfs
+  derivado (`ZbusSystemd::connect_system`). El job regular `media-broker`
+  sigue sin `--ignored`. Este corte no arranca el worker, no prueba UID A/B,
+  cgroup, `Ready` ni HTTP. `003B-4B-3` y `003B-4C` siguen abiertos.
+
 ## 2026-11-21 — PR #330 fusionado, 003B-4B-3 sigue abierto
 
 - PR #330 merge `cc19634783ba2c59c8cd44365a37496bb5dd1dda` sobre candidato
