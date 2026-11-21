@@ -136,7 +136,15 @@ fn approve(
 fn hash(descriptor: OwnedFd) -> Result<[u8; 32], RuntimeError> {
     let mut file = std::fs::File::from(descriptor);
     let mut hasher = Sha256::new();
-    std::io::copy(&mut file, &mut hasher).map_err(|_| RuntimeError::Unavailable)?;
+    let mut buffer = [0_u8; 8192];
+    loop {
+        let read = std::io::Read::read(&mut file, &mut buffer)
+            .map_err(|_| RuntimeError::Unavailable)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
     Ok(hasher.finalize().into())
 }
 

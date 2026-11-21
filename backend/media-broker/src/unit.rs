@@ -151,8 +151,10 @@ mod tests {
     fn unit_names_are_derived_only_from_the_job_identity() {
         let job = JobId::create([0xab; 16]).expect("job");
         let units = DerivedUnits::from_job(job);
-        let mount = core::str::from_utf8(units.mount().as_bytes()).expect("utf8");
-        let worker = core::str::from_utf8(units.worker().as_bytes()).expect("utf8");
+        let mount_name = units.mount();
+        let worker_name = units.worker();
+        let mount = core::str::from_utf8(mount_name.as_bytes()).expect("utf8");
+        let worker = core::str::from_utf8(worker_name.as_bytes()).expect("utf8");
         assert_eq!(
             mount,
             "storecore-media-abababababababababababababababab.mount"
