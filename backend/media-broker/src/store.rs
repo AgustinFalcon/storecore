@@ -303,8 +303,13 @@ impl BrokerStore {
     }
 
     #[cfg(test)]
-    fn fail_next_persist_after_rename(&self) {
+    pub(crate) fn fail_next_persist_after_rename(&self) {
         self.journal.fail_next_persist_after_rename();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_persist_after_rename_skipping(&self, skip: u32) {
+        self.journal.fail_persist_after_rename_skipping(skip);
     }
 
     #[cfg(test)]

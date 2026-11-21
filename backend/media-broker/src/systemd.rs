@@ -71,6 +71,8 @@ pub struct WorkerSpec {
     worker: Principal,
     java: PathBuf,
     jar: PathBuf,
+    java_digest: [u8; 32],
+    jar_digest: [u8; 32],
 }
 
 impl WorkerSpec {
@@ -89,6 +91,14 @@ impl WorkerSpec {
     #[must_use]
     pub fn jar(&self) -> &std::path::Path {
         &self.jar
+    }
+    #[must_use]
+    pub const fn java_digest(&self) -> [u8; 32] {
+        self.java_digest
+    }
+    #[must_use]
+    pub const fn jar_digest(&self) -> [u8; 32] {
+        self.jar_digest
     }
 }
 
@@ -124,6 +134,8 @@ impl TransientUnits {
                 worker,
                 java: runtime.java_path().to_path_buf(),
                 jar: runtime.jar_path().to_path_buf(),
+                java_digest: runtime.java().digest(),
+                jar_digest: runtime.jar().digest(),
             },
         }
     }
@@ -171,6 +183,7 @@ pub trait SystemdControl {
 pub struct FakeSystemd {
     units: BTreeMap<Vec<u8>, UnitState>,
     fail_kind: Option<UnitKind>,
+    fail_stop: bool,
 }
 
 impl FakeSystemd {
@@ -182,6 +195,12 @@ impl FakeSystemd {
     #[must_use]
     pub fn fail_kind(mut self, kind: UnitKind) -> Self {
         self.fail_kind = Some(kind);
+        self
+    }
+
+    #[must_use]
+    pub fn fail_stop(mut self) -> Self {
+        self.fail_stop = true;
         self
     }
 
@@ -210,6 +229,9 @@ impl SystemdControl for FakeSystemd {
     }
 
     fn stop(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError> {
+        if self.fail_stop {
+            return Err(SystemdError::AttestationFailed);
+        }
         let name = name_for(kind, spec)?;
         self.units
             .insert(name.as_bytes().to_vec(), UnitState::Inactive);
@@ -269,6 +291,8 @@ mod tests {
         );
         assert_eq!(spec.worker().java(), runtime.java_path());
         assert_eq!(spec.worker().jar(), runtime.jar_path());
+        assert_eq!(spec.worker().java_digest(), runtime.java().digest());
+        assert_eq!(spec.worker().jar_digest(), runtime.jar().digest());
         let where_path = spec.mount().where_path().to_string_lossy();
         assert!(where_path.starts_with("/run/storecore-media/"));
         assert!(!where_path.contains(".."));

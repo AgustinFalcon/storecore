@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
-use crate::runtime::ApprovedRuntime;
+use crate::journal::DurableBlockReason;
+use crate::runtime::{ApprovedRuntime, RuntimeError};
 use crate::state::{JobId, JobRecord, JobState, Principal};
-use crate::store::{BrokerStore, StoreError};
+use crate::store::{AdmissionBlock, AdmissionStatus, BrokerStore, StoreError};
 use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
 use crate::unit::{UnitKind, UnitState};
 
@@ -10,8 +11,10 @@ use crate::unit::{UnitKind, UnitState};
 pub enum DaemonError {
     Store(StoreError),
     Systemd(SystemdError),
+    Runtime(RuntimeError),
     NotSealed,
     AttestationFailed,
+    RollbackFailed,
 }
 
 pub struct BrokerDaemon<Control> {
@@ -78,6 +81,7 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
         if current.state() != JobState::InputSealed {
             return Err(DaemonError::NotSealed);
         }
+        self.runtime.confirm().map_err(DaemonError::Runtime)?;
         let starting = self
             .store
             .transition(
@@ -92,12 +96,10 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
         let spec =
             TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime);
         if let Err(error) = self.start_kind(UnitKind::Mount, &spec) {
-            self.rollback_units(&spec);
-            return Err(error);
+            return Err(self.abort_start(error, &spec, &starting, now_ms));
         }
         if let Err(error) = self.start_kind(UnitKind::Worker, &spec) {
-            self.rollback_units(&spec);
-            return Err(error);
+            return Err(self.abort_start(error, &spec, &starting, now_ms));
         }
         match self.store.transition(
             job_id,
@@ -108,10 +110,7 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             now_ms,
         ) {
             Ok(record) => Ok(record),
-            Err(error) => {
-                self.rollback_units(&spec);
-                Err(DaemonError::Store(error))
-            }
+            Err(error) => Err(self.abort_start(DaemonError::Store(error), &spec, &starting, now_ms)),
         }
     }
 }
@@ -132,20 +131,89 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
         }
     }
 
-    fn rollback_units(&mut self, spec: &TransientUnits) {
-        let _ = self.systemd.stop(UnitKind::Worker, spec);
-        let _ = self.systemd.stop(UnitKind::Mount, spec);
+    fn abort_start(
+        &mut self,
+        error: DaemonError,
+        spec: &TransientUnits,
+        starting: &JobRecord,
+        now_ms: u64,
+    ) -> DaemonError {
+        self.rollback_units(spec, starting, now_ms)
+            .err()
+            .unwrap_or(error)
     }
+
+    fn rollback_units(
+        &mut self,
+        spec: &TransientUnits,
+        starting: &JobRecord,
+        now_ms: u64,
+    ) -> Result<(), DaemonError> {
+        let worker_cleared = unit_left_active(self.systemd.stop(UnitKind::Worker, spec));
+        let mount_cleared = unit_left_active(self.systemd.stop(UnitKind::Mount, spec));
+        if worker_cleared && mount_cleared {
+            if self.store.admission_status() != AdmissionStatus::Open {
+                return Ok(());
+            }
+            self.store
+                .transition(
+                    starting.job_id(),
+                    starting.revision(),
+                    starting.principal(),
+                    starting.boot_id(),
+                    JobState::Terminal,
+                    now_ms,
+                )
+                .map(|_| ())
+                .map_err(DaemonError::Store)
+        } else {
+            self.fail_closed_rollback(starting, now_ms)?;
+            Err(DaemonError::RollbackFailed)
+        }
+    }
+
+    fn fail_closed_rollback(
+        &mut self,
+        starting: &JobRecord,
+        now_ms: u64,
+    ) -> Result<(), DaemonError> {
+        if self.store.admission_status() != AdmissionStatus::Open {
+            self.store.block(AdmissionBlock::ReconciliationMismatch);
+            return Ok(());
+        }
+        match self.store.transition(
+            starting.job_id(),
+            starting.revision(),
+            starting.principal(),
+            starting.boot_id(),
+            JobState::Quarantined,
+            now_ms,
+        ) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let _ = self.store.block_durably(
+                    DurableBlockReason::ReconciliationMismatch,
+                    AdmissionBlock::ReconciliationMismatch,
+                );
+                Err(DaemonError::Store(error))
+            }
+        }
+    }
+}
+
+fn unit_left_active(result: Result<UnitState, SystemdError>) -> bool {
+    matches!(result, Ok(state) if !state.is_active() && state != UnitState::Unknown)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{BrokerDaemon, DaemonError};
     use crate::budget::BudgetLimits;
+    use crate::journal::JournalError;
     use crate::reconcile::{ReconcileStatus, RuntimeAdapter, reconcile};
-    use crate::runtime::ApprovedRuntime;
+    use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, JobState, Principal, Reservation};
-    use crate::store::{AdmissionStatus, BrokerStore};
+    use crate::store::{AdmissionBlock, AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{FakeSystemd, SystemdError};
     use crate::unit::{DerivedUnits, UnitKind, UnitState};
     use sha2::{Digest, Sha256};
@@ -248,7 +316,159 @@ mod tests {
                 .record(sealed.job_id())
                 .expect("record")
                 .state(),
+            JobState::Terminal
+        );
+        assert_eq!(
+            fixture.daemon.store().admission_status(),
+            AdmissionStatus::Open
+        );
+    }
+
+    #[test]
+    fn start_blocks_admission_when_stop_is_not_attested() {
+        let mut fixture = Fixture::failing_stop(UnitKind::Worker);
+        let allocated = fixture
+            .daemon
+            .store_mut()
+            .allocate([12; 16], principal(), [6; 16], reservation(), 1)
+            .expect("allocate");
+        let sealed = fixture
+            .daemon
+            .store_mut()
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        assert_eq!(
+            fixture
+                .daemon
+                .start(sealed.job_id(), sealed.revision(), principal(), 3),
+            Err(DaemonError::RollbackFailed)
+        );
+        let names = DerivedUnits::from_job(sealed.job_id());
+        assert_eq!(
+            fixture.daemon.systemd().recorded(names.mount()),
+            Some(UnitState::Active)
+        );
+        assert_eq!(
+            fixture
+                .daemon
+                .store()
+                .record(sealed.job_id())
+                .expect("record")
+                .state(),
+            JobState::Quarantined
+        );
+        assert_eq!(
+            fixture.daemon.store().admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::ReconciliationMismatch)
+        );
+    }
+
+    #[test]
+    fn start_stops_units_when_running_persist_fails() {
+        let mut fixture = Fixture::new();
+        let allocated = fixture
+            .daemon
+            .store_mut()
+            .allocate([13; 16], principal(), [7; 16], reservation(), 1)
+            .expect("allocate");
+        let sealed = fixture
+            .daemon
+            .store_mut()
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        fixture
+            .daemon
+            .store_mut()
+            .fail_persist_after_rename_skipping(1);
+        assert_eq!(
+            fixture
+                .daemon
+                .start(sealed.job_id(), sealed.revision(), principal(), 3),
+            Err(DaemonError::Store(StoreError::Journal(
+                JournalError::DirectorySyncFailed
+            )))
+        );
+        let names = DerivedUnits::from_job(sealed.job_id());
+        assert_ne!(
+            fixture.daemon.systemd().recorded(names.mount()),
+            Some(UnitState::Active)
+        );
+        assert_ne!(
+            fixture.daemon.systemd().recorded(names.worker()),
+            Some(UnitState::Active)
+        );
+        assert_eq!(
+            fixture
+                .daemon
+                .store()
+                .record(sealed.job_id())
+                .expect("record")
+                .state(),
             JobState::Starting
+        );
+        assert_eq!(
+            fixture.daemon.store().admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::JournalFailure)
+        );
+    }
+
+    #[test]
+    fn start_rejects_replaced_runtime_before_starting() {
+        let mut fixture = Fixture::new();
+        let allocated = fixture
+            .daemon
+            .store_mut()
+            .allocate([14; 16], principal(), [8; 16], reservation(), 1)
+            .expect("allocate");
+        let sealed = fixture
+            .daemon
+            .store_mut()
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        fs::remove_file(&fixture.java).expect("unlink");
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o555)
+            .open(&fixture.java)
+            .expect("replace");
+        file.write_all(b"java").expect("write");
+        file.sync_all().expect("sync");
+        assert_eq!(
+            fixture
+                .daemon
+                .start(sealed.job_id(), sealed.revision(), principal(), 3),
+            Err(DaemonError::Runtime(RuntimeError::IdentityDrift))
+        );
+        assert_eq!(
+            fixture
+                .daemon
+                .store()
+                .record(sealed.job_id())
+                .expect("record")
+                .state(),
+            JobState::InputSealed
         );
         assert_eq!(
             fixture.daemon.store().admission_status(),
@@ -267,6 +487,7 @@ mod tests {
     struct Fixture {
         daemon: BrokerDaemon<FakeSystemd>,
         root: std::path::PathBuf,
+        java: std::path::PathBuf,
     }
 
     impl Fixture {
@@ -276,6 +497,10 @@ mod tests {
 
         fn failing(kind: UnitKind) -> Self {
             Self::with_systemd(FakeSystemd::new().fail_kind(kind))
+        }
+
+        fn failing_stop(kind: UnitKind) -> Self {
+            Self::with_systemd(FakeSystemd::new().fail_kind(kind).fail_stop())
         }
 
         fn with_systemd(systemd: FakeSystemd) -> Self {
@@ -314,7 +539,7 @@ mod tests {
                 root.join("mnt"),
                 Principal::create(2000, 2000),
             );
-            Self { daemon, root }
+            Self { daemon, root, java }
         }
     }
 

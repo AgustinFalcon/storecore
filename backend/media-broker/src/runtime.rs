@@ -3,7 +3,7 @@ use std::io::Read;
 use std::os::fd::OwnedFd;
 use std::path::{Component, Path, PathBuf};
 
-use rustix::fs::{CWD, FileType, Mode, OFlags, fstat, open, openat};
+use rustix::fs::{FileType, Mode, OFlags, fstat, open, openat};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeKind {
@@ -32,12 +32,15 @@ pub enum RuntimeError {
     Permissions,
     LinkCount,
     DigestMismatch,
+    IdentityDrift,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ApprovedFile {
     digest: [u8; 32],
     kind: RuntimeKind,
+    dev: u64,
+    ino: u64,
 }
 
 impl ApprovedFile {
@@ -50,6 +53,11 @@ impl ApprovedFile {
     pub const fn kind(self) -> RuntimeKind {
         self.kind
     }
+
+    #[must_use]
+    pub const fn identity(self) -> (u64, u64) {
+        (self.dev, self.ino)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -58,6 +66,7 @@ pub struct ApprovedRuntime {
     jar: ApprovedFile,
     java_path: PathBuf,
     jar_path: PathBuf,
+    owner: u32,
 }
 
 impl ApprovedRuntime {
@@ -75,6 +84,9 @@ impl ApprovedRuntime {
         expected_java_digest: [u8; 32],
         expected_jar_digest: [u8; 32],
     ) -> Result<Self, RuntimeError> {
+        if !java.is_absolute() || !jar.is_absolute() {
+            return Err(RuntimeError::Unavailable);
+        }
         Ok(Self {
             java: approve(
                 java,
@@ -85,7 +97,28 @@ impl ApprovedRuntime {
             jar: approve(jar, RuntimeKind::Jar, expected_owner, expected_jar_digest)?,
             java_path: java.to_path_buf(),
             jar_path: jar.to_path_buf(),
+            owner: expected_owner,
         })
+    }
+
+    /// Reopens both files with `NOFOLLOW` and rejects digest or inode drift.
+    ///
+    /// # Errors
+    ///
+    /// Returns a closed [`RuntimeError`] when the path no longer names the
+    /// approved regular file.
+    pub fn confirm(&self) -> Result<(), RuntimeError> {
+        let java = approve(
+            &self.java_path,
+            RuntimeKind::Java,
+            self.owner,
+            self.java.digest,
+        )?;
+        let jar = approve(&self.jar_path, RuntimeKind::Jar, self.owner, self.jar.digest)?;
+        if java != self.java || jar != self.jar {
+            return Err(RuntimeError::IdentityDrift);
+        }
+        Ok(())
     }
 
     #[must_use]
@@ -118,7 +151,7 @@ fn approve(
     if matches!(kind, RuntimeKind::Unknown) {
         return Err(RuntimeError::UnknownKind);
     }
-    let descriptor = open_nofollow(path)?;
+    let descriptor = open_nofollow(path, expected_owner)?;
     let metadata = fstat(&descriptor).map_err(|_| RuntimeError::Unavailable)?;
     if FileType::from_raw_mode(metadata.st_mode) != FileType::RegularFile {
         return Err(RuntimeError::NotRegular);
@@ -141,10 +174,18 @@ fn approve(
     if digest != expected_digest {
         return Err(RuntimeError::DigestMismatch);
     }
-    Ok(ApprovedFile { digest, kind })
+    Ok(ApprovedFile {
+        digest,
+        kind,
+        dev: metadata.st_dev,
+        ino: metadata.st_ino,
+    })
 }
 
-fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
+fn open_nofollow(path: &Path, expected_owner: u32) -> Result<OwnedFd, RuntimeError> {
+    if !path.is_absolute() {
+        return Err(RuntimeError::Unavailable);
+    }
     let parts: Vec<Component<'_>> = path.components().collect();
     if parts.is_empty() {
         return Err(RuntimeError::Unavailable);
@@ -157,14 +198,14 @@ fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
                 if index != 0 {
                     return Err(RuntimeError::Unavailable);
                 }
-                current = Some(
-                    open(
-                        "/",
-                        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
-                        Mode::empty(),
-                    )
-                    .map_err(|_| RuntimeError::Unavailable)?,
-                );
+                let root = open(
+                    "/",
+                    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+                    Mode::empty(),
+                )
+                .map_err(|_| RuntimeError::Unavailable)?;
+                trust_parent(&root, expected_owner)?;
+                current = Some(root);
             }
             Component::Normal(name) => {
                 let flags = if index == last {
@@ -174,9 +215,12 @@ fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
                 };
                 let next = match current.as_ref() {
                     Some(dir) => openat(dir, name, flags, Mode::empty()),
-                    None => openat(CWD, name, flags, Mode::empty()),
+                    None => return Err(RuntimeError::Unavailable),
                 }
                 .map_err(|_| RuntimeError::Unavailable)?;
+                if index != last {
+                    trust_parent(&next, expected_owner)?;
+                }
                 current = Some(next);
             }
             Component::Prefix(_) | Component::CurDir | Component::ParentDir => {
@@ -185,6 +229,23 @@ fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
         }
     }
     current.ok_or(RuntimeError::Unavailable)
+}
+
+fn trust_parent(descriptor: &OwnedFd, expected_owner: u32) -> Result<(), RuntimeError> {
+    let metadata = fstat(descriptor).map_err(|_| RuntimeError::Unavailable)?;
+    if FileType::from_raw_mode(metadata.st_mode) != FileType::Directory {
+        return Err(RuntimeError::Unavailable);
+    }
+    if metadata.st_uid != expected_owner && metadata.st_uid != 0 {
+        return Err(RuntimeError::Ownership);
+    }
+    let mode = metadata.st_mode & 0o7777;
+    let group_or_other_write = mode & 0o022 != 0;
+    let sticky = mode & 0o1000 != 0;
+    if group_or_other_write && !sticky {
+        return Err(RuntimeError::Permissions);
+    }
+    Ok(())
 }
 
 fn hash(descriptor: OwnedFd) -> Result<[u8; 32], RuntimeError> {
@@ -210,6 +271,7 @@ mod tests {
     use std::fs::{self, OpenOptions};
     use std::io::Write;
     use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static NEXT: AtomicU64 = AtomicU64::new(1);
@@ -283,6 +345,69 @@ mod tests {
             ),
             Err(RuntimeError::Unavailable)
         );
+    }
+
+    #[test]
+    fn relative_path_is_rejected() {
+        let fixture = Fixture::new();
+        let java_digest = write_private(&fixture.java, 0o555, b"java-bin");
+        let jar_digest = write_private(&fixture.jar, 0o444, b"fat-jar");
+        assert_eq!(
+            ApprovedRuntime::open(
+                Path::new("java"),
+                &fixture.jar,
+                fixture.owner,
+                java_digest,
+                jar_digest,
+            ),
+            Err(RuntimeError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn world_writable_parent_without_sticky_is_rejected() {
+        let fixture = Fixture::new();
+        let open_dir = fixture.root.join("open");
+        fs::create_dir(&open_dir).expect("open");
+        fs::set_permissions(&open_dir, fs::Permissions::from_mode(0o777)).expect("mode");
+        let java = open_dir.join("java");
+        let jar = open_dir.join("worker.jar");
+        let java_digest = write_private(&java, 0o555, b"java-bin");
+        let jar_digest = write_private(&jar, 0o444, b"fat-jar");
+        assert_eq!(
+            ApprovedRuntime::open(&java, &jar, fixture.owner, java_digest, jar_digest),
+            Err(RuntimeError::Permissions)
+        );
+    }
+
+    #[test]
+    fn confirm_rejects_replaced_inode_at_the_same_path() {
+        let fixture = Fixture::new();
+        let java_digest = write_private(&fixture.java, 0o555, b"java-bin");
+        let jar_digest = write_private(&fixture.jar, 0o444, b"fat-jar");
+        let approved = ApprovedRuntime::open(
+            &fixture.java,
+            &fixture.jar,
+            fixture.owner,
+            java_digest,
+            jar_digest,
+        )
+        .expect("approved");
+        approved.confirm().expect("same inode");
+        let before = approved.java().identity();
+        fs::remove_file(&fixture.java).expect("unlink");
+        let replaced = write_private(&fixture.java, 0o555, b"java-bin");
+        assert_eq!(replaced, java_digest);
+        assert_eq!(approved.confirm(), Err(RuntimeError::IdentityDrift));
+        let again = ApprovedRuntime::open(
+            &fixture.java,
+            &fixture.jar,
+            fixture.owner,
+            java_digest,
+            jar_digest,
+        )
+        .expect("new inode");
+        assert_ne!(again.java().identity(), before);
     }
 
     fn write_private(path: &std::path::Path, mode: u32, bytes: &[u8]) -> [u8; 32] {
