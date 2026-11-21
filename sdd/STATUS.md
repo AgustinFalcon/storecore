@@ -1,5 +1,29 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-21, 4B-3 tmpfs/NoNewPrivileges
+
+`master cc19634783ba2c59c8cd44365a37496bb5dd1dda` integra PR #330. Su
+candidato exacto `e2978566a7aa6d77abece4f6e724bda4b21fe6a3` pasó Verify
+`44952793361` 6/6. Dos reviews independientes Grok 4.7 (autorizadas porque
+gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3. El corte deriva
+internamente `mode=03770,uid=0,gid=<worker>`, `DirectoryMode=03770` y
+`NoNewPrivileges=true`. El cliente no suministra esas properties.
+`FakeSystemd` sigue en tests; CI no abre el system bus. No hay `Ready`,
+wiring Spring ni harness UID A/B. `003B-4B-3` permanece abierto junto con
+`003B-4B-4`, el agregado `003B-4B`, `003B-4C`, `003B-4`, TASK-005 y #7.
+
+## Master vigente — 2026-11-21, 4B-3 nombres PID 1 y adapter zbus
+
+`master 4cbd801109e060b1918de55eb1ef16abcc2589da` integra PR #328. Su
+candidato exacto `7155a8e6c755b55d5d0bbc7e9578c151370deffd` pasó Verify
+`44950931261` 6/6. El P3 de `a42bbf4` (Starting antes de derivar `Where`) se
+cerró en ese SHA. Dos reviews independientes Grok 4.7 (autorizadas porque
+gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3. El corte entrega
+nombres `.mount` escapados, worker `.service` con `ExecStart` interno y
+adapter blocking `zbus`. `FakeSystemd` sigue en tests; CI no abre el system
+bus. No hay `Ready` ni harness UID A/B. `003B-4B-3` permanece abierto junto
+con `003B-4B-4`, el agregado `003B-4B`, `003B-4C`, `003B-4`, TASK-005 y #7.
+
 ## Master vigente — 2026-11-21, arranque 4B-4
 
 `master 29940436175451e7db40e79210613970ff82b056` integra PR #326. Su
