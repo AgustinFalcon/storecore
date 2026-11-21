@@ -8,7 +8,7 @@ use crate::unit::{DerivedUnits, UnitKind, UnitName, UnitState, encode_job_hex};
 
 pub const MOUNT_BYTES: u64 = 48 * 1024 * 1024;
 pub const MOUNT_INODES: u64 = 1024;
-const TMPFS_OPTIONS: &[u8] = b"nosuid,nodev,noexec,size=48M,nr_inodes=1024";
+pub const DIRECTORY_MODE: u32 = 0o3770;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DbusMethod {
@@ -43,8 +43,9 @@ pub enum SystemdError {
 pub struct MountSpec {
     name: UnitName,
     what: &'static [u8],
-    options: &'static [u8],
+    options: String,
     where_path: PathBuf,
+    directory_mode: u32,
 }
 
 impl MountSpec {
@@ -57,12 +58,16 @@ impl MountSpec {
         self.what
     }
     #[must_use]
-    pub const fn options(&self) -> &'static [u8] {
-        self.options
+    pub fn options(&self) -> &str {
+        &self.options
     }
     #[must_use]
     pub fn where_path(&self) -> &std::path::Path {
         &self.where_path
+    }
+    #[must_use]
+    pub const fn directory_mode(&self) -> u32 {
+        self.directory_mode
     }
 }
 
@@ -141,8 +146,9 @@ impl TransientUnits {
             mount: MountSpec {
                 name: *names.mount(),
                 what: b"tmpfs",
-                options: TMPFS_OPTIONS,
+                options: tmpfs_options(worker),
                 where_path,
+                directory_mode: DIRECTORY_MODE,
             },
             worker: WorkerSpec {
                 name: *names.worker(),
@@ -286,6 +292,13 @@ fn hex_job(job_id: JobId) -> String {
     String::from_utf8(hex.to_vec()).expect("job hex is ascii")
 }
 
+fn tmpfs_options(worker: Principal) -> String {
+    format!(
+        "nosuid,nodev,noexec,size=48M,nr_inodes=1024,mode=03770,uid=0,gid={}",
+        worker.gid()
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{FakeSystemd, SystemdControl, SystemdError, TransientUnits};
@@ -335,11 +348,12 @@ mod tests {
             "storecore-media-07070707070707070707070707070707.service"
         );
         assert_eq!(spec.mount().what(), b"tmpfs");
-        assert!(
-            core::str::from_utf8(spec.mount().options())
-                .expect("utf8")
-                .contains("noexec")
-        );
+        assert_eq!(spec.mount().directory_mode(), 0o3770);
+        let options = spec.mount().options();
+        assert!(options.contains("noexec"));
+        assert!(options.contains("mode=03770"));
+        assert!(options.contains("gid=2000"));
+        assert!(!options.contains("mode=0777"));
         let mut systemd = FakeSystemd::new();
         assert_eq!(
             systemd.start_transient(UnitKind::Mount, &spec),

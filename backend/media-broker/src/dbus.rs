@@ -182,7 +182,7 @@ pub(crate) fn mount_properties(
         .ok_or(SystemdError::Unavailable)?
         .to_owned();
     let what = utf8(spec.mount().what())?.to_owned();
-    let options = utf8(spec.mount().options())?.to_owned();
+    let options = spec.mount().options().to_owned();
     Ok(vec![
         (
             "Description",
@@ -193,6 +193,7 @@ pub(crate) fn mount_properties(
         ("Where", Value::from(where_path)),
         ("Type", Value::from("tmpfs".to_owned())),
         ("Options", Value::from(options)),
+        ("DirectoryMode", Value::from(spec.mount().directory_mode())),
     ])
 }
 
@@ -238,6 +239,7 @@ pub(crate) fn worker_properties(
             Value::from(spec.worker().worker().gid().to_string()),
         ),
         ("WorkingDirectory", Value::from(workspace)),
+        ("NoNewPrivileges", Value::from(true)),
     ])
 }
 
@@ -296,6 +298,10 @@ mod tests {
         assert!(!keys.contains(&"ExecStart"));
         let worker_keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(worker_keys.contains(&"ExecStart"));
+        assert!(worker_keys.contains(&"NoNewPrivileges"));
+        assert!(keys.contains(&"DirectoryMode"));
+        assert!(spec.mount().options().contains("mode=03770"));
+        assert!(spec.mount().options().contains("gid=2000"));
         assert_eq!(
             spec.mount().name().as_str().expect("utf8"),
             "run-storecore_media-jobs-abababababababababababababababab.mount"
