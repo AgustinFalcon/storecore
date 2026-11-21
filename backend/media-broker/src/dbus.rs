@@ -21,6 +21,7 @@ const JOB_PATH_PREFIX: &str = "/org/freedesktop/systemd1/job/";
 const UNIT_PATH_PREFIX: &str = "/org/freedesktop/systemd1/unit/";
 const START_MODE: &str = "fail";
 const STOP_MODE: &str = "fail";
+const NO_SUCH_UNIT: &str = "org.freedesktop.systemd1.NoSuchUnit";
 const METHOD_TIMEOUT: Duration = Duration::from_secs(5);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -75,7 +76,7 @@ impl ZbusSystemd {
         let job: OwnedObjectPath = self
             .manager()?
             .call("StopUnit", &(name, STOP_MODE))
-            .map_err(|_| SystemdError::Unavailable)?;
+            .map_err(from_zbus)?;
         validate_job_path(&job)
     }
 
@@ -83,7 +84,7 @@ impl ZbusSystemd {
         let unit_path: OwnedObjectPath = self
             .manager()?
             .call("GetUnit", &(name,))
-            .map_err(|_| SystemdError::Unavailable)?;
+            .map_err(from_zbus)?;
         if !unit_path.as_str().starts_with(UNIT_PATH_PREFIX)
             || unit_path.as_str().len() == UNIT_PATH_PREFIX.len()
         {
@@ -139,7 +140,7 @@ impl SystemdControl for ZbusSystemd {
         if let Err(error) = self.stop_unit(&name) {
             return match self.active_state(&name) {
                 Ok(state @ (UnitState::Inactive | UnitState::Failed)) => Ok(state),
-                Err(SystemdError::Unavailable) => Ok(UnitState::Inactive),
+                Err(SystemdError::NotLoaded) => Ok(UnitState::Inactive),
                 _ => Err(error),
             };
         }
@@ -147,7 +148,7 @@ impl SystemdControl for ZbusSystemd {
             matches!(state, UnitState::Inactive | UnitState::Failed)
         }) {
             Ok(state) => Ok(state),
-            Err(SystemdError::Unavailable) => Ok(UnitState::Inactive),
+            Err(SystemdError::NotLoaded) => Ok(UnitState::Inactive),
             other => other,
         }
     }
@@ -260,6 +261,21 @@ fn utf8(bytes: &[u8]) -> Result<&str, SystemdError> {
     core::str::from_utf8(bytes).map_err(|_| SystemdError::Unavailable)
 }
 
+fn from_zbus(error: zbus::Error) -> SystemdError {
+    match error.name() {
+        Some(name) => classify_dbus_name(name.as_str()),
+        None => SystemdError::Unavailable,
+    }
+}
+
+fn classify_dbus_name(name: &str) -> SystemdError {
+    if name == NO_SUCH_UNIT {
+        SystemdError::NotLoaded
+    } else {
+        SystemdError::Unavailable
+    }
+}
+
 fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
     if path.as_str().starts_with(JOB_PATH_PREFIX)
         && path.as_str().len() > JOB_PATH_PREFIX.len()
@@ -275,10 +291,10 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ZbusSystemd, mount_properties, worker_properties};
+    use super::{ZbusSystemd, classify_dbus_name, mount_properties, worker_properties};
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
-    use crate::systemd::{SystemdControl, TransientUnits};
+    use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
@@ -340,6 +356,22 @@ mod tests {
         assert_eq!(spec.worker().argv()[1], "-jar");
         assert_eq!(spec.worker().argv()[0], spec.worker().java());
         assert_eq!(spec.worker().argv()[2], spec.worker().jar());
+    }
+
+    #[test]
+    fn collected_unit_is_not_loaded_other_dbus_errors_stay_unavailable() {
+        assert_eq!(
+            classify_dbus_name("org.freedesktop.systemd1.NoSuchUnit"),
+            SystemdError::NotLoaded
+        );
+        assert_eq!(
+            classify_dbus_name("org.freedesktop.DBus.Error.Disconnected"),
+            SystemdError::Unavailable
+        );
+        assert_eq!(
+            classify_dbus_name("org.freedesktop.DBus.Error.Failed"),
+            SystemdError::Unavailable
+        );
     }
 
     #[test]
