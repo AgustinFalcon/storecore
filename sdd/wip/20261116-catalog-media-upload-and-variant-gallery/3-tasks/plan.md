@@ -84,6 +84,16 @@
         - [ ] `003B-4B-3`: daemon endurecido, runtime aprobado y unidades
           transitorias `.mount`/worker administradas por PID 1 vía D-Bus, sin
           aceptar comandos, paths o properties del cliente.
+          - [ ] `003B-4B-3A`: tipos cerrados de perfil/política, identidad y
+            specs derivadas de mount/worker, más attestación fail-closed de la
+            cadena runtime root-owned. Sin conexión D-Bus ni efectos PID 1.
+          - [ ] `003B-4B-3B`: adapter `zbus` blocking con allowlist exacta de
+            `StartTransientUnit`/stop/inspect y traducción única de estados y
+            propiedades observadas. Sin aceptar valores privilegiados del
+            cliente.
+          - [ ] `003B-4B-3C`: daemon instalable endurecido, orquestación durable
+            mount/worker y cleanup/reconciliación real. `4B-3` sólo cierra con
+            los tres subcortes aprobados.
         - [ ] `003B-4B-4`: `BrokeredMediaByteNormalizer`, traducción wire única,
           lifecycle/ACK del artefacto y capability todavía bloqueada hasta 4C.
       - [ ] `MEDIA-NORMALIZE-003B-4C`: harness Linux real con UID A/UID B,

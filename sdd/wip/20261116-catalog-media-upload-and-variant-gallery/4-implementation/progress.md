@@ -638,3 +638,22 @@
   `003B-4B-4`, el agregado `003B-4B`, `003B-4C`,
   `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. Este corte no acredita daemon
   privilegiado, mounts, D-Bus, wiring Spring ni capability `Ready`.
+
+## 2026-11-20 — 003B-4B-3A en implementación
+
+- El corte `003B-4B-3` se divide sin reducir sus criterios: `3A` define la
+  política cerrada y la attestación del runtime; `3B` implementará el adapter
+  D-Bus allowlisted; `3C` conectará daemon, efectos y reconciliación. Ningún
+  subcorte aislado cierra `4B-3` ni habilita `Ready`.
+- La implementación candidata deriva workspace, unidad `.mount`, unidad worker,
+  opciones tmpfs, comando, entorno y límites sólo desde `JobId`, un
+  `MediaIsolationProfileId` conocido y política compilada por el broker. El
+  cliente no aporta paths, nombres, comandos ni propiedades systemd.
+- `ApprovedRuntime` fija las rutas versionadas de Java/JAR y exige evidencia
+  root-owned, sin symlinks, modos `0555`/`0444` y digest exacto. Evidencia
+  ausente, `Unknown`, de tipo distinto, escribible o con digest diferente falla
+  cerrada.
+- `rustfmt` y una compilación de metadata Rust 1.100 del módulo y sus tipos
+  dependientes pasan localmente. Clippy y tests Linux exact-head siguen
+  pendientes del CI; por eso `003B-4B-3A`, `003B-4B-3`, `003B-4B`, `4C`,
+  TASK-005 e issue #7 permanecen abiertos.
