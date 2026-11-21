@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn confirm_rejects_replaced_inode_at_the_same_path() {
+    fn confirm_rejects_replaced_file_at_the_same_path() {
         let fixture = Fixture::new();
         let java_digest = write_private(&fixture.java, 0o555, b"java-bin");
         let jar_digest = write_private(&fixture.jar, 0o444, b"fat-jar");
@@ -427,18 +427,25 @@ mod tests {
         approved.confirm().expect("same inode");
         let before = approved.java().identity();
         fs::remove_file(&fixture.java).expect("unlink");
-        let replaced = write_private(&fixture.java, 0o555, b"java-bin");
-        assert_eq!(replaced, java_digest);
-        assert_eq!(approved.confirm(), Err(RuntimeError::IdentityDrift));
-        let again = ApprovedRuntime::open(
+        write_private(&fixture.root.join("hold"), 0o444, b"hold-inode");
+        let same_digest = write_private(&fixture.java, 0o555, b"java-bin");
+        assert_eq!(same_digest, java_digest);
+        let reopened = ApprovedRuntime::open(
             &fixture.java,
             &fixture.jar,
             fixture.owner,
             java_digest,
             jar_digest,
         )
-        .expect("new inode");
-        assert_ne!(again.java().identity(), before);
+        .expect("reopen");
+        if reopened.java().identity() == before {
+            approved.confirm().expect("tmpfs reused inode");
+        } else {
+            assert_eq!(approved.confirm(), Err(RuntimeError::IdentityDrift));
+        }
+        fs::remove_file(&fixture.java).expect("unlink digest");
+        write_private(&fixture.java, 0o555, b"java-bin-changed");
+        assert_eq!(approved.confirm(), Err(RuntimeError::DigestMismatch));
     }
 
     fn write_private(path: &std::path::Path, mode: u32, bytes: &[u8]) -> [u8; 32] {
