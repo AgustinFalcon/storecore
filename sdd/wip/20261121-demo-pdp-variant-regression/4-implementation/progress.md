@@ -12,4 +12,6 @@ Validation:
 - `git diff --check`: PASS.
 - Temporary loopback demo server stopped after verification.
 
-Independent GPT-6.1 Sol medium code/product and security reviews both returned APPROVE: the diff is test/SDD-only, preserves the deliberately disabled DEMO-002 Case variant, uses the existing closed variant type, and does not weaken stock, availability or persistence. PVR-003 remains pending only for the combined branch gate and integration. No PR was created in this implementation task.
+Independent GPT-6.1 Sol medium code/product and security reviews both returned APPROVE: the diff is test/SDD-only, preserves the deliberately disabled DEMO-002 Case variant, uses the existing closed variant type, and does not weaken stock, availability or persistence.
+
+After integration with the bounded showcase JSON dataset on `demo/storecore-showcase-20261121`, `npm run test:demo` passed **335/335** Playwright cases in 19.2 minutes. The corrected PDP regression passed as case 302; SC17B, all 26 Demo surfaces, responsive/Axe, actor isolation and snapshot persistence also passed. PVR-003 is complete. Remote CI remains the PR gate; no PR is claimed by this record.
