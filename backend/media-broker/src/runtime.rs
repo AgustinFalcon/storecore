@@ -114,7 +114,12 @@ impl ApprovedRuntime {
             self.owner,
             self.java.digest,
         )?;
-        let jar = approve(&self.jar_path, RuntimeKind::Jar, self.owner, self.jar.digest)?;
+        let jar = approve(
+            &self.jar_path,
+            RuntimeKind::Jar,
+            self.owner,
+            self.jar.digest,
+        )?;
         if java != self.java || jar != self.jar {
             return Err(RuntimeError::IdentityDrift);
         }

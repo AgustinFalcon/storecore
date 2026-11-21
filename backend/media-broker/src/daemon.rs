@@ -110,7 +110,9 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             now_ms,
         ) {
             Ok(record) => Ok(record),
-            Err(error) => Err(self.abort_start(DaemonError::Store(error), &spec, &starting, now_ms)),
+            Err(error) => {
+                Err(self.abort_start(DaemonError::Store(error), &spec, &starting, now_ms))
+            }
         }
     }
 }
