@@ -1,6 +1,17 @@
 # Estado canónico del SDD — StoreCore
 
-## Master vigente — 2026-11-20
+## Master vigente — 2026-11-20, estado durable 4B-2
+
+`master 381296d6e267d4c2813345f3bb635ad927a1aff5` integra PR #319. Su
+candidato exacto `9e77bcf8de7b2a874d0998cd43435f999050f85b` pasó Verify
+`44837144576` 6/6 y el post-merge `44838436904` terminó 6/6. Dos reviews
+independientes Grok 4.7 (autorizadas porque gpt-5.6-sol-medium estaba sin
+cupo) aprobaron sin P0–P3. El corte entrega máquina durable/CAS, journal,
+budgets y reconciliación fake; no instala daemon D-Bus, mounts, wiring
+Spring ni `Ready`. `003B-4B-3..4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos.
+
+## Master vigente — 2026-11-20, factory 4A
 
 `master d824e0751010a5f3a5f7e3522329832f02018bd6` integra PR #313. Su
 candidato exacto `649f11242b47eca59ef28b9d87febfa85f3acab3` pasó Verify de PR

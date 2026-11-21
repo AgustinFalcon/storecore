@@ -73,9 +73,14 @@
           `df13f2dda89440a77bd7bcec7b48f1b1c139fe25`; Verify exact-head
           `44826977557` y post-merge `44828593553` terminaron 6/6. Tres reviews
           exact-head independientes aprobaron sin P0–P3.
-        - [ ] `003B-4B-2`: máquina durable/CAS, budgets globales, journal
+        - [x] `003B-4B-2`: máquina durable/CAS, budgets globales, journal
           atómico y reconciliación con adapters fake; corrupción cierra
-          admisión.
+          admisión. PR #319 head
+          `9e77bcf8de7b2a874d0998cd43435f999050f85b`, merge
+          `381296d6e267d4c2813345f3bb635ad927a1aff5`; Verify exact-head
+          `44837144576` y post-merge `44838436904` terminaron 6/6. El job
+          broker ejecutó 46 tests. Dos reviews independientes Grok 4.7
+          (sustituto autorizado de Sol por cupo agotado) aprobaron sin P0–P3.
         - [ ] `003B-4B-3`: daemon endurecido, runtime aprobado y unidades
           transitorias `.mount`/worker administradas por PID 1 vía D-Bus, sin
           aceptar comandos, paths o properties del cliente.
