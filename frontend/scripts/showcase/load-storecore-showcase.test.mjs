@@ -1,12 +1,132 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { ShowcaseDataset, DEFAULT_SHOWCASE_DATASET } from './showcase-dataset.mjs';
 import * as domain from './load-storecore-showcase.mjs';
 import {
   ShowcaseAdapterMode, ShowcaseCapability, ShowcaseCapabilityState, ShowcaseConfig,
   ShowcaseOrderStatus, ShowcasePaymentStatus, ShowcaseRole, ShowcaseStage,
   ShowcaseLoader,
 } from './load-storecore-showcase.mjs';
+
+function importedWire() {
+  return { schemaVersion: DEFAULT_SHOWCASE_DATASET.schema.wire,
+    products: DEFAULT_SHOWCASE_DATASET.products.map(product => ({ ...product })),
+    home: { title: 'Taller importado', body: 'Contenido importado por archivo local.' } };
+}
+
+test('slug collisions and declared journey fee overflow reject before any HTTP', async t => {
+  const { state, run } = await api(t);
+  for (const field of ['sku', 'brand', 'category']) {
+    const raw = importedWire();
+    if (field === 'sku') raw.products.push({ ...raw.products[0], sku: 'SHOW-TALADRO_18V' });
+    else { raw.products[0][field] = 'Tool A'; raw.products[1][field] = 'Tool-A'; }
+    assert.throws(() => run(ShowcaseDataset.fromWire(raw)), /SlugCollision/);
+  }
+  const overflow = importedWire(); overflow.products[1].price = 999999999999;
+  assert.throws(() => run(ShowcaseDataset.fromWire(overflow)), /price/);
+  assert.deepEqual(state.requests, []);
+  const fee = await api(t, { manualFulfillmentPolicy: { localDelivery: { cost: '250000000000.00' } } });
+  assert.throws(() => fee.run(), /journeyBudget/);
+  assert.deepEqual(fee.state.requests, []);
+});
+
+
+test('imported fixture resumes after a late failure without duplicating order or reservation', async t => {
+  let fail = true;
+  const dataset = ShowcaseDataset.fromWire(importedWire());
+  const { state, run } = await api(t, { dataset, response: result => {
+    if (fail && result.path.endsWith('/favorites/' + dataset.journey.primary.sku) && result.method === 'PUT') {
+      fail = false;
+      result.payload.data.outcome = 'future';
+      return { status: result.status, payload: result.payload };
+    }
+  } });
+  await assert.rejects(run(), /FAVORITES_VERIFICATION_FAILED/);
+  assert.equal(state.orders.length, 1);
+  const product = clone(state.products[dataset.journey.primary.sku]);
+  const result = await run();
+  assert.equal(result.pendingOrderCreated, false);
+  assert.equal(state.orders.length, 1);
+  assert.deepEqual(state.products[dataset.journey.primary.sku], product);
+  assert.equal(state.requests.filter(request => request.path.endsWith('/checkout')).length, 1);
+});
+
+test('imported reordered dataset creates exact fields and fourth product, then replays without writes', async t => {
+  const raw = importedWire();
+  raw.products[0].name = 'Taladro importado';
+  raw.products[0].description = 'Descripción importada';
+  raw.products[0].price = 199999;
+  raw.products[0].stock = 25;
+  raw.products[0].image = 'https://images.unsplash.com/photo-custom-import';
+  raw.products.push({ ...raw.products[1], sku: 'SHOW-EXTRA', name: 'Producto adicional' });
+  raw.products.reverse();
+  const dataset = ShowcaseDataset.fromWire(raw);
+  const { state, run } = await api(t, { dataset, requireRealRouteReceipt: true });
+  const first = await run();
+  assert.equal(first.products, 4);
+  assert.equal(first.receipt.products.length, 4);
+  assert.equal(first.receipt.homeTitle, raw.home.title);
+  assert.equal(state.orders[0].lines[0].sku, dataset.journey.primary.sku);
+  assert.deepEqual(state.cart.lines.map(line => [line.sku, line.quantity]), [
+    [dataset.journey.cart.sku, 1], [dataset.journey.secondaryCart.sku, 2],
+  ]);
+  const create = state.requests.find(request => request.path.endsWith('/' + dataset.journey.primary.sku) && request.method === 'PUT');
+  assert.deepEqual(create.body, dataset.journey.primary.toCatalogCommand());
+  assert.equal(state.products['SHOW-EXTRA'].name, 'Producto adicional');
+  const count = state.writes.length;
+  const replay = await run();
+  assert.equal(state.writes.length, count);
+  assert.equal(replay.pendingOrderCreated, false);
+  assert.deepEqual(replay.receipt, first.receipt);
+});
+
+test('changed input preserves existing operator fields, images, stock, home and collections', async t => {
+  const raw = importedWire();
+  const { state, run } = await api(t, { dataset: ShowcaseDataset.fromWire(raw) });
+  await run();
+  state.products[SKUS[0]].name = 'Operator edited';
+  state.products[SKUS[0]].images = ['https://example.invalid/operator.jpg'];
+  state.products[SKUS[0]].media[0].url = state.products[SKUS[0]].images[0];
+  state.products[SKUS[0]].price.base = 5;
+  state.products[SKUS[0]].variants[0].availableQuantity = 99;
+  state.products[SKUS[0]].status = domain.ShowcaseProductStatus.Archived.wire;
+  state.home.sections = [{ key: 'operator', kind: 'future-kind', content: { custom: true } }];
+  state.home.revision++;
+  const before = clone({ products: state.products, home: state.home, cart: state.cart, orders: state.orders, offers: state.offers, favorites: state.favorites });
+  raw.products[0].name = 'New input ignored for existing product';
+  raw.products[0].stock = 100;
+  raw.home.title = 'New input home ignored';
+  const count = state.writes.length;
+  await run(ShowcaseDataset.fromWire(raw));
+  assert.equal(state.writes.length, count);
+  assert.deepEqual({ products: state.products, home: state.home, cart: state.cart, orders: state.orders, offers: state.offers, favorites: state.favorites }, before);
+});
+
+test('invalid or forged injected datasets fail before HTTP', async t => {
+  const { state, run } = await api(t);
+  for (const raw of [importedWire(), Object.create(ShowcaseDataset.prototype), null]) {
+    assert.throws(() => run(raw), /SHOWCASE_DATASET_INVALID/);
+  }
+  assert.deepEqual(state.requests, []);
+  assert.deepEqual(state.writes, []);
+});
+
+test('imported create and readback verify imported image and price rather than default constants', async t => {
+  for (const field of ['image', 'price']) await t.test(field, async t => {
+    const raw = importedWire();
+    raw.products[0].image = 'https://images.unsplash.com/photo-import-only';
+    raw.products[0].price = 123456;
+    const { run } = await api(t, { dataset: ShowcaseDataset.fromWire(raw), response: result => {
+      if (result.path === '/api/v1/user/catalog/products/' + SKUS[0] && result.method === 'PUT') {
+        if (field === 'image') result.payload.data.media[0].url = DEFAULT_SHOWCASE_DATASET.journey.primary.image;
+        else result.payload.data.price.base = DEFAULT_SHOWCASE_DATASET.journey.primary.price;
+        return { status: result.status, payload: result.payload };
+      }
+    } });
+    await assert.rejects(run(), /CATALOG_VERIFICATION_FAILED/);
+  });
+});
 
 const valid = {
   baseUrl: 'http://127.0.0.1:8080', origin: 'http://localhost:4200',
@@ -217,7 +337,7 @@ async function api(t, options = {}) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); assert.deepEqual(state.errors, []); });
   const config = new ShowcaseConfig({ ...valid, baseUrl: `http://127.0.0.1:${server.address().port}`, includePendingOrder: options.includePendingOrder ?? true, manualFulfillmentPolicy: options.manualFulfillmentPolicy, requireRealRouteReceipt: options.requireRealRouteReceipt });
-  return { state, run: () => new ShowcaseLoader(config, () => {}).run() };
+  return { state, run: (dataset = options.dataset) => new ShowcaseLoader(config, () => {}, dataset).run() };
 }
 
 function page(items, url, sizeKey = 'size') {

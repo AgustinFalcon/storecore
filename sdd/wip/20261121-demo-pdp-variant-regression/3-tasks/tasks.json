@@ -1,0 +1,9 @@
+{
+  "feature": "20261121-demo-pdp-variant-regression",
+  "status": "ready_for_pr",
+  "tasks": [
+    { "id": "PVR-001", "title": "Reconcile regression journey with SC17B disabled variant contract", "status": "done" },
+    { "id": "PVR-002", "title": "Verify repeated case, regression/SC17B files and demo build", "status": "done" },
+    { "id": "PVR-003", "title": "Independent review and combined integration close-out", "status": "done", "evidence": "2026-11-21: independent GPT-6.1 Sol medium code/product and security reviews APPROVE; integrated demo/storecore-showcase-20261121 gate passed all 335 Playwright cases in 19.2m, including this PDP regression, SC17B, responsive/Axe, persistence and all 26 Demo surfaces." }
+  ]
+}

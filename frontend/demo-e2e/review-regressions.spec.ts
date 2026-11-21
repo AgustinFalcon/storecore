@@ -1,4 +1,5 @@
 import { expect, Page, test } from '@playwright/test';
+import { DemoProductVariant } from '../src/app/demo/catalog/product-variant';
 const cta=(page:Page,id:string)=>page.locator(`[data-cta="${id}"]`);
 async function login(page:Page,admin=false){await page.goto('/demo/login');await page.getByLabel('Contraseña',{exact:true}).fill('demo');await cta(page,'login-submit').click();await cta(page,admin?'login-admin':'login-customer').click();}
 
@@ -13,7 +14,22 @@ test('PDP invalid quantities preserve cart and navigation resets stale presentat
  await login(page); await page.goto('/demo/catalog/DEMO-001'); await cta(page,'product-add-cart').click(); const before=await page.evaluate(()=>localStorage.getItem('storecore.commercial-demo.v1')); const trace:{input:string;expected:string;cartUnchanged:boolean}[]=[];
  for(const input of ['0','-1','0.5','1.5','']) { const quantity=page.getByLabel('Cantidad',{exact:true});await quantity.fill(input); await cta(page,'product-add-cart').click(); await expect(page.getByRole('alert')).toContainText('cantidad entera');await expect(quantity).toHaveAttribute('aria-invalid','true');await expect(quantity).toHaveAttribute('aria-describedby','product-action-feedback'); await expect(page.locator('.notice.success')).toHaveCount(0); await expect(cta(page,'shell-cart')).toContainText('1'); const unchanged=await page.evaluate(()=>localStorage.getItem('storecore.commercial-demo.v1'))===before; expect(unchanged).toBe(true); trace.push({input,expected:'visible integer >=1 error; no success; cart unchanged',cartUnchanged:unchanged}); }
  await page.getByLabel('Cantidad',{exact:true}).fill('2'); await cta(page,'product-add-cart').click(); await expect(cta(page,'shell-cart')).toContainText('3'); await expect(page.getByRole('alert')).toHaveCount(0); await expect(page.locator('#product-action-feedback.notice.success')).toContainText('agregado');await expect(cta(page,'product-add-cart')).toContainText('Agregado');await expect(page.locator('.details-card').filter({hasText:'Ficha del producto'})).toContainText('Tensión');await expect(page.locator('.details-card').filter({hasText:'Ficha del producto'})).toContainText('1.500 rpm');
- await cta(page,'product-variant').selectOption('with-case'); await cta(page,'related-DEMO-002').click(); await expect(cta(page,'product-variant')).toHaveValue('standard'); await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('1'); await cta(page,'product-variant').selectOption('with-case'); await page.getByLabel('Buscar productos',{exact:true}).fill('Guantes'); await cta(page,'shell-search').click(); await cta(page,'product-open-DEMO-007').click(); await expect(cta(page,'product-variant')).toHaveValue('standard'); await expect(cta(page,'product-variant').locator('option')).toHaveCount(1); await cta(page,'product-add-cart').click(); await expect(cta(page,'shell-cart')).toContainText('4'); await cta(page,'product-review-cart').click(); await expect(page.locator('.cart-line').filter({hasText:'DEMO-007'})).toContainText('Estándar'); await expect(page.locator('.cart-line').filter({hasText:'DEMO-007'})).not.toContainText('Con estuche');
+ await cta(page,'product-variant').selectOption(DemoProductVariant.Case.wire);
+ await cta(page,'related-DEMO-002').click();
+ await expect(cta(page,'product-variant')).toHaveValue(DemoProductVariant.Standard.wire);
+ await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('1');
+ await expect(cta(page,'product-variant').locator(`option[value="${DemoProductVariant.Case.wire}"]`)).toBeDisabled();
+ await page.goto('/demo/catalog/DEMO-004');
+ await cta(page,'product-variant').selectOption(DemoProductVariant.Case.wire);
+ await page.getByLabel('Buscar productos',{exact:true}).fill('Guantes');
+ await cta(page,'shell-search').click(); await cta(page,'product-open-DEMO-007').click();
+ await expect(cta(page,'product-variant')).toHaveValue(DemoProductVariant.Standard.wire);
+ await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('1');
+ await expect(cta(page,'product-variant').locator('option')).toHaveCount(1);
+ await cta(page,'product-add-cart').click(); await expect(cta(page,'shell-cart')).toContainText('4');
+ await cta(page,'product-review-cart').click();
+ await expect(page.locator('.cart-line').filter({hasText:'DEMO-007'})).toContainText(DemoProductVariant.Standard.label);
+ await expect(page.locator('.cart-line').filter({hasText:'DEMO-007'})).not.toContainText(DemoProductVariant.Case.label);
  await info.attach('input-validity-state-trace',{body:JSON.stringify({quantity:trace,validAddition:'2 increments existing 1 to 3',sameRouteSkuNavigation:'Case -> Standard, quantity ->1',incompatibleSku:'Only Standard and no Case in persisted cart'},null,2),contentType:'application/json'});
 });
 for(const width of [390,768,1440]){
