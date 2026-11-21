@@ -6,6 +6,7 @@ import com.storecore.catalog.domain.media.MediaByteSize
 import com.storecore.catalog.domain.media.MediaFormat
 import com.storecore.catalog.domain.media.MediaNormalizationLimits
 import com.storecore.catalog.domain.media.MediaNormalizationRejectReason
+import com.storecore.catalog.domain.media.MediaPixelSideLimit
 import com.storecore.catalog.domain.media.PixelDimensions
 import com.storecore.catalog.infrastructure.media.worker.BrokeredMediaByteNormalizer
 import com.storecore.catalog.infrastructure.media.worker.BrokeredMediaCapabilityFactory
@@ -164,6 +165,34 @@ class BrokeredMediaByteNormalizerTest {
     }
 
     @Test
+    fun `proof dimensions outside caller limits stay Unknown without ACK`() {
+        val input = byteArrayOf(1, 2, 3)
+        val output = byteArrayOf(9, 8, 7, 6)
+        val proof = requireNotNull(
+            MediaBrokerArtifactProof.create(
+                MediaBrokerArtifactProof.ROOT_UID,
+                MediaBrokerArtifactProof.REGULAR_FILE_MODE,
+                MediaFormat.PNG,
+                requireNotNull(PixelDimensions.fromWire(640, 480)),
+                output,
+            ),
+        )
+        val client = ScriptedClient(
+            seal = completed(MediaBrokerResult.SNAPSHOT_ACCEPTED),
+            claim = MediaBrokerExchange.Completed(
+                requireNotNull(MediaBrokerResponse.create(MediaBrokerResult.ARTIFACT_READY, jobId, 1)),
+                proof.encode(),
+            ),
+            ack = completed(MediaBrokerResult.ACK_ACCEPTED),
+        )
+        assertSame(MediaNormalizationResult.Unknown, normalizer(client).normalize(source(input), tightMaxSide()))
+        assertEquals(
+            listOf(MediaBrokerOperation.SEAL_INPUT, MediaBrokerOperation.CLAIM_OUTPUT),
+            client.operations,
+        )
+    }
+
+    @Test
     fun `oversized declared source is rejected before the helper runs`() {
         val never = MediaBrokerClient { _, _, _ -> error("helper must not run") }
         val oversized = object : MediaNormalizationSource {
@@ -172,6 +201,26 @@ class BrokeredMediaByteNormalizerTest {
         }
         val result = BrokeredMediaByteNormalizer(never) { jobId }.normalize(oversized, limits) as MediaNormalizationResult.Rejected
         assertEquals(MediaNormalizationRejectReason.INPUT_LIMIT_EXCEEDED, result.reason)
+    }
+
+    private fun tightMaxSide(): MediaNormalizationLimits {
+        val standard = MediaNormalizationLimits.standard()
+        return requireNotNull(
+            MediaNormalizationLimits.create(
+                standard.maxInputBytes,
+                standard.maxOutputBytes,
+                standard.minSide,
+                MediaPixelSideLimit.fromWire(400),
+                standard.maxPixels,
+                standard.workerHeapBytes,
+                standard.workspaceBytes,
+                standard.timeout,
+                standard.maxConcurrency,
+                standard.maxDiagnosticBytes,
+                standard.maxContainerSegments,
+                standard.maxMetadataBytes,
+            ),
+        )
     }
 
     private fun normalizer(client: MediaBrokerClient) = BrokeredMediaByteNormalizer(client) { jobId }

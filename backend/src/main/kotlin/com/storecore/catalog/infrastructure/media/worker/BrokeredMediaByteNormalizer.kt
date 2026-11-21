@@ -6,6 +6,7 @@ import com.storecore.catalog.application.media.MediaNormalizationResult
 import com.storecore.catalog.application.media.MediaNormalizationSource
 import com.storecore.catalog.domain.media.ContentDigest
 import com.storecore.catalog.domain.media.MediaByteSize
+import com.storecore.catalog.domain.media.MediaDimensionDecision
 import com.storecore.catalog.domain.media.MediaNormalizationLimits
 import com.storecore.catalog.domain.media.MediaNormalizationProfile
 import com.storecore.catalog.domain.media.MediaNormalizationRejectReason
@@ -90,6 +91,9 @@ class BrokeredMediaByteNormalizer(
                     if (!profile.permitsOutput(proof.format) || !limits.acceptsOutput(proof.size)) {
                         return MediaNormalizationResult.Unknown
                     }
+                    if (limits.inspectDimensions(proof.dimensions.width, proof.dimensions.height) !is MediaDimensionDecision.Accepted) {
+                        return MediaNormalizationResult.Unknown
+                    }
                     val original = ContentDigest.fromWire(inputDigest.joinToString("") { "%02x".format(it) })
                         ?: return MediaNormalizationResult.Unknown
                     val ack = ackRequest(claim, proof) ?: return MediaNormalizationResult.Unknown
@@ -102,10 +106,7 @@ class BrokeredMediaByteNormalizer(
                         proof.dimensions,
                         profile,
                         limits,
-                    ) ?: run {
-                        artifact.close()
-                        MediaNormalizationResult.Unknown
-                    }
+                    ) ?: MediaNormalizationResult.Unknown
                 }
                 MediaBrokerResult.REJECTED -> rejected(MediaNormalizationRejectReason.NORMALIZATION_FAILED)
                 MediaBrokerResult.PEER_DENIED -> MediaNormalizationResult.Unavailable
