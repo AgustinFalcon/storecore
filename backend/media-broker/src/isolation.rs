@@ -311,26 +311,21 @@ pub struct JobPaths {
     root: PathBuf,
     input: PathBuf,
     request: PathBuf,
-    writable_root: PathBuf,
     output: PathBuf,
     result: PathBuf,
     diagnostic: PathBuf,
-    temporary: PathBuf,
     worker_gid: u32,
 }
 
 impl JobPaths {
     fn derive(root: PathBuf, worker: WorkerPrincipal) -> Self {
-        let writable_root = root.join("out");
         Self {
             input: root.join("input.bin"),
             request: root.join("request.bin"),
-            output: writable_root.join("output.bin"),
-            result: writable_root.join("result.bin"),
-            diagnostic: writable_root.join("diagnostic.bin"),
-            temporary: writable_root.join("tmp"),
+            output: root.join("output.bin"),
+            result: root.join("result.bin"),
+            diagnostic: root.join("diagnostic.bin"),
             worker_gid: worker.gid(),
-            writable_root,
             root,
         }
     }
@@ -351,11 +346,6 @@ impl JobPaths {
     }
 
     #[must_use]
-    pub fn writable_root(&self) -> &Path {
-        &self.writable_root
-    }
-
-    #[must_use]
     pub fn output(&self) -> &Path {
         &self.output
     }
@@ -368,11 +358,6 @@ impl JobPaths {
     #[must_use]
     pub fn diagnostic(&self) -> &Path {
         &self.diagnostic
-    }
-
-    #[must_use]
-    pub fn temporary(&self) -> &Path {
-        &self.temporary
     }
 
     #[must_use]
@@ -391,7 +376,7 @@ impl JobPaths {
     }
 
     #[must_use]
-    pub const fn writable_root_permissions(&self) -> u32 {
+    pub const fn workspace_permissions(&self) -> u32 {
         0o700
     }
 }
@@ -439,7 +424,8 @@ impl MountUnitSpec {
             unit_name: identity.mount_unit.clone(),
             where_path: identity.paths.root.clone(),
             options: format!(
-                "mode=0710,uid=0,gid={},size={WORKSPACE_BYTES},nr_inodes={WORKSPACE_INODES},nosuid,nodev,noexec",
+                "mode=0700,uid={},gid={},size={WORKSPACE_BYTES},nr_inodes={WORKSPACE_INODES},nosuid,nodev,noexec",
+                worker.uid(),
                 worker.gid()
             ),
         }
@@ -472,7 +458,7 @@ impl MountUnitSpec {
 
     #[must_use]
     pub const fn directory_mode(&self) -> u32 {
-        0o710
+        0o700
     }
 
     #[must_use]
@@ -511,8 +497,7 @@ pub struct WorkerUnitSpec {
     unit_name: String,
     mount_unit: String,
     workspace: PathBuf,
-    writable_root: PathBuf,
-    temporary: PathBuf,
+    read_only_paths: [PathBuf; 2],
     worker: WorkerPrincipal,
     runtime: ApprovedRuntime,
 }
@@ -527,8 +512,7 @@ impl WorkerUnitSpec {
             unit_name: identity.worker_unit.clone(),
             mount_unit: identity.mount_unit.clone(),
             workspace: identity.paths.root.clone(),
-            writable_root: identity.paths.writable_root.clone(),
-            temporary: identity.paths.temporary.clone(),
+            read_only_paths: [identity.paths.input.clone(), identity.paths.request.clone()],
             worker,
             runtime,
         }
@@ -550,8 +534,11 @@ impl WorkerUnitSpec {
     }
 
     #[must_use]
-    pub fn writable_root(&self) -> &Path {
-        &self.writable_root
+    pub fn read_only_paths(&self) -> [&Path; 2] {
+        [
+            self.read_only_paths[0].as_path(),
+            self.read_only_paths[1].as_path(),
+        ]
     }
 
     #[must_use]
@@ -575,7 +562,7 @@ impl WorkerUnitSpec {
             self.java().to_string_lossy().into_owned(),
             format!("-Xmx{}", self.heap_bytes()),
             format!("-XX:MaxDirectMemorySize={}", self.direct_memory_bytes()),
-            format!("-Djava.io.tmpdir={}", self.temporary.display()),
+            "-Djava.io.tmpdir=/tmp".to_owned(),
             "-jar".to_owned(),
             self.worker_jar().to_string_lossy().into_owned(),
         ]
@@ -584,8 +571,8 @@ impl WorkerUnitSpec {
     #[must_use]
     pub fn environment(&self) -> Vec<String> {
         vec![
-            format!("HOME={}", self.writable_root.display()),
-            format!("TMPDIR={}", self.temporary.display()),
+            format!("HOME={}", self.workspace.display()),
+            "TMPDIR=/tmp".to_owned(),
         ]
     }
 
@@ -601,7 +588,7 @@ impl WorkerUnitSpec {
 
     #[must_use]
     pub const fn memory_max_bytes(&self) -> u64 {
-        192 * 1024 * 1024
+        256 * 1024 * 1024
     }
 
     #[must_use]
@@ -787,29 +774,21 @@ mod tests {
             spec.paths().root().join("request.bin")
         );
         assert_eq!(
-            spec.paths().writable_root(),
-            spec.paths().root().join("out")
-        );
-        assert_eq!(
             spec.paths().output(),
-            spec.paths().writable_root().join("output.bin")
+            spec.paths().root().join("output.bin")
         );
         assert_eq!(
             spec.paths().result(),
-            spec.paths().writable_root().join("result.bin")
+            spec.paths().root().join("result.bin")
         );
         assert_eq!(
             spec.paths().diagnostic(),
-            spec.paths().writable_root().join("diagnostic.bin")
-        );
-        assert_eq!(
-            spec.paths().temporary(),
-            spec.paths().writable_root().join("tmp")
+            spec.paths().root().join("diagnostic.bin")
         );
         assert_eq!(spec.paths().snapshot_owner_uid(), 0);
         assert_eq!(spec.paths().snapshot_permissions(), 0o440);
         assert_eq!(spec.paths().snapshot_group_gid(), 2002);
-        assert_eq!(spec.paths().writable_root_permissions(), 0o700);
+        assert_eq!(spec.paths().workspace_permissions(), 0o700);
     }
 
     #[test]
@@ -819,11 +798,11 @@ mod tests {
             .expect("known profile");
         assert_eq!(spec.mount().what(), "tmpfs");
         assert_eq!(spec.mount().file_system_type(), "tmpfs");
-        assert_eq!(spec.mount().directory_mode(), 0o710);
+        assert_eq!(spec.mount().directory_mode(), 0o700);
         assert!(spec.mount().collect_inactive_or_failed());
         assert_eq!(
             spec.mount().options(),
-            "mode=0710,uid=0,gid=2002,size=50331648,nr_inodes=4096,nosuid,nodev,noexec"
+            "mode=0700,uid=2001,gid=2002,size=50331648,nr_inodes=4096,nosuid,nodev,noexec"
         );
     }
 
@@ -833,6 +812,10 @@ mod tests {
             .derive(job(), MediaIsolationProfileId::ImageIoV1)
             .expect("known profile");
         let worker = spec.worker();
+        assert_eq!(
+            worker.read_only_paths(),
+            [spec.paths().input(), spec.paths().request()]
+        );
         assert_eq!(worker.address_families(), AddressFamilyPolicy::UnixOnly);
         assert_eq!(worker.kill_mode(), KillModePolicy::ControlGroup);
         assert_eq!(worker.device_policy(), DevicePolicy::Closed);
@@ -857,7 +840,11 @@ mod tests {
         assert!(worker.lock_personality());
         assert!(worker.memory_oom_group());
         assert!(worker.capability_bounding_set_is_empty());
-        assert_eq!(worker.memory_max_bytes(), 192 * 1024 * 1024);
+        assert_eq!(worker.memory_max_bytes(), 256 * 1024 * 1024);
+        assert!(
+            worker.memory_max_bytes() > worker.heap_bytes() + worker.direct_memory_bytes(),
+            "cgroup memory must leave bounded JVM native overhead above heap and direct memory"
+        );
         assert_eq!(worker.memory_swap_max_bytes(), 0);
         assert_eq!(worker.tasks_max(), 32);
         assert_eq!(worker.runtime_max_micros(), 12_000_000);
@@ -869,7 +856,7 @@ mod tests {
                 JAVA_PATH.to_owned(),
                 "-Xmx201326592".to_owned(),
                 "-XX:MaxDirectMemorySize=20971520".to_owned(),
-                format!("-Djava.io.tmpdir={}", spec.paths().temporary().display()),
+                "-Djava.io.tmpdir=/tmp".to_owned(),
                 "-jar".to_owned(),
                 WORKER_JAR_PATH.to_owned(),
             ]
@@ -877,8 +864,8 @@ mod tests {
         assert_eq!(
             worker.environment(),
             vec![
-                format!("HOME={}", worker.writable_root().display()),
-                format!("TMPDIR={}", spec.paths().temporary().display()),
+                format!("HOME={}", worker.workspace().display()),
+                "TMPDIR=/tmp".to_owned(),
             ]
         );
     }
