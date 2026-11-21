@@ -455,13 +455,13 @@ mod tests {
             .mode(0o555)
             .open(&fixture.java)
             .expect("replace");
-        file.write_all(b"java").expect("write");
+        file.write_all(b"java-replaced").expect("write");
         file.sync_all().expect("sync");
         assert_eq!(
             fixture
                 .daemon
                 .start(sealed.job_id(), sealed.revision(), principal(), 3),
-            Err(DaemonError::Runtime(RuntimeError::IdentityDrift))
+            Err(DaemonError::Runtime(RuntimeError::DigestMismatch))
         );
         assert_eq!(
             fixture
