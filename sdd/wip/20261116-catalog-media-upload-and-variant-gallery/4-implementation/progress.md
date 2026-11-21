@@ -652,3 +652,15 @@
   path, unit name ni ExecStart. No hay zbus todavía (lockfile); el adapter real
   D-Bus queda para el mismo corte cuando Cargo Linux pueda resolverlo. No hay
   `Ready`, wiring Spring ni helper privilegiado.
+
+## 2026-11-21 — PR #320 fusionado, 003B-4B-3 sigue abierto
+
+- PR #320 merge `1526201285bebfd5c8c4b5ee44a5bf0f05a38aba` sobre candidato
+  `35b8ce711a6c07e7a1aa5e4b418c9031f9024070`. Verify exact-head `44856904469`
+  terminó 6/6. Dos reviews Grok 4.7 (sustituto autorizado de Sol) aprobaron
+  sin P0–P3: `sdd/reviews/20261120-sol-pr320-architecture.md` y
+  `sdd/reviews/20261120-sol-pr320-security.md`.
+- El corte entrega el arranque del daemon, runtime aprobado y unidades
+  derivadas. `FakeSystemd` no es PID 1. No se marca `003B-4B-3` en `plan.md`.
+  Permanecen abiertos `003B-4B-3..4`, el agregado `003B-4B`, `003B-4C`,
+  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready`.
