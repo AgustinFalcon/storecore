@@ -1,0 +1,9 @@
+{
+  "feature": "20261121-demo-pdp-variant-regression",
+  "status": "in_progress",
+  "tasks": [
+    { "id": "PVR-001", "title": "Reconcile regression journey with SC17B disabled variant contract", "status": "done" },
+    { "id": "PVR-002", "title": "Verify repeated case, regression/SC17B files and demo build", "status": "done" },
+    { "id": "PVR-003", "title": "Independent review and combined integration close-out", "status": "pending" }
+  ]
+}
