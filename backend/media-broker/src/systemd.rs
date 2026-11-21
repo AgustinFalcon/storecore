@@ -184,6 +184,7 @@ pub struct FakeSystemd {
     units: BTreeMap<Vec<u8>, UnitState>,
     fail_kind: Option<UnitKind>,
     fail_stop: bool,
+    stop_as: Option<UnitState>,
 }
 
 impl FakeSystemd {
@@ -201,6 +202,12 @@ impl FakeSystemd {
     #[must_use]
     pub fn fail_stop(mut self) -> Self {
         self.fail_stop = true;
+        self
+    }
+
+    #[must_use]
+    pub fn stop_as(mut self, state: UnitState) -> Self {
+        self.stop_as = Some(state);
         self
     }
 
@@ -233,6 +240,11 @@ impl SystemdControl for FakeSystemd {
             return Err(SystemdError::AttestationFailed);
         }
         let name = name_for(kind, spec)?;
+        if let Some(state) = self.stop_as {
+            self.units
+                .insert(name.as_bytes().to_vec(), state);
+            return Ok(state);
+        }
         self.units
             .insert(name.as_bytes().to_vec(), UnitState::Inactive);
         Ok(UnitState::Inactive)
