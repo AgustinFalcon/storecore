@@ -1,0 +1,43 @@
+{
+  "feature": "20261121-showcase-json-dataset",
+  "status": "ready_for_pr",
+  "tasks": [
+    {
+      "id": "SJD-T01",
+      "title": "Record bounded import contract",
+      "status": "done",
+      "requirements": [
+        "SJD-R01",
+        "SJD-R02",
+        "SJD-R03",
+        "SJD-R04",
+        "SJD-R05",
+        "SJD-R06"
+      ]
+    },
+    {
+      "id": "SJD-T02",
+      "title": "Implement closed translator and bounded local reader",
+      "status": "done",
+      "evidence": "Closed schema/Unknown, immutable translator and regular-file UTF-8 reader with bounded 1 MiB input; Node built-ins only."
+    },
+    {
+      "id": "SJD-T03",
+      "title": "Inject dataset into existing steps",
+      "status": "done",
+      "evidence": "Dataset injected into existing ordered loader steps; fixed journey identities resolved by SKU; existing records preserved."
+    },
+    {
+      "id": "SJD-T04",
+      "title": "Run focused unit and contract tests",
+      "status": "done",
+      "evidence": "2026-11-21, Node v24.19.0: npm run showcase:test PASS 96/96; npm run test:surface-data-manifest PASS 2/2; node --check on three runtime modules and both test modules PASS; git diff --check PASS. Review remediations cover exact README template UTF-8 bytes/reader roundtrip, backend slug vectors/source guard and pre-network collision rejection, derived BigInt monetary budgets and declared fee rejection before HTTP. No node_modules reused or required."
+    },
+    {
+      "id": "SJD-T05",
+      "title": "Real disposable database replay and independent review",
+      "status": "done",
+      "evidence": "2026-11-21: fresh PostgreSQL 16/Flyway V1-V30, packaged Spring jar and synthetic ADMIN. A four-product UTF-8 JSON dataset loaded through the real loopback API twice; both runs completed every loader stage and reported exactly four products with no pending order. Direct disposable-DB readback confirmed four expected SHOW-* variants, custom prices/stocks, one custom HERO section and one synthetic CUSTOMER. GPT-6.1 Sol medium code/product/SDD and security re-reviews both APPROVE after three P2 remediations; local suites remain 96/96 and 2/2. The operator loader has no browser surface; remote CI remains a PR gate, not evidence claimed here. Backend, container, temporary dataset and Docker Desktop were stopped/removed after evidence collection."
+    }
+  ]
+}

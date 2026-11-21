@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { ShowcaseDataset, DEFAULT_SHOWCASE_DATASET } from './showcase-dataset.mjs';
+import { readShowcaseDataset } from './read-showcase-dataset.mjs';
 
 const CONSTRUCTION_TOKEN = Symbol('ShowcaseStage');
 
@@ -211,12 +213,6 @@ export const ShowcaseExternalCapability = closedWireType('ShowcaseExternalCapabi
   Insights: 'ML_COMPETITION_INSIGHTS', Kits: 'ML_VIRTUAL_KITS', Carriers: 'CARRIERS', Blackstore: 'BLACKSTORE_INTEGRATION',
 });
 
-const PRODUCTS = Object.freeze([
-  Object.freeze({ sku: 'SHOW-TALADRO-18V', name: 'Taladro percutor 18V', description: 'Taladro inalámbrico para taller con dos baterías.', brand: 'Showcase Tools', category: 'Herramientas eléctricas', image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c', price: 189900, stock: 12 }),
-  Object.freeze({ sku: 'SHOW-AMOLADORA-850', name: 'Amoladora angular 850W', description: 'Amoladora compacta con protector regulable.', brand: 'Showcase Tools', category: 'Herramientas eléctricas', image: 'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8', price: 87900, stock: 8 }),
-  Object.freeze({ sku: 'SHOW-SET-MANUAL', name: 'Set de herramientas 108 piezas', description: 'Kit organizado para mantenimiento general.', brand: 'Showcase Pro', category: 'Herramientas manuales', image: 'https://images.unsplash.com/photo-1530124566582-a618bc2615dc', price: 149500, stock: 15 }),
-]);
-
 const SHOWCASE_ADDRESS = Object.freeze({
   street: 'Avenida Siempre Viva',
   number: '2209',
@@ -225,8 +221,6 @@ const SHOWCASE_ADDRESS = Object.freeze({
   postalCode: '5000',
   isDefault: true,
 });
-const SHOWCASE_HOME = Object.freeze({ key: 'showcase-home-v1', kind: ShowcaseHomeKind.Hero.wire, active: true, sortOrder: 0,
-  content: { title: 'Todo para tu taller, en un solo lugar', body: 'Herramientas seleccionadas, stock visible y compra simple.' } });
 const SHOWCASE_OFFER_NAME = 'SHOWCASE_LOCAL_OFFER_V1';
 
 export class ShowcaseConfig {
@@ -313,8 +307,13 @@ class HttpSession {
 }
 
 class ShowcaseContext {
-  constructor(config) {
+  constructor(config, dataset) {
     this.config = config;
+    this.dataset = ShowcaseDataset.require(dataset);
+    this.journey = this.dataset.journey;
+    this.journey.requireBudget(config.manualFulfillmentPolicy?.localDelivery?.cost);
+    this.homeFixture = Object.freeze({ key: 'showcase-home-v1', kind: ShowcaseHomeKind.Hero.wire, active: true,
+      sortOrder: 0, content: this.dataset.home });
     this.admin = new HttpSession(config);
     this.customer = new HttpSession(config);
     this.addressId = null;
@@ -324,7 +323,7 @@ class ShowcaseContext {
     this.orderReceipt = null;
     this.customerId = null;
     this.offerId = null;
-    this.favoriteSku = PRODUCTS[0].sku;
+    this.favoriteSku = this.journey.primary.sku;
     this.home = null;
     this.cart = null;
     this.createdProducts = new Map();
@@ -382,9 +381,9 @@ async function externalSafety(ctx) {
   return modules;
 }
 
-function requireOffer(offer) {
+function requireOffer(offer, journey) {
   if (!offer || !Number.isSafeInteger(offer.id) || offer.id <= 0 || offer.name !== SHOWCASE_OFFER_NAME ||
-      !Array.isArray(offer.skus) || offer.skus.length !== 1 || offer.skus[0] !== PRODUCTS[0].sku ||
+      !Array.isArray(offer.skus) || offer.skus.length !== 1 || offer.skus[0] !== journey.primary.sku ||
       ShowcaseOfferStatus.fromWire(offer.status) === ShowcaseOfferStatus.Unknown ||
       ShowcaseDiscountKind.fromWire(offer.discountKind) === ShowcaseDiscountKind.Unknown ||
       !Number.isSafeInteger(offer.priority) || typeof offer.discountValue !== 'number' || !Number.isFinite(offer.discountValue) ||
@@ -517,17 +516,17 @@ const STEPS = Object.freeze([
     const home = await ctx.admin.request('/api/v1/user/content/home');
     if (!Number.isSafeInteger(home?.revision) || !Array.isArray(home.sections)) throw new Error('SHOWCASE_HOME_VERIFICATION_FAILED');
     ctx.home = home.sections.length === 0
-      ? await ctx.admin.request('/api/v1/user/content/home', { method: 'PUT', csrf: true, body: { expectedRevision: home.revision, sections: [SHOWCASE_HOME] } })
+      ? await ctx.admin.request('/api/v1/user/content/home', { method: 'PUT', csrf: true, body: { expectedRevision: home.revision, sections: [ctx.homeFixture] } })
       : home;
     if (!Array.isArray(ctx.home?.sections) || (home.sections.length === 0 &&
-        (ctx.home.sections.length !== 1 || ctx.home.sections[0].key !== SHOWCASE_HOME.key ||
-        JSON.stringify(ctx.home.sections[0].content) !== JSON.stringify(SHOWCASE_HOME.content)))) throw new Error('SHOWCASE_HOME_VERIFICATION_FAILED');
-    for (const product of PRODUCTS) {
+        (ctx.home.sections.length !== 1 || ctx.home.sections[0].key !== ctx.homeFixture.key ||
+        JSON.stringify(ctx.home.sections[0].content) !== JSON.stringify(ctx.homeFixture.content)))) throw new Error('SHOWCASE_HOME_VERIFICATION_FAILED');
+    for (const product of ctx.dataset.products) {
       const existing = await ctx.admin.request(`/api/v1/user/catalog/products/${encodeURIComponent(product.sku)}`, { expected: [200, 404] });
       if (existing !== null) continue;
       const created = await ctx.admin.request(`/api/v1/user/catalog/products/${encodeURIComponent(product.sku)}`, {
         method: 'PUT', csrf: true,
-        body: { sku: product.sku, name: product.name, description: product.description, brand: product.brand, category: product.category, images: [product.image], price: { base: product.price }, active: true, variants: [{ sku: product.sku, name: product.name, availableQuantity: product.stock, stockAdjustmentReason: 'LOCAL_SHOWCASE_RECONCILIATION' }] },
+        body: product.toCatalogCommand(),
       });
       ctx.createdProducts.set(product.sku, requireCreatedProduct(created, product));
     }
@@ -559,23 +558,24 @@ const STEPS = Object.freeze([
   step(ShowcaseStage.PendingOrder, async (ctx) => {
     if (!ctx.config.includePendingOrder) return;
     const orders = await allPages(ctx.customer, '/api/v1/customer/orders');
-    const matches = orders.filter((order) => Array.isArray(order?.lines) && order.lines.some((line) => line?.sku === PRODUCTS[0].sku));
+    const matches = orders.filter((order) => Array.isArray(order?.lines) && order.lines.some((line) => line?.sku === ctx.journey.primary.sku));
     if (matches.length > 1) throw new Error('SHOWCASE_ORDER_OWNERSHIP_AMBIGUOUS');
     const existing = matches[0];
     if (existing) {
       requirePendingOrder(existing);
-      requireOrderIdentity(existing, existing.id);
+      requireOrderIdentity(existing, existing.id, ctx.journey);
       ctx.orderId = existing.id;
       return;
     }
     let cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(cart?.lines) || cart.lines.length !== 0) throw new Error('SHOWCASE_CHECKOUT_REQUIRES_EMPTY_CART');
-    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[0].sku, quantity: 1 } });
+    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: ctx.journey.primary.sku, quantity: 1 } });
     cart = await ctx.customer.request('/api/v1/customer/cart');
-    if (!Array.isArray(cart?.lines) || cart.lines.length !== 1 || cart.lines[0].sku !== PRODUCTS[0].sku || cart.lines[0].quantity !== 1 ||
+    if (!Array.isArray(cart?.lines) || cart.lines.length !== 1 || cart.lines[0].sku !== ctx.journey.primary.sku || cart.lines[0].quantity !== 1 ||
         typeof cart.revision !== 'string' || !cart.revision.trim()) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
     const delivery = requireArray(cart.deliveryOptions, 'SHOWCASE_DELIVERY_OPTIONS_REQUIRED').find(option => ShowcaseDeliveryMode.fromWire(option.mode) === ShowcaseDeliveryMode.LocalDelivery);
     if (!delivery || !Number.isSafeInteger(delivery.configurationVersion) || delivery.configurationVersion < 1 || delivery.currency !== 'ARS' || delivery.requiresAddress !== true) throw new Error('SHOWCASE_DELIVERY_OPTIONS_REQUIRED');
+    ctx.journey.requireBudget(delivery.cost ?? null);
     const receipt = await ctx.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: { idempotencyKey: '2f5570dc-70b8-4f1c-a217-71f82f6ebc45', addressId: ctx.addressId, addressRevision: ctx.addressRevision, cartRevision: cart.revision, currency: 'ARS', deliveryMode: ShowcaseDeliveryMode.LocalDelivery.wire, deliveryConfigurationVersion: delivery.configurationVersion } });
     requirePendingOrder(receipt);
     if (!validOrderId(receipt?.orderId) || receipt.checkoutUrl != null) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
@@ -586,12 +586,12 @@ const STEPS = Object.freeze([
     ctx.cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(ctx.cart?.lines)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
     if (ctx.cart.lines.length !== 0) return;
-    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[1].sku, quantity: 1 } });
-    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: PRODUCTS[2].sku, quantity: 2 } });
+    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: ctx.journey.cart.sku, quantity: 1 } });
+    await ctx.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: ctx.journey.secondaryCart.sku, quantity: 2 } });
     ctx.cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(ctx.cart?.lines) || ctx.cart.lines.length !== 2 ||
-        !ctx.cart.lines.some((line) => line.sku === PRODUCTS[1].sku && line.quantity === 1) ||
-        !ctx.cart.lines.some((line) => line.sku === PRODUCTS[2].sku && line.quantity === 2)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
+        !ctx.cart.lines.some((line) => line.sku === ctx.journey.cart.sku && line.quantity === 1) ||
+        !ctx.cart.lines.some((line) => line.sku === ctx.journey.secondaryCart.sku && line.quantity === 2)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
   }),
   step(ShowcaseStage.Favorites, async (ctx) => {
     const before = requireFavorites(await ctx.customer.request('/api/v1/customer/favorites'));
@@ -609,16 +609,16 @@ const STEPS = Object.freeze([
     const now = Date.now();
     const draft = { name: SHOWCASE_OFFER_NAME, priority: 0, startsAt: new Date(now - 60000).toISOString(),
       endsAt: new Date(now + 30 * 86400000).toISOString(), discountKind: ShowcaseDiscountKind.Percent.wire,
-      discountValue: 10, minMarginPercent: 0, skus: [PRODUCTS[0].sku] };
+      discountValue: 10, minMarginPercent: 0, skus: [ctx.journey.primary.sku] };
     const offer = matches[0] ?? await ctx.admin.request('/api/v1/user/offers', {
       method: 'POST', csrf: true, expected: [201], envelopeCode: 200,
       body: draft,
     });
-    ctx.offerId = requireOffer(offer).id;
+    ctx.offerId = requireOffer(offer, ctx.journey).id;
     if (!matches.length && offerFingerprint(offer) !== offerFingerprint({ id: ctx.offerId, ...draft, status: ShowcaseOfferStatus.Draft.wire })) throw new Error('SHOWCASE_OFFER_VERIFICATION_FAILED');
     const readback = requireArray(await ctx.admin.request('/api/v1/user/offers'), 'SHOWCASE_OFFER_VERIFICATION_FAILED');
     const matching = readback.filter((item) => item?.name === SHOWCASE_OFFER_NAME);
-    if (matching.length !== 1 || offerFingerprint(requireOffer(matching[0])) !== offerFingerprint(offer)) throw new Error('SHOWCASE_OFFER_VERIFICATION_FAILED');
+    if (matching.length !== 1 || offerFingerprint(requireOffer(matching[0], ctx.journey)) !== offerFingerprint(offer)) throw new Error('SHOWCASE_OFFER_VERIFICATION_FAILED');
   }),
   step(ShowcaseStage.CustomerAdministration, async (ctx) => {
     const customers = await allPages(ctx.admin, `/api/v1/user/customers?query=${encodeURIComponent(ctx.config.customerEmail)}`, 'pageSize');
@@ -637,20 +637,20 @@ const STEPS = Object.freeze([
   step(ShowcaseStage.Verification, async (ctx) => {
     const home = await ctx.admin.request('/api/v1/user/content/home');
     if (JSON.stringify(home) !== JSON.stringify(ctx.home)) throw new Error('SHOWCASE_HOME_VERIFICATION_FAILED');
-    for (const product of PRODUCTS) {
+    for (const product of ctx.dataset.products) {
       const actual = await ctx.admin.request(`/api/v1/user/catalog/products/${encodeURIComponent(product.sku)}`);
       if (actual?.sku !== product.sku || !Array.isArray(actual.variants) || !actual.variants.some((variant) => variant.sku === product.sku)) throw new Error('SHOWCASE_CATALOG_VERIFICATION_FAILED');
       const variant = actual.variants.find((item) => item.sku === product.sku);
       if (!validOrderId(actual.id) || !validOrderId(variant?.id) || typeof actual.name !== 'string' || !actual.name.trim()) throw new Error('SHOWCASE_CATALOG_VERIFICATION_FAILED');
       ctx.products.push(Object.freeze({ productId: String(actual.id), variantId: String(variant.id), sku: product.sku, name: actual.name }));
       const identity = ctx.createdProducts.get(product.sku);
-      if (identity) requireCreatedProduct(actual, product, ctx.orderReceipt !== null && product === PRODUCTS[0] ? 1 : 0, identity);
+      if (identity) requireCreatedProduct(actual, product, ctx.orderReceipt !== null && product === ctx.journey.primary ? 1 : 0, identity);
     }
     const cart = await ctx.customer.request('/api/v1/customer/cart');
     if (!Array.isArray(cart?.lines) || JSON.stringify(cart) !== JSON.stringify(ctx.cart)) throw new Error('SHOWCASE_CART_VERIFICATION_FAILED');
     if (ctx.orderId != null) {
       const order = await ctx.customer.request(`/api/v1/customer/orders/${encodeURIComponent(ctx.orderId)}`);
-      requireOrderIdentity(order, ctx.orderId);
+      requireOrderIdentity(order, ctx.orderId, ctx.journey);
       requirePendingOrder(order);
     }
     await externalSafety(ctx);
@@ -668,12 +668,12 @@ function validOrderId(value) {
   return (typeof value === 'string' && /^[1-9]\d*$/.test(value)) || (Number.isSafeInteger(value) && value > 0);
 }
 
-function requireOrderIdentity(order, id) {
+function requireOrderIdentity(order, id, journey) {
   if (!validOrderId(id) || String(order?.id) !== String(id) || !Array.isArray(order.lines) || order.lines.length !== 1 ||
-      order.lines[0]?.sku !== PRODUCTS[0].sku || order.lines[0].quantity !== 1) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
+      order.lines[0]?.sku !== journey.primary.sku || order.lines[0].quantity !== 1) throw new Error('SHOWCASE_ORDER_VERIFICATION_FAILED');
 }
 
-function requireRealReceipt(receipt) {
+function requireRealReceipt(receipt, expectedProductCount) {
   const text = value => typeof value === 'string' && value.trim().length > 0;
   const unique = values => new Set(values).size === values.length;
   const products = receipt.products;
@@ -683,7 +683,7 @@ function requireRealReceipt(receipt) {
       !text(receipt.addressStreet) || !text(receipt.homeTitle) ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(receipt.customerEmail) ||
       !text(receipt.cart.revision) || receipt.cart.skus.length === 0 || !unique(receipt.cart.skus) ||
-      products.length !== PRODUCTS.length || !unique(products.map(product => product.productId)) ||
+      products.length !== expectedProductCount || !unique(products.map(product => product.productId)) ||
       !unique(products.map(product => product.variantId)) || !unique(products.map(product => product.sku)) ||
       products.some(product => !validOrderId(product.productId) || !validOrderId(product.variantId) ||
         !text(product.name) || !text(product.sku) || product.sku.startsWith('ROUTE-')) ||
@@ -693,8 +693,8 @@ function requireRealReceipt(receipt) {
 }
 
 export class ShowcaseLoader {
-  constructor(config, onProgress = (stage) => console.log(`[showcase] ${stage.label}: OK`)) {
-    this.context = new ShowcaseContext(config);
+  constructor(config, onProgress = (stage) => console.log(`[showcase] ${stage.label}: OK`), dataset = DEFAULT_SHOWCASE_DATASET) {
+    this.context = new ShowcaseContext(config, dataset);
     this.onProgress = onProgress;
   }
   async run() {
@@ -704,7 +704,7 @@ export class ShowcaseLoader {
       this.onProgress(current.stage);
     }
     const ctx = this.context;
-    const summary = { products: PRODUCTS.length, pendingOrderCreated: ctx.orderReceipt !== null };
+    const summary = { products: ctx.dataset.products.length, pendingOrderCreated: ctx.orderReceipt !== null };
     if (!ctx.config.requireRealRouteReceipt) return Object.freeze(summary);
     const receipt = Object.freeze({ schemaVersion: 1, scenarioPrefix: ctx.config.scenarioPrefix,
       products: Object.freeze(ctx.products), customerId: ctx.customerId, customerEmail: ctx.config.customerEmail,
@@ -714,13 +714,14 @@ export class ShowcaseLoader {
       cart: Object.freeze({ revision: ctx.cart.revision, skus: Object.freeze(ctx.cart.lines.map(line => line.sku)) }),
       scenarios: Object.freeze(ShowcaseReceiptScenario.values.map(scenario => Object.freeze({ scenario: scenario.wire, evidence: ShowcaseReceiptEvidence.RealBackend.wire }))),
     });
-    requireRealReceipt(receipt);
+    requireRealReceipt(receipt, ctx.dataset.products.length);
     return Object.freeze({ ...summary, receipt });
   }
 }
 
 async function main() {
-  const result = await new ShowcaseLoader(ShowcaseConfig.fromEnvironment()).run();
+  const dataset = await readShowcaseDataset(process.env.STORECORE_SHOWCASE_DATASET_FILE);
+  const result = await new ShowcaseLoader(ShowcaseConfig.fromEnvironment(), undefined, dataset).run();
   console.log(`[showcase] completed: ${result.products} products; pending order created: ${result.pendingOrderCreated}`);
 }
 
