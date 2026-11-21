@@ -24,12 +24,12 @@ integradas; TASK-003 continúa abierto aunque el claim atómico MEDIA-CREATE y l
 subcortes durables previos ya fueron entregados. No se reimplementan.
 
 MEDIA-NORMALIZE-003B-1/2/3 y `003B-4A`/`003B-4B-1`/`003B-4B-2` están
-integrados. PR #320 arranca `003B-4B-3` (head `35b8ce7`, merge `1526201`,
-Verify `44856904469` 6/6, dos Grok 4.7 APPROVED) con `FakeSystemd`; no cierra
-el agregado ni instala `zbus`, PID 1, adapter Spring ni `Ready`. Siguen
-abiertos `003B-4B-3`, `003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos
-gates propios deben cerrarse antes de que `003B-4`, TASK-005 o #7 puedan
-cerrarse.
+integrados. PR #320 arranca `003B-4B-3` (`FakeSystemd`, no PID 1). PR #326
+arranca `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify `44940481556`
+6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability bloqueada; no
+devuelve `Ready` ni cierra el agregado. Siguen abiertos `003B-4B-3`,
+`003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos gates propios deben
+cerrarse antes de que `003B-4`, TASK-005 o #7 puedan cerrarse.
 
 No existe GO live para Cloudinary, credenciales, HTTP upload, deploy ni
 homologación externa hasta cerrar sus gates separados.
