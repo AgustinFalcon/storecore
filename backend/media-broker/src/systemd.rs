@@ -37,6 +37,8 @@ pub enum SystemdError {
     UnknownState,
     UnexpectedKind,
     AttestationFailed,
+    /// PID 1 reports the derived unit is not loaded (`NoSuchUnit`).
+    NotLoaded,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
