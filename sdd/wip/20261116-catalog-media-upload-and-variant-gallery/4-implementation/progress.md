@@ -619,25 +619,29 @@
   efecto externo en el segundo. Este nuevo candidato vuelve a requerir CI 6/6
   y tres aprobaciones exact-head; 4B-2 continúa abierto hasta entonces.
 
-## 2026-11-20 — 003B-4B-2 implementado y verificado
+## 2026-11-20 — 003B-4B-2 cerrado: Grok 4.7 APPROVED y post-merge 6/6
 
 - El candidato final `9e77bcf8de7b2a874d0998cd43435f999050f85b`
   persiste la intención durable antes de cualquier terminación o cuarentena que
   pueda consumir evidencia. `RecoveryPending` permite completar sólo la
   remediación interna; allocation y transición pública permanecen cerradas. Si
   el latch no puede acreditarse, el adapter no recibe el efecto.
-- Verify exact-head `44837144576` terminó 6/6. El job `media-broker`
+- PR #319 pasó Verify `44837144576` 6/6. El job `media-broker`
   `136636396565` pasó 46 tests Linux, fmt/clippy, 16 licencias y el gate sin
-  HIGH/CRITICAL. Las tres reviews independientes GPT-6.1 Sol de
-  bug/arquitectura, arquitectura y seguridad aprobaron el SHA exacto sin
-  hallazgos P0–P3.
-- PR #319 fue fusionado en `master` mediante
-  `381296d6e267d4c2813345f3bb635ad927a1aff5`. El Verify post-merge
-  `44838436904` terminó 6/6 sobre ese merge commit.
-- Se cierra exclusivamente `003B-4B-2`. Permanecen abiertos `003B-4B-3`,
-  `003B-4B-4`, el agregado `003B-4B`, `003B-4C`,
-  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. Este corte no acredita daemon
-  privilegiado, mounts, D-Bus, wiring Spring ni capability `Ready`.
+  HIGH/CRITICAL. Se fusionó como
+  `381296d6e267d4c2813345f3bb635ad927a1aff5` sin archivos Sol persistidos
+  (cupo de gpt-5.6-sol-medium agotado).
+- Dos reviews independientes Grok 4.7 (autorizadas explícitamente como
+  sustituto de Sol) devolvieron APPROVED sin P0–P3 sobre el SHA exacto:
+  arquitectura y seguridad. El modelo, el cupo de Sol y la autorización
+  quedan en los archivos de evidencia. No hubo tres reviews GPT-6.1 Sol
+  de este SHA.
+- El Verify post-merge `44838436904` sobre `381296d` terminó 6/6. Con esas
+  dos APPROVED exact-head se marca `003B-4B-2` en `plan.md`. Permanecen
+  abiertos `003B-4B-3..4`, el agregado `003B-4B`, `003B-4C`,
+  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready`. Este corte
+  no acredita daemon privilegiado, mounts, D-Bus, wiring Spring ni capability
+  `Ready`.
 
 ## 2026-11-20 — 003B-4B-3A en implementación
 

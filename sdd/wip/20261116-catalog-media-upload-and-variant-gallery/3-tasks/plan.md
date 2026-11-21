@@ -79,8 +79,8 @@
           `9e77bcf8de7b2a874d0998cd43435f999050f85b`, merge
           `381296d6e267d4c2813345f3bb635ad927a1aff5`; Verify exact-head
           `44837144576` y post-merge `44838436904` terminaron 6/6. El job
-          broker ejecutó 46 tests, y tres reviews exact-head independientes
-          aprobaron sin P0–P3.
+          broker ejecutó 46 tests. Dos reviews independientes Grok 4.7
+          (sustituto autorizado de Sol por cupo agotado) aprobaron sin P0–P3.
         - [ ] `003B-4B-3`: daemon endurecido, runtime aprobado y unidades
           transitorias `.mount`/worker administradas por PID 1 vía D-Bus, sin
           aceptar comandos, paths o properties del cliente.
