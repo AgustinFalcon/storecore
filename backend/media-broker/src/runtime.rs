@@ -124,7 +124,7 @@ fn approve(
         RuntimeKind::Jar => 0o444,
         RuntimeKind::Unknown => return Err(RuntimeError::UnknownKind),
     };
-    if metadata.st_mode & 0o777 != allowed {
+    if metadata.st_mode & 0o7777 != allowed {
         return Err(RuntimeError::Permissions);
     }
     let digest = hash(descriptor)?;
@@ -184,6 +184,19 @@ mod tests {
         assert_eq!(approved.jar().digest(), jar_digest);
 
         fs::set_permissions(&fixture.jar, fs::Permissions::from_mode(0o644)).expect("mode");
+        assert_eq!(
+            ApprovedRuntime::open(
+                &fixture.java,
+                &fixture.jar,
+                fixture.owner,
+                java_digest,
+                jar_digest,
+            ),
+            Err(RuntimeError::Permissions)
+        );
+
+        fs::set_permissions(&fixture.jar, fs::Permissions::from_mode(0o444)).expect("restore");
+        fs::set_permissions(&fixture.java, fs::Permissions::from_mode(0o4555)).expect("suid");
         assert_eq!(
             ApprovedRuntime::open(
                 &fixture.java,
