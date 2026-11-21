@@ -664,3 +664,16 @@
   derivadas. `FakeSystemd` no es PID 1. No se marca `003B-4B-3` en `plan.md`.
   Permanecen abiertos `003B-4B-3..4`, el agregado `003B-4B`, `003B-4C`,
   `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready`.
+
+## 2026-11-21 — PR #326 fusionado, 003B-4B-4 sigue abierto
+
+- PR #326 merge `29940436175451e7db40e79210613970ff82b056` sobre candidato
+  `7afcbfa0cc1b9bf7b9a5efc25d7a3af319d18fd5`. Verify exact-head `44940481556`
+  terminó 6/6. Dos reviews Grok 4.7 (sustituto autorizado de Sol) aprobaron
+  sin P0–P3 tras el P2 de `67551c9`: `sdd/reviews/20261121-sol-pr326-architecture.md`
+  y `sdd/reviews/20261121-sol-pr326-security.md`.
+- El corte entrega el adapter Kotlin, vectores CLAIM/ACK y ACK sólo tras
+  `Accepted`. `BrokeredMediaCapabilityFactory` no devuelve `Ready`. No se
+  marca `003B-4B-4` en `plan.md`. Permanecen abiertos `003B-4B-3..4`, el
+  agregado `003B-4B`, `003B-4C`, `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue
+  #7. No hay `Ready`.

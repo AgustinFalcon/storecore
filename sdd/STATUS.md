@@ -1,5 +1,17 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-21, arranque 4B-4
+
+`master 29940436175451e7db40e79210613970ff82b056` integra PR #326. Su
+candidato exacto `7afcbfa0cc1b9bf7b9a5efc25d7a3af319d18fd5` pasó Verify
+`44940481556` 6/6. Dos reviews independientes Grok 4.7 (autorizadas porque
+gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3 tras un P2 de ACK
+sobre `67551c9`. El corte arranca `003B-4B-4`: `BrokeredMediaByteNormalizer`
+en infrastructure, traducción wire única, ACK sólo tras `Accepted`, y
+capability `Unknown`/`Unavailable`. No hay `Ready`, wiring Spring, `zbus`,
+PID 1 ni harness UID A/B. `003B-4B-4` permanece abierto junto con
+`003B-4B-3`, el agregado `003B-4B`, `003B-4C`, `003B-4`, TASK-005 y #7.
+
 ## Master vigente — 2026-11-21, arranque 4B-3
 
 `master 1526201285bebfd5c8c4b5ee44a5bf0f05a38aba` integra PR #320. Su
