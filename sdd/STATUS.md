@@ -1,5 +1,17 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-21, arranque 4B-3
+
+`master 1526201285bebfd5c8c4b5ee44a5bf0f05a38aba` integra PR #320. Su
+candidato exacto `35b8ce711a6c07e7a1aa5e4b418c9031f9024070` pasó Verify
+`44856904469` 6/6. Dos reviews independientes Grok 4.7 (autorizadas porque
+gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3. El corte arranca
+`003B-4B-3`: tipos cerrados de unidad/D-Bus/runtime, nombres derivados del
+`JobId`, runtime aprobado `NOFOLLOW` y un daemon que no trata `Unknown` como
+`Running`. El controlador de este SHA es `FakeSystemd`; no hay `zbus`, PID 1
+real, wiring Spring ni `Ready`. `003B-4B-3` permanece abierto junto con
+`003B-4B-4`, el agregado `003B-4B`, `003B-4C`, `003B-4`, TASK-005 y #7.
+
 ## Master vigente — 2026-11-20, estado durable 4B-2
 
 `master 381296d6e267d4c2813345f3bb635ad927a1aff5` integra PR #319. Su
