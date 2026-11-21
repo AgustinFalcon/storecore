@@ -238,9 +238,10 @@ pub(crate) fn worker_properties(
             "Group",
             Value::from(spec.worker().worker().gid().to_string()),
         ),
-        ("WorkingDirectory", Value::from(workspace)),
+        ("WorkingDirectory", Value::from(workspace.clone())),
         ("NoNewPrivileges", Value::from(true)),
         ("ProtectSystem", Value::from("strict".to_owned())),
+        ("ReadWritePaths", Value::from(vec![workspace])),
     ])
 }
 
@@ -301,6 +302,28 @@ mod tests {
         assert!(worker_keys.contains(&"ExecStart"));
         assert!(worker_keys.contains(&"NoNewPrivileges"));
         assert!(worker_keys.contains(&"ProtectSystem"));
+        assert!(worker_keys.contains(&"ReadWritePaths"));
+        let protect = worker
+            .iter()
+            .find(|(key, _)| *key == "ProtectSystem")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            protect
+                .as_deref()
+                .is_some_and(|value| value.contains("strict")),
+            "ProtectSystem must be the internal literal strict, got {protect:?}"
+        );
+        let writable = worker
+            .iter()
+            .find(|(key, _)| *key == "ReadWritePaths")
+            .map(|(_, value)| format!("{value:?}"));
+        let where_path = spec.mount().where_path().to_str().expect("utf8 where");
+        assert!(
+            writable
+                .as_deref()
+                .is_some_and(|value| value.contains(where_path)),
+            "ReadWritePaths must be the derived Where {where_path}, got {writable:?}"
+        );
         assert!(keys.contains(&"DirectoryMode"));
         assert!(spec.mount().options().contains("mode=03770"));
         assert!(spec.mount().options().contains("gid=2000"));
