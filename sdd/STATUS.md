@@ -1,5 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
+## Master vigente — 2026-11-21, 4B-3 harness PID 1 tmpfs
+
+`master 0cccaaf2b2032414be79cb07bcf30f475fa47605` integra PR #332. Su
+candidato exacto `d9f6dacb006eb861544d24b29b9c301cfaf36c54` pasó Verify
+`44960599616` 7/7 (incluye `media-broker-pid1`). Dos reviews independientes
+Grok 4.7 (autorizadas porque gpt-5.6-sol-medium estaba sin cupo) aprobaron
+sin P0–P3 tras un P2: `stop` sólo traduce `NoSuchUnit` a `NotLoaded` /
+`Inactive`. El corte abre el system bus en CI como root y atesta el tmpfs
+derivado en `/proc/self/mountinfo`. No arranca el worker, no hay UID A/B,
+`Ready` ni HTTP. `003B-4B-3` permanece abierto junto con `003B-4B-4`, el
+agregado `003B-4B`, `003B-4C`, `003B-4`, TASK-005 y #7.
+
+## Master vigente — 2026-11-21, 4B-3 ProtectSystem=strict
+
+`master 223513d6788afe95b7525efef17281882e7d451e` integra PR #331. Su
+candidato exacto `32d6c7c8fceb981e9a038c55a878c64047052567` pasó Verify
+`44955708647` 6/6. Dos reviews independientes Grok 4.7 aprobaron sin P0–P3
+tras un P1: `ReadWritePaths` derivado del mismo `Where` que
+`WorkingDirectory`. El worker envía `ProtectSystem=strict` internamente.
+El cliente no suministra esas properties. `003B-4B-3` permanece abierto.
+
 ## Master vigente — 2026-11-21, 4B-3 tmpfs/NoNewPrivileges
 
 `master cc19634783ba2c59c8cd44365a37496bb5dd1dda` integra PR #330. Su

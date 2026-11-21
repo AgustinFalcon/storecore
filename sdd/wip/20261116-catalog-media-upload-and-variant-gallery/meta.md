@@ -31,7 +31,12 @@ interno y adapter blocking `zbus`; `FakeSystemd` sigue en tests y CI no
 abre el system bus. PR #330 (head `e297856`, merge `cc19634`, Verify
 `44952793361` 6/6, dos Grok 4.7 APPROVED) deriva internamente
 `mode=03770,uid=0,gid=<worker>`, `DirectoryMode=03770` y `NoNewPrivileges`.
-PR #326 arranca `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
+PR #331 (head `32d6c7c`, merge `223513d`, Verify `44955708647` 6/6, dos
+Grok 4.7 APPROVED) deriva `ProtectSystem=strict` y `ReadWritePaths` del
+`Where` del job. PR #332 (head `d9f6dac`, merge `0cccaaf`, Verify
+`44960599616` 7/7, dos Grok 4.7 APPROVED) atesta el tmpfs derivado vía
+PID 1 en CI; no arranca el worker ni cierra UID A/B. PR #326 arranca
+`003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
 `003B-4B-3`, `003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos gates
