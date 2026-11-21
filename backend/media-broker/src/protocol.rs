@@ -10,6 +10,8 @@ const VERSION: u16 = 1;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BrokerOperation {
     SealInput,
+    AckOutput,
+    ClaimOutput,
     Unknown,
 }
 
@@ -18,6 +20,8 @@ impl BrokerOperation {
     pub const fn from_wire(raw: u8) -> Self {
         match raw {
             1 => Self::SealInput,
+            2 => Self::AckOutput,
+            3 => Self::ClaimOutput,
             _ => Self::Unknown,
         }
     }
@@ -25,6 +29,8 @@ impl BrokerOperation {
     const fn to_wire(self) -> u8 {
         match self {
             Self::SealInput => 1,
+            Self::AckOutput => 2,
+            Self::ClaimOutput => 3,
             Self::Unknown => 0,
         }
     }
@@ -36,6 +42,8 @@ pub enum BrokerResult {
     Rejected,
     PeerDenied,
     StaleRevision,
+    AckAccepted,
+    ArtifactReady,
     Unknown,
 }
 
@@ -47,6 +55,8 @@ impl BrokerResult {
             2 => Self::Rejected,
             3 => Self::PeerDenied,
             4 => Self::StaleRevision,
+            5 => Self::AckAccepted,
+            6 => Self::ArtifactReady,
             _ => Self::Unknown,
         }
     }
@@ -57,6 +67,8 @@ impl BrokerResult {
             Self::Rejected => 2,
             Self::PeerDenied => 3,
             Self::StaleRevision => 4,
+            Self::AckAccepted => 5,
+            Self::ArtifactReady => 6,
             Self::Unknown => 0,
         }
     }

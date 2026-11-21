@@ -5,6 +5,8 @@ import java.nio.ByteOrder
 
 enum class MediaBrokerOperation(private val wire: Byte) {
     SEAL_INPUT(1),
+    ACK_OUTPUT(2),
+    CLAIM_OUTPUT(3),
     UNKNOWN(0);
 
     fun toWire(): Byte? = takeUnless { it == UNKNOWN }?.wire
@@ -18,6 +20,8 @@ enum class MediaBrokerResult(private val wire: Byte) {
     REJECTED(2),
     PEER_DENIED(3),
     STALE_REVISION(4),
+    ACK_ACCEPTED(5),
+    ARTIFACT_READY(6),
     UNKNOWN(0);
 
     fun toWire(): Byte? = takeUnless { it == UNKNOWN }?.wire

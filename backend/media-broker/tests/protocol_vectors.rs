@@ -25,6 +25,43 @@ fn response_matches_the_cross_language_golden_vector() {
 }
 
 #[test]
+fn claim_and_ack_frames_match_the_cross_language_golden_vectors() {
+    let ack_request = BrokerRequest::create(BrokerOperation::AckOutput, job_id(), 7, digest(), 5)
+        .expect("valid ack");
+    let claim_request =
+        BrokerRequest::create(BrokerOperation::ClaimOutput, job_id(), 7, digest(), 5)
+            .expect("valid claim");
+    let ack_response = BrokerResponse::create(BrokerResult::AckAccepted, job_id(), 7)
+        .expect("valid ack response");
+    let artifact_response = BrokerResponse::create(BrokerResult::ArtifactReady, job_id(), 7)
+        .expect("valid artifact response");
+
+    assert_eq!(ack_request.encode().as_slice(), vector("request_ack"));
+    assert_eq!(claim_request.encode().as_slice(), vector("request_claim"));
+    assert_eq!(ack_response.encode().as_slice(), vector("response_ack"));
+    assert_eq!(
+        artifact_response.encode().as_slice(),
+        vector("response_artifact")
+    );
+    assert_eq!(
+        BrokerRequest::decode(&vector("request_ack")),
+        Ok(ack_request)
+    );
+    assert_eq!(
+        BrokerRequest::decode(&vector("request_claim")),
+        Ok(claim_request)
+    );
+    assert_eq!(
+        BrokerResponse::decode(&vector("response_ack")),
+        Ok(ack_response)
+    );
+    assert_eq!(
+        BrokerResponse::decode(&vector("response_artifact")),
+        Ok(artifact_response)
+    );
+}
+
+#[test]
 fn decoder_fails_closed_for_unknown_and_malformed_wire_values() {
     let mut unknown_operation = vector("request");
     unknown_operation[6] = 99;
