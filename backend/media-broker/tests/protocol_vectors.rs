@@ -31,8 +31,8 @@ fn claim_and_ack_frames_match_the_cross_language_golden_vectors() {
     let claim_request =
         BrokerRequest::create(BrokerOperation::ClaimOutput, job_id(), 7, digest(), 5)
             .expect("valid claim");
-    let ack_response = BrokerResponse::create(BrokerResult::AckAccepted, job_id(), 7)
-        .expect("valid ack response");
+    let ack_response =
+        BrokerResponse::create(BrokerResult::AckAccepted, job_id(), 7).expect("valid ack response");
     let artifact_response = BrokerResponse::create(BrokerResult::ArtifactReady, job_id(), 7)
         .expect("valid artifact response");
 
