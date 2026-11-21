@@ -139,12 +139,17 @@ impl SystemdControl for ZbusSystemd {
         if let Err(error) = self.stop_unit(&name) {
             return match self.active_state(&name) {
                 Ok(state @ (UnitState::Inactive | UnitState::Failed)) => Ok(state),
+                Err(SystemdError::Unavailable) => Ok(UnitState::Inactive),
                 _ => Err(error),
             };
         }
-        self.wait_state(&name, |state| {
+        match self.wait_state(&name, |state| {
             matches!(state, UnitState::Inactive | UnitState::Failed)
-        })
+        }) {
+            Ok(state) => Ok(state),
+            Err(SystemdError::Unavailable) => Ok(UnitState::Inactive),
+            other => other,
+        }
     }
 
     fn attest(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError> {
@@ -270,7 +275,7 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{mount_properties, worker_properties, ZbusSystemd};
+    use super::{ZbusSystemd, mount_properties, worker_properties};
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
     use crate::systemd::{SystemdControl, TransientUnits};
@@ -380,6 +385,13 @@ mod tests {
         );
         let stopped = systemd.stop(UnitKind::Mount, &spec).expect("stop");
         assert!(matches!(stopped, UnitState::Inactive | UnitState::Failed));
+        let mounts_after = fs::read_to_string("/proc/self/mountinfo").expect("mountinfo after stop");
+        assert!(
+            !mounts_after
+                .lines()
+                .any(|line| line.contains(&where_path) && line.contains("tmpfs")),
+            "tmpfs still mounted after stop at {where_path}"
+        );
     }
 
     fn approved_runtime() -> ApprovedRuntime {
