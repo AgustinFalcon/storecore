@@ -65,20 +65,30 @@ impl MountSpec {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerSpec {
     name: UnitName,
     worker: Principal,
+    java: PathBuf,
+    jar: PathBuf,
 }
 
 impl WorkerSpec {
     #[must_use]
-    pub const fn name(self) -> UnitName {
+    pub const fn name(&self) -> UnitName {
         self.name
     }
     #[must_use]
-    pub const fn worker(self) -> Principal {
+    pub const fn worker(&self) -> Principal {
         self.worker
+    }
+    #[must_use]
+    pub fn java(&self) -> &std::path::Path {
+        &self.java
+    }
+    #[must_use]
+    pub fn jar(&self) -> &std::path::Path {
+        &self.jar
     }
 }
 
@@ -97,7 +107,7 @@ impl TransientUnits {
         job_id: JobId,
         mount_root: PathBuf,
         worker: Principal,
-        _runtime: ApprovedRuntime,
+        runtime: &ApprovedRuntime,
     ) -> Self {
         let names = DerivedUnits::from_job(job_id);
         let mut where_path = mount_root;
@@ -112,6 +122,8 @@ impl TransientUnits {
             worker: WorkerSpec {
                 name: names.worker(),
                 worker,
+                java: runtime.java_path().to_path_buf(),
+                jar: runtime.jar_path().to_path_buf(),
             },
         }
     }
@@ -158,12 +170,19 @@ pub trait SystemdControl {
 #[derive(Default)]
 pub struct FakeSystemd {
     units: BTreeMap<Vec<u8>, UnitState>,
+    fail_kind: Option<UnitKind>,
 }
 
 impl FakeSystemd {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    #[must_use]
+    pub fn fail_kind(mut self, kind: UnitKind) -> Self {
+        self.fail_kind = Some(kind);
+        self
     }
 
     #[must_use]
@@ -180,6 +199,9 @@ impl SystemdControl for FakeSystemd {
     ) -> Result<UnitState, SystemdError> {
         if matches!(kind, UnitKind::Unknown) {
             return Err(SystemdError::UnexpectedKind);
+        }
+        if self.fail_kind == Some(kind) {
+            return Err(SystemdError::AttestationFailed);
         }
         let name = name_for(kind, spec)?;
         self.units
@@ -243,8 +265,10 @@ mod tests {
             job,
             std::path::PathBuf::from("/run/storecore-media"),
             Principal::create(2000, 2000),
-            runtime,
+            &runtime,
         );
+        assert_eq!(spec.worker().java(), runtime.java_path());
+        assert_eq!(spec.worker().jar(), runtime.jar_path());
         let where_path = spec.mount().where_path().to_string_lossy();
         assert!(where_path.starts_with("/run/storecore-media/"));
         assert!(!where_path.contains(".."));
@@ -268,11 +292,12 @@ mod tests {
     #[test]
     fn unknown_unit_kind_is_rejected_before_dbus() {
         let job = JobId::create([8; 16]).expect("job");
+        let runtime = approved_runtime();
         let spec = TransientUnits::derive(
             job,
             std::path::PathBuf::from("/run/storecore-media"),
             Principal::create(2000, 2000),
-            approved_runtime(),
+            &runtime,
         );
         let mut systemd = FakeSystemd::new();
         assert_eq!(

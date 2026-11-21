@@ -50,6 +50,11 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
         &mut self.store
     }
 
+    #[must_use]
+    pub fn systemd(&self) -> &Control {
+        &self.systemd
+    }
+
     /// Starts PID-1 transient mount and worker units for a sealed job.
     ///
     /// Unit names, `Where` and `ExecStart` are derived internally. A non-`Active`
@@ -85,19 +90,29 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             )
             .map_err(DaemonError::Store)?;
         let spec =
-            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, self.runtime);
-        self.start_kind(UnitKind::Mount, &spec)?;
-        self.start_kind(UnitKind::Worker, &spec)?;
-        self.store
-            .transition(
-                job_id,
-                starting.revision(),
-                principal,
-                starting.boot_id(),
-                JobState::Running,
-                now_ms,
-            )
-            .map_err(DaemonError::Store)
+            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime);
+        if let Err(error) = self.start_kind(UnitKind::Mount, &spec) {
+            self.rollback_units(&spec);
+            return Err(error);
+        }
+        if let Err(error) = self.start_kind(UnitKind::Worker, &spec) {
+            self.rollback_units(&spec);
+            return Err(error);
+        }
+        match self.store.transition(
+            job_id,
+            starting.revision(),
+            principal,
+            starting.boot_id(),
+            JobState::Running,
+            now_ms,
+        ) {
+            Ok(record) => Ok(record),
+            Err(error) => {
+                self.rollback_units(&spec);
+                Err(DaemonError::Store(error))
+            }
+        }
     }
 }
 
@@ -116,6 +131,11 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             Err(error) => Err(DaemonError::Systemd(error)),
         }
     }
+
+    fn rollback_units(&mut self, spec: &TransientUnits) {
+        let _ = self.systemd.stop(UnitKind::Worker, spec);
+        let _ = self.systemd.stop(UnitKind::Mount, spec);
+    }
 }
 
 #[cfg(test)]
@@ -126,7 +146,8 @@ mod tests {
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, JobState, Principal, Reservation};
     use crate::store::{AdmissionStatus, BrokerStore};
-    use crate::systemd::FakeSystemd;
+    use crate::systemd::{FakeSystemd, SystemdError};
+    use crate::unit::{DerivedUnits, UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
@@ -185,6 +206,56 @@ mod tests {
         );
     }
 
+    #[test]
+    fn start_stops_units_when_worker_fails_after_mount() {
+        let mut fixture = Fixture::failing(UnitKind::Worker);
+        let allocated = fixture
+            .daemon
+            .store_mut()
+            .allocate([11; 16], principal(), [5; 16], reservation(), 1)
+            .expect("allocate");
+        let sealed = fixture
+            .daemon
+            .store_mut()
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        assert_eq!(
+            fixture
+                .daemon
+                .start(sealed.job_id(), sealed.revision(), principal(), 3),
+            Err(DaemonError::Systemd(SystemdError::AttestationFailed))
+        );
+        let names = DerivedUnits::from_job(sealed.job_id());
+        assert_ne!(
+            fixture.daemon.systemd().recorded(names.mount()),
+            Some(UnitState::Active)
+        );
+        assert_ne!(
+            fixture.daemon.systemd().recorded(names.worker()),
+            Some(UnitState::Active)
+        );
+        assert_eq!(
+            fixture
+                .daemon
+                .store()
+                .record(sealed.job_id())
+                .expect("record")
+                .state(),
+            JobState::Starting
+        );
+        assert_eq!(
+            fixture.daemon.store().admission_status(),
+            AdmissionStatus::Open
+        );
+    }
+
     const fn principal() -> Principal {
         Principal::create(1000, 1000)
     }
@@ -200,6 +271,14 @@ mod tests {
 
     impl Fixture {
         fn new() -> Self {
+            Self::with_systemd(FakeSystemd::new())
+        }
+
+        fn failing(kind: UnitKind) -> Self {
+            Self::with_systemd(FakeSystemd::new().fail_kind(kind))
+        }
+
+        fn with_systemd(systemd: FakeSystemd) -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
             let root = std::env::temp_dir().join(format!(
                 "storecore-media-broker-daemon-{}-{id}",
@@ -230,7 +309,7 @@ mod tests {
                 .expect("runtime");
             let daemon = BrokerDaemon::new(
                 store,
-                FakeSystemd::new(),
+                systemd,
                 runtime,
                 root.join("mnt"),
                 Principal::create(2000, 2000),

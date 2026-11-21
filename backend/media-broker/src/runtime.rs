@@ -1,9 +1,9 @@
 use sha2::{Digest, Sha256};
 use std::io::Read;
 use std::os::fd::OwnedFd;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
-use rustix::fs::{FileType, Mode, OFlags, fstat, open};
+use rustix::fs::{CWD, FileType, Mode, OFlags, fstat, open, openat};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeKind {
@@ -52,14 +52,17 @@ impl ApprovedFile {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ApprovedRuntime {
     java: ApprovedFile,
     jar: ApprovedFile,
+    java_path: PathBuf,
+    jar_path: PathBuf,
 }
 
 impl ApprovedRuntime {
-    /// Opens a root-owned Java binary and fat jar without following symlinks.
+    /// Opens a root-owned Java binary and fat jar. Every path component is
+    /// opened with `NOFOLLOW`; parent symlinks cannot redirect the leaf.
     ///
     /// # Errors
     ///
@@ -80,17 +83,29 @@ impl ApprovedRuntime {
                 expected_java_digest,
             )?,
             jar: approve(jar, RuntimeKind::Jar, expected_owner, expected_jar_digest)?,
+            java_path: java.to_path_buf(),
+            jar_path: jar.to_path_buf(),
         })
     }
 
     #[must_use]
-    pub const fn java(self) -> ApprovedFile {
+    pub const fn java(&self) -> ApprovedFile {
         self.java
     }
 
     #[must_use]
-    pub const fn jar(self) -> ApprovedFile {
+    pub const fn jar(&self) -> ApprovedFile {
         self.jar
+    }
+
+    #[must_use]
+    pub fn java_path(&self) -> &Path {
+        &self.java_path
+    }
+
+    #[must_use]
+    pub fn jar_path(&self) -> &Path {
+        &self.jar_path
     }
 }
 
@@ -103,12 +118,7 @@ fn approve(
     if matches!(kind, RuntimeKind::Unknown) {
         return Err(RuntimeError::UnknownKind);
     }
-    let descriptor = open(
-        path,
-        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-        Mode::empty(),
-    )
-    .map_err(|_| RuntimeError::Unavailable)?;
+    let descriptor = open_nofollow(path)?;
     let metadata = fstat(&descriptor).map_err(|_| RuntimeError::Unavailable)?;
     if FileType::from_raw_mode(metadata.st_mode) != FileType::RegularFile {
         return Err(RuntimeError::NotRegular);
@@ -132,6 +142,49 @@ fn approve(
         return Err(RuntimeError::DigestMismatch);
     }
     Ok(ApprovedFile { digest, kind })
+}
+
+fn open_nofollow(path: &Path) -> Result<OwnedFd, RuntimeError> {
+    let parts: Vec<Component<'_>> = path.components().collect();
+    if parts.is_empty() {
+        return Err(RuntimeError::Unavailable);
+    }
+    let last = parts.len() - 1;
+    let mut current: Option<OwnedFd> = None;
+    for (index, component) in parts.iter().enumerate() {
+        match component {
+            Component::RootDir => {
+                if index != 0 {
+                    return Err(RuntimeError::Unavailable);
+                }
+                current = Some(
+                    open(
+                        "/",
+                        OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+                        Mode::empty(),
+                    )
+                    .map_err(|_| RuntimeError::Unavailable)?,
+                );
+            }
+            Component::Normal(name) => {
+                let flags = if index == last {
+                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC
+                } else {
+                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::DIRECTORY | OFlags::CLOEXEC
+                };
+                let next = match current.as_ref() {
+                    Some(dir) => openat(dir, name, flags, Mode::empty()),
+                    None => openat(CWD, name, flags, Mode::empty()),
+                }
+                .map_err(|_| RuntimeError::Unavailable)?;
+                current = Some(next);
+            }
+            Component::Prefix(_) | Component::CurDir | Component::ParentDir => {
+                return Err(RuntimeError::Unavailable);
+            }
+        }
+    }
+    current.ok_or(RuntimeError::Unavailable)
 }
 
 fn hash(descriptor: OwnedFd) -> Result<[u8; 32], RuntimeError> {
@@ -206,6 +259,29 @@ mod tests {
                 jar_digest,
             ),
             Err(RuntimeError::Permissions)
+        );
+    }
+
+    #[test]
+    fn parent_symlink_cannot_redirect_the_leaf() {
+        let fixture = Fixture::new();
+        let real = fixture.root.join("real");
+        fs::create_dir(&real).expect("real");
+        let java = real.join("java");
+        let jar = real.join("worker.jar");
+        let java_digest = write_private(&java, 0o555, b"java-bin");
+        let jar_digest = write_private(&jar, 0o444, b"fat-jar");
+        let link = fixture.root.join("link");
+        std::os::unix::fs::symlink(&real, &link).expect("symlink");
+        assert_eq!(
+            ApprovedRuntime::open(
+                &link.join("java"),
+                &jar,
+                fixture.owner,
+                java_digest,
+                jar_digest,
+            ),
+            Err(RuntimeError::Unavailable)
         );
     }
 
