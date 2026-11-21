@@ -169,9 +169,39 @@ impl BrokerStore {
         self.records.values().copied()
     }
 
+    #[must_use]
+    pub const fn durable_block(&self) -> Option<DurableBlockReason> {
+        self.durable_block
+    }
+
     pub(crate) fn block(&mut self, reason: AdmissionBlock) {
         if !matches!(self.admission, AdmissionStatus::Blocked(_)) {
             self.admission = AdmissionStatus::Blocked(reason);
+        }
+    }
+
+    /// Records quarantine and the intervention latch even if admission is
+    /// already closed. A memory-only block cannot skip this path.
+    pub(crate) fn quarantine_and_latch(
+        &mut self,
+        job_id: JobId,
+        expected_revision: u64,
+        now_ms: u64,
+    ) -> Result<JobRecord, StoreError> {
+        let current = self.record(job_id)?;
+        let quarantined =
+            self.transition_internal(current, expected_revision, JobState::Quarantined, now_ms);
+        let latch = self.block_durably(
+            DurableBlockReason::ReconciliationMismatch,
+            AdmissionBlock::ReconciliationMismatch,
+        );
+        self.admission = AdmissionStatus::Blocked(self.durable_block.map_or(
+            AdmissionBlock::ReconciliationMismatch,
+            Self::admission_reason,
+        ));
+        match (quarantined, latch) {
+            (Ok(record), Ok(())) => Ok(record),
+            (Err(error), _) | (_, Err(error)) => Err(error),
         }
     }
 
@@ -303,8 +333,13 @@ impl BrokerStore {
     }
 
     #[cfg(test)]
-    fn fail_next_persist_after_rename(&self) {
+    pub(crate) fn fail_next_persist_after_rename(&self) {
         self.journal.fail_next_persist_after_rename();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_persist_after_rename_skipping(&self, skip: u32) {
+        self.journal.fail_persist_after_rename_skipping(skip);
     }
 
     #[cfg(test)]

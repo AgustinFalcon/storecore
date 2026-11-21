@@ -106,6 +106,8 @@ pub struct Journal {
     #[cfg(test)]
     fail_after_rename: std::cell::Cell<bool>,
     #[cfg(test)]
+    fail_after_rename_skips: std::cell::Cell<u32>,
+    #[cfg(test)]
     fail_before_latch_create: std::cell::Cell<bool>,
 }
 
@@ -140,6 +142,8 @@ impl Journal {
             expected_owner,
             #[cfg(test)]
             fail_after_rename: std::cell::Cell::new(false),
+            #[cfg(test)]
+            fail_after_rename_skips: std::cell::Cell::new(0),
             #[cfg(test)]
             fail_before_latch_create: std::cell::Cell::new(false),
         })
@@ -235,8 +239,14 @@ impl Journal {
         )
         .map_err(|_| JournalError::RenameFailed)?;
         #[cfg(test)]
-        if self.fail_after_rename.replace(false) {
-            return Err(JournalError::DirectorySyncFailed);
+        if self.fail_after_rename.get() {
+            let skips = self.fail_after_rename_skips.get();
+            if skips > 0 {
+                self.fail_after_rename_skips.set(skips - 1);
+            } else {
+                self.fail_after_rename.set(false);
+                return Err(JournalError::DirectorySyncFailed);
+            }
         }
         fsync(&self.directory).map_err(|_| JournalError::DirectorySyncFailed)
     }
@@ -279,6 +289,12 @@ impl Journal {
 
     #[cfg(test)]
     pub(crate) fn fail_next_persist_after_rename(&self) {
+        self.fail_persist_after_rename_skipping(0);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fail_persist_after_rename_skipping(&self, skip: u32) {
+        self.fail_after_rename_skips.set(skip);
         self.fail_after_rename.set(true);
     }
 

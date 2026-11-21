@@ -642,3 +642,13 @@
   `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready`. Este corte
   no acredita daemon privilegiado, mounts, D-Bus, wiring Spring ni capability
   `Ready`.
+
+## 2026-11-20 — 003B-4B-3 en implementación
+
+- `003B-4B-3` arranca en `feat/media-broker-daemon-4b3-20261120`: tipos cerrados
+  de unidad/D-Bus/runtime, nombres `.mount`/`.scope` derivados sólo del JobId,
+  runtime Java/jar `NOFOLLOW` 0555/0444 con digest, y daemon que arranca unidades
+  transitorias vía un controlador PID 1 testeable. El cliente no puede pasar
+  path, unit name ni ExecStart. No hay zbus todavía (lockfile); el adapter real
+  D-Bus queda para el mismo corte cuando Cargo Linux pueda resolverlo. No hay
+  `Ready`, wiring Spring ni helper privilegiado.
