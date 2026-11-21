@@ -28,8 +28,8 @@ impl WorkerInvocation {
     #[must_use]
     pub const fn from_wire(raw: u8) -> Self {
         match raw {
-            1 => Self::SelfTest,
-            2 => Self::Normalize,
+            1 => Self::Normalize,
+            2 => Self::SelfTest,
             _ => Self::Unknown,
         }
     }
@@ -74,9 +74,9 @@ impl WorkerPrincipal {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ApprovedRuntime {
-    java_sha256: [u8; 32],
-    worker_jar_sha256: [u8; 32],
-    runtime_tree_sha256: [u8; 32],
+    java_digest: [u8; 32],
+    worker_jar_digest: [u8; 32],
+    runtime_tree_digest: [u8; 32],
 }
 
 impl ApprovedRuntime {
@@ -91,9 +91,9 @@ impl ApprovedRuntime {
             None
         } else {
             Some(Self {
-                java_sha256,
-                worker_jar_sha256,
-                runtime_tree_sha256,
+                java_digest: java_sha256,
+                worker_jar_digest: worker_jar_sha256,
+                runtime_tree_digest: runtime_tree_sha256,
             })
         }
     }
@@ -115,17 +115,17 @@ impl ApprovedRuntime {
 
     #[must_use]
     pub const fn java_sha256(self) -> [u8; 32] {
-        self.java_sha256
+        self.java_digest
     }
 
     #[must_use]
     pub const fn worker_jar_sha256(self) -> [u8; 32] {
-        self.worker_jar_sha256
+        self.worker_jar_digest
     }
 
     #[must_use]
     pub const fn runtime_tree_sha256(self) -> [u8; 32] {
-        self.runtime_tree_sha256
+        self.runtime_tree_digest
     }
 
     /// Verifies the fixed runtime chain against evidence collected without
@@ -178,19 +178,19 @@ impl ApprovedRuntime {
             self.java(),
             RuntimeObjectKind::RegularFile,
             RuntimePermissionPolicy::Exact(0o555),
-            Some(self.java_sha256),
+            Some(self.java_digest),
         )?;
         verify_node(
             source,
             self.worker_jar(),
             RuntimeObjectKind::RegularFile,
             RuntimePermissionPolicy::Exact(0o444),
-            Some(self.worker_jar_sha256),
+            Some(self.worker_jar_digest),
         )?;
         let observed_tree = source
             .tree_sha256(self.root())
             .map_err(|_| RuntimeAttestationError::EvidenceUnavailable)?;
-        if observed_tree != self.runtime_tree_sha256 {
+        if observed_tree != self.runtime_tree_digest {
             return Err(RuntimeAttestationError::RuntimeTreeMismatch);
         }
         Ok(RuntimeAttestation::Matched)
@@ -309,7 +309,9 @@ fn verify_node(
     }
     let permissions_match = match expected_permissions {
         RuntimePermissionPolicy::Exact(expected) => evidence.permissions == expected,
-        RuntimePermissionPolicy::RootOwnedTraversal => evidence.permissions & 0o022 == 0,
+        RuntimePermissionPolicy::RootOwnedTraversal => {
+            evidence.permissions & 0o022 == 0 && evidence.permissions & 0o111 == 0o111
+        }
     };
     if !permissions_match {
         return Err(RuntimeAttestationError::WrongPermissions);
@@ -318,7 +320,7 @@ fn verify_node(
         (None, None) => Ok(()),
         (Some(expected), Some(observed)) if expected == observed => Ok(()),
         (Some(_), None) => Err(RuntimeAttestationError::MissingDigest),
-        (Some(_), Some(_)) | (None, Some(_)) => Err(RuntimeAttestationError::DigestMismatch),
+        (Some(_) | None, Some(_)) => Err(RuntimeAttestationError::DigestMismatch),
     }
 }
 
@@ -658,7 +660,7 @@ impl WorkerUnitSpec {
     pub fn masked_job_root(&self) -> TemporaryFileSystemSpec {
         TemporaryFileSystemSpec {
             path: PathBuf::from(JOB_ROOT),
-            options: "ro,mode=000",
+            options: "ro,mode=0711",
         }
     }
 
@@ -809,7 +811,7 @@ impl WorkerUnitSpec {
 
     #[must_use]
     pub const fn private_tmp(&self) -> bool {
-        true
+        false
     }
 
     #[must_use]
@@ -994,7 +996,10 @@ mod tests {
         assert_eq!(worker.limit_open_files(), 64);
         assert_eq!(worker.limit_processes(), 32);
         assert!(worker.send_sigkill());
-        assert!(worker.private_tmp());
+        assert!(
+            !worker.private_tmp(),
+            "the read-only host /tmp and /var/tmp must not be replaced by writable private mounts"
+        );
         assert!(worker.ip_address_deny_any());
         assert!(worker.no_new_privileges());
         assert!(worker.private_devices());
@@ -1079,7 +1084,7 @@ mod tests {
             .expect("second spec");
         let mask = first.worker().masked_job_root();
         assert_eq!(mask.path(), Path::new(JOB_ROOT));
-        assert_eq!(mask.options(), "ro,mode=000");
+        assert_eq!(mask.options(), "ro,mode=0711");
         let visible = first.worker().visible_workspace();
         assert_eq!(visible.source(), first.paths().root());
         assert_eq!(visible.destination(), first.paths().root());
@@ -1098,6 +1103,17 @@ mod tests {
         assert_eq!(runtime.java_sha256(), [1; 32]);
         assert_eq!(runtime.worker_jar_sha256(), [2; 32]);
         assert_eq!(runtime.runtime_tree_sha256(), [3; 32]);
+    }
+
+    #[test]
+    fn worker_invocation_has_one_closed_wire_translation_boundary() {
+        assert_eq!(WorkerInvocation::from_wire(1), WorkerInvocation::Normalize);
+        assert_eq!(WorkerInvocation::from_wire(2), WorkerInvocation::SelfTest);
+        assert_eq!(WorkerInvocation::from_wire(0), WorkerInvocation::Unknown);
+        assert_eq!(
+            WorkerInvocation::from_wire(u8::MAX),
+            WorkerInvocation::Unknown
+        );
     }
 
     #[test]
@@ -1143,6 +1159,25 @@ mod tests {
             runtime().attest(&mut writable),
             Err(RuntimeAttestationError::WrongPermissions)
         );
+
+        for inaccessible_mode in [0o000, 0o700, 0o750] {
+            let mut inaccessible = RuntimeFixture::matched();
+            inaccessible.nodes.insert(
+                PathBuf::from("/usr/lib/storecore"),
+                node(
+                    RuntimeObjectKind::Directory,
+                    0,
+                    inaccessible_mode,
+                    false,
+                    None,
+                ),
+            );
+            assert_eq!(
+                runtime().attest(&mut inaccessible),
+                Err(RuntimeAttestationError::WrongPermissions),
+                "mode {inaccessible_mode:o} must not attest for a non-root worker"
+            );
+        }
 
         let mut changed_tree = RuntimeFixture::matched();
         changed_tree.tree_sha256 = [9; 32];

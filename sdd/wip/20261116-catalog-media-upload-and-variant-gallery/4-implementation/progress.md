@@ -669,3 +669,24 @@
   sólo el workspace actual, y exige un digest estable del árbol runtime completo
   además de la cadena de ancestros, Java y JAR. El siguiente SHA vuelve a
   requerir CI completo y tres reviews exact-head.
+- El segundo candidato exact-head
+  `d762f00ad60f26051647388c1d96ef4dc0fc2a61` también fue rechazado por las
+  tres reviews independientes. Convergieron en tres P2: la máscara
+  `mode=000` impedía al UID worker atravesar hasta su propio bind hijo,
+  `PrivateTmp=true` conservaba `/tmp` y `/var/tmp` escribibles fuera de la
+  cuota del job, y la attestación aceptaba ancestros root-owned sin permiso de
+  búsqueda para el worker. Verify `44843328522` falló además en clippy
+  (`unnested_or_patterns` y `struct_field_names`) antes de ejecutar tests; los
+  demás jobs se cancelaron para no consumir recursos. Ese SHA no autoriza
+  merge ni cierre.
+- La nueva corrección usa una raíz temporal vacía, read-only y atravesable
+  (`0711`) que sigue sin enumerar ni reexponer siblings; deja `/tmp` y
+  `/var/tmp` read-only bajo `ProtectSystem=strict` al no crear mounts privados,
+  y dirige `TMPDIR`/`java.io.tmpdir` al workspace acotado. Los ancestros deben
+  acreditar todos los bits de búsqueda y ausencia de escritura de grupo/otros.
+  También alinea el traductor cerrado de operación con el protocolo worker
+  existente (`NORMALIZE=1`, `SELF_TEST=2`) y agrega regresiones para códigos
+  desconocidos, modos `000/0700/0750`, bindings por operación y namespace por
+  job. Rust 1.100 compila la metadata de todos los tests localmente; clippy y
+  tests Linux completos requieren todavía un nuevo CI exact-head y tres nuevas
+  aprobaciones. `003B-4B-3A` y todos sus agregados permanecen abiertos.
