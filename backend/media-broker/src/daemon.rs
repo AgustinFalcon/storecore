@@ -57,6 +57,17 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
         &self.systemd
     }
 
+    /// Internally derived mount/worker specs for a job. Callers cannot supply
+    /// unit names, `Where` or `ExecStart`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SystemdError::Unavailable`] when the mount `Where` cannot be
+    /// escaped into a systemd unit name.
+    pub fn derived_units(&self, job_id: JobId) -> Result<TransientUnits, SystemdError> {
+        TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime)
+    }
+
     /// Starts PID-1 transient mount and worker units for a sealed job.
     ///
     /// Unit names, `Where` and `ExecStart` are derived internally. A non-`Active`
@@ -93,7 +104,8 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             )
             .map_err(DaemonError::Store)?;
         let spec =
-            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime);
+            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime)
+                .map_err(DaemonError::Systemd)?;
         if let Err(error) = self.start_kind(UnitKind::Mount, &spec) {
             return Err(self.abort_start(error, &spec, &starting, now_ms));
         }
@@ -190,7 +202,7 @@ mod tests {
     use crate::state::{JobId, JobState, Principal, Reservation};
     use crate::store::{AdmissionBlock, AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{FakeSystemd, SystemdError};
-    use crate::unit::{DerivedUnits, UnitKind, UnitState};
+    use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
@@ -275,13 +287,16 @@ mod tests {
                 .start(sealed.job_id(), sealed.revision(), principal(), 3),
             Err(DaemonError::Systemd(SystemdError::AttestationFailed))
         );
-        let names = DerivedUnits::from_job(sealed.job_id());
+        let names = fixture
+            .daemon
+            .derived_units(sealed.job_id())
+            .expect("names");
         assert_ne!(
-            fixture.daemon.systemd().recorded(names.mount()),
+            fixture.daemon.systemd().recorded(names.mount().name()),
             Some(UnitState::Active)
         );
         assert_ne!(
-            fixture.daemon.systemd().recorded(names.worker()),
+            fixture.daemon.systemd().recorded(names.worker().name()),
             Some(UnitState::Active)
         );
         assert_eq!(
@@ -325,9 +340,12 @@ mod tests {
                 .start(sealed.job_id(), sealed.revision(), principal(), 3),
             Err(DaemonError::RollbackFailed)
         );
-        let names = DerivedUnits::from_job(sealed.job_id());
+        let names = fixture
+            .daemon
+            .derived_units(sealed.job_id())
+            .expect("names");
         assert_eq!(
-            fixture.daemon.systemd().recorded(names.mount()),
+            fixture.daemon.systemd().recorded(names.mount().name()),
             Some(UnitState::Active)
         );
         assert_eq!(
@@ -480,13 +498,16 @@ mod tests {
                 JournalError::DirectorySyncFailed
             )))
         );
-        let names = DerivedUnits::from_job(sealed.job_id());
+        let names = fixture
+            .daemon
+            .derived_units(sealed.job_id())
+            .expect("names");
         assert_ne!(
-            fixture.daemon.systemd().recorded(names.mount()),
+            fixture.daemon.systemd().recorded(names.mount().name()),
             Some(UnitState::Active)
         );
         assert_ne!(
-            fixture.daemon.systemd().recorded(names.worker()),
+            fixture.daemon.systemd().recorded(names.worker().name()),
             Some(UnitState::Active)
         );
         assert_eq!(

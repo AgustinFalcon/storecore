@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-21 — 003B-4B-3 nombres PID 1 y adapter zbus
+
+- El residual de #320 queda explícito: una unidad `.mount` se nombra con el
+  `Where` escapado al estilo systemd, el worker es `.service` con `ExecStart`
+  interno (`java -jar` del runtime aprobado) y el adapter blocking `zbus`
+  habla `StartTransientUnit`/`StopUnit`/`GetUnit` sin aceptar método, path,
+  nombre ni comando del cliente. `FakeSystemd` sigue cubriendo el daemon en
+  tests; no hay conexión a PID 1 en CI. `003B-4B-3` permanece abierto: este
+  corte no acredita harness UID A/B, cgroup, `Ready` ni HTTP.
+- Licencias: se admite MIT y duales ya revisados en el lockfile de zbus
+  5.19.0; el gate sigue fallando cerrado ante una licencia no listada.
+
 ## 2026-11-20 — 003B-4B descompuesto antes de código privilegiado
 
 - Dos auditorías GPT-6.1 Sol sobre `master e0fef105` confirmaron que JDK 21 no

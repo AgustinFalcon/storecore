@@ -3,6 +3,7 @@
 
 pub mod budget;
 pub mod daemon;
+pub mod dbus;
 pub mod journal;
 pub mod protocol;
 pub mod reconcile;

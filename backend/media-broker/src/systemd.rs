@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use crate::runtime::ApprovedRuntime;
 use crate::state::{JobId, Principal};
-use crate::unit::{DerivedUnits, UnitKind, UnitName, UnitState};
+use crate::unit::{DerivedUnits, UnitKind, UnitName, UnitState, encode_job_hex};
 
 pub const MOUNT_BYTES: u64 = 48 * 1024 * 1024;
 pub const MOUNT_INODES: u64 = 1024;
@@ -100,6 +101,16 @@ impl WorkerSpec {
     pub const fn jar_digest(&self) -> [u8; 32] {
         self.jar_digest
     }
+
+    /// Internally derived argv: approved Java, `-jar`, approved fat jar.
+    #[must_use]
+    pub fn argv(&self) -> [&OsStr; 3] {
+        [
+            self.java.as_os_str(),
+            OsStr::new("-jar"),
+            self.jar.as_os_str(),
+        ]
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -112,17 +123,21 @@ impl TransientUnits {
     /// Derives mount and worker units exclusively from the job identity and
     /// root-owned configuration. Callers cannot supply unit names, `Where` or
     /// `ExecStart`.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SystemdError::Unavailable`] when `Where` is not an absolute
+    /// UTF-8 path or the escaped unit name would exceed systemd's limit.
     pub fn derive(
         job_id: JobId,
         mount_root: PathBuf,
         worker: Principal,
         runtime: &ApprovedRuntime,
-    ) -> Self {
-        let names = DerivedUnits::from_job(job_id);
+    ) -> Result<Self, SystemdError> {
         let mut where_path = mount_root;
         where_path.push(hex_job(job_id));
-        Self {
+        let names = DerivedUnits::derive(job_id, &where_path).ok_or(SystemdError::Unavailable)?;
+        Ok(Self {
             mount: MountSpec {
                 name: names.mount(),
                 what: b"tmpfs",
@@ -137,7 +152,7 @@ impl TransientUnits {
                 java_digest: runtime.java().digest(),
                 jar_digest: runtime.jar().digest(),
             },
-        }
+        })
     }
 
     #[must_use]
@@ -267,13 +282,8 @@ fn name_for(kind: UnitKind, spec: &TransientUnits) -> Result<UnitName, SystemdEr
 }
 
 fn hex_job(job_id: JobId) -> String {
-    const HEX: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(32);
-    for byte in job_id.bytes() {
-        out.push(HEX[usize::from(byte >> 4)] as char);
-        out.push(HEX[usize::from(byte & 0x0f)] as char);
-    }
-    out
+    let hex = encode_job_hex(job_id);
+    String::from_utf8(hex.to_vec()).expect("job hex is ascii")
 }
 
 #[cfg(test)]
@@ -296,17 +306,34 @@ mod tests {
         let runtime = approved_runtime();
         let spec = TransientUnits::derive(
             job,
-            std::path::PathBuf::from("/run/storecore-media"),
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
             Principal::create(2000, 2000),
             &runtime,
-        );
+        )
+        .expect("spec");
         assert_eq!(spec.worker().java(), runtime.java_path());
         assert_eq!(spec.worker().jar(), runtime.jar_path());
         assert_eq!(spec.worker().java_digest(), runtime.java().digest());
         assert_eq!(spec.worker().jar_digest(), runtime.jar().digest());
+        assert_eq!(
+            spec.worker().argv(),
+            [
+                runtime.java_path().as_os_str(),
+                std::ffi::OsStr::new("-jar"),
+                runtime.jar_path().as_os_str(),
+            ]
+        );
         let where_path = spec.mount().where_path().to_string_lossy();
-        assert!(where_path.starts_with("/run/storecore-media/"));
+        assert!(where_path.starts_with("/run/storecore_media/jobs/"));
         assert!(!where_path.contains(".."));
+        assert_eq!(
+            spec.mount().name().as_str().expect("utf8"),
+            "run-storecore_media-jobs-07070707070707070707070707070707.mount"
+        );
+        assert_eq!(
+            spec.worker().name().as_str().expect("utf8"),
+            "storecore-media-07070707070707070707070707070707.service"
+        );
         assert_eq!(spec.mount().what(), b"tmpfs");
         assert!(
             core::str::from_utf8(spec.mount().options())
@@ -330,14 +357,30 @@ mod tests {
         let runtime = approved_runtime();
         let spec = TransientUnits::derive(
             job,
-            std::path::PathBuf::from("/run/storecore-media"),
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
             Principal::create(2000, 2000),
             &runtime,
-        );
+        )
+        .expect("spec");
         let mut systemd = FakeSystemd::new();
         assert_eq!(
             systemd.start_transient(UnitKind::Unknown, &spec),
             Err(SystemdError::UnexpectedKind)
+        );
+    }
+
+    #[test]
+    fn relative_where_is_rejected_before_dbus() {
+        let job = JobId::create([9; 16]).expect("job");
+        let runtime = approved_runtime();
+        assert_eq!(
+            TransientUnits::derive(
+                job,
+                std::path::PathBuf::from("mnt"),
+                Principal::create(2000, 2000),
+                &runtime,
+            ),
+            Err(SystemdError::Unavailable)
         );
     }
 
