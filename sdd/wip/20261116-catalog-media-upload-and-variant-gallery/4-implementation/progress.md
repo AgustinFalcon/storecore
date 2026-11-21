@@ -1,5 +1,20 @@
 # Progreso
 
+## 2026-11-21 — PR #328 fusionado, 003B-4B-3 sigue abierto
+
+- PR #328 merge `4cbd801109e060b1918de55eb1ef16abcc2589da` sobre candidato
+  `7155a8e6c755b55d5d0bbc7e9578c151370deffd`. Verify exact-head `44950931261`
+  terminó 6/6. El P3 de `a42bbf4` (Starting antes de derivar `Where`) se cerró
+  en ese SHA. Dos reviews independientes Grok 4.7 (sustituto autorizado de
+  Sol) aprobaron sin P0–P3:
+  `sdd/reviews/20261121-sol-pr328-architecture.md` y
+  `sdd/reviews/20261121-sol-pr328-security.md`.
+- El corte entrega nombres `.mount` escapados, worker `.service` con
+  `ExecStart` interno y adapter blocking `zbus`. `FakeSystemd` sigue en tests;
+  CI no abre el system bus. No se marca `003B-4B-3` en `plan.md`. Permanecen
+  abiertos `003B-4B-3..4`, el agregado `003B-4B`, `003B-4C`,
+  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready` ni HTTP.
+
 ## 2026-11-21 — 003B-4B-3 nombres PID 1 y adapter zbus
 
 - El residual de #320 queda explícito: una unidad `.mount` se nombra con el
