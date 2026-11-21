@@ -130,35 +130,35 @@ impl SystemdControl for ZbusSystemd {
         spec: &TransientUnits,
     ) -> Result<UnitState, SystemdError> {
         let name = unit_name(kind, spec)?;
-        self.start(name, properties(kind, spec)?)?;
-        self.wait_state(name, UnitState::is_active)
+        self.start(&name, properties(kind, spec)?)?;
+        self.wait_state(&name, UnitState::is_active)
     }
 
     fn stop(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError> {
         let name = unit_name(kind, spec)?;
-        if let Err(error) = self.stop_unit(name) {
-            return match self.active_state(name) {
+        if let Err(error) = self.stop_unit(&name) {
+            return match self.active_state(&name) {
                 Ok(state @ (UnitState::Inactive | UnitState::Failed)) => Ok(state),
                 _ => Err(error),
             };
         }
-        self.wait_state(name, |state| {
+        self.wait_state(&name, |state| {
             matches!(state, UnitState::Inactive | UnitState::Failed)
         })
     }
 
     fn attest(&mut self, kind: UnitKind, spec: &TransientUnits) -> Result<UnitState, SystemdError> {
-        self.active_state(unit_name(kind, spec)?)
+        self.active_state(&unit_name(kind, spec)?)
     }
 }
 
-fn unit_name(kind: UnitKind, spec: &TransientUnits) -> Result<&str, SystemdError> {
+fn unit_name(kind: UnitKind, spec: &TransientUnits) -> Result<String, SystemdError> {
     let name = match kind {
         UnitKind::Mount => spec.mount().name(),
         UnitKind::Worker => spec.worker().name(),
         UnitKind::Unknown => return Err(SystemdError::UnexpectedKind),
     };
-    name.as_str().ok_or(SystemdError::Unavailable)
+    required_name(name)
 }
 
 fn properties(
