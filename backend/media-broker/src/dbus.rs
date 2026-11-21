@@ -262,9 +262,9 @@ fn utf8(bytes: &[u8]) -> Result<&str, SystemdError> {
 }
 
 fn from_zbus(error: zbus::Error) -> SystemdError {
-    match error.name() {
-        Some(name) => classify_dbus_name(name.as_str()),
-        None => SystemdError::Unavailable,
+    match error {
+        zbus::Error::MethodError(name, _, _) => classify_dbus_name(name.as_str()),
+        _ => SystemdError::Unavailable,
     }
 }
 
