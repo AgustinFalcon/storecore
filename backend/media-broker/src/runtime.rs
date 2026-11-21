@@ -200,7 +200,7 @@ fn open_nofollow(path: &Path, expected_owner: u32) -> Result<OwnedFd, RuntimeErr
                 }
                 let root = open(
                     "/",
-                    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::CLOEXEC,
+                    OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NONBLOCK | OFlags::CLOEXEC,
                     Mode::empty(),
                 )
                 .map_err(|_| RuntimeError::Unavailable)?;
@@ -209,9 +209,13 @@ fn open_nofollow(path: &Path, expected_owner: u32) -> Result<OwnedFd, RuntimeErr
             }
             Component::Normal(name) => {
                 let flags = if index == last {
-                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC
+                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC
                 } else {
-                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::DIRECTORY | OFlags::CLOEXEC
+                    OFlags::RDONLY
+                        | OFlags::NOFOLLOW
+                        | OFlags::DIRECTORY
+                        | OFlags::NONBLOCK
+                        | OFlags::CLOEXEC
                 };
                 let next = match current.as_ref() {
                     Some(dir) => openat(dir, name, flags, Mode::empty()),
@@ -344,6 +348,28 @@ mod tests {
                 jar_digest,
             ),
             Err(RuntimeError::Unavailable)
+        );
+    }
+
+    #[test]
+    fn fifo_leaf_does_not_block_approval() {
+        let fixture = Fixture::new();
+        rustix::fs::mkfifoat(
+            rustix::fs::CWD,
+            &fixture.java,
+            rustix::fs::Mode::from_raw_mode(0o555),
+        )
+        .expect("fifo");
+        let jar_digest = write_private(&fixture.jar, 0o444, b"fat-jar");
+        assert_eq!(
+            ApprovedRuntime::open(
+                &fixture.java,
+                &fixture.jar,
+                fixture.owner,
+                [0; 32],
+                jar_digest,
+            ),
+            Err(RuntimeError::NotRegular)
         );
     }
 
