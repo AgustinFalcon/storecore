@@ -92,6 +92,9 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
             return Err(DaemonError::NotSealed);
         }
         self.runtime.confirm().map_err(DaemonError::Runtime)?;
+        let spec =
+            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime)
+                .map_err(DaemonError::Systemd)?;
         let starting = self
             .store
             .transition(
@@ -103,9 +106,6 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
                 now_ms,
             )
             .map_err(DaemonError::Store)?;
-        let spec =
-            TransientUnits::derive(job_id, self.mount_root.clone(), self.worker, &self.runtime)
-                .map_err(DaemonError::Systemd)?;
         if let Err(error) = self.start_kind(UnitKind::Mount, &spec) {
             return Err(self.abort_start(error, &spec, &starting, now_ms));
         }
@@ -258,6 +258,47 @@ mod tests {
                 .expect("record")
                 .state(),
             JobState::Allocated
+        );
+    }
+
+    #[test]
+    fn start_rejects_relative_where_before_starting() {
+        let mut fixture = Fixture::with_relative_mount();
+        let allocated = fixture
+            .daemon
+            .store_mut()
+            .allocate([18; 16], principal(), [10; 16], reservation(), 1)
+            .expect("allocate");
+        let sealed = fixture
+            .daemon
+            .store_mut()
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        assert_eq!(
+            fixture
+                .daemon
+                .start(sealed.job_id(), sealed.revision(), principal(), 3),
+            Err(DaemonError::Systemd(SystemdError::Unavailable))
+        );
+        assert_eq!(
+            fixture
+                .daemon
+                .store()
+                .record(sealed.job_id())
+                .expect("record")
+                .state(),
+            JobState::InputSealed
+        );
+        assert_eq!(
+            fixture.daemon.store().admission_status(),
+            AdmissionStatus::Open
         );
     }
 
@@ -610,7 +651,15 @@ mod tests {
             Self::with_systemd(FakeSystemd::new().fail_kind(kind).stop_as(state))
         }
 
+        fn with_relative_mount() -> Self {
+            Self::assemble(FakeSystemd::new(), false)
+        }
+
         fn with_systemd(systemd: FakeSystemd) -> Self {
+            Self::assemble(systemd, true)
+        }
+
+        fn assemble(systemd: FakeSystemd, absolute_mount: bool) -> Self {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
             let root = std::env::temp_dir().join(format!(
                 "storecore-media-broker-daemon-{}-{id}",
@@ -639,11 +688,16 @@ mod tests {
             let jar_digest = write(&jar, 0o444, b"jar");
             let runtime = ApprovedRuntime::open(&java, &jar, owner, java_digest, jar_digest)
                 .expect("runtime");
+            let mount_root = if absolute_mount {
+                root.join("mnt")
+            } else {
+                std::path::PathBuf::from("mnt")
+            };
             let daemon = BrokerDaemon::new(
                 store,
                 systemd,
                 runtime,
-                root.join("mnt"),
+                mount_root,
                 Principal::create(2000, 2000),
             );
             Self { daemon, root, java }
