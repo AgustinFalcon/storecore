@@ -1,5 +1,35 @@
 # Progreso
 
+## 2026-11-21 — PR #330 fusionado, 003B-4B-3 sigue abierto
+
+- PR #330 merge `cc19634783ba2c59c8cd44365a37496bb5dd1dda` sobre candidato
+  `e2978566a7aa6d77abece4f6e724bda4b21fe6a3`. Verify exact-head `44952793361`
+  terminó 6/6. Dos reviews independientes Grok 4.7 (sustituto autorizado de
+  Sol) aprobaron sin P0–P3:
+  `sdd/reviews/20261121-sol-pr330-architecture.md` y
+  `sdd/reviews/20261121-sol-pr330-security.md`.
+- El corte deriva `mode=03770,uid=0,gid=<worker>`, `DirectoryMode=03770` y
+  `NoNewPrivileges` internamente. El cliente no suministra esas properties.
+  `FakeSystemd` sigue en tests; CI no abre el system bus. No se marca
+  `003B-4B-3` en `plan.md`. Permanecen abiertos `003B-4B-3..4`, el agregado
+  `003B-4B`, `003B-4C`, `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay
+  `Ready` ni HTTP.
+
+## 2026-11-21 — PR #328 fusionado, 003B-4B-3 sigue abierto
+
+- PR #328 merge `4cbd801109e060b1918de55eb1ef16abcc2589da` sobre candidato
+  `7155a8e6c755b55d5d0bbc7e9578c151370deffd`. Verify exact-head `44950931261`
+  terminó 6/6. El P3 de `a42bbf4` (Starting antes de derivar `Where`) se cerró
+  en ese SHA. Dos reviews independientes Grok 4.7 (sustituto autorizado de
+  Sol) aprobaron sin P0–P3:
+  `sdd/reviews/20261121-sol-pr328-architecture.md` y
+  `sdd/reviews/20261121-sol-pr328-security.md`.
+- El corte entrega nombres `.mount` escapados, worker `.service` con
+  `ExecStart` interno y adapter blocking `zbus`. `FakeSystemd` sigue en tests;
+  CI no abre el system bus. No se marca `003B-4B-3` en `plan.md`. Permanecen
+  abiertos `003B-4B-3..4`, el agregado `003B-4B`, `003B-4C`,
+  `MEDIA-NORMALIZE-003B-4`, TASK-005 e issue #7. No hay `Ready` ni HTTP.
+
 ## 2026-11-21 — 003B-4B-3 tmpfs no world-writable y NoNewPrivileges
 
 - Residual de seguridad de #328: el tmpfs deriva `mode=03770,uid=0,gid=<worker>`

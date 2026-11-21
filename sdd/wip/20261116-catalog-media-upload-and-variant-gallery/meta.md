@@ -24,12 +24,19 @@ integradas; TASK-003 continúa abierto aunque el claim atómico MEDIA-CREATE y l
 subcortes durables previos ya fueron entregados. No se reimplementan.
 
 MEDIA-NORMALIZE-003B-1/2/3 y `003B-4A`/`003B-4B-1`/`003B-4B-2` están
-integrados. PR #320 arranca `003B-4B-3` (`FakeSystemd`, no PID 1). PR #326
-arranca `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify `44940481556`
-6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability bloqueada; no
-devuelve `Ready` ni cierra el agregado. Siguen abiertos `003B-4B-3`,
-`003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos gates propios deben
-cerrarse antes de que `003B-4`, TASK-005 o #7 puedan cerrarse.
+integrados. PR #320 arranca `003B-4B-3` (`FakeSystemd`, no PID 1). PR #328
+(head `7155a8e`, merge `4cbd801`, Verify `44950931261` 6/6, dos Grok 4.7
+APPROVED) agrega `.mount` escapado, worker `.service` con `ExecStart`
+interno y adapter blocking `zbus`; `FakeSystemd` sigue en tests y CI no
+abre el system bus. PR #330 (head `e297856`, merge `cc19634`, Verify
+`44952793361` 6/6, dos Grok 4.7 APPROVED) deriva internamente
+`mode=03770,uid=0,gid=<worker>`, `DirectoryMode=03770` y `NoNewPrivileges`.
+PR #326 arranca `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
+`44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
+bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
+`003B-4B-3`, `003B-4B-4`, `003B-4C` y el agregado `003B-4B`. Esos gates
+propios deben cerrarse antes de que `003B-4`, TASK-005 o #7 puedan
+cerrarse.
 
 No existe GO live para Cloudinary, credenciales, HTTP upload, deploy ni
 homologación externa hasta cerrar sus gates separados.
