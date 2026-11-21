@@ -276,8 +276,9 @@ impl IsolationPolicy {
         if profile != MediaIsolationProfileId::ImageIoV1 {
             return Err(IsolationPolicyError::UnknownProfile);
         }
-        let identity = RuntimeIdentity::derive(job_id);
+        let identity = RuntimeIdentity::derive(job_id, self.worker);
         Ok(IsolatedJobSpec {
+            paths: identity.paths.clone(),
             mount: MountUnitSpec::derive(&identity, self.worker),
             worker: WorkerUnitSpec::derive(&identity, self.worker, self.runtime),
             runtime: self.runtime,
@@ -288,16 +289,16 @@ impl IsolationPolicy {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RuntimeIdentity {
     job_hex: String,
-    workspace: PathBuf,
+    paths: JobPaths,
     mount_unit: String,
     worker_unit: String,
 }
 
 impl RuntimeIdentity {
-    fn derive(job_id: JobId) -> Self {
+    fn derive(job_id: JobId, worker: WorkerPrincipal) -> Self {
         let job_hex = encode_hex(job_id.bytes());
         Self {
-            workspace: Path::new(JOB_ROOT).join(&job_hex),
+            paths: JobPaths::derive(Path::new(JOB_ROOT).join(&job_hex), worker),
             mount_unit: format!("run-storecore_media-jobs-{job_hex}.mount"),
             worker_unit: format!("storecore-media-worker-{job_hex}.service"),
             job_hex,
@@ -306,13 +307,109 @@ impl RuntimeIdentity {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JobPaths {
+    root: PathBuf,
+    input: PathBuf,
+    request: PathBuf,
+    writable_root: PathBuf,
+    output: PathBuf,
+    result: PathBuf,
+    diagnostic: PathBuf,
+    temporary: PathBuf,
+    worker_gid: u32,
+}
+
+impl JobPaths {
+    fn derive(root: PathBuf, worker: WorkerPrincipal) -> Self {
+        let writable_root = root.join("out");
+        Self {
+            input: root.join("input.bin"),
+            request: root.join("request.bin"),
+            output: writable_root.join("output.bin"),
+            result: writable_root.join("result.bin"),
+            diagnostic: writable_root.join("diagnostic.bin"),
+            temporary: writable_root.join("tmp"),
+            worker_gid: worker.gid(),
+            writable_root,
+            root,
+        }
+    }
+
+    #[must_use]
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
+    #[must_use]
+    pub fn input(&self) -> &Path {
+        &self.input
+    }
+
+    #[must_use]
+    pub fn request(&self) -> &Path {
+        &self.request
+    }
+
+    #[must_use]
+    pub fn writable_root(&self) -> &Path {
+        &self.writable_root
+    }
+
+    #[must_use]
+    pub fn output(&self) -> &Path {
+        &self.output
+    }
+
+    #[must_use]
+    pub fn result(&self) -> &Path {
+        &self.result
+    }
+
+    #[must_use]
+    pub fn diagnostic(&self) -> &Path {
+        &self.diagnostic
+    }
+
+    #[must_use]
+    pub fn temporary(&self) -> &Path {
+        &self.temporary
+    }
+
+    #[must_use]
+    pub const fn snapshot_owner_uid(&self) -> u32 {
+        0
+    }
+
+    #[must_use]
+    pub const fn snapshot_permissions(&self) -> u32 {
+        0o440
+    }
+
+    #[must_use]
+    pub const fn snapshot_group_gid(&self) -> u32 {
+        self.worker_gid
+    }
+
+    #[must_use]
+    pub const fn writable_root_permissions(&self) -> u32 {
+        0o700
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IsolatedJobSpec {
+    paths: JobPaths,
     mount: MountUnitSpec,
     worker: WorkerUnitSpec,
     runtime: ApprovedRuntime,
 }
 
 impl IsolatedJobSpec {
+    #[must_use]
+    pub const fn paths(&self) -> &JobPaths {
+        &self.paths
+    }
+
     #[must_use]
     pub const fn mount(&self) -> &MountUnitSpec {
         &self.mount
@@ -340,10 +437,9 @@ impl MountUnitSpec {
     fn derive(identity: &RuntimeIdentity, worker: WorkerPrincipal) -> Self {
         Self {
             unit_name: identity.mount_unit.clone(),
-            where_path: identity.workspace.clone(),
+            where_path: identity.paths.root.clone(),
             options: format!(
-                "mode=0700,uid={},gid={},size={WORKSPACE_BYTES},nr_inodes={WORKSPACE_INODES},nosuid,nodev,noexec",
-                worker.uid(),
+                "mode=0710,uid=0,gid={},size={WORKSPACE_BYTES},nr_inodes={WORKSPACE_INODES},nosuid,nodev,noexec",
                 worker.gid()
             ),
         }
@@ -376,7 +472,7 @@ impl MountUnitSpec {
 
     #[must_use]
     pub const fn directory_mode(&self) -> u32 {
-        0o700
+        0o710
     }
 
     #[must_use]
@@ -415,6 +511,8 @@ pub struct WorkerUnitSpec {
     unit_name: String,
     mount_unit: String,
     workspace: PathBuf,
+    writable_root: PathBuf,
+    temporary: PathBuf,
     worker: WorkerPrincipal,
     runtime: ApprovedRuntime,
 }
@@ -428,7 +526,9 @@ impl WorkerUnitSpec {
         Self {
             unit_name: identity.worker_unit.clone(),
             mount_unit: identity.mount_unit.clone(),
-            workspace: identity.workspace.clone(),
+            workspace: identity.paths.root.clone(),
+            writable_root: identity.paths.writable_root.clone(),
+            temporary: identity.paths.temporary.clone(),
             worker,
             runtime,
         }
@@ -447,6 +547,11 @@ impl WorkerUnitSpec {
     #[must_use]
     pub fn required_mount_unit(&self) -> &str {
         &self.mount_unit
+    }
+
+    #[must_use]
+    pub fn writable_root(&self) -> &Path {
+        &self.writable_root
     }
 
     #[must_use]
@@ -470,7 +575,7 @@ impl WorkerUnitSpec {
             self.java().to_string_lossy().into_owned(),
             format!("-Xmx{}", self.heap_bytes()),
             format!("-XX:MaxDirectMemorySize={}", self.direct_memory_bytes()),
-            format!("-Djava.io.tmpdir={}", self.workspace.display()),
+            format!("-Djava.io.tmpdir={}", self.temporary.display()),
             "-jar".to_owned(),
             self.worker_jar().to_string_lossy().into_owned(),
         ]
@@ -479,8 +584,8 @@ impl WorkerUnitSpec {
     #[must_use]
     pub fn environment(&self) -> Vec<String> {
         vec![
-            format!("HOME={}", self.workspace.display()),
-            format!("TMPDIR={}", self.workspace.display()),
+            format!("HOME={}", self.writable_root.display()),
+            format!("TMPDIR={}", self.temporary.display()),
         ]
     }
 
@@ -675,6 +780,36 @@ mod tests {
             spec.worker().required_mount_unit(),
             spec.mount().unit_name()
         );
+        assert_eq!(spec.paths().root(), spec.mount().where_path());
+        assert_eq!(spec.paths().input(), spec.paths().root().join("input.bin"));
+        assert_eq!(
+            spec.paths().request(),
+            spec.paths().root().join("request.bin")
+        );
+        assert_eq!(
+            spec.paths().writable_root(),
+            spec.paths().root().join("out")
+        );
+        assert_eq!(
+            spec.paths().output(),
+            spec.paths().writable_root().join("output.bin")
+        );
+        assert_eq!(
+            spec.paths().result(),
+            spec.paths().writable_root().join("result.bin")
+        );
+        assert_eq!(
+            spec.paths().diagnostic(),
+            spec.paths().writable_root().join("diagnostic.bin")
+        );
+        assert_eq!(
+            spec.paths().temporary(),
+            spec.paths().writable_root().join("tmp")
+        );
+        assert_eq!(spec.paths().snapshot_owner_uid(), 0);
+        assert_eq!(spec.paths().snapshot_permissions(), 0o440);
+        assert_eq!(spec.paths().snapshot_group_gid(), 2002);
+        assert_eq!(spec.paths().writable_root_permissions(), 0o700);
     }
 
     #[test]
@@ -684,11 +819,11 @@ mod tests {
             .expect("known profile");
         assert_eq!(spec.mount().what(), "tmpfs");
         assert_eq!(spec.mount().file_system_type(), "tmpfs");
-        assert_eq!(spec.mount().directory_mode(), 0o700);
+        assert_eq!(spec.mount().directory_mode(), 0o710);
         assert!(spec.mount().collect_inactive_or_failed());
         assert_eq!(
             spec.mount().options(),
-            "mode=0700,uid=2001,gid=2002,size=50331648,nr_inodes=4096,nosuid,nodev,noexec"
+            "mode=0710,uid=0,gid=2002,size=50331648,nr_inodes=4096,nosuid,nodev,noexec"
         );
     }
 
@@ -734,7 +869,7 @@ mod tests {
                 JAVA_PATH.to_owned(),
                 "-Xmx201326592".to_owned(),
                 "-XX:MaxDirectMemorySize=20971520".to_owned(),
-                format!("-Djava.io.tmpdir={}", worker.workspace().display()),
+                format!("-Djava.io.tmpdir={}", spec.paths().temporary().display()),
                 "-jar".to_owned(),
                 WORKER_JAR_PATH.to_owned(),
             ]
@@ -742,8 +877,8 @@ mod tests {
         assert_eq!(
             worker.environment(),
             vec![
-                format!("HOME={}", worker.workspace().display()),
-                format!("TMPDIR={}", worker.workspace().display()),
+                format!("HOME={}", worker.writable_root().display()),
+                format!("TMPDIR={}", spec.paths().temporary().display()),
             ]
         );
     }
