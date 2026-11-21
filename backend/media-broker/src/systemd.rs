@@ -90,8 +90,8 @@ pub struct TransientUnits {
 
 impl TransientUnits {
     /// Derives mount and worker units exclusively from the job identity and
-    /// root-owned configuration. Callers cannot supply unit names, Where or
-    /// ExecStart.
+    /// root-owned configuration. Callers cannot supply unit names, `Where` or
+    /// `ExecStart`.
     #[must_use]
     pub fn derive(
         job_id: JobId,
@@ -140,7 +140,7 @@ pub trait SystemdControl {
         spec: &TransientUnits,
     ) -> Result<UnitState, SystemdError>;
 
-    /// Stops one internally derived unit and verifies it left Active.
+    /// Stops one internally derived unit and verifies it left `Active`.
     ///
     /// # Errors
     ///

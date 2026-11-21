@@ -52,8 +52,8 @@ impl<Control: SystemdControl> BrokerDaemon<Control> {
 
     /// Starts PID-1 transient mount and worker units for a sealed job.
     ///
-    /// Unit names, Where and ExecStart are derived internally. A non-Active
-    /// attestation fails closed and does not invent Running.
+    /// Unit names, `Where` and `ExecStart` are derived internally. A non-`Active`
+    /// attestation fails closed and does not invent `Running`.
     ///
     /// # Errors
     ///
