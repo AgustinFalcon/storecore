@@ -800,7 +800,19 @@ mod tests {
         if first.is_err() {
             dump_worker_unit(&spec, first, &where_path);
         }
-        wait_exec_main_status(name, "2", Duration::from_secs(30));
+        wait_exec_main_status(
+            name,
+            "2",
+            Duration::from_secs(60),
+            &spec,
+            first,
+            &where_path,
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "failed worker must not write result.bin"
+        );
+        assert_eq!(systemctl_property(name, "Result"), "exit-code");
         let stopped_failed = systemd.stop(UnitKind::Worker, &spec).expect("stop failed");
         assert!(matches!(
             stopped_failed,
@@ -822,7 +834,14 @@ mod tests {
             Duration::from_secs(30),
         );
         assert_eq!(restarted.expect("restart worker"), UnitState::Active);
-        wait_exec_main_status(name, "0", Duration::from_secs(5));
+        wait_exec_main_status(
+            name,
+            "0",
+            Duration::from_secs(15),
+            &spec,
+            restarted,
+            &where_path,
+        );
         stop_pid1_worker(&mut systemd, &spec);
     }
 
@@ -1175,16 +1194,29 @@ mod tests {
         String::from_utf8_lossy(&shown.stdout).trim().to_owned()
     }
 
-    fn wait_exec_main_status(name: &str, expected: &str, timeout: Duration) {
+    fn wait_exec_main_status(
+        name: &str,
+        expected: &str,
+        timeout: Duration,
+        spec: &TransientUnits,
+        started: Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
         let deadline = Instant::now() + timeout;
         loop {
             let status = systemctl_property(name, "ExecMainStatus");
-            if status == expected {
+            let main_pid = systemctl_property(name, "MainPID");
+            let exited = main_pid.is_empty() || main_pid == "0";
+            if exited && status == expected {
                 return;
             }
             if Instant::now() >= deadline {
-                panic!("ExecMainStatus for {name} want {expected}, got {status}");
+                dump_worker_unit(spec, started, where_path);
             }
+            assert!(
+                Instant::now() < deadline,
+                "ExecMainStatus for {name} want {expected}, got {status}, MainPID={main_pid}"
+            );
             thread::sleep(Duration::from_millis(50));
         }
     }
