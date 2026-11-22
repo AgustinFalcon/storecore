@@ -284,13 +284,15 @@ function required(value, name) {
   return value.trim();
 }
 
-class HttpSession {
+export class HttpSession {
   #cookie = '';
   #csrf = '';
   constructor(config) { this.config = config; }
 
-  async request(path, { method = 'GET', body, expected = [200], csrf = false, envelope = true, envelopeCode } = {}) {
-    const headers = { Accept: 'application/json', Origin: this.config.origin };
+  async request(path, { method = 'GET', body, expected = [200], csrf = false, envelope = true, envelopeCode, headers: extraHeaders = {} } = {}) {
+    const protectedHeaders = new Set(['accept', 'origin', 'content-type', 'cookie', 'x-csrf-token']);
+    if (Object.keys(extraHeaders).some((name) => protectedHeaders.has(name.toLowerCase()))) throw new Error('SHOWCASE_PROTECTED_HEADER_OVERRIDE');
+    const headers = { Accept: 'application/json', Origin: this.config.origin, ...extraHeaders };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (this.#cookie) headers.Cookie = this.#cookie;
     if (csrf) {

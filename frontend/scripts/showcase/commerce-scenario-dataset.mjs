@@ -47,14 +47,14 @@ export function stableUuid(key) {
 }
 function path(...commands) { return Object.freeze(commands); }
 const blueprints = Object.freeze([
-  [CommerceScenarioKind.PendingPayment, CommerceDeliveryMode.LocalDelivery, path(), false, false, 1],
-  [CommerceScenarioKind.PaidAwaitingPreparation, CommerceDeliveryMode.LocalDelivery, path(), false, false, 1],
-  [CommerceScenarioKind.Preparing, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing), false, false, 1],
-  [CommerceScenarioKind.Shipped, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped), false, false, 1],
-  [CommerceScenarioKind.Delivered, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), false, false, 1],
-  [CommerceScenarioKind.ReadyForPickup, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup), false, false, 1],
-  [CommerceScenarioKind.PickedUp, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup, CommerceShipmentCommand.PickedUp), false, false, 1],
-  [CommerceScenarioKind.ReturnReceived, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), true, false, 1],
+  [CommerceScenarioKind.PendingPayment, CommerceDeliveryMode.LocalDelivery, path(), false, false, 2],
+  [CommerceScenarioKind.PaidAwaitingPreparation, CommerceDeliveryMode.LocalDelivery, path(), false, false, 2],
+  [CommerceScenarioKind.Preparing, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing), false, false, 2],
+  [CommerceScenarioKind.Shipped, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped), false, false, 2],
+  [CommerceScenarioKind.Delivered, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), false, false, 2],
+  [CommerceScenarioKind.ReadyForPickup, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup), false, false, 2],
+  [CommerceScenarioKind.PickedUp, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup, CommerceShipmentCommand.PickedUp), false, false, 2],
+  [CommerceScenarioKind.ReturnReceived, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), true, false, 2],
   [CommerceScenarioKind.ReturnClosedMixed, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), true, true, 3],
 ]);
 

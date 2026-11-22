@@ -14,6 +14,8 @@ test('nine scenarios are closed, deterministic and use distinct catalog products
   assert.equal(first.filter(row => row.receiveReturn).length, 2);
   assert.equal(first.filter(row => row.closeMixedReturn).length, 1);
   assert.equal(first.find(row => row.kind === CommerceScenarioKind.ReturnClosedMixed).quantity, 3);
+  assert.equal(first.reduce((total, row) => total + row.quantity, 0), 19);
+  assert.equal(first.filter(row => row.kind !== CommerceScenarioKind.PendingPayment).reduce((total, row) => total + row.quantity, 0), 17);
   assert.match(stableUuid('same'), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-a[0-9a-f]{3}-[0-9a-f]{12}$/);
 });
 test('unknown wires fail closed and insufficient products are rejected', () => {
