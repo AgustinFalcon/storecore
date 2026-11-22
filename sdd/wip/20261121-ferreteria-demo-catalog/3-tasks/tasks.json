@@ -1,0 +1,13 @@
+{
+  "feature": "20261121-ferreteria-demo-catalog",
+  "status": "in_progress",
+  "tasks": [
+    { "id": "FDC-T01", "title": "Approve functional and technical gallery contract", "status": "done", "requirements": ["FDC-R01", "FDC-R02", "FDC-R03", "FDC-R04", "FDC-R05", "FDC-R06", "FDC-R07", "FDC-R08"] },
+    { "id": "FDC-T02", "title": "Implement closed V1/V2 gallery translator", "status": "in_progress", "requirements": ["FDC-R02", "FDC-R06", "FDC-R07"] },
+    { "id": "FDC-T03", "title": "Create the forty-product hardware-store dataset", "status": "pending", "requirements": ["FDC-R01", "FDC-R03", "FDC-R04", "FDC-R05"] },
+    { "id": "FDC-T04", "title": "Cover compatibility, bounds and loader verification", "status": "pending", "requirements": ["FDC-R06", "FDC-R07", "FDC-R08"] },
+    { "id": "FDC-T05", "title": "Load and replay against disposable PostgreSQL and Spring", "status": "pending", "requirements": ["FDC-R06", "FDC-R08"] },
+    { "id": "FDC-T06", "title": "Exercise buyer and administrator flows", "status": "pending", "requirements": ["FDC-R08"] },
+    { "id": "FDC-T07", "title": "Record exact evidence and independent reviews", "status": "pending", "requirements": ["FDC-R08"] }
+  ]
+}

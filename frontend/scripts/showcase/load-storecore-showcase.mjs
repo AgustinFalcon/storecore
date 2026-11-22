@@ -415,13 +415,15 @@ function requireCreatedProduct(actual, fixture, reserved = 0, identity) {
       balance.available !== available || balance.reserved !== reserved || balance.safety !== 0 || balance.onHand !== fixture.stock ||
       balance.onHand !== balance.available + balance.reserved || balance.saleable !== Math.max(balance.available - balance.safety, 0) ||
       balance.saleable !== available || !Number.isFinite(Date.parse(balance.updatedAt)) ||
-      !Array.isArray(actual.media) || actual.media.length !== 1 || !validOrderId(actual.media[0]?.id) ||
-      actual.media[0].url !== fixture.image || actual.media[0].sortOrder !== 0 || actual.media[0].primary !== true ||
-      !Array.isArray(actual.images) || actual.images.length !== 1 || actual.images[0] !== fixture.image ||
-      (identity && (actual.id !== identity.id || variant.id !== identity.variantId || actual.media[0].id !== identity.mediaId))) {
+      !Array.isArray(actual.media) || actual.media.length !== fixture.images.length ||
+      actual.media.some((media, index) => !validOrderId(media?.id) || media.url !== fixture.images[index] ||
+        media.sortOrder !== index || media.primary !== (index === 0)) ||
+      !Array.isArray(actual.images) || JSON.stringify(actual.images) !== JSON.stringify(fixture.images) ||
+      (identity && (actual.id !== identity.id || variant.id !== identity.variantId ||
+        JSON.stringify(actual.media.map(media => media.id)) !== JSON.stringify(identity.mediaIds)))) {
     throw new Error('SHOWCASE_CATALOG_VERIFICATION_FAILED');
   }
-  return Object.freeze({ id: actual.id, variantId: variant.id, mediaId: actual.media[0].id });
+  return Object.freeze({ id: actual.id, variantId: variant.id, mediaIds: Object.freeze(actual.media.map(media => media.id)) });
 }
 
 function requireFavorites(raw) {
