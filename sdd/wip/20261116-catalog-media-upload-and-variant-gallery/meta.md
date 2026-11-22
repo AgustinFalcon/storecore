@@ -61,7 +61,11 @@ cierra fallos/reinicio ni `Ready`. PR #353 (head `1980148`,
 merge `94c2747`, Verify `44992591084` 7/7, dos Grok 4.7
 APPROVED) atesta `UNKNOWN_EXIT` (`status=2` en journal) y
 reinicia el mismo `JobId` con `SELF_TEST`; no cierra rechazo
-de sustitución ni `Ready`. PR #326 arranca
+de sustitución ni `Ready`. PR #355 (head `7319204`,
+merge `dceb02d`, Verify `44994529755` 7/7, dos Grok 4.7
+APPROVED) atesta `RuntimeError::DigestMismatch` del jar
+sustituido y no arranca el worker; no cierra OOM/timeout,
+terminación del cgroup ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos

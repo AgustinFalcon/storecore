@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #355, 003B-4C sigue abierto
+
+- Merge #355 `dceb02dcdb02dfebc41b5b48bced50b1b7301e20` sobre candidato
+  `73192046a927a34a7008f824d40c3c9e260a74a3`. Verify exact-head
+  `44994529755` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr355-architecture.md`
+  y `sdd/reviews/20261122-sol-pr355-security.md`.
+- El harness atesta `confirm() = DigestMismatch` del jar sustituido y
+  no arranca el worker. No se marca `003B-4C`. No hay OOM/timeout,
+  terminación del cgroup, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C rechazo de sustitución
 
 - El harness PID 1 copia java/jar aprobados, altera el jar y atesta
