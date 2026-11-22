@@ -310,14 +310,14 @@ mod tests {
         WORKER_MEMORY_MAX_BYTES, WORKER_TASKS_MAX, ZbusSystemd, classify_dbus_name,
         mount_properties, worker_properties,
     };
-    use crate::runtime::ApprovedRuntime;
+    use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
     use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
-    use std::os::unix::fs::{self as unix_fs, OpenOptionsExt};
+    use std::os::unix::fs::{self as unix_fs, OpenOptionsExt, PermissionsExt};
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -838,6 +838,56 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_rejects_substituted_runtime_jar() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let (jar, runtime) = copied_pid1_runtime();
+        runtime.confirm().expect("unmodified runtime");
+        let job = JobId::create([0x88; 16]).expect("job");
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        fs::write(&jar, b"substituted-storecore-jar\n").expect("substitute jar");
+        assert_eq!(
+            runtime.confirm(),
+            Err(RuntimeError::DigestMismatch),
+            "daemon start must refuse a substituted jar"
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "substituted runtime must not start the worker"
+        );
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -894,6 +944,33 @@ mod tests {
         let java_digest = Sha256::digest(fs::read(&java).expect("java bytes")).into();
         let jar_digest = Sha256::digest(fs::read(&jar).expect("jar bytes")).into();
         ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime")
+    }
+
+    fn copied_pid1_runtime() -> (PathBuf, ApprovedRuntime) {
+        let src_java =
+            PathBuf::from(std::env::var("STORECORE_MEDIA_JAVA").expect("STORECORE_MEDIA_JAVA"));
+        let src_jar =
+            PathBuf::from(std::env::var("STORECORE_MEDIA_JAR").expect("STORECORE_MEDIA_JAR"));
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "storecore-media-broker-sub-{}-{id}",
+            std::process::id()
+        ));
+        fs::create_dir(&root).expect("sub root");
+        let java = root.join("java");
+        let jar = root.join("worker.jar");
+        fs::copy(&src_java, &java).expect("copy java");
+        fs::copy(&src_jar, &jar).expect("copy jar");
+        fs::set_permissions(&java, fs::Permissions::from_mode(0o555)).expect("java mode");
+        fs::set_permissions(&jar, fs::Permissions::from_mode(0o444)).expect("jar mode");
+        unix_fs::chown(&java, Some(0), Some(0)).expect("java owner");
+        unix_fs::chown(&jar, Some(0), Some(0)).expect("jar owner");
+        let java_digest = Sha256::digest(fs::read(&java).expect("java bytes")).into();
+        let jar_digest = Sha256::digest(fs::read(&jar).expect("jar bytes")).into();
+        (
+            jar.clone(),
+            ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime"),
+        )
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
