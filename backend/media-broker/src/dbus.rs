@@ -29,6 +29,8 @@ const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
 /// `IMAGE_IO_V1` timeout (12 s). Derived internally; the client cannot supply it.
 const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
+/// Stop grace after RuntimeMax. Derived internally; the client cannot supply it.
+const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -266,6 +268,7 @@ pub(crate) fn worker_properties(
         ("TasksAccounting", Value::from(true)),
         ("TasksMax", Value::from(WORKER_TASKS_MAX)),
         ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
+        ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
     ])
 }
 
@@ -310,8 +313,8 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX, ZbusSystemd,
-        classify_dbus_name, mount_properties, worker_properties,
+        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX, WORKER_TIMEOUT_STOP_USEC,
+        ZbusSystemd, classify_dbus_name, mount_properties, worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -369,6 +372,7 @@ mod tests {
         assert!(worker_keys.contains(&"TasksAccounting"));
         assert!(worker_keys.contains(&"TasksMax"));
         assert!(worker_keys.contains(&"RuntimeMaxUSec"));
+        assert!(worker_keys.contains(&"TimeoutStopUSec"));
         let runtime_max = worker
             .iter()
             .find(|(key, _)| *key == "RuntimeMaxUSec")
@@ -378,6 +382,16 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains(&WORKER_RUNTIME_MAX_USEC.to_string())),
             "RuntimeMaxUSec must be the internal 12s ceiling, got {runtime_max:?}"
+        );
+        let timeout_stop = worker
+            .iter()
+            .find(|(key, _)| *key == "TimeoutStopUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            timeout_stop
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_TIMEOUT_STOP_USEC.to_string())),
+            "TimeoutStopUSec must be the internal 1s grace, got {timeout_stop:?}"
         );
         let memory_max = worker
             .iter()
@@ -903,7 +917,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
-    fn pid1_worker_runtime_max_times_out_remain_after_exit() {
+    fn pid1_worker_runtime_max_stops_frozen_mainpid() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
                 .expect("pid1 comm")
@@ -939,14 +953,7 @@ mod tests {
             dump_worker_unit(&spec, started_worker, &where_path);
             panic!("StartTransientUnit rejected derived RuntimeMaxUSec");
         }
-        wait_for_worker_result(
-            &where_path.join("result.bin"),
-            worker.uid(),
-            &spec,
-            started_worker,
-            &where_path,
-            Duration::from_secs(30),
-        );
+        freeze_worker_main_pid(name);
         let runtime_max = systemctl_property(name, "RuntimeMaxUSec");
         assert!(
             runtime_max == WORKER_RUNTIME_MAX_USEC.to_string() || runtime_max == "12s",
@@ -958,6 +965,10 @@ mod tests {
             &spec,
             started_worker,
             &where_path,
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "frozen worker must not finish SELF_TEST before RuntimeMax"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
@@ -1055,6 +1066,19 @@ mod tests {
             jar.clone(),
             ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime"),
         )
+    }
+
+    fn freeze_worker_main_pid(name: &str) {
+        let pid = systemctl_property(name, "MainPID");
+        assert!(
+            !pid.is_empty() && pid != "0",
+            "RuntimeMax attest needs a live MainPID, got {pid}"
+        );
+        let stopped = Command::new("kill")
+            .args(["-STOP", &pid])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -STOP {pid}: {error}"));
+        assert!(stopped.success(), "kill -STOP {pid} failed with {stopped}");
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
@@ -1366,15 +1390,10 @@ mod tests {
         loop {
             let result = systemctl_property(name, "Result");
             let journal = worker_journal(name);
-            if result == "timeout"
-                || journal.contains("Reached runtime time limit")
+            if journal.contains("Reached runtime time limit")
                 || journal.contains("result 'timeout'")
+                || journal.contains("Failed with result 'timeout'")
             {
-                assert!(
-                    journal.contains("Reached runtime time limit")
-                        || journal.contains("result 'timeout'"),
-                    "journal must record RuntimeMax timeout for {name}: {journal}"
-                );
                 return;
             }
             if Instant::now() >= deadline {

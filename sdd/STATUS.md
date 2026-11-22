@@ -2,12 +2,12 @@
 
 ## En implementación — 2026-11-22, 4C timeout del worker
 
-Este corte no cierra `003B-4C`. Deriva `RuntimeMaxUSec=12s` de
-`IMAGE_IO_V1`. El harness corre `SELF_TEST` y atesta que PID 1 corta
-la unidad `RemainAfterExit` al vencer ese techo. Sigue sin OOM,
-terminación del cgroup, `CPUQuota` ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+Este corte no cierra `003B-4C`. Deriva `RuntimeMaxUSec=12s` y
+`TimeoutStopUSec=1s`. El harness congela el `MainPID` y atesta que PID 1
+corta el worker al vencer el techo. FIFO y `RemainAfterExit` sin proceso
+no disparan timeout. Sigue sin OOM, terminación del cgroup, `CPUQuota`
+ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos. Este corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, persist reviews PR #355
 
