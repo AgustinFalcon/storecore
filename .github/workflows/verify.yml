@@ -162,14 +162,15 @@ jobs:
         run: |
           sudo useradd --system --no-create-home --uid 2101 storecore-backend
           sudo useradd --system --no-create-home --uid 2102 storecore-worker
-          runtime=/opt/storecore-media-runtime
+          runtime=/usr/lib/storecore-media-runtime
           sudo mkdir -p "$runtime"
           sudo cp -a "$(readlink -f "$JAVA_HOME")" "$runtime/jdk"
           sudo install -m 0444 \
             "$GITHUB_WORKSPACE/backend/media-worker/target/storecore-media-worker-0.1.0-SNAPSHOT.jar" \
             "$runtime/worker.jar"
           sudo chown -R root:root "$runtime"
-          sudo chmod -R a+rX "$runtime"
+          sudo chmod -R a+rX,go-w "$runtime"
+          sudo find "$runtime" -type d -exec chmod 0555 {} \;
           sudo chmod 0555 "$runtime/jdk/bin/java"
           sudo chmod 0444 "$runtime/worker.jar"
           export STORECORE_MEDIA_JAVA="$runtime/jdk/bin/java"
