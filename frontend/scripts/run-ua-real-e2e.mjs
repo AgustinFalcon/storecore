@@ -6,6 +6,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import https from 'node:https';
 import { databaseEnvironment, query } from './ua-real-database.mjs';
+import { ShowcaseConfig, ShowcaseLoader } from './showcase/load-storecore-showcase.mjs';
+import { CommerceScenarioConfig, CommerceScenarioLoader } from './showcase/load-commerce-scenarios.mjs';
+import { readShowcaseDataset } from './showcase/read-showcase-dataset.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const backend = resolve(frontend, '../backend');
@@ -14,6 +17,7 @@ const jar = join(backend, 'target/storecore-backend-0.1.0-SNAPSHOT.jar');
 const origin = 'https://localhost:4301';
 const children = new Set();
 const logs = [];
+const showcaseCommerce = process.argv.includes('--showcase-commerce');
 process.env = databaseEnvironment();
 const scratch = mkdtempSync(join(tmpdir(), 'storecore-ua-e2e-'));
 mkdirSync(results, { recursive: true });
@@ -62,8 +66,28 @@ async function ready(child, url, secure = false) {
   }
   throw new Error(`Readiness timed out: ${url}`);
 }
-function spring(guard, name) {
-  return start(process.env.STORECORE_UA_JAVA ?? 'java', ['-jar', jar,
+function commerceAuthorityFootprint(receipt) {
+  const ids = receipt.scenarios.map(row => String(row.orderId));
+  if (ids.length !== 9 || ids.some(id => !/^\d+$/.test(id))) throw new Error('SHOWCASE_COMMERCE_RECEIPT_IDS_INVALID');
+  const scope = ids.join(',');
+  return query(`SELECT concat_ws('|',
+    (SELECT count(*) FROM orders WHERE id IN (${scope})),
+    (SELECT count(*) FROM checkout_idempotency_claims c JOIN orders o ON o.checkout_claim_id=c.id WHERE o.id IN (${scope})),
+    (SELECT count(*) FROM payments WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM mp_checkout_attempts WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM mp_order_notification_inbox i JOIN mp_checkout_attempts a ON a.provider_order_id=i.provider_order_id_candidate WHERE a.order_id IN (${scope})),
+    (SELECT count(*) FROM mp_order_commercial_applications WHERE order_id IN (${scope})),
+    (SELECT count(*)||':'||coalesce(sum(r.quantity),0) FROM inventory_reservations r JOIN orders o ON r.reservation_saga_key=(o.checkout_snapshot->>'reservationSagaKey')::uuid WHERE o.id IN (${scope})),
+    (SELECT count(*)||':'||coalesce(sum(quantity_delta),0) FROM inventory_ledger WHERE actor IN (${ids.map(id => `'MP_ORDERS:${id}'`).join(',')})),
+    (SELECT count(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id IN (${scope})),
+    (SELECT count(*) FROM returns WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM return_items i JOIN returns r ON r.id=i.return_id WHERE r.order_id IN (${scope})),
+    (SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id IN (${scope})),
+    (SELECT coalesce(sum(b.available_quantity),0)||':'||coalesce(sum(b.reserved_quantity),0) FROM inventory_balances b JOIN order_items i ON i.variant_id=b.variant_id WHERE i.order_id IN (${scope}))
+  );`);
+}
+function spring(guard, name, official = true, installationOrigin = origin) {
+  const integration = official ? [
     '--server.address=127.0.0.1', '--server.port=8080', `--storecore.installation-guard.enabled=${guard}`,
     '--storecore.integrations.refetch-delay-ms=500',
     '--storecore.integrations.mp-orders.adapter=official',
@@ -73,11 +97,14 @@ function spring(guard, name) {
     '--storecore.integrations.mp-orders.checkout-url-hosts[0]=provider.example.test',
     '--storecore.integrations.mp-orders.api-base-url=http://127.0.0.1:4302',
     '--storecore.integrations.mp-orders.access-token-ref=CFE_LOCAL_PROVIDER_TOKEN',
-    '--storecore.integrations.mp-orders.webhook-secret-ref=CFE_LOCAL_WEBHOOK_SECRET'], name, {
+    '--storecore.integrations.mp-orders.webhook-secret-ref=CFE_LOCAL_WEBHOOK_SECRET',
+  ] : ['--server.address=127.0.0.1', '--server.port=8080', `--storecore.installation-guard.enabled=${guard}`,
+    '--storecore.integrations.mp-orders.adapter=unconfigured'];
+  return start(process.env.STORECORE_UA_JAVA ?? 'java', ['-jar', jar, ...integration], name, {
     ...process.env,
     STORECORE_DB_URL: `jdbc:postgresql://${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`,
     STORECORE_DB_USERNAME: process.env.PGUSER, STORECORE_DB_PASSWORD: process.env.PGPASSWORD,
-    STORECORE_INSTALLATION_ORIGIN: origin,
+    STORECORE_INSTALLATION_ORIGIN: installationOrigin,
     CFE_LOCAL_PROVIDER_TOKEN: 'cfe-local-provider-token',
     CFE_LOCAL_WEBHOOK_SECRET: 'cfe-local-webhook-secret',
   });
@@ -103,7 +130,10 @@ async function run() {
     '-addext', 'subjectAltName=DNS:localhost'], { encoding: 'utf8', timeout: 30_000 });
   if (cert.error) throw cert.error;
   if (cert.status !== 0) throw new Error(`Test certificate creation failed: ${cert.stderr}`);
-  const provider = start(process.execPath, [join(frontend, 'scripts/cfe-official-provider.mjs')], 'cfe-provider');
+  const provider = start(process.execPath, [join(frontend, 'scripts/cfe-official-provider.mjs')], 'cfe-provider', {
+    ...process.env,
+    CFE_PROVIDER_JOURNAL_PATH: join(scratch, 'cfe-provider.json'),
+  });
   await ready(provider, 'http://127.0.0.1:4302/health');
   const migrationServer = spring(false, 'backend-provision');
   await ready(migrationServer, 'http://127.0.0.1:8080/actuator/health');
@@ -113,16 +143,49 @@ async function run() {
   });
   if (registered.status !== 201) throw new Error(`Fixture registration failed (${registered.status})`);
   query(readFileSync(join(frontend, 'e2e-real/fixtures/identities.sql'), 'utf8'));
+  if (showcaseCommerce) query("UPDATE installation_settings SET business_name='Ferretería Falcon' WHERE installation_id=1;");
   await stop(migrationServer);
+  if (showcaseCommerce) {
+    const dataset = await readShowcaseDataset(join(frontend, 'scripts/showcase/datasets/ferreteria-full-showcase.json'));
+    const showcaseOrigin = 'http://localhost:4301';
+    const showcaseBackend = spring(true, 'backend-showcase-catalog', false, showcaseOrigin);
+    await ready(showcaseBackend, 'http://127.0.0.1:8080/actuator/health');
+    await new ShowcaseLoader(new ShowcaseConfig({
+      baseUrl: 'http://127.0.0.1:8080', origin: showcaseOrigin,
+      adminEmail: 'cfe-user-admin@example.test', adminPassword: 'ua-fixture-password-2026',
+      customerEmail: 'showcase.customer@storecore.invalid', customerPassword: 'StoreCore-showcase-2026!',
+      includePendingOrder: true, requireRealRouteReceipt: true, scenarioPrefix: 'ferreteria-demo-v1',
+      manualFulfillmentPolicy: { pickup: { enabled: true, label: 'Retiro en Ferretería Falcon', cost: '0.00', minDays: 0, maxDays: 1, destination: 'Av. Demo 2209, Córdoba', instructions: 'Presentar DNI y número de pedido.' }, localDelivery: { enabled: true, label: 'Envío local', cost: '4500.00', minDays: 1, maxDays: 3 } },
+    }), () => {}, dataset).run();
+    await stop(showcaseBackend);
+  }
   const backendServer = spring(true, 'backend');
   await ready(backendServer, 'http://127.0.0.1:8080/actuator/health');
-  await seedManualFulfillment('http://127.0.0.1:8080', origin);
+  if (!showcaseCommerce) await seedManualFulfillment('http://127.0.0.1:8080', origin);
+  if (showcaseCommerce) {
+    const dataset = await readShowcaseDataset(join(frontend, 'scripts/showcase/datasets/ferreteria-full-showcase.json'));
+    const commerceLoader = new CommerceScenarioLoader(new CommerceScenarioConfig({
+      baseUrl: 'http://127.0.0.1:8080', origin, providerUrl: 'http://127.0.0.1:4302',
+      adminEmail: 'cfe-user-admin@example.test', adminPassword: 'ua-fixture-password-2026',
+      customerEmail: 'showcase.commerce@storecore.invalid', customerPassword: 'StoreCore-commerce-2026!',
+      journalPath: join(scratch, 'commerce-journal.json'), receiptPath: join(results, 'showcase-commerce-receipt.json'),
+    }), dataset);
+    const firstReceipt = await commerceLoader.run();
+    const firstFootprint = commerceAuthorityFootprint(firstReceipt);
+    const replayReceipt = await commerceLoader.run();
+    if (JSON.stringify(firstReceipt) !== JSON.stringify(replayReceipt)) throw new Error('SHOWCASE_COMMERCE_REPLAY_DRIFT');
+    if (commerceAuthorityFootprint(replayReceipt) !== firstFootprint) throw new Error('SHOWCASE_COMMERCE_REPLAY_EFFECT_DRIFT');
+  }
   const angular = start(process.execPath, [join(frontend, 'node_modules/@angular/cli/bin/ng.js'), 'serve',
+    '--configuration', 'production',
     '--host', 'localhost', '--port', '4301', '--ssl', '--ssl-cert', certificate, '--ssl-key', key,
     '--proxy-config', 'proxy.ua-real.conf.json'], 'angular');
   await ready(angular, `${origin}/login`, true);
-  const playwright = spawn(process.execPath, [join(frontend, 'node_modules/@playwright/test/cli.js'),
-    'test', '--config', 'playwright.ua-real.config.ts'], { cwd: frontend, env: process.env, detached: process.platform !== 'win32', stdio: 'inherit' });
+  const playwrightArguments = [join(frontend, 'node_modules/@playwright/test/cli.js'), 'test', '--config', 'playwright.ua-real.config.ts'];
+  playwrightArguments.push(...(showcaseCommerce ? ['showcase-commerce-loaded.spec.ts']
+    : ['commerce-fulfillment.spec.ts', 'stock-adjustment.spec.ts', 'unified-access.spec.ts']));
+  const playwright = spawn(process.execPath, playwrightArguments, { cwd: frontend, env: { ...process.env,
+    STORECORE_SHOWCASE_COMMERCE_RECEIPT: join(results, 'showcase-commerce-receipt.json') }, detached: process.platform !== 'win32', stdio: 'inherit' });
   children.add(playwright);
   const code = await new Promise((resolveExit, rejectExit) => {
     playwright.once('error', rejectExit); playwright.once('exit', (value) => resolveExit(value ?? 1));
