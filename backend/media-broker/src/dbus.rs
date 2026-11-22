@@ -806,6 +806,7 @@ mod tests {
             stopped_failed,
             UnitState::Inactive | UnitState::Failed
         ));
+        reset_failed_unit(name);
         write_self_test_request(&where_path, 2101, worker.gid());
         assert_request_owned_by_backend(&where_path, 2101);
         let restarted = systemd.start_transient(UnitKind::Worker, &spec);
@@ -1186,6 +1187,18 @@ mod tests {
             }
             thread::sleep(Duration::from_millis(50));
         }
+    }
+
+    fn reset_failed_unit(name: &str) {
+        let reset = Command::new("systemctl")
+            .args(["reset-failed", name])
+            .output()
+            .unwrap_or_else(|error| panic!("systemctl reset-failed: {error}"));
+        assert!(
+            reset.status.success(),
+            "systemctl reset-failed {name}: {}",
+            String::from_utf8_lossy(&reset.stderr)
+        );
     }
 
     fn assert_worker_cgroup_v2(spec: &TransientUnits) {
