@@ -7,6 +7,7 @@ import { ManageHomeCompositionUseCase } from '../../domain/content/manage-home-c
 import { HomeBlockKind } from '../../domain/content/home-composition';
 import { UserContentComponent } from './user-content.component';
 import { UserContentStore } from './user-content.store';
+import { CatalogStore } from '../storefront/catalog.store';
 
 describe('UserContent navigation protection', () => {
   function setup() {
@@ -14,7 +15,8 @@ describe('UserContent navigation protection', () => {
     const session = new UserSession(); session.commit({ id: 'admin-a', roles: [UserRole.Admin] }, 'csrf');
     store.setActor(session.principal());
     store.load();
-    return { store, session, component: TestBed.runInInjectionContext(() => new UserContentComponent(store, session)) };
+    const catalog = { loadStorefront: vi.fn() } as unknown as CatalogStore;
+    return { store, session, component: TestBed.runInInjectionContext(() => new UserContentComponent(store, session, catalog)) };
   }
 
   afterEach(() => vi.restoreAllMocks());

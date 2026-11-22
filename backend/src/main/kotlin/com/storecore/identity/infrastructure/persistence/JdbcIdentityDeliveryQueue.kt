@@ -100,7 +100,7 @@ class JdbcIdentityDeliveryQueue(
     }
 
     override fun beginHandoff(lease: IdentityDeliveryLease, now: Instant): Boolean = transactions.execute { jdbc.update(
-        """UPDATE identity_message_delivery d SET handoff_started_at=clock_timestamp(),updated_at=clock_timestamp()
+        """UPDATE identity_message_delivery d SET handoff_started_at=statement_timestamp(),updated_at=GREATEST(d.updated_at,statement_timestamp())
            FROM identity_message_outbox o WHERE o.id=d.event_id AND d.event_id=? AND d.state='LEASED'
            AND d.lease_owner=? AND d.attempts=? AND d.lease_until=? AND d.handoff_started_at IS NULL AND d.lease_until>GREATEST(clock_timestamp(),?::timestamptz)
            AND o.expires_at>GREATEST(clock_timestamp(),?::timestamptz)""", lease.eventId, lease.owner, lease.attempt, Timestamp.from(lease.expiresAt), Timestamp.from(now), Timestamp.from(now),

@@ -194,7 +194,16 @@ class IdentityDeliveryQueuePostgresTest {
     @Test fun `startup shreds expired old key payload but refuses a key required by live work`() = database { jdbc, tx, _ ->
         val databaseNow = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
         val expired = eventAt(jdbc, tx, databaseNow.plusSeconds(2), "retired-key")
-        Thread.sleep(2_500)
+        val databaseDeadline = System.nanoTime() + Duration.ofSeconds(10).toNanos()
+        while (jdbc.queryForObject(
+                "SELECT clock_timestamp() >= expires_at FROM identity_message_outbox WHERE id=?",
+                Boolean::class.java,
+                expired,
+            ) != true
+        ) {
+            check(System.nanoTime() < databaseDeadline) { "PostgreSQL clock did not pass the delivery deadline" }
+            Thread.sleep(20)
+        }
         val settings = IdentityDeliverySettings(
             EmailDeliveryMode.VERIFICATION_ONLY, true, "smtp.example.test", 465, IdentitySmtpTls.IMPLICIT,
             "fixture", "fixture-secret", "sender@example.test", "https://store.example.test", "queue-test",

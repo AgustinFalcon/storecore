@@ -125,9 +125,9 @@ for (const realm of [RealmFixture.Customer, RealmFixture.User]) {
     const other = realm === RealmFixture.Customer ? RealmFixture.User : RealmFixture.Customer;
     const beforeCookie = (await context.cookies()).find((cookie) => cookie.name === other.cookie)!.value;
     await chooseExisting(page, realm);
-    await expect(page.getByRole('button', { name: 'Salir', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Cerrar sesión', exact: true })).toBeEnabled();
     const loggedOut = page.waitForResponse((response) => new URL(response.url()).pathname === `/api/v1/${realm.path}/auth/logout`);
-    await page.getByRole('button', { name: 'Salir', exact: true }).click();
+    await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
     const response = await loggedOut;
     expect(response.status()).toBe(204);
     expect(response.request().headers()['x-csrf-token']).toBeTruthy();

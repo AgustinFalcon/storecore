@@ -1,6 +1,8 @@
 import { AsyncPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+import { BoundedPageRequest } from '../../domain/catalog/bounded-page';
 import { CatalogPageViewComponent } from './catalog-page.view';
 import { CatalogStore } from './catalog.store';
 
@@ -17,7 +19,8 @@ import { CatalogStore } from './catalog.store';
         (brandChange)="onBrand($event)"
         (categoryChange)="onCategory($event)"
         (offersChange)="onOffers($event)"
-        (searchSubmit)="store.search()"
+        (searchSubmit)="applyFilters()"
+        (filtersClear)="clearFilters()"
         (pageChange)="store.goToPage($event)"
       />
     }
@@ -27,19 +30,23 @@ export class CatalogPageComponent implements OnInit {
   constructor(
     readonly store: CatalogStore,
     private readonly route: ActivatedRoute,
+    private readonly router: Router,
+    private readonly destroyRef: DestroyRef,
   ) {}
 
   ngOnInit(): void {
-    const params = this.route.snapshot.queryParamMap;
-    this.store.setQuery({
-      ...this.store.snapshot.query,
-      query: params.get('q') ?? '',
-      brand: params.get('brand') ?? '',
-      category: params.get('category') ?? '',
-      offersOnly: params.get('offers') === '1',
-    });
     this.store.loadFacets();
-    this.store.search();
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      this.store.setQuery({
+        ...this.store.snapshot.query,
+        query: params.get('q') ?? '',
+        brand: params.get('brand') ?? '',
+        category: params.get('category') ?? '',
+        offersOnly: params.get('offers') === '1',
+        pagination: BoundedPageRequest.first(this.store.snapshot.query.pagination.size),
+      });
+      this.store.search();
+    });
   }
 
   onQuery(query: string): void {
@@ -48,13 +55,40 @@ export class CatalogPageComponent implements OnInit {
 
   onBrand(brand: string): void {
     this.store.setQuery({ ...this.store.snapshot.query, brand });
+    this.applyFilters();
   }
 
   onCategory(category: string): void {
     this.store.setQuery({ ...this.store.snapshot.query, category });
+    this.applyFilters();
   }
 
   onOffers(offersOnly: boolean): void {
     this.store.setQuery({ ...this.store.snapshot.query, offersOnly });
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    const query = this.store.snapshot.query;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        q: query.query.trim() || null,
+        brand: query.brand || null,
+        category: query.category || null,
+        offers: query.offersOnly ? '1' : null,
+      },
+      replaceUrl: true,
+    }).then((navigated) => {
+      // Angular skips same-URL navigation. Retry/search and clearing an already
+      // clean toolbar must still restore authoritative results.
+      if (!navigated) this.store.search();
+    });
+  }
+
+  clearFilters(): void {
+    const size = this.store.snapshot.query.pagination.size;
+    this.store.setQuery({ query: '', brand: '', category: '', offersOnly: false, pagination: BoundedPageRequest.first(size) });
+    this.applyFilters();
   }
 }

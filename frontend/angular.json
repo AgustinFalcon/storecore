@@ -14,7 +14,10 @@
             "browser": "src/main.ts",
             "index": "src/index.html",
             "tsConfig": "tsconfig.app.json",
-            "assets": [],
+            "assets": [
+              { "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" },
+              { "glob": "**/*", "input": "src/assets/showcase", "output": "assets/showcase" }
+            ],
             "styles": ["src/styles.scss"],
             "inlineStyleLanguage": "scss"
           },
@@ -31,7 +34,10 @@
                 "browser": "src/main.demo.ts",
                 "index": { "input": "src/index.demo.html", "output": "index.html" },
                 "tsConfig": "tsconfig.demo.json",
-                "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }],
+                "assets": [
+                  { "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" },
+                  { "glob": "**/*", "input": "src/assets/showcase", "output": "assets/showcase" }
+                ],
                 "optimization": true,
                 "sourceMap": false,
                 "preserveSymlinks": true,
@@ -46,7 +52,10 @@
                 "browser": "src/main.demo.ts",
                 "index": { "input": "src/index.demo.html", "output": "index.html" },
                 "tsConfig": "tsconfig.demo.json",
-                "assets": [{ "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" }],
+                "assets": [
+                  { "glob": "**/*", "input": "src/assets/demo", "output": "assets/demo" },
+                  { "glob": "**/*", "input": "src/assets/showcase", "output": "assets/showcase" }
+                ],
                 "optimization": false,
                 "sourceMap": true,
                 "preserveSymlinks": true,
@@ -77,5 +86,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

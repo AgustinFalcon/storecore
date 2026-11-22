@@ -117,7 +117,7 @@ class JdbcMediaCommandRepository(
         val updated = jdbc.update(
             """UPDATE media_upload_commands SET state='CLAIMED',lease_owner=?,
                    lease_until=GREATEST(clock_timestamp(),?::timestamptz)+?*interval '1 millisecond',
-                   fence_version=fence_version+1,updated_at=clock_timestamp()
+                   fence_version=fence_version+1,updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE draft_id=? AND upload_id=? AND (state='AWAITING_BYTES' OR (state='CLAIMED' AND lease_until<=GREATEST(clock_timestamp(),?::timestamptz)))
                  AND EXISTS(SELECT 1 FROM catalog_media_drafts d WHERE d.id=media_upload_commands.draft_id
                    AND d.state='OPEN' AND d.expires_at>clock_timestamp())""",
@@ -136,13 +136,13 @@ class JdbcMediaCommandRepository(
         val row = lockedLiveUpload(lease, now) ?: return@execute false
         if (row["deterministic_key"] != lookup.providerKey.value) return@execute false
         check(jdbc.update(
-            """UPDATE media_assets SET state='STORED_PRIVATE',provider_kind=?,provider_key=?,failure_code='NONE',updated_at=clock_timestamp()
+            """UPDATE media_assets SET state='STORED_PRIVATE',provider_kind=?,provider_key=?,failure_code='NONE',updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE id=? AND state='AWAITING_BYTES'""",
             providerKind.wire, lookup.providerKey.value, lease.snapshot.assetId.value,
         ) == 1) { "media asset transition lost" }
         check(jdbc.update(
             """UPDATE media_upload_commands SET state='COMPLETED',lease_owner=NULL,lease_until=NULL,outcome='CREATED',
-                   result=jsonb_build_object('assetId',asset_id::text,'state','STORED_PRIVATE'),updated_at=clock_timestamp()
+                   result=jsonb_build_object('assetId',asset_id::text,'state','STORED_PRIVATE'),updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE draft_id=? AND upload_id=? AND state='CLAIMED' AND lease_owner=? AND fence_version=?
                  AND lease_until>GREATEST(clock_timestamp(),?::timestamptz)""",
             lease.snapshot.draftId.value, lease.snapshot.uploadId.value, lease.leaseOwner.toString(), lease.fenceVersion,
@@ -154,7 +154,7 @@ class JdbcMediaCommandRepository(
     override fun retryUpload(lease: MediaUploadLease, now: Instant): Boolean = isolated.execute {
         if (lockedLiveUpload(lease, now) == null) return@execute false
         jdbc.update(
-            """UPDATE media_upload_commands SET state='AWAITING_BYTES',lease_owner=NULL,lease_until=NULL,updated_at=clock_timestamp()
+            """UPDATE media_upload_commands SET state='AWAITING_BYTES',lease_owner=NULL,lease_until=NULL,updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE draft_id=? AND upload_id=? AND state='CLAIMED' AND lease_owner=? AND fence_version=?
                  AND lease_until>GREATEST(clock_timestamp(),?::timestamptz)""",
             lease.snapshot.draftId.value, lease.snapshot.uploadId.value, lease.leaseOwner.toString(), lease.fenceVersion,
@@ -165,12 +165,12 @@ class JdbcMediaCommandRepository(
     override fun failUpload(lease: MediaUploadLease, failure: MediaFailureCode, now: Instant): Boolean = isolated.execute {
         if (failure == MediaFailureCode.NONE || failure == MediaFailureCode.UNKNOWN || lockedLiveUpload(lease, now) == null) return@execute false
         check(jdbc.update(
-            "UPDATE media_assets SET state='FAILED',failure_code=?,updated_at=clock_timestamp() WHERE id=? AND state='AWAITING_BYTES'",
+            "UPDATE media_assets SET state='FAILED',failure_code=?,updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=? AND state='AWAITING_BYTES'",
             failure.wire, lease.snapshot.assetId.value,
         ) == 1) { "media asset failure transition lost" }
         check(jdbc.update(
             """UPDATE media_upload_commands SET state='FAILED',lease_owner=NULL,lease_until=NULL,outcome='FAILED',
-                   result=jsonb_build_object('failure',?),updated_at=clock_timestamp()
+                   result=jsonb_build_object('failure',?),updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE draft_id=? AND upload_id=? AND state='CLAIMED' AND lease_owner=? AND fence_version=?
                  AND lease_until>GREATEST(clock_timestamp(),?::timestamptz)""",
             failure.wire, lease.snapshot.draftId.value, lease.snapshot.uploadId.value, lease.leaseOwner.toString(), lease.fenceVersion,
@@ -191,13 +191,13 @@ class JdbcMediaCommandRepository(
         val commandState = MediaCommandState.fromWire(row["command_state"] as? String)
         if (commandState == MediaCommandState.CLAIMED || commandState == MediaCommandState.AWAITING_BYTES) check(jdbc.update(
             """UPDATE media_upload_commands SET state='DELETE_PENDING',lease_owner=NULL,lease_until=NULL,
-                   outcome=NULL,result=NULL,fence_version=fence_version+1,updated_at=clock_timestamp()
+                   outcome=NULL,result=NULL,fence_version=fence_version+1,updated_at=GREATEST(clock_timestamp(),created_at)
                WHERE asset_id=? AND state IN ('CLAIMED','AWAITING_BYTES')""",
             assetId.value,
         ) == 1) { "media upload delete fencing transition lost" }
         check(jdbc.update(
             """UPDATE media_assets SET state='DELETE_PENDING',failure_code='NONE',delete_requested_at=GREATEST(clock_timestamp(),?::timestamptz),
-                   updated_at=clock_timestamp() WHERE id=?""",
+                   updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=?""",
             Timestamp.from(now), assetId.value,
         ) == 1) { "media asset delete transition lost" }
         check(jdbc.update(
@@ -254,7 +254,7 @@ class JdbcMediaCommandRepository(
         when (outcome) {
             MediaDeleteOutcome.DELETED, MediaDeleteOutcome.ALREADY_ABSENT -> {
                 check(jdbc.update(
-                    "UPDATE media_assets SET state='DELETED',failure_code='NONE',updated_at=clock_timestamp() WHERE id=? AND state IN ('DELETE_PENDING','DELETED')",
+                    "UPDATE media_assets SET state='DELETED',failure_code='NONE',updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=? AND state IN ('DELETE_PENDING','DELETED')",
                     lease.assetId.value,
                 ) == 1) { "media asset tombstone transition lost" }
                 check(jdbc.update(

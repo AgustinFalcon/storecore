@@ -3,6 +3,8 @@ import { provideRouter } from '@angular/router';
 import { HomeContentPhase as Phase } from '../../domain/user/home-content-phase';
 import { HomeBlockKind as Kind, HomeComposition } from '../../domain/content/home-composition';
 import { UserContentViewComponent } from './user-content.view';
+import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
+import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 const home: HomeComposition = {revision: 1, sections: [{key: 'hero', kind: Kind.Hero, active: true, sortOrder: 0, content: {title: '<script>Título</script>', body: 'Texto'}, updatedAt: null}]};
 function setup(phase = Phase.Editing, composition = home) {
   TestBed.configureTestingModule({imports: [UserContentViewComponent], providers: [provideRouter([])]});
@@ -20,6 +22,19 @@ describe('composition editor view', () => {
     buttons.find(button => button.textContent?.includes('Publicar cambios'))!.click();
     buttons.find(button => button.textContent?.includes('Descartar cambios'))!.click();
     expect(save).toHaveBeenCalledOnce(); expect(discard).toHaveBeenCalledOnce();
+  });
+  it('resolves existing category and product references in the preview', () => {
+    const composition: HomeComposition = { revision: 1, sections: [
+      { key: 'category', kind: Kind.CategoryRail, active: true, sortOrder: 0, content: { title: 'Categorías', categoryIds: [1] }, updatedAt: null },
+      { key: 'product', kind: Kind.ProductRail, active: true, sortOrder: 1, content: { title: 'Productos', skus: ['SKU-DEMO'] }, updatedAt: null },
+    ] };
+    const fixture = setup(Phase.Clean, composition);
+    fixture.componentRef.setInput('categories', [{ id: '1', name: 'Herramientas' }] satisfies CatalogFacet[]);
+    fixture.componentRef.setInput('products', [{ sku: 'SKU-DEMO', name: 'Taladro demo', price: 100, originalPrice: null, imageUrl: null, offerRef: null }] satisfies ProductSummary[]);
+    fixture.detectChanges(); const preview = fixture.nativeElement.querySelector('aside') as HTMLElement;
+    expect(preview.textContent).toContain('Herramientas'); expect(preview.textContent).toContain('Taladro demo');
+    expect(preview.textContent).not.toContain('Categoría no disponible: 1');
+    expect(preview.textContent).not.toContain('Producto no disponible: SKU-DEMO');
   });
   it('adds distinct typed blocks, edits references, reorders and removes by stable key', () => {
     const fixture = setup(), view = fixture.componentInstance, change = vi.fn(); view.homeChange.subscribe(change);

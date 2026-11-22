@@ -46,7 +46,7 @@ import { ProductTileComponent } from './product-tile.component';
       }
     }
   `,
-  styles: [':host {display:grid;gap:1.5rem;min-width:0} .sc-carousel__slide {min-height:16rem;padding:1.5rem} .sc-carousel h2,.sc-carousel p {color:inherit;margin:0} .sc-carousel a {justify-self:start} .block-body {white-space:pre-wrap;overflow-wrap:anywhere} h2 {overflow-wrap:anywhere}'],
+  styles: [':host {display:grid;gap:1.5rem;min-width:0} .sc-home__tiles {grid-template-columns:repeat(auto-fit,minmax(9rem,1fr))} .sc-carousel__slide {min-height:16rem;padding:1.5rem} .sc-carousel h2,.sc-carousel p {color:inherit;margin:0} .sc-carousel a {justify-self:start} .block-body {white-space:pre-wrap;overflow-wrap:anywhere} h2 {overflow-wrap:anywhere}'],
 })
 export class HomeBlocksComponent {
   constructor(private readonly router: Router) {}

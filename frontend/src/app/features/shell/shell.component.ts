@@ -1,7 +1,7 @@
 import { StoreBrandingStore } from './store-branding.store';
 import { BrandingLogoComponent } from './branding-logo.component';
 import { AsyncPipe, DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
@@ -26,6 +26,7 @@ import { matchedSurface } from '../navigation/surface-host';
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent implements OnInit {
+  readonly accessContext = AccessContext;
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   get skipLinkHref(): string { return `${this.router.url.split('#')[0]}#contenido-principal`; }
@@ -34,6 +35,8 @@ export class ShellComponent implements OnInit {
     this.document.getElementById('contenido-principal')?.focus();
   }
   query = '';
+  readonly logoutBusy = signal(false);
+  readonly logoutMessage = signal('');
   readonly consoleMode$ = this.router.events.pipe(
     filter((event): event is NavigationEnd => event instanceof NavigationEnd),
     map((event) => event.urlAfterRedirects.startsWith('/user')),
@@ -78,5 +81,21 @@ export class ShellComponent implements OnInit {
 
   retry(): void {
     this.store.loadHealth();
+  }
+
+  signOut(context: AccessContext): void {
+    if (this.logoutBusy() || !context.isKnown) return;
+    this.logoutBusy.set(true);
+    this.logoutMessage.set('');
+    this.access.logout(context).subscribe({
+      next: () => {
+        this.logoutBusy.set(false);
+        void this.router.navigateByUrl('/login');
+      },
+      error: () => {
+        this.logoutBusy.set(false);
+        this.logoutMessage.set('No se pudo cerrar la sesión. Intentá nuevamente.');
+      },
+    });
   }
 }

@@ -93,7 +93,16 @@ class MediaCommandPostgresTest {
                     runtimeRepository(fixture.url).retryUpload(claim.lease, Instant.now())
                 }
                 started.await()
-                Thread.sleep(350)
+                val databaseDeadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
+                while (fixture.jdbc.queryForObject(
+                        "SELECT clock_timestamp() > lease_until FROM media_upload_commands WHERE asset_id=?",
+                        Boolean::class.java,
+                        command.assetId.value,
+                    ) != true
+                ) {
+                    check(System.nanoTime() < databaseDeadline) { "PostgreSQL clock did not pass the upload lease deadline" }
+                    Thread.sleep(20)
+                }
                 blocker.commit()
                 assertFalse(settlement.get())
             } finally {

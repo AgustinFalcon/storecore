@@ -16,7 +16,7 @@ class DeliveryMigrationTest {
             flyway("21").migrate()
             val jdbc=JdbcTemplate(DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password))
             val history=jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
-            assertEquals("30",flyway().migrate().targetSchemaVersion.toString())
+            assertEquals("32",flyway().migrate().targetSchemaVersion.toString())
             assertEquals(history,jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=21 ORDER BY installed_rank"))
             val row=jdbc.queryForMap("SELECT config_schema_version,config_version,config::text,updated_by,state FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'")
             assertEquals(2,(row["config_schema_version"] as Number).toInt())
