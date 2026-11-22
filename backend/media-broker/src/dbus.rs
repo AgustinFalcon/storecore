@@ -75,7 +75,10 @@ impl ZbusSystemd {
                 "StartTransientUnit",
                 &(name, START_MODE, properties, auxiliary),
             )
-            .map_err(|_| SystemdError::Unavailable)?;
+            .map_err(|error| {
+                eprintln!("StartTransientUnit {name}: {error}");
+                SystemdError::Unavailable
+            })?;
         validate_job_path(&job)
     }
 
