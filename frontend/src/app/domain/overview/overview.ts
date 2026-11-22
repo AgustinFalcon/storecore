@@ -46,9 +46,10 @@ export class OverviewShipmentState {
   static readonly Pending = new OverviewShipmentState('PENDING', 'Envío pendiente');
   static readonly Preparing = new OverviewShipmentState('PREPARING', 'Preparando');
   static readonly Shipped = new OverviewShipmentState('SHIPPED', 'Despachado');
+  static readonly ReadyForPickup = new OverviewShipmentState('READY_FOR_PICKUP', 'Listo para retirar');
   static readonly Unknown = new OverviewShipmentState('UNKNOWN', 'Estado no reconocido');
   static fromWire(raw: unknown): OverviewShipmentState {
-    return [this.Missing, this.Pending, this.Preparing, this.Shipped].find((value) => value.wire === raw) ?? this.Unknown;
+    return [this.Missing, this.Pending, this.Preparing, this.Shipped, this.ReadyForPickup].find((value) => value.wire === raw) ?? this.Unknown;
   }
 }
 

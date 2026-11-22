@@ -43,6 +43,12 @@ class OverviewHttpIntegrationTest(
         val paidId = order(customerId, "PAID", "100.00")
         accredit(paidId, "100.00")
         jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PREPARING')", paidId)
+        val pickupReadyId = order(customerId, "PAID", "30.00")
+        accredit(pickupReadyId, "30.00")
+        jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'READY_FOR_PICKUP')", pickupReadyId)
+        val pickedUpId = order(customerId, "PAID", "40.00")
+        accredit(pickedUpId, "40.00")
+        jdbc.update("INSERT INTO shipments(order_id,status,delivered_at) VALUES (?,'PICKED_UP',now())", pickedUpId)
         val oldPendingId = order(customerId, "PENDING_PAYMENT", "40.00")
         val oldPaidId = order(customerId, "PAID", "60.00")
         jdbc.update("UPDATE orders SET created_at=now()-interval '2 days' WHERE id IN (?,?)", oldPendingId, oldPaidId)
@@ -55,11 +61,13 @@ class OverviewHttpIntegrationTest(
         assertEquals(200, response.statusCode.value(), response.body)
         val body = response.body!!
         assertTrue(body.contains("\"period\":\"TODAY\"") && body.contains("\"timezone\":\"America/Argentina/Buenos_Aires\""))
-        assertTrue(body.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":100.00"), body)
-        assertTrue(body.contains("\"orderCount\":{\"state\":\"KNOWN\",\"value\":2"), body)
+        assertTrue(body.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":170.00"), body)
+        assertTrue(body.contains("\"orderCount\":{\"state\":\"KNOWN\",\"value\":4"), body)
         assertTrue(body.contains("\"orderId\":$pendingId") && body.contains("\"reason\":\"NO_PAYMENT\""), body)
         assertTrue(body.contains("\"orderId\":$oldPendingId"), "current queue must include work created before TODAY: $body")
         assertTrue(body.contains("\"orderId\":$paidId") && body.contains("\"shipmentState\":\"PREPARING\""), body)
+        assertTrue(body.contains("\"orderId\":$pickupReadyId") && body.contains("\"shipmentState\":\"READY_FOR_PICKUP\""), body)
+        assertFalse(body.contains("\"orderId\":$pickedUpId"), "completed pickup must not remain in fulfillment: $body")
         assertTrue(body.contains("\"orderId\":$oldPaidId") && body.contains("\"shipmentState\":\"MISSING\""), "current fulfillment must include work created before TODAY: $body")
         assertTrue(body.contains("\"variantId\":$variantId") && body.contains("\"availableQuantity\":2") && body.contains("\"safetyStock\":5"), body)
         assertFalse(body.contains("overview-customer") || body.contains("password", true) || body.contains("buyerSnapshot", true))
@@ -99,7 +107,7 @@ class OverviewHttpIntegrationTest(
         jdbc.update("UPDATE payments SET status='REFUNDED' WHERE id=(SELECT payment_id FROM mp_checkout_attempts WHERE id=?)", refundedAttempt)
         response = exchange("/api/v1/user/overview?period=TODAY", admin)
         assertEquals(200, response.statusCode.value(), response.body)
-        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":205.00"), "resolved reversal must be excluded and rejected review retained: ${response.body}")
+        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":275.00"), "resolved reversal must be excluded and rejected review retained: ${response.body}")
         assertFalse(response.body!!.contains("\"orderId\":$reversedId"), "reversed order must not enter fulfillment")
         assertFalse(response.body!!.contains("\"orderId\":$refundedId"), "refunded order must not enter fulfillment")
         assertTrue(response.body!!.contains("\"orderId\":$rejectedId"), "rejected reversal review must retain fulfillment")
@@ -113,7 +121,7 @@ class OverviewHttpIntegrationTest(
         jdbc.update("UPDATE mp_order_incidents SET review_status='RESOLVED' WHERE order_id=?", orphanId)
         jdbc.update("UPDATE mp_order_reversal_cases SET review_status='REJECTED' WHERE id=?", reviewCase)
         response = exchange("/api/v1/user/overview?period=TODAY", admin)
-        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":225.00"), response.body)
+        assertTrue(response.body!!.contains("\"accreditedRevenue\":{\"state\":\"KNOWN\",\"value\":295.00"), response.body)
 
         jdbc.update("INSERT INTO mp_order_incidents(order_id,kind,review_status,evidence_redacted) VALUES (?,'DUPLICATE_REMOTE_CREDIT','OPEN','{}')", orphanId)
         response = exchange("/api/v1/user/overview?period=TODAY", admin)
@@ -218,9 +226,9 @@ class OverviewHttpIntegrationTest(
         }
         val restored = json.readTree(exchange("/api/v1/user/overview?period=TODAY", operator).body).path("data")
         assertEquals("KNOWN", restored.path("accreditedRevenue").path("state").asText())
-        assertEquals(0, restored.path("accreditedRevenue").path("value").decimalValue().compareTo(java.math.BigDecimal("100.00")))
+        assertEquals(0, restored.path("accreditedRevenue").path("value").decimalValue().compareTo(java.math.BigDecimal("170.00")))
         assertEquals("KNOWN", restored.path("fulfillment").path("state").asText())
-        assertEquals(2, restored.path("fulfillment").path("totalCount").asInt())
+        assertEquals(3, restored.path("fulfillment").path("totalCount").asInt())
         assertEquals(1, restored.path("fulfillment").path("items").count { it.path("orderId").asLong() == paidId })
     }
 
@@ -296,8 +304,10 @@ class OverviewHttpIntegrationTest(
         )!!
         return jdbc.queryForObject(
             """INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,
-               buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total)
-               VALUES (?,?,?,?,?,?,'{}','{}',?::numeric,0,?::numeric) RETURNING id""",
+               buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,'{}','{}',?::numeric,0,?::numeric,
+                 date_trunc('day',now() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires',
+                 date_trunc('day',now() AT TIME ZONE 'America/Argentina/Buenos_Aires') AT TIME ZONE 'America/Argentina/Buenos_Aires') RETURNING id""",
             Long::class.java, "OV-${UUID.randomUUID()}", claim, key, hash, customerId, status, total, total,
         )!!
     }

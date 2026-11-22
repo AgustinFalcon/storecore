@@ -16,6 +16,11 @@ describe('operator overview HTTP mapper', () => {
     expect(value.period).toBe(OverviewPeriod.Today); expect(value.accreditedRevenue.state).toBe(OverviewFactState.Known); expect(value.accreditedRevenue.value).toBe(0);
     expect(value.pendingPayments.items[0].reason).toBe(PendingPaymentReason.Pending); expect(value.fulfillment.items[0].shipmentState).toBe(OverviewShipmentState.Preparing);
   });
+  it('maps pickup work as a closed overview state', () => {
+    const value = mapOperatorOverview({ ...base, fulfillment: { ...base.fulfillment,
+      items: [{ ...base.fulfillment.items[0], shipmentState: 'READY_FOR_PICKUP' }] } });
+    expect(value.fulfillment.items[0].shipmentState).toBe(OverviewShipmentState.ReadyForPickup);
+  });
   it('maps future finite values to Unknown instead of exposing wire text', () => {
     const value = mapOperatorOverview({ ...base, period: 'FUTURE', pendingPayments: { ...base.pendingPayments, items: [{ ...base.pendingPayments.items[0], reason: 'FUTURE' }] } });
     expect(value.period).toBe(OverviewPeriod.Unknown); expect(value.pendingPayments.items[0].reason).toBe(PendingPaymentReason.Unknown);
