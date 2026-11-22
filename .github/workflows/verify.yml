@@ -160,8 +160,10 @@ jobs:
       - name: Start derived tmpfs and worker units through PID 1
         working-directory: backend/media-broker
         run: |
-          sudo useradd --system --no-create-home --uid 2101 storecore-backend
-          sudo useradd --system --no-create-home --uid 2102 storecore-worker
+          echo '2101:x:2101:' | sudo tee -a /etc/group
+          echo '2102:x:2102:' | sudo tee -a /etc/group
+          sudo useradd --system --no-create-home --uid 2101 --gid 2101 --no-user-group storecore-backend
+          sudo useradd --system --no-create-home --uid 2102 --gid 2102 --no-user-group storecore-worker
           runtime=/usr/lib/storecore-media-runtime
           sudo mkdir -p "$runtime"
           sudo cp -a "$(readlink -f "$JAVA_HOME")" "$runtime/jdk"

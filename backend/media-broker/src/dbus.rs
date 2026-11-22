@@ -634,10 +634,7 @@ mod tests {
             .args(["-la", where_path.to_str().unwrap_or(".")])
             .output()
             .expect("ls workspace");
-        eprintln!(
-            "workspace:\n{}",
-            String::from_utf8_lossy(&listing.stdout)
-        );
+        eprintln!("workspace:\n{}", String::from_utf8_lossy(&listing.stdout));
         let status = Command::new("systemctl")
             .args([
                 "show",
@@ -669,10 +666,7 @@ mod tests {
             .args(["-b", "-u", name, "--no-pager", "-n", "80"])
             .output()
             .expect("journalctl");
-        eprintln!(
-            "journalctl:\n{}",
-            String::from_utf8_lossy(&journal.stdout)
-        );
+        eprintln!("journalctl:\n{}", String::from_utf8_lossy(&journal.stdout));
         if !journal.stderr.is_empty() {
             eprintln!(
                 "journalctl stderr:\n{}",
