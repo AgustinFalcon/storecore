@@ -1,13 +1,24 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C fallos y reinicio
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 arranca el worker sin
-`request.bin`, atesta `UNKNOWN_EXIT` (`status=2` en journal; `CollectMode`
-puede recoger la unidad fallida) y reinicia el mismo `JobId` con
-`SELF_TEST`. Sigue sin `CPUQuota`, rechazo de
-sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Siguiente corte: rechazo de sustitución. Este documento no cierra
+`003B-4C`. Sigue sin `CPUQuota`, rechazo de sustitución ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C fallos y reinicio
+
+`master 94c27473d31184a26b1607734012147a83652be2` integra PR #353. Su
+candidato exacto `19801483f611ac737c275519766125a08655e97b` pasó Verify
+`44992591084` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr353-architecture.md` y
+`sdd/reviews/20261122-sol-pr353-security.md`. El harness atesta
+`UNKNOWN_EXIT` (`status=2` en journal) y reinicia el mismo `JobId` con
+`SELF_TEST`. El corte no cierra `003B-4C`: no hay rechazo de
+sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y
+#7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, persist reviews PR #350
 
