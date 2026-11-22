@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #348, 003B-4C sigue abierto
+
+- PR #348 merge `64796e5133f7ae5361310599d07d0ed12f99f5f2` sobre candidato
+  `15b9e5180014ce8649e02930e44ab3cf7309c679`. Verify exact-head
+  `44986626639` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr348-architecture.md` y
+  `sdd/reviews/20261122-sol-pr348-security.md`.
+- Atesta dos `JobId` con `ReadWritePaths` igual al `Where` propio. No se
+  marca `003B-4C`. No hay proceso UID A, fallos/reinicio, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C aislamiento entre jobs
 
 - `worker_properties` deriva internamente `ReadWritePaths` del `Where` de
