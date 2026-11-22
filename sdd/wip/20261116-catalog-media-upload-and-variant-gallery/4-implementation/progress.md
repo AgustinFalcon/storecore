@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C cgroup v2 del worker
+
+- El harness PID 1 atesta el directorio cgroup v2 del `.service` worker
+  en `system.slice` (`memory` controller y `memory.current`).
+- No se marca `003B-4C`. No hay cuota efectiva, aislamiento, proceso
+  UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #340, 003B-4C sigue abierto
 
 - PR #340 merge `b8d3c6250b2a0943871f61f518e9423a7c4f8f0f` sobre candidato

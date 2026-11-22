@@ -1,11 +1,12 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C sigue abierto
+## En implementación — 2026-11-22, 4C atesta cgroup v2 del worker
 
-Siguiente corte: cgroup/quota, aislamiento entre jobs y proceso UID A.
-Este documento no cierra `003B-4C`. Sigue sin cgroup/quota, aislamiento,
-proceso UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Este corte no cierra `003B-4C`. El harness PID 1 lee el cgroup v2 real
+del `.service` worker (`cgroup.controllers` memory y `memory.current`).
+No fija cuota, no aísla jobs ni corre un proceso UID A. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, 4C NORMALIZE dentro de la unidad
 
