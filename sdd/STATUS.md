@@ -4,8 +4,9 @@
 
 Este corte no cierra `003B-4C`. El harness PID 1 deja `request.bin`
 owned por UID A (2101) y `result.bin` por UID B (2102). Sigue sin
-`NORMALIZE`, cgroup/quota, aislamiento entre jobs ni `Ready`. TASK-005
-y HTTP permanecen cerrados.
+`NORMALIZE`, cgroup/quota, aislamiento entre jobs ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos. Este corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, 4B-3 worker PID 1 SELF_TEST
 
