@@ -137,21 +137,49 @@ jobs:
   media-broker-pid1:
     needs: repository-hygiene
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21.0.13+9'
+          check-latest: false
+          cache: maven
+          cache-dependency-path: backend/media-worker/pom.xml
+      - name: Pin Temurin 21.0.13+9
+        run: node .github/scripts/assert-temurin-21.mjs
+      - name: Package the media-worker jar
+        working-directory: backend/media-worker
+        run: mvn -B -DskipTests package
       - name: Install the pinned Rust toolchain
         run: >-
           rustup toolchain install 1.100.0
           --profile minimal
           --component clippy,rustfmt
-      - name: Start a derived tmpfs mount through PID 1
+      - name: Start derived tmpfs and worker units through PID 1
         working-directory: backend/media-broker
         run: |
-          sudo useradd --system --no-create-home --uid 2101 storecore-backend
-          sudo useradd --system --no-create-home --uid 2102 storecore-worker
-          sudo --preserve-env=PATH,CARGO_HOME,RUSTUP_HOME \
+          echo '2101:x:2101:' | sudo tee -a /etc/group
+          echo '2102:x:2102:' | sudo tee -a /etc/group
+          sudo useradd --system --no-create-home --uid 2101 --gid 2101 --no-user-group storecore-backend
+          sudo useradd --system --no-create-home --uid 2102 --gid 2102 --no-user-group storecore-worker
+          runtime=/usr/lib/storecore-media-runtime
+          sudo mkdir -p "$runtime"
+          sudo cp -a "$(readlink -f "$JAVA_HOME")" "$runtime/jdk"
+          sudo install -m 0444 \
+            "$GITHUB_WORKSPACE/backend/media-worker/target/storecore-media-worker-0.1.0-SNAPSHOT.jar" \
+            "$runtime/worker.jar"
+          sudo chown -R root:root "$runtime"
+          sudo chmod -R a+rX,go-w "$runtime"
+          sudo find "$runtime" -type d -exec chmod 0555 {} \;
+          sudo chmod 0555 "$runtime/jdk/bin/java"
+          sudo chmod 0444 "$runtime/worker.jar"
+          export STORECORE_MEDIA_JAVA="$runtime/jdk/bin/java"
+          export STORECORE_MEDIA_JAR="$runtime/worker.jar"
+          sudo --preserve-env=PATH,CARGO_HOME,RUSTUP_HOME,STORECORE_MEDIA_JAVA,STORECORE_MEDIA_JAR \
             "$(command -v cargo)" +1.100.0 test --locked --all-targets \
-            -- --ignored pid1_starts_and_stops_derived_tmpfs_mount
+            -- --ignored --test-threads=1 pid1_
 
   frontend:
     needs: repository-hygiene
