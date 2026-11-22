@@ -48,7 +48,10 @@ atesta `request.bin` uid 2101 y `result.bin` uid 2102; no cierra
 `output.bin`/`result.bin` Accepted uid 2102; no cierra cgroup, proceso
 UID A ni `Ready`. PR #342 (head `de9f964`, merge `c2d0413`, Verify
 `44975913833` 7/7, dos Grok 4.7 APPROVED) atesta el cgroup v2 del
-worker vía `ControlGroup`; no fija cuota ni cierra `Ready`. PR #326 arranca
+worker vía `ControlGroup`; no fija cuota ni cierra `Ready`. PR #346
+(head `caed99f`, merge `2aa276c`, Verify `44984436471` 7/7, dos Grok 4.7
+APPROVED) deriva `MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64`;
+no cierra `CPUQuota`, aislamiento ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos

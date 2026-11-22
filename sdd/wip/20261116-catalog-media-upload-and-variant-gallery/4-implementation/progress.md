@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #346, 003B-4C sigue abierto
+
+- PR #346 merge `2aa276cd7bee7a8a4b6921ed857c5ef96f59d539` sobre candidato
+  `caed99fb14c9c8c3b50200f95cfce2717f8394a9`. Verify exact-head
+  `44984436471` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr346-architecture.md` y
+  `sdd/reviews/20261122-sol-pr346-security.md`.
+- Deriva `MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64`. No se
+  marca `003B-4C`. No hay aislamiento, proceso UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C cuota efectiva del worker
 
 - `worker_properties` deriva internamente `MemoryMax=192MiB`,
