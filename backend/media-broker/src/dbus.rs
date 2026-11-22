@@ -496,13 +496,13 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         let result_path = where_path.join("result.bin");
         if started_worker != Ok(UnitState::Active) {
-            dump_worker_unit(&spec, &started_worker, &where_path);
+            dump_worker_unit(&spec, started_worker, &where_path);
         }
         wait_for_worker_result(
             &result_path,
             worker.uid(),
             &spec,
-            &started_worker,
+            started_worker,
             &where_path,
         );
         assert!(
@@ -592,7 +592,7 @@ mod tests {
         path: &Path,
         worker_uid: u32,
         spec: &TransientUnits,
-        started: &Result<UnitState, SystemdError>,
+        started: Result<UnitState, SystemdError>,
         where_path: &Path,
     ) {
         let deadline = Instant::now() + Duration::from_secs(30);
@@ -621,7 +621,7 @@ mod tests {
 
     fn dump_worker_unit(
         spec: &TransientUnits,
-        started: &Result<UnitState, SystemdError>,
+        started: Result<UnitState, SystemdError>,
         where_path: &Path,
     ) {
         let name = spec
