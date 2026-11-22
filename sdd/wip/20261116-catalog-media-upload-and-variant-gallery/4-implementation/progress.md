@@ -1,5 +1,11 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C NORMALIZE dentro de la unidad
+
+- El harness PID 1 deja `input.bin`/`request.bin` uid 2101 y atesta
+  `output.bin`/`result.bin` Accepted uid 2102.
+- No se marca `003B-4C`. No hay cgroup, proceso UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 003B-4C, request.bin UID A
 
 - El harness PID 1 chown `request.bin` a 2101:2102 (`0640`) y atesta ese
