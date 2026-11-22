@@ -98,9 +98,9 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
         val summary = jdbc.queryForMap(
             cte + """SELECT count(*) FILTER (WHERE unresolved_incident OR unresolved_reversal OR invalid_exclusion_evidence OR orphan_accredited_payment OR
                                                       (NOT excluded AND NOT valid_authority)) payment_contradiction_count,
-                              count(*) FILTER (WHERE shipment_status NOT IN ('PENDING','PREPARING','SHIPPED','DELIVERED','CANCELLED')) shipment_contradiction_count,
+                              count(*) FILTER (WHERE shipment_status NOT IN ('PENDING','PREPARING','SHIPPED','DELIVERED','READY_FOR_PICKUP','PICKED_UP','CANCELLED')) shipment_contradiction_count,
                               count(*) FILTER (WHERE valid_authority AND NOT excluded AND NOT unresolved_incident AND NOT unresolved_reversal AND
-                                      (shipment_status IS NULL OR shipment_status IN ('PENDING','PREPARING','SHIPPED'))) total_count
+                                      (shipment_status IS NULL OR shipment_status IN ('PENDING','PREPARING','SHIPPED','READY_FOR_PICKUP'))) total_count
                        FROM classified""",
         )
         if (number(summary, "payment_contradiction_count") > 0) return OverviewQueue.unavailable(OverviewUnavailableReason.PAYMENT_FACTS_INCOMPLETE)
@@ -109,7 +109,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
         val items = jdbc.query(
             cte + """SELECT id,order_number,total,created_at,paid_at,shipment_status FROM classified
                        WHERE valid_authority AND NOT excluded AND NOT unresolved_incident AND NOT unresolved_reversal AND
-                             (shipment_status IS NULL OR shipment_status IN ('PENDING','PREPARING','SHIPPED'))
+                              (shipment_status IS NULL OR shipment_status IN ('PENDING','PREPARING','SHIPPED','READY_FOR_PICKUP'))
                        ORDER BY created_at ASC,id ASC LIMIT $QUEUE_LIMIT""",
             { rs, _ -> FulfillmentItem(
                 rs.getLong("id"), rs.getString("order_number"), rs.getBigDecimal("total"), rs.getTimestamp("paid_at").toInstant(),
@@ -118,6 +118,7 @@ open class JdbcOverviewRepository(private val jdbc: JdbcTemplate) : OverviewRepo
                     "PENDING" -> OverviewShipmentState.PENDING
                     "PREPARING" -> OverviewShipmentState.PREPARING
                     "SHIPPED" -> OverviewShipmentState.SHIPPED
+                    "READY_FOR_PICKUP" -> OverviewShipmentState.READY_FOR_PICKUP
                     else -> OverviewShipmentState.UNKNOWN
                 },
             ) },

@@ -56,7 +56,7 @@ data class OverviewQueue<T>(
 
 enum class PendingPaymentReason { NO_PAYMENT, PENDING, REJECTED, UNKNOWN }
 
-enum class OverviewShipmentState { MISSING, PENDING, PREPARING, SHIPPED, UNKNOWN }
+enum class OverviewShipmentState { MISSING, PENDING, PREPARING, SHIPPED, READY_FOR_PICKUP, UNKNOWN }
 
 data class PendingPaymentItem(
     val orderId: Long,
