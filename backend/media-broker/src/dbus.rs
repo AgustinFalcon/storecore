@@ -522,6 +522,7 @@ mod tests {
                 .expect("attest worker"),
             UnitState::Active
         );
+        assert_worker_cgroup_v2(&spec);
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
             stopped_worker,
@@ -593,6 +594,7 @@ mod tests {
                 .expect("attest worker"),
             UnitState::Active
         );
+        assert_worker_cgroup_v2(&spec);
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
             stopped_worker,
@@ -791,6 +793,31 @@ mod tests {
         assert_eq!(&result[..4], &[0x53, 0x43, 0x4d, 0x57]);
         assert_eq!(result[4], 2, "RESPONSE frame");
         assert_eq!(result[12], 1, "ACCEPTED");
+    }
+
+    fn assert_worker_cgroup_v2(spec: &TransientUnits) {
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let dir = Path::new("/sys/fs/cgroup/system.slice").join(name);
+        assert!(
+            dir.is_dir(),
+            "worker cgroup v2 missing at {}",
+            dir.display()
+        );
+        let controllers = fs::read_to_string(dir.join("cgroup.controllers"))
+            .unwrap_or_else(|error| panic!("cgroup.controllers: {error}"));
+        assert!(
+            controllers
+                .split_whitespace()
+                .any(|controller| controller == "memory"),
+            "memory controller absent from {}: {controllers}",
+            dir.display()
+        );
+        let memory_current = fs::read_to_string(dir.join("memory.current"))
+            .unwrap_or_else(|error| panic!("memory.current: {error}"));
+        memory_current
+            .trim()
+            .parse::<u64>()
+            .unwrap_or_else(|error| panic!("memory.current integer: {error}"));
     }
 
     fn wait_for_worker_result(
