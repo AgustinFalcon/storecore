@@ -723,7 +723,11 @@ mod tests {
         payload.push(1);
         payload.push(0);
         payload.extend_from_slice(&0u16.to_be_bytes());
-        payload.extend_from_slice(&u64::try_from(input.len()).expect("input size").to_be_bytes());
+        payload.extend_from_slice(
+            &u64::try_from(input.len())
+                .expect("input size")
+                .to_be_bytes(),
+        );
         payload.extend_from_slice(&digest);
         payload.extend_from_slice(&(10 * MIB).to_be_bytes());
         payload.extend_from_slice(&(20 * MIB).to_be_bytes());
