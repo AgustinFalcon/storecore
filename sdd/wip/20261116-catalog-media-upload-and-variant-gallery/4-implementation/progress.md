@@ -6,6 +6,18 @@
   `output.bin`/`result.bin` Accepted uid 2102.
 - No se marca `003B-4C`. No hay cgroup, proceso UID A, `Ready` ni HTTP.
 
+## 2026-11-22 — persist reviews PR #338, 003B-4C sigue abierto
+
+- PR #338 merge `e7909f667aa6799fc3daf1fa148265b929f3749e` sobre candidato
+  `df37702e74c7047f26ec6988522a88ae28115b88`. Verify exact-head
+  `44969344387` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3 tras un P3 de wording:
+  `sdd/reviews/20261122-sol-pr338-architecture.md` y
+  `sdd/reviews/20261122-sol-pr338-security.md`.
+- El harness PID 1 deja `request.bin` uid 2101 y `result.bin` uid 2102.
+  No se marca `003B-4C`. No hay `NORMALIZE`, cgroup, proceso UID A,
+  `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 003B-4C, request.bin UID A
 
 - El harness PID 1 chown `request.bin` a 2101:2102 (`0640`) y atesta ese

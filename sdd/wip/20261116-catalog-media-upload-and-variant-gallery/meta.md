@@ -39,7 +39,10 @@ PID 1 en CI. PR #334 (head `5fe84c7`, merge `a20b4ad`, Verify
 `44961959590` 7/7) persiste las reviews de #331/#332. PR #335 (head `1b143d5`, merge `9030319`, Verify
 `44965939283` 7/7, dos Grok 4.7 APPROVED) arranca el `.service` worker
 derivado con runtime Java/jar root-owned y SELF_TEST `result.bin` uid
-2102; no cierra UID A/B ni `NORMALIZE`. PR #326 arranca
+2102; no cierra UID A/B ni `NORMALIZE`. PR #338 (head `df37702`,
+merge `e7909f6`, Verify `44969344387` 7/7, dos Grok 4.7 APPROVED)
+atesta `request.bin` uid 2101 y `result.bin` uid 2102; no cierra
+`NORMALIZE`, cgroup ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
