@@ -177,7 +177,7 @@ jobs:
           export STORECORE_MEDIA_JAR="$runtime/worker.jar"
           sudo --preserve-env=PATH,CARGO_HOME,RUSTUP_HOME,STORECORE_MEDIA_JAVA,STORECORE_MEDIA_JAR \
             "$(command -v cargo)" +1.100.0 test --locked --all-targets \
-            -- --ignored pid1_
+            -- --ignored --test-threads=1 pid1_
 
   frontend:
     needs: repository-hygiene

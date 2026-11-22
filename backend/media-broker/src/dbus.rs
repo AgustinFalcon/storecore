@@ -253,6 +253,8 @@ pub(crate) fn worker_properties(
             Value::from(vec![format!("TMPDIR={workspace}")]),
         ),
         ("RemainAfterExit", Value::from(true)),
+        ("StandardOutput", Value::from("journal".to_owned())),
+        ("StandardError", Value::from("journal".to_owned())),
     ])
 }
 
@@ -306,6 +308,7 @@ mod tests {
     use std::io::Write;
     use std::os::unix::fs::{self as unix_fs, OpenOptionsExt};
     use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::thread;
     use std::time::{Duration, Instant};
@@ -344,6 +347,8 @@ mod tests {
         assert!(worker_keys.contains(&"ReadWritePaths"));
         assert!(worker_keys.contains(&"Environment"));
         assert!(worker_keys.contains(&"RemainAfterExit"));
+        assert!(worker_keys.contains(&"StandardOutput"));
+        assert!(worker_keys.contains(&"StandardError"));
         let protect = worker
             .iter()
             .find(|(key, _)| *key == "ProtectSystem")
@@ -490,7 +495,16 @@ mod tests {
         write_self_test_request(&where_path, worker.gid());
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         let result_path = where_path.join("result.bin");
-        wait_for_worker_result(&result_path, worker.uid());
+        if started_worker != Ok(UnitState::Active) {
+            dump_worker_unit(&spec, &started_worker, &where_path);
+        }
+        wait_for_worker_result(
+            &result_path,
+            worker.uid(),
+            &spec,
+            &started_worker,
+            &where_path,
+        );
         assert!(
             !where_path.join("output.bin").exists(),
             "SELF_TEST must not write output.bin"
@@ -574,7 +588,13 @@ mod tests {
         unix_fs::chown(&path, Some(0), Some(worker_gid)).expect("chown request");
     }
 
-    fn wait_for_worker_result(path: &Path, worker_uid: u32) {
+    fn wait_for_worker_result(
+        path: &Path,
+        worker_uid: u32,
+        spec: &TransientUnits,
+        started: &Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
             if let Ok(descriptor) = rustix::fs::open(
@@ -591,12 +611,73 @@ mod tests {
                     return;
                 }
             }
-            assert!(
-                Instant::now() < deadline,
-                "worker did not write result.bin at {}",
-                path.display()
-            );
+            if Instant::now() >= deadline {
+                dump_worker_unit(spec, started, where_path);
+                panic!("worker did not write result.bin at {}", path.display());
+            }
             thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    fn dump_worker_unit(
+        spec: &TransientUnits,
+        started: &Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
+        let name = spec
+            .worker()
+            .name()
+            .as_str()
+            .unwrap_or("storecore-media-worker.service");
+        eprintln!("worker start_transient={started:?} unit={name}");
+        let listing = Command::new("ls")
+            .args(["-la", where_path.to_str().unwrap_or(".")])
+            .output()
+            .expect("ls workspace");
+        eprintln!(
+            "workspace:\n{}",
+            String::from_utf8_lossy(&listing.stdout)
+        );
+        let status = Command::new("systemctl")
+            .args([
+                "show",
+                name,
+                "-p",
+                "Id",
+                "-p",
+                "ActiveState",
+                "-p",
+                "SubState",
+                "-p",
+                "Result",
+                "-p",
+                "ExecMainStatus",
+                "-p",
+                "ExecMainCode",
+                "-p",
+                "User",
+                "-p",
+                "FragmentPath",
+            ])
+            .output()
+            .expect("systemctl show");
+        eprintln!(
+            "systemctl show:\n{}",
+            String::from_utf8_lossy(&status.stdout)
+        );
+        let journal = Command::new("journalctl")
+            .args(["-b", "-u", name, "--no-pager", "-n", "80"])
+            .output()
+            .expect("journalctl");
+        eprintln!(
+            "journalctl:\n{}",
+            String::from_utf8_lossy(&journal.stdout)
+        );
+        if !journal.stderr.is_empty() {
+            eprintln!(
+                "journalctl stderr:\n{}",
+                String::from_utf8_lossy(&journal.stderr)
+            );
         }
     }
 }
