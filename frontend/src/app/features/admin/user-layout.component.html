@@ -4,7 +4,7 @@
     <a [routerLink]="action.path" routerLinkActive="is-active">{{ action.label }}</a>
   }
   @if (session.authenticated()) {
-    <button type="button" class="sc-console-nav__out" [disabled]="logoutBusy()" (click)="signOut()">Salir</button>
+    <button type="button" class="sc-console-nav__out" [disabled]="logoutBusy()" (click)="signOut()">Cerrar sesión</button>
   }
 </nav>
 @if (logoutMessage()) { <p role="alert">{{ logoutMessage() }}</p> }

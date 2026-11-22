@@ -3,6 +3,7 @@ package com.storecore.catalog.infrastructure
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.storecore.catalog.domain.ArsAmount
 import com.storecore.catalog.domain.CatalogSearchTerm
+import com.storecore.catalog.domain.CatalogImageReference
 import com.storecore.catalog.domain.VariantPriceCommand
 import com.storecore.catalog.application.port.input.CatalogSearchResult
 import com.storecore.catalog.application.port.output.CatalogQueryPort
@@ -91,7 +92,7 @@ class JdbcCatalogService(private val jdbc: JdbcTemplate, private val mapper: Obj
             lockedVariants[current.sku] = current.copy(active = effective)
         }
         jdbc.update("DELETE FROM product_images WHERE product_id=?", productId)
-        images.filter { it.startsWith("https://") }.forEachIndexed { index, url -> jdbc.update("INSERT INTO product_images(product_id,url,sort_order,is_primary) VALUES (?,?,?,?)", productId, url, index, index == 0) }
+        images.mapNotNull { CatalogImageReference.fromWire(it).storedValue }.forEachIndexed { index, url -> jdbc.update("INSERT INTO product_images(product_id,url,sort_order,is_primary) VALUES (?,?,?,?)", productId, url, index, index == 0) }
         val stockChanges = mutableListOf<Triple<Long, Int, String?>>()
         variants.forEachIndexed { index, variant ->
             val requestedVariantActive = variantStates[index].active

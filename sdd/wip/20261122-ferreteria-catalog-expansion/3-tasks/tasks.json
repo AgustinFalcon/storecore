@@ -1,0 +1,11 @@
+{
+  "feature": "20261122-ferreteria-catalog-expansion",
+  "status": "done",
+  "tasks": [
+    { "id": "FCE-T01", "title": "Approve dense catalog contract", "status": "done", "requirements": ["FCE-R01", "FCE-R02", "FCE-R03", "FCE-R04", "FCE-R05", "FCE-R06", "FCE-R07"] },
+    { "id": "FCE-T02", "title": "Implement deterministic 72-product fixture matrix", "status": "done", "requirements": ["FCE-R02", "FCE-R03", "FCE-R06"], "evidence": "2 Node tests pass; 12 categories and 72 unique SKUs" },
+    { "id": "FCE-T03", "title": "Implement API-only idempotent loader and local photo bank", "status": "done", "requirements": ["FCE-R01", "FCE-R03", "FCE-R04", "FCE-R05"], "evidence": "66 photos localized; API reconciliation 72; replay preserved 72 with stable digest cc6ef2e514736fd347eb2ad5942e937968d218db6eaed0537972da46fdafc2b1" },
+    { "id": "FCE-T04", "title": "Inject, replay and validate database totals", "status": "done", "requirements": ["FCE-R05", "FCE-R07"], "evidence": "152 products, 152 variants, 452 images, 288 expansion images, min/max 4, duplicate SKUs 0" },
+    { "id": "FCE-T05", "title": "Validate populated public and administrator surfaces", "status": "done", "requirements": ["FCE-R07"], "evidence": "Expanded catalog browser PASS; 152 total, 50 tiles, 4 thumbnails with loaded pixels; presentation browser 24/24 PASS" }
+  ]
+}

@@ -5,6 +5,8 @@ import { HomeContentPhase } from '../../domain/user/home-content-phase';
 import { homeContentDirty, UserContentState } from './user-content.store';
 import { FeatureStatusComponent } from '../../shared/feature-status.component';
 import { HomeBlocksComponent } from '../../shared/home-blocks.component';
+import { CatalogFacet } from '../../domain/catalog/catalog-facet.entity';
+import { ProductSummary } from '../../domain/catalog/product-summary.entity';
 @Component({
   selector: 'sc-user-content-view',
   imports: [FormsModule, FeatureStatusComponent, HomeBlocksComponent],
@@ -14,6 +16,8 @@ import { HomeBlocksComponent } from '../../shared/home-blocks.component';
 })
 export class UserContentViewComponent {
   @Input({ required: true }) state!: UserContentState;
+  @Input() categories: readonly CatalogFacet[] = [];
+  @Input() products: readonly ProductSummary[] = [];
   readonly Phase = HomeContentPhase;
   readonly kinds = HomeBlockKind.editable;
   @Output() readonly homeChange = new EventEmitter<HomeComposition>();

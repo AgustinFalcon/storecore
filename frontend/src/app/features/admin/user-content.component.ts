@@ -4,16 +4,19 @@ import { HomeContentPhase } from '../../domain/user/home-content-phase';
 import { UserSession } from '../../core/auth/user-session';
 import { UserContentViewComponent } from './user-content.view';
 import { UserContentStore } from './user-content.store';
+import { CatalogStore } from '../storefront/catalog.store';
 
 @Component({
   selector: 'sc-user-content',
   imports: [AsyncPipe, UserContentViewComponent],
-  providers: [UserContentStore],
+  providers: [UserContentStore, CatalogStore],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (store.state$ | async; as state) {
       <sc-user-content-view
         [state]="state"
+        [categories]="(catalog.categories$ | async) ?? []"
+        [products]="(catalog.offers$ | async) ?? []"
         (homeChange)="store.edit($event)"
         (save)="store.publish()"
         (retry)="store.load()"
@@ -23,7 +26,8 @@ import { UserContentStore } from './user-content.store';
   `,
 })
 export class UserContentComponent {
-  constructor(readonly store: UserContentStore, private readonly session: UserSession) {
+  constructor(readonly store: UserContentStore, private readonly session: UserSession, readonly catalog: CatalogStore) {
+    catalog.loadStorefront();
     effect(() => {
       store.setActor(session.authenticated() ? session.principal() : null);
       store.load();

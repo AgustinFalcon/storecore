@@ -20,6 +20,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.testcontainers.containers.PostgreSQLContainer
 import java.sql.DriverManager
+import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
@@ -177,7 +178,16 @@ class CapabilitySessionAdministrationMigrationTest {
                 }
             }
             check(started.await(5, TimeUnit.SECONDS))
-            Thread.sleep(3_000)
+            val databaseDeadline = System.nanoTime() + Duration.ofSeconds(10).toNanos()
+            while (jdbc.queryForObject(
+                    "SELECT clock_timestamp() >= idle_expires_at FROM identity_sessions WHERE id=?",
+                    Boolean::class.java,
+                    expiringSession,
+                ) != true
+            ) {
+                check(System.nanoTime() < databaseDeadline) { "PostgreSQL clock did not pass the session deadline" }
+                Thread.sleep(20)
+            }
             blocker.commit()
 
             val failure = assertThrows(ExecutionException::class.java) { future.get(10, TimeUnit.SECONDS) }

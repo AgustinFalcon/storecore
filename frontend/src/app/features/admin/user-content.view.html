@@ -61,7 +61,7 @@
         <p>{{ dirty ? 'Tus cambios todavía no se publicaron.' : 'Composición confirmada por la tienda.' }} Sólo se muestran los bloques visibles y compatibles.</p>
         <p class="field-help">Las referencias de catálogo se verifican al publicar. Los productos o categorías sin datos se indican como no disponibles.</p>
         @if (state.conflict) { <p role="note">Cargá la versión actual para conservar tu borrador sobre ella. Revisalo antes de publicar: la publicación reemplaza toda la composición.</p> }
-        <sc-home-blocks [sections]="state.home.sections" />
+        <sc-home-blocks [sections]="state.home.sections" [categories]="categories" [products]="products" />
       </aside>
     </div>
   }

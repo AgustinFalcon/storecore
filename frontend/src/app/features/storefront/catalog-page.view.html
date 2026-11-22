@@ -29,6 +29,7 @@
       Sólo ofertas
     </label>
     <button type="submit" class="sc-btn sc-btn--primary">Buscar</button>
+    <button type="button" class="sc-btn sc-btn--ghost" (click)="filtersClear.emit()">Limpiar filtros</button>
   </form>
   <sc-feature-status
     [loading]="state.loading"

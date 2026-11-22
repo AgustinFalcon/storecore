@@ -18,5 +18,6 @@ export class CatalogPageViewComponent {
   @Output() readonly categoryChange = new EventEmitter<string>();
   @Output() readonly offersChange = new EventEmitter<boolean>();
   @Output() readonly searchSubmit = new EventEmitter<void>();
+  @Output() readonly filtersClear = new EventEmitter<void>();
 }
 import { BoundedPaginationComponent } from '../../shared/bounded-pagination.component';

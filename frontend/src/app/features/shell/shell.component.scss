@@ -130,6 +130,21 @@
   font-weight: 650;
 }
 
+.chrome__signout {
+  min-height: 2.5rem;
+  padding: 0 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--sc-text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.chrome__signout:disabled { cursor: wait; opacity: 0.7; }
+
 .chrome__badge {
   position: absolute;
   top: 0.15rem;
@@ -208,8 +223,18 @@
 
 @media (max-width: 767px) {
   .chrome {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr);
     padding: var(--sc-space-4);
+  }
+
+  .chrome__brand,
+  .chrome__actions {
+    grid-column: 1 / -1;
+  }
+
+  .chrome__actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
 
   .chrome__search {

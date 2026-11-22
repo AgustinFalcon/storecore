@@ -157,25 +157,25 @@ class JdbcMediaCompositionRepository(
 
         for (assetId in stagedAssetIds) {
             check(jdbc.update(
-                "UPDATE media_assets SET state='ATTACHED',updated_at=clock_timestamp() WHERE id=? AND state='STORED_PRIVATE'",
+                "UPDATE media_assets SET state='ATTACHED',updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=? AND state='STORED_PRIVATE'",
                 assetId.value,
             ) == 1) { "media asset attach transition lost" }
             check(jdbc.update(
-                """UPDATE media_upload_commands SET state='ATTACHED',outcome=NULL,result=NULL,updated_at=clock_timestamp()
+                """UPDATE media_upload_commands SET state='ATTACHED',outcome=NULL,result=NULL,updated_at=GREATEST(clock_timestamp(),created_at)
                    WHERE asset_id=? AND state='COMPLETED'""",
                 assetId.value,
             ) == 1) { "media upload attach transition lost" }
         }
         for (assetId in removedAssets) {
             check(jdbc.update(
-                """UPDATE media_assets SET state='STORED_PRIVATE',updated_at=clock_timestamp()
+                """UPDATE media_assets SET state='STORED_PRIVATE',updated_at=GREATEST(clock_timestamp(),created_at)
                    WHERE id=? AND state='ATTACHED' AND NOT EXISTS
                      (SELECT 1 FROM product_images WHERE media_asset_id=?)""",
                 assetId.value, assetId.value,
             ) == 1) { "media asset detach transition lost" }
             check(jdbc.update(
                 """UPDATE media_upload_commands SET state='COMPLETED',outcome='CREATED',
-                     result=jsonb_build_object('assetId',asset_id::text,'state','STORED_PRIVATE'),updated_at=clock_timestamp()
+                     result=jsonb_build_object('assetId',asset_id::text,'state','STORED_PRIVATE'),updated_at=GREATEST(clock_timestamp(),created_at)
                    WHERE asset_id=? AND state='ATTACHED'""",
                 assetId.value,
             ) == 1) { "media upload detach transition lost" }

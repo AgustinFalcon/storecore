@@ -76,8 +76,20 @@ class MediaProductCreationPostgresTest {
     @Test fun `expired draft and unavailable asset fail closed without partial product`() {
         fixture().use { f ->
             val expired = f.command("expired", 0)
-            f.jdbc.update("UPDATE catalog_media_drafts SET expires_at=clock_timestamp()+interval '100 milliseconds' WHERE id=?", expired.draftId.value)
-            Thread.sleep(200)
+            f.jdbc.update(
+                "UPDATE catalog_media_drafts SET expires_at=GREATEST(clock_timestamp(),created_at)+interval '100 milliseconds' WHERE id=?",
+                expired.draftId.value,
+            )
+            val databaseDeadline = System.nanoTime() + Duration.ofSeconds(10).toNanos()
+            while (f.jdbc.queryForObject(
+                    "SELECT clock_timestamp() >= expires_at FROM catalog_media_drafts WHERE id=?",
+                    Boolean::class.java,
+                    expired.draftId.value,
+                ) != true
+            ) {
+                check(System.nanoTime() < databaseDeadline) { "PostgreSQL clock did not pass the draft deadline" }
+                Thread.sleep(20)
+            }
             assertEquals(MediaProductCreationResult.DraftClosed, f.repository.create(expired))
             assertEquals(0, f.count("products"))
         }
@@ -314,14 +326,14 @@ class MediaProductCreationPostgresTest {
         }
     }
 
-    @Test fun `V30 upgrades V29 and preserves published checksums`() {
+    @Test fun `current schema upgrades V29 and preserves published checksums`() {
         val database = "media_create_upgrade_${UUID.randomUUID().toString().replace("-", "")}"
         postgres.createConnection("").use { it.createStatement().execute("CREATE DATABASE $database") }
         val url = postgres.jdbcUrl.substringBefore('?').substringBeforeLast('/') + "/$database"
         val v29 = flyway(url, "29"); assertEquals("29", v29.migrate().targetSchemaVersion.toString())
         val jdbc = JdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         val history = jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
-        assertEquals("30", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("32", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=29 ORDER BY installed_rank"))
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name='catalog_media_product_creation_commands'", Int::class.java))
         flyway(url).validate()

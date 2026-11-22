@@ -123,9 +123,9 @@ class JdbcMediaProductCreationRepository(
             variantSnapshots += CreatedVariantGallerySnapshot(gallery.clientRef, images)
         }
         assetRows.keys.forEach { assetId ->
-            if (jdbc.update("UPDATE media_assets SET state='ATTACHED',updated_at=clock_timestamp() WHERE id=? AND state='STORED_PRIVATE'", assetId.value) != 1)
+            if (jdbc.update("UPDATE media_assets SET state='ATTACHED',updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=? AND state='STORED_PRIVATE'", assetId.value) != 1)
                 throw CreationAbort(MediaProductCreationResult.AssetUnavailable)
-            if (jdbc.update("UPDATE media_upload_commands SET state='ATTACHED',outcome=NULL,result=NULL,updated_at=clock_timestamp() WHERE asset_id=? AND state='COMPLETED'", assetId.value) != 1)
+            if (jdbc.update("UPDATE media_upload_commands SET state='ATTACHED',outcome=NULL,result=NULL,updated_at=GREATEST(clock_timestamp(),created_at) WHERE asset_id=? AND state='COMPLETED'", assetId.value) != 1)
                 throw CreationAbort(MediaProductCreationResult.AssetUnavailable)
         }
         if (jdbc.update(

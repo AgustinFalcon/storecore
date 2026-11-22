@@ -70,14 +70,14 @@ class JdbcMediaDraftCleanupRepository(
             if (commandState == MediaCommandState.CLAIMED || commandState == MediaCommandState.AWAITING_BYTES) {
                 check(jdbc.update(
                     """UPDATE media_upload_commands SET state='DELETE_PENDING',lease_owner=NULL,lease_until=NULL,
-                         outcome=NULL,result=NULL,fence_version=fence_version+1,updated_at=clock_timestamp()
+                         outcome=NULL,result=NULL,fence_version=fence_version+1,updated_at=GREATEST(clock_timestamp(),created_at)
                        WHERE asset_id=? AND state IN ('CLAIMED','AWAITING_BYTES')""",
                     assetId,
                 ) == 1) { "media orphan upload fencing transition lost" }
             }
             check(jdbc.update(
                 """UPDATE media_assets SET state='DELETE_PENDING',failure_code='NONE',
-                     delete_requested_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=?""",
+                     delete_requested_at=clock_timestamp(),updated_at=GREATEST(clock_timestamp(),created_at) WHERE id=?""",
                 assetId,
             ) == 1) { "media orphan asset transition lost" }
             check(jdbc.update(

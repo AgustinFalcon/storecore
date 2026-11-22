@@ -40,6 +40,9 @@
         <a class="chrome__account" [routerLink]="customer.authenticated() ? '/customer/profile' : '/login'">
           {{ customer.authenticated() ? 'Mi cuenta' : 'Ingresá' }}
         </a>
+        @if (customer.authenticated()) {
+          <button type="button" class="chrome__signout" [disabled]="logoutBusy()" (click)="signOut(accessContext.Customer)">Cerrar sesión</button>
+        }
       </div>
     </header>
     <nav class="chrome__cats" aria-label="Categorías">
@@ -53,6 +56,9 @@
   }
 
   <div class="shell__status" aria-live="polite">
+    @if (logoutMessage()) {
+      <p class="status status--error" role="alert">{{ logoutMessage() }}</p>
+    }
     @if (store.loading$ | async) {
       <p class="status status--loading">Comprobando el API de esta instalación…</p>
     } @else if (store.errorMessage$ | async; as errorMessage) {

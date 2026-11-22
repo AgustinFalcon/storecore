@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "images": [
+    {
+      "source": "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-001.jpg",
+      "bytes": 248792
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-002.jpg",
+      "bytes": 251400
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-003.jpg",
+      "bytes": 248792
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-004.jpg",
+      "bytes": 128152
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-005.jpg",
+      "bytes": 128152
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-006.jpg",
+      "bytes": 117548
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-007.jpg",
+      "bytes": 128152
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-008.jpg",
+      "bytes": 177873
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+      "localUrl": "/assets/showcase/catalog/ferreteria-009.jpg",
+      "bytes": 177873
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-010.jpg",
+      "bytes": 177894
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-011.jpg",
+      "bytes": 172760
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-012.jpg",
+      "bytes": 177894
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-013.jpg",
+      "bytes": 312504
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-014.jpg",
+      "bytes": 312504
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-015.jpg",
+      "bytes": 314211
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-016.jpg",
+      "bytes": 312504
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-017.jpg",
+      "bytes": 134850
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-018.jpg",
+      "bytes": 142856
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=top",
+      "localUrl": "/assets/showcase/catalog/ferreteria-019.jpg",
+      "bytes": 134850
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-020.jpg",
+      "bytes": 109724
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-021.jpg",
+      "bytes": 109720
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-022.jpg",
+      "bytes": 109703
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-023.jpg",
+      "bytes": 109724
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-024.jpg",
+      "bytes": 119550
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+      "localUrl": "/assets/showcase/catalog/ferreteria-025.jpg",
+      "bytes": 136869
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-026.jpg",
+      "bytes": 119550
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-027.jpg",
+      "bytes": 136776
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=top",
+      "localUrl": "/assets/showcase/catalog/ferreteria-028.jpg",
+      "bytes": 110284
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-029.jpg",
+      "bytes": 129618
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+      "localUrl": "/assets/showcase/catalog/ferreteria-030.jpg",
+      "bytes": 162264
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-031.jpg",
+      "bytes": 129618
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=edges",
+      "localUrl": "/assets/showcase/catalog/ferreteria-032.jpg",
+      "bytes": 87499
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-033.jpg",
+      "bytes": 153404
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-034.jpg",
+      "bytes": 129584
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-035.jpg",
+      "bytes": 115388
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+      "localUrl": "/assets/showcase/catalog/ferreteria-036.jpg",
+      "bytes": 115388
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-037.jpg",
+      "bytes": 115388
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=edges",
+      "localUrl": "/assets/showcase/catalog/ferreteria-038.jpg",
+      "bytes": 115730
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-039.jpg",
+      "bytes": 113757
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-040.jpg",
+      "bytes": 115376
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=top",
+      "localUrl": "/assets/showcase/catalog/ferreteria-041.jpg",
+      "bytes": 115388
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-042.jpg",
+      "bytes": 127544
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-043.jpg",
+      "bytes": 127557
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=edges",
+      "localUrl": "/assets/showcase/catalog/ferreteria-044.jpg",
+      "bytes": 134924
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-045.jpg",
+      "bytes": 134088
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-046.jpg",
+      "bytes": 127544
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-047.jpg",
+      "bytes": 164836
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-048.jpg",
+      "bytes": 165149
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-049.jpg",
+      "bytes": 164878
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-050.jpg",
+      "bytes": 364834
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+      "localUrl": "/assets/showcase/catalog/ferreteria-051.jpg",
+      "bytes": 347310
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-052.jpg",
+      "bytes": 364834
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=edges",
+      "localUrl": "/assets/showcase/catalog/ferreteria-053.jpg",
+      "bytes": 330880
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-054.jpg",
+      "bytes": 365255
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-055.jpg",
+      "bytes": 364834
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-056.jpg",
+      "bytes": 297275
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-057.jpg",
+      "bytes": 297219
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-058.jpg",
+      "bytes": 302104
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-059.jpg",
+      "bytes": 296349
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-060.jpg",
+      "bytes": 128535
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-061.jpg",
+      "bytes": 128535
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-062.jpg",
+      "bytes": 128415
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80",
+      "localUrl": "/assets/showcase/catalog/ferreteria-063.jpg",
+      "bytes": 217167
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=center",
+      "localUrl": "/assets/showcase/catalog/ferreteria-064.jpg",
+      "bytes": 217167
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+      "localUrl": "/assets/showcase/catalog/ferreteria-065.jpg",
+      "bytes": 211793
+    },
+    {
+      "source": "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=faces",
+      "localUrl": "/assets/showcase/catalog/ferreteria-066.jpg",
+      "bytes": 217139
+    }
+  ]
+}
