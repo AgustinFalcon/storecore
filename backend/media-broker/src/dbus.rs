@@ -229,6 +229,14 @@ pub(crate) fn worker_properties(
         .to_str()
         .ok_or(SystemdError::Unavailable)?
         .to_owned();
+    let jobs_root = spec
+        .mount()
+        .where_path()
+        .parent()
+        .and_then(|path| path.to_str())
+        .filter(|path| !path.is_empty())
+        .ok_or(SystemdError::Unavailable)?
+        .to_owned();
     Ok(vec![
         (
             "Description",
@@ -250,6 +258,7 @@ pub(crate) fn worker_properties(
         ("WorkingDirectory", Value::from(workspace.clone())),
         ("NoNewPrivileges", Value::from(true)),
         ("ProtectSystem", Value::from("strict".to_owned())),
+        ("InaccessiblePaths", Value::from(vec![jobs_root])),
         ("ReadWritePaths", Value::from(vec![workspace.clone()])),
         (
             "Environment",
@@ -355,6 +364,7 @@ mod tests {
         assert!(worker_keys.contains(&"ExecStart"));
         assert!(worker_keys.contains(&"NoNewPrivileges"));
         assert!(worker_keys.contains(&"ProtectSystem"));
+        assert!(worker_keys.contains(&"InaccessiblePaths"));
         assert!(worker_keys.contains(&"ReadWritePaths"));
         assert!(worker_keys.contains(&"Environment"));
         assert!(worker_keys.contains(&"RemainAfterExit"));
@@ -404,6 +414,22 @@ mod tests {
                 .is_some_and(|value| value.contains(where_path)),
             "ReadWritePaths must be the derived Where {where_path}, got {writable:?}"
         );
+        let hidden = worker
+            .iter()
+            .find(|(key, _)| *key == "InaccessiblePaths")
+            .map(|(_, value)| format!("{value:?}"));
+        let jobs_root = spec
+            .mount()
+            .where_path()
+            .parent()
+            .and_then(|path| path.to_str())
+            .expect("jobs root");
+        assert!(
+            hidden
+                .as_deref()
+                .is_some_and(|value| value.contains(jobs_root)),
+            "InaccessiblePaths must be the derived jobs root {jobs_root}, got {hidden:?}"
+        );
         let environment = worker
             .iter()
             .find(|(key, _)| *key == "Environment")
@@ -424,6 +450,50 @@ mod tests {
         assert_eq!(spec.worker().argv()[1], "-jar");
         assert_eq!(spec.worker().argv()[0], spec.worker().java());
         assert_eq!(spec.worker().argv()[2], spec.worker().jar());
+    }
+
+    #[test]
+    fn two_jobs_do_not_share_read_write_paths() {
+        let runtime = approved_runtime();
+        let spec_a = TransientUnits::derive(
+            JobId::create([0x44; 16]).expect("job a"),
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec a");
+        let spec_b = TransientUnits::derive(
+            JobId::create([0x55; 16]).expect("job b"),
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec b");
+        let where_a = spec_a.mount().where_path().to_str().expect("where a");
+        let where_b = spec_b.mount().where_path().to_str().expect("where b");
+        assert_ne!(where_a, where_b, "jobs must not share Where");
+        let worker_a = worker_properties(&spec_a).expect("worker a");
+        let worker_b = worker_properties(&spec_b).expect("worker b");
+        let writable_a = worker_a
+            .iter()
+            .find(|(key, _)| *key == "ReadWritePaths")
+            .map(|(_, value)| format!("{value:?}"));
+        let writable_b = worker_b
+            .iter()
+            .find(|(key, _)| *key == "ReadWritePaths")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            writable_a
+                .as_deref()
+                .is_some_and(|value| value.contains(where_a) && !value.contains(where_b)),
+            "worker A ReadWritePaths must be only Where A, got {writable_a:?}"
+        );
+        assert!(
+            writable_b
+                .as_deref()
+                .is_some_and(|value| value.contains(where_b) && !value.contains(where_a)),
+            "worker B ReadWritePaths must be only Where B, got {writable_b:?}"
+        );
     }
 
     #[test]
@@ -642,6 +712,44 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_isolates_worker_read_write_paths_per_job() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec_a = start_pid1_self_test_worker(
+            &mut systemd,
+            JobId::create([0x44; 16]).expect("job a"),
+            &runtime,
+            worker,
+        );
+        let spec_b = start_pid1_self_test_worker(
+            &mut systemd,
+            JobId::create([0x55; 16]).expect("job b"),
+            &runtime,
+            worker,
+        );
+        let where_a = spec_a.mount().where_path().to_path_buf();
+        let where_b = spec_b.mount().where_path().to_path_buf();
+        assert_worker_job_isolation(&spec_a, &where_b);
+        assert_worker_job_isolation(&spec_b, &where_a);
+        stop_pid1_worker(&mut systemd, &spec_a);
+        stop_pid1_worker(&mut systemd, &spec_b);
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -827,6 +935,108 @@ mod tests {
         assert_eq!(&result[..4], &[0x53, 0x43, 0x4d, 0x57]);
         assert_eq!(result[4], 2, "RESPONSE frame");
         assert_eq!(result[12], 1, "ACCEPTED");
+    }
+
+    fn start_pid1_self_test_worker(
+        systemd: &mut ZbusSystemd,
+        job: JobId,
+        runtime: &ApprovedRuntime,
+        worker: Principal,
+    ) -> TransientUnits {
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        assert_request_owned_by_backend(&where_path, 2101);
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        let result_path = where_path.join("result.bin");
+        if started_worker != Ok(UnitState::Active) {
+            dump_worker_unit(&spec, started_worker, &where_path);
+        }
+        assert_worker_cgroup_v2(&spec);
+        wait_for_worker_result(
+            &result_path,
+            worker.uid(),
+            &spec,
+            started_worker,
+            &where_path,
+            Duration::from_secs(30),
+        );
+        assert_eq!(
+            started_worker.expect("start worker"),
+            UnitState::Active,
+            "RemainAfterExit keeps the worker Active after SELF_TEST exits"
+        );
+        spec
+    }
+
+    fn stop_pid1_worker(systemd: &mut ZbusSystemd, spec: &TransientUnits) {
+        let stopped_worker = systemd.stop(UnitKind::Worker, spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    fn assert_worker_job_isolation(spec: &TransientUnits, peer_where: &Path) {
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let own = spec.mount().where_path().to_str().expect("own where");
+        let peer = peer_where.to_str().expect("peer where");
+        assert_ne!(own, peer, "jobs must not share Where");
+        let writable = systemctl_property(name, "ReadWritePaths");
+        let writable_paths: Vec<&str> = writable.split_whitespace().collect();
+        assert!(
+            writable_paths.iter().any(|path| *path == own),
+            "ReadWritePaths of {name} must include own Where {own}: {writable}"
+        );
+        assert!(
+            !writable_paths.iter().any(|path| *path == peer),
+            "ReadWritePaths of {name} must not include peer Where {peer}: {writable}"
+        );
+        assert!(
+            !writable_paths.iter().any(|path| {
+                path.starts_with("/run/storecore_media/jobs/") && *path != own
+            }),
+            "ReadWritePaths of {name} must not include another job Where: {writable}"
+        );
+        let hidden = systemctl_property(name, "InaccessiblePaths");
+        let jobs_root = spec
+            .mount()
+            .where_path()
+            .parent()
+            .and_then(|path| path.to_str())
+            .expect("jobs root");
+        assert!(
+            hidden.split_whitespace().any(|path| path == jobs_root),
+            "InaccessiblePaths of {name} must include jobs root {jobs_root}: {hidden}"
+        );
+    }
+
+    fn systemctl_property(name: &str, property: &str) -> String {
+        let shown = Command::new("systemctl")
+            .args(["show", name, "-p", property, "--value"])
+            .output()
+            .unwrap_or_else(|error| panic!("systemctl {property}: {error}"));
+        assert!(
+            shown.status.success(),
+            "systemctl {property} failed for {name}: {}",
+            String::from_utf8_lossy(&shown.stderr)
+        );
+        String::from_utf8_lossy(&shown.stdout).trim().to_owned()
     }
 
     fn assert_worker_cgroup_v2(spec: &TransientUnits) {
