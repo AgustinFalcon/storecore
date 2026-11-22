@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-22 — PR #335 fusionado, 003B-4B-3 sigue abierto
+
+- PR #335 merge `9030319adc16f21b0be95f38c9258593d8cbcf73` sobre candidato
+  `1b143d56ac88cffa1b8bd679ad6794267a0b43a1`. Verify exact-head
+  `44965939283` terminó 7/7 (incluye worker `SELF_TEST` en PID 1). Dos
+  reviews independientes Grok 4.7 aprobaron sin P0–P3:
+  `sdd/reviews/20261122-sol-pr335-architecture.md` y
+  `sdd/reviews/20261122-sol-pr335-security.md`.
+- El corte arranca el `.service` worker derivado. No se marca
+  `003B-4B-3` ni `003B-4C`. No hay UID A, `NORMALIZE`, cgroup, `Ready`
+  ni HTTP.
+
 ## 2026-11-21 — 003B-4B-3 worker PID 1 SELF_TEST, 4B-3 sigue abierto
 
 - El job `media-broker-pid1` empaqueta el fat-jar, copia Temurin 21.0.13+9
