@@ -724,6 +724,47 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_uid_a_process_cannot_traverse_job_tmpfs() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x66; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        assert_request_owned_by_backend(&where_path, 2101);
+        assert_uid_a_process(&where_path);
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -909,6 +950,76 @@ mod tests {
         assert_eq!(&result[..4], &[0x53, 0x43, 0x4d, 0x57]);
         assert_eq!(result[4], 2, "RESPONSE frame");
         assert_eq!(result[12], 1, "ACCEPTED");
+    }
+
+    fn assert_uid_a_process(where_path: &Path) {
+        let identity = Command::new("setpriv")
+            .args([
+                "--reuid=2101",
+                "--regid=2101",
+                "--clear-groups",
+                "--",
+                "id",
+                "-u",
+            ])
+            .output()
+            .expect("setpriv id");
+        assert!(
+            identity.status.success(),
+            "setpriv id failed: {}",
+            String::from_utf8_lossy(&identity.stderr)
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&identity.stdout).trim(),
+            "2101",
+            "UID A process must run as 2101"
+        );
+        let request = where_path.join("request.bin");
+        let read = Command::new("setpriv")
+            .args([
+                "--reuid=2101",
+                "--regid=2101",
+                "--clear-groups",
+                "--",
+                "head",
+                "-c",
+                "1",
+            ])
+            .arg(&request)
+            .output()
+            .expect("setpriv read");
+        assert!(
+            !read.status.success(),
+            "UID A process must not search the 03770 job tmpfs"
+        );
+        let read_err = String::from_utf8_lossy(&read.stderr);
+        assert!(
+            read_err.contains("Permission denied"),
+            "UID A read must fail closed on the job tmpfs, got {read_err}"
+        );
+        let probe = where_path.join("uid-a-write.bin");
+        let write = Command::new("setpriv")
+            .args([
+                "--reuid=2101",
+                "--regid=2101",
+                "--clear-groups",
+                "--",
+                "dd",
+                "if=/dev/zero",
+                &format!("of={}", probe.display()),
+                "bs=1",
+                "count=1",
+            ])
+            .output()
+            .expect("setpriv write");
+        assert!(
+            !write.status.success(),
+            "UID A process must not write the 03770 job tmpfs"
+        );
+        assert!(
+            !probe.exists(),
+            "UID A process must not leave a file in the job tmpfs"
+        );
     }
 
     fn start_pid1_self_test_worker(

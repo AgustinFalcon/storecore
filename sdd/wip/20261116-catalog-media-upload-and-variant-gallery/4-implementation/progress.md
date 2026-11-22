@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C proceso UID A
+
+- El harness PID 1 permanece euid 0 y coloca `request.bin` uid 2101. Un
+  proceso `setpriv --reuid=2101` no recorre ni escribe el tmpfs `03770`
+  (el handoff productivo sigue siendo `SCM_RIGHTS`).
+- No se marca `003B-4C`. No hay fallos/reinicio, rechazo de sustitución,
+  `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #348, 003B-4C sigue abierto
 
 - PR #348 merge `64796e5133f7ae5361310599d07d0ed12f99f5f2` sobre candidato
