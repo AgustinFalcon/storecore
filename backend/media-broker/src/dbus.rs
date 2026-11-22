@@ -24,6 +24,10 @@ const STOP_MODE: &str = "fail";
 const NO_SUCH_UNIT: &str = "org.freedesktop.systemd1.NoSuchUnit";
 const METHOD_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
+/// IMAGE_IO_V1 worker heap. Derived internally; the client cannot supply it.
+const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
+const WORKER_TASKS_MAX: u64 = 64;
+const WORKER_CPU_QUOTA_PER_SEC_USEC: u64 = 1_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -255,6 +259,17 @@ pub(crate) fn worker_properties(
         ("RemainAfterExit", Value::from(true)),
         ("StandardOutput", Value::from("journal".to_owned())),
         ("StandardError", Value::from("journal".to_owned())),
+        ("MemoryAccounting", Value::from(true)),
+        ("MemoryMax", Value::from(WORKER_MEMORY_MAX_BYTES)),
+        ("MemorySwapMax", Value::from(0u64)),
+        ("MemoryOOMGroup", Value::from(true)),
+        ("TasksAccounting", Value::from(true)),
+        ("TasksMax", Value::from(WORKER_TASKS_MAX)),
+        ("CPUAccounting", Value::from(true)),
+        (
+            "CPUQuotaPerSecUSec",
+            Value::from(WORKER_CPU_QUOTA_PER_SEC_USEC),
+        ),
     ])
 }
 
@@ -298,7 +313,10 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ZbusSystemd, classify_dbus_name, mount_properties, worker_properties};
+    use super::{
+        WORKER_MEMORY_MAX_BYTES, WORKER_TASKS_MAX, ZbusSystemd, classify_dbus_name,
+        mount_properties, worker_properties,
+    };
     use crate::runtime::ApprovedRuntime;
     use crate::state::{JobId, Principal};
     use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
@@ -349,6 +367,32 @@ mod tests {
         assert!(worker_keys.contains(&"RemainAfterExit"));
         assert!(worker_keys.contains(&"StandardOutput"));
         assert!(worker_keys.contains(&"StandardError"));
+        assert!(worker_keys.contains(&"MemoryAccounting"));
+        assert!(worker_keys.contains(&"MemoryMax"));
+        assert!(worker_keys.contains(&"MemorySwapMax"));
+        assert!(worker_keys.contains(&"MemoryOOMGroup"));
+        assert!(worker_keys.contains(&"TasksAccounting"));
+        assert!(worker_keys.contains(&"TasksMax"));
+        assert!(worker_keys.contains(&"CPUAccounting"));
+        assert!(worker_keys.contains(&"CPUQuotaPerSecUSec"));
+        let memory_max = worker
+            .iter()
+            .find(|(key, _)| *key == "MemoryMax")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            memory_max
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_MEMORY_MAX_BYTES.to_string())),
+            "MemoryMax must be the internal 192MiB ceiling, got {memory_max:?}"
+        );
+        let swap_max = worker
+            .iter()
+            .find(|(key, _)| *key == "MemorySwapMax")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            swap_max.as_deref().is_some_and(|value| value.contains('0')),
+            "MemorySwapMax must be the internal zero, got {swap_max:?}"
+        );
         let protect = worker
             .iter()
             .find(|(key, _)| *key == "ProtectSystem")
@@ -828,6 +872,25 @@ mod tests {
             .trim()
             .parse::<u64>()
             .unwrap_or_else(|error| panic!("memory.current integer: {error}"));
+        let memory_max = fs::read_to_string(dir.join("memory.max"))
+            .unwrap_or_else(|error| panic!("memory.max: {error}"));
+        assert_eq!(
+            memory_max.trim(),
+            WORKER_MEMORY_MAX_BYTES.to_string(),
+            "memory.max must be the derived 192MiB ceiling at {}",
+            dir.display()
+        );
+        let swap_max = fs::read_to_string(dir.join("memory.swap.max"))
+            .unwrap_or_else(|error| panic!("memory.swap.max: {error}"));
+        assert_eq!(swap_max.trim(), "0", "memory.swap.max must be 0");
+        let tasks_max = fs::read_to_string(dir.join("pids.max"))
+            .unwrap_or_else(|error| panic!("pids.max: {error}"));
+        assert_eq!(
+            tasks_max.trim(),
+            WORKER_TASKS_MAX.to_string(),
+            "pids.max must be the derived TasksMax at {}",
+            dir.display()
+        );
     }
 
     fn wait_for_worker_result(
