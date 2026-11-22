@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #340, 003B-4C sigue abierto
+
+- PR #340 merge `b8d3c6250b2a0943871f61f518e9423a7c4f8f0f` sobre candidato
+  `9bd0063e2ce0296afb2fbf5de162752c61f9e197`. Verify exact-head
+  `44972840444` terminó 7/7 (incluye `NORMALIZE` en PID 1). Dos reviews
+  independientes Grok 4.7 aprobaron sin P0–P3:
+  `sdd/reviews/20261122-sol-pr340-architecture.md` y
+  `sdd/reviews/20261122-sol-pr340-security.md`.
+- El harness deja `input.bin`/`request.bin` uid 2101 y
+  `output.bin`/`result.bin` Accepted uid 2102. No se marca `003B-4C`.
+  No hay cgroup, proceso UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C NORMALIZE dentro de la unidad
 
 - El harness PID 1 deja `input.bin`/`request.bin` uid 2101 y atesta
