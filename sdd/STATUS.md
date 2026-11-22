@@ -1,12 +1,23 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C atesta cgroup v2 del worker
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 lee el cgroup v2 real
-del `.service` worker (`cgroup.controllers` memory y `memory.current`).
-No fija cuota, no aísla jobs ni corre un proceso UID A. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+Siguiente corte: cuota efectiva, aislamiento entre jobs y proceso UID A.
+Este documento no cierra `003B-4C`. Sigue sin cuota, aislamiento, proceso
+UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C cgroup v2 del worker
+
+`master c2d0413fb8f6caa1a90dbf4ab38fb9f6c119dc0c` integra PR #342. Su
+candidato exacto `de9f964a6fc0a9aaa1d0b54d67419903dbf0c178` pasó Verify
+`44975913833` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr342-architecture.md` y
+`sdd/reviews/20261122-sol-pr342-security.md`. El harness lee
+`ControlGroup` y `memory.current`. El corte no cierra `003B-4C`: no hay
+cuota, aislamiento, proceso UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, 4C NORMALIZE dentro de la unidad
 

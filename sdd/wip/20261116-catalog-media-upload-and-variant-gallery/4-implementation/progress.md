@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #342, 003B-4C sigue abierto
+
+- PR #342 merge `c2d0413fb8f6caa1a90dbf4ab38fb9f6c119dc0c` sobre candidato
+  `de9f964a6fc0a9aaa1d0b54d67419903dbf0c178`. Verify exact-head
+  `44975913833` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr342-architecture.md` y
+  `sdd/reviews/20261122-sol-pr342-security.md`.
+- El harness lee `ControlGroup` y `memory.current`. No se marca
+  `003B-4C`. No hay cuota, proceso UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C cgroup v2 del worker
 
 - El harness PID 1 atesta el directorio cgroup v2 del `.service` worker

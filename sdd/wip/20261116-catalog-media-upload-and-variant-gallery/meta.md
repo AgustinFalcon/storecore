@@ -46,7 +46,9 @@ atesta `request.bin` uid 2101 y `result.bin` uid 2102; no cierra
 `b8d3c62`, Verify `44972840444` 7/7, dos Grok 4.7 APPROVED) corre
 `NORMALIZE` dentro de la unidad con `input.bin` uid 2101 y
 `output.bin`/`result.bin` Accepted uid 2102; no cierra cgroup, proceso
-UID A ni `Ready`. PR #326 arranca
+UID A ni `Ready`. PR #342 (head `de9f964`, merge `c2d0413`, Verify
+`44975913833` 7/7, dos Grok 4.7 APPROVED) atesta el cgroup v2 del
+worker vía `ControlGroup`; no fija cuota ni cierra `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
