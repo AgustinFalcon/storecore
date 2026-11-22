@@ -1,11 +1,21 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C sigue abierto
+## En implementación — 2026-11-22, 4C fallos y reinicio
 
-Siguiente corte: fallos/reinicio y rechazo de sustitución. Este documento
-no cierra `003B-4C`. Sigue sin `CPUQuota`, fallos/reinicio, rechazo de
+Este corte no cierra `003B-4C`. El harness PID 1 arranca el worker sin
+`request.bin`, atesta `UNKNOWN_EXIT` (`status=2` en journal; `CollectMode`
+puede recoger la unidad fallida) y reinicia el mismo `JobId` con
+`SELF_TEST`. Sigue sin `CPUQuota`, rechazo de
 sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
 TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, persist reviews PR #350
+
+`master 5c4444c4e0bbb73db96a3c3b87b80766ce57e504` integra PR #352. Persiste
+las dos reviews Grok 4.7 APPROVED de PR #350. No cierra `003B-4C`. Sigue
+sin `CPUQuota`, fallos/reinicio, rechazo de sustitución ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP.
 
 ## Master vigente — 2026-11-22, 4C proceso UID A
 
