@@ -239,10 +239,13 @@ export class PresentationVolumeLoader {
   }
 
   async findPolicy(id) {
-    const page = requirePage(await this.admin.request('/api/v1/user/promos?page=0&size=50'), 'PRESENTATION_POLICY_PAGE_INVALID');
-    const policy = page.items.find(row => String(row?.id) === String(id));
-    if (!policy) throw new Error(`PRESENTATION_POLICY_NOT_FOUND:${id}`);
-    return policy;
+    for (let page = 0; page < 200; page += 1) {
+      const result = requirePage(await this.admin.request(`/api/v1/user/promos?page=${page}&size=50`), 'PRESENTATION_POLICY_PAGE_INVALID');
+      const policy = result.items.find(row => String(row?.id) === String(id));
+      if (policy) return policy;
+      if ((page + 1) * 50 >= result.total) throw new Error(`PRESENTATION_POLICY_NOT_FOUND:${id}`);
+    }
+    throw new Error('PRESENTATION_POLICY_PAGE_LIMIT');
   }
 
   async findPoliciesByCommand(command) {

@@ -61,6 +61,17 @@ test('policy recovery adopts the single committed response and never duplicates 
   assert.equal(persisted.policyId, '1');
 });
 
+test('policy lookup paginates beyond the newest fifty operator policies', async () => {
+  const policies = Array.from({ length: 51 }, (_, index) => ({ id: String(51 - index), status: 'DRAFT' }));
+  const admin = { request: async path => {
+    const url = new URL(path, 'http://127.0.0.1');
+    const page = Number(url.searchParams.get('page'));
+    return { items: policies.slice(page * 50, (page + 1) * 50), total: policies.length };
+  } };
+  const loader = new PresentationVolumeLoader({}, {}, { dataset: { customers: [], policies: [], digest: 'digest' }, admin, journal: {} });
+  assert.equal((await loader.findPolicy('1')).id, '1');
+});
+
 test('presentation dataset rejects insufficient or unsafe product input', () => {
   assert.throws(() => presentationVolumeDataset([]), /PRESENTATION_PRODUCTS_INSUFFICIENT/);
   const duplicated = Array.from({ length: 40 }, () => ({ sku: 'DUPLICATE', stock: 10, price: 100 }));
