@@ -445,6 +445,9 @@ function spring(origin, guard, name) {
 }
 async function run() {
   const showcaseDataset = await readShowcaseDataset(showcaseDatasetFile);
+  if (showcaseDataset.products.length !== 80 || showcaseDataset.experience === null) {
+    throw new Error('PSD requires the integral V3 showcase dataset');
+  }
   await egressSelfTests();
   if (!existsSync(jar)) throw new Error('Build backend first: mvn -B -DskipTests package');
   if (!existsSync(join(frontend, 'dist/storecore-demo/browser/index.html'))) throw new Error('Build Demo first: npm run build:demo');
@@ -502,6 +505,20 @@ async function run() {
   const first = new ShowcaseLoader(config, undefined, showcaseDataset);
   const firstResult = await first.run();
   assert.equal(firstResult.pendingOrderCreated, true);
+  assert.equal(firstResult.products, 80);
+  assert.equal(firstResult.receipt.products.length, 80);
+  assert.equal(firstResult.receipt.cart.skus.length, 5);
+  assert.equal(query('SELECT count(*) FROM products;'), '80');
+  assert.equal(query('SELECT count(*) FROM product_variants;'), '80');
+  assert.equal(query('SELECT count(*) FROM inventory_balances WHERE available_quantity=0 AND reserved_quantity=0;'), '5');
+  assert.equal(query('SELECT count(*) FROM home_content_sections;'), '7');
+  assert.equal(query("SELECT count(*) FROM offers WHERE status='DRAFT';"), '4');
+  assert.equal(query("SELECT count(*) FROM offers WHERE status='ACTIVE';"), '4');
+  assert.equal(query("SELECT count(*) FROM offers WHERE status='PAUSED';"), '2');
+  assert.equal(query("SELECT count(*) FROM offers WHERE status='ENDED';"), '2');
+  assert.equal(query("SELECT count(*) FROM customer_addresses WHERE customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '3');
+  assert.equal(query("SELECT count(*) FROM customer_favorites WHERE customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '12');
+  assert.equal(query("SELECT count(*) FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '5');
   writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify(firstResult.receipt, null, 2)}\n`);
   const unrelated = await first.context.admin.request('/api/v1/user/offers', {
     method: 'POST', csrf: true, expected: [201], envelopeCode: 200,

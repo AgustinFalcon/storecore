@@ -37,6 +37,7 @@ Los pedidos pagados requieren pago, intento de checkout, aplicación comercial, 
 - Tests unitarios del traductor V3, Unknown, límites, referencias y congelamiento.
 - Test HTTP del loader con replay y estados de oferta.
 - PostgreSQL real: conteos, membresía y distribución.
+- El gate productivo carga el dataset V3 integral, no el fixture de catálogo reducido, y afirma en PostgreSQL: 80 productos/variantes, 5 balances sin stock, 7 secciones Home, 12 ofertas con distribución 4/4/2/2, 3 direcciones, 5 líneas de carrito y 12 favoritos del comprador showcase.
 - Playwright: assertions de contenido exacto por superficie y flujos comprador/admin.
 - CI existente completo y dos reviews GPT-6.1 Sol sobre el mismo SHA.
 

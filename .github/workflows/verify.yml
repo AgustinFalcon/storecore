@@ -280,7 +280,7 @@ jobs:
           sudo -u storecore-psd setpriv --no-new-privs env -i PATH="$PATH" JAVA_HOME="$JAVA_HOME" HOME=/home/storecore-psd \
             LANG=C.UTF-8 CI=true PLAYWRIGHT_BROWSERS_PATH="${{ runner.temp }}/storecore-psd-browsers" \
             PGHOST=127.0.0.1 PGPORT=5434 PGDATABASE=storecore_ua_e2e PGUSER=storecore PGPASSWORD=storecore \
-            STORECORE_SHOWCASE_DATASET_FILE="$GITHUB_WORKSPACE/frontend/scripts/showcase/datasets/ferreteria-demo.json" \
+            STORECORE_SHOWCASE_DATASET_FILE="$GITHUB_WORKSPACE/frontend/scripts/showcase/datasets/ferreteria-full-showcase.json" \
             STORECORE_PSD_EGRESS_PROOF=/run/storecore-psd-egress.json GITHUB_SHA="$GITHUB_SHA" \
             "$(command -v node)" "$GITHUB_WORKSPACE/frontend/scripts/run-psd-real-e2e.mjs"
       - name: Verify required evidence exists

@@ -14,8 +14,13 @@ test('customer favorite removal persists and USER authority stays separate', asy
   expect((await page.request.get('/api/v1/internal/me')).status()).toBe(401);
   await page.goto('/customer/favorites');
   await expect(page.getByRole('heading', { name: 'Tus favoritos' })).toBeVisible();
-  await expect(page.locator('.sc-favorite-card')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Quitar', exact: true }).click();
+  await expect(page.locator('.sc-favorite-card')).toHaveCount(12);
+  while (await page.locator('.sc-favorite-card').count()) {
+    const removed = page.waitForResponse(response => response.request().method() === 'DELETE' &&
+      new URL(response.url()).pathname.startsWith('/api/v1/customer/favorites/'));
+    await page.getByRole('button', { name: 'Quitar', exact: true }).first().click();
+    expect((await removed).status()).toBe(200);
+  }
   await expect(page.locator('.sc-favorite-card')).toHaveCount(0);
   await page.reload();
   await expect(page.getByText('Todavía no guardaste productos.', { exact: false })).toBeVisible();
@@ -103,7 +108,14 @@ for (const width of [390, 768, 1440]) {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.goto('/user/inventory');
     await expect(page.getByRole('heading', { name: 'Inventario WEB', exact: true })).toBeVisible();
-    await expect(page.getByRole('rowheader', { name: /^SHOW-SET-MANUAL / })).toBeVisible();
+    await expect(page.locator('.inventory__table tbody tr').first()).toBeVisible();
+    const inventoryPages = await Promise.all([0, 1].map(index => page.request.get(`/api/v1/user/inventory?page=${index}&size=50`)));
+    expect(inventoryPages.map(item => item.status())).toEqual([200, 200]);
+    const inventoryPayloads = await Promise.all(inventoryPages.map(item => item.json()));
+    expect(inventoryPayloads.map(item => item.data.total)).toEqual([80, 80]);
+    const inventoryRows = inventoryPayloads.flatMap(item => item.data.items as { sku: string }[]);
+    expect(inventoryRows).toHaveLength(80);
+    expect(inventoryRows.some(row => row.sku === 'SHOW-SET-MANUAL')).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
