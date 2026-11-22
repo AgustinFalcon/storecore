@@ -54,7 +54,10 @@ APPROVED) deriva `MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64`;
 no cierra `CPUQuota`, aislamiento ni `Ready`. PR #348 (head
 `15b9e51`, merge `64796e5`, Verify `44986626639` 7/7, dos Grok 4.7
 APPROVED) atesta dos `JobId` con `ReadWritePaths` igual al `Where`
-propio; no cierra proceso UID A, fallos/reinicio ni `Ready`. PR #326 arranca
+propio; no cierra proceso UID A, fallos/reinicio ni `Ready`. PR #350
+(head `3fe28fe`, merge `59da884`, Verify `44989524553` 7/7, dos Grok 4.7
+APPROVED) atesta un proceso UID A que no recorre el tmpfs `03770`; no
+cierra fallos/reinicio ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
