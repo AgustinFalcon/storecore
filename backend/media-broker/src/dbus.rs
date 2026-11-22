@@ -505,6 +505,7 @@ mod tests {
             &spec,
             started_worker,
             &where_path,
+            Duration::from_secs(30),
         );
         assert!(
             !where_path.join("output.bin").exists(),
@@ -578,6 +579,7 @@ mod tests {
             &spec,
             started_worker,
             &where_path,
+            Duration::from_secs(60),
         );
         assert_accepted_normalize_artifacts(&where_path, worker.uid());
         assert_eq!(
@@ -605,13 +607,16 @@ mod tests {
 
     #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
-        let input = [0xFFu8, 0xD8, 0xFF, 0xD9];
+        let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
         assert_eq!(&frame[..4], &[0x53, 0x43, 0x4d, 0x57]);
         assert_eq!(frame[4], 1, "REQUEST frame");
         assert_eq!(frame[5], 0);
         assert_eq!(&frame[6..8], &[0, 0]);
-        assert_eq!(u32::from_be_bytes(frame[8..12].try_into().unwrap()), 176);
+        assert_eq!(
+            u32::from_be_bytes(frame[8..12].try_into().expect("length")),
+            176
+        );
         assert_eq!(frame[12], 1, "V1");
         assert_eq!(frame[13], 1, "NORMALIZE");
         assert_eq!(frame.len(), 188);
@@ -762,8 +767,8 @@ mod tests {
             rustix::fs::Mode::empty(),
         )
         .unwrap_or_else(|error| panic!("open {name}: {error}"));
-        let stat = rustix::fs::fstat(&descriptor)
-            .unwrap_or_else(|error| panic!("fstat {name}: {error}"));
+        let stat =
+            rustix::fs::fstat(&descriptor).unwrap_or_else(|error| panic!("fstat {name}: {error}"));
         assert_eq!(stat.st_uid, uid, "{name} must be owned by uid {uid}");
     }
 
@@ -790,8 +795,9 @@ mod tests {
         spec: &TransientUnits,
         started: Result<UnitState, SystemdError>,
         where_path: &Path,
+        timeout: Duration,
     ) {
-        let deadline = Instant::now() + Duration::from_secs(30);
+        let deadline = Instant::now() + timeout;
         loop {
             if let Ok(descriptor) = rustix::fs::open(
                 path,
