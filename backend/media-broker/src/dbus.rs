@@ -24,7 +24,7 @@ const STOP_MODE: &str = "fail";
 const NO_SUCH_UNIT: &str = "org.freedesktop.systemd1.NoSuchUnit";
 const METHOD_TIMEOUT: Duration = Duration::from_secs(30);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
-/// IMAGE_IO_V1 worker heap. Derived internally; the client cannot supply it.
+/// `IMAGE_IO_V1` worker heap. Derived internally; the client cannot supply it.
 const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
 const WORKER_CPU_QUOTA_PER_SEC_USEC: u64 = 1_000_000;
