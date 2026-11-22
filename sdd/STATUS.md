@@ -1,13 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C timeout del worker
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. Deriva `RuntimeMaxUSec=12s` y
-`TimeoutStopUSec=1s`. El harness congela el `MainPID` y atesta que PID 1
-corta el worker al vencer el techo. FIFO y `RemainAfterExit` sin proceso
-no disparan timeout. Sigue sin OOM, terminación del cgroup, `CPUQuota`
-ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
-siguen abiertos. Este corte no agrega HTTP.
+Siguiente corte: OOM y terminación del cgroup. Este documento
+no cierra `003B-4C`. Sigue sin `CPUQuota`, OOM, terminación
+del cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C timeout del worker
+
+`master 7694e77812318ab23e5fadeb13475f793c3e8e80` integra PR #358. Su
+candidato exacto `cda8f48d34482af7becb25910520186d90091411` pasó Verify
+`45000735868` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr358-architecture.md` y
+`sdd/reviews/20261122-sol-pr358-security.md`. El harness deriva
+`RuntimeMaxUSec=12s` y `TimeoutStopUSec=1s`, congela el `MainPID` y
+atesta que PID 1 corta el worker. FIFO y `RemainAfterExit` sin proceso
+no disparan timeout. El corte no cierra `003B-4C`: no hay OOM,
+terminación del cgroup ni `Ready`. `CPUQuota` sigue fuera.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP.
 
 ## Master vigente — 2026-11-22, showcase commerce PR #357
 

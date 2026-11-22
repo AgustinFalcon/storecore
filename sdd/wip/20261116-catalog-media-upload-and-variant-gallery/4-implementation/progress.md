@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-22 — persist reviews PR #358, 003B-4C sigue abierto
+
+- Merge #358 `7694e77812318ab23e5fadeb13475f793c3e8e80` sobre candidato
+  `cda8f48d34482af7becb25910520186d90091411`. Verify exact-head
+  `45000735868` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr358-architecture.md`
+  y `sdd/reviews/20261122-sol-pr358-security.md`.
+- El harness congela el `MainPID` y atesta `RuntimeMax`. No se marca
+  `003B-4C`. No hay OOM, terminación del cgroup, `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C timeout del worker
 
 - El harness PID 1 deriva `RuntimeMaxUSec=12s` y `TimeoutStopUSec=1s`,
