@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tasks": [
+    {"id":"COM-01","title":"Cerrar contrato y matriz de nueve escenarios","status":"completed"},
+    {"id":"COM-02","title":"Hacer durable e idempotente el proveedor local","status":"completed"},
+    {"id":"COM-03","title":"Implementar coordinador checkout/acreditación","status":"in_progress"},
+    {"id":"COM-04","title":"Alcanzar fulfillment y RMA por APIs productivas","status":"pending"},
+    {"id":"COM-05","title":"Emitir recibo y validar replay exacto","status":"pending"},
+    {"id":"COM-06","title":"Probar superficies comprador/admin y overview","status":"pending"},
+    {"id":"COM-07","title":"Ejecutar CI y dos revisiones exact-head","status":"pending"}
+  ]
+}

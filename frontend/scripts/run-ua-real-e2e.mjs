@@ -103,7 +103,10 @@ async function run() {
     '-addext', 'subjectAltName=DNS:localhost'], { encoding: 'utf8', timeout: 30_000 });
   if (cert.error) throw cert.error;
   if (cert.status !== 0) throw new Error(`Test certificate creation failed: ${cert.stderr}`);
-  const provider = start(process.execPath, [join(frontend, 'scripts/cfe-official-provider.mjs')], 'cfe-provider');
+  const provider = start(process.execPath, [join(frontend, 'scripts/cfe-official-provider.mjs')], 'cfe-provider', {
+    ...process.env,
+    CFE_PROVIDER_JOURNAL_PATH: join(scratch, 'cfe-provider.json'),
+  });
   await ready(provider, 'http://127.0.0.1:4302/health');
   const migrationServer = spring(false, 'backend-provision');
   await ready(migrationServer, 'http://127.0.0.1:8080/actuator/health');
