@@ -9,6 +9,14 @@ no disparan timeout. Sigue sin OOM, terminación del cgroup, `CPUQuota`
 ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
 siguen abiertos. Este corte no agrega HTTP.
 
+## Master vigente — 2026-11-22, showcase commerce PR #357
+
+`master 8a2ca296f2198f5a918738385e01248c04ff71ba` integra PR #357. Cierra
+evidencia commerce del showcase. No cierra `003B-4C`. Sigue sin
+`CPUQuota`, OOM/timeout, terminación del cgroup ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP de media.
+
 ## Master vigente — 2026-11-22, persist reviews PR #355
 
 `master d24742bbb3cee3807c5c87031e20c0fae4dcadd0` integra PR #356. Persiste
