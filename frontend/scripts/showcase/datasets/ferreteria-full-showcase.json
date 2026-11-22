@@ -1,0 +1,1450 @@
+{
+  "schemaVersion": 3,
+  "products": [
+    {
+      "sku": "SHOW-TALADRO-18V",
+      "name": "Taladro percutor inalámbrico 18V",
+      "description": "Taladro de dos velocidades con función percutora, mandril autoajustable, dos baterías y maletín para obra y taller.",
+      "brand": "Falcon Pro",
+      "category": "Herramientas eléctricas",
+      "images": [
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 189900,
+      "stock": 18
+    },
+    {
+      "sku": "SHOW-AMOLADORA-850",
+      "name": "Amoladora angular 850W 115 mm",
+      "description": "Amoladora compacta con protector regulable, empuñadura lateral y traba de eje para corte y desbaste.",
+      "brand": "Falcon Pro",
+      "category": "Herramientas eléctricas",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 87900,
+      "stock": 14
+    },
+    {
+      "sku": "SHOW-ROTOMARTILLO-1050",
+      "name": "Rotomartillo SDS Plus 1050W",
+      "description": "Equipo de impacto para perforación en mampostería con selector de funciones, profundidad regulable y caja rígida.",
+      "brand": "Falcon Pro",
+      "category": "Herramientas eléctricas",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 236500,
+      "stock": 6
+    },
+    {
+      "sku": "SHOW-SIERRA-CIRCULAR-1400",
+      "name": "Sierra circular 1400W 185 mm",
+      "description": "Sierra con regulación de profundidad y bisel, guía paralela y salida para aspiración de polvo.",
+      "brand": "Falcon Pro",
+      "category": "Herramientas eléctricas",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 214900,
+      "stock": 3
+    },
+    {
+      "sku": "SHOW-ATORNILLADOR-12V",
+      "name": "Atornillador compacto 12V",
+      "description": "Atornillador reversible con luz LED, control de torque, batería de litio y cargador rápido.",
+      "brand": "Falcon Pro",
+      "category": "Herramientas eléctricas",
+      "images": [
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 119800,
+      "stock": 11
+    },
+    {
+      "sku": "SHOW-SET-MANUAL",
+      "name": "Set de herramientas 108 piezas",
+      "description": "Maletín completo con llaves, tubos, crique, puntas, pinzas y accesorios para mantenimiento general.",
+      "brand": "Taller Uno",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 149500,
+      "stock": 15
+    },
+    {
+      "sku": "SHOW-DESTORNILLADORES-12",
+      "name": "Juego de destornilladores 12 piezas",
+      "description": "Puntas planas y Phillips con mangos antideslizantes, identificación visible y soporte organizador.",
+      "brand": "Taller Uno",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 36500,
+      "stock": 28
+    },
+    {
+      "sku": "SHOW-PINZA-UNIVERSAL-8",
+      "name": "Pinza universal profesional 8 pulgadas",
+      "description": "Mordazas de acero templado, zona de corte reforzada y empuñadura bimaterial para uso frecuente.",
+      "brand": "Taller Uno",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 18900,
+      "stock": 32
+    },
+    {
+      "sku": "SHOW-MARTILLO-450",
+      "name": "Martillo carpintero 450 g",
+      "description": "Cabeza pulida con uña curva y mango ergonómico con absorción de vibraciones.",
+      "brand": "Taller Uno",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 23900,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-LLAVES-COMBINADAS-12",
+      "name": "Juego de llaves combinadas 12 piezas",
+      "description": "Medidas métricas de 6 a 22 mm en acero cromo vanadio con estuche enrollable.",
+      "brand": "Taller Uno",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 58400,
+      "stock": 9
+    },
+    {
+      "sku": "SHOW-DISCOS-CORTE-10",
+      "name": "Discos de corte fino 115 mm pack x10",
+      "description": "Discos reforzados para acero e inoxidable, corte rápido y baja formación de rebaba.",
+      "brand": "CorteMax",
+      "category": "Corte y abrasivos",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=edges"
+      ],
+      "price": 21800,
+      "stock": 55
+    },
+    {
+      "sku": "SHOW-DISCO-FLAP-80-5",
+      "name": "Disco flap grano 80 pack x5",
+      "description": "Abrasivo de zirconio para desbaste y terminación uniforme en metales ferrosos.",
+      "brand": "CorteMax",
+      "category": "Corte y abrasivos",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 19500,
+      "stock": 24
+    },
+    {
+      "sku": "SHOW-MECHAS-METAL-19",
+      "name": "Juego de mechas para metal 19 piezas",
+      "description": "Mechas HSS de 1 a 10 mm en caja indexada para perforación precisa de acero, aluminio y madera.",
+      "brand": "CorteMax",
+      "category": "Corte y abrasivos",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 42900,
+      "stock": 17
+    },
+    {
+      "sku": "SHOW-HOJAS-CALADORA-10",
+      "name": "Hojas para sierra caladora pack x10",
+      "description": "Selección de hojas para cortes rectos y curvos en madera, laminados y metal delgado.",
+      "brand": "CorteMax",
+      "category": "Corte y abrasivos",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=top",
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 17800,
+      "stock": 3
+    },
+    {
+      "sku": "SHOW-COPA-DIAMANTADA-115",
+      "name": "Copa diamantada doble pista 115 mm",
+      "description": "Copa ventilada para desbaste de hormigón, piedra y superficies de obra.",
+      "brand": "CorteMax",
+      "category": "Corte y abrasivos",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 39800,
+      "stock": 7
+    },
+    {
+      "sku": "SHOW-TORNILLOS-MADERA-100",
+      "name": "Tornillos para madera 4 x 40 mm pack x100",
+      "description": "Tornillos zincados con cabeza fresada y punta aguja para armado, muebles y carpintería.",
+      "brand": "Fijar",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 12400,
+      "stock": 86
+    },
+    {
+      "sku": "SHOW-TARUGOS-8-50",
+      "name": "Tarugos de nylon 8 mm pack x50",
+      "description": "Fijación multipropósito para paredes macizas y huecas, con expansión controlada.",
+      "brand": "Fijar",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 8900,
+      "stock": 64
+    },
+    {
+      "sku": "SHOW-BULONES-M8-20",
+      "name": "Bulones hexagonales M8 x 50 pack x20",
+      "description": "Bulones zincados de resistencia estándar con tuercas incluidas para estructuras y reparaciones.",
+      "brand": "Fijar",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=edges",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 15900,
+      "stock": 21
+    },
+    {
+      "sku": "SHOW-ARANDELAS-M8-100",
+      "name": "Arandelas planas M8 pack x100",
+      "description": "Arandelas zincadas de apoyo uniforme para bulones y varillas roscadas.",
+      "brand": "Fijar",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 7600,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-CLAVOS-2-500",
+      "name": "Clavos punta París 2 pulgadas 500 g",
+      "description": "Clavos de acero para carpintería, embalaje y trabajos generales de obra.",
+      "brand": "Fijar",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 6900,
+      "stock": 47
+    },
+    {
+      "sku": "SHOW-CINTA-METRICA-5",
+      "name": "Cinta métrica profesional 5 m",
+      "description": "Cinta de 25 mm con freno, recubrimiento resistente, gancho magnético y carcasa de alto impacto.",
+      "brand": "Precisa",
+      "category": "Medición",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 14800,
+      "stock": 34
+    },
+    {
+      "sku": "SHOW-NIVEL-ALUMINIO-60",
+      "name": "Nivel de aluminio magnético 60 cm",
+      "description": "Perfil reforzado con tres burbujas de alta visibilidad y base magnética rectificada.",
+      "brand": "Precisa",
+      "category": "Medición",
+      "images": [
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 28600,
+      "stock": 12
+    },
+    {
+      "sku": "SHOW-CALIBRE-DIGITAL-150",
+      "name": "Calibre digital 150 mm",
+      "description": "Medición interior, exterior y profundidad con pantalla clara, puesta a cero y estuche protector.",
+      "brand": "Precisa",
+      "category": "Medición",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 34900,
+      "stock": 8
+    },
+    {
+      "sku": "SHOW-NIVEL-LASER-2L",
+      "name": "Nivel láser autonivelante 2 líneas",
+      "description": "Proyección horizontal y vertical, bloqueo de péndulo, soporte magnético y bolso de transporte.",
+      "brand": "Precisa",
+      "category": "Medición",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 76500,
+      "stock": 3
+    },
+    {
+      "sku": "SHOW-ESCUADRA-300",
+      "name": "Escuadra metálica 300 mm",
+      "description": "Regla grabada de lectura permanente y talón mecanizado para trazado de 90 y 45 grados.",
+      "brand": "Precisa",
+      "category": "Medición",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=edges",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 13200,
+      "stock": 26
+    },
+    {
+      "sku": "SHOW-GUANTES-NITRILO-10",
+      "name": "Guantes de trabajo nitrilo talle 10",
+      "description": "Tejido respirable con palma recubierta para agarre, abrasión y manipulación general.",
+      "brand": "SeguroLab",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 9800,
+      "stock": 41
+    },
+    {
+      "sku": "SHOW-ANTEOJOS-TRANSPARENTES",
+      "name": "Anteojos de seguridad transparentes",
+      "description": "Protección envolvente liviana con patillas flexibles y lente transparente antiimpacto.",
+      "brand": "SeguroLab",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 8500,
+      "stock": 38
+    },
+    {
+      "sku": "SHOW-CASCO-AMARILLO",
+      "name": "Casco de obra con ajuste",
+      "description": "Casco liviano con arnés regulable, suspensión interior y canaleta perimetral.",
+      "brand": "SeguroLab",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 22400,
+      "stock": 19
+    },
+    {
+      "sku": "SHOW-PROTECTOR-AUDITIVO",
+      "name": "Protector auditivo tipo copa",
+      "description": "Vincha acolchada regulable y copas de sellado confortable para taller y obra.",
+      "brand": "SeguroLab",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 19800,
+      "stock": 1
+    },
+    {
+      "sku": "SHOW-MASCARAS-POLVO-10",
+      "name": "Máscaras descartables para polvo pack x10",
+      "description": "Protección respiratoria para tareas de lijado, barrido y mantenimiento en ambientes ventilados.",
+      "brand": "SeguroLab",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 11600,
+      "stock": 25
+    },
+    {
+      "sku": "SHOW-RODILLO-22",
+      "name": "Rodillo profesional 22 cm",
+      "description": "Rodillo de microfibra para látex, con buena carga y terminación pareja en paredes interiores.",
+      "brand": "ColorCasa",
+      "category": "Pintura",
+      "images": [
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 13900,
+      "stock": 31
+    },
+    {
+      "sku": "SHOW-PINCEL-3",
+      "name": "Pincel profesional 3 pulgadas",
+      "description": "Cerda mixta de buena retención, mango ergonómico y virola reforzada para esmaltes y látex.",
+      "brand": "ColorCasa",
+      "category": "Pintura",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 11200,
+      "stock": 22
+    },
+    {
+      "sku": "SHOW-BANDEJA-PINTURA",
+      "name": "Bandeja para pintura 32 cm",
+      "description": "Bandeja rígida con superficie de descarga texturada compatible con rodillos de hasta 22 cm.",
+      "brand": "ColorCasa",
+      "category": "Pintura",
+      "images": [
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 7900,
+      "stock": 3
+    },
+    {
+      "sku": "SHOW-CINTA-PINTOR-48",
+      "name": "Cinta de enmascarar 48 mm x 40 m",
+      "description": "Adhesión uniforme y retiro limpio para protección de zócalos, marcos y terminaciones.",
+      "brand": "ColorCasa",
+      "category": "Pintura",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=top",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 6200,
+      "stock": 73
+    },
+    {
+      "sku": "SHOW-LATEX-INTERIOR-10",
+      "name": "Pintura látex interior blanco 10 L",
+      "description": "Látex mate de buen poder cubritivo y bajo olor para paredes y cielorrasos interiores.",
+      "brand": "ColorCasa",
+      "category": "Pintura",
+      "images": [
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 68900,
+      "stock": 10
+    },
+    {
+      "sku": "SHOW-PALA-PUNTA",
+      "name": "Pala de punta con cabo reforzado",
+      "description": "Hoja de acero estampado y cabo de madera seleccionado para suelo, arena y tareas de obra.",
+      "brand": "CampoFirme",
+      "category": "Construcción y jardín",
+      "images": [
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 32900,
+      "stock": 13
+    },
+    {
+      "sku": "SHOW-RASTRILLO-14",
+      "name": "Rastrillo metálico 14 dientes",
+      "description": "Cabezal reforzado y mango largo para nivelación de tierra y limpieza de jardín.",
+      "brand": "CampoFirme",
+      "category": "Construcción y jardín",
+      "images": [
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 27600,
+      "stock": 16
+    },
+    {
+      "sku": "SHOW-MANGUERA-20",
+      "name": "Manguera de jardín reforzada 20 m",
+      "description": "Manguera flexible de tres capas con conectores rápidos y lanza regulable incluidos.",
+      "brand": "CampoFirme",
+      "category": "Construcción y jardín",
+      "images": [
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 43800,
+      "stock": 8
+    },
+    {
+      "sku": "SHOW-CUCHARA-ALBANIL-7",
+      "name": "Cuchara de albañil 7 pulgadas",
+      "description": "Hoja de acero flexible, espiga soldada y mango de madera para mezcla y aplicación de mortero.",
+      "brand": "CampoFirme",
+      "category": "Construcción y jardín",
+      "images": [
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 12800,
+      "stock": 29
+    },
+    {
+      "sku": "SHOW-CARRETILLA-75",
+      "name": "Carretilla reforzada 75 L",
+      "description": "Batea metálica, chasis tubular y rueda neumática para traslado de materiales en obra y jardín.",
+      "brand": "CampoFirme",
+      "category": "Construcción y jardín",
+      "images": [
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=edges"
+      ],
+      "price": 124900,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-MECHA-HSS-19",
+      "name": "Juego de mechas HSS 19 piezas",
+      "description": "Juego de mechas HSS 19 piezas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Rothen Tools",
+      "category": "Accesorios y consumibles",
+      "images": [
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 45900,
+      "stock": 28
+    },
+    {
+      "sku": "SHOW-DISCO-CORTE-115-X10",
+      "name": "Discos de corte 115 mm pack x10",
+      "description": "Discos de corte 115 mm pack x10. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Abramax",
+      "category": "Accesorios y consumibles",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 28900,
+      "stock": 45
+    },
+    {
+      "sku": "SHOW-DISCO-FLAP-115-X5",
+      "name": "Discos flap grano 80 pack x5",
+      "description": "Discos flap grano 80 pack x5. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Abramax",
+      "category": "Accesorios y consumibles",
+      "images": [
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 33700,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-HOJA-SIERRA-MADERA",
+      "name": "Hoja circular para madera 185 mm",
+      "description": "Hoja circular para madera 185 mm. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bosch Professional",
+      "category": "Accesorios y consumibles",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 41600,
+      "stock": 0
+    },
+    {
+      "sku": "SHOW-PUNTA-PH2-X20",
+      "name": "Puntas PH2 impacto pack x20",
+      "description": "Puntas PH2 impacto pack x20. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "DeWalt",
+      "category": "Accesorios y consumibles",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 24800,
+      "stock": 34
+    },
+    {
+      "sku": "SHOW-TARUGO-8-X100",
+      "name": "Tarugos nylon 8 mm pack x100",
+      "description": "Tarugos nylon 8 mm pack x100. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Fischer",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=edges",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 15900,
+      "stock": 80
+    },
+    {
+      "sku": "SHOW-TORNILLO-T2-X200",
+      "name": "Tornillos T2 punta aguja pack x200",
+      "description": "Tornillos T2 punta aguja pack x200. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Fischer",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 18700,
+      "stock": 63
+    },
+    {
+      "sku": "SHOW-ANCLAJE-M10-X10",
+      "name": "Anclajes metálicos M10 pack x10",
+      "description": "Anclajes metálicos M10 pack x10. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Fischer",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 32400,
+      "stock": 12
+    },
+    {
+      "sku": "SHOW-BULON-M8-X50",
+      "name": "Bulones hexagonales M8 pack x50",
+      "description": "Bulones hexagonales M8 pack x50. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bulonera Sur",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 26900,
+      "stock": 1
+    },
+    {
+      "sku": "SHOW-ARANDELA-M8-X100",
+      "name": "Arandelas planas M8 pack x100",
+      "description": "Arandelas planas M8 pack x100. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bulonera Sur",
+      "category": "Fijaciones",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 11900,
+      "stock": 0
+    },
+    {
+      "sku": "SHOW-DESTORNILLADOR-AISLADO",
+      "name": "Set destornilladores aislados 1000V",
+      "description": "Set destornilladores aislados 1000V. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bahco",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 78400,
+      "stock": 15
+    },
+    {
+      "sku": "SHOW-PINZA-UNIVERSAL-KNIPEX-8",
+      "name": "Pinza universal profesional 8 pulgadas",
+      "description": "Pinza universal profesional 8 pulgadas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Knipex",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 69600,
+      "stock": 9
+    },
+    {
+      "sku": "SHOW-LLAVE-AJUSTABLE-12",
+      "name": "Llave ajustable cromada 12 pulgadas",
+      "description": "Llave ajustable cromada 12 pulgadas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bahco",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 52300,
+      "stock": 18
+    },
+    {
+      "sku": "SHOW-CRIQUE-ENC-72",
+      "name": "Criquet encastre 1/2 72 dientes",
+      "description": "Criquet encastre 1/2 72 dientes. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Stanley",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 89900,
+      "stock": 3
+    },
+    {
+      "sku": "SHOW-MARTILLO-CARPINTERO-27",
+      "name": "Martillo carpintero mango fibra 27 mm",
+      "description": "Martillo carpintero mango fibra 27 mm. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Stanley",
+      "category": "Herramientas manuales",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 41800,
+      "stock": 26
+    },
+    {
+      "sku": "SHOW-NIVEL-LASER-VERDE",
+      "name": "Nivel láser verde autonivelante",
+      "description": "Nivel láser verde autonivelante. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bosch Professional",
+      "category": "Medición y precisión",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 284900,
+      "stock": 7
+    },
+    {
+      "sku": "SHOW-CALIBRE-DIGITAL-MITUTOYO-150",
+      "name": "Calibre digital inoxidable 150 mm",
+      "description": "Calibre digital inoxidable 150 mm. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Mitutoyo",
+      "category": "Medición y precisión",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 126500,
+      "stock": 5
+    },
+    {
+      "sku": "SHOW-CINTA-METRICA-8",
+      "name": "Cinta métrica profesional 8 m",
+      "description": "Cinta métrica profesional 8 m. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Stanley",
+      "category": "Medición y precisión",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 23600,
+      "stock": 42
+    },
+    {
+      "sku": "SHOW-ESCUADRA-COMB-300",
+      "name": "Escuadra combinada 300 mm",
+      "description": "Escuadra combinada 300 mm. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bahco",
+      "category": "Medición y precisión",
+      "images": [
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=bottom",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 47700,
+      "stock": 0
+    },
+    {
+      "sku": "SHOW-MULTIMETRO-TRUE-RMS",
+      "name": "Multímetro digital True RMS",
+      "description": "Multímetro digital True RMS. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Fluke",
+      "category": "Electricidad",
+      "images": [
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 349000,
+      "stock": 6
+    },
+    {
+      "sku": "SHOW-PINZA-AMPEROMETRICA",
+      "name": "Pinza amperométrica digital",
+      "description": "Pinza amperométrica digital. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Fluke",
+      "category": "Electricidad",
+      "images": [
+        "https://images.unsplash.com/photo-1767188949854-b67a5f83beda?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 428000,
+      "stock": 4
+    },
+    {
+      "sku": "SHOW-PROLONGADOR-20M",
+      "name": "Prolongador industrial 20 m",
+      "description": "Prolongador industrial 20 m. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Kalop",
+      "category": "Electricidad",
+      "images": [
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 98700,
+      "stock": 17
+    },
+    {
+      "sku": "SHOW-FICHA-INDUSTRIAL-16A",
+      "name": "Ficha industrial 16A IP44",
+      "description": "Ficha industrial 16A IP44. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Kalop",
+      "category": "Electricidad",
+      "images": [
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 17900,
+      "stock": 31
+    },
+    {
+      "sku": "SHOW-TABLERO-OBRA-4T",
+      "name": "Tablero portátil de obra 4 tomas",
+      "description": "Tablero portátil de obra 4 tomas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Sica",
+      "category": "Electricidad",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 138900,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-CASCO-ABS-RATCHET",
+      "name": "Casco ABS con ajuste ratchet",
+      "description": "Casco ABS con ajuste ratchet. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "3M",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 38900,
+      "stock": 24
+    },
+    {
+      "sku": "SHOW-ANTEOJO-ANTIEMP",
+      "name": "Anteojos transparentes antiempaño",
+      "description": "Anteojos transparentes antiempaño. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "3M",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 14600,
+      "stock": 58
+    },
+    {
+      "sku": "SHOW-GUANTE-NITRILO-X12",
+      "name": "Guantes nitrilo reforzado pack x12",
+      "description": "Guantes nitrilo reforzado pack x12. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Libus",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 22900,
+      "stock": 40
+    },
+    {
+      "sku": "SHOW-PROTECTOR-AUDITIVO-COPA",
+      "name": "Protector auditivo copa 25 dB",
+      "description": "Protector auditivo copa 25 dB. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Libus",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=edges",
+        "https://images.unsplash.com/photo-1745449064670-94bd0fc13df8?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 35700,
+      "stock": 8
+    },
+    {
+      "sku": "SHOW-MASCARA-MEDIA-CARA",
+      "name": "Máscara media cara reutilizable",
+      "description": "Máscara media cara reutilizable. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "3M",
+      "category": "Seguridad industrial",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 75900,
+      "stock": 0
+    },
+    {
+      "sku": "SHOW-RODILLO-22-KIT",
+      "name": "Kit rodillo 22 cm con bandeja",
+      "description": "Kit rodillo 22 cm con bandeja. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "El Galgo",
+      "category": "Pintura y terminación",
+      "images": [
+        "https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1645639554326-6d738cf1695b?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 31800,
+      "stock": 21
+    },
+    {
+      "sku": "SHOW-PISTOLA-PINTAR-HVLP",
+      "name": "Pistola de pintar HVLP 600 ml",
+      "description": "Pistola de pintar HVLP 600 ml. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Gamma",
+      "category": "Pintura y terminación",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 112900,
+      "stock": 5
+    },
+    {
+      "sku": "SHOW-LIJA-ORBITAL-X20",
+      "name": "Lijas orbitales surtidas pack x20",
+      "description": "Lijas orbitales surtidas pack x20. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Norton",
+      "category": "Pintura y terminación",
+      "images": [
+        "https://images.unsplash.com/photo-1742828719490-0032a50fdf49?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1770763233593-74dfd0da7bf0?auto=format&fit=crop&w=1200&q=80&crop=center"
+      ],
+      "price": 26400,
+      "stock": 38
+    },
+    {
+      "sku": "SHOW-ESPATULA-INOX-100",
+      "name": "Espátula flexible inoxidable 100 mm",
+      "description": "Espátula flexible inoxidable 100 mm. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "El Galgo",
+      "category": "Pintura y terminación",
+      "images": [
+        "https://images.unsplash.com/photo-1754666104618-3e0655f5fa7c?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 12900,
+      "stock": 19
+    },
+    {
+      "sku": "SHOW-CINTA-ENMASCARAR-X6",
+      "name": "Cinta de enmascarar 48 mm pack x6",
+      "description": "Cinta de enmascarar 48 mm pack x6. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Norton",
+      "category": "Pintura y terminación",
+      "images": [
+        "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 21700,
+      "stock": 2
+    },
+    {
+      "sku": "SHOW-MANGUERA-20M",
+      "name": "Manguera reforzada 1/2 20 m",
+      "description": "Manguera reforzada 1/2 20 m. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Tramontina",
+      "category": "Jardín y exterior",
+      "images": [
+        "https://images.unsplash.com/photo-1530124566582-a618bc2615dc?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1759200165738-6366977a73c6?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 68900,
+      "stock": 14
+    },
+    {
+      "sku": "SHOW-TIJERA-PODA-BYPASS",
+      "name": "Tijera de poda bypass profesional",
+      "description": "Tijera de poda bypass profesional. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Tramontina",
+      "category": "Jardín y exterior",
+      "images": [
+        "https://images.unsplash.com/photo-1647329797478-52c45b06856b?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80"
+      ],
+      "price": 39900,
+      "stock": 23
+    },
+    {
+      "sku": "SHOW-PALA-PUNTA-FIBRA",
+      "name": "Pala punta con mango de fibra",
+      "description": "Pala punta con mango de fibra. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Tramontina",
+      "category": "Jardín y exterior",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1562259949-e8e7689d7828?auto=format&fit=crop&w=1200&q=80&crop=faces"
+      ],
+      "price": 57400,
+      "stock": 10
+    },
+    {
+      "sku": "SHOW-HACHA-800-FIBRA",
+      "name": "Hacha 800 g mango de fibra",
+      "description": "Hacha 800 g mango de fibra. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Bahco",
+      "category": "Jardín y exterior",
+      "images": [
+        "https://images.unsplash.com/photo-1755925193287-275aa7fe64f0?auto=format&fit=crop&w=1200&q=80&crop=faces",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=top"
+      ],
+      "price": 64900,
+      "stock": 1
+    },
+    {
+      "sku": "SHOW-ASPERSOR-OSCILANTE",
+      "name": "Aspersor oscilante 18 boquillas",
+      "description": "Aspersor oscilante 18 boquillas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Tramontina",
+      "category": "Jardín y exterior",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=entropy",
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=bottom"
+      ],
+      "price": 49600,
+      "stock": 0
+    },
+    {
+      "sku": "SHOW-ORGANIZADOR-22",
+      "name": "Organizador modular 22 pulgadas",
+      "description": "Organizador modular 22 pulgadas. Selección profesional para ferretería, taller, mantenimiento y obra, con especificaciones claras y disponibilidad visible.",
+      "brand": "Stanley",
+      "category": "Almacenamiento y obra",
+      "images": [
+        "https://images.unsplash.com/photo-1679018179962-06922435f6bc?auto=format&fit=crop&w=1200&q=80&crop=center",
+        "https://images.unsplash.com/photo-1789992085565-c9eaf815767b?auto=format&fit=crop&w=1200&q=80&crop=entropy"
+      ],
+      "price": 118900,
+      "stock": 13
+    }
+  ],
+  "home": {
+    "title": "Herramientas para hacer el trabajo bien",
+    "body": "Equipá tu taller, obra o casa con herramientas, fijaciones y consumibles seleccionados. Stock visible, compra simple y retiro o envío según tu zona."
+  },
+  "experience": {
+    "profile": "FULL_DEMO",
+    "cart": [
+      {
+        "sku": "SHOW-AMOLADORA-850",
+        "quantity": 1
+      },
+      {
+        "sku": "SHOW-SET-MANUAL",
+        "quantity": 2
+      },
+      {
+        "sku": "SHOW-MECHA-HSS-19",
+        "quantity": 1
+      },
+      {
+        "sku": "SHOW-ANTEOJO-ANTIEMP",
+        "quantity": 3
+      },
+      {
+        "sku": "SHOW-TARUGO-8-X100",
+        "quantity": 2
+      }
+    ],
+    "favoriteSkus": [
+      "SHOW-ATORNILLADOR-12V",
+      "SHOW-SET-MANUAL",
+      "SHOW-DESTORNILLADORES-12",
+      "SHOW-PINZA-UNIVERSAL-8",
+      "SHOW-MARTILLO-450",
+      "SHOW-LLAVES-COMBINADAS-12",
+      "SHOW-DISCOS-CORTE-10",
+      "SHOW-DISCO-FLAP-80-5",
+      "SHOW-MECHAS-METAL-19",
+      "SHOW-HOJAS-CALADORA-10",
+      "SHOW-COPA-DIAMANTADA-115",
+      "SHOW-TORNILLOS-MADERA-100"
+    ],
+    "addresses": [
+      {
+        "label": "Casa",
+        "recipient": "Agustín Demo",
+        "street": "Avenida Siempre Viva",
+        "number": "2209",
+        "floorApartment": null,
+        "city": "Córdoba",
+        "province": "Córdoba",
+        "postalCode": "5000",
+        "notes": "Portón gris",
+        "isDefault": true
+      },
+      {
+        "label": "Taller",
+        "recipient": "Agustín Demo",
+        "street": "Bulevar Los Artesanos",
+        "number": "1450",
+        "floorApartment": "Galpón 3",
+        "city": "Córdoba",
+        "province": "Córdoba",
+        "postalCode": "5008",
+        "notes": "Recepción de 8 a 17",
+        "isDefault": false
+      },
+      {
+        "label": "Obra",
+        "recipient": "Agustín Demo",
+        "street": "Camino Interfábricas",
+        "number": "731",
+        "floorApartment": null,
+        "city": "Villa Allende",
+        "province": "Córdoba",
+        "postalCode": "5105",
+        "notes": "Llamar al llegar",
+        "isDefault": false
+      }
+    ],
+    "offers": [
+      {
+        "key": "potencia-15",
+        "name": "Potencia profesional 15%",
+        "priority": 100,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 15,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-TALADRO-18V",
+          "SHOW-AMOLADORA-850",
+          "SHOW-ROTOMARTILLO-1050",
+          "SHOW-SIERRA-CIRCULAR-1400"
+        ],
+        "status": "ACTIVE"
+      },
+      {
+        "key": "taller-12",
+        "name": "Semana del taller 12%",
+        "priority": 90,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 12,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-ATORNILLADOR-12V",
+          "SHOW-SET-MANUAL",
+          "SHOW-DESTORNILLADORES-12",
+          "SHOW-PINZA-UNIVERSAL-8"
+        ],
+        "status": "ACTIVE"
+      },
+      {
+        "key": "obra-10",
+        "name": "Equipá tu obra 10%",
+        "priority": 80,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-MARTILLO-450",
+          "SHOW-LLAVES-COMBINADAS-12",
+          "SHOW-DISCOS-CORTE-10",
+          "SHOW-DISCO-FLAP-80-5"
+        ],
+        "status": "ACTIVE"
+      },
+      {
+        "key": "manuales-8",
+        "name": "Manuales seleccionadas 8%",
+        "priority": 70,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 8,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-MECHAS-METAL-19",
+          "SHOW-HOJAS-CALADORA-10",
+          "SHOW-COPA-DIAMANTADA-115",
+          "SHOW-TORNILLOS-MADERA-100"
+        ],
+        "status": "ACTIVE"
+      },
+      {
+        "key": "borrador-electricidad",
+        "name": "Especial electricidad",
+        "priority": 60,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-CINTA-METRICA-5",
+          "SHOW-NIVEL-ALUMINIO-60",
+          "SHOW-CALIBRE-DIGITAL-150",
+          "SHOW-NIVEL-LASER-2L"
+        ],
+        "status": "DRAFT"
+      },
+      {
+        "key": "borrador-seguridad",
+        "name": "Seguridad para el equipo",
+        "priority": 50,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-ESCUADRA-300",
+          "SHOW-GUANTES-NITRILO-10",
+          "SHOW-ANTEOJOS-TRANSPARENTES",
+          "SHOW-CASCO-AMARILLO"
+        ],
+        "status": "DRAFT"
+      },
+      {
+        "key": "borrador-jardin",
+        "name": "Temporada jardín",
+        "priority": 40,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-LATEX-INTERIOR-10",
+          "SHOW-PALA-PUNTA",
+          "SHOW-RASTRILLO-14",
+          "SHOW-MANGUERA-20"
+        ],
+        "status": "DRAFT"
+      },
+      {
+        "key": "borrador-fijaciones",
+        "name": "Volumen fijaciones",
+        "priority": 30,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-TARUGO-8-X100",
+          "SHOW-TORNILLO-T2-X200",
+          "SHOW-ANCLAJE-M10-X10",
+          "SHOW-BULON-M8-X50"
+        ],
+        "status": "DRAFT"
+      },
+      {
+        "key": "pausada-medicion",
+        "name": "Precisión profesional",
+        "priority": 20,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-NIVEL-LASER-VERDE",
+          "SHOW-CALIBRE-DIGITAL-MITUTOYO-150",
+          "SHOW-CINTA-METRICA-8",
+          "SHOW-ESCUADRA-COMB-300"
+        ],
+        "status": "PAUSED"
+      },
+      {
+        "key": "pausada-pintura",
+        "name": "Renová tu taller",
+        "priority": 10,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-RODILLO-22-KIT",
+          "SHOW-PISTOLA-PINTAR-HVLP",
+          "SHOW-LIJA-ORBITAL-X20",
+          "SHOW-ESPATULA-INOX-100"
+        ],
+        "status": "PAUSED"
+      },
+      {
+        "key": "finalizada-invierno",
+        "name": "Campaña invierno",
+        "priority": 5,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "PERCENT",
+        "discountValue": 10,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-TARUGOS-8-50",
+          "SHOW-BULONES-M8-20",
+          "SHOW-ARANDELAS-M8-100",
+          "SHOW-CLAVOS-2-500"
+        ],
+        "status": "ENDED"
+      },
+      {
+        "key": "finalizada-apertura",
+        "name": "Apertura de temporada",
+        "priority": 1,
+        "startsInDays": -7,
+        "endsInDays": 60,
+        "discountKind": "FIXED",
+        "discountValue": 5000,
+        "minMarginPercent": 0,
+        "skus": [
+          "SHOW-PINZA-AMPEROMETRICA",
+          "SHOW-PROLONGADOR-20M",
+          "SHOW-FICHA-INDUSTRIAL-16A",
+          "SHOW-TABLERO-OBRA-4T"
+        ],
+        "status": "ENDED"
+      }
+    ],
+    "homeSections": [
+      {
+        "key": "hero-ferreteria",
+        "kind": "HERO",
+        "active": true,
+        "sortOrder": 0,
+        "content": {
+          "title": "Herramientas para hacer el trabajo bien",
+          "body": "Equipá tu taller, obra o casa con herramientas, fijaciones y consumibles seleccionados. Stock visible, compra simple y retiro o envío según tu zona.",
+          "ctaLabel": "Explorar catálogo",
+          "ctaPath": "/catalog"
+        }
+      },
+      {
+        "key": "categorias-principales",
+        "kind": "CATEGORY_RAIL",
+        "active": true,
+        "sortOrder": 10,
+        "content": {
+          "title": "Comprá por categoría",
+          "categoryNames": [
+            "Herramientas eléctricas",
+            "Herramientas manuales",
+            "Corte y abrasivos",
+            "Fijaciones",
+            "Medición",
+            "Seguridad industrial",
+            "Pintura",
+            "Construcción y jardín"
+          ]
+        }
+      },
+      {
+        "key": "ofertas-destacadas",
+        "kind": "PRODUCT_RAIL",
+        "active": true,
+        "sortOrder": 20,
+        "content": {
+          "title": "Ofertas para trabajar mejor",
+          "skus": [
+            "SHOW-TALADRO-18V",
+            "SHOW-AMOLADORA-850",
+            "SHOW-ROTOMARTILLO-1050",
+            "SHOW-SIERRA-CIRCULAR-1400",
+            "SHOW-ATORNILLADOR-12V",
+            "SHOW-SET-MANUAL",
+            "SHOW-DESTORNILLADORES-12",
+            "SHOW-PINZA-UNIVERSAL-8"
+          ]
+        }
+      },
+      {
+        "key": "banner-envio",
+        "kind": "PROMO_BANNER",
+        "active": true,
+        "sortOrder": 30,
+        "content": {
+          "title": "Envíos y retiro coordinado",
+          "body": "Elegí entrega local o retiro al preparar tu compra.",
+          "ctaLabel": "Ver productos",
+          "ctaPath": "/catalog"
+        }
+      },
+      {
+        "key": "mas-elegidos",
+        "kind": "PRODUCT_RAIL",
+        "active": true,
+        "sortOrder": 40,
+        "content": {
+          "title": "Los más elegidos del taller",
+          "skus": [
+            "SHOW-MARTILLO-450",
+            "SHOW-LLAVES-COMBINADAS-12",
+            "SHOW-DISCOS-CORTE-10",
+            "SHOW-DISCO-FLAP-80-5",
+            "SHOW-MECHAS-METAL-19",
+            "SHOW-HOJAS-CALADORA-10",
+            "SHOW-COPA-DIAMANTADA-115",
+            "SHOW-TORNILLOS-MADERA-100"
+          ]
+        }
+      },
+      {
+        "key": "banner-profesionales",
+        "kind": "PROMO_BANNER",
+        "active": true,
+        "sortOrder": 50,
+        "content": {
+          "title": "Precios claros para profesionales",
+          "body": "Stock visible, ofertas vigentes y seguimiento desde tu cuenta.",
+          "ctaLabel": "Ver ofertas",
+          "ctaPath": "/catalog?offers=1"
+        }
+      },
+      {
+        "key": "temporada-inactiva",
+        "kind": "PRODUCT_RAIL",
+        "active": false,
+        "sortOrder": 60,
+        "content": {
+          "title": "Próxima temporada",
+          "skus": [
+            "SHOW-CINTA-METRICA-5",
+            "SHOW-NIVEL-ALUMINIO-60",
+            "SHOW-CALIBRE-DIGITAL-150",
+            "SHOW-NIVEL-LASER-2L",
+            "SHOW-ESCUADRA-300",
+            "SHOW-GUANTES-NITRILO-10",
+            "SHOW-ANTEOJOS-TRANSPARENTES",
+            "SHOW-CASCO-AMARILLO"
+          ]
+        }
+      }
+    ]
+  }
+}

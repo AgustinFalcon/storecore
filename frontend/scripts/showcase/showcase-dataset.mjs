@@ -2,6 +2,7 @@ const SCHEMA_TOKEN = Symbol('ShowcaseDatasetSchema');
 export class ShowcaseDatasetSchema {
   static V1 = new ShowcaseDatasetSchema(SCHEMA_TOKEN, 1);
   static V2 = new ShowcaseDatasetSchema(SCHEMA_TOKEN, 2);
+  static V3 = new ShowcaseDatasetSchema(SCHEMA_TOKEN, 3);
   static Unknown = new ShowcaseDatasetSchema(SCHEMA_TOKEN, null);
   constructor(token, wire) {
     if (token !== SCHEMA_TOKEN) throw new TypeError('ShowcaseDatasetSchema is closed');
@@ -11,10 +12,30 @@ export class ShowcaseDatasetSchema {
   static fromWire(raw) {
     if (raw === this.V1.wire) return this.V1;
     if (raw === this.V2.wire) return this.V2;
+    if (raw === this.V3.wire) return this.V3;
     return this.Unknown;
   }
 }
 Object.freeze(ShowcaseDatasetSchema);
+
+function closedWireType(name, cases) {
+  const token = Symbol(name);
+  class ClosedValue {
+    constructor(key, wire) { if (key !== token) throw new TypeError(`${name} is closed`); this.wire = wire; Object.freeze(this); }
+    static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+  }
+  for (const [key, wire] of Object.entries(cases)) ClosedValue[key] = new ClosedValue(token, wire);
+  ClosedValue.Unknown = new ClosedValue(token, 'unknown');
+  ClosedValue.values = Object.freeze(Object.keys(cases).map(key => ClosedValue[key]));
+  return Object.freeze(ClosedValue);
+}
+
+export const ShowcaseSeedProfile = closedWireType('ShowcaseSeedProfile', { FullDemo: 'FULL_DEMO' });
+export const ShowcaseFixtureOfferStatus = closedWireType('ShowcaseFixtureOfferStatus', { Draft: 'DRAFT', Active: 'ACTIVE', Paused: 'PAUSED', Ended: 'ENDED' });
+export const ShowcaseFixtureDiscountKind = closedWireType('ShowcaseFixtureDiscountKind', { Percent: 'PERCENT', Fixed: 'FIXED' });
+export const ShowcaseFixtureHomeKind = closedWireType('ShowcaseFixtureHomeKind', {
+  Hero: 'HERO', CategoryRail: 'CATEGORY_RAIL', ProductRail: 'PRODUCT_RAIL', PromoBanner: 'PROMO_BANNER',
+});
 
 const DATASET_TOKEN = Symbol('ShowcaseDataset');
 const validatedDatasets = new WeakSet();
@@ -72,6 +93,14 @@ function image(raw, field) {
       url.hostname !== 'images.unsplash.com' || url.username || url.password || url.port || url.hash) invalid(field);
   return raw;
 }
+function internalRoute(raw, field) {
+  text(raw, 1, 2048, field);
+  let url;
+  try { url = new URL(raw, 'https://storecore.invalid'); } catch { invalid(field); }
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\') || /\s|[\u0000-\u001f\u007f-\u009f]/u.test(raw) ||
+      url.origin !== 'https://storecore.invalid' || /%(2f|5c|0[0-9a-f]|1[0-9a-f]|7f)/iu.test(raw)) invalid(field);
+  return raw;
+}
 
 export class ShowcaseProductFixture {
   constructor(token, fields) {
@@ -110,11 +139,12 @@ export class ShowcaseJourney {
 }
 
 export class ShowcaseDataset {
-  constructor(token, schema, products, home) {
+  constructor(token, schema, products, home, experience = null) {
     if (token !== DATASET_TOKEN) throw new TypeError('Use ShowcaseDataset.fromWire');
     this.schema = schema;
     this.products = Object.freeze(products);
     this.home = Object.freeze(home);
+    this.experience = experience;
     this.journey = new ShowcaseJourney(token, this.products);
     this.journey.requireBudget();
     validatedDatasets.add(this);
@@ -125,7 +155,8 @@ export class ShowcaseDataset {
     return value;
   }
   static fromWire(raw) {
-    object(raw, ['schemaVersion', 'products', 'home'], 'root');
+    const rootKeys = raw?.schemaVersion === 3 ? ['schemaVersion', 'products', 'home', 'experience'] : ['schemaVersion', 'products', 'home'];
+    object(raw, rootKeys, 'root');
     const schema = ShowcaseDatasetSchema.fromWire(raw.schemaVersion);
     if (schema === ShowcaseDatasetSchema.Unknown) invalid('schemaVersion');
     if (!Array.isArray(raw.products) || raw.products.length < 3 || raw.products.length > 100) invalid('products');
@@ -152,7 +183,7 @@ export class ShowcaseDataset {
         category: text(product.category, 1, 100, field + '.category'),
         images,
         price: integer(product.price, 1, SHOWCASE_PRICE_MAX, field + '.price'),
-        stock: integer(product.stock, 1, 1000000, field + '.stock'),
+        stock: integer(product.stock, schema === ShowcaseDatasetSchema.V3 ? 0 : 1, 1000000, field + '.stock'),
       });
     });
     if (new Set(products.map(product => product.sku)).size !== products.length) invalid('duplicateSku');
@@ -160,12 +191,100 @@ export class ShowcaseDataset {
     requireDistinctSlugs(products, 'brand');
     requireDistinctSlugs(products, 'category');
     object(raw.home, ['title', 'body'], 'home');
-    return new ShowcaseDataset(DATASET_TOKEN, schema, products, {
+    const home = {
       title: text(raw.home.title, 1, 200, 'home.title'), body: text(raw.home.body, 1, 1000, 'home.body'),
-    });
+    };
+    return new ShowcaseDataset(DATASET_TOKEN, schema, products, home,
+      schema === ShowcaseDatasetSchema.V3 ? translateExperience(raw.experience, products, home) : null);
   }
 }
 Object.freeze(ShowcaseDataset);
+
+function translateExperience(raw, products, legacyHome) {
+  object(raw, ['profile', 'cart', 'favoriteSkus', 'addresses', 'offers', 'homeSections'], 'experience');
+  const profile = ShowcaseSeedProfile.fromWire(raw.profile);
+  if (profile === ShowcaseSeedProfile.Unknown) invalid('experience.profile');
+  const knownSkus = new Set(products.map(product => product.sku));
+  const knownCategories = new Set(products.map(product => product.category.toLowerCase()));
+  const uniqueSkus = (values, field, min, max) => {
+    if (!Array.isArray(values) || values.length < min || values.length > max) invalid(field);
+    const result = values.map((value, index) => text(value, 1, 69, `${field}[${index}]`));
+    if (new Set(result).size !== result.length || result.some(value => !knownSkus.has(value))) invalid(field);
+    return Object.freeze(result);
+  };
+  if (!Array.isArray(raw.cart) || raw.cart.length < 2 || raw.cart.length > 8) invalid('experience.cart');
+  const cart = raw.cart.map((line, index) => {
+    object(line, ['sku', 'quantity'], `experience.cart[${index}]`);
+    const sku = text(line.sku, 1, 69, `experience.cart[${index}].sku`);
+    if (!knownSkus.has(sku)) invalid(`experience.cart[${index}].sku`);
+    return Object.freeze({ sku, quantity: integer(line.quantity, 1, 99, `experience.cart[${index}].quantity`) });
+  });
+  if (new Set(cart.map(line => line.sku)).size !== cart.length) invalid('experience.cart');
+  const prices = new Map(products.map(product => [product.sku, BigInt(product.price)]));
+  const cartCents = cart.reduce((sum, line) => sum + prices.get(line.sku) * BigInt(line.quantity) * 100n, 0n);
+  if (cartCents + SHOWCASE_FEE_MAX_CENTS > SHOWCASE_CHECKOUT_MAX_CENTS) invalid('experience.cartBudget');
+  if (!Array.isArray(raw.addresses) || raw.addresses.length < 1 || raw.addresses.length > 5) invalid('experience.addresses');
+  const addresses = raw.addresses.map((address, index) => {
+    const field = `experience.addresses[${index}]`;
+    object(address, ['label', 'recipient', 'street', 'number', 'floorApartment', 'city', 'province', 'postalCode', 'notes', 'isDefault'], field);
+    if (typeof address.isDefault !== 'boolean') invalid(`${field}.isDefault`);
+    return Object.freeze({ label: text(address.label, 1, 80, `${field}.label`), recipient: text(address.recipient, 1, 160, `${field}.recipient`),
+      street: text(address.street, 1, 160, `${field}.street`), number: text(address.number, 1, 20, `${field}.number`),
+      floorApartment: address.floorApartment === null ? null : text(address.floorApartment, 1, 40, `${field}.floorApartment`),
+      city: text(address.city, 1, 100, `${field}.city`), province: text(address.province, 1, 100, `${field}.province`),
+      postalCode: text(address.postalCode, 1, 20, `${field}.postalCode`), notes: address.notes === null ? null : text(address.notes, 1, 300, `${field}.notes`), isDefault: address.isDefault });
+  });
+  if (addresses.filter(address => address.isDefault).length !== 1) invalid('experience.addresses.default');
+  if (!Array.isArray(raw.offers) || raw.offers.length < 1 || raw.offers.length > 30) invalid('experience.offers');
+  const offers = raw.offers.map((offer, index) => {
+    const field = `experience.offers[${index}]`;
+    object(offer, ['key', 'name', 'priority', 'startsInDays', 'endsInDays', 'discountKind', 'discountValue', 'minMarginPercent', 'skus', 'status'], field);
+    const status = ShowcaseFixtureOfferStatus.fromWire(offer.status);
+    const discountKind = ShowcaseFixtureDiscountKind.fromWire(offer.discountKind);
+    if (status === ShowcaseFixtureOfferStatus.Unknown || discountKind === ShowcaseFixtureDiscountKind.Unknown) invalid(field);
+    const discountValue = integer(offer.discountValue, 1, discountKind === ShowcaseFixtureDiscountKind.Percent ? 100 : SHOWCASE_PRICE_MAX, `${field}.discountValue`);
+    const startsInDays = integer(offer.startsInDays, -365, 365, `${field}.startsInDays`);
+    const endsInDays = integer(offer.endsInDays, -365, 730, `${field}.endsInDays`);
+    if (startsInDays >= endsInDays) invalid(`${field}.window`);
+    return Object.freeze({ key: text(offer.key, 1, 80, `${field}.key`), name: text(offer.name, 1, 160, `${field}.name`),
+      priority: integer(offer.priority, 0, 1000000, `${field}.priority`), startsInDays, endsInDays, discountKind, discountValue,
+      minMarginPercent: integer(offer.minMarginPercent, 0, 0, `${field}.minMarginPercent`),
+      skus: uniqueSkus(offer.skus, `${field}.skus`, 1, 50), status });
+  });
+  if (new Set(offers.map(offer => offer.key)).size !== offers.length || new Set(offers.map(offer => offer.name)).size !== offers.length) invalid('experience.offers.identity');
+  if (!Array.isArray(raw.homeSections) || raw.homeSections.length < 4 || raw.homeSections.length > 20) invalid('experience.homeSections');
+  const homeSections = raw.homeSections.map((section, index) => translateHomeSection(section, index, knownSkus, knownCategories, legacyHome));
+  if (new Set(homeSections.map(section => section.key)).size !== homeSections.length) invalid('experience.homeSections.identity');
+  return Object.freeze({ profile, cart: Object.freeze(cart), favoriteSkus: uniqueSkus(raw.favoriteSkus, 'experience.favoriteSkus', 1, 30),
+    addresses: Object.freeze(addresses), offers: Object.freeze(offers), homeSections: Object.freeze(homeSections) });
+}
+
+function translateHomeSection(section, index, knownSkus, knownCategories, legacyHome) {
+  const field = `experience.homeSections[${index}]`;
+  object(section, ['key', 'kind', 'active', 'sortOrder', 'content'], field);
+  const kind = ShowcaseFixtureHomeKind.fromWire(section.kind);
+  if (kind === ShowcaseFixtureHomeKind.Unknown || typeof section.active !== 'boolean') invalid(field);
+  const base = { key: text(section.key, 1, 80, `${field}.key`), kind, active: section.active, sortOrder: integer(section.sortOrder, 0, 1000, `${field}.sortOrder`) };
+  if (kind === ShowcaseFixtureHomeKind.Hero || kind === ShowcaseFixtureHomeKind.PromoBanner) {
+    object(section.content, ['title', 'body', 'ctaLabel', 'ctaPath'], `${field}.content`);
+    return Object.freeze({ ...base, content: Object.freeze({ title: text(section.content.title || legacyHome.title, 1, 120, `${field}.content.title`),
+      body: text(section.content.body || legacyHome.body, 0, kind === ShowcaseFixtureHomeKind.Hero ? 500 : 300, `${field}.content.body`),
+      ctaLabel: section.content.ctaLabel === null ? null : text(section.content.ctaLabel, 1, 80, `${field}.content.ctaLabel`),
+      ctaPath: section.content.ctaPath === null ? null : internalRoute(section.content.ctaPath, `${field}.content.ctaPath`) }) });
+  }
+  if (kind === ShowcaseFixtureHomeKind.CategoryRail) {
+    object(section.content, ['title', 'categoryNames'], `${field}.content`);
+    if (!Array.isArray(section.content.categoryNames) || section.content.categoryNames.length < 1 || section.content.categoryNames.length > 12) invalid(`${field}.content.categoryNames`);
+    const categoryNames = section.content.categoryNames.map((value, categoryIndex) => text(value, 1, 100, `${field}.content.categoryNames[${categoryIndex}]`));
+    if (new Set(categoryNames.map(value => value.toLowerCase())).size !== categoryNames.length ||
+        categoryNames.some(value => !knownCategories.has(value.toLowerCase()))) invalid(`${field}.content.categoryNames`);
+    return Object.freeze({ ...base, content: Object.freeze({ title: text(section.content.title, 1, 120, `${field}.content.title`), categoryNames: Object.freeze(categoryNames) }) });
+  }
+  object(section.content, ['title', 'skus'], `${field}.content`);
+  if (!Array.isArray(section.content.skus) || section.content.skus.length < 1 || section.content.skus.length > 20 ||
+      new Set(section.content.skus).size !== section.content.skus.length || section.content.skus.some(sku => !knownSkus.has(sku))) invalid(`${field}.content.skus`);
+  return Object.freeze({ ...base, content: Object.freeze({ title: text(section.content.title, 1, 120, `${field}.content.title`), skus: Object.freeze([...section.content.skus]) }) });
+}
 
 export const DEFAULT_SHOWCASE_DATASET = ShowcaseDataset.fromWire({
   schemaVersion: 1,

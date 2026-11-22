@@ -17,19 +17,30 @@ npm run showcase:load
 
 The usual explicit loopback API/origin and existing ADMIN credentials are still required. Remove STORECORE_SHOWCASE_DATASET_FILE to use built-in defaults. The path is local; URLs are not downloaded as datasets.
 
-The root has exactly schemaVersion, products, and home. Version 1 remains compatible and each product has the exact legacy `image` field. Version 2 is the gallery format and each product has exactly `images` with two to four distinct, ordered URLs. Both versions translate to the same internal gallery model. Home has exactly title and body. Unknown versions or fields are rejected. Text must already be trimmed and contain no controls. Price is positive integer pesos, not a string or decimal. Stock is positive integer initial inventory.
+Versions 1 and 2 keep the exact root `schemaVersion`, `products`, and `home`. Version 1 remains compatible and each product has the exact legacy `image` field. Version 2 is the gallery format and each product has exactly `images` with two to four distinct, ordered URLs. Version 3 adds the exact `experience` field for a disposable, full-demo profile. All versions translate to the same internal product model. Home has exactly title and body. Unknown versions or fields are rejected. Text must already be trimmed and contain no controls. Price is positive integer pesos, not a string or decimal. V1/V2 stock is positive; V3 may explicitly carry zero stock.
 
 Keep SHOW-TALADRO-18V (pending order/favorite/offer), SHOW-AMOLADORA-850 (one cart unit), and SHOW-SET-MANUAL (two cart units). Product order is irrelevant. The first and third identities require stock at least 2. Add synthetic SHOW-* products up to 100 total. SKU suffix is 1–64 uppercase ASCII letters/digits/underscore/hyphen, starting with a letter or digit.
 
 Limits: file 1 MiB; name 200, description 5000, brand/category 100, home title 200, home body 1000, each image URL 2048 characters; price at most 249999999999; stock at most 1000000. Description alone may be empty. Images must be absolute HTTPS on images.unsplash.com without credentials, nondefault port or fragment. The loader stores the URLs and never fetches them; image availability is a separate presentation-environment check.
 
-The committed presentation dataset is `scripts/showcase/datasets/ferreteria-demo.json`. Select it with `STORECORE_SHOWCASE_DATASET_FILE` to populate the real local API with forty synthetic hardware-store products and multi-image galleries.
+The focused catalog dataset is `scripts/showcase/datasets/ferreteria-demo.json` (40 products). The full client-presentation dataset is `scripts/showcase/datasets/ferreteria-full-showcase.json`: 80 products, seven home sections, twelve offers across four lifecycle states, three addresses, five cart lines and twelve favorites. Rebuild it deterministically with `node scripts/showcase/generate-full-ferreteria-dataset.mjs`; the generator never contacts the network.
+
+Select the full dataset before loading or running productive route evidence:
+
+~~~powershell
+$env:STORECORE_SHOWCASE_DATASET_FILE = (Resolve-Path ./scripts/showcase/datasets/ferreteria-full-showcase.json).Path
+npm run showcase:load
+~~~
+
+V3 `experience` is validated before HTTP. `profile` is the closed `FULL_DEMO` value. Offer status, discount type and home block kind are closed types; unknown values fail. Product/category references must exist in the same dataset. Exactly one address is default. Replay creates missing fixture-owned rows but does not overwrite operator-edited products, content or existing collections.
 
 Product SKU slugs must be unique. Brand/category names may repeat case-insensitively, but distinct names cannot share a slug within the same entity type: Tool A and Tool-A collide. The backend lowercases, replaces every non-ASCII-letter/digit run with a hyphen, trims hyphens and falls back to item. SHOW-TALADRO_18V therefore collides with SHOW-TALADRO-18V. These dataset collisions fail before HTTP; collisions against unrelated existing database rows remain server-authoritative.
 
 The price ceiling is derived from the backend monetary maximum 999999999999.99: the three cart units plus a reserved shipping share split that maximum four ways. Integer-peso fixture prices round each share down to 249999999999; shipping is limited to 249999999999.99. BigInt cents validate the pending-order subtotal and representative-cart subtotal, each with shipping, before HTTP. A supplied policy fee is checked then; an existing installation's fee is unknown until read, so the authoritative selected fee is checked again before checkout. Operator price/policy drift cannot be predicted from the JSON and is preserved.
 
-Import creates missing products and fills an empty home through existing APIs. It preserves existing stock, prices, images, statuses and home, even when the JSON changes. To see different initial fixture values, the operator must prepare a separate disposable environment. This does not load the Angular demo's in-memory catalog.
+Import creates missing products and fills an empty home through existing APIs. V3 also creates fixture-owned offers, addresses, cart lines and favorites. It preserves existing stock, prices, images, statuses and nonempty home, even when the JSON changes. To see different initial fixture values, the operator must prepare a separate disposable environment. This does not load the Angular demo's in-memory catalog.
+
+The loader never fabricates an accredited payment. Its safe journey remains a provider-free pending order. Paid orders, shipments, pickup and RMA require the separate controlled local-provider evidence graph; changing a status string is not accepted as evidence.
 
 Run exclusively while preparing the environment. The existing catalog GET followed by PUT does not provide concurrency exclusion against another writer. Customer, address, offer, checkout key, roles, statuses, integration safety and delivery policy are not JSON fields.
 
