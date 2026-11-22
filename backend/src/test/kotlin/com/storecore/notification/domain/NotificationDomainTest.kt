@@ -120,7 +120,7 @@ class NotificationDomainTest {
         assertNull(NotificationSourceId.fromWire("é".repeat(65)))
         assertNotNull(NotificationEpisodeKey.fromWire("a".repeat(128)))
         assertNull(NotificationEpisodeKey.fromWire("a".repeat(129)))
-        listOf(null, "", "\uD800").forEach { assertNull(NotificationSourceId.fromWire(it)); assertNull(NotificationEpisodeKey.fromWire(it)) }
+        listOf(null, "", "\u0000", "a\u0000b", "\uD800").forEach { assertNull(NotificationSourceId.fromWire(it)); assertNull(NotificationEpisodeKey.fromWire(it)) }
         assertNotEquals(NotificationSourceId.fromWire("source"), NotificationSourceId.fromWire(" source "))
         assertNotNull(NotificationConditionCode.fromWire("A0_-.") )
         assertNotNull(NotificationConditionCode.fromWire("A".repeat(64)))
@@ -128,7 +128,8 @@ class NotificationDomainTest {
         val emoji = "\uD83D\uDE00"
         assertNotNull(NotificationReason.fromWire("  ${emoji.repeat(500)}  "))
         assertNull(NotificationReason.fromWire(emoji.repeat(501)))
-        listOf(null, "", " \t\n ", "\uD800").forEach { assertNull(NotificationReason.fromWire(it)) }
+        listOf(null, "", " \t\n\r\u000B\u000C ", "a\u0000b", "\uD800").forEach { assertNull(NotificationReason.fromWire(it)) }
+        assertEquals("reason", NotificationReason.fromWire("\t\n reason \r\u000B\u000C")?.value)
         assertEquals("reason", NotificationReason.fromWire("  reason  ")?.value)
         assertNull(NotificationId.fromWire(UUID(0, 0))); assertNull(NotificationId.fromWire(null))
         assertNull(NotificationActorId.fromWire(0)); assertNull(NotificationActorId.fromWire(-1)); assertNull(NotificationActorId.fromWire(null))

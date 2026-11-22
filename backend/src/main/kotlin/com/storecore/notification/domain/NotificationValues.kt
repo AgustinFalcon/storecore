@@ -36,8 +36,8 @@ import java.util.UUID
 @JvmInline value class NotificationReason private constructor(val value: String) {
     companion object {
         fun fromWire(raw: String?): NotificationReason? {
-            val trimmed = raw?.trim() ?: return null
-            if (strictUtf8(trimmed) == null || trimmed.codePointCount(0, trimmed.length) !in 1..500) return null
+            val trimmed = raw?.trim(*asciiEdgeWhitespace) ?: return null
+            if ('\u0000' in trimmed || strictUtf8(trimmed) == null || trimmed.codePointCount(0, trimmed.length) !in 1..500) return null
             return NotificationReason(trimmed)
         }
     }
@@ -78,7 +78,10 @@ private fun validUuid(raw: UUID?): UUID? = raw?.takeIf { it != UUID(0, 0) }
 private val digestSyntax = Regex("[0-9a-f]{64}")
 private fun validDigest(raw: String?): String? = raw?.takeIf(digestSyntax::matches)
 internal fun strictUtf8(value: String): ByteArray? = value.toByteArray(Charsets.UTF_8).takeIf { it.toString(Charsets.UTF_8) == value }
-private fun boundedUtf8(raw: String?, max: Int): String? = raw?.takeIf { value -> strictUtf8(value)?.size?.let { it in 1..max } == true }
+private val asciiEdgeWhitespace = charArrayOf(' ', '\t', '\n', '\r', '\u000B', '\u000C')
+private fun boundedUtf8(raw: String?, max: Int): String? = raw?.takeIf { value ->
+    '\u0000' !in value && strictUtf8(value)?.size?.let { it in 1..max } == true
+}
 private fun lengthFramedSha256(fields: List<String>): String {
     val bytes = ByteArrayOutputStream().also { buffer -> DataOutputStream(buffer).use { out ->
         fields.forEach { value -> val utf8 = requireNotNull(strictUtf8(value)); out.writeInt(utf8.size); out.write(utf8) }
