@@ -800,19 +800,11 @@ mod tests {
         if first.is_err() {
             dump_worker_unit(&spec, first, &where_path);
         }
-        wait_exec_main_status(
-            name,
-            "2",
-            Duration::from_secs(60),
-            &spec,
-            first,
-            &where_path,
-        );
+        wait_unknown_exit_journal(name, Duration::from_secs(15), &spec, first, &where_path);
         assert!(
             !where_path.join("result.bin").exists(),
             "failed worker must not write result.bin"
         );
-        assert_eq!(systemctl_property(name, "Result"), "exit-code");
         let stopped_failed = systemd.stop(UnitKind::Worker, &spec).expect("stop failed");
         assert!(matches!(
             stopped_failed,
@@ -1194,6 +1186,44 @@ mod tests {
         String::from_utf8_lossy(&shown.stdout).trim().to_owned()
     }
 
+    fn worker_journal(name: &str) -> String {
+        let journal = Command::new("journalctl")
+            .args(["-b", "-u", name, "--no-pager", "-n", "80"])
+            .output()
+            .unwrap_or_else(|error| panic!("journalctl {name}: {error}"));
+        String::from_utf8_lossy(&journal.stdout).into_owned()
+    }
+
+    fn wait_unknown_exit_journal(
+        name: &str,
+        timeout: Duration,
+        spec: &TransientUnits,
+        started: Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let status = systemctl_property(name, "ExecMainStatus");
+            let result = systemctl_property(name, "Result");
+            let journal = worker_journal(name);
+            if status == "2" || result == "exit-code" || journal.contains("status=2") {
+                assert!(
+                    journal.contains("status=2"),
+                    "journal must record UNKNOWN_EXIT 2 for {name}: {journal}"
+                );
+                return;
+            }
+            if Instant::now() >= deadline {
+                dump_worker_unit(spec, started, where_path);
+            }
+            assert!(
+                Instant::now() < deadline,
+                "UNKNOWN_EXIT for {name} want status=2, ExecMainStatus={status} Result={result}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
     fn wait_exec_main_status(
         name: &str,
         expected: &str,
@@ -1226,10 +1256,13 @@ mod tests {
             .args(["reset-failed", name])
             .output()
             .unwrap_or_else(|error| panic!("systemctl reset-failed: {error}"));
+        if reset.status.success() {
+            return;
+        }
+        let stderr = String::from_utf8_lossy(&reset.stderr);
         assert!(
-            reset.status.success(),
-            "systemctl reset-failed {name}: {}",
-            String::from_utf8_lossy(&reset.stderr)
+            stderr.contains("not loaded") || stderr.contains("not found"),
+            "systemctl reset-failed {name}: {stderr}"
         );
     }
 

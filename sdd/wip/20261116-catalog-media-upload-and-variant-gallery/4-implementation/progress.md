@@ -3,8 +3,8 @@
 ## 2026-11-22 — arranque 4C fallos y reinicio
 
 - El harness PID 1 arranca el worker sin `request.bin` y atesta
-  `ExecMainStatus=2`. Después coloca `SELF_TEST` y reinicia el mismo
-  `JobId`.
+  `UNKNOWN_EXIT` (`status=2` en journal). Después coloca `SELF_TEST` y
+  reinicia el mismo `JobId`.
 - No se marca `003B-4C`. No hay rechazo de sustitución, `Ready` ni HTTP.
 
 ## 2026-11-22 — persist reviews PR #350, 003B-4C sigue abierto
