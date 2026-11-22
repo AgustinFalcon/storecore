@@ -2,11 +2,11 @@
 
 ## 2026-11-22 — arranque 4C aislamiento entre jobs
 
-- `worker_properties` deriva internamente `InaccessiblePaths` del directorio
-  de jobs y `ReadWritePaths` del `Where` de ese `JobId`. El cliente no
-  suministra esas properties.
+- `worker_properties` deriva internamente `ReadWritePaths` del `Where` de
+  ese `JobId`. El cliente no suministra esa property. `InaccessiblePaths`
+  del directorio de jobs queda fuera: PID 1 falla en `CHDIR`.
 - El harness PID 1 arranca dos jobs `SELF_TEST` y atesta que cada worker
-  ve sólo su propio `Where`.
+  tiene `ReadWritePaths` igual a su propio `Where`.
 - No se marca `003B-4C`. No hay `CPUQuota`, proceso UID A, fallos/reinicio,
   `Ready` ni HTTP.
 

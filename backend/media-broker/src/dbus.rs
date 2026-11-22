@@ -229,14 +229,6 @@ pub(crate) fn worker_properties(
         .to_str()
         .ok_or(SystemdError::Unavailable)?
         .to_owned();
-    let jobs_root = spec
-        .mount()
-        .where_path()
-        .parent()
-        .and_then(|path| path.to_str())
-        .filter(|path| !path.is_empty())
-        .ok_or(SystemdError::Unavailable)?
-        .to_owned();
     Ok(vec![
         (
             "Description",
@@ -258,7 +250,6 @@ pub(crate) fn worker_properties(
         ("WorkingDirectory", Value::from(workspace.clone())),
         ("NoNewPrivileges", Value::from(true)),
         ("ProtectSystem", Value::from("strict".to_owned())),
-        ("InaccessiblePaths", Value::from(vec![jobs_root])),
         ("ReadWritePaths", Value::from(vec![workspace.clone()])),
         (
             "Environment",
@@ -364,7 +355,6 @@ mod tests {
         assert!(worker_keys.contains(&"ExecStart"));
         assert!(worker_keys.contains(&"NoNewPrivileges"));
         assert!(worker_keys.contains(&"ProtectSystem"));
-        assert!(worker_keys.contains(&"InaccessiblePaths"));
         assert!(worker_keys.contains(&"ReadWritePaths"));
         assert!(worker_keys.contains(&"Environment"));
         assert!(worker_keys.contains(&"RemainAfterExit"));
@@ -413,22 +403,6 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains(where_path)),
             "ReadWritePaths must be the derived Where {where_path}, got {writable:?}"
-        );
-        let hidden = worker
-            .iter()
-            .find(|(key, _)| *key == "InaccessiblePaths")
-            .map(|(_, value)| format!("{value:?}"));
-        let jobs_root = spec
-            .mount()
-            .where_path()
-            .parent()
-            .and_then(|path| path.to_str())
-            .expect("jobs root");
-        assert!(
-            hidden
-                .as_deref()
-                .is_some_and(|value| value.contains(jobs_root)),
-            "InaccessiblePaths must be the derived jobs root {jobs_root}, got {hidden:?}"
         );
         let environment = worker
             .iter()
@@ -1008,21 +982,10 @@ mod tests {
             "ReadWritePaths of {name} must not include peer Where {peer}: {writable}"
         );
         assert!(
-            !writable_paths.iter().any(|path| {
-                path.starts_with("/run/storecore_media/jobs/") && *path != own
-            }),
+            !writable_paths
+                .iter()
+                .any(|path| path.starts_with("/run/storecore_media/jobs/") && *path != own),
             "ReadWritePaths of {name} must not include another job Where: {writable}"
-        );
-        let hidden = systemctl_property(name, "InaccessiblePaths");
-        let jobs_root = spec
-            .mount()
-            .where_path()
-            .parent()
-            .and_then(|path| path.to_str())
-            .expect("jobs root");
-        assert!(
-            hidden.split_whitespace().any(|path| path == jobs_root),
-            "InaccessiblePaths of {name} must include jobs root {jobs_root}: {hidden}"
         );
     }
 

@@ -2,12 +2,13 @@
 
 ## En implementación — 2026-11-22, 4C aislamiento entre jobs
 
-Este corte no cierra `003B-4C`. El harness PID 1 arranca dos `JobId`,
-deriva `InaccessiblePaths` del directorio de jobs y atesta que
-`ReadWritePaths` de cada worker es sólo su propio `Where`. Sigue sin
-`CPUQuota`, proceso UID A, fallos/reinicio ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+Este corte no cierra `003B-4C`. El harness PID 1 arranca dos `JobId` y
+atesta que `ReadWritePaths` de cada worker es sólo su propio `Where`.
+`InaccessiblePaths` del directorio de jobs queda fuera: oculta el
+`WorkingDirectory` y PID 1 falla en `CHDIR`. Sigue sin `CPUQuota`,
+proceso UID A, fallos/reinicio ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP.
 
 ## Master vigente — 2026-11-22, 4C cuota efectiva del worker
 
