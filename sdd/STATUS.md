@@ -1,11 +1,13 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C sigue abierto
+## En implementación — 2026-11-22, 4C cuota efectiva del worker
 
-Siguiente corte: cuota efectiva, aislamiento entre jobs y proceso UID A.
-Este documento no cierra `003B-4C`. Sigue sin cuota, aislamiento, proceso
-UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Este corte no cierra `003B-4C`. El harness PID 1 deriva internamente
+`MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64` y atesta
+`memory.max` / `pids.max` del cgroup v2. Sigue sin `CPUQuota`,
+aislamiento entre jobs, proceso UID A ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, 4C cgroup v2 del worker
 

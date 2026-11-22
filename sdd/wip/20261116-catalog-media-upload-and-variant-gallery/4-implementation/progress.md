@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C cuota efectiva del worker
+
+- `worker_properties` deriva internamente `MemoryMax=192MiB`,
+  `MemorySwapMax=0` y `TasksMax=64`. El cliente no suministra esas
+  properties. `CPUQuota` queda fuera de este corte.
+- El harness PID 1 atesta `memory.max`, `memory.swap.max=0` y `pids.max`.
+- No se marca `003B-4C`. No hay aislamiento, proceso UID A, `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #342, 003B-4C sigue abierto
 
 - PR #342 merge `c2d0413fb8f6caa1a90dbf4ab38fb9f6c119dc0c` sobre candidato
