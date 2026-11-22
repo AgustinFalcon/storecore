@@ -27,6 +27,8 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 /// `IMAGE_IO_V1` worker heap. Derived internally; the client cannot supply it.
 const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
+/// `IMAGE_IO_V1` timeout (12 s). Derived internally; the client cannot supply it.
+const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -263,6 +265,7 @@ pub(crate) fn worker_properties(
         ("MemorySwapMax", Value::from(0u64)),
         ("TasksAccounting", Value::from(true)),
         ("TasksMax", Value::from(WORKER_TASKS_MAX)),
+        ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
     ])
 }
 
@@ -307,8 +310,8 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_MEMORY_MAX_BYTES, WORKER_TASKS_MAX, ZbusSystemd, classify_dbus_name,
-        mount_properties, worker_properties,
+        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX, ZbusSystemd,
+        classify_dbus_name, mount_properties, worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -317,7 +320,7 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
-    use std::os::unix::fs::{self as unix_fs, OpenOptionsExt, PermissionsExt};
+        use std::os::unix::fs::{self as unix_fs, MetadataExt, OpenOptionsExt, PermissionsExt};
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -365,6 +368,17 @@ mod tests {
         assert!(worker_keys.contains(&"MemorySwapMax"));
         assert!(worker_keys.contains(&"TasksAccounting"));
         assert!(worker_keys.contains(&"TasksMax"));
+        assert!(worker_keys.contains(&"RuntimeMaxUSec"));
+        let runtime_max = worker
+            .iter()
+            .find(|(key, _)| *key == "RuntimeMaxUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            runtime_max
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_RUNTIME_MAX_USEC.to_string())),
+            "RuntimeMaxUSec must be the internal 12s ceiling, got {runtime_max:?}"
+        );
         let memory_max = worker
             .iter()
             .find(|(key, _)| *key == "MemoryMax")
@@ -888,6 +902,73 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_runtime_max_times_out_blocked_request() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x99; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_blocking_request_fifo(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived RuntimeMaxUSec");
+        }
+        let runtime_max = systemctl_property(name, "RuntimeMaxUSec");
+        assert_eq!(
+            runtime_max,
+            WORKER_RUNTIME_MAX_USEC.to_string(),
+            "PID 1 must apply the derived IMAGE_IO_V1 timeout, got {runtime_max}"
+        );
+        wait_runtime_timeout_journal(
+            name,
+            Duration::from_secs(20),
+            &spec,
+            started_worker,
+            &where_path,
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "timed-out worker must not write result.bin"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -971,6 +1052,29 @@ mod tests {
             jar.clone(),
             ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime"),
         )
+    }
+
+    fn write_blocking_request_fifo(where_path: &Path, backend_uid: u32, worker_gid: u32) {
+        let path = where_path.join("request.bin");
+        rustix::fs::mkfifoat(
+            rustix::fs::CWD,
+            &path,
+            rustix::fs::Mode::from_raw_mode(0o640),
+        )
+        .unwrap_or_else(|error| panic!("mkfifo request.bin: {error}"));
+        unix_fs::chown(&path, Some(backend_uid), Some(worker_gid))
+            .unwrap_or_else(|error| panic!("chown request.bin: {error}"));
+        let metadata = fs::metadata(&path).unwrap_or_else(|error| panic!("stat request.bin: {error}"));
+        assert_eq!(
+            metadata.uid(),
+            backend_uid,
+            "request.bin fifo must be owned by uid {backend_uid}"
+        );
+        assert_eq!(
+            metadata.gid(),
+            worker_gid,
+            "request.bin fifo must be owned by gid {worker_gid}"
+        );
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
@@ -1269,6 +1373,39 @@ mod tests {
             .output()
             .unwrap_or_else(|error| panic!("journalctl {name}: {error}"));
         String::from_utf8_lossy(&journal.stdout).into_owned()
+    }
+
+    fn wait_runtime_timeout_journal(
+        name: &str,
+        timeout: Duration,
+        spec: &TransientUnits,
+        started: Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let result = systemctl_property(name, "Result");
+            let journal = worker_journal(name);
+            if result == "timeout"
+                || journal.contains("Reached runtime time limit")
+                || journal.contains("result 'timeout'")
+            {
+                assert!(
+                    journal.contains("Reached runtime time limit")
+                        || journal.contains("result 'timeout'"),
+                    "journal must record RuntimeMax timeout for {name}: {journal}"
+                );
+                return;
+            }
+            if Instant::now() >= deadline {
+                dump_worker_unit(spec, started, where_path);
+            }
+            assert!(
+                Instant::now() < deadline,
+                "RuntimeMax timeout for {name} want Result=timeout, got Result={result}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn wait_unknown_exit_journal(
