@@ -3,11 +3,11 @@
 ## En implementación — 2026-11-22, 4C cuota efectiva del worker
 
 Este corte no cierra `003B-4C`. El harness PID 1 deriva internamente
-`MemoryMax=192MiB`, `MemorySwapMax=0`, `TasksMax=64` y `CPUQuota=100%`
-y atesta `memory.max` / `pids.max` del cgroup v2. Sigue sin aislamiento
-entre jobs, proceso UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP.
+`MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64` y atesta
+`memory.max` / `pids.max` del cgroup v2. Sigue sin `CPUQuota`,
+aislamiento entre jobs, proceso UID A ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, 4C cgroup v2 del worker
 

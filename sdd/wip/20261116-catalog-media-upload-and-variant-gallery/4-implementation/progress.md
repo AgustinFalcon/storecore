@@ -3,8 +3,8 @@
 ## 2026-11-22 — arranque 4C cuota efectiva del worker
 
 - `worker_properties` deriva internamente `MemoryMax=192MiB`,
-  `MemorySwapMax=0`, `TasksMax=64` y `CPUQuotaPerSecUSec=100%`. El cliente
-  no suministra esas properties.
+  `MemorySwapMax=0` y `TasksMax=64`. El cliente no suministra esas
+  properties. `CPUQuota` queda fuera de este corte.
 - El harness PID 1 atesta `memory.max`, `memory.swap.max=0` y `pids.max`.
 - No se marca `003B-4C`. No hay aislamiento, proceso UID A, `Ready` ni HTTP.
 

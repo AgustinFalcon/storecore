@@ -27,7 +27,6 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 /// `IMAGE_IO_V1` worker heap. Derived internally; the client cannot supply it.
 const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
-const WORKER_CPU_QUOTA_PER_SEC_USEC: u64 = 1_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -262,14 +261,8 @@ pub(crate) fn worker_properties(
         ("MemoryAccounting", Value::from(true)),
         ("MemoryMax", Value::from(WORKER_MEMORY_MAX_BYTES)),
         ("MemorySwapMax", Value::from(0u64)),
-        ("MemoryOOMGroup", Value::from(true)),
         ("TasksAccounting", Value::from(true)),
         ("TasksMax", Value::from(WORKER_TASKS_MAX)),
-        ("CPUAccounting", Value::from(true)),
-        (
-            "CPUQuotaPerSecUSec",
-            Value::from(WORKER_CPU_QUOTA_PER_SEC_USEC),
-        ),
     ])
 }
 
@@ -370,11 +363,8 @@ mod tests {
         assert!(worker_keys.contains(&"MemoryAccounting"));
         assert!(worker_keys.contains(&"MemoryMax"));
         assert!(worker_keys.contains(&"MemorySwapMax"));
-        assert!(worker_keys.contains(&"MemoryOOMGroup"));
         assert!(worker_keys.contains(&"TasksAccounting"));
         assert!(worker_keys.contains(&"TasksMax"));
-        assert!(worker_keys.contains(&"CPUAccounting"));
-        assert!(worker_keys.contains(&"CPUQuotaPerSecUSec"));
         let memory_max = worker
             .iter()
             .find(|(key, _)| *key == "MemoryMax")
