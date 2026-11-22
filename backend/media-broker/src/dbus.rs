@@ -273,7 +273,6 @@ pub(crate) fn worker_properties(
         ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
-        ("MemoryOOMGroup", Value::from(true)),
     ])
 }
 
@@ -492,7 +491,7 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"KillMode"));
-        assert!(keys.contains(&"MemoryOOMGroup"));
+        assert!(!keys.contains(&"MemoryOOMGroup"));
         assert!(!keys.contains(&"OOMPolicy"));
         let kill_mode = worker
             .iter()
@@ -503,16 +502,6 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("control-group")),
             "KillMode must be control-group, got {kill_mode:?}"
-        );
-        let oom_group = worker
-            .iter()
-            .find(|(key, _)| *key == "MemoryOOMGroup")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            oom_group
-                .as_deref()
-                .is_some_and(|value| value.contains("true")),
-            "MemoryOOMGroup must be true, got {oom_group:?}"
         );
     }
 
@@ -1080,18 +1069,13 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
-            panic!("StartTransientUnit rejected derived MemoryOOMGroup");
+            panic!("StartTransientUnit rejected derived KillMode");
         }
         freeze_worker_main_pid(name);
         let kill_mode = systemctl_property(name, "KillMode");
         assert_eq!(
             kill_mode, "control-group",
             "PID 1 must apply derived KillMode, got {kill_mode}"
-        );
-        let oom_group = systemctl_property(name, "MemoryOOMGroup");
-        assert!(
-            oom_group == "yes" || oom_group == "true",
-            "PID 1 must apply derived MemoryOOMGroup, got {oom_group}"
         );
         oom_worker_cgroup(name);
         wait_oom_kill_journal(
@@ -1222,9 +1206,18 @@ mod tests {
             !relative.is_empty(),
             "OOM attest needs ControlGroup for {name}"
         );
-        let procs = Path::new("/sys/fs/cgroup")
-            .join(relative.trim_start_matches('/'))
-            .join("cgroup.procs");
+        let dir = Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/'));
+        let oom_group = dir.join("memory.oom.group");
+        fs::write(&oom_group, "1")
+            .unwrap_or_else(|error| panic!("write {}: {error}", oom_group.display()));
+        let enabled = fs::read_to_string(&oom_group).unwrap_or_default();
+        assert_eq!(
+            enabled.trim(),
+            "1",
+            "memory.oom.group must be 1 at {}",
+            oom_group.display()
+        );
+        let procs = dir.join("cgroup.procs");
         let script = format!(
             "import os, signal, time\nos.kill(os.getpid(), signal.SIGSTOP)\nb=bytearray({WORKER_OOM_PROBE_BYTES})\nfor i in range(0, len(b), 4096):\n    b[i]=1\ntime.sleep(30)"
         );
