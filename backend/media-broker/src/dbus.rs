@@ -974,11 +974,11 @@ mod tests {
         let writable = systemctl_property(name, "ReadWritePaths");
         let writable_paths: Vec<&str> = writable.split_whitespace().collect();
         assert!(
-            writable_paths.iter().any(|path| *path == own),
+            writable_paths.contains(&own),
             "ReadWritePaths of {name} must include own Where {own}: {writable}"
         );
         assert!(
-            !writable_paths.iter().any(|path| *path == peer),
+            !writable_paths.contains(&peer),
             "ReadWritePaths of {name} must not include peer Where {peer}: {writable}"
         );
         assert!(
