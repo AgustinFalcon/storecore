@@ -1,5 +1,11 @@
 # Progreso
 
+## 2026-11-22 — arranque 003B-4C, request.bin UID A
+
+- El harness PID 1 chown `request.bin` a 2101:2102 (`0640`) y atesta ese
+  owner con `NOFOLLOW`. El worker sigue siendo UID B 2102.
+- No se marca `003B-4C`. No hay `NORMALIZE`, cgroup, `Ready` ni HTTP.
+
 ## 2026-11-22 — PR #335 fusionado, 003B-4B-3 sigue abierto
 
 - PR #335 merge `9030319adc16f21b0be95f38c9258593d8cbcf73` sobre candidato
