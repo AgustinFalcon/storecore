@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C aislamiento entre jobs
+
+- `worker_properties` deriva internamente `ReadWritePaths` del `Where` de
+  ese `JobId`. El cliente no suministra esa property. `InaccessiblePaths`
+  del directorio de jobs queda fuera: PID 1 falla en `CHDIR`.
+- El harness PID 1 arranca dos jobs `SELF_TEST` y atesta que cada worker
+  tiene `ReadWritePaths` igual a su propio `Where`.
+- No se marca `003B-4C`. No hay `CPUQuota`, proceso UID A, fallos/reinicio,
+  `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #346, 003B-4C sigue abierto
 
 - PR #346 merge `2aa276cd7bee7a8a4b6921ed857c5ef96f59d539` sobre candidato
