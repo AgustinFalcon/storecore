@@ -1,12 +1,25 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C rechazo de sustitución
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 copia el runtime
-aprobado, altera el jar y atesta `RuntimeError::DigestMismatch` por
-`confirm()`, sin arrancar el worker. Sigue sin `CPUQuota` ni `Ready`.
-`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
-abiertos. Este corte no agrega HTTP.
+Siguiente corte: OOM/timeout y terminación del cgroup. Este documento
+no cierra `003B-4C`. Sigue sin `CPUQuota`, OOM/timeout, terminación
+del cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C rechazo de sustitución
+
+`master dceb02dcdb02dfebc41b5b48bced50b1b7301e20` integra PR #355. Su
+candidato exacto `73192046a927a34a7008f824d40c3c9e260a74a3` pasó Verify
+`44994529755` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr355-architecture.md` y
+`sdd/reviews/20261122-sol-pr355-security.md`. El harness copia el
+runtime aprobado, altera el jar y atesta `RuntimeError::DigestMismatch`
+por `confirm()`, sin arrancar el worker. El corte no cierra `003B-4C`:
+no hay OOM/timeout, terminación del cgroup ni `Ready`. `CPUQuota` sigue
+fuera. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, persist reviews PR #353
 
