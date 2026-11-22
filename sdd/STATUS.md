@@ -2,10 +2,11 @@
 
 ## En implementación — 2026-11-22, 4C OOM del cgroup worker
 
-Este corte no cierra `003B-4C`. Deriva `KillMode=control-group`,
-`MemoryOOMGroup=yes` y `OOMPolicy=kill`. El harness congela el `MainPID`,
-inyecta un allocador en el cgroup y atesta que PID 1 mata el grupo al
-vencer `MemoryMax`. Sigue sin `CPUQuota` ni `Ready`. `003B-4B-3`,
+Este corte no cierra `003B-4C`. Deriva `KillMode=control-group` y
+`MemoryOOMGroup=yes`. `OOMPolicy` queda fuera: PID 1 rechazó la
+propiedad. El harness congela el `MainPID`, inyecta un allocador en el
+cgroup y atesta que el grupo muere al vencer `MemoryMax`. Sigue sin
+`CPUQuota` ni `Ready`. `003B-4B-3`,
 `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
 corte no agrega HTTP.
 

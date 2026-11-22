@@ -271,7 +271,6 @@ pub(crate) fn worker_properties(
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
         ("MemoryOOMGroup", Value::from(true)),
-        ("OOMPolicy", Value::from("kill".to_owned())),
     ])
 }
 
@@ -491,7 +490,7 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"KillMode"));
         assert!(keys.contains(&"MemoryOOMGroup"));
-        assert!(keys.contains(&"OOMPolicy"));
+        assert!(!keys.contains(&"OOMPolicy"));
         let kill_mode = worker
             .iter()
             .find(|(key, _)| *key == "KillMode")
@@ -511,16 +510,6 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("true")),
             "MemoryOOMGroup must be true, got {oom_group:?}"
-        );
-        let oom_policy = worker
-            .iter()
-            .find(|(key, _)| *key == "OOMPolicy")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            oom_policy
-                .as_deref()
-                .is_some_and(|value| value.contains("kill")),
-            "OOMPolicy must be kill, got {oom_policy:?}"
         );
     }
 

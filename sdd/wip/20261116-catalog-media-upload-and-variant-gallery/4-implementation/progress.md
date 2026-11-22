@@ -2,9 +2,9 @@
 
 ## 2026-11-22 — arranque 4C OOM del cgroup worker
 
-- El harness PID 1 deriva `KillMode=control-group`, `MemoryOOMGroup=yes`
-  y `OOMPolicy=kill`, congela el `MainPID`, inyecta un allocador en el
-  cgroup y atesta oom-kill. `CPUQuota` sigue fuera.
+- El harness PID 1 deriva `KillMode=control-group` y `MemoryOOMGroup=yes`.
+  `OOMPolicy` queda fuera. Congela el `MainPID`, inyecta un allocador en
+  el cgroup y atesta oom-kill. `CPUQuota` sigue fuera.
 - No se marca `003B-4C`. No hay `Ready` ni HTTP.
 
 ## 2026-11-22 — persist reviews PR #358, 003B-4C sigue abierto
