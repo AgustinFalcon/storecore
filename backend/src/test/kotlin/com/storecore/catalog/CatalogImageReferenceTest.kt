@@ -18,6 +18,7 @@ class CatalogImageReferenceTest {
             "http://images.example.com/tool.jpg",
             "/assets/../secret.jpg",
             "/assets/tool.jpg?redirect=https://example.com",
+            "/assets/showcase/catalog/tool.JPG",
             "/other/tool.jpg",
             "javascript:alert(1)",
             "future-reference",

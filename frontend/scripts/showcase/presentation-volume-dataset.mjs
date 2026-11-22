@@ -1,46 +1,94 @@
 import { createHash } from 'node:crypto';
 
+const presentationWireToken = Symbol('PresentationWireType');
+
 class ClosedWireType {
-  constructor(wire, label) { this.wire = wire; this.label = label; Object.freeze(this); }
+  constructor(token, wire, label) {
+    if (token !== presentationWireToken) throw new TypeError('PRESENTATION_CLOSED_TYPE_CONSTRUCTOR');
+    this.wire = wire; this.label = label; Object.freeze(this);
+  }
 }
 
 export class PresentationRunState extends ClosedWireType {
-  static Create = new PresentationRunState('CREATE', 'Crear');
-  static Replay = new PresentationRunState('REPLAY', 'Revalidar');
-  static Unknown = new PresentationRunState('UNKNOWN', 'Desconocido');
+  static Create = new PresentationRunState(presentationWireToken, 'CREATE', 'Crear');
+  static Replay = new PresentationRunState(presentationWireToken, 'REPLAY', 'Revalidar');
+  static Unknown = new PresentationRunState(presentationWireToken, 'UNKNOWN', 'Desconocido');
   static values = Object.freeze([this.Create, this.Replay]);
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
 export class PresentationPricePolicyState extends ClosedWireType {
-  static Draft = new PresentationPricePolicyState('DRAFT', 'Borrador');
-  static Active = new PresentationPricePolicyState('ACTIVE', 'Activa');
-  static Paused = new PresentationPricePolicyState('PAUSED', 'Pausada');
-  static Unknown = new PresentationPricePolicyState('UNKNOWN', 'Desconocida');
+  static Draft = new PresentationPricePolicyState(presentationWireToken, 'DRAFT', 'Borrador');
+  static Active = new PresentationPricePolicyState(presentationWireToken, 'ACTIVE', 'Activa');
+  static Paused = new PresentationPricePolicyState(presentationWireToken, 'PAUSED', 'Pausada');
+  static Unknown = new PresentationPricePolicyState(presentationWireToken, 'UNKNOWN', 'Desconocida');
   static values = Object.freeze([this.Draft, this.Active, this.Paused]);
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
 export class PresentationPricePolicyTransition extends ClosedWireType {
-  static Activate = new PresentationPricePolicyTransition('ACTIVATE', 'Activar');
-  static Pause = new PresentationPricePolicyTransition('PAUSE', 'Pausar');
-  static Unknown = new PresentationPricePolicyTransition('UNKNOWN', 'Desconocida');
+  static Activate = new PresentationPricePolicyTransition(presentationWireToken, 'ACTIVATE', 'Activar');
+  static Pause = new PresentationPricePolicyTransition(presentationWireToken, 'PAUSE', 'Pausar');
+  static Unknown = new PresentationPricePolicyTransition(presentationWireToken, 'UNKNOWN', 'Desconocida');
   static values = Object.freeze([this.Activate, this.Pause]);
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
 export class PresentationOrderStatus extends ClosedWireType {
-  static PendingPayment = new PresentationOrderStatus('PENDING_PAYMENT', 'Pendiente de pago');
-  static Unknown = new PresentationOrderStatus('UNKNOWN', 'Desconocido');
+  static PendingPayment = new PresentationOrderStatus(presentationWireToken, 'PENDING_PAYMENT', 'Pendiente de pago');
+  static Unknown = new PresentationOrderStatus(presentationWireToken, 'UNKNOWN', 'Desconocido');
   static values = Object.freeze([this.PendingPayment]);
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
 export class PresentationDeliveryMode extends ClosedWireType {
-  static LocalDelivery = new PresentationDeliveryMode('LOCAL_DELIVERY', 'Envío local');
-  static StorePickup = new PresentationDeliveryMode('PICKUP', 'Retiro en local');
-  static Unknown = new PresentationDeliveryMode('UNKNOWN', 'Desconocido');
+  static LocalDelivery = new PresentationDeliveryMode(presentationWireToken, 'LOCAL_DELIVERY', 'Envío local');
+  static StorePickup = new PresentationDeliveryMode(presentationWireToken, 'PICKUP', 'Retiro en local');
+  static Unknown = new PresentationDeliveryMode(presentationWireToken, 'UNKNOWN', 'Desconocido');
   static values = Object.freeze([this.LocalDelivery, this.StorePickup]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationHealthStatus extends ClosedWireType {
+  static Up = new PresentationHealthStatus(presentationWireToken, 'UP', 'Disponible');
+  static Unknown = new PresentationHealthStatus(presentationWireToken, 'UNKNOWN', 'Desconocido');
+  static values = Object.freeze([this.Up]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationCapabilityModule extends ClosedWireType {
+  static ManualFulfillment = new PresentationCapabilityModule(presentationWireToken, 'MANUAL_FULFILLMENT', 'Fulfillment manual');
+  static ManualPromotions = new PresentationCapabilityModule(presentationWireToken, 'MANUAL_PROMOTIONS', 'Promociones manuales');
+  static Unknown = new PresentationCapabilityModule(presentationWireToken, 'UNKNOWN', 'Desconocido');
+  static values = Object.freeze([this.ManualFulfillment, this.ManualPromotions]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationCapabilityState extends ClosedWireType {
+  static Active = new PresentationCapabilityState(presentationWireToken, 'ACTIVE', 'Activa');
+  static Unknown = new PresentationCapabilityState(presentationWireToken, 'UNKNOWN', 'Desconocida');
+  static values = Object.freeze([this.Active]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationCurrency extends ClosedWireType {
+  static Ars = new PresentationCurrency(presentationWireToken, 'ARS', 'Peso argentino');
+  static Unknown = new PresentationCurrency(presentationWireToken, 'UNKNOWN', 'Desconocida');
+  static values = Object.freeze([this.Ars]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationPriceScope extends ClosedWireType {
+  static Default = new PresentationPriceScope(presentationWireToken, 'DEFAULT', 'Predeterminado');
+  static Unknown = new PresentationPriceScope(presentationWireToken, 'UNKNOWN', 'Desconocido');
+  static values = Object.freeze([this.Default]);
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class PresentationPriceWriter extends ClosedWireType {
+  static Manual = new PresentationPriceWriter(presentationWireToken, 'MANUAL', 'Manual');
+  static Unknown = new PresentationPriceWriter(presentationWireToken, 'UNKNOWN', 'Desconocido');
+  static values = Object.freeze([this.Manual]);
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 

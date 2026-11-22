@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CatalogExpansionDecision, buildCatalogExpansionFixtures } from './load-catalog-expansion.mjs';
+import { CatalogExpansionDecision, CatalogProductStatus, buildCatalogExpansionFixtures } from './load-catalog-expansion.mjs';
 
 const imagePool = Array.from(
   { length: 24 },
@@ -29,4 +29,11 @@ test('catalog expansion decision is a closed wire type with an Unknown fallback'
   assert.equal(CatalogExpansionDecision.fromWire('RECONCILE'), CatalogExpansionDecision.Reconcile);
   assert.equal(CatalogExpansionDecision.fromWire('PRESERVE'), CatalogExpansionDecision.Preserve);
   assert.equal(CatalogExpansionDecision.fromWire('future-state'), CatalogExpansionDecision.Unknown);
+  assert.throws(() => new CatalogExpansionDecision('future-state'), /CATALOG_EXPANSION_DECISION_CONSTRUCTOR/);
+});
+
+test('catalog product status is closed and translates unknown values', () => {
+  assert.equal(CatalogProductStatus.fromWire('ACTIVE'), CatalogProductStatus.Active);
+  assert.equal(CatalogProductStatus.fromWire('future-state'), CatalogProductStatus.Unknown);
+  assert.throws(() => new CatalogProductStatus('future-state'), /CATALOG_PRODUCT_STATUS_CONSTRUCTOR/);
 });

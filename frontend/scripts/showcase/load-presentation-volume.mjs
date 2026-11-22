@@ -4,8 +4,9 @@ import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HttpSession } from './load-storecore-showcase.mjs';
 import { readShowcaseDataset } from './read-showcase-dataset.mjs';
-import { PresentationDeliveryMode, PresentationOrderStatus, PresentationPricePolicyState,
-  PresentationPricePolicyTransition, PresentationRunState, presentationVolumeDataset } from './presentation-volume-dataset.mjs';
+import { PresentationCapabilityModule, PresentationCapabilityState, PresentationCurrency, PresentationDeliveryMode,
+  PresentationHealthStatus, PresentationOrderStatus, PresentationPricePolicyState, PresentationPricePolicyTransition,
+  PresentationPriceScope, PresentationPriceWriter, PresentationRunState, presentationVolumeDataset } from './presentation-volume-dataset.mjs';
 
 const required = (value, name) => {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${name}_REQUIRED`);
@@ -107,11 +108,12 @@ export class PresentationVolumeLoader {
 
   async preflight() {
     const health = await this.admin.request('/api/v1/health', { envelope: false });
-    if (health?.status !== 'UP') throw new Error('PRESENTATION_BACKEND_NOT_READY');
+    if (PresentationHealthStatus.fromWire(health?.status) !== PresentationHealthStatus.Up) throw new Error('PRESENTATION_BACKEND_NOT_READY');
     await this.admin.request('/api/v1/internal/auth/login', { method: 'POST', body: { email: this.config.adminEmail, password: this.config.adminPassword } });
     const capabilities = await this.admin.request('/api/v1/user/capabilities');
-    for (const code of ['MANUAL_FULFILLMENT', 'MANUAL_PROMOTIONS']) {
-      if (capabilities.find(row => row?.module === code)?.state !== 'ACTIVE') throw new Error(`PRESENTATION_CAPABILITY_NOT_ACTIVE:${code}`);
+    for (const module of PresentationCapabilityModule.values) {
+      const capability = capabilities.find(row => PresentationCapabilityModule.fromWire(row?.module) === module);
+      if (PresentationCapabilityState.fromWire(capability?.state) !== PresentationCapabilityState.Active) throw new Error(`PRESENTATION_CAPABILITY_NOT_ACTIVE:${module.wire}`);
     }
   }
 
@@ -165,11 +167,11 @@ export class PresentationVolumeLoader {
       }
       if (!exactCart(cart, fixture.orderSku)) throw new Error(`PRESENTATION_CHECKOUT_CART_DRIFT:${fixture.key}`);
       const quote = cart.deliveryOptions?.find(row => PresentationDeliveryMode.fromWire(row?.mode) === fixture.deliveryMode);
-      if (!quote || !Number.isSafeInteger(quote.configurationVersion) || quote.currency !== 'ARS') throw new Error(`PRESENTATION_DELIVERY_INVALID:${fixture.key}`);
+      if (!quote || !Number.isSafeInteger(quote.configurationVersion) || PresentationCurrency.fromWire(quote.currency) !== PresentationCurrency.Ars) throw new Error(`PRESENTATION_DELIVERY_INVALID:${fixture.key}`);
       saved = { ...saved, checkoutCommand: { idempotencyKey: fixture.idempotencyKey,
         addressId: fixture.deliveryMode === PresentationDeliveryMode.LocalDelivery ? String(defaultAddress.id) : null,
         addressRevision: fixture.deliveryMode === PresentationDeliveryMode.LocalDelivery ? defaultAddress.revision : null,
-        cartRevision: cart.revision, currency: 'ARS', deliveryMode: fixture.deliveryMode.wire,
+        cartRevision: cart.revision, currency: PresentationCurrency.Ars.wire, deliveryMode: fixture.deliveryMode.wire,
         deliveryConfigurationVersion: quote.configurationVersion } };
       await this.journal.save('customers', fixture.key, saved);
     }
@@ -203,9 +205,9 @@ export class PresentationVolumeLoader {
     for (const fixture of this.dataset.policies) {
       let saved = this.journal.policy(fixture.key);
       if (!saved) {
-        const command = { listingSku: fixture.sku, currency: 'ARS', priceScope: 'DEFAULT', desiredPrice: fixture.desiredPrice,
+        const command = { listingSku: fixture.sku, currency: PresentationCurrency.Ars.wire, priceScope: PresentationPriceScope.Default.wire, desiredPrice: fixture.desiredPrice,
           effectivePromoPrice: null, validFrom: new Date(now - 86_400_000).toISOString(),
-          validTo: new Date(now + 90 * 86_400_000).toISOString(), writer: 'MANUAL' };
+          validTo: new Date(now + 90 * 86_400_000).toISOString(), writer: PresentationPriceWriter.Manual.wire };
         saved = { key: fixture.key, sku: fixture.sku, target: fixture.target.wire, command };
         await this.journal.save('policies', fixture.key, saved);
       }
@@ -213,9 +215,11 @@ export class PresentationVolumeLoader {
         throw new Error(`PRESENTATION_POLICY_JOURNAL_DRIFT:${fixture.key}`);
       }
       if (!saved.policyId) {
-        const created = await this.admin.request('/api/v1/user/promos', { method: 'POST', csrf: true, body: saved.command });
-        if (!validId(created?.id) || PresentationPricePolicyState.fromWire(created.status) !== PresentationPricePolicyState.Draft) throw new Error(`PRESENTATION_POLICY_CREATE_FAILED:${fixture.key}`);
-        saved = { ...saved, policyId: String(created.id) };
+        const recovered = await this.findPoliciesByCommand(saved.command);
+        if (recovered.length > 1) throw new Error(`PRESENTATION_POLICY_RECOVERY_AMBIGUOUS:${fixture.key}`);
+        const policy = recovered[0] ?? await this.admin.request('/api/v1/user/promos', { method: 'POST', csrf: true, body: saved.command });
+        if (!validId(policy?.id) || PresentationPricePolicyState.fromWire(policy.status) === PresentationPricePolicyState.Unknown) throw new Error(`PRESENTATION_POLICY_CREATE_FAILED:${fixture.key}`);
+        saved = { ...saved, policyId: String(policy.id) };
         await this.journal.save('policies', fixture.key, saved);
       }
       let policy = await this.findPolicy(saved.policyId);
@@ -239,6 +243,25 @@ export class PresentationVolumeLoader {
     const policy = page.items.find(row => String(row?.id) === String(id));
     if (!policy) throw new Error(`PRESENTATION_POLICY_NOT_FOUND:${id}`);
     return policy;
+  }
+
+  async findPoliciesByCommand(command) {
+    const found = [];
+    for (let page = 0; page < 200; page += 1) {
+      const result = requirePage(await this.admin.request(`/api/v1/user/promos?page=${page}&size=50`), 'PRESENTATION_POLICY_PAGE_INVALID');
+      found.push(...result.items.filter(policy => this.policyMatchesCommand(policy, command)));
+      if ((page + 1) * 50 >= result.total) return found;
+    }
+    throw new Error('PRESENTATION_POLICY_PAGE_LIMIT');
+  }
+
+  policyMatchesCommand(policy, command) {
+    return policy?.listingSku === command.listingSku
+      && PresentationCurrency.fromWire(policy.currency) === PresentationCurrency.fromWire(command.currency)
+      && PresentationPriceScope.fromWire(policy.priceScope) === PresentationPriceScope.fromWire(command.priceScope)
+      && policy.desiredPrice === command.desiredPrice && policy.effectivePromoPrice === command.effectivePromoPrice
+      && Date.parse(policy.validFrom) === Date.parse(command.validFrom) && Date.parse(policy.validTo) === Date.parse(command.validTo)
+      && PresentationPriceWriter.fromWire(policy.writer) === PresentationPriceWriter.fromWire(command.writer);
   }
 
   async verify() {

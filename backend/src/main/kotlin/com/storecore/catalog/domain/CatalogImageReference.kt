@@ -8,7 +8,7 @@ sealed class CatalogImageReference(open val storedValue: String?) {
     data object Unknown : CatalogImageReference(null)
 
     companion object {
-        private val assetPath = Regex("^/assets/[A-Za-z0-9._/-]+\\.(?:avif|gif|jpe?g|png|svg|webp)$", RegexOption.IGNORE_CASE)
+        private val assetPath = Regex("^/assets/[A-Za-z0-9._/-]+\\.(?:avif|gif|jpe?g|png|svg|webp)$")
 
         fun fromWire(raw: String?): CatalogImageReference {
             val value = raw?.trim()?.takeIf(String::isNotEmpty) ?: return Unknown

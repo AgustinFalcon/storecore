@@ -5,13 +5,24 @@ import { pathToFileURL } from 'node:url';
 import { HttpSession } from './load-storecore-showcase.mjs';
 import { readShowcaseDataset } from './read-showcase-dataset.mjs';
 
+const catalogExpansionDecisionToken = Symbol('CatalogExpansionDecision');
+const catalogProductStatusToken = Symbol('CatalogProductStatus');
+
 export class CatalogExpansionDecision {
-  static Create = new CatalogExpansionDecision('CREATE');
-  static Reconcile = new CatalogExpansionDecision('RECONCILE');
-  static Preserve = new CatalogExpansionDecision('PRESERVE');
-  static Unknown = new CatalogExpansionDecision('UNKNOWN');
+  static Create = new CatalogExpansionDecision(catalogExpansionDecisionToken, 'CREATE');
+  static Reconcile = new CatalogExpansionDecision(catalogExpansionDecisionToken, 'RECONCILE');
+  static Preserve = new CatalogExpansionDecision(catalogExpansionDecisionToken, 'PRESERVE');
+  static Unknown = new CatalogExpansionDecision(catalogExpansionDecisionToken, 'UNKNOWN');
   static values = Object.freeze([this.Create, this.Reconcile, this.Preserve]);
-  constructor(wire) { this.wire = wire; Object.freeze(this); }
+  constructor(token, wire) { if (token !== catalogExpansionDecisionToken) throw new TypeError('CATALOG_EXPANSION_DECISION_CONSTRUCTOR'); this.wire = wire; Object.freeze(this); }
+  static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class CatalogProductStatus {
+  static Active = new CatalogProductStatus(catalogProductStatusToken, 'ACTIVE');
+  static Unknown = new CatalogProductStatus(catalogProductStatusToken, 'UNKNOWN');
+  static values = Object.freeze([this.Active]);
+  constructor(token, wire) { if (token !== catalogProductStatusToken) throw new TypeError('CATALOG_PRODUCT_STATUS_CONSTRUCTOR'); this.wire = wire; Object.freeze(this); }
   static fromWire(raw) { return this.values.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
@@ -84,7 +95,7 @@ function command(row, existing = null) {
 function matches(actual, expected) {
   const variant = actual?.variants?.length === 1 ? actual.variants[0] : null;
   return !(actual?.sku !== expected.sku || actual.name !== expected.name || actual.description !== expected.description || actual.brand !== expected.brand
-    || actual.category !== expected.category || actual.status !== 'ACTIVE' || actual.active !== true || actual.price?.base !== expected.price
+    || actual.category !== expected.category || CatalogProductStatus.fromWire(actual.status) !== CatalogProductStatus.Active || actual.active !== true || actual.price?.base !== expected.price
     || variant?.sku !== expected.sku || variant.name !== expected.name || variant.active !== true || variant.inventory?.onHand !== expected.stock
     || !Array.isArray(actual.media) || actual.media.length !== 4 || actual.media.some((media, index) => media.url !== expected.images[index] || media.sortOrder !== index || media.primary !== (index === 0)));
 }
