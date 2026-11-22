@@ -7,6 +7,6 @@
     {"id":"COM-04","title":"Alcanzar fulfillment y RMA por APIs productivas","status":"completed"},
     {"id":"COM-05","title":"Emitir recibo y validar replay exacto","status":"completed"},
     {"id":"COM-06","title":"Probar superficies comprador/admin y overview","status":"completed"},
-    {"id":"COM-07","title":"Ejecutar CI y dos revisiones exact-head","status":"in_progress"}
+    {"id":"COM-07","title":"Ejecutar CI y dos revisiones exact-head","status":"completed"}
   ]
 }
