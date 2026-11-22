@@ -1,15 +1,18 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-21, 4B-3 worker PID 1 SELF_TEST
+## Master vigente — 2026-11-22, 4B-3 worker PID 1 SELF_TEST
 
-Este corte arranca el `.service` worker derivado contra PID 1. Instala
-Temurin 21.0.13+9 y el fat-jar root-owned (`0555`/`0444`, `nlink=1`),
-escribe el `SELF_TEST` `request.bin` en el tmpfs `03770` y atesta
-`result.bin` uid 2102. `RemainAfterExit` y `TMPDIR=<Where>` son
-properties internas. No cierra `003B-4B-3`: el harness no corre como
-UID A, no ejecuta `NORMALIZE`, no atesta cgroup/quota. `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay `Ready` ni
-HTTP.
+`master 9030319adc16f21b0be95f38c9258593d8cbcf73` integra PR #335. Su
+candidato exacto `1b143d56ac88cffa1b8bd679ad6794267a0b43a1` pasó Verify
+`44965939283` 7/7 (incluye `media-broker-pid1` con worker `SELF_TEST`).
+Dos reviews independientes Grok 4.7 (autorizadas porque gpt-5.6-sol-medium
+estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr335-architecture.md` y
+`sdd/reviews/20261122-sol-pr335-security.md`. El corte arranca el
+`.service` worker derivado contra PID 1 con runtime Java/jar root-owned
+y atesta `result.bin` uid 2102. No cierra `003B-4B-3`: no hay UID A,
+`NORMALIZE`, cgroup ni `Ready`. `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-21, 4B-3 persist reviews #331/#332
 
