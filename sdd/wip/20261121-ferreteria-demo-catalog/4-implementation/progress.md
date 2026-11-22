@@ -1,0 +1,11 @@
+# Implementation progress
+
+Date: 2026-11-21
+
+- FDC-T01 done: product owner requested a complete synthetic hardware-store population and full-flow validation; scope and non-goals recorded.
+- FDC-T02 done: closed `V1`, `V2`, `Unknown`; legacy one-image wire and new ordered galleries translate once to immutable `images`.
+- FDC-T03 done: committed catalog has 40 products, eight categories/brands, 84 image placements and eight low-stock products. All 66 unique image URLs returned HTTP 200 with an image content type on 2026-11-21.
+- FDC-T04 done on rebased candidate `109cc92a2e417020da109253545a62fd3b7ba577`: showcase 99/99, surface manifest 2/2, Angular 228 files / 1621 tests, lint, demo build and productive-runner contract/list 126 cases pass. The known demo build warning remains 30.53 kB above its warning budget and below the error threshold.
+- FDC-T05 done: fresh PostgreSQL 16.14, Flyway V1-V30 and packaged Spring. First real load completed all stages with 40 products and one pending order; replay completed with no new order. Direct DB readback: 40 products, 40 variants, 84 ordered media rows, eight categories, eight brands, stock range 1-86, one synthetic order, one offer and one home section. Exact Spring process, database container and Docker Desktop were stopped afterwards.
+- FDC-T06 done: Demo Playwright passed 335/335 in 18.9 minutes, covering buyer/admin surfaces, all inventoried CTA, responsive widths, keyboard, Axe, text at 200 percent, persistence and failures. The first productive CI run exposed two dataset-specific E2E literals; both were replaced with the validated receipt and real product detail. GitHub run `44969581412` then passed the isolated Linux productive matrix. Artifact `14733077320` records 126/126 cases, zero failures, 90 route acceptances, 17 action acceptances and external safety true before and after execution.
+- FDC-T07 done: the branch was rebased onto `origin/master` `63d286f` to preserve PR #335 evidence. Exact implementation head `bb1af39ffbd6047af0d0a7d91a9b823b7bb0df5c` received independent GPT-6.1 Sol bug/product and security APPROVE decisions with no P0-P3. GitHub run `44969581412` completed all seven jobs successfully: repository hygiene, frontend, backend, media broker, PID 1 isolation, unified-access real E2E and productive-routes real E2E.

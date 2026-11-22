@@ -10,6 +10,7 @@ import evidenceWire from '../route-evidence-wire.json' with { type: 'json' };
 import { databaseEnvironment, query } from './ua-real-database.mjs';
 import { ShowcaseConfig, ShowcaseLoader, ShowcaseDiscountKind, ShowcaseAdapterMode,
   ShowcaseExternalCapability, ShowcaseCapabilityState } from './showcase/load-storecore-showcase.mjs';
+import { readShowcaseDataset } from './showcase/read-showcase-dataset.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jar = resolve(frontend, '../backend/target/storecore-backend-0.1.0-SNAPSHOT.jar');
@@ -22,6 +23,7 @@ const children = new Set();
 const logs = [];
 // Never inherit Spring/JVM configuration, proxy settings, credentials or preload hooks.
 const inherited = process.env;
+const showcaseDatasetFile = inherited.STORECORE_SHOWCASE_DATASET_FILE;
 const childKeys = ['PATH', 'HOME', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TMP', 'TEMP', 'SystemRoot', 'WINDIR',
   'JAVA_HOME', 'CI', 'PLAYWRIGHT_BROWSERS_PATH', 'PGHOST', 'PGPORT', 'PGDATABASE', 'PGUSER', 'PGPASSWORD',
   'STORECORE_UA_JAVA', 'STORECORE_UA_PSQL', 'STORECORE_UA_OPENSSL', 'STORECORE_PSD_EGRESS_PROOF',
@@ -442,6 +444,7 @@ function spring(origin, guard, name) {
     STORECORE_INSTALLATION_ORIGIN: origin });
 }
 async function run() {
+  const showcaseDataset = await readShowcaseDataset(showcaseDatasetFile);
   await egressSelfTests();
   if (!existsSync(jar)) throw new Error('Build backend first: mvn -B -DskipTests package');
   if (!existsSync(join(frontend, 'dist/storecore-demo/browser/index.html'))) throw new Error('Build Demo first: npm run build:demo');
@@ -496,7 +499,7 @@ async function run() {
         destination: 'Local descartable PSD', instructions: 'Presentar confirmación del pedido' },
       localDelivery: { enabled: true, label: 'Entrega local PSD', cost: '0.00', minDays: 1, maxDays: 2 },
     } });
-  const first = new ShowcaseLoader(config);
+  const first = new ShowcaseLoader(config, undefined, showcaseDataset);
   const firstResult = await first.run();
   assert.equal(firstResult.pendingOrderCreated, true);
   writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify(firstResult.receipt, null, 2)}\n`);
@@ -513,7 +516,7 @@ async function run() {
   const historical = query("SELECT count(*) FROM orders;");
   const balances = query('SELECT row_to_json(b)::text FROM inventory_balances b ORDER BY variant_id;');
   const ledger = query('SELECT row_to_json(l)::text FROM inventory_ledger l ORDER BY id;');
-  const replay = await new ShowcaseLoader(config).run();
+  const replay = await new ShowcaseLoader(config, undefined, showcaseDataset).run();
   assert.equal(replay.pendingOrderCreated, false);
   assert.deepEqual(replay.receipt, firstResult.receipt);
   assert.equal(query('SELECT count(*) FROM orders;'), historical);

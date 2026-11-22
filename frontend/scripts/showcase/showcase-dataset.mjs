@@ -1,13 +1,18 @@
 const SCHEMA_TOKEN = Symbol('ShowcaseDatasetSchema');
 export class ShowcaseDatasetSchema {
   static V1 = new ShowcaseDatasetSchema(SCHEMA_TOKEN, 1);
+  static V2 = new ShowcaseDatasetSchema(SCHEMA_TOKEN, 2);
   static Unknown = new ShowcaseDatasetSchema(SCHEMA_TOKEN, null);
   constructor(token, wire) {
     if (token !== SCHEMA_TOKEN) throw new TypeError('ShowcaseDatasetSchema is closed');
     this.wire = wire;
     Object.freeze(this);
   }
-  static fromWire(raw) { return raw === this.V1.wire ? this.V1 : this.Unknown; }
+  static fromWire(raw) {
+    if (raw === this.V1.wire) return this.V1;
+    if (raw === this.V2.wire) return this.V2;
+    return this.Unknown;
+  }
 }
 Object.freeze(ShowcaseDatasetSchema);
 
@@ -72,11 +77,13 @@ export class ShowcaseProductFixture {
   constructor(token, fields) {
     if (token !== DATASET_TOKEN) throw new TypeError('Use ShowcaseDataset.fromWire');
     Object.assign(this, fields);
+    this.images = Object.freeze([...fields.images]);
     Object.freeze(this);
   }
+  get image() { return this.images[0]; }
   toCatalogCommand() {
     return { sku: this.sku, name: this.name, description: this.description, brand: this.brand,
-      category: this.category, images: [this.image], price: { base: this.price }, active: true,
+      category: this.category, images: [...this.images], price: { base: this.price }, active: true,
       variants: [{ sku: this.sku, name: this.name, availableQuantity: this.stock,
         stockAdjustmentReason: 'LOCAL_SHOWCASE_RECONCILIATION' }] };
   }
@@ -124,15 +131,26 @@ export class ShowcaseDataset {
     if (!Array.isArray(raw.products) || raw.products.length < 3 || raw.products.length > 100) invalid('products');
     const products = raw.products.map((product, index) => {
       const field = 'products[' + index + ']';
-      object(product, ['sku', 'name', 'description', 'brand', 'category', 'image', 'price', 'stock'], field);
+      const productKeys = schema === ShowcaseDatasetSchema.V1
+        ? ['sku', 'name', 'description', 'brand', 'category', 'image', 'price', 'stock']
+        : ['sku', 'name', 'description', 'brand', 'category', 'images', 'price', 'stock'];
+      object(product, productKeys, field);
       const sku = text(product.sku, 1, 69, field + '.sku');
       if (!/^SHOW-[A-Z0-9][A-Z0-9_-]{0,63}$/.test(sku)) invalid(field + '.sku');
+      const images = schema === ShowcaseDatasetSchema.V1
+        ? [image(product.image, field + '.image')]
+        : (() => {
+            if (!Array.isArray(product.images) || product.images.length < 2 || product.images.length > 4) invalid(field + '.images');
+            const translated = product.images.map((value, imageIndex) => image(value, `${field}.images[${imageIndex}]`));
+            if (new Set(translated).size !== translated.length) invalid(field + '.duplicateImage');
+            return translated;
+          })();
       return new ShowcaseProductFixture(DATASET_TOKEN, {
         sku, name: text(product.name, 1, 200, field + '.name'),
         description: text(product.description, 0, 5000, field + '.description'),
         brand: text(product.brand, 1, 100, field + '.brand'),
         category: text(product.category, 1, 100, field + '.category'),
-        image: image(product.image, field + '.image'),
+        images,
         price: integer(product.price, 1, SHOWCASE_PRICE_MAX, field + '.price'),
         stock: integer(product.stock, 1, 1000000, field + '.stock'),
       });
