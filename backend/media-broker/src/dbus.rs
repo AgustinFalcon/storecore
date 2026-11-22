@@ -765,6 +765,67 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_fails_without_request_then_restarts() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x77; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let first = systemd.start_transient(UnitKind::Worker, &spec);
+        if first.is_err() {
+            dump_worker_unit(&spec, first, &where_path);
+        }
+        wait_exec_main_status(name, "2", Duration::from_secs(30));
+        let stopped_failed = systemd.stop(UnitKind::Worker, &spec).expect("stop failed");
+        assert!(matches!(
+            stopped_failed,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        write_self_test_request(&where_path, 2101, worker.gid());
+        assert_request_owned_by_backend(&where_path, 2101);
+        let restarted = systemd.start_transient(UnitKind::Worker, &spec);
+        if restarted != Ok(UnitState::Active) {
+            dump_worker_unit(&spec, restarted, &where_path);
+        }
+        wait_for_worker_result(
+            &where_path.join("result.bin"),
+            worker.uid(),
+            &spec,
+            restarted,
+            &where_path,
+            Duration::from_secs(30),
+        );
+        assert_eq!(restarted.expect("restart worker"), UnitState::Active);
+        wait_exec_main_status(name, "0", Duration::from_secs(5));
+        stop_pid1_worker(&mut systemd, &spec);
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -1111,6 +1172,20 @@ mod tests {
             String::from_utf8_lossy(&shown.stderr)
         );
         String::from_utf8_lossy(&shown.stdout).trim().to_owned()
+    }
+
+    fn wait_exec_main_status(name: &str, expected: &str, timeout: Duration) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let status = systemctl_property(name, "ExecMainStatus");
+            if status == expected {
+                return;
+            }
+            if Instant::now() >= deadline {
+                panic!("ExecMainStatus for {name} want {expected}, got {status}");
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn assert_worker_cgroup_v2(spec: &TransientUnits) {

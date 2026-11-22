@@ -1,12 +1,20 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C fallos y reinicio
+
+- El harness PID 1 arranca el worker sin `request.bin` y atesta
+  `ExecMainStatus=2`. Después coloca `SELF_TEST` y reinicia el mismo
+  `JobId`.
+- No se marca `003B-4C`. No hay rechazo de sustitución, `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #350, 003B-4C sigue abierto
 
-- PR #350 merge `59da884d06aabacb08f0a8e5ac056e7d512af0bd` sobre candidato
-  `3fe28fed07bdbd285341b4861c00eeff69c43152`. Verify exact-head
-  `44989524553` terminó 7/7. Dos reviews independientes Grok 4.7
-  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr350-architecture.md` y
-  `sdd/reviews/20261122-sol-pr350-security.md`.
+- PR #352 merge `5c4444c4e0bbb73db96a3c3b87b80766ce57e504` persiste las
+  reviews de PR #350. Merge #350 `59da884d06aabacb08f0a8e5ac056e7d512af0bd`
+  sobre candidato `3fe28fed07bdbd285341b4861c00eeff69c43152`. Verify
+  exact-head `44989524553` terminó 7/7. Dos reviews independientes Grok
+  4.7 aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr350-architecture.md`
+  y `sdd/reviews/20261122-sol-pr350-security.md`.
 - Un proceso UID A no recorre el tmpfs `03770`. No se marca `003B-4C`.
   No hay fallos/reinicio, rechazo de sustitución, `Ready` ni HTTP.
 
