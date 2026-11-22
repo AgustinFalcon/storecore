@@ -1,14 +1,24 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C aislamiento entre jobs
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 arranca dos `JobId` y
-atesta que `ReadWritePaths` de cada worker es sólo su propio `Where`.
-`InaccessiblePaths` del directorio de jobs queda fuera: oculta el
-`WorkingDirectory` y PID 1 falla en `CHDIR`. Sigue sin `CPUQuota`,
-proceso UID A, fallos/reinicio ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP.
+Siguiente corte: proceso UID A, fallos/reinicio y rechazo de sustitución.
+Este documento no cierra `003B-4C`. Sigue sin `CPUQuota`, proceso UID A,
+fallos/reinicio ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C aislamiento entre jobs
+
+`master 64796e5133f7ae5361310599d07d0ed12f99f5f2` integra PR #348. Su
+candidato exacto `15b9e5180014ce8649e02930e44ab3cf7309c679` pasó Verify
+`44986626639` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr348-architecture.md` y
+`sdd/reviews/20261122-sol-pr348-security.md`. Atesta dos `JobId` con
+`ReadWritePaths` igual al `Where` propio. `InaccessiblePaths` queda fuera
+por `CHDIR`. El corte no cierra `003B-4C`: no hay `CPUQuota`, proceso
+UID A, fallos/reinicio ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`,
+TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, 4C cuota efectiva del worker
 

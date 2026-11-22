@@ -51,7 +51,10 @@ UID A ni `Ready`. PR #342 (head `de9f964`, merge `c2d0413`, Verify
 worker vía `ControlGroup`; no fija cuota ni cierra `Ready`. PR #346
 (head `caed99f`, merge `2aa276c`, Verify `44984436471` 7/7, dos Grok 4.7
 APPROVED) deriva `MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64`;
-no cierra `CPUQuota`, aislamiento ni `Ready`. PR #326 arranca
+no cierra `CPUQuota`, aislamiento ni `Ready`. PR #348 (head
+`15b9e51`, merge `64796e5`, Verify `44986626639` 7/7, dos Grok 4.7
+APPROVED) atesta dos `JobId` con `ReadWritePaths` igual al `Where`
+propio; no cierra proceso UID A, fallos/reinicio ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
