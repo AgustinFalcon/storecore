@@ -59,3 +59,15 @@ test('confirmed mixed disposition with wrong quantities fails closed', async () 
   const scenario = loader.scenarios.at(-1);
   await assert.rejects(loader.dispose(scenario, { orderId: '42' }), /COMMERCE_DISPOSITION_CONFIRMED_DRIFT/);
 });
+
+test('drifted partial intent aborts before cart or journal mutation', async () => {
+  const journal = memoryJournal();
+  journal.value.scenarios['pending-payment'] = { key: 'pending-payment', kind: 'PENDING_PAYMENT', sku: 'OLD-SKU', quantity: 2 };
+  let requests = 0; let saves = 0;
+  journal.save = async () => { saves += 1; };
+  const customer = { request: async () => { requests += 1; throw new Error('HTTP must not run'); } };
+  const loader = new CommerceScenarioLoader(new CommerceScenarioConfig(valid()), { products }, { journal, customer, admin: {} });
+  await assert.rejects(loader.reachScenario(loader.scenarios[0]), /COMMERCE_JOURNAL_SCENARIO_DRIFT/);
+  assert.equal(requests, 0);
+  assert.equal(saves, 0);
+});

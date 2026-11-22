@@ -81,6 +81,29 @@ class CommerceJournal {
 class ScenarioStep {
   constructor(name, execute) { this.name = name; this.execute = execute; Object.freeze(this); }
 }
+class CheckoutScenarioStep {
+  name = 'checkout';
+  execute(context, scenario, saved) { return context.checkoutScenario(scenario, saved); }
+}
+class AccreditationScenarioStep {
+  name = 'accreditation';
+  async execute(context, scenario, saved) {
+    if (expectedPayment(scenario) === CommercePaymentStatus.Approved) await context.accredit(scenario, saved);
+    return saved;
+  }
+}
+class FulfillmentScenarioStep {
+  name = 'fulfillment';
+  async execute(context, scenario, saved) { await context.fulfill(scenario, saved); return saved; }
+}
+class ReturnScenarioStep {
+  name = 'return';
+  async execute(context, scenario, saved) {
+    if (scenario.returnTarget !== CommerceReturnTarget.None) await context.receive(scenario, saved);
+    if (scenario.returnTarget === CommerceReturnTarget.ClosedMixed) await context.dispose(scenario, saved);
+    return saved;
+  }
+}
 
 const shipmentCommand = new Map([
   [CommerceShipmentCommand.Preparing, 'PACKED'], [CommerceShipmentCommand.Shipped, 'SHIPPED'],
@@ -114,6 +137,7 @@ export class CommerceScenarioLoader {
       new ScenarioStep('orders', context => context.orders()),
       new ScenarioStep('verify', context => context.verify()),
     ]);
+    this.scenarioSteps = Object.freeze([new CheckoutScenarioStep(), new AccreditationScenarioStep(), new FulfillmentScenarioStep(), new ReturnScenarioStep()]);
   }
 
   async run() {
@@ -152,11 +176,23 @@ export class CommerceScenarioLoader {
   }
 
   async reachScenario(scenario) {
-    let saved = this.journal.scenario(scenario.key);
+    let saved = null;
+    for (const step of this.scenarioSteps) saved = await step.execute(this, scenario, saved);
+  }
+
+  assertIntent(scenario, saved) {
+    if (!saved || saved.key !== scenario.key || saved.kind !== scenario.kind.wire || saved.sku !== scenario.sku || saved.quantity !== scenario.quantity) {
+      throw new Error(`COMMERCE_JOURNAL_SCENARIO_DRIFT:${scenario.key}`);
+    }
+  }
+
+  async checkoutScenario(scenario, resumed) {
+    let saved = resumed ?? this.journal.scenario(scenario.key);
     if (!saved) {
       saved = { key: scenario.key, kind: scenario.kind.wire, sku: scenario.sku, quantity: scenario.quantity };
       await this.journal.save(scenario.key, saved);
     }
+    this.assertIntent(scenario, saved);
     const decision = saved.orderId ? CommerceReplayDecision.ReplayOrder
       : saved.checkoutCommand ? CommerceReplayDecision.ResumeIntent : CommerceReplayDecision.CreateIntent;
     if (decision === CommerceReplayDecision.CreateIntent) {
@@ -182,7 +218,7 @@ export class CommerceScenarioLoader {
       await this.journal.save(scenario.key, saved);
     }
     if (!saved.orderId) {
-      if (!saved.checkoutCommand || saved.kind !== scenario.kind.wire || saved.sku !== scenario.sku || saved.quantity !== scenario.quantity) throw new Error(`COMMERCE_JOURNAL_SCENARIO_DRIFT:${scenario.key}`);
+      if (!saved.checkoutCommand) throw new Error(`COMMERCE_JOURNAL_SCENARIO_DRIFT:${scenario.key}`);
       const checkout = await this.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: saved.checkoutCommand });
       const providerId = this.providerId(checkout.checkoutUrl);
       saved = { ...saved, orderId: String(checkout.orderId), providerId, checkoutUrl: checkout.checkoutUrl };
@@ -192,10 +228,7 @@ export class CommerceScenarioLoader {
       const replay = await this.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: saved.checkoutCommand });
       if (String(replay.orderId) !== saved.orderId) throw new Error(`COMMERCE_CHECKOUT_REPLAY_DRIFT:${scenario.key}`);
     }
-    if (expectedPayment(scenario) === CommercePaymentStatus.Approved) await this.accredit(scenario, saved);
-    await this.fulfill(scenario, saved);
-    if (scenario.returnTarget !== CommerceReturnTarget.None) await this.receive(scenario, saved);
-    if (scenario.returnTarget === CommerceReturnTarget.ClosedMixed) await this.dispose(scenario, saved);
+    return saved;
   }
 
   assertSaved(scenario, saved) {
