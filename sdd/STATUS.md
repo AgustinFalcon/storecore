@@ -1,12 +1,24 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C UID A posee request.bin
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 deja `request.bin`
-owned por UID A (2101) y `result.bin` por UID B (2102). Sigue sin
-`NORMALIZE`, cgroup/quota, aislamiento entre jobs ni `Ready`.
-`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
-abiertos. Este corte no agrega HTTP.
+Siguiente corte: `NORMALIZE` dentro de la unidad PID 1. Este documento no
+cierra `003B-4C`. Sigue sin `NORMALIZE`, cgroup/quota, aislamiento entre
+jobs, proceso UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
+`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C UID A posee request.bin
+
+`master e7909f667aa6799fc3daf1fa148265b929f3749e` integra PR #338. Su
+candidato exacto `df37702e74c7047f26ec6988522a88ae28115b88` pasó Verify
+`44969344387` 7/7 (incluye `media-broker-pid1` con `request.bin` uid 2101
+y `result.bin` uid 2102). Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3 tras un P3
+de wording: `sdd/reviews/20261122-sol-pr338-architecture.md` y
+`sdd/reviews/20261122-sol-pr338-security.md`. El corte no cierra
+`003B-4C`: no hay `NORMALIZE`, cgroup, proceso UID A ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP.
 
 ## Master vigente — 2026-11-22, 4B-3 worker PID 1 SELF_TEST
 
