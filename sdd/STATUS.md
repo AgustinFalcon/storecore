@@ -3,11 +3,11 @@
 ## En implementación — 2026-11-22, 4C proceso UID A
 
 Este corte no cierra `003B-4C`. El harness PID 1 sigue en euid 0 y coloca
-el stamp `request.bin`. Un proceso real `setpriv --reuid=2101` lee ese
-archivo y no puede escribir el tmpfs `03770`. Sigue sin `CPUQuota`,
-fallos/reinicio, rechazo de sustitución ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+el stamp `request.bin` uid 2101. Un proceso real `setpriv --reuid=2101`
+no puede recorrer ni escribir el tmpfs `03770`; el handoff productivo
+sigue siendo `SCM_RIGHTS`. Sigue sin `CPUQuota`, fallos/reinicio, rechazo
+de sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
 
 ## Master vigente — 2026-11-22, 4C aislamiento entre jobs
 

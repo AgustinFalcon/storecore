@@ -725,7 +725,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
-    fn pid1_uid_a_process_reads_backend_owned_request() {
+    fn pid1_uid_a_process_cannot_traverse_job_tmpfs() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
                 .expect("pid1 comm")
@@ -989,9 +989,13 @@ mod tests {
             .output()
             .expect("setpriv read");
         assert!(
-            read.status.success(),
-            "UID A process must read request.bin: {}",
-            String::from_utf8_lossy(&read.stderr)
+            !read.status.success(),
+            "UID A process must not search the 03770 job tmpfs"
+        );
+        let read_err = String::from_utf8_lossy(&read.stderr);
+        assert!(
+            read_err.contains("Permission denied"),
+            "UID A read must fail closed on the job tmpfs, got {read_err}"
         );
         let probe = where_path.join("uid-a-write.bin");
         let write = Command::new("setpriv")

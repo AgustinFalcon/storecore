@@ -3,8 +3,8 @@
 ## 2026-11-22 — arranque 4C proceso UID A
 
 - El harness PID 1 permanece euid 0 y coloca `request.bin` uid 2101. Un
-  proceso `setpriv --reuid=2101` lee ese archivo y no escribe el tmpfs
-  `03770` (el handoff productivo sigue siendo `SCM_RIGHTS`).
+  proceso `setpriv --reuid=2101` no recorre ni escribe el tmpfs `03770`
+  (el handoff productivo sigue siendo `SCM_RIGHTS`).
 - No se marca `003B-4C`. No hay fallos/reinicio, rechazo de sustitución,
   `Ready` ni HTTP.
 
