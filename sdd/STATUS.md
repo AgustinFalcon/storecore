@@ -1,11 +1,19 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C sigue abierto
+## En implementación — 2026-11-22, 4C rechazo de sustitución
 
-Siguiente corte: rechazo de sustitución. Este documento no cierra
-`003B-4C`. Sigue sin `CPUQuota`, rechazo de sustitución ni `Ready`.
+Este corte no cierra `003B-4C`. El harness PID 1 copia el runtime
+aprobado, altera el jar y atesta `RuntimeError::DigestMismatch` por
+`confirm()`, sin arrancar el worker. Sigue sin `CPUQuota` ni `Ready`.
 `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
 abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, persist reviews PR #353
+
+`master 17c6544e36ce03a00186dd2cb4bc07606aa74a2d` integra PR #354. Persiste
+las dos reviews Grok 4.7 APPROVED de PR #353. No cierra `003B-4C`. Sigue
+sin `CPUQuota`, rechazo de sustitución ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, 4C fallos y reinicio
 

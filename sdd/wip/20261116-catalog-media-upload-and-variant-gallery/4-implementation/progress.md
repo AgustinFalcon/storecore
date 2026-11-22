@@ -1,12 +1,19 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C rechazo de sustitución
+
+- El harness PID 1 copia java/jar aprobados, altera el jar y atesta
+  `confirm() = DigestMismatch`. No arranca el worker sustituido.
+- No se marca `003B-4C`. No hay `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #353, 003B-4C sigue abierto
 
-- PR #353 merge `94c27473d31184a26b1607734012147a83652be2` sobre candidato
-  `19801483f611ac737c275519766125a08655e97b`. Verify exact-head
-  `44992591084` terminó 7/7. Dos reviews independientes Grok 4.7
-  aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr353-architecture.md` y
-  `sdd/reviews/20261122-sol-pr353-security.md`.
+- PR #354 merge `17c6544e36ce03a00186dd2cb4bc07606aa74a2d` persiste las
+  reviews de PR #353. Merge #353 `94c27473d31184a26b1607734012147a83652be2`
+  sobre candidato `19801483f611ac737c275519766125a08655e97b`. Verify
+  exact-head `44992591084` terminó 7/7. Dos reviews independientes Grok
+  4.7 aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr353-architecture.md`
+  y `sdd/reviews/20261122-sol-pr353-security.md`.
 - El harness atesta `UNKNOWN_EXIT` (`status=2` en journal) y reinicia el
   mismo `JobId`. No se marca `003B-4C`. No hay rechazo de sustitución,
   `Ready` ni HTTP.
