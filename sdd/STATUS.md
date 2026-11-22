@@ -1,13 +1,23 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C cuota efectiva del worker
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 deriva internamente
-`MemoryMax=192MiB`, `MemorySwapMax=0` y `TasksMax=64` y atesta
-`memory.max` / `pids.max` del cgroup v2. Sigue sin `CPUQuota`,
-aislamiento entre jobs, proceso UID A ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+Siguiente corte: aislamiento entre jobs, proceso UID A y fallos/reinicio.
+Este documento no cierra `003B-4C`. Sigue sin `CPUQuota`, aislamiento,
+proceso UID A ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C cuota efectiva del worker
+
+`master 2aa276cd7bee7a8a4b6921ed857c5ef96f59d539` integra PR #346. Su
+candidato exacto `caed99fb14c9c8c3b50200f95cfce2717f8394a9` pasó Verify
+`44984436471` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr346-architecture.md` y
+`sdd/reviews/20261122-sol-pr346-security.md`. Deriva `MemoryMax=192MiB`,
+`MemorySwapMax=0` y `TasksMax=64`. El corte no cierra `003B-4C`: no hay
+`CPUQuota`, aislamiento, proceso UID A ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, 4C cgroup v2 del worker
 
