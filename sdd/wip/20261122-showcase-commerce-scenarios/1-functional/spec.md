@@ -16,7 +16,7 @@ La carga conserva el comprador principal de catálogo y usa un comprador comerci
 6. un retiro listo para retirar;
 7. un retiro ya retirado;
 8. una devolución recibida pendiente de clasificación;
-9. una devolución cerrada con dos unidades: una repuesta y una dañada.
+9. una devolución cerrada con tres unidades: una repuesta, una dañada y una rechazada por devolución incompleta.
 
 Cada acreditación recorre checkout real, proveedor oficial local, webhook firmado, inbox durable, refetch oficial y worker comercial. Los estados de envío y devolución se alcanzan mediante comandos productivos ordenados.
 
@@ -32,7 +32,7 @@ Cada acreditación recorre checkout real, proveedor oficial local, webhook firma
 
 - Nueve pedidos exactos y ocho aplicaciones comerciales acreditadas.
 - Ocho pagos aprobados, ocho intentos acreditados y ocho reservas consumidas.
-- Siete registros de envío: sin preparar, preparar, enviado, entregado, listo para retirar, retirado y retorno recibido/cerrado según el modelo productivo.
+- Nueve registros de envío, uno por pedido, con distribución exacta: dos pendientes, uno preparando, uno enviado, tres entregados, uno listo para retirar y uno retirado.
 - Dos devoluciones y una disposición mixta confirmada.
 - Conteos y miembros se verifican por claves estables, no sólo por presencia visual.
 - Recibo sin cookies, contraseñas, tokens ni PII real.

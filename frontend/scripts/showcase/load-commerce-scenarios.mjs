@@ -3,7 +3,9 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { HttpSession } from './load-storecore-showcase.mjs';
-import { commerceScenarioDataset, CommerceDeliveryMode, CommerceScenarioKind, CommerceShipmentCommand } from './commerce-scenario-dataset.mjs';
+import { commerceScenarioDataset, CommerceDeliveryMode, CommerceDispositionState, CommercePaymentStatus,
+  CommerceReplayDecision, CommerceReturnTarget, CommerceRmaStatus, CommerceScenarioKind, CommerceShipmentCommand,
+  CommerceShipmentStatus } from './commerce-scenario-dataset.mjs';
 import { readShowcaseDataset } from './read-showcase-dataset.mjs';
 
 const loopbackHosts = new Set(['localhost', '127.0.0.1', '[::1]']);
@@ -85,10 +87,16 @@ const shipmentCommand = new Map([
   [CommerceShipmentCommand.Delivered, 'DELIVERED'], [CommerceShipmentCommand.ReadyForPickup, 'READY_FOR_PICKUP'],
   [CommerceShipmentCommand.PickedUp, 'PICKED_UP'],
 ]);
-const expectedPayment = (scenario) => scenario.kind === CommerceScenarioKind.PendingPayment ? 'PENDING' : 'APPROVED';
-const expectedShipment = (scenario) => scenario.shipmentPath.at(-1)?.wire ?? 'PENDING';
+const expectedPayment = (scenario) => scenario.kind === CommerceScenarioKind.PendingPayment ? CommercePaymentStatus.Pending : CommercePaymentStatus.Approved;
+const expectedShipment = (scenario) => CommerceShipmentStatus.fromWire(scenario.shipmentPath.at(-1)?.wire ?? CommerceShipmentStatus.Pending.wire);
 const delay = (milliseconds) => new Promise(resolvePromise => setTimeout(resolvePromise, milliseconds));
 const validId = (value) => /^\d+$/.test(String(value));
+const exactCartLine = (cart, scenario) => Array.isArray(cart?.lines) && cart.lines.length === 1
+  && cart.lines[0]?.sku === scenario.sku && cart.lines[0]?.quantity === scenario.quantity;
+const exactMixedDisposition = (disposition) => disposition?.lines?.length === 1
+  && disposition.lines[0].quantity === 3 && disposition.lines[0].restockQuantity === 1
+  && disposition.lines[0].damagedQuantity === 1 && disposition.lines[0].rejectedQuantity === 1
+  && disposition.lines[0].damageReason === 'COSMETIC' && disposition.lines[0].rejectionReason === 'INCOMPLETE_RETURN';
 
 export class CommerceScenarioLoader {
   constructor(config, dataset, dependencies = {}) {
@@ -146,10 +154,21 @@ export class CommerceScenarioLoader {
   async reachScenario(scenario) {
     let saved = this.journal.scenario(scenario.key);
     if (!saved) {
+      saved = { key: scenario.key, kind: scenario.kind.wire, sku: scenario.sku, quantity: scenario.quantity };
+      await this.journal.save(scenario.key, saved);
+    }
+    const decision = saved.orderId ? CommerceReplayDecision.ReplayOrder
+      : saved.checkoutCommand ? CommerceReplayDecision.ResumeIntent : CommerceReplayDecision.CreateIntent;
+    if (decision === CommerceReplayDecision.CreateIntent) {
       let cart = await this.customer.request('/api/v1/customer/cart');
-      if (!Array.isArray(cart?.lines) || cart.lines.length !== 0) throw new Error(`COMMERCE_CART_NOT_EMPTY:${scenario.key}`);
-      await this.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: scenario.sku, quantity: scenario.quantity } });
-      cart = await this.customer.request('/api/v1/customer/cart');
+      if (!Array.isArray(cart?.lines)) throw new Error(`COMMERCE_CART_INVALID:${scenario.key}`);
+      if (cart.lines.length === 0) {
+        await this.customer.request('/api/v1/customer/cart/items', { method: 'PUT', csrf: true, body: { sku: scenario.sku, quantity: scenario.quantity } });
+        cart = await this.customer.request('/api/v1/customer/cart');
+      } else if (!exactCartLine(cart, scenario)) {
+        throw new Error(`COMMERCE_CART_DRIFT:${scenario.key}`);
+      }
+      if (!exactCartLine(cart, scenario)) throw new Error(`COMMERCE_CART_WRITE_FAILED:${scenario.key}`);
       const quote = cart.deliveryOptions?.find(option => option.mode === scenario.deliveryMode.wire);
       if (!quote || !Number.isSafeInteger(quote.configurationVersion) || quote.currency !== 'ARS') throw new Error(`COMMERCE_DELIVERY_QUOTE_INVALID:${scenario.key}`);
       const command = {
@@ -159,7 +178,7 @@ export class CommerceScenarioLoader {
         cartRevision: cart.revision, currency: 'ARS', deliveryMode: scenario.deliveryMode.wire,
         deliveryConfigurationVersion: quote.configurationVersion,
       };
-      saved = { key: scenario.key, kind: scenario.kind.wire, sku: scenario.sku, quantity: scenario.quantity, checkoutCommand: command };
+      saved = { ...saved, checkoutCommand: command };
       await this.journal.save(scenario.key, saved);
     }
     if (!saved.orderId) {
@@ -173,10 +192,10 @@ export class CommerceScenarioLoader {
       const replay = await this.customer.request('/api/v1/customer/checkout', { method: 'POST', csrf: true, body: saved.checkoutCommand });
       if (String(replay.orderId) !== saved.orderId) throw new Error(`COMMERCE_CHECKOUT_REPLAY_DRIFT:${scenario.key}`);
     }
-    if (scenario.kind !== CommerceScenarioKind.PendingPayment) await this.accredit(scenario, saved);
+    if (expectedPayment(scenario) === CommercePaymentStatus.Approved) await this.accredit(scenario, saved);
     await this.fulfill(scenario, saved);
-    if (scenario.receiveReturn) await this.receive(scenario, saved);
-    if (scenario.closeMixedReturn) await this.dispose(scenario, saved);
+    if (scenario.returnTarget !== CommerceReturnTarget.None) await this.receive(scenario, saved);
+    if (scenario.returnTarget === CommerceReturnTarget.ClosedMixed) await this.dispose(scenario, saved);
   }
 
   assertSaved(scenario, saved) {
@@ -201,15 +220,17 @@ export class CommerceScenarioLoader {
       envelope: false, expected: [200],
       headers: { 'x-request-id': scenario.webhookRequestId, 'x-signature': `ts=${timestamp},v1=${signature}` },
     });
-    await this.poll(async () => (await this.admin.request(`/api/v1/user/orders/${saved.orderId}`))?.paymentStatus === 'APPROVED', `COMMERCE_ACCREDIT_TIMEOUT:${scenario.key}`);
+    await this.poll(async () => CommercePaymentStatus.fromWire((await this.admin.request(`/api/v1/user/orders/${saved.orderId}`))?.paymentStatus) === CommercePaymentStatus.Approved, `COMMERCE_ACCREDIT_TIMEOUT:${scenario.key}`);
   }
 
   async fulfill(scenario, saved) {
     let order = await this.admin.request(`/api/v1/user/orders/${saved.orderId}`);
     const target = expectedShipment(scenario);
-    if (order.shipmentStatus === target) return;
-    const currentIndex = ['PENDING', ...scenario.shipmentPath.map(row => row.wire)].indexOf(order.shipmentStatus);
-    if (currentIndex < 0) throw new Error(`COMMERCE_SHIPMENT_DRIFT:${scenario.key}:${order.shipmentStatus}`);
+    const current = CommerceShipmentStatus.fromWire(order.shipmentStatus);
+    if (current === target) return;
+    const path = [CommerceShipmentStatus.Pending, ...scenario.shipmentPath.map(row => CommerceShipmentStatus.fromWire(row.wire))];
+    const currentIndex = path.indexOf(current);
+    if (current === CommerceShipmentStatus.Unknown || currentIndex < 0) throw new Error(`COMMERCE_SHIPMENT_DRIFT:${scenario.key}:${order.shipmentStatus}`);
     for (const targetState of scenario.shipmentPath.slice(currentIndex)) {
       const command = shipmentCommand.get(targetState);
       if (!command) throw new Error(`COMMERCE_SHIPMENT_COMMAND_UNKNOWN:${scenario.key}`);
@@ -219,17 +240,25 @@ export class CommerceScenarioLoader {
 
   async receive(scenario, saved) {
     const order = await this.admin.request(`/api/v1/user/orders/${saved.orderId}`);
-    if (['RETURN_RECEIVED', 'CLOSED'].includes(order.rmaStatus)) return;
-    if (order.rmaStatus !== 'NONE') throw new Error(`COMMERCE_RMA_DRIFT:${scenario.key}:${order.rmaStatus}`);
+    const current = CommerceRmaStatus.fromWire(order.rmaStatus);
+    if (current === scenario.returnTarget.expectedRmaStatus) return;
+    if (scenario.returnTarget === CommerceReturnTarget.ClosedMixed && current === CommerceRmaStatus.ReturnReceived) return;
+    if (current !== CommerceRmaStatus.None) throw new Error(`COMMERCE_RMA_DRIFT:${scenario.key}:${order.rmaStatus}`);
     await this.admin.request(`/api/v1/user/orders/${saved.orderId}/rma`, { method: 'POST', csrf: true, body: { status: 'RECEIVED' } });
   }
 
   async dispose(scenario, saved) {
     const path = `/api/v1/user/orders/${saved.orderId}/return-disposition`;
     const disposition = await this.admin.request(path);
-    if (disposition.state === 'CONFIRMED') return;
-    if (disposition.state !== 'EDITABLE' || disposition.lines?.length !== 1 || disposition.lines[0].quantity !== 3) throw new Error(`COMMERCE_DISPOSITION_DRIFT:${scenario.key}`);
+    const state = CommerceDispositionState.fromWire(disposition.state);
+    if (state === CommerceDispositionState.Confirmed) {
+      if (!exactMixedDisposition(disposition)) throw new Error(`COMMERCE_DISPOSITION_CONFIRMED_DRIFT:${scenario.key}`);
+      return;
+    }
+    if (state !== CommerceDispositionState.Editable || disposition.lines?.length !== 1 || disposition.lines[0].quantity !== 3) throw new Error(`COMMERCE_DISPOSITION_DRIFT:${scenario.key}`);
     await this.admin.request(path, { method: 'POST', csrf: true, body: { idempotencyKey: scenario.dispositionKey, lines: [{ returnItemId: disposition.lines[0].returnItemId, restockQuantity: 1, damagedQuantity: 1, rejectedQuantity: 1, damageReason: 'COSMETIC', rejectionReason: 'INCOMPLETE_RETURN', observation: 'Demo: una unidad apta, una con daño estético y una devolución incompleta.' }] } });
+    const confirmed = await this.admin.request(path);
+    if (CommerceDispositionState.fromWire(confirmed.state) !== CommerceDispositionState.Confirmed || !exactMixedDisposition(confirmed)) throw new Error(`COMMERCE_DISPOSITION_CONFIRM_FAILED:${scenario.key}`);
   }
 
   async poll(predicate, code) {
@@ -243,8 +272,15 @@ export class CommerceScenarioLoader {
       const saved = this.journal.scenario(scenario.key); this.assertSaved(scenario, saved);
       const admin = await this.admin.request(`/api/v1/user/orders/${saved.orderId}`);
       const customer = await this.customer.request(`/api/v1/customer/orders/${saved.orderId}`);
-      if (admin.paymentStatus !== expectedPayment(scenario) || admin.shipmentStatus !== expectedShipment(scenario) || String(customer.id) !== saved.orderId || customer.paymentStatus !== admin.paymentStatus) throw new Error(`COMMERCE_READBACK_FAILED:${scenario.key}`);
-      if (scenario.receiveReturn && !['RETURN_RECEIVED', 'CLOSED'].includes(admin.rmaStatus)) throw new Error(`COMMERCE_RMA_READBACK_FAILED:${scenario.key}`);
+      if (CommercePaymentStatus.fromWire(admin.paymentStatus) !== expectedPayment(scenario)
+        || CommerceShipmentStatus.fromWire(admin.shipmentStatus) !== expectedShipment(scenario)
+        || String(customer.id) !== saved.orderId
+        || CommercePaymentStatus.fromWire(customer.paymentStatus) !== CommercePaymentStatus.fromWire(admin.paymentStatus)) throw new Error(`COMMERCE_READBACK_FAILED:${scenario.key}`);
+      if (CommerceRmaStatus.fromWire(admin.rmaStatus) !== scenario.returnTarget.expectedRmaStatus) throw new Error(`COMMERCE_RMA_READBACK_FAILED:${scenario.key}`);
+      if (scenario.returnTarget === CommerceReturnTarget.ClosedMixed) {
+        const disposition = await this.admin.request(`/api/v1/user/orders/${saved.orderId}/return-disposition`);
+        if (CommerceDispositionState.fromWire(disposition.state) !== CommerceDispositionState.Confirmed || !exactMixedDisposition(disposition)) throw new Error(`COMMERCE_DISPOSITION_READBACK_FAILED:${scenario.key}`);
+      }
     }
   }
 

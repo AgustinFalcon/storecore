@@ -39,6 +39,61 @@ export class CommerceShipmentCommand extends ClosedWireType {
   static all = Object.freeze([this.Preparing, this.Shipped, this.Delivered, this.ReadyForPickup, this.PickedUp]);
   static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
 }
+export class CommercePaymentStatus extends ClosedWireType {
+  static Pending = new CommercePaymentStatus(closedToken, 'PENDING');
+  static Approved = new CommercePaymentStatus(closedToken, 'APPROVED');
+  static Unknown = new CommercePaymentStatus(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.Pending, this.Approved]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+}
+export class CommerceShipmentStatus extends ClosedWireType {
+  static Pending = new CommerceShipmentStatus(closedToken, 'PENDING');
+  static Preparing = new CommerceShipmentStatus(closedToken, 'PREPARING');
+  static Shipped = new CommerceShipmentStatus(closedToken, 'SHIPPED');
+  static Delivered = new CommerceShipmentStatus(closedToken, 'DELIVERED');
+  static ReadyForPickup = new CommerceShipmentStatus(closedToken, 'READY_FOR_PICKUP');
+  static PickedUp = new CommerceShipmentStatus(closedToken, 'PICKED_UP');
+  static Unknown = new CommerceShipmentStatus(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.Pending, this.Preparing, this.Shipped, this.Delivered, this.ReadyForPickup, this.PickedUp]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+}
+export class CommerceRmaStatus extends ClosedWireType {
+  static None = new CommerceRmaStatus(closedToken, 'NONE');
+  static ReturnReceived = new CommerceRmaStatus(closedToken, 'RETURN_RECEIVED');
+  static Closed = new CommerceRmaStatus(closedToken, 'CLOSED');
+  static Unknown = new CommerceRmaStatus(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.None, this.ReturnReceived, this.Closed]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+}
+export class CommerceDispositionState extends ClosedWireType {
+  static Editable = new CommerceDispositionState(closedToken, 'EDITABLE');
+  static Confirmed = new CommerceDispositionState(closedToken, 'CONFIRMED');
+  static Unknown = new CommerceDispositionState(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.Editable, this.Confirmed]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+}
+export class CommerceReturnTarget extends ClosedWireType {
+  static None = new CommerceReturnTarget(closedToken, 'NONE');
+  static Received = new CommerceReturnTarget(closedToken, 'RECEIVED');
+  static ClosedMixed = new CommerceReturnTarget(closedToken, 'CLOSED_MIXED');
+  static Unknown = new CommerceReturnTarget(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.None, this.Received, this.ClosedMixed]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+  get expectedRmaStatus() {
+    if (this === CommerceReturnTarget.None) return CommerceRmaStatus.None;
+    if (this === CommerceReturnTarget.Received) return CommerceRmaStatus.ReturnReceived;
+    if (this === CommerceReturnTarget.ClosedMixed) return CommerceRmaStatus.Closed;
+    return CommerceRmaStatus.Unknown;
+  }
+}
+export class CommerceReplayDecision extends ClosedWireType {
+  static CreateIntent = new CommerceReplayDecision(closedToken, 'CREATE_INTENT');
+  static ResumeIntent = new CommerceReplayDecision(closedToken, 'RESUME_INTENT');
+  static ReplayOrder = new CommerceReplayDecision(closedToken, 'REPLAY_ORDER');
+  static Unknown = new CommerceReplayDecision(closedToken, 'UNKNOWN');
+  static all = Object.freeze([this.CreateIntent, this.ResumeIntent, this.ReplayOrder]);
+  static fromWire(value) { return this.all.find(candidate => candidate.wire === value) ?? this.Unknown; }
+}
 
 const namespace = 'ferreteria-falcon-commerce-v1';
 export function stableUuid(key) {
@@ -47,28 +102,27 @@ export function stableUuid(key) {
 }
 function path(...commands) { return Object.freeze(commands); }
 const blueprints = Object.freeze([
-  [CommerceScenarioKind.PendingPayment, CommerceDeliveryMode.LocalDelivery, path(), false, false, 2],
-  [CommerceScenarioKind.PaidAwaitingPreparation, CommerceDeliveryMode.LocalDelivery, path(), false, false, 2],
-  [CommerceScenarioKind.Preparing, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing), false, false, 2],
-  [CommerceScenarioKind.Shipped, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped), false, false, 2],
-  [CommerceScenarioKind.Delivered, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), false, false, 2],
-  [CommerceScenarioKind.ReadyForPickup, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup), false, false, 2],
-  [CommerceScenarioKind.PickedUp, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup, CommerceShipmentCommand.PickedUp), false, false, 2],
-  [CommerceScenarioKind.ReturnReceived, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), true, false, 2],
-  [CommerceScenarioKind.ReturnClosedMixed, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), true, true, 3],
+  [CommerceScenarioKind.PendingPayment, CommerceDeliveryMode.LocalDelivery, path(), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.PaidAwaitingPreparation, CommerceDeliveryMode.LocalDelivery, path(), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.Preparing, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.Shipped, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.Delivered, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.ReadyForPickup, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.PickedUp, CommerceDeliveryMode.Pickup, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.ReadyForPickup, CommerceShipmentCommand.PickedUp), CommerceReturnTarget.None, 2],
+  [CommerceScenarioKind.ReturnReceived, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), CommerceReturnTarget.Received, 2],
+  [CommerceScenarioKind.ReturnClosedMixed, CommerceDeliveryMode.LocalDelivery, path(CommerceShipmentCommand.Preparing, CommerceShipmentCommand.Shipped, CommerceShipmentCommand.Delivered), CommerceReturnTarget.ClosedMixed, 3],
 ]);
 
 export function commerceScenarioDataset(products) {
   if (!Array.isArray(products)) throw new TypeError('Commerce scenarios require products');
   const candidates = products.filter(product => typeof product?.sku === 'string' && Number.isSafeInteger(product.stock) && product.stock >= 5 && Number.isFinite(product.price) && product.price > 0);
   if (candidates.length < blueprints.length) throw new Error('Commerce scenarios require nine saleable products');
-  return Object.freeze(blueprints.map(([kind, deliveryMode, shipmentPath, receiveReturn, closeMixedReturn, quantity], index) => Object.freeze({
+  return Object.freeze(blueprints.map(([kind, deliveryMode, shipmentPath, returnTarget, quantity], index) => Object.freeze({
     key: kind.wire.toLowerCase().replaceAll('_', '-'),
     kind,
     deliveryMode,
     shipmentPath,
-    receiveReturn,
-    closeMixedReturn,
+    returnTarget,
     quantity,
     sku: candidates[index].sku,
     unitPrice: String(candidates[index].price),
@@ -82,3 +136,9 @@ export function commerceScenarioDataset(products) {
 Object.freeze(CommerceScenarioKind.prototype);
 Object.freeze(CommerceDeliveryMode.prototype);
 Object.freeze(CommerceShipmentCommand.prototype);
+Object.freeze(CommercePaymentStatus.prototype);
+Object.freeze(CommerceShipmentStatus.prototype);
+Object.freeze(CommerceRmaStatus.prototype);
+Object.freeze(CommerceDispositionState.prototype);
+Object.freeze(CommerceReturnTarget.prototype);
+Object.freeze(CommerceReplayDecision.prototype);

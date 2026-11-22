@@ -66,6 +66,26 @@ async function ready(child, url, secure = false) {
   }
   throw new Error(`Readiness timed out: ${url}`);
 }
+function commerceAuthorityFootprint(receipt) {
+  const ids = receipt.scenarios.map(row => String(row.orderId));
+  if (ids.length !== 9 || ids.some(id => !/^\d+$/.test(id))) throw new Error('SHOWCASE_COMMERCE_RECEIPT_IDS_INVALID');
+  const scope = ids.join(',');
+  return query(`SELECT concat_ws('|',
+    (SELECT count(*) FROM orders WHERE id IN (${scope})),
+    (SELECT count(*) FROM checkout_idempotency_claims c JOIN orders o ON o.checkout_claim_id=c.id WHERE o.id IN (${scope})),
+    (SELECT count(*) FROM payments WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM mp_checkout_attempts WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM mp_order_notification_inbox i JOIN mp_checkout_attempts a ON a.provider_order_id=i.provider_order_id_candidate WHERE a.order_id IN (${scope})),
+    (SELECT count(*) FROM mp_order_commercial_applications WHERE order_id IN (${scope})),
+    (SELECT count(*)||':'||coalesce(sum(r.quantity),0) FROM inventory_reservations r JOIN orders o ON r.reservation_saga_key=(o.checkout_snapshot->>'reservationSagaKey')::uuid WHERE o.id IN (${scope})),
+    (SELECT count(*)||':'||coalesce(sum(quantity_delta),0) FROM inventory_ledger WHERE actor IN (${ids.map(id => `'MP_ORDERS:${id}'`).join(',')})),
+    (SELECT count(*) FROM fulfillment_events e JOIN shipments s ON s.id=e.shipment_id WHERE s.order_id IN (${scope})),
+    (SELECT count(*) FROM returns WHERE order_id IN (${scope})),
+    (SELECT count(*) FROM return_items i JOIN returns r ON r.id=i.return_id WHERE r.order_id IN (${scope})),
+    (SELECT count(*) FROM rma_disposition_commands c JOIN returns r ON r.id=c.return_id WHERE r.order_id IN (${scope})),
+    (SELECT coalesce(sum(b.available_quantity),0)||':'||coalesce(sum(b.reserved_quantity),0) FROM inventory_balances b JOIN order_items i ON i.variant_id=b.variant_id WHERE i.order_id IN (${scope}))
+  );`);
+}
 function spring(guard, name, official = true, installationOrigin = origin) {
   const integration = official ? [
     '--server.address=127.0.0.1', '--server.port=8080', `--storecore.installation-guard.enabled=${guard}`,
@@ -151,15 +171,19 @@ async function run() {
       journalPath: join(scratch, 'commerce-journal.json'), receiptPath: join(results, 'showcase-commerce-receipt.json'),
     }), dataset);
     const firstReceipt = await commerceLoader.run();
+    const firstFootprint = commerceAuthorityFootprint(firstReceipt);
     const replayReceipt = await commerceLoader.run();
     if (JSON.stringify(firstReceipt) !== JSON.stringify(replayReceipt)) throw new Error('SHOWCASE_COMMERCE_REPLAY_DRIFT');
+    if (commerceAuthorityFootprint(replayReceipt) !== firstFootprint) throw new Error('SHOWCASE_COMMERCE_REPLAY_EFFECT_DRIFT');
   }
   const angular = start(process.execPath, [join(frontend, 'node_modules/@angular/cli/bin/ng.js'), 'serve',
+    '--configuration', 'production',
     '--host', 'localhost', '--port', '4301', '--ssl', '--ssl-cert', certificate, '--ssl-key', key,
     '--proxy-config', 'proxy.ua-real.conf.json'], 'angular');
   await ready(angular, `${origin}/login`, true);
   const playwrightArguments = [join(frontend, 'node_modules/@playwright/test/cli.js'), 'test', '--config', 'playwright.ua-real.config.ts'];
-  if (showcaseCommerce) playwrightArguments.push('showcase-commerce-loaded.spec.ts');
+  playwrightArguments.push(...(showcaseCommerce ? ['showcase-commerce-loaded.spec.ts']
+    : ['commerce-fulfillment.spec.ts', 'stock-adjustment.spec.ts', 'unified-access.spec.ts']));
   const playwright = spawn(process.execPath, playwrightArguments, { cwd: frontend, env: { ...process.env,
     STORECORE_SHOWCASE_COMMERCE_RECEIPT: join(results, 'showcase-commerce-receipt.json') }, detached: process.platform !== 'win32', stdio: 'inherit' });
   children.add(playwright);

@@ -27,6 +27,7 @@ El proveedor local persiste `orders` e idempotency claims en JSON versionado. La
 - Cada escenario tiene clave estable y se descubre por `checkout_idempotency_key`/referencia externa.
 - Un escenario completo se verifica y no se muta.
 - Un escenario parcial sólo reanuda desde evidencia durable válida.
+- La intención se persiste antes de mutar el carrito; una reanudación sólo adopta un único renglón que coincida exactamente en SKU y cantidad.
 - Evidencia contradictoria aborta todo el run; no se repara con SQL directo.
 - Datos ajenos al namespace se preservan.
 
@@ -49,6 +50,7 @@ El recibo y los tests afirman por claves estables:
 - overview TODAY/7/30, colas y exclusión de terminales;
 - historial y detalle comprador; listado, detalle y acciones admin;
 - replay con cero filas nuevas y recibo idéntico.
+- replay con huella de autoridad SQL idéntica antes y después, además del recibo idéntico.
 
 ## Seguridad
 

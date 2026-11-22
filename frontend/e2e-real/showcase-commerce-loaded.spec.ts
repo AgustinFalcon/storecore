@@ -4,7 +4,7 @@ import { database } from './support/fixtures';
 
 interface ScenarioReceipt {
   readonly key: string; readonly orderId: string; readonly sku: string; readonly quantity: number;
-  readonly deliveryMode: string; readonly paymentStatus: string; readonly shipmentStatus: string; readonly rmaStatus: string;
+  readonly deliveryMode: string; readonly paymentStatus: string; readonly shipmentStatus: string; readonly rmaStatus: string; readonly total: string;
 }
 interface CommerceReceipt { readonly schemaVersion: number; readonly evidence: string; readonly scenarios: readonly ScenarioReceipt[]; readonly digest: string; }
 
@@ -82,20 +82,32 @@ test('administrator sees exact operational distribution and actionable queue', a
 });
 
 test('inventory, offers and overview expose the same loaded business graph', async ({ page }) => {
+  const data = receipt();
   await login(page, 'internal', 'cfe-user-admin@example.test', 'ua-fixture-password-2026');
-  const [inventory, offers, overview] = await Promise.all([
+  const [inventory, offers, ...overviews] = await Promise.all([
     page.request.get('/api/v1/user/inventory?page=0&size=50'),
     page.request.get('/api/v1/user/offers'),
-    page.request.get('/api/v1/user/overview?period=LAST_30_DAYS'),
+    ...['TODAY', 'LAST_7_DAYS', 'LAST_30_DAYS'].map(period => page.request.get(`/api/v1/user/overview?period=${period}`)),
   ]);
-  expect(inventory.status()).toBe(200); expect(offers.status()).toBe(200); expect(overview.status()).toBe(200);
+  expect(inventory.status()).toBe(200); expect(offers.status()).toBe(200);
+  for (const overview of overviews) expect(overview.status()).toBe(200);
   const inventoryPage = (await inventory.json()).data;
   expect(inventoryPage.total).toBeGreaterThanOrEqual(80);
   expect(inventoryPage.items).toHaveLength(50);
   expect((await offers.json()).data.length).toBe(12);
-  const facts = (await overview.json()).data;
-  expect(facts.pendingPayments.totalCount).toBeGreaterThanOrEqual(1);
-  expect(facts.fulfillment.totalCount).toBeGreaterThanOrEqual(4);
+  const expectedRevenue = data.scenarios.filter(row => row.paymentStatus === 'APPROVED').reduce((sum, row) => sum + Number(row.total), 0);
+  const commercePending = data.scenarios.find(row => row.key === 'pending-payment')!.orderId;
+  const activeKeys = new Set(['paid-awaiting-preparation', 'preparing', 'shipped', 'ready-for-pickup']);
+  const expectedFulfillment = new Set(data.scenarios.filter(row => activeKeys.has(row.key)).map(row => row.orderId));
+  for (const response of overviews) {
+    const facts = (await response.json()).data;
+    expect(facts.accreditedRevenue).toMatchObject({ state: 'KNOWN', value: expectedRevenue });
+    expect(facts.orderCount).toMatchObject({ state: 'KNOWN', value: 10 });
+    expect(facts.pendingPayments.totalCount).toBe(2);
+    expect(new Set(facts.pendingPayments.items.map((row: { orderId: number }) => String(row.orderId))).has(commercePending)).toBe(true);
+    expect(facts.fulfillment.totalCount).toBe(4);
+    expect(new Set(facts.fulfillment.items.map((row: { orderId: number }) => String(row.orderId)))).toEqual(expectedFulfillment);
+  }
   await page.goto('/user/inventory');
   await expect(page.getByRole('heading', { name: 'Inventario WEB', exact: true })).toBeVisible();
   await page.goto('/user/home');
