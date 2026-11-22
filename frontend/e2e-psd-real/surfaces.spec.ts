@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { AccessContext } from '../src/app/domain/access/access-context';
@@ -5,6 +6,7 @@ import { OfferStatus, OfferTransition } from '../src/app/domain/offer/offer';
 import { CustomerStateTransition } from '../src/app/domain/customer-admin/customer-admin';
 import { UserRole } from '../src/app/domain/user/user-role';
 import { OverviewFactState, OverviewPeriod } from '../src/app/domain/overview/overview';
+import { RealRouteReceipt } from '../src/app/features/navigation/real-fixture-receipt';
 import { apiCustomerLogin, customerEmail, login, origin } from './support';
 
 test('customer favorite removal persists and USER authority stays separate', async ({ page }) => {
@@ -133,10 +135,11 @@ test('customer search/detail suspension revokes an existing CUSTOMER session', a
 });
 
 test('optimized Production and Demo runtime entries remain isolated', async ({ page }) => {
+  const receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync('psd-real-results/fixture-receipt.json', 'utf8')));
   const calls: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) calls.push(request.url()); });
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Todo para tu taller, en un solo lugar' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: receipt.homeTitle, exact: true })).toBeVisible();
   expect(calls.length).toBeGreaterThan(0);
   await expect(page.getByText('DEMO', { exact: true })).toHaveCount(0);
   await page.waitForLoadState('networkidle');
