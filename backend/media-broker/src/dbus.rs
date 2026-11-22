@@ -492,7 +492,8 @@ mod tests {
             .expect("start mount");
         assert_eq!(started_mount, UnitState::Active);
         let where_path = spec.mount().where_path().to_path_buf();
-        write_self_test_request(&where_path, worker.gid());
+        write_self_test_request(&where_path, 2101, worker.gid());
+        assert_request_owned_by_backend(&where_path, 2101);
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         let result_path = where_path.join("result.bin");
         if started_worker != Ok(UnitState::Active) {
@@ -574,7 +575,7 @@ mod tests {
         ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime")
     }
 
-    fn write_self_test_request(where_path: &Path, worker_gid: u32) {
+    fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
         let path = where_path.join("request.bin");
         let mut file = OpenOptions::new()
             .write(true)
@@ -585,7 +586,22 @@ mod tests {
         file.write_all(&SELF_TEST_REQUEST).expect("write request");
         file.sync_all().expect("sync request");
         drop(file);
-        unix_fs::chown(&path, Some(0), Some(worker_gid)).expect("chown request");
+        unix_fs::chown(&path, Some(backend_uid), Some(worker_gid)).expect("chown request");
+    }
+
+    fn assert_request_owned_by_backend(where_path: &Path, backend_uid: u32) {
+        let path = where_path.join("request.bin");
+        let descriptor = rustix::fs::open(
+            &path,
+            rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::NOFOLLOW,
+            rustix::fs::Mode::empty(),
+        )
+        .expect("open request.bin");
+        let stat = rustix::fs::fstat(&descriptor).expect("fstat request.bin");
+        assert_eq!(
+            stat.st_uid, backend_uid,
+            "request.bin must be owned by backend UID A"
+        );
     }
 
     fn wait_for_worker_result(
