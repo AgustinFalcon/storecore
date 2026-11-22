@@ -6,8 +6,8 @@ Complete the integral StoreCore Phase 1 with operator-facing coordination that i
 
 ## Actors
 
-- `ADMIN`: configures rules, acknowledges alerts, manages campaigns and performs audited loyalty adjustments.
-- `OPERATOR`: reads operational alerts, calendar and reports; actions remain limited by explicit permissions.
+- `ADMIN`: configures rules, acknowledges, resolves and reopens alerts, manages campaigns and performs audited loyalty adjustments.
+- `OPERATOR`: reads operational alerts, calendar and reports. In Slice A it is read-only; notification lifecycle commands are ADMIN-only.
 - `CUSTOMER`: reads its own loyalty balance and immutable movement history, and may request or cancel a redemption reservation for its own checkout under the active policy.
 - `SYSTEM`: records deterministic events from authoritative StoreCore facts and, only when enabled, accepted BlackStore receipts.
 
@@ -18,6 +18,9 @@ Complete the integral StoreCore Phase 1 with operator-facing coordination that i
 - PCC-R03: acknowledge, resolve and reopen are explicit idempotent commands with actor, timestamp, reason and revision.
 - PCC-R04: duplicate source events converge on one alert fingerprint; a replay cannot create a second alert.
 - PCC-R05: email is an optional delivery projection. Failed or disabled SMTP never loses the in-app alert.
+- PCC-R05A: Slice A freezes the vocabularies as severity `INFO`, `WARNING`, `CRITICAL`, `UNKNOWN`; category `STOCK`, `ORDER`, `PAYMENT`, `RETURN`, `INTEGRATION`, `CAMPAIGN`, `UNKNOWN`; lifecycle `OPEN`, `ACKNOWLEDGED`, `RESOLVED`, `UNKNOWN`; source type `STORECORE_FACT`, `BLACKSTORE_STOCK_RECEIPT`, `SYSTEM_CAMPAIGN`, `UNKNOWN`.
+- PCC-R05B: the only valid lifecycle graph is acknowledge `OPEN -> ACKNOWLEDGED`, resolve `OPEN|ACKNOWLEDGED -> RESOLVED`, and reopen `RESOLVED -> OPEN`. Self-transitions, commands from `UNKNOWN` and every other jump fail closed. A replay is recognized only by its original command receipt, never because the aggregate already has the requested destination state.
+- PCC-R05C: `source_id` is the stable authoritative identifier supplied by the typed producer, not a URL, localized label or delivery UUID. One alert episode is identified by `(source_type, source_id, fingerprint)`. The V1 fingerprint hashes the length-framed UTF-8 tuple `notification-v1`, category, stable condition code and producer-owned episode key. Delivery time, title, localized body, severity and personal data are excluded. A retry reuses the same episode key; a genuine recurrence must provide a new stable episode key. Duplicate events never reopen a resolved alert.
 
 ## Slice B — commercial calendar
 

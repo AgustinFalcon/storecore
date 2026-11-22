@@ -8,6 +8,8 @@ The feature is split into four modules: `notification`, `commercialcalendar`, `c
 
 Kotlin uses `enum class` or `sealed interface` for alert severity/category/lifecycle, calendar lifecycle/transition/audience, channel/source/freshness, report period state, loyalty unit/movement/reservation state and every command result. Angular uses private-token classes with canonical static instances and one `fromWire`; `Unknown` is always present. Labels and transition rules live in the type, never in view string switches.
 
+Notification domain freezes these cases: severity `INFO|WARNING|CRITICAL|UNKNOWN`; category `STOCK|ORDER|PAYMENT|RETURN|INTEGRATION|CAMPAIGN|UNKNOWN`; lifecycle `OPEN|ACKNOWLEDGED|RESOLVED|UNKNOWN`; source `STORECORE_FACT|BLACKSTORE_STOCK_RECEIPT|SYSTEM_CAMPAIGN|UNKNOWN`. Transition step objects implement only acknowledge `OPEN -> ACKNOWLEDGED`, resolve `OPEN|ACKNOWLEDGED -> RESOLVED`, and reopen `RESOLVED -> OPEN`. Unknown has no actions. The aggregate increments a non-negative revision with checked arithmetic and never mutates source identity or fingerprint.
+
 ## Persistence
 
 - Notifications: append-only source events, current alert projection, command receipt and audit tables. Unique `(source_type, source_id, fingerprint)`.
@@ -16,6 +18,8 @@ Kotlin uses `enum class` or `sealed interface` for alert severity/category/lifec
 - Loyalty: append-only ledger, earning-lot allocation, recovery-pending adjustment and reservation records. Unique source/idempotency keys; balance uses checked integer arithmetic. No mutable balance column is authoritative. Reserve/commit/release/expire lock one customer ledger in PostgreSQL so availability is recalculated and mutated atomically.
 
 Every migration supports clean install and upgrade from the current schema, has constraints equivalent to domain validation and preserves published checksums.
+
+Notification V1 bounds are shared by domain, HTTP and DDL: `source_id` 1..128 UTF-8 bytes; condition code 1..64 uppercase ASCII characters plus digits, `_`, `-` and `.`; episode key 1..128 UTF-8 bytes; lifecycle command reason 1..500 Unicode code points after edge trimming; fingerprint exactly 64 lowercase hexadecimal characters. The producer passes a typed source identity and stable episode key. Fingerprinting uses SHA-256 over a versioned, length-prefixed UTF-8 sequence, never string concatenation. Event delivery identity, source identity, episode fingerprint and command payload hash are distinct value objects. Missing episode identity fails validation; time-bucket inference is forbidden.
 
 ## Commands and consistency
 
@@ -28,6 +32,7 @@ Return processing stores cumulative eligible value returned plus prior earned-re
 ## HTTP and authorization
 
 - `/api/v1/user/notifications`, `/api/v1/user/commercial-calendar`, `/api/v1/user/channel-reports`, `/api/v1/user/loyalty` require USER realm and explicit role policy.
+- Slice A notification reads allow `ADMIN` and `OPERATOR`; acknowledge, resolve and reopen allow `ADMIN` only. The application derives the actor and role from the live USER session on every command and replay.
 - `/api/v1/customer/loyalty` reads only the authenticated customer ledger.
 - POST commands require CSRF, JSON content type, idempotency key, bounded payloads and audited actor identity.
 - BlackStore ingestion remains behind the existing disabled capability and authenticated/versioned stock receipt contract; no trusted `X-Actor-Id`/`X-Role` shortcut is introduced. Monetary reporting stays unavailable until a new commercial-facts contract passes review.
