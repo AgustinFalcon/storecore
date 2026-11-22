@@ -1,11 +1,20 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C sigue abierto
+## En implementación — 2026-11-22, 4C OOM del cgroup worker
 
-Siguiente corte: OOM y terminación del cgroup. Este documento
-no cierra `003B-4C`. Sigue sin `CPUQuota`, OOM, terminación
-del cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Este corte no cierra `003B-4C`. Deriva `KillMode=control-group`,
+`MemoryOOMGroup=yes` y `OOMPolicy=kill`. El harness congela el `MainPID`,
+inyecta un allocador en el cgroup y atesta que PID 1 mata el grupo al
+vencer `MemoryMax`. Sigue sin `CPUQuota` ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, persist reviews PR #358
+
+`master 5e9bd629cdaed278c3a1cd5745f72f12497342ad` integra PR #359. Persiste
+las dos reviews Grok 4.7 APPROVED de PR #358. No cierra `003B-4C`. Sigue
+sin `CPUQuota`, OOM, terminación del cgroup ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-22, 4C timeout del worker
 
