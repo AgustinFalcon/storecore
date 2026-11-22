@@ -499,6 +499,7 @@ mod tests {
         if started_worker != Ok(UnitState::Active) {
             dump_worker_unit(&spec, started_worker, &where_path);
         }
+        assert_worker_cgroup_v2(&spec);
         wait_for_worker_result(
             &result_path,
             worker.uid(),
@@ -522,7 +523,6 @@ mod tests {
                 .expect("attest worker"),
             UnitState::Active
         );
-        assert_worker_cgroup_v2(&spec);
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
             stopped_worker,
@@ -574,6 +574,7 @@ mod tests {
         if started_worker != Ok(UnitState::Active) {
             dump_worker_unit(&spec, started_worker, &where_path);
         }
+        assert_worker_cgroup_v2(&spec);
         wait_for_worker_result(
             &result_path,
             worker.uid(),
@@ -594,7 +595,6 @@ mod tests {
                 .expect("attest worker"),
             UnitState::Active
         );
-        assert_worker_cgroup_v2(&spec);
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
             stopped_worker,
@@ -797,10 +797,20 @@ mod tests {
 
     fn assert_worker_cgroup_v2(spec: &TransientUnits) {
         let name = spec.worker().name().as_str().expect("worker unit name");
-        let dir = Path::new("/sys/fs/cgroup/system.slice").join(name);
+        let shown = Command::new("systemctl")
+            .args(["show", name, "-p", "ControlGroup", "--value"])
+            .output()
+            .expect("systemctl ControlGroup");
+        let relative = String::from_utf8_lossy(&shown.stdout).trim().to_owned();
+        assert!(
+            !relative.is_empty(),
+            "ControlGroup empty for {name}: {}",
+            String::from_utf8_lossy(&shown.stderr)
+        );
+        let dir = Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/'));
         assert!(
             dir.is_dir(),
-            "worker cgroup v2 missing at {}",
+            "worker cgroup v2 missing at {} (ControlGroup={relative})",
             dir.display()
         );
         let controllers = fs::read_to_string(dir.join("cgroup.controllers"))
