@@ -34,7 +34,7 @@ import { ProductTileComponent } from './product-tile.component';
               </ul>
             }
             @if (section.kind.referencesProducts) {
-              <div class="sc-rail">
+              <div class="sc-rail" tabindex="0" role="region" [attr.aria-label]="'Productos de ' + section.content.title">
                 @for (sku of section.content.skus; track sku) {
                   @if (product(sku); as item) { <sc-product-tile [product]="item" /> }
                   @else { <p>Producto no disponible: {{ sku }}</p> }

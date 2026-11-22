@@ -13,6 +13,10 @@ describe('typed storefront blocks', () => {
     expect(element.textContent).toContain('Categoría real'); expect(element.textContent).toContain('Categoría no disponible: 2');
     expect(element.textContent).toContain('Producto no disponible: SKU-MISSING'); expect(element.textContent).not.toContain('Oculto');
     expect(element.querySelectorAll('section')).toHaveLength(3); expect(element.querySelectorAll('a')).toHaveLength(1);
+    const productRail = element.querySelector<HTMLElement>('.sc-rail');
+    expect(productRail?.getAttribute('tabindex')).toBe('0');
+    expect(productRail?.getAttribute('role')).toBe('region');
+    expect(productRail?.getAttribute('aria-label')).toBe('Productos de Productos');
   });
 
   it('preserves query parameters and fragments in internal CTA destinations', () => {
