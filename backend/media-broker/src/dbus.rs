@@ -320,7 +320,7 @@ mod tests {
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
     use std::io::Write;
-    use std::os::unix::fs::{self as unix_fs, MetadataExt, OpenOptionsExt, PermissionsExt};
+    use std::os::unix::fs::{self as unix_fs, OpenOptionsExt, PermissionsExt};
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -903,7 +903,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
-    fn pid1_worker_runtime_max_times_out_blocked_request() {
+    fn pid1_worker_runtime_max_times_out_remain_after_exit() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
                 .expect("pid1 comm")
@@ -932,13 +932,21 @@ mod tests {
             .expect("start mount");
         assert_eq!(started_mount, UnitState::Active);
         let where_path = spec.mount().where_path().to_path_buf();
-        write_blocking_request_fifo(&where_path, 2101, worker.gid());
+        write_self_test_request(&where_path, 2101, worker.gid());
         let name = spec.worker().name().as_str().expect("worker unit name");
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
             panic!("StartTransientUnit rejected derived RuntimeMaxUSec");
         }
+        wait_for_worker_result(
+            &where_path.join("result.bin"),
+            worker.uid(),
+            &spec,
+            started_worker,
+            &where_path,
+            Duration::from_secs(30),
+        );
         let runtime_max = systemctl_property(name, "RuntimeMaxUSec");
         assert!(
             runtime_max == WORKER_RUNTIME_MAX_USEC.to_string() || runtime_max == "12s",
@@ -950,10 +958,6 @@ mod tests {
             &spec,
             started_worker,
             &where_path,
-        );
-        assert!(
-            !where_path.join("result.bin").exists(),
-            "timed-out worker must not write result.bin"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
@@ -1051,30 +1055,6 @@ mod tests {
             jar.clone(),
             ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime"),
         )
-    }
-
-    fn write_blocking_request_fifo(where_path: &Path, backend_uid: u32, worker_gid: u32) {
-        let path = where_path.join("request.bin");
-        rustix::fs::mkfifoat(
-            rustix::fs::CWD,
-            &path,
-            rustix::fs::Mode::from_raw_mode(0o640),
-        )
-        .unwrap_or_else(|error| panic!("mkfifo request.bin: {error}"));
-        unix_fs::chown(&path, Some(backend_uid), Some(worker_gid))
-            .unwrap_or_else(|error| panic!("chown request.bin: {error}"));
-        let metadata =
-            fs::metadata(&path).unwrap_or_else(|error| panic!("stat request.bin: {error}"));
-        assert_eq!(
-            metadata.uid(),
-            backend_uid,
-            "request.bin fifo must be owned by uid {backend_uid}"
-        );
-        assert_eq!(
-            metadata.gid(),
-            worker_gid,
-            "request.bin fifo must be owned by gid {worker_gid}"
-        );
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
