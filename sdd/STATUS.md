@@ -1,13 +1,24 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C proceso UID A
+## En implementación — 2026-11-22, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness PID 1 sigue en euid 0 y coloca
-el stamp `request.bin` uid 2101. Un proceso real `setpriv --reuid=2101`
-no puede recorrer ni escribir el tmpfs `03770`; el handoff productivo
-sigue siendo `SCM_RIGHTS`. Sigue sin `CPUQuota`, fallos/reinicio, rechazo
-de sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+Siguiente corte: fallos/reinicio y rechazo de sustitución. Este documento
+no cierra `003B-4C`. Sigue sin `CPUQuota`, fallos/reinicio, rechazo de
+sustitución ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
 TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-22, 4C proceso UID A
+
+`master 59da884d06aabacb08f0a8e5ac056e7d512af0bd` integra PR #350. Su
+candidato exacto `3fe28fed07bdbd285341b4861c00eeff69c43152` pasó Verify
+`44989524553` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261122-sol-pr350-architecture.md` y
+`sdd/reviews/20261122-sol-pr350-security.md`. Un proceso `setpriv
+--reuid=2101` no recorre el tmpfs `03770`. El corte no cierra `003B-4C`:
+no hay `CPUQuota`, fallos/reinicio, rechazo de sustitución ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP.
 
 ## Master vigente — 2026-11-22, 4C aislamiento entre jobs
 
