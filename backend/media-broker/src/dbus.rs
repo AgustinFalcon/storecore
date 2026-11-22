@@ -29,7 +29,7 @@ const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
 /// `IMAGE_IO_V1` timeout (12 s). Derived internally; the client cannot supply it.
 const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
-/// Stop grace after RuntimeMax. Derived internally; the client cannot supply it.
+/// Stop grace after `RuntimeMax`. Derived internally; the client cannot supply it.
 const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
@@ -372,28 +372,6 @@ mod tests {
         assert!(worker_keys.contains(&"MemorySwapMax"));
         assert!(worker_keys.contains(&"TasksAccounting"));
         assert!(worker_keys.contains(&"TasksMax"));
-        assert!(worker_keys.contains(&"RuntimeMaxUSec"));
-        assert!(worker_keys.contains(&"TimeoutStopUSec"));
-        let runtime_max = worker
-            .iter()
-            .find(|(key, _)| *key == "RuntimeMaxUSec")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            runtime_max
-                .as_deref()
-                .is_some_and(|value| value.contains(&WORKER_RUNTIME_MAX_USEC.to_string())),
-            "RuntimeMaxUSec must be the internal 12s ceiling, got {runtime_max:?}"
-        );
-        let timeout_stop = worker
-            .iter()
-            .find(|(key, _)| *key == "TimeoutStopUSec")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            timeout_stop
-                .as_deref()
-                .is_some_and(|value| value.contains(&WORKER_TIMEOUT_STOP_USEC.to_string())),
-            "TimeoutStopUSec must be the internal 1s grace, got {timeout_stop:?}"
-        );
         let memory_max = worker
             .iter()
             .find(|(key, _)| *key == "MemoryMax")
@@ -453,6 +431,43 @@ mod tests {
         assert_eq!(spec.worker().argv()[1], "-jar");
         assert_eq!(spec.worker().argv()[0], spec.worker().java());
         assert_eq!(spec.worker().argv()[2], spec.worker().jar());
+    }
+
+    #[test]
+    fn derived_worker_timeout_matches_image_io_v1() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"RuntimeMaxUSec"));
+        assert!(keys.contains(&"TimeoutStopUSec"));
+        let runtime_max = worker
+            .iter()
+            .find(|(key, _)| *key == "RuntimeMaxUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            runtime_max
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_RUNTIME_MAX_USEC.to_string())),
+            "RuntimeMaxUSec must be the internal 12s ceiling, got {runtime_max:?}"
+        );
+        let timeout_stop = worker
+            .iter()
+            .find(|(key, _)| *key == "TimeoutStopUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            timeout_stop
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_TIMEOUT_STOP_USEC.to_string())),
+            "TimeoutStopUSec must be the internal 1s grace, got {timeout_stop:?}"
+        );
     }
 
     #[test]
