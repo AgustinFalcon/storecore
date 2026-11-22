@@ -31,8 +31,6 @@ const WORKER_TASKS_MAX: u64 = 64;
 const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
 /// Stop grace after `RuntimeMax`. Derived internally; the client cannot supply it.
 const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
-/// Bytes a harness allocator writes inside the worker cgroup to exceed `MemoryMax`.
-const WORKER_OOM_PROBE_BYTES: usize = 256 * 1024 * 1024;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -318,7 +316,7 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_MEMORY_MAX_BYTES, WORKER_OOM_PROBE_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
+        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
         WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
         worker_properties,
     };
@@ -344,6 +342,9 @@ mod tests {
         0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
         0x2d, 0x2e, 0x2f, 0x30,
     ];
+
+    /// Bytes a harness allocator writes inside the worker cgroup to exceed `MemoryMax`.
+    const WORKER_OOM_PROBE_BYTES: usize = 256 * 1024 * 1024;
 
     static NEXT: AtomicU64 = AtomicU64::new(1);
 
