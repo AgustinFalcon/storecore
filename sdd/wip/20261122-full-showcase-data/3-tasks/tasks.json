@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "tasks": [
+    {"id":"DATA-01","title":"Versionar contrato V3 y tipos cerrados","status":"done"},
+    {"id":"DATA-02","title":"Crear dataset integral de 80 productos","status":"done"},
+    {"id":"DATA-03","title":"Cargar portada, ofertas, direcciones, carrito y favoritos","status":"done"},
+    {"id":"DATA-04","title":"Agregar escenarios comerciales locales coherentes","status":"pending"},
+    {"id":"DATA-05","title":"Afirmar datos exactos en todas las superficies","status":"in_progress"},
+    {"id":"DATA-06","title":"Validar replay, PostgreSQL, UI y CI","status":"in_progress"},
+    {"id":"DATA-07","title":"Revisar exact head y preparar PR con evidencia","status":"pending"}
+  ]
+}

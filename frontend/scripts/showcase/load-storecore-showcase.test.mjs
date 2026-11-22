@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { ShowcaseDataset, DEFAULT_SHOWCASE_DATASET } from './showcase-dataset.mjs';
+import { readShowcaseDataset } from './read-showcase-dataset.mjs';
 import * as domain from './load-storecore-showcase.mjs';
 import {
   ShowcaseAdapterMode, ShowcaseCapability, ShowcaseCapabilityState, ShowcaseConfig,
   ShowcaseOrderStatus, ShowcasePaymentStatus, ShowcaseRole, ShowcaseStage,
-  ShowcaseLoader,
+  ShowcaseLoader, ShowcaseOfferTransition,
 } from './load-storecore-showcase.mjs';
 
 function importedWire() {
@@ -106,6 +108,90 @@ test('V2 import creates and verifies each ordered product gallery', async t => {
   }
 });
 
+test('V3 full showcase loads every declared buyer/admin collection and replays without duplicates', async t => {
+  const dataset = await readShowcaseDataset(fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url)));
+  const { state, run } = await api(t, { dataset, requireRealRouteReceipt: true });
+  const first = await run();
+  assert.equal(first.products, 80);
+  assert.equal(Object.keys(state.products).length, 80);
+  assert.equal(state.home.sections.length, 7);
+  assert.equal(state.addresses.length, 3);
+  assert.equal(state.cart.lines.length, 5);
+  assert.equal(state.cart.lines.reduce((sum, line) => sum + line.quantity, 0), 9);
+  assert.equal(state.favorites.length, 12);
+  assert.equal(state.offers.length, 12);
+  assert.deepEqual(Object.fromEntries(domain.ShowcaseOfferStatus.values.map(status => [status.wire,
+    state.offers.filter(offer => offer.status === status.wire).length])), { DRAFT: 4, ACTIVE: 4, PAUSED: 2, ENDED: 2 });
+  const writes = state.writes.length;
+  const replay = await run();
+  assert.equal(state.writes.length, writes);
+  assert.deepEqual(replay.receipt, first.receipt);
+});
+
+test('V3 replay resumes a partially persisted address set and offer lifecycle without duplicates', async t => {
+  const dataset = await readShowcaseDataset(fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url)));
+  let failAddress = true;
+  let failOffer = true;
+  const fixture = await api(t, { dataset, requireRealRouteReceipt: true, response: result => {
+    if (failAddress && result.path === '/api/v1/customer/me/addresses' && result.method === 'POST') {
+      failAddress = false;
+      return { status: 200, payload: { code: 200, data: null, errorCode: null } };
+    }
+    if (!failAddress && failOffer && /^\/api\/v1\/user\/offers\/\d+\/state$/.test(result.path) && result.body?.transition === ShowcaseOfferTransition.Activate.wire) {
+      failOffer = false;
+      return { status: 200, payload: { code: 200, data: null, errorCode: null } };
+    }
+  } });
+  await assert.rejects(fixture.run(), /INVALID_BASE_RESPONSE/);
+  assert.equal(fixture.state.addresses.length, 1);
+  await assert.rejects(fixture.run(), /INVALID_BASE_RESPONSE/);
+  assert.equal(fixture.state.addresses.length, 3);
+  assert.equal(fixture.state.offers.length, 1);
+  const completed = await fixture.run();
+  assert.equal(completed.products, 80);
+  assert.equal(fixture.state.addresses.length, 3);
+  assert.equal(fixture.state.offers.length, 12);
+  assert.deepEqual(Object.fromEntries(domain.ShowcaseOfferStatus.values.map(status => [status.wire,
+    fixture.state.offers.filter(offer => offer.status === status.wire).length])), { DRAFT: 4, ACTIVE: 4, PAUSED: 2, ENDED: 2 });
+});
+
+test('V3 completed-import marker preserves a later operator pause on replay', async t => {
+  const dataset = await readShowcaseDataset(fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url)));
+  const fixture = await api(t, { dataset });
+  await fixture.run();
+  const offer = fixture.state.offers.find(row => row.status === domain.ShowcaseOfferStatus.Active.wire);
+  assert.ok(offer);
+  offer.status = domain.ShowcaseOfferStatus.Paused.wire;
+  fixture.state.home = { revision: fixture.state.home.revision + 1, sections: [] };
+  const writes = fixture.state.writes.length;
+  await fixture.run();
+  assert.equal(offer.status, domain.ShowcaseOfferStatus.Paused.wire);
+  assert.deepEqual(fixture.state.home.sections, []);
+  assert.equal(fixture.state.writes.length, writes);
+});
+
+test('V3 explicit pending marker resumes over preexisting Home and restores operator composition', async t => {
+  const dataset = await readShowcaseDataset(fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url)));
+  const operatorHome = { key: 'operator-banner', kind: domain.ShowcaseHomeKind.Banner.wire, active: true, sortOrder: 7,
+    content: { title: 'Contenido del operador', body: 'Se conserva' } };
+  let failOffer = true;
+  const fixture = await api(t, { dataset, requireRealRouteReceipt: true,
+    prepare: state => { state.home = { revision: 4, sections: [clone(operatorHome)] }; },
+    response: result => {
+      if (failOffer && /^\/api\/v1\/user\/offers\/\d+\/state$/.test(result.path)) {
+        failOffer = false;
+        return { status: 200, payload: { code: 200, data: null, errorCode: null } };
+      }
+    } });
+  await assert.rejects(fixture.run(), /INVALID_BASE_RESPONSE/);
+  assert.equal(fixture.state.offers.length, 1);
+  assert.equal(fixture.state.home.sections.length, 2);
+  assert.equal(fixture.state.home.sections.find(section => section.key.startsWith('storecore-showcase-v3-import'))?.active, false);
+  await fixture.run();
+  assert.deepEqual(fixture.state.home.sections, [operatorHome]);
+  assert.equal(fixture.state.offers.length, 12);
+});
+
 test('changed input preserves existing operator fields, images, stock, home and collections', async t => {
   const raw = importedWire();
   const { state, run } = await api(t, { dataset: ShowcaseDataset.fromWire(raw) });
@@ -182,6 +268,13 @@ test('showcase capabilities and states are closed and fail unknown wires closed'
   assert.equal(ShowcaseCapabilityState.fromWire('ACTIVE'), ShowcaseCapabilityState.Active);
   assert.equal(ShowcaseCapabilityState.fromWire('PAUSED'), ShowcaseCapabilityState.Unknown);
   assert.throws(() => new ShowcaseCapabilityState(null, 'INJECTED'), /closed/);
+});
+test('offer transitions are closed commands and unknown wire fails closed', () => {
+  assert.equal(ShowcaseOfferTransition.fromWire('ACTIVATE'), ShowcaseOfferTransition.Activate);
+  assert.equal(ShowcaseOfferTransition.fromWire('DELETE'), ShowcaseOfferTransition.Unknown);
+  assert.throws(() => new ShowcaseOfferTransition(null, 'INJECTED'), /closed/);
+  assert.equal(domain.ShowcaseImportProgress.fromWire('PENDING'), domain.ShowcaseImportProgress.Pending);
+  assert.equal(domain.ShowcaseImportProgress.fromWire('COMPLETE'), domain.ShowcaseImportProgress.Unknown);
 });
 test('config accepts only explicit loopback targets', () => {
   const config = new ShowcaseConfig(valid);
@@ -282,10 +375,20 @@ async function api(t, options = {}) {
           assert.equal(body.expectedConfigVersion, module.configVersion);
           module.state = body.state; module.configVersion++; data = module;
           if (module.module === ShowcaseCapability.ManualFulfillment.wire) state.cart.deliveryOptions?.forEach(option => option.configurationVersion = module.configVersion);
+        } else if (path === '/api/v1/catalog/categories') {
+          const names = [...new Set(Object.values(state.products).map(product => product.category))].sort();
+          data = names.map((name, index) => ({ id: index + 1, name }));
         } else if (path === '/api/v1/user/content/home') {
+          assert.equal(state.modules.find(item => item.module === ShowcaseCapability.Catalog.wire)?.state,
+            ShowcaseCapabilityState.Active.wire, 'Home requires CATALOG');
           if (method === 'PUT') {
             assert.equal(body.expectedRevision, state.home.revision);
-            state.home = { revision: state.home.revision + 1, sections: clone(body.sections) };
+            const sections = clone(body.sections);
+            for (const section of sections) {
+              if (section.content?.ctaLabel === null) delete section.content.ctaLabel;
+              if (section.content?.ctaPath === null) delete section.content.ctaPath;
+            }
+            state.home = { revision: state.home.revision + 1, sections };
           }
           data = state.home;
         } else if (path.startsWith('/api/v1/user/catalog/products/')) {
@@ -298,7 +401,7 @@ async function api(t, options = {}) {
               images: clone(body.images), media: body.images.map((url, index) => ({ id: String(Number(id) * 100 + index), url, sortOrder: index, primary: index === 0 })),
               price: { base: body.price.base, original: body.price.base, effective: body.price.base, offer: null },
               variants: [{ id, sku, name: variant.name, status: domain.ShowcaseVariantStatus.Active.wire, active: true, attributes: {},
-                availableQuantity: variant.availableQuantity, availability: domain.ShowcaseVariantAvailability.Available.wire,
+                availableQuantity: variant.availableQuantity, availability: (variant.availableQuantity === 0 ? domain.ShowcaseVariantAvailability.OutOfStock : domain.ShowcaseVariantAvailability.Available).wire,
                 inventory: { variantId: id, sku, productName: body.name, variantLabel: variant.name,
                   available: variant.availableQuantity, reserved: 0, onHand: variant.availableQuantity, safety: 0, saleable: variant.availableQuantity,
                   state: domain.ShowcaseInventoryState.Known.wire, updatedAt: '2026-01-01T00:00:00Z' } }],
@@ -337,10 +440,17 @@ async function api(t, options = {}) {
             availability: domain.ShowcaseFavoriteAvailability.Available.wire, addedAt: '2026-01-01T00:00:00Z' });
           data = { sku, outcome: (present ? domain.ShowcaseFavoriteOutcome.AlreadyPresent : domain.ShowcaseFavoriteOutcome.Added).wire };
         } else if (path === '/api/v1/user/offers') {
+          assert.equal(state.modules.find(item => item.module === ShowcaseCapability.ManualPromotions.wire)?.state,
+            ShowcaseCapabilityState.Active.wire, 'offers require MANUAL_PROMOTIONS');
           if (method === 'POST') {
-            const offer = { id: state.offers.length + 1, ...body, status: domain.ShowcaseOfferStatus.Draft.wire };
+            const offer = { id: state.offers.length + 1, ...body, skus: [...body.skus].sort((left, right) => left.localeCompare(right)), status: domain.ShowcaseOfferStatus.Draft.wire };
             state.offers.push(offer); data = offer; status = 201; code = 200;
           } else data = state.offers;
+        } else if (/^\/api\/v1\/user\/offers\/\d+\/state$/.test(path)) {
+          const id = Number(path.split('/')[5]);
+          const offer = state.offers.find(item => item.id === id);
+          const targets = { ACTIVATE: domain.ShowcaseOfferStatus.Active.wire, PAUSE: domain.ShowcaseOfferStatus.Paused.wire, END: domain.ShowcaseOfferStatus.Ended.wire };
+          offer.status = targets[body.transition]; data = offer;
         } else if (path === '/api/v1/user/customers') {
           const others = options.customerRows ?? [];
           data = page([...others, state.customer], url, 'pageSize');

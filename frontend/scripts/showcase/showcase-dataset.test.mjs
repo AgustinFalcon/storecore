@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ShowcaseDataset, ShowcaseDatasetSchema, DEFAULT_SHOWCASE_DATASET, showcaseCatalogSlug,
-  SHOWCASE_PRICE_MAX, SHOWCASE_FEE_MAX_CENTS, SHOWCASE_CHECKOUT_MAX_CENTS } from './showcase-dataset.mjs';
+  SHOWCASE_PRICE_MAX, SHOWCASE_FEE_MAX_CENTS, SHOWCASE_CHECKOUT_MAX_CENTS,
+  ShowcaseSeedProfile, ShowcaseFixtureOfferStatus, ShowcaseFixtureDiscountKind, ShowcaseFixtureHomeKind } from './showcase-dataset.mjs';
 import { MAX_SHOWCASE_DATASET_BYTES, readShowcaseDataset } from './read-showcase-dataset.mjs';
 
 export function defaultWire() {
@@ -81,7 +82,8 @@ test('journey budget derives conservative price bound from three cart units and 
 test('schema is closed, Unknown fails translation, and datasets cannot be forged', () => {
   assert.equal(ShowcaseDatasetSchema.fromWire(ShowcaseDatasetSchema.V1.wire), ShowcaseDatasetSchema.V1);
   assert.equal(ShowcaseDatasetSchema.fromWire(ShowcaseDatasetSchema.V2.wire), ShowcaseDatasetSchema.V2);
-  for (const value of [null, undefined, '1', 3]) assert.equal(ShowcaseDatasetSchema.fromWire(value), ShowcaseDatasetSchema.Unknown);
+  assert.equal(ShowcaseDatasetSchema.fromWire(ShowcaseDatasetSchema.V3.wire), ShowcaseDatasetSchema.V3);
+  for (const value of [null, undefined, '1', 4]) assert.equal(ShowcaseDatasetSchema.fromWire(value), ShowcaseDatasetSchema.Unknown);
   assert.throws(() => new ShowcaseDatasetSchema(null, 3), /closed/);
   assert.throws(() => new ShowcaseDataset(null), /fromWire/);
   assert.throws(() => ShowcaseDataset.require(Object.create(ShowcaseDataset.prototype)), /INVALID/);
@@ -226,4 +228,53 @@ test('committed hardware-store dataset is dense, bounded and journey-complete', 
   assert.ok(dataset.products.every(product => product.images.length >= 2 && product.images.length <= 4));
   assert.deepEqual([dataset.journey.primary.sku, dataset.journey.cart.sku, dataset.journey.secondaryCart.sku],
     ['SHOW-TALADRO-18V', 'SHOW-AMOLADORA-850', 'SHOW-SET-MANUAL']);
+});
+
+test('V3 full showcase dataset fills the buyer and operator experience with closed typed fixtures', async () => {
+  const path = fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url));
+  const dataset = await readShowcaseDataset(path);
+  assert.equal(dataset.schema, ShowcaseDatasetSchema.V3);
+  assert.equal(dataset.experience.profile, ShowcaseSeedProfile.FullDemo);
+  assert.equal(dataset.products.length, 80);
+  assert.ok(new Set(dataset.products.map(product => product.brand)).size >= 12);
+  assert.ok(new Set(dataset.products.map(product => product.category)).size >= 8);
+  assert.equal(dataset.products.filter(product => product.stock === 0).length, 5);
+  assert.equal(dataset.experience.cart.length, 5);
+  assert.equal(dataset.experience.cart.reduce((sum, line) => sum + line.quantity, 0), 9);
+  assert.equal(dataset.experience.favoriteSkus.length, 12);
+  assert.equal(dataset.experience.addresses.length, 3);
+  assert.equal(dataset.experience.addresses.filter(address => address.isDefault).length, 1);
+  assert.equal(dataset.experience.offers.length, 12);
+  assert.deepEqual(Object.fromEntries(ShowcaseFixtureOfferStatus.values.map(status => [status.wire,
+    dataset.experience.offers.filter(offer => offer.status === status).length])),
+  { DRAFT: 4, ACTIVE: 4, PAUSED: 2, ENDED: 2 });
+  assert.ok(dataset.experience.offers.some(offer => offer.discountKind === ShowcaseFixtureDiscountKind.Fixed));
+  assert.equal(dataset.experience.homeSections.length, 7);
+  assert.deepEqual(new Set(dataset.experience.homeSections.map(section => section.kind)), new Set(ShowcaseFixtureHomeKind.values));
+  assert.equal(dataset.experience.homeSections.filter(section => !section.active).length, 1);
+  for (const value of [dataset.experience, dataset.experience.cart, dataset.experience.addresses,
+    dataset.experience.offers, dataset.experience.homeSections]) assert.equal(Object.isFrozen(value), true);
+});
+
+test('V3 fixture states and references fail closed before loader HTTP', async () => {
+  const path = fileURLToPath(new URL('./datasets/ferreteria-full-showcase.json', import.meta.url));
+  const raw = JSON.parse(await readFile(path, 'utf8'));
+  for (const mutate of [
+    value => { value.experience.profile = 'PRODUCTION'; },
+    value => { value.experience.offers[0].status = 'PUBLISHED'; },
+    value => { value.experience.offers[0].discountKind = 'COUPON'; },
+    value => { value.experience.homeSections[0].kind = 'HTML'; },
+    value => { value.experience.cart[0].sku = 'SHOW-NOT-FOUND'; },
+    value => { value.experience.favoriteSkus.push(value.experience.favoriteSkus[0]); },
+    value => { value.experience.addresses[1].isDefault = true; },
+    value => { value.experience.homeSections[2].content.skus.push('SHOW-NOT-FOUND'); },
+    value => { value.experience.homeSections[0].content.ctaPath = 'javascript:alert(1)'; },
+    value => { value.experience.homeSections[1].content.categoryNames[0] = 'Categoría inexistente'; },
+    value => { value.experience.offers[0].priority = -1; },
+    value => { value.experience.offers[0].minMarginPercent = 1; },
+    value => { value.experience.cart = [{ sku: 'SHOW-TALADRO-18V', quantity: 99 }, { sku: 'SHOW-AMOLADORA-850', quantity: 99 }]; value.products[0].price = SHOWCASE_PRICE_MAX; value.products[1].price = SHOWCASE_PRICE_MAX; },
+  ]) {
+    const value = structuredClone(raw); mutate(value);
+    assert.throws(() => ShowcaseDataset.fromWire(value), /SHOWCASE_DATASET_INVALID/);
+  }
 });
