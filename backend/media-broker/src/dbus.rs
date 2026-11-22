@@ -318,9 +318,9 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_MEMORY_MAX_BYTES, WORKER_OOM_PROBE_BYTES, WORKER_RUNTIME_MAX_USEC,
-        WORKER_TASKS_MAX, WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name,
-        mount_properties, worker_properties,
+        WORKER_MEMORY_MAX_BYTES, WORKER_OOM_PROBE_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
+        WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
+        worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -1241,9 +1241,8 @@ mod tests {
             .unwrap_or_else(|error| panic!("python3 hog: {error}"));
         let pid = hog.id();
         wait_proc_stopped(pid);
-        fs::write(&procs, pid.to_string()).unwrap_or_else(|error| {
-            panic!("move hog {pid} into {}: {error}", procs.display())
-        });
+        fs::write(&procs, pid.to_string())
+            .unwrap_or_else(|error| panic!("move hog {pid} into {}: {error}", procs.display()));
         let continued = Command::new("kill")
             .args(["-CONT", &pid.to_string()])
             .status()
