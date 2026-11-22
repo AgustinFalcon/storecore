@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-22 — arranque 4C timeout del worker
+
+- El harness PID 1 deriva `RuntimeMaxUSec=12s` y `TimeoutStopUSec=1s`,
+  congela el `MainPID` y atesta timeout (`Reached runtime time limit`).
+  FIFO y `RemainAfterExit` sin proceso no disparan timeout.
+- No se marca `003B-4C`. No hay OOM, terminación del cgroup, `Ready` ni
+  HTTP.
+
 ## 2026-11-22 — persist reviews PR #355, 003B-4C sigue abierto
 
 - Merge #355 `dceb02dcdb02dfebc41b5b48bced50b1b7301e20` sobre candidato

@@ -27,6 +27,10 @@ const POLL_INTERVAL: Duration = Duration::from_millis(50);
 /// `IMAGE_IO_V1` worker heap. Derived internally; the client cannot supply it.
 const WORKER_MEMORY_MAX_BYTES: u64 = 192 * 1024 * 1024;
 const WORKER_TASKS_MAX: u64 = 64;
+/// `IMAGE_IO_V1` timeout (12 s). Derived internally; the client cannot supply it.
+const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
+/// Stop grace after `RuntimeMax`. Derived internally; the client cannot supply it.
+const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -263,6 +267,8 @@ pub(crate) fn worker_properties(
         ("MemorySwapMax", Value::from(0u64)),
         ("TasksAccounting", Value::from(true)),
         ("TasksMax", Value::from(WORKER_TASKS_MAX)),
+        ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
+        ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
     ])
 }
 
@@ -307,8 +313,9 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_MEMORY_MAX_BYTES, WORKER_TASKS_MAX, ZbusSystemd, classify_dbus_name,
-        mount_properties, worker_properties,
+        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
+        WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
+        worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -424,6 +431,43 @@ mod tests {
         assert_eq!(spec.worker().argv()[1], "-jar");
         assert_eq!(spec.worker().argv()[0], spec.worker().java());
         assert_eq!(spec.worker().argv()[2], spec.worker().jar());
+    }
+
+    #[test]
+    fn derived_worker_timeout_matches_image_io_v1() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"RuntimeMaxUSec"));
+        assert!(keys.contains(&"TimeoutStopUSec"));
+        let runtime_max = worker
+            .iter()
+            .find(|(key, _)| *key == "RuntimeMaxUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            runtime_max
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_RUNTIME_MAX_USEC.to_string())),
+            "RuntimeMaxUSec must be the internal 12s ceiling, got {runtime_max:?}"
+        );
+        let timeout_stop = worker
+            .iter()
+            .find(|(key, _)| *key == "TimeoutStopUSec")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            timeout_stop
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_TIMEOUT_STOP_USEC.to_string())),
+            "TimeoutStopUSec must be the internal 1s grace, got {timeout_stop:?}"
+        );
     }
 
     #[test]
@@ -888,6 +932,73 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_runtime_max_stops_frozen_mainpid() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x99; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived RuntimeMaxUSec");
+        }
+        freeze_worker_main_pid(name);
+        let runtime_max = systemctl_property(name, "RuntimeMaxUSec");
+        assert!(
+            runtime_max == WORKER_RUNTIME_MAX_USEC.to_string() || runtime_max == "12s",
+            "PID 1 must apply the derived IMAGE_IO_V1 timeout, got {runtime_max}"
+        );
+        wait_runtime_timeout_journal(
+            name,
+            Duration::from_secs(20),
+            &spec,
+            started_worker,
+            &where_path,
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "frozen worker must not finish SELF_TEST before RuntimeMax"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -971,6 +1082,19 @@ mod tests {
             jar.clone(),
             ApprovedRuntime::open(&java, &jar, 0, java_digest, jar_digest).expect("runtime"),
         )
+    }
+
+    fn freeze_worker_main_pid(name: &str) {
+        let pid = systemctl_property(name, "MainPID");
+        assert!(
+            !pid.is_empty() && pid != "0",
+            "RuntimeMax attest needs a live MainPID, got {pid}"
+        );
+        let stopped = Command::new("kill")
+            .args(["-STOP", &pid])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -STOP {pid}: {error}"));
+        assert!(stopped.success(), "kill -STOP {pid} failed with {stopped}");
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
@@ -1269,6 +1393,34 @@ mod tests {
             .output()
             .unwrap_or_else(|error| panic!("journalctl {name}: {error}"));
         String::from_utf8_lossy(&journal.stdout).into_owned()
+    }
+
+    fn wait_runtime_timeout_journal(
+        name: &str,
+        timeout: Duration,
+        spec: &TransientUnits,
+        started: Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let result = systemctl_property(name, "Result");
+            let journal = worker_journal(name);
+            if journal.contains("Reached runtime time limit")
+                || journal.contains("result 'timeout'")
+                || journal.contains("Failed with result 'timeout'")
+            {
+                return;
+            }
+            if Instant::now() >= deadline {
+                dump_worker_unit(spec, started, where_path);
+            }
+            assert!(
+                Instant::now() < deadline,
+                "RuntimeMax timeout for {name} want Result=timeout, got Result={result}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn wait_unknown_exit_journal(
