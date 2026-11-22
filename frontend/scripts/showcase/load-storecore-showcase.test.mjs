@@ -11,8 +11,21 @@ import {
 
 function importedWire() {
   return { schemaVersion: DEFAULT_SHOWCASE_DATASET.schema.wire,
-    products: DEFAULT_SHOWCASE_DATASET.products.map(product => ({ ...product })),
+    products: DEFAULT_SHOWCASE_DATASET.products.map(product => ({
+      sku: product.sku, name: product.name, description: product.description, brand: product.brand,
+      category: product.category, image: product.image, price: product.price, stock: product.stock,
+    })),
     home: { title: 'Taller importado', body: 'Contenido importado por archivo local.' } };
+}
+
+function importedGalleryWire() {
+  const raw = importedWire();
+  raw.schemaVersion = 2;
+  raw.products = raw.products.map(({ image, ...product }, index) => ({
+    ...product,
+    images: [image, `${image}?auto=format&fit=crop&w=${1000 + index}`],
+  }));
+  return raw;
 }
 
 test('slug collisions and declared journey fee overflow reject before any HTTP', async t => {
@@ -79,6 +92,18 @@ test('imported reordered dataset creates exact fields and fourth product, then r
   assert.equal(state.writes.length, count);
   assert.equal(replay.pendingOrderCreated, false);
   assert.deepEqual(replay.receipt, first.receipt);
+});
+
+test('V2 import creates and verifies each ordered product gallery', async t => {
+  const dataset = ShowcaseDataset.fromWire(importedGalleryWire());
+  const { state, run } = await api(t, { dataset });
+  const result = await run();
+  assert.equal(result.products, 3);
+  for (const product of dataset.products) {
+    assert.deepEqual(state.products[product.sku].images, product.images);
+    assert.deepEqual(state.products[product.sku].media.map(media => [media.url, media.sortOrder, media.primary]),
+      product.images.map((url, index) => [url, index, index === 0]));
+  }
 });
 
 test('changed input preserves existing operator fields, images, stock, home and collections', async t => {

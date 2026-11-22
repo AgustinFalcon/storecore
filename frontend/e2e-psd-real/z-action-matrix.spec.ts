@@ -70,6 +70,10 @@ test('PRM action: public catalog combines search brand category and active-offer
 
     const page = await context.newPage();
     observeActionTransport(page, info);
+    const targetResponse = await context.request.get(`/api/v1/catalog/products/${encodeURIComponent(receipt.products[0].sku)}`);
+    expect(targetResponse.status()).toBe(200);
+    const target = mapProductDetail(readApiBody(await targetResponse.json()));
+    const searchTerm = target.name.split(/\s+/u)[0];
     await test.step('Load real catalog and await its initial response', async () => {
       const initial = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/catalog');
       await page.goto('/catalog');
@@ -77,13 +81,13 @@ test('PRM action: public catalog combines search brand category and active-offer
       await expect(page.locator('sc-catalog-page-view > section')).toHaveAttribute('aria-busy', 'false');
     });
     await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible();
-    await page.getByLabel('Búsqueda', { exact: true }).fill('Taladro');
+    await page.getByLabel('Búsqueda', { exact: true }).fill(searchTerm);
     const brandFilter = page.getByRole('combobox', { name: 'Marca', exact: true });
     const categoryFilter = page.getByRole('combobox', { name: 'Categoría', exact: true });
-    await brandFilter.selectOption({ label: 'Showcase Tools' });
-    await categoryFilter.selectOption({ label: 'Herramientas eléctricas' });
+    await brandFilter.selectOption({ label: target.brand });
+    await categoryFilter.selectOption({ label: target.category });
     await page.getByLabel('Sólo ofertas', { exact: true }).check();
-    await expect(page.getByLabel('Búsqueda', { exact: true })).toHaveValue('Taladro');
+    await expect(page.getByLabel('Búsqueda', { exact: true })).toHaveValue(searchTerm);
     await expect(page.getByLabel('Sólo ofertas', { exact: true })).toBeChecked();
     await expect(page.getByRole('status')).toHaveText('Aplicá Buscar para consultar estos filtros.');
     const brand = await brandFilter.inputValue();
@@ -95,7 +99,7 @@ test('PRM action: public catalog combines search brand category and active-offer
     ]);
     expect(response.status()).toBe(200);
     const query = new URL(response.url()).searchParams;
-    expect(query.get('query')).toBe('Taladro');
+    expect(query.get('query')).toBe(searchTerm);
     expect(query.get('brand')).toBe(brand);
     expect(query.get('category')).toBe(category);
     expect(query.get('offers')).toBe('true');

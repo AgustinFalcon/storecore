@@ -4,6 +4,7 @@ import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ShowcaseDataset, ShowcaseDatasetSchema, DEFAULT_SHOWCASE_DATASET, showcaseCatalogSlug,
   SHOWCASE_PRICE_MAX, SHOWCASE_FEE_MAX_CENTS, SHOWCASE_CHECKOUT_MAX_CENTS } from './showcase-dataset.mjs';
 import { MAX_SHOWCASE_DATASET_BYTES, readShowcaseDataset } from './read-showcase-dataset.mjs';
@@ -14,6 +15,16 @@ export function defaultWire() {
       sku: product.sku, name: product.name, description: product.description, brand: product.brand,
       category: product.category, image: product.image, price: product.price, stock: product.stock,
     })), home: { ...DEFAULT_SHOWCASE_DATASET.home } };
+}
+
+function galleryWire() {
+  const raw = defaultWire();
+  raw.schemaVersion = ShowcaseDatasetSchema.V2.wire;
+  raw.products = raw.products.map(({ image, ...product }) => ({
+    ...product,
+    images: [image, `${image}?auto=format&fit=crop&w=1200`],
+  }));
+  return raw;
 }
 
 test('slug translator matches backend algorithm and collision vectors', async () => {
@@ -69,8 +80,9 @@ test('journey budget derives conservative price bound from three cart units and 
 
 test('schema is closed, Unknown fails translation, and datasets cannot be forged', () => {
   assert.equal(ShowcaseDatasetSchema.fromWire(ShowcaseDatasetSchema.V1.wire), ShowcaseDatasetSchema.V1);
-  for (const value of [null, undefined, '1', 2]) assert.equal(ShowcaseDatasetSchema.fromWire(value), ShowcaseDatasetSchema.Unknown);
-  assert.throws(() => new ShowcaseDatasetSchema(null, 2), /closed/);
+  assert.equal(ShowcaseDatasetSchema.fromWire(ShowcaseDatasetSchema.V2.wire), ShowcaseDatasetSchema.V2);
+  for (const value of [null, undefined, '1', 3]) assert.equal(ShowcaseDatasetSchema.fromWire(value), ShowcaseDatasetSchema.Unknown);
+  assert.throws(() => new ShowcaseDatasetSchema(null, 3), /closed/);
   assert.throws(() => new ShowcaseDataset(null), /fromWire/);
   assert.throws(() => ShowcaseDataset.require(Object.create(ShowcaseDataset.prototype)), /INVALID/);
 });
@@ -86,13 +98,26 @@ test('translation rebuilds immutable objects, resolves journey by identity and g
   for (const value of [dataset, dataset.products, dataset.products[0], dataset.home, dataset.journey]) assert.equal(Object.isFrozen(value), true);
   const command = dataset.journey.primary.toCatalogCommand();
   assert.equal(command.variants[0].availableQuantity, dataset.journey.primary.stock);
-  assert.deepEqual(command.images, [dataset.journey.primary.image]);
+  assert.deepEqual(command.images, dataset.journey.primary.images);
   assert.equal(Object.hasOwn(command, 'schemaVersion'), false);
+});
+
+test('V2 translates ordered galleries once and keeps V1 compatibility', () => {
+  const legacy = ShowcaseDataset.fromWire(defaultWire());
+  assert.deepEqual(legacy.journey.primary.images, [legacy.journey.primary.image]);
+  const raw = galleryWire();
+  const dataset = ShowcaseDataset.fromWire(raw);
+  raw.products[0].images[0] = 'https://images.unsplash.com/changed';
+  assert.equal(dataset.products[0].images.length, 2);
+  assert.equal(dataset.products[0].image, dataset.products[0].images[0]);
+  assert.notEqual(dataset.products[0].images[0], raw.products[0].images[0]);
+  assert.equal(Object.isFrozen(dataset.products[0].images), true);
+  assert.deepEqual(dataset.products[0].toCatalogCommand().images, dataset.products[0].images);
 });
 
 test('dataset rejects malformed shapes, unknown fields, duplicate/missing journey and unsafe scalar values', () => {
   const cases = [
-    raw => { raw.schemaVersion = 2; },
+    raw => { raw.schemaVersion = 3; },
     raw => { raw.secret = 'must not log'; },
     raw => { raw.products = null; },
     raw => { raw.products.pop(); },
@@ -156,6 +181,17 @@ test('images are HTTPS allowlisted URLs without authority tricks or active schem
   }
   const raw = defaultWire(); raw.products[0].image = 'https://images.unsplash.com/' + 'a'.repeat(2048 - 'https://images.unsplash.com/'.length);
   ShowcaseDataset.fromWire(raw);
+
+  for (const mutate of [
+    value => { value.products[0].images = [value.products[0].images[0]]; },
+    value => { value.products[0].images.push(...value.products[0].images, value.products[0].images[0]); },
+    value => { value.products[0].images[1] = value.products[0].images[0]; },
+    value => { value.products[0].image = value.products[0].images[0]; },
+    value => { value.products[0].images[1] = 'https://example.com/image'; },
+  ]) {
+    const value = galleryWire(); mutate(value);
+    assert.throws(() => ShowcaseDataset.fromWire(value), /INVALID/);
+  }
 });
 
 test('local reader defaults only when absent and enforces UTF-8, JSON, regular file and byte bounds', async t => {
@@ -177,4 +213,17 @@ test('local reader defaults only when absent and enforces UTF-8, JSON, regular f
   await assert.rejects(readShowcaseDataset(directory), /FILE_(INVALID|UNREADABLE)/);
   await assert.rejects(readShowcaseDataset(join(directory, 'missing.json')), /FILE_UNREADABLE/);
   await assert.rejects(readShowcaseDataset(''), /FILE_INVALID/);
+});
+
+test('committed hardware-store dataset is dense, bounded and journey-complete', async () => {
+  const path = fileURLToPath(new URL('./datasets/ferreteria-demo.json', import.meta.url));
+  const dataset = await readShowcaseDataset(path);
+  assert.equal(dataset.schema, ShowcaseDatasetSchema.V2);
+  assert.equal(dataset.products.length, 40);
+  assert.equal(new Set(dataset.products.map(product => product.category)).size, 8);
+  assert.equal(dataset.products.filter(product => product.stock <= 3).length, 8);
+  assert.equal(dataset.products.reduce((count, product) => count + product.images.length, 0), 84);
+  assert.ok(dataset.products.every(product => product.images.length >= 2 && product.images.length <= 4));
+  assert.deepEqual([dataset.journey.primary.sku, dataset.journey.cart.sku, dataset.journey.secondaryCart.sku],
+    ['SHOW-TALADRO-18V', 'SHOW-AMOLADORA-850', 'SHOW-SET-MANUAL']);
 });
