@@ -1,11 +1,34 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-24, 4C sigue abierto
+## En implementación — 2026-11-24, 4C terminación del cgroup
 
-Siguiente corte: terminación del cgroup. Este documento
-no cierra `003B-4C`. Sigue sin `CPUQuota`, terminación del
-cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Este corte no cierra `003B-4C`. El harness mete un `sleep` en el cgroup
+del worker y atesta que `StopUnit` con `KillMode=control-group` lo mata.
+Sigue sin `CPUQuota` ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
+`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-24, persist reviews PR #360
+
+`master 7c2a819470ea614d4750b96afd88150a09aab5b7` integra PR #365.
+Persiste las dos reviews Grok 4.7 APPROVED de PR #360. No cierra
+`003B-4C`. Sigue sin `CPUQuota`, terminación del cgroup ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP.
+
+## Master vigente — 2026-11-24, calendario comercial PR #371
+
+`master 4b0e06ab3d6f73ed7d038aa587a9687bef2e10d8` integra PR #371. Cierra
+el corte de persistencia del calendario comercial. No cierra `003B-4C`.
+Sigue sin `CPUQuota`, terminación del cgroup ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
+
+## Master vigente — 2026-11-24, centro de notificación PR #370
+
+`master 227412d6426cd488a91dd321c166ef8ea20c95be` integra PR #370. No
+cierra `003B-4C`. Sigue sin `CPUQuota`, terminación del cgroup ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-24, 4C OOM del cgroup worker
 
