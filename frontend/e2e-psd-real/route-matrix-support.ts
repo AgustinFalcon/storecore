@@ -223,6 +223,8 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
     ['user/promos', ['user/promos']], ['user/orders', ['user/orders']], ['user/orders/:id', [`user/orders/${order}`]],
     ['user/inventory', ['user/inventory']], ['user/mercadolibre', ['user/mercadolibre/account', 'user/mercadolibre/listings']],
     ['user/capabilities', ['user/capabilities']], ['user/profile-import', []],
+    ['user/notifications', ['user/notifications', 'user/notifications/email-preferences']],
+    ['user/notifications/:alertId', [`user/notifications/${receipt.notification?.id.wire}`]],
   ]);
   const own = reads.get(binding.pattern);
   if (!own) throw new Error('Missing explicit real readiness binding');

@@ -14,6 +14,7 @@ function receiptWire() {
     customerId: 881, customerEmail: 'owner@example.test', addressId: '1907', addressRevision: '2026-11-14T13:45:17Z',
     addressStreet: 'Calle persistida', pendingOrderId: '8001', offerId: 799,
     cart: { revision: 'revision-from-backend', skus: ['REAL-SKU / 7'] }, homeTitle: 'Inicio persistido',
+    notification: { id: '77777777-7777-4777-8777-777777777777', sourceId: 'Persisted-stock-17' },
     scenarios: [RouteScenario.Populated, RouteScenario.InvalidSecret].map(scenario =>
       ({ scenario: scenario.wire, evidence: RouteEvidenceMode.RealBackend.wire })),
   };
@@ -26,9 +27,9 @@ function check(tree: readonly Route[] = routes, definitions = productiveRouteDef
 }
 
 describe('productive route acceptance contract', () => {
-  it('reconciles 30 leaves, four redirects and three wildcards with both evidence sources', () => {
+  it('reconciles 32 leaves, four redirects and three wildcards with both evidence sources', () => {
     const actual = censusProductiveRoutes(routes);
-    expect(actual.leaves).toHaveLength(30); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
+    expect(actual.leaves).toHaveLength(32); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
     check();
     expect(productiveRouteManifest).toBe(productiveHttpRouteBindings);
     expect(productiveRouteDefinitions.every(entry => !('url' in entry) && !('evidence' in entry))).toBe(true);
@@ -77,6 +78,9 @@ describe('productive route acceptance contract', () => {
     expect(real.find(row => row.pattern === 'user/home')?.readiness).toContain('Indicadores');
     expect(real.find(row => row.pattern === 'user/promos')?.readiness).toContain('REAL-SKU / 7');
     expect(real.find(row => row.pattern === 'user/mercadolibre')?.readiness).toBe('#ml-disabled-title');
+    expect(real.find(row => row.pattern === 'user/notifications')?.actor).toBe(RouteActor.Operator);
+    expect(real.find(row => row.pattern === 'user/notifications/:alertId')?.url).toContain(receiptWire().notification.id);
+    expect(real.find(row => row.pattern === 'user/notifications')?.readiness).toContain(receiptWire().notification.sourceId);
   });
   it('copies and freezes receipt data at the boundary', () => {
     const wire = receiptWire(), receipt = RealRouteReceipt.fromWire(wire);
@@ -89,6 +93,7 @@ describe('productive route acceptance contract', () => {
       { ...receiptWire(), pendingOrderId: null }, { ...receiptWire(), products: [] },
       { ...receiptWire(), addressRevision: 'future' }, { ...receiptWire(), customerId: 0 },
       { ...receiptWire(), homeTitle: '' }, { ...receiptWire(), addressId: '../1' },
+      { ...receiptWire(), notification: { id: '00000000-0000-0000-0000-000000000000', sourceId: 'missing' } },
       { ...receiptWire(), cart: { revision: '', skus: ['REAL-SKU / 7'] } },
       { ...receiptWire(), cart: { revision: 'revision', skus: ['foreign'] } },
       { ...receiptWire(), products: [{ ...receiptWire().products[0], sku: 'ROUTE-SKU-1' }],
@@ -99,5 +104,6 @@ describe('productive route acceptance contract', () => {
     for (const raw of invalid) expect(() => RealRouteReceipt.fromWire(raw)).toThrow();
     expect(() => bindProductiveRealRoutes(RealRouteReceipt.fromWire({ ...receiptWire(), scenarios: receiptWire().scenarios.slice(0, 1) }))).toThrow(/scenario/);
     expect(() => bindProductiveRealRoutes({} as RealRouteReceipt)).toThrow();
+    expect(() => bindProductiveRealRoutes(RealRouteReceipt.fromWire({ ...receiptWire(), notification: undefined }))).toThrow(/notification/);
   });
 });

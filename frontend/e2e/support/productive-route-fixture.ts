@@ -34,6 +34,20 @@ const customer = {
   state: 'ACTIVE', createdAt: '2026-11-01T10:00:00Z', orderCount: 1, lastOrderAt: '2026-11-14T10:00:00Z',
 };
 
+const notification = {
+  notification: {
+    id: '00000000-0000-4000-8000-000000000001', sourceType: 'STORECORE_FACT', sourceId: 'ROUTE-STOCK-1',
+    fingerprint: '1'.padStart(64, '0'), category: 'STOCK', severity: 'WARNING', lifecycle: 'OPEN', revision: '0',
+  },
+  createdAt: '2026-11-14T10:00:00Z', availableOperations: ['ACKNOWLEDGE', 'RESOLVE'],
+};
+
+const notificationPreference = {
+  preference: { state: 'DISABLED', revision: '0', categories: [], severities: [], boundEmailVersion: null },
+  verified: true,
+  readiness: 'UNCONFIGURED',
+};
+
 const home = {
   revision: 1,
   sections: [{ key: 'route-home', kind: 'HERO', active: true, sortOrder: 0, content: { title: 'Portada de ruta', body: 'Experiencia demostrable y determinista.' }, updatedAt: null }],
@@ -71,8 +85,8 @@ export async function installProductiveRouteFixture(page: Page, actor: RouteActo
     if (path.endsWith('/customer/me') && get) return actor === RouteActor.Customer
       ? route.fulfill({ json: envelope({ id: 'route-customer-1', email: 'route.customer@example.test', firstName: 'Cliente', lastName: 'Ruta', phone: '' }) })
       : route.fulfill({ status: 401, json: { code: 401 } });
-    if (path.endsWith('/internal/me') && get) return actor === RouteActor.Admin
-      ? route.fulfill({ json: envelope({ id: 'route-admin-1', roles: ['ADMIN'] }) })
+    if (path.endsWith('/internal/me') && get) return actor === RouteActor.Admin || actor === RouteActor.Operator
+      ? route.fulfill({ json: envelope({ id: actor === RouteActor.Admin ? 42 : 43, roles: [actor === RouteActor.Admin ? 'ADMIN' : 'OPERATOR'] }) })
       : route.fulfill({ status: 401, json: { code: 401 } });
     if (path.endsWith('/auth/csrf') && get) return route.fulfill({ json: envelope({}), headers: { 'X-CSRF-Token': 'route-fixture-csrf' } });
     if (path.endsWith('/health') && get) return route.fulfill({ json: envelope({ status: 'UP' }) });
@@ -124,6 +138,9 @@ export async function installProductiveRouteFixture(page: Page, actor: RouteActo
     if (path === '/api/v1/user/mercadolibre/account' && get) return route.fulfill({ json: envelope({ accountRef: 'ROUTE-ML-ACCOUNT', status: 'ACTIVE', availability: 'KNOWN', reason: null, updatedAt: '2026-11-14T10:00:00Z' }) });
     if (path === '/api/v1/user/mercadolibre/listings' && get) return route.fulfill({ json: envelope({ items: [{ listingId: 'ROUTE-ML-1', variationId: '', sku: 'ROUTE-SKU-1', accountRef: 'ROUTE-ML-ACCOUNT', status: 'ACTIVE', desiredQuantity: 8, desiredPrice: 112500, observedQuantity: { state: 'KNOWN', value: 8, freshness: 'UNVERIFIED', reason: null }, observedPrice: { state: 'KNOWN', value: 112500, freshness: 'UNVERIFIED', reason: null }, manualInterventionRequired: false, updatedAt: '2026-11-14T10:00:00Z' }], total: 1, page: 0, size: 25, truncated: false }) });
     if (path === '/api/v1/user/capabilities' && get) return route.fulfill({ json: envelope([{ module: 'CATALOG', state: 'ACTIVE', configVersion: 1 }, { module: 'MANUAL_FULFILLMENT', state: 'ACTIVE', configVersion: 1 }]) });
+    if (path === '/api/v1/user/notifications' && get) return route.fulfill({ json: envelope({ items: [notification], total: 1, page: 0, size: 25, hasMore: false }) });
+    if (path === '/api/v1/user/notifications/email-preferences' && get) return route.fulfill({ json: envelope(notificationPreference) });
+    if (path === '/api/v1/user/notifications/00000000-0000-4000-8000-000000000001' && get) return route.fulfill({ json: envelope(notification) });
 
     if (!get) evidence.writes.push(`${method} ${path}`);
     evidence.unhandled.push(`${method} ${path}${url.search}`);

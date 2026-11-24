@@ -16,13 +16,17 @@
     "SC-SURF-22": "inventory_balances", "SC-SURF-23": "channel_accounts+channel_listings",
     "SC-SURF-24": "module_configurations+capability_kill_switches", "SC-SURF-25": "universal_profile_imports",
     "SC-SURF-26": "customers+orders+identity_sessions+audit_events",
-    "SC-SURF-27": "installation_settings+audit_events"
+    "SC-SURF-27": "installation_settings+audit_events",
+    "SC-SURF-28": "notification_alerts+notification_email_preferences+notification_email_preference_receipts",
+    "SC-SURF-29": "notification_alerts+notification_command_receipts+notification_lifecycle_audit"
   },
   "targets": {
     "SC-SURF-03": { "ownerTask": "EXTERNAL", "operations": ["real email provider and delivery homologation", "verified email policy"], "fields": ["delivery result"] },
     "SC-SURF-23": { "ownerTask": "EXTERNAL", "operations": ["live observation", "provider synchronization"], "fields": ["verified freshness", "provider result"] }
   },
   "surfaces": [
+    { "id": "SC-SURF-28", "name": "Notification center", "route": "/user/notifications", "state": "REAL", "read": ["GET /api/v1/user/notifications", "GET /api/v1/user/notifications/email-preferences"], "writes": ["POST /api/v1/user/notifications/email-preferences/commands"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
+    { "id": "SC-SURF-29", "name": "Notification detail", "route": "/user/notifications/:alertId", "state": "REAL", "read": ["GET /api/v1/user/notifications/{alertId}", "GET /api/v1/user/notifications/{alertId}/commands/{commandId}"], "writes": ["POST /api/v1/user/notifications/{alertId}/commands"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-27", "name": "Merchant appearance", "route": "/user/settings", "state": "REAL", "read": ["GET /api/v1/user/settings/branding", "GET /api/v1/storefront/branding"], "writes": ["PUT /api/v1/user/settings/branding"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-01", "name": "Home", "route": "/", "state": "REAL", "read": ["GET /api/v1/content/home"], "writes": [], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-02", "name": "Unified login", "route": "/login", "state": "REAL", "read": ["GET /api/v1/customer/me", "GET /api/v1/internal/me"], "writes": ["POST /api/v1/auth/login", "POST /api/v1/auth/context-selection"], "loaderStage": "CUSTOMER_IDENTITY", "coverage": "COMPLETE" },

@@ -13,7 +13,8 @@ describe('closed access domain', () => {
     for (const value of [AccessContext.Customer, AccessContext.User]) expect(AccessContext.fromWire(value.wire)).toBe(value);
     for (const value of [AccessHome.Storefront, AccessHome.Operations]) expect(AccessHome.fromWire(value.wire)).toBe(value);
     for (const value of [ReturnDestination.Home, ReturnDestination.Catalog, ReturnDestination.Cart, ReturnDestination.Checkout,
-      ReturnDestination.CustomerProfile, ReturnDestination.CustomerOrders, ReturnDestination.UserOrders]) expect(ReturnDestination.fromWire(value.wire)).toBe(value);
+      ReturnDestination.CustomerProfile, ReturnDestination.CustomerOrders, ReturnDestination.UserOrders,
+      ReturnDestination.UserNotifications]) expect(ReturnDestination.fromWire(value.wire)).toBe(value);
     for (const value of [LoginStage.CollectCredentials, LoginStage.Authenticate, LoginStage.SelectContext, LoginStage.CompleteAccess]) expect(LoginStage.fromWire(value.wire)).toBe(value);
     for (const value of [LoginResolution.Authenticated, LoginResolution.ContextSelectionRequired, LoginResolution.Rejected, LoginResolution.Unavailable]) expect(LoginResolution.fromWire(value.wire)).toBe(value);
   });
@@ -21,6 +22,8 @@ describe('closed access domain', () => {
     expect(ReturnDestination.CustomerOrders.routeFor(AccessContext.Customer)).toBe('/customer/orders');
     expect(ReturnDestination.CustomerOrders.routeFor(AccessContext.User)).toBeNull();
     expect(ReturnDestination.UserOrders.routeFor(AccessContext.Customer)).toBeNull();
+    expect(ReturnDestination.UserNotifications.routeFor(AccessContext.User)).toBe('/user/notifications');
+    expect(ReturnDestination.UserNotifications.routeFor(AccessContext.Customer)).toBeNull();
     expect(ReturnDestination.Cart.routeFor(AccessContext.Customer)).toBe('/cart');
     expect(ReturnDestination.Checkout.routeFor(AccessContext.Customer)).toBe('/checkout');
     expect(ReturnDestination.Checkout.routeFor(AccessContext.User)).toBeNull();
@@ -32,6 +35,7 @@ describe('closed access domain', () => {
     expect(ReturnDestination.fromPath('/catalog')).toBe(ReturnDestination.Catalog);
     expect(ReturnDestination.fromPath('/cart')).toBe(ReturnDestination.Cart);
     expect(ReturnDestination.fromPath('/checkout')).toBe(ReturnDestination.Checkout);
+    expect(ReturnDestination.fromPath('/user/notifications')).toBe(ReturnDestination.UserNotifications);
     for (const path of ['https://evil.test', '//evil.test', '/customer/orders?context=USER', '/catalog#x', '/%63atalog', '/checkout?pay=true', '/customer/addresses', '/user/orders/1', '\\catalog', '/catalog?x=1', 'x'.repeat(2049)]) expect(ReturnDestination.fromPath(path)).toBe(ReturnDestination.Unknown);
   });
   it('rejects unknown context, mismatched home and cross-realm destinations', () => {

@@ -55,6 +55,8 @@ export const productiveRouteDefinitions: readonly ProductiveRouteDefinition[] = 
   definition('user/mercadolibre', SurfaceIdentity.MercadoLibre, RouteActor.Admin, RouteScenario.Populated),
   definition('user/capabilities', SurfaceIdentity.Capabilities, RouteActor.Admin, RouteScenario.Populated),
   definition('user/profile-import', SurfaceIdentity.Configuration, RouteActor.Admin, RouteScenario.Populated),
+  definition('user/notifications', SurfaceIdentity.Notifications, RouteActor.Operator, RouteScenario.Populated),
+  definition('user/notifications/:alertId', SurfaceIdentity.NotificationDetail, RouteActor.Operator, RouteScenario.Populated),
 ]);
 
 function canonical(pattern: string): ProductiveRouteDefinition {
@@ -97,6 +99,8 @@ export const productiveHttpRouteBindings: readonly ProductiveRouteAcceptance[] =
   httpBinding('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', 'text=ROUTE-ML-1'),
   httpBinding('user/capabilities', '/user/capabilities', 'Módulos del comercio', 'text=Preparación y entregas'),
   httpBinding('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
+  httpBinding('user/notifications', '/user/notifications', 'Centro de notificaciones', '#notifications-title'),
+  httpBinding('user/notifications/:alertId', '/user/notifications/00000000-0000-4000-8000-000000000001', 'Detalle de notificación', '#notification-detail-title'),
 ]);
 
 // Existing HTTP consumers retain their source; evidence never changes globally.
@@ -114,6 +118,7 @@ export const productiveWildcardManifest = ['**', 'customer/**', 'user/**'] as co
 /** Each real binding is resolved from a validated receipt, never the HTTP fixture. */
 export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly ProductiveRouteAcceptance[] {
   if (!(receipt instanceof RealRouteReceipt) || receipt.pendingOrderId === null) throw new Error('Real matrix requires a validated pending order');
+  if (!receipt.notification) throw new Error('Real matrix requires a persisted notification receipt');
   const product = receipt.products[0];
   const cartProduct = receipt.products.find(item => item.sku === receipt.cart.skus[0]);
   if (!cartProduct) throw new Error('Real matrix requires a receipt cart product');
@@ -156,5 +161,7 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', '#ml-disabled-title'),
     real('user/capabilities', '/user/capabilities', 'Módulos del comercio', 'text=Preparación y entregas'),
     real('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
+    real('user/notifications', '/user/notifications', 'Centro de notificaciones', textSelector(receipt.notification.sourceId)),
+    real('user/notifications/:alertId', `/user/notifications/${receipt.notification.id.wire}`, 'Detalle de notificación', textSelector(receipt.notification.sourceId)),
   ]);
 }

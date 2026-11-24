@@ -8,6 +8,7 @@ import { UserRole } from '../src/app/domain/user/user-role';
 const passwordByActor = new Map<RouteActor, string>([
   [RouteActor.Customer, 'StoreCore-showcase-2026!'],
   [RouteActor.Admin, 'PSD-disposable-fixture-2026!'],
+  [RouteActor.Operator, 'PSD-disposable-fixture-2026!'],
 ]);
 
 export default async function routeAuthSetup(config: FullConfig): Promise<void> {
@@ -18,13 +19,13 @@ export default async function routeAuthSetup(config: FullConfig): Promise<void> 
   const baseURL = config.projects[0]?.use.baseURL;
   if (typeof baseURL !== 'string') throw new Error('Missing productive route base URL');
 
-  for (const actor of [RouteActor.Customer, RouteActor.Admin]) {
+  for (const actor of [RouteActor.Customer, RouteActor.Admin, RouteActor.Operator]) {
     const context = await request.newContext({ baseURL, ignoreHTTPSErrors: true,
       extraHTTPHeaders: { Origin: baseURL } });
     try {
       const realm = actor === RouteActor.Customer ? 'customer' : 'internal';
       const response = await context.post(`/api/v1/${realm}/auth/login`, { data: {
-        email: actor === RouteActor.Customer ? receipt.customerEmail : 'psd-route-admin@storecore.invalid',
+        email: actor === RouteActor.Customer ? receipt.customerEmail : actor === RouteActor.Operator ? 'psd-operator@storecore.invalid' : 'psd-route-admin@storecore.invalid',
         password: passwordByActor.get(actor),
       } });
       expect(response.status()).toBe(200);
