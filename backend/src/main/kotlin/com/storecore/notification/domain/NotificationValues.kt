@@ -82,7 +82,7 @@ private val asciiEdgeWhitespace = charArrayOf(' ', '\t', '\n', '\r', '\u000B', '
 private fun boundedUtf8(raw: String?, max: Int): String? = raw?.takeIf { value ->
     '\u0000' !in value && strictUtf8(value)?.size?.let { it in 1..max } == true
 }
-private fun lengthFramedSha256(fields: List<String>): String {
+internal fun lengthFramedSha256(fields: List<String>): String {
     val bytes = ByteArrayOutputStream().also { buffer -> DataOutputStream(buffer).use { out ->
         fields.forEach { value -> val utf8 = requireNotNull(strictUtf8(value)); out.writeInt(utf8.size); out.write(utf8) }
     } }.toByteArray()

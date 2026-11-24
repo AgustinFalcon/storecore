@@ -4,7 +4,7 @@
   "deliveryOrder": ["notifications", "calendar", "reporting", "loyalty"],
   "tasks": [
     {"id":"PCC-001","slice":"notifications","status":"completed","title":"Close domain vocabularies, transitions and source fingerprint rules"},
-    {"id":"PCC-002","slice":"notifications","status":"pending","title":"Add constrained PostgreSQL schema, repositories and command receipts"},
+    {"id":"PCC-002","slice":"notifications","status":"completed","title":"Add constrained PostgreSQL schema, repositories and command receipts"},
     {"id":"PCC-003","slice":"notifications","status":"pending","title":"Add USER API, permissions, CSRF, pagination and optional email outbox"},
     {"id":"PCC-004","slice":"notifications","status":"pending","title":"Build responsive notification center and synthetic demo states"},
     {"id":"PCC-005","slice":"notifications","status":"pending","title":"Validate local, browser, reviews, CI and merge before next slice"},
