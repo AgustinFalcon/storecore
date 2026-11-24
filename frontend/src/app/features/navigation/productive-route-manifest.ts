@@ -55,6 +55,8 @@ export const productiveRouteDefinitions: readonly ProductiveRouteDefinition[] = 
   definition('user/mercadolibre', SurfaceIdentity.MercadoLibre, RouteActor.Admin, RouteScenario.Populated),
   definition('user/capabilities', SurfaceIdentity.Capabilities, RouteActor.Admin, RouteScenario.Populated),
   definition('user/profile-import', SurfaceIdentity.Configuration, RouteActor.Admin, RouteScenario.Populated),
+  definition('user/notifications', SurfaceIdentity.Notifications, RouteActor.Operator, RouteScenario.Populated),
+  definition('user/notifications/:alertId', SurfaceIdentity.NotificationDetail, RouteActor.Operator, RouteScenario.Populated),
 ]);
 
 function canonical(pattern: string): ProductiveRouteDefinition {
@@ -97,6 +99,8 @@ export const productiveHttpRouteBindings: readonly ProductiveRouteAcceptance[] =
   httpBinding('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', 'text=ROUTE-ML-1'),
   httpBinding('user/capabilities', '/user/capabilities', 'Módulos del comercio', 'text=Preparación y entregas'),
   httpBinding('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
+  httpBinding('user/notifications', '/user/notifications', 'Centro de notificaciones', '#notifications-title'),
+  httpBinding('user/notifications/:alertId', '/user/notifications/00000000-0000-4000-8000-000000000001', 'Detalle de notificación', '#notification-detail-title'),
 ]);
 
 // Existing HTTP consumers retain their source; evidence never changes globally.
@@ -156,5 +160,7 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('user/mercadolibre', '/user/mercadolibre', 'Mercado Libre', '#ml-disabled-title'),
     real('user/capabilities', '/user/capabilities', 'Módulos del comercio', 'text=Preparación y entregas'),
     real('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
+    real('user/notifications', '/user/notifications', 'Centro de notificaciones', '#notifications-title'),
+    real('user/notifications/:alertId', '/user/notifications/00000000-0000-4000-8000-000000000001', 'Detalle de notificación', '#notification-detail-title'),
   ]);
 }

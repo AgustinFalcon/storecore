@@ -15,6 +15,27 @@ describe('authInterceptor', () => {
       providers: [provideHttpClient(withInterceptors([authInterceptor])), provideHttpClientTesting()],
     });
   });
+  it.each(['/api/v1/user/notifications/11111111-1111-1111-1111-111111111111/commands', '/api/v1/user/notifications/email-preferences/commands'])('accepts notification business 409 rotation on %s', async path => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old');
+    const ctrl = TestBed.inject(HttpTestingController);
+    const result = firstValueFrom(TestBed.inject(HttpClient).post(path, {})).catch(error => error);
+    ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'next' } });
+    await result; expect(session.csrf()).toBe('next'); ctrl.verify();
+  });
+  it.each(['/api/v1/user/notifications/unknown/commands', '/api/v1/user/notifications/email-preferences/commands/foreign', '/api/v1/user/notifications'])('does not trust a 409 token outside notification commands: %s', async path => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old'); const ctrl = TestBed.inject(HttpTestingController);
+    const result = firstValueFrom(TestBed.inject(HttpClient).post(path, {})).catch(error => error);
+    ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'foreign' } }); await result;
+    expect(session.csrf()).toBe('old'); ctrl.verify();
+  });
+  it('ignores notification 409 rotation after the USER mutation fence changes', async () => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old'); const ctrl = TestBed.inject(HttpTestingController);
+    const path = '/api/v1/user/notifications/email-preferences/commands';
+    const result = firstValueFrom(TestBed.inject(HttpClient).post(path, {})).catch(error => error);
+    TestBed.inject(AccessMutationFence).advance(AccessContext.User);
+    ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'stale' } }); await result;
+    expect(session.csrf()).toBe('old'); ctrl.verify();
+  });
   it.each([409, 422])('accepts committed inventory rejection CSRF rotation on %s', async status => {
     const session = TestBed.inject(UserSession); session.setCsrf('old'); const epoch = session.authenticationEpoch();
     const http = TestBed.inject(HttpClient); const ctrl = TestBed.inject(HttpTestingController);

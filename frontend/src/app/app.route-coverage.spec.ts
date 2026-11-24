@@ -26,9 +26,9 @@ function check(tree: readonly Route[] = routes, definitions = productiveRouteDef
 }
 
 describe('productive route acceptance contract', () => {
-  it('reconciles 30 leaves, four redirects and three wildcards with both evidence sources', () => {
+  it('reconciles 32 leaves, four redirects and three wildcards with both evidence sources', () => {
     const actual = censusProductiveRoutes(routes);
-    expect(actual.leaves).toHaveLength(30); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
+    expect(actual.leaves).toHaveLength(32); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
     check();
     expect(productiveRouteManifest).toBe(productiveHttpRouteBindings);
     expect(productiveRouteDefinitions.every(entry => !('url' in entry) && !('evidence' in entry))).toBe(true);
@@ -77,6 +77,8 @@ describe('productive route acceptance contract', () => {
     expect(real.find(row => row.pattern === 'user/home')?.readiness).toContain('Indicadores');
     expect(real.find(row => row.pattern === 'user/promos')?.readiness).toContain('REAL-SKU / 7');
     expect(real.find(row => row.pattern === 'user/mercadolibre')?.readiness).toBe('#ml-disabled-title');
+    expect(real.find(row => row.pattern === 'user/notifications')?.actor).toBe(RouteActor.Operator);
+    expect(real.find(row => row.pattern === 'user/notifications/:alertId')?.url).toContain('00000000-0000-4000-8000-000000000001');
   });
   it('copies and freezes receipt data at the boundary', () => {
     const wire = receiptWire(), receipt = RealRouteReceipt.fromWire(wire);

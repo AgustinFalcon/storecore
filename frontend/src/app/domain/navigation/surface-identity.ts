@@ -41,8 +41,10 @@ export class SurfaceIdentity {
   static readonly EmailVerification = new SurfaceIdentity('RD-VERIFY-EMAIL', 'verify-email', true, false, true);
   static readonly UserAccount = new SurfaceIdentity('RD-USER-ACCOUNT', 'user/account', true, false);
   static readonly Settings = new SurfaceIdentity('SC-SURF-27', 'user/settings', true, false);
+  static readonly Notifications = new SurfaceIdentity('SC-SURF-28', 'user/notifications', true, false);
+  static readonly NotificationDetail = new SurfaceIdentity('SC-SURF-29', 'user/notifications/:alertId', true, false);
   static readonly Unknown = new SurfaceIdentity('NOT-FOUND', '**', false);
-  static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers, this.EmailVerification, this.UserAccount, this.Settings];
+  static readonly all: readonly SurfaceIdentity[] = [this.Home, this.Login, this.Recovery, this.Catalog, this.Product, this.Registration, this.Profile, this.Addresses, this.Favorites, this.Cart, this.Checkout, this.Result, this.Orders, this.Order, this.Overview, this.Content, this.AdminCatalog, this.Offers, this.Campaigns, this.AdminOrders, this.AdminOrder, this.Inventory, this.MercadoLibre, this.Capabilities, this.Configuration, this.Customers, this.EmailVerification, this.UserAccount, this.Settings, this.Notifications, this.NotificationDetail];
   static fromWire(raw: unknown): SurfaceIdentity { return this.all.find(surface => surface.wire === raw) ?? this.Unknown; }
   availableOn(target: SurfaceTarget): boolean { return this !== SurfaceIdentity.Unknown && (target === SurfaceTarget.Demo && this.demo || target === SurfaceTarget.Real && this.real); }
   observableUrl(url: string): string { return this === SurfaceIdentity.Recovery || this.secretLink ? url.split(/[?#]/, 1)[0] : url; }

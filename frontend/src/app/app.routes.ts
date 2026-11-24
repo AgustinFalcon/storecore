@@ -140,6 +140,18 @@ export const routes: Routes = [
             canActivate: [userGuard],
           },
           {
+            path: 'notifications',
+            loadComponent: () => import('./features/notifications/notification-center.component').then((module) => module.NotificationCenterComponent),
+            title: 'Notificaciones',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'notifications/:alertId',
+            loadComponent: () => import('./features/notifications/notification-detail.component').then((module) => module.NotificationDetailComponent),
+            title: 'Detalle de notificación',
+            canActivate: [userGuard],
+          },
+          {
             path: 'profile-import',
             loadComponent: () => import('./features/admin/profile-import.component').then((module) => module.ProfileImportComponent),
             title: 'Perfil',
