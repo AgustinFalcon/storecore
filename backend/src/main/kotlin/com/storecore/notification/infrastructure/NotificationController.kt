@@ -104,7 +104,7 @@ class NotificationNoStoreFilter : OncePerRequestFilter() {
 }
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes=[NotificationController::class])
+@RestControllerAdvice(assignableTypes=[NotificationController::class,NotificationEmailPreferencesController::class])
 class NotificationExceptionAdvice {
     @ExceptionHandler(InvalidNotificationRequest::class) fun invalid()=error(400,"REQUEST_VALIDATION_FAILED")
     @ExceptionHandler(NotificationUnsupportedMedia::class) fun media()=error(415,"UNSUPPORTED_MEDIA_TYPE")

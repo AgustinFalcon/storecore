@@ -14,7 +14,8 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val transactions: TransactionTemplate,
-                                  mapper: ObjectMapper, private val clock: Clock = Clock.systemUTC()) : NotificationPersistencePort {
+                                  mapper: ObjectMapper, private val clock: Clock = Clock.systemUTC(),
+                                  private val emailProjection: NotificationEmailIntentProjection = NoNotificationEmailProjection) : NotificationPersistencePort {
     private val rowMapper = NotificationAlertRowMapper()
     private val snapshots = NotificationSnapshotCodec(mapper)
 
@@ -31,7 +32,7 @@ class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val tr
                 else NotificationIngestionResult.DeliveryConflict
         }
         val at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS))
-        jdbc.update("""INSERT INTO notification_alerts(id,source_type,source_id,fingerprint,category,severity,lifecycle,revision,created_at)
+        val inserted=jdbc.update("""INSERT INTO notification_alerts(id,source_type,source_id,fingerprint,category,severity,lifecycle,revision,created_at)
             VALUES (?,?,?,?,?,?,'OPEN',0,?) ON CONFLICT(source_type,source_id,fingerprint) DO NOTHING""",
             UUID.randomUUID(), event.source.type.wire, event.source.id.value, event.fingerprint.value, event.category.wire, event.severity.wire, at)
         val alert = jdbc.query("SELECT * FROM notification_alerts WHERE source_type=? AND source_id=? AND fingerprint=? FOR UPDATE",
@@ -40,6 +41,7 @@ class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val tr
         jdbc.update("""INSERT INTO notification_source_events(delivery_id,alert_id,source_type,source_id,fingerprint,category,severity,condition_code,episode_key,event_hash,recorded_at)
             VALUES (?,?,?,?,?,?,?,?,?,?,?)""", event.deliveryId.value, alert.id.value, event.source.type.wire, event.source.id.value,
             event.fingerprint.value, event.category.wire, event.severity.wire, event.condition.value, event.episode.value, event.canonicalHash().value, at)
+        if(inserted==1) emailProjection.firstAlert(alert)
         NotificationIngestionResult.Recorded(alert)
     }!!
 
@@ -54,6 +56,10 @@ class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val tr
         if (!authorized(actor)) return@execute NotificationExecutionResult.Unauthorized
         val command = requireNotNull(NotificationCommand.ChangeLifecycle.create(request.commandId,request.alertId,actorId,request.expectedRevision,
             request.step, request.reason, clock.instant().truncatedTo(ChronoUnit.MICROS)))
+        val global=jdbc.queryForList("SELECT * FROM notification_command_bindings WHERE command_id=?",request.commandId.value).singleOrNull()
+        if(global!=null && (NotificationCommandFamily.fromWire(global["family"] as? String)!=NotificationCommandFamily.LIFECYCLE ||
+            (global["actor_id"] as Number).toLong()!=actor.userId || global["aggregate_ref"]!=request.alertId.value.toString() ||
+            global["operation"]!=request.step.wire || global["payload_hash"]!=command.payloadHash().value)) return@execute NotificationExecutionResult.IdempotencyConflict
         val stored = jdbc.queryForList("SELECT * FROM notification_command_receipts WHERE command_id=?", request.commandId.value).singleOrNull()
         if (stored != null) {
             if ((stored["actor_id"] as Number).toLong()!=actor.userId || stored["alert_id"]!=request.alertId.value || stored["operation"]!=request.step.wire ||

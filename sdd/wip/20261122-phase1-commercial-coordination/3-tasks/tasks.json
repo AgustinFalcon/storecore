@@ -6,7 +6,7 @@
     {"id":"PCC-001","slice":"notifications","status":"completed","title":"Close domain vocabularies, transitions and source fingerprint rules"},
     {"id":"PCC-002","slice":"notifications","status":"completed","title":"Add constrained PostgreSQL schema, repositories and command receipts"},
     {"id":"PCC-003A","slice":"notifications","status":"completed","title":"Add USER API, permissions, CSRF, pagination and receipt recovery"},
-    {"id":"PCC-003B","slice":"notifications","status":"pending","title":"Approve consent policy and add the optional notification email outbox without activating SMTP"},
+    {"id":"PCC-003B","slice":"notifications","status":"completed","title":"Approve consent policy and add the optional notification email outbox without activating SMTP"},
     {"id":"PCC-004","slice":"notifications","status":"pending","title":"Build responsive notification center and synthetic demo states"},
     {"id":"PCC-005","slice":"notifications","status":"pending","title":"Validate local, browser, reviews, CI and merge before next slice"},
     {"id":"PCC-006","slice":"calendar","status":"pending","title":"Close reminder-only calendar lifecycle, transition graph, timezone and preflight"},
