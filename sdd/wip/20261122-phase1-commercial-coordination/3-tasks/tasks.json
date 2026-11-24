@@ -1,0 +1,26 @@
+{
+  "feature": "phase1-commercial-coordination",
+  "status": "approved_for_bounded_implementation",
+  "deliveryOrder": ["notifications", "calendar", "reporting", "loyalty"],
+  "tasks": [
+    {"id":"PCC-001","slice":"notifications","status":"pending","title":"Close domain vocabularies, transitions and source fingerprint rules"},
+    {"id":"PCC-002","slice":"notifications","status":"pending","title":"Add constrained PostgreSQL schema, repositories and command receipts"},
+    {"id":"PCC-003","slice":"notifications","status":"pending","title":"Add USER API, permissions, CSRF, pagination and optional email outbox"},
+    {"id":"PCC-004","slice":"notifications","status":"pending","title":"Build responsive notification center and synthetic demo states"},
+    {"id":"PCC-005","slice":"notifications","status":"pending","title":"Validate local, browser, reviews, CI and merge before next slice"},
+    {"id":"PCC-006","slice":"calendar","status":"pending","title":"Close reminder-only calendar lifecycle, transition graph, timezone and preflight"},
+    {"id":"PCC-007","slice":"calendar","status":"pending","title":"Add revisioned calendar persistence, application service and audit"},
+    {"id":"PCC-008","slice":"calendar","status":"pending","title":"Build month/list UI, filters, reminders and kill-switch workflow"},
+    {"id":"PCC-009","slice":"calendar","status":"pending","title":"Validate local, browser, reviews, CI and merge before next slice"},
+    {"id":"PCC-010","slice":"reporting","status":"pending","title":"Define exact period, source, freshness and NOT_AVAILABLE contracts"},
+    {"id":"PCC-011","slice":"reporting","status":"pending","title":"Implement authoritative StoreCore aggregates and BlackStore stock-status projection only"},
+    {"id":"PCC-012","slice":"reporting","status":"pending","title":"Build consolidated dashboard, drilldowns and safe CSV export"},
+    {"id":"PCC-013","slice":"reporting","status":"pending","title":"Validate unavailable/stale/partial data, reviews, CI and merge"},
+    {"id":"PCC-013A","slice":"reporting-future","status":"deferred","title":"Design and review a separate BlackStore commercial-facts read contract before monetary channel mix"},
+    {"id":"PCC-014","slice":"loyalty","status":"pending","title":"Close Policy V1 POINT ledger, earning lots, recovery, reservation and reconciliation semantics"},
+    {"id":"PCC-015","slice":"loyalty","status":"pending","title":"Implement append-only ledger, checked balance and idempotent order saga"},
+    {"id":"PCC-016","slice":"loyalty","status":"pending","title":"Build customer wallet and audited admin adjustment/reconciliation UI"},
+    {"id":"PCC-017","slice":"loyalty","status":"pending","title":"Validate cumulative partial returns, late payment approval, expiry, concurrency, reviews, CI and merge"},
+    {"id":"PCC-018","slice":"closeout","status":"pending","title":"Reconcile backlog and traceability without claiming external activation"}
+  ]
+}
