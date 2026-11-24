@@ -35,6 +35,24 @@ internal class NotificationHttpTranslator(mapper: ObjectMapper) {
             NotificationRevision.fromWire(revision.toLongOrNull()) ?: throw InvalidNotificationRequest(),step,
             NotificationReason.fromWire(node.path("reason").textValue()) ?: throw InvalidNotificationRequest())
     }
+    fun emailPreference(key: String?,raw: ByteArray): NotificationEmailPreferenceCommand {
+        if(raw.size>8192) throw InvalidNotificationRequest()
+        val text=raw.toString(Charsets.UTF_8)
+        if(!text.toByteArray(Charsets.UTF_8).contentEquals(raw)) throw InvalidNotificationRequest()
+        val node=runCatching { json.readTree(text) }.getOrNull() ?: throw InvalidNotificationRequest()
+        if(!node.isObject || !node.path("operation").isTextual || !node.path("expectedRevision").isTextual) throw InvalidNotificationRequest()
+        val operation=NotificationEmailOperation.fromWire(node["operation"].textValue())
+        val fields=if(operation==NotificationEmailOperation.ENABLE) setOf("operation","expectedRevision","categories","severities") else setOf("operation","expectedRevision")
+        if(operation==NotificationEmailOperation.UNKNOWN || node.fieldNames().asSequence().toSet()!=fields) throw InvalidNotificationRequest()
+        val revision=node["expectedRevision"].textValue()
+        if(!unsigned.matches(revision)) throw InvalidNotificationRequest()
+        val filters=if(operation==NotificationEmailOperation.ENABLE) {
+            if(!node["categories"].isArray || !node["severities"].isArray || node["categories"].any { !it.isTextual } || node["severities"].any { !it.isTextual }) throw InvalidNotificationRequest()
+            NotificationEmailFilters.create(node["categories"].map { NotificationCategory.fromWire(it.textValue()) },node["severities"].map { NotificationSeverity.fromWire(it.textValue()) }) ?: throw InvalidNotificationRequest()
+        } else null
+        return NotificationEmailPreferenceCommand.create(commandId(key),operation,
+            NotificationRevision.fromWire(revision.toLongOrNull()) ?: throw InvalidNotificationRequest(),filters) ?: throw InvalidNotificationRequest()
+    }
     fun query(params: MultiValueMap<String,String>): NotificationInboxQuery {
         if(params.keys.any { it !in setOf("page","size","severity","category","lifecycle","source") } || params.values.any { it.size!=1 }) throw InvalidNotificationRequest()
         fun integer(key: String,default: Int): Int {
