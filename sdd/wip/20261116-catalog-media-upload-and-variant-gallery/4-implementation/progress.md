@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-24 — persist reviews PR #360, 003B-4C sigue abierto
+
+- Merge #360 `b658cf97c657efd131744befad51b824ea8da68a` sobre candidato
+  `873cffc8d71d7860b770f0802bec0e51b1cc93a2`. Verify exact-head
+  `45472580402` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261124-sol-pr360-architecture.md`
+  y `sdd/reviews/20261124-sol-pr360-security.md`.
+- El harness escribe `memory.oom.group=1`, congela el `MainPID` y
+  atesta oom-kill. No se marca `003B-4C`. No hay terminación del
+  cgroup, `Ready` ni HTTP.
+
 ## 2026-11-24 — rebase 4C OOM sobre master 493a582
 
 - Rebase de #360 sobre `origin/master` (`493a582`, PRs #361/#362).

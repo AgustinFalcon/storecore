@@ -1,15 +1,25 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-22, 4C OOM del cgroup worker
+## En implementación — 2026-11-24, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. Deriva `KillMode=control-group`.
-`MemoryOOMGroup` y `OOMPolicy` quedan fuera: PID 1 responde
-`PropertyReadOnly` en `StartTransientUnit`. El harness escribe
-`memory.oom.group=1` en el cgroup v2, congela el `MainPID`, inyecta un
-allocador y atesta que el grupo muere al vencer `MemoryMax`. Sigue sin
-`CPUQuota` ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP.
+Siguiente corte: terminación del cgroup. Este documento
+no cierra `003B-4C`. Sigue sin `CPUQuota`, terminación del
+cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+
+## Master vigente — 2026-11-24, 4C OOM del cgroup worker
+
+`master b658cf97c657efd131744befad51b824ea8da68a` integra PR #360. Su
+candidato exacto `873cffc8d71d7860b770f0802bec0e51b1cc93a2` pasó Verify
+`45472580402` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261124-sol-pr360-architecture.md` y
+`sdd/reviews/20261124-sol-pr360-security.md`. El harness deriva
+`KillMode=control-group`, escribe `memory.oom.group=1` en el cgroup v2,
+congela el `MainPID` y atesta oom-kill. `MemoryOOMGroup` y `OOMPolicy`
+quedan fuera (`PropertyReadOnly`). El corte no cierra `003B-4C`: no hay
+terminación del cgroup ni `Ready`. `CPUQuota` sigue fuera. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP.
 
 ## Master vigente — 2026-11-24, coordinación comercial fase 1 PR #362
 
