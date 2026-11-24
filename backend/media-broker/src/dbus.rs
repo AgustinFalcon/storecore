@@ -75,7 +75,10 @@ impl ZbusSystemd {
                 "StartTransientUnit",
                 &(name, START_MODE, properties, auxiliary),
             )
-            .map_err(|_| SystemdError::Unavailable)?;
+            .map_err(|error| {
+                eprintln!("StartTransientUnit {name}: {error}");
+                SystemdError::Unavailable
+            })?;
         validate_job_path(&job)
     }
 
@@ -269,6 +272,7 @@ pub(crate) fn worker_properties(
         ("TasksMax", Value::from(WORKER_TASKS_MAX)),
         ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
+        ("KillMode", Value::from("control-group".to_owned())),
     ])
 }
 
@@ -339,6 +343,9 @@ mod tests {
         0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c,
         0x2d, 0x2e, 0x2f, 0x30,
     ];
+
+    /// Bytes a harness allocator writes inside the worker cgroup to exceed `MemoryMax`.
+    const WORKER_OOM_PROBE_BYTES: usize = 256 * 1024 * 1024;
 
     static NEXT: AtomicU64 = AtomicU64::new(1);
 
@@ -467,6 +474,34 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains(&WORKER_TIMEOUT_STOP_USEC.to_string())),
             "TimeoutStopUSec must be the internal 1s grace, got {timeout_stop:?}"
+        );
+    }
+
+    #[test]
+    fn derived_worker_oom_kills_the_cgroup() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"KillMode"));
+        assert!(!keys.contains(&"MemoryOOMGroup"));
+        assert!(!keys.contains(&"OOMPolicy"));
+        let kill_mode = worker
+            .iter()
+            .find(|(key, _)| *key == "KillMode")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            kill_mode
+                .as_deref()
+                .is_some_and(|value| value.contains("control-group")),
+            "KillMode must be control-group, got {kill_mode:?}"
         );
     }
 
@@ -999,6 +1034,74 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_memory_max_oom_kills_cgroup() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0xaa; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived KillMode");
+        }
+        freeze_worker_main_pid(name);
+        let kill_mode = systemctl_property(name, "KillMode");
+        assert_eq!(
+            kill_mode, "control-group",
+            "PID 1 must apply derived KillMode, got {kill_mode}"
+        );
+        oom_worker_cgroup(name);
+        wait_oom_kill_journal(
+            name,
+            Duration::from_secs(20),
+            &spec,
+            started_worker,
+            &where_path,
+        );
+        assert!(
+            !where_path.join("result.bin").exists(),
+            "oom-killed worker must not finish SELF_TEST"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -1095,6 +1198,62 @@ mod tests {
             .status()
             .unwrap_or_else(|error| panic!("kill -STOP {pid}: {error}"));
         assert!(stopped.success(), "kill -STOP {pid} failed with {stopped}");
+    }
+
+    fn oom_worker_cgroup(name: &str) {
+        let relative = systemctl_property(name, "ControlGroup");
+        assert!(
+            !relative.is_empty(),
+            "OOM attest needs ControlGroup for {name}"
+        );
+        let dir = Path::new("/sys/fs/cgroup").join(relative.trim_start_matches('/'));
+        let oom_group = dir.join("memory.oom.group");
+        fs::write(&oom_group, "1")
+            .unwrap_or_else(|error| panic!("write {}: {error}", oom_group.display()));
+        let enabled = fs::read_to_string(&oom_group).unwrap_or_default();
+        assert_eq!(
+            enabled.trim(),
+            "1",
+            "memory.oom.group must be 1 at {}",
+            oom_group.display()
+        );
+        let procs = dir.join("cgroup.procs");
+        let script = format!(
+            "import os, signal, time\nos.kill(os.getpid(), signal.SIGSTOP)\nb=bytearray({WORKER_OOM_PROBE_BYTES})\nfor i in range(0, len(b), 4096):\n    b[i]=1\ntime.sleep(30)"
+        );
+        let hog = Command::new("python3")
+            .args(["-c", &script])
+            .spawn()
+            .unwrap_or_else(|error| panic!("python3 hog: {error}"));
+        let pid = hog.id();
+        wait_proc_stopped(pid);
+        fs::write(&procs, pid.to_string())
+            .unwrap_or_else(|error| panic!("move hog {pid} into {}: {error}", procs.display()));
+        let continued = Command::new("kill")
+            .args(["-CONT", &pid.to_string()])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -CONT {pid}: {error}"));
+        assert!(
+            continued.success(),
+            "kill -CONT {pid} failed with {continued}"
+        );
+        std::mem::forget(hog);
+    }
+
+    fn wait_proc_stopped(pid: u32) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let path = format!("/proc/{pid}/status");
+        loop {
+            let status = fs::read_to_string(&path).unwrap_or_default();
+            if status.lines().any(|line| line.starts_with("State:\tT")) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "hog {pid} did not SIGSTOP, status={status}"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
     }
 
     fn write_self_test_request(where_path: &Path, backend_uid: u32, worker_gid: u32) {
@@ -1418,6 +1577,36 @@ mod tests {
             assert!(
                 Instant::now() < deadline,
                 "RuntimeMax timeout for {name} want Result=timeout, got Result={result}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    fn wait_oom_kill_journal(
+        name: &str,
+        timeout: Duration,
+        spec: &TransientUnits,
+        started: Result<UnitState, SystemdError>,
+        where_path: &Path,
+    ) {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let result = systemctl_property(name, "Result");
+            let journal = worker_journal(name);
+            if journal.contains("oom-kill")
+                || journal.contains("result 'oom-kill'")
+                || journal.contains("Failed with result 'oom-kill'")
+                || journal.contains("Memory cgroup out of memory")
+                || result == "oom-kill"
+            {
+                return;
+            }
+            if Instant::now() >= deadline {
+                dump_worker_unit(spec, started, where_path);
+            }
+            assert!(
+                Instant::now() < deadline,
+                "OOM kill for {name} want Result=oom-kill, got Result={result}"
             );
             thread::sleep(Duration::from_millis(50));
         }

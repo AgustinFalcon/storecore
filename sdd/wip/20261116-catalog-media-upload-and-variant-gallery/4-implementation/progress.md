@@ -1,12 +1,26 @@
 # Progreso
 
+## 2026-11-24 — rebase 4C OOM sobre master 493a582
+
+- Rebase de #360 sobre `origin/master` (`493a582`, PRs #361/#362).
+  No se marca `003B-4C`. No hay `Ready` ni HTTP.
+
+## 2026-11-22 — arranque 4C OOM del cgroup worker
+
+- El harness PID 1 deriva `KillMode=control-group`. `MemoryOOMGroup` y
+  `OOMPolicy` quedan fuera (`PropertyReadOnly`). Escribe
+  `memory.oom.group=1` en el cgroup v2, congela el `MainPID`, inyecta un
+  allocador y atesta oom-kill. `CPUQuota` sigue fuera.
+- No se marca `003B-4C`. No hay `Ready` ni HTTP.
+
 ## 2026-11-22 — persist reviews PR #358, 003B-4C sigue abierto
 
 - Merge #358 `7694e77812318ab23e5fadeb13475f793c3e8e80` sobre candidato
   `cda8f48d34482af7becb25910520186d90091411`. Verify exact-head
   `45000735868` terminó 7/7. Dos reviews independientes Grok 4.7
   aprobaron sin P0–P3: `sdd/reviews/20261122-sol-pr358-architecture.md`
-  y `sdd/reviews/20261122-sol-pr358-security.md`.
+  y `sdd/reviews/20261122-sol-pr358-security.md`. Persist #359
+  `5e9bd629cdaed278c3a1cd5745f72f12497342ad`.
 - El harness congela el `MainPID` y atesta `RuntimeMax`. No se marca
   `003B-4C`. No hay OOM, terminación del cgroup, `Ready` ni HTTP.
 
