@@ -11,6 +11,22 @@ allocador y atesta que el grupo muere al vencer `MemoryMax`. Sigue sin
 `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
 corte no agrega HTTP.
 
+## Master vigente — 2026-11-24, coordinación comercial fase 1 PR #362
+
+`master 493a582f5caad9b8564d680dc8cf5c6f3d0d23dd` integra PR #362. Aprueba
+specs de coordinación comercial fase 1 y congela contratos de
+notificación. No cierra `003B-4C`. Sigue sin `CPUQuota`, OOM,
+terminación del cgroup ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`,
+TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
+## Master vigente — 2026-11-22, presentación showcase PR #361
+
+`master 862e5248841025254f4d8a51db543c39cb1aef12` integra PR #361. Completa
+la presentación StoreCore poblada. No cierra `003B-4C`. Sigue sin
+`CPUQuota`, OOM, terminación del cgroup ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
+
 ## Master vigente — 2026-11-22, persist reviews PR #358
 
 `master 5e9bd629cdaed278c3a1cd5745f72f12497342ad` integra PR #359. Persiste

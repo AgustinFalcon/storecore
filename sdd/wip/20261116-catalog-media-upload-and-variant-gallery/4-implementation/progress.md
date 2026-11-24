@@ -1,5 +1,10 @@
 # Progreso
 
+## 2026-11-24 — rebase 4C OOM sobre master 493a582
+
+- Rebase de #360 sobre `origin/master` (`493a582`, PRs #361/#362).
+  No se marca `003B-4C`. No hay `Ready` ni HTTP.
+
 ## 2026-11-22 — arranque 4C OOM del cgroup worker
 
 - El harness PID 1 deriva `KillMode=control-group`. `MemoryOOMGroup` y
