@@ -209,7 +209,7 @@ class CatalogOptionSchemaMigrationTest {
         val beforeVariants = variantDigest(sql, product)
         val beforeBalances = sql.queryForList("SELECT * FROM inventory_balances ORDER BY variant_id")
         val history = sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("33", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("34", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, sql.queryForList("SELECT installed_rank,version,script,checksum FROM flyway_schema_history WHERE version::int<=23 ORDER BY installed_rank"))
         val afterProduct = sql.queryForMap("SELECT * FROM products WHERE id=?", product)
         beforeProduct.forEach { (column, value) -> assertEquals(value, afterProduct[column], column) }
@@ -233,7 +233,7 @@ class CatalogOptionSchemaMigrationTest {
 
         val result = CatalogSchemaMigrationRunner.migrate(url, postgres.username, postgres.password)
 
-        assertEquals("33", result.targetSchemaVersion.toString())
+        assertEquals("34", result.targetSchemaVersion.toString())
         assertEquals(3, jdbc(url).queryForObject(
             "SELECT version FROM catalog_schema_compatibility_version WHERE singleton",
             Int::class.java,
