@@ -11,6 +11,7 @@ import { databaseEnvironment, query } from './ua-real-database.mjs';
 import { ShowcaseConfig, ShowcaseLoader, ShowcaseDiscountKind, ShowcaseAdapterMode,
   ShowcaseExternalCapability, ShowcaseCapabilityState } from './showcase/load-storecore-showcase.mjs';
 import { readShowcaseDataset } from './showcase/read-showcase-dataset.mjs';
+import { NotificationFixtureSeedStep } from './psd-notification-fixture.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const jar = resolve(frontend, '../backend/target/storecore-backend-0.1.0-SNAPSHOT.jar');
@@ -112,7 +113,7 @@ class PublishedAxeImpact extends PublicationValue {
 }
 const publishedActionIds = new Set(Object.values(evidenceWire.actionIds));
 const publishedSurfaces = new Set([
-  ...Array.from({ length: 27 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
+  ...Array.from({ length: 29 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
   'RD-VERIFY-EMAIL', 'RD-USER-ACCOUNT',
 ]);
 const publishedFailureFiles = new Set([
@@ -519,7 +520,8 @@ async function run() {
   assert.equal(query("SELECT count(*) FROM customer_addresses WHERE customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '3');
   assert.equal(query("SELECT count(*) FROM customer_favorites WHERE customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '12');
   assert.equal(query("SELECT count(*) FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '5');
-  writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify(firstResult.receipt, null, 2)}\n`);
+  const notification = await new NotificationFixtureSeedStep(query, first.context.admin).run();
+  writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify({ ...firstResult.receipt, notification }, null, 2)}\n`);
   const unrelated = await first.context.admin.request('/api/v1/user/offers', {
     method: 'POST', csrf: true, expected: [201], envelopeCode: 200,
     body: { name: 'PSD_OPERATOR_OWNED', priority: 7, startsAt: new Date().toISOString(),
@@ -583,7 +585,7 @@ async function run() {
   });
   await checkSafety();
   const evidence = publishEvidence(process.env.STORECORE_PSD_RAW_REPORT);
-  if (evidence.failures > 0 || evidence.routeAcceptances !== 90 || evidence.actionAcceptances !== 17) process.exitCode = 1;
+  if (evidence.failures > 0 || evidence.routeAcceptances !== 96 || evidence.actionAcceptances !== 17) process.exitCode = 1;
   writeFileSync(join(results, 'runtime-summary.json'), `${JSON.stringify({ sha: process.env.GITHUB_SHA ?? 'local',
     externalSafetyBefore: true, externalSafetyAfter: true, ...evidence, exitCode: process.exitCode })}\n`);
 }

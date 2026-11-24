@@ -26,8 +26,8 @@ let bindings: readonly ProductiveRouteAcceptance[];
 test.beforeAll(async ({ browser }) => {
   receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync(resolve('psd-real-results/fixture-receipt.json'), 'utf8')));
   bindings = bindProductiveRealRoutes(receipt);
-  expect(bindings).toHaveLength(30);
-  for (const actor of [RouteActor.Anonymous, RouteActor.Customer, RouteActor.Admin]) {
+  expect(bindings).toHaveLength(32);
+  for (const actor of [RouteActor.Anonymous, RouteActor.Customer, RouteActor.Admin, RouteActor.Operator]) {
     const authDir = process.env['STORECORE_PSD_AUTH_DIR'];
     if (!authDir) throw new Error('Missing ephemeral route auth directory');
     const storageState = actor === RouteActor.Anonymous ? undefined : join(authDir, `${actor.wire}.json`);
@@ -40,9 +40,9 @@ test.beforeAll(async ({ browser }) => {
       const other = actor === RouteActor.Customer ? 'internal' : 'customer';
       const principal = await page.request.get(`/api/v1/${own}/me`);
       expect(principal.status()).toBe(200);
-      if (actor === RouteActor.Admin) {
+      if (actor === RouteActor.Admin || actor === RouteActor.Operator) {
         const session = mapUserSession(readApiBody(await principal.json()));
-        expect(session.roles.includes(UserRole.Admin)).toBe(true);
+        expect(session.roles).toEqual([actor === RouteActor.Admin ? UserRole.Admin : UserRole.Operator]);
       } else {
         const customer = readApiBody<{ id: number; email: string }>(await principal.json());
         expect(String(customer.id)).toBe(String(receipt.customerId));
@@ -157,7 +157,7 @@ for (const path of ['/prm-missing-route', '/customer/prm-missing-route', '/user/
 }
 
 test('real contexts retain separate CUSTOMER and USER authority', async () => {
-  for (const actor of [RouteActor.Customer, RouteActor.Admin]) {
+  for (const actor of [RouteActor.Customer, RouteActor.Admin, RouteActor.Operator]) {
     const context = contexts.get(actor)!;
     const own = actor.context === AccessContext.Customer ? 'customer' : 'internal';
     const other = actor.context === AccessContext.Customer ? 'internal' : 'customer';

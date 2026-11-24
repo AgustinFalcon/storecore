@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, Page, test } from '@playwright/test';
+import { expect, Page, test, TestInfo } from '@playwright/test';
 import { RouteActor } from '../src/app/features/navigation/productive-route-manifest';
 import { installProductiveRouteFixture } from './support/productive-route-fixture';
 
@@ -27,8 +27,20 @@ async function install(page: Page, actor: RouteActor): Promise<void> {
   await installProductiveRouteFixture(page, actor);
 }
 
+async function assertNotificationReflow(page: Page, testInfo: TestInfo): Promise<void> {
+  const reflow = await page.evaluate(() => ({
+    viewportWidth: innerWidth, documentWidth: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll('.notifications, .notifications *')].flatMap(element => {
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && (rect.left < 0 || rect.right > innerWidth) ? [{ tag: element.tagName.toLowerCase(), left: Math.floor(rect.left), right: Math.ceil(rect.right), width: Math.ceil(rect.width) }] : [];
+    }).slice(0, 16),
+  }));
+  if (reflow.documentWidth > reflow.viewportWidth) await testInfo.attach('notification-reflow', { contentType: 'application/json', body: JSON.stringify(reflow) });
+  expect(reflow.documentWidth, JSON.stringify(reflow)).toBeLessThanOrEqual(reflow.viewportWidth);
+}
+
 for (const width of [320, 390, 768, 1440]) {
-  test(`notification center remains usable and accessible at ${width}`, async ({ page }) => {
+  test(`notification center remains usable and accessible at ${width}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
     await install(page, RouteActor.Operator);
     await page.goto('/user/notifications');
@@ -37,7 +49,12 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.getByText('1 alertas · Página 1', { exact: true })).toBeVisible();
     await expect(page.getByText('Correo sin configurar.', { exact: false })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Ver detalle de ROUTE-STOCK-1', exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await assertNotificationReflow(page, testInfo);
+    if (width === 320) {
+      // Exercise wider native font metrics even on platforms whose default font happens to fit.
+      await page.addStyleTag({ content: '.notifications { font-family: sans-serif; font-size: 18px; }' });
+      await assertNotificationReflow(page, testInfo);
+    }
 
     await page.getByLabel('Severidad').selectOption('WARNING');
     await page.getByRole('button', { name: 'Aplicar filtros', exact: true }).click();
@@ -52,7 +69,7 @@ for (const width of [320, 390, 768, 1440]) {
     await expect(page.getByRole('heading', { name: 'Detalle de notificación', exact: true })).toBeVisible();
     await expect(page.getByText('Acceso de lectura.', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Reconocer', exact: true })).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await assertNotificationReflow(page, testInfo);
   });
 }
 
