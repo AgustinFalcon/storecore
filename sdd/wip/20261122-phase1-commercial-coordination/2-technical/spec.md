@@ -37,6 +37,9 @@ Return processing stores cumulative eligible value returned plus prior earned-re
 
 - `/api/v1/user/notifications`, `/api/v1/user/commercial-calendar`, `/api/v1/user/channel-reports`, `/api/v1/user/loyalty` require USER realm and explicit role policy.
 - Slice A notification reads allow `ADMIN` and `OPERATOR`; acknowledge, resolve and reopen allow `ADMIN` only. The application derives the actor and role from the live USER session on every command and replay.
+- Notification HTTP V1 exposes `GET /api/v1/user/notifications`, `GET /api/v1/user/notifications/{alertId}`, `POST /api/v1/user/notifications/{alertId}/commands` and `GET /api/v1/user/notifications/{alertId}/commands/{commandId}`. List filters are optional closed severity/category/lifecycle/source values; an unknown supplied filter is invalid rather than absent. Pagination is zero-based, defaults to 25 and is capped at 100. Ordering is `created_at DESC,id ASC`; revision is serialized as a canonical unsigned decimal string.
+- The command endpoint accepts exact fields `{operation,expectedRevision,reason}` plus a canonical non-zero UUID `Idempotency-Key`. It requires USER ADMIN, same-origin JSON and CSRF through the existing mutation coordinator. Business rejections and exact replay return the rotated CSRF token. Applied returns 200; domain conflicts return 409; malformed input 400; wrong media type 415; missing aggregate 404; corrupt/future persisted data 503. Every response is `Cache-Control: no-store`.
+- Receipt lookup requires live USER ADMIN and the original actor; another actor and an absent or foreign aggregate are indistinguishable 404. OPERATOR reads alerts but cannot read receipt actor/reason details. Ingestion remains an internal port and is not exposed over HTTP.
 - `/api/v1/customer/loyalty` reads only the authenticated customer ledger.
 - POST commands require CSRF, JSON content type, idempotency key, bounded payloads and audited actor identity.
 - BlackStore ingestion remains behind the existing disabled capability and authenticated/versioned stock receipt contract; no trusted `X-Actor-Id`/`X-Role` shortcut is introduced. Monetary reporting stays unavailable until a new commercial-facts contract passes review.
@@ -48,6 +51,8 @@ Each feature has a plain domain model, repository port, store/use case and prese
 ## Delivery and failure
 
 In-app notification persistence commits before optional email delivery. Email uses an outbox and retry policy; it cannot change alert lifecycle. Report freshness is explicit. BlackStore commercial reporting produces `NOT_AVAILABLE`; stock freshness may be `UNAVAILABLE` or `STALE`, never zero. Loyalty uncertainty blocks a second loyalty effect until reconciliation but never blocks an independently authoritative refund or return.
+
+The optional email projection is a separate PCC-003B gate. Until recipient selection, explicit opt-in, verified address policy, versioned template, backfill and retry semantics pass review, readiness is `UNCONFIGURED`, no notification email outbox is enqueued and no SMTP scheduler or transport is active. Identity recovery/verification outboxes are not reused.
 
 ## Verification gates
 

@@ -14,4 +14,7 @@ open class NotificationPersistenceConfiguration {
     @Bean open fun notificationPersistence(jdbc: JdbcTemplate, transactions: TransactionTemplate, mapper: ObjectMapper): NotificationPersistencePort =
         JdbcNotificationPersistence(jdbc,transactions,mapper)
     @Bean open fun notificationPersistenceService(port: NotificationPersistencePort) = NotificationPersistenceService(port)
+    @Bean open fun notificationQueries(jdbc: JdbcTemplate,transactions: TransactionTemplate,mapper: ObjectMapper): NotificationQueryPort =
+        JdbcNotificationQueries(jdbc,transactions,mapper)
+    @Bean open fun notificationQueryService(port: NotificationQueryPort) = NotificationQueryService(port)
 }
