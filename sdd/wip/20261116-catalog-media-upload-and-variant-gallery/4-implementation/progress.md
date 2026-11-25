@@ -1,5 +1,10 @@
 # Progreso
 
+## 2026-11-24 — rebase 4C cgroup-kill sobre master 4b0e06a
+
+- Rebase de #366 sobre `origin/master` (`4b0e06a`, PR #371). No se
+  marca `003B-4C`. No hay `Ready` ni HTTP.
+
 ## 2026-11-24 — arranque 4C terminación del cgroup
 
 - El harness PID 1 congela el `MainPID` (el cgroup vacío tras SELF_TEST
