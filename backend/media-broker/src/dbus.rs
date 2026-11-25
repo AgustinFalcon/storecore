@@ -301,6 +301,7 @@ pub(crate) fn worker_properties(
         ("ProtectHostname", Value::from(true)),
         ("RestrictSUIDSGID", Value::from(true)),
         ("ProtectClock", Value::from(true)),
+        ("ProtectKernelLogs", Value::from(true)),
     ])
 }
 
@@ -902,6 +903,35 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("true")),
             "ProtectClock must be the internal true, got {protect_clock:?}"
+        );
+    }
+
+    #[test]
+    fn derived_worker_protect_kernel_logs() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"ProtectKernelLogs"));
+        assert!(!keys.contains(&"ProtectHome"));
+        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(!keys.contains(&"CPUQuota"));
+        let protect_kernel_logs = worker
+            .iter()
+            .find(|(key, _)| *key == "ProtectKernelLogs")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            protect_kernel_logs
+                .as_deref()
+                .is_some_and(|value| value.contains("true")),
+            "ProtectKernelLogs must be the internal true, got {protect_kernel_logs:?}"
         );
     }
 
@@ -2370,6 +2400,61 @@ mod tests {
         assert!(
             protect_clock == "yes" || protect_clock == "true",
             "PID 1 must apply derived ProtectClock, got {protect_clock}"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_protect_kernel_logs() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x1d; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived ProtectKernelLogs");
+        }
+        let protect_kernel_logs = systemctl_property(name, "ProtectKernelLogs");
+        assert!(
+            protect_kernel_logs == "yes" || protect_kernel_logs == "true",
+            "PID 1 must apply derived ProtectKernelLogs, got {protect_kernel_logs}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
