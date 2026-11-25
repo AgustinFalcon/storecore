@@ -75,7 +75,10 @@ terminación del cgroup ni `Ready`. PR #366 (head `0a02b58`,
 merge `ff30b8a`, Verify `45534853760` 7/7, dos Grok 4.7
 APPROVED) atesta `StopUnit` con `KillMode=control-group` y
 `KillSignal=SIGKILL`; no cierra `CPUQuota`, cuota global ni
-`Ready`. PR #326 arranca
+`Ready`. PR #374 (head `69827b8`, merge `c146fdd`, Verify
+`45541300889` 7/7, dos Grok 4.7 APPROVED) deriva
+`LimitNOFILE=1024` y deja fuera `RestrictAddressFamilies`
+(`ENXIO`); no cierra namespaces, cuota global ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
