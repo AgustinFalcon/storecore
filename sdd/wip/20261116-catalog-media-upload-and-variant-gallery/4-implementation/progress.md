@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C ProtectHome del worker
+
+- El harness deriva `ProtectHome=true` y PID 1 lo lee. `CPUQuota` y
+  `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #387, 003B-4C sigue abierto
 
 - Merge #387 `5a80863c3355ac1430ac5221a194683d7d1046c3` sobre candidato
