@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #393, 003B-4C sigue abierto
+
+- Merge #393 `95d322c0f901b8cdbc7bf1b20d104b7098a1ba30` sobre candidato
+  `8c006b51f6baaed3d0b0c4193629621f1727c403`. Verify exact-head
+  `45643109921` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr393-architecture.md`
+  y `sdd/reviews/20261125-sol-pr393-security.md`.
+- El harness deriva `RestrictRealtime=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C RestrictRealtime del worker
 
 - El harness deriva `RestrictRealtime=true` y PID 1 lo lee.
