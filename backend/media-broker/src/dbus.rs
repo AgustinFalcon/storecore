@@ -273,6 +273,7 @@ pub(crate) fn worker_properties(
         ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
+        ("KillSignal", Value::from(9i32)),
     ])
 }
 
@@ -491,6 +492,7 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"KillMode"));
+        assert!(keys.contains(&"KillSignal"));
         assert!(!keys.contains(&"MemoryOOMGroup"));
         assert!(!keys.contains(&"OOMPolicy"));
         let kill_mode = worker
@@ -502,6 +504,16 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("control-group")),
             "KillMode must be control-group, got {kill_mode:?}"
+        );
+        let kill_signal = worker
+            .iter()
+            .find(|(key, _)| *key == "KillSignal")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            kill_signal
+                .as_deref()
+                .is_some_and(|value| value.contains('9')),
+            "KillSignal must be SIGKILL, got {kill_signal:?}"
         );
     }
 
@@ -1102,6 +1114,78 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_stop_kills_extra_cgroup_process() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0xbb; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived KillMode");
+        }
+        freeze_worker_main_pid(name);
+        assert_eq!(
+            systemctl_property(name, "KillMode"),
+            "control-group",
+            "PID 1 must apply derived KillMode"
+        );
+        let kill_signal = systemctl_property(name, "KillSignal");
+        assert!(
+            kill_signal == "9" || kill_signal == "SIGKILL",
+            "PID 1 must apply derived KillSignal, got {kill_signal}"
+        );
+        let mut extra = spawn_cgroup_sleeper(name);
+        let extra_pid = extra.id();
+        let continued = Command::new("kill")
+            .args(["-CONT", &extra_pid.to_string()])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -CONT extra {extra_pid}: {error}"));
+        assert!(
+            continued.success(),
+            "kill -CONT extra {extra_pid} failed with {continued}"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        wait_child_reaped(&mut extra, Duration::from_secs(8));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
     fn normalize_request_frame_matches_worker_v1_layout() {
         let input = [0xffu8, 0xd8, 0xff, 0xd9];
         let frame = encode_normalize_request(&input);
@@ -1198,6 +1282,115 @@ mod tests {
             .status()
             .unwrap_or_else(|error| panic!("kill -STOP {pid}: {error}"));
         assert!(stopped.success(), "kill -STOP {pid} failed with {stopped}");
+    }
+
+    fn spawn_cgroup_sleeper(name: &str) -> std::process::Child {
+        let relative = wait_control_group(name);
+        let child = Command::new("sleep")
+            .arg("60")
+            .spawn()
+            .unwrap_or_else(|error| panic!("sleep: {error}"));
+        let pid = child.id();
+        let stopped = Command::new("kill")
+            .args(["-STOP", &pid.to_string()])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -STOP extra {pid}: {error}"));
+        assert!(
+            stopped.success(),
+            "kill -STOP extra {pid} failed with {stopped}"
+        );
+        wait_proc_stopped(pid);
+        attach_pid_to_unit(name, pid);
+        assert_in_worker_cgroup(name, &relative, pid);
+        child
+    }
+
+    fn attach_pid_to_unit(name: &str, pid: u32) {
+        let attached = Command::new("busctl")
+            .args([
+                "call",
+                "--system",
+                "org.freedesktop.systemd1",
+                "/org/freedesktop/systemd1",
+                "org.freedesktop.systemd1.Manager",
+                "AttachProcessesToUnit",
+                "ssau",
+                name,
+                "",
+                "1",
+                &pid.to_string(),
+            ])
+            .output()
+            .unwrap_or_else(|error| panic!("busctl AttachProcessesToUnit: {error}"));
+        if attached.status.success() {
+            return;
+        }
+        let relative = wait_control_group(name);
+        let procs = Path::new("/sys/fs/cgroup")
+            .join(relative.trim_start_matches('/'))
+            .join("cgroup.procs");
+        fs::write(&procs, pid.to_string()).unwrap_or_else(|error| {
+            panic!(
+                "AttachProcessesToUnit failed: {}; cgroup.procs {}: {error}",
+                String::from_utf8_lossy(&attached.stderr),
+                procs.display()
+            )
+        });
+    }
+
+    fn assert_in_worker_cgroup(name: &str, relative: &str, pid: u32) {
+        let marker = relative.trim_start_matches('/');
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let cgroup = fs::read_to_string(format!("/proc/{pid}/cgroup")).unwrap_or_default();
+            if !marker.is_empty() && cgroup.contains(marker) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "extra {pid} not in {name} cgroup {marker}: {cgroup}"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    fn wait_control_group(name: &str) -> String {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let relative = systemctl_property(name, "ControlGroup");
+            if !relative.is_empty() {
+                return relative;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "KillMode attest needs ControlGroup for {name}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    fn wait_child_reaped(child: &mut std::process::Child, timeout: Duration) {
+        let pid = child.id();
+        let deadline = Instant::now() + timeout;
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => {
+                    let status =
+                        fs::read_to_string(format!("/proc/{pid}/status")).unwrap_or_default();
+                    if status.lines().any(|line| line.starts_with("State:\tZ")) {
+                        let _ = child.wait();
+                        return;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "cgroup member {pid} still alive after KillMode stop; {status}"
+                    );
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => panic!("wait extra {pid}: {error}"),
+            }
+        }
     }
 
     fn oom_worker_cgroup(name: &str) {
