@@ -1,12 +1,34 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-24, 4C terminación del cgroup
+## En implementación — 2026-11-24, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness congela el `MainPID` para
-conservar el cgroup, adjunta un `sleep`, deriva `KillSignal=SIGKILL` y
-atesta que `StopUnit` con `KillMode=control-group` lo mata.
-Sigue sin `CPUQuota` ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
-`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
+Siguiente corte: cuota global, namespaces, sockets y RLIMIT. Este
+documento no cierra `003B-4C`. Sigue sin `CPUQuota`, cuota global,
+terminales sin ACK, FD/mmap tras el seal, reinicio en cada transición
+durable, namespaces, RLIMIT ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP de media.
+
+## Master vigente — 2026-11-24, 4C terminación del cgroup PR #366
+
+`master ff30b8aaffa5b6ffea077a51c8dedf335ba3e935` integra PR #366. Su
+candidato exacto `0a02b5834a9b1a8ae325caf041746dab18d499db` pasó Verify
+`45534853760` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261124-sol-pr366-architecture.md` y
+`sdd/reviews/20261124-sol-pr366-security.md`. El harness deriva
+`KillMode=control-group` y `KillSignal=SIGKILL`, congela el `MainPID`,
+adjunta un `sleep` y atesta que `StopUnit` lo mata. El corte no cierra
+`003B-4C`: no hay `CPUQuota`, cuota global ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
+
+## Master vigente — 2026-11-24, calendario comercial HTTP PR #372
+
+`master ac92b03e3dcbfc89de804ce2f50bf30d46e0e316` integra PR #372. No
+cierra `003B-4C`. Sigue sin `CPUQuota`, cuota global ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP de media.
 
 ## Master vigente — 2026-11-24, persist reviews PR #360
 
