@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C RLIMIT CORE del worker
+
+- El harness deriva `LimitCORE=0` y PID 1 lo lee.
+  `RestrictAddressFamilies` y `CPUQuota` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #379, 003B-4C sigue abierto
 
 - Merge #379 `6704455f65e4ded6034b0ed440963a01de612146` sobre candidato
