@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #379, 003B-4C sigue abierto
+
+- Merge #379 `6704455f65e4ded6034b0ed440963a01de612146` sobre candidato
+  `7b897ccbf17991d36a30783df8a370d6efd8a136`. Verify exact-head
+  `45551795655` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr379-architecture.md`
+  y `sdd/reviews/20261125-sol-pr379-security.md`.
+- El harness deriva `LimitNPROC=64` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C RLIMIT NPROC del worker
 
 - El harness deriva `LimitNPROC=64` y PID 1 lo lee.
