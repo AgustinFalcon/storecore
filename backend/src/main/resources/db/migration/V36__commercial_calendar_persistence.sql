@@ -114,13 +114,21 @@ CREATE TABLE calendar_command_receipts (
  actor_id BIGINT REFERENCES users(id) CHECK(actor_id>0),
  operation TEXT NOT NULL CHECK(operation IN ('CREATE','EDIT','SCHEDULE','PAUSE','RESUME','CANCEL','SYSTEM_ACTIVATE','SYSTEM_COMPLETE')),
  expected_revision BIGINT CHECK(expected_revision>=0), reason TEXT CHECK(char_length(reason) BETWEEN 1 AND 500 AND reason=btrim(reason,E' \t\n\r\013\014')),
+ requested_definition_hash TEXT CHECK(requested_definition_hash COLLATE "C" ~ '^[0-9a-f]{64}$'),
+ preflight_id UUID CHECK(preflight_id<>'00000000-0000-0000-0000-000000000000'),
  payload_hash TEXT NOT NULL CHECK(payload_hash COLLATE "C" ~ '^[0-9a-f]{64}$'),
  outcome TEXT NOT NULL CHECK(outcome IN ('APPLIED','REVISION_CONFLICT','INVALID_TRANSITION','INVALID_DEFINITION','PREFLIGHT_REQUIRED','PREFLIGHT_EXPIRED','PREFLIGHT_STALE','REVISION_EXHAUSTED')),
  before_snapshot JSONB CHECK(calendar_event_valid(before_snapshot)), after_snapshot JSONB NOT NULL CHECK(calendar_event_valid(after_snapshot)), recorded_at TIMESTAMPTZ NOT NULL,
  CHECK(after_snapshot->>'id'=event_id::text AND (before_snapshot IS NULL OR before_snapshot->>'id'=event_id::text)),
  CHECK((operation IN ('SYSTEM_ACTIVATE','SYSTEM_COMPLETE'))=(actor_id IS NULL)),
+ CHECK((operation='EDIT')=(requested_definition_hash IS NOT NULL)),
+ CHECK(operation='SCHEDULE' OR preflight_id IS NULL),
  CHECK((operation='CREATE' AND expected_revision IS NULL AND reason IS NULL AND before_snapshot IS NULL AND outcome='APPLIED' AND after_snapshot->>'revision'='0' AND after_snapshot->>'lifecycle'='DRAFT')
   OR (operation<>'CREATE' AND expected_revision IS NOT NULL AND before_snapshot IS NOT NULL AND reason IS NOT NULL)),
+ CHECK(payload_hash=CASE WHEN operation='CREATE'
+  THEN public.notification_v1_hash('calendar-create-v1',actor_id::text,after_snapshot->'definition'->>'hash')
+  ELSE public.notification_v1_hash('calendar-command-v1',coalesce(actor_id::text,'SYSTEM'),event_id::text,operation,expected_revision::text,reason,
+   coalesce(requested_definition_hash,''),coalesce(preflight_id::text,'')) END),
  CHECK(operation='CREATE' OR (outcome='APPLIED' AND (after_snapshot->>'revision')::bigint-1=(before_snapshot->>'revision')::bigint) OR (outcome<>'APPLIED' AND after_snapshot=before_snapshot))
 );
 ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_revision_result CHECK(operation='CREATE'

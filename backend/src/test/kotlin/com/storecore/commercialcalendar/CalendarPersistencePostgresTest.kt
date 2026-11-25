@@ -203,13 +203,25 @@ class CalendarPersistencePostgresTest {
             root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
                 VALUES(?,?,?,'CANCEL',0,'Fixture receipt',?,'REVISION_EXHAUSTED',?::jsonb,?::jsonb,clock_timestamp())""",exhaustion,event.id.value,admin.userId,"c".repeat(64),snapshot,snapshot)
         }
+        val forged=UUID.randomUUID(); bind(forged,"f".repeat(64))
+        assertThrows(DataAccessException::class.java) {
+            root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
+                VALUES(?,?,?,'CANCEL',1,'Fixture receipt',?,'REVISION_CONFLICT',?::jsonb,?::jsonb,clock_timestamp())""",forged,event.id.value,admin.userId,"f".repeat(64),snapshot,snapshot)
+        }
         val corrupt=UUID.randomUUID(); bind(corrupt,"d".repeat(64))
+        val canonicalCancel=CalendarFixtures.hasher.hash(listOf("calendar-command-v1",admin.userId.toString(),event.id.value.toString(),CalendarOperation.CANCEL.wire,"1","Fixture receipt","","")).value
         root.execute("ALTER TABLE calendar_command_receipts DISABLE TRIGGER trg_calendar_receipt_binding_consistency")
         try {
             root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
-                VALUES(?,?,?,'CANCEL',1,'Fixture receipt',?,'REVISION_CONFLICT',?::jsonb,?::jsonb,clock_timestamp())""",corrupt,event.id.value,admin.userId,"e".repeat(64),snapshot,snapshot)
+                VALUES(?,?,?,'CANCEL',1,'Fixture receipt',?,'REVISION_CONFLICT',?::jsonb,?::jsonb,clock_timestamp())""",corrupt,event.id.value,admin.userId,canonicalCancel,snapshot,snapshot)
         } finally { root.execute("ALTER TABLE calendar_command_receipts ENABLE TRIGGER trg_calendar_receipt_binding_consistency") }
         assertThrows(RuntimeException::class.java) { repository.receipt(admin,requireNotNull(CalendarCommandId.fromWire(corrupt)),event.id) }
+        val validRow=root.queryForMap("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
+            FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.event_id=? AND r.operation='CREATE'""",event.id.value)
+        val forgedRow=HashMap(validRow).apply { this["payload_hash"]="9".repeat(64); this["binding_payload_hash"]="9".repeat(64) }
+        val decode=JdbcCalendarPersistence::class.java.getDeclaredMethod("decodeReceipt",Map::class.java).apply { isAccessible=true }
+        val invocation=assertThrows(java.lang.reflect.InvocationTargetException::class.java) { decode.invoke(repository,forgedRow) }
+        assertInstanceOf(IllegalArgumentException::class.java,invocation.cause)
 
         val atomicEvent=create(repository,admin); val atomic=request(atomicEvent,CalendarStep.Cancel)
         root.execute("CREATE FUNCTION calendar_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'} BEGIN RAISE EXCEPTION 'fixture failure'; END ${'$'}${'$'}")

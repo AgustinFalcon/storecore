@@ -10,7 +10,7 @@ data class CalendarChangeRequest(val commandId: CalendarCommandId,val eventId: C
     val step: CalendarStep,val reason: CalendarReason,val definition: CalendarDefinition?=null,val preflightId: CalendarPreflightId?=null)
 class CalendarReceipt(val commandId: CalendarCommandId,val eventId: CalendarEventId,val actorId: Long?,val operation: CalendarOperation,
     val payloadHash: CalendarCommandPayloadHash,val outcome: CalendarOutcome,val before: CalendarEvent?,val after: CalendarEvent,val recordedAt: Instant,
-    val expectedRevision: CalendarRevision?,val reason: CalendarReason?)
+    val expectedRevision: CalendarRevision?,val reason: CalendarReason?,val requestedDefinitionHash: CalendarHash?,val preflightId: CalendarPreflightId?)
 sealed interface CalendarPersistenceResult {
     class Recorded(val receipt: CalendarReceipt): CalendarPersistenceResult
     data object Unauthorized: CalendarPersistenceResult

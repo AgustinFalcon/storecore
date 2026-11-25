@@ -43,7 +43,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         jdbc.update("INSERT INTO calendar_events(id,revision,definition_revision,lifecycle,snapshot) VALUES(?,0,0,?,?::jsonb)",event.id.value,event.lifecycle.wire,codec.event(event))
         writeDefinition(event)
         bind(request.commandId,actor.userId,event.id,CalendarCommandFamily.EVENT,hash)
-        val receipt=CalendarReceipt(request.commandId,event.id,actor.userId,CalendarOperation.CREATE,hash,CalendarOutcome.APPLIED,null,event,now,null,null)
+        val receipt=CalendarReceipt(request.commandId,event.id,actor.userId,CalendarOperation.CREATE,hash,CalendarOutcome.APPLIED,null,event,now,null,null,null,null)
         writeReceipt(receipt)
         CalendarPersistenceResult.Recorded(receipt)
     }
@@ -78,7 +78,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             }
         }
         bind(request.commandId,actor,before.id,CalendarCommandFamily.EVENT,hash)
-        val receipt=CalendarReceipt(request.commandId,before.id,actor,request.step.operation,hash,decision.outcome,before,decision.event,now,request.expectedRevision,request.reason)
+        val receipt=CalendarReceipt(request.commandId,before.id,actor,request.step.operation,hash,decision.outcome,before,decision.event,now,request.expectedRevision,request.reason,request.definition?.hash,request.preflightId)
         writeReceipt(receipt)
         return CalendarPersistenceResult.Recorded(receipt)
     }
@@ -146,8 +146,8 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         d.reminders.forEach { rule -> jdbc.update("INSERT INTO calendar_reminder_rules(event_id,definition_revision,rule_id,channel,offset_seconds) VALUES(?,?,?,?,?)",event.id.value,d.revision.value,rule.id.value,rule.channel.wire,rule.offsetSeconds) }
     }
     private fun writeReceipt(r: CalendarReceipt) {
-        jdbc.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
-            VALUES(?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?)""",r.commandId.value,r.eventId.value,r.actorId,r.operation.wire,r.expectedRevision?.value,r.reason?.value,r.payloadHash.value,r.outcome.wire,r.before?.let(codec::event),codec.event(r.after),Timestamp.from(r.recordedAt))
+        jdbc.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,requested_definition_hash,preflight_id,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?)""",r.commandId.value,r.eventId.value,r.actorId,r.operation.wire,r.expectedRevision?.value,r.reason?.value,r.requestedDefinitionHash?.value,r.preflightId?.value,r.payloadHash.value,r.outcome.wire,r.before?.let(codec::event),codec.event(r.after),Timestamp.from(r.recordedAt))
         jdbc.update("INSERT INTO calendar_audit(command_id) VALUES(?)",r.commandId.value)
     }
     private fun loadReceipt(id: CalendarCommandId): CalendarPersistenceResult {
@@ -167,6 +167,16 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         if(operation==CalendarOperation.CREATE) require(before==null && outcome==CalendarOutcome.APPLIED && after.revision==CalendarRevision.Zero)
         val recordedAt=(row["recorded_at"] as Timestamp).toInstant()
         val expected=(row["expected_revision"] as? Number)?.toLong()?.let { requireNotNull(CalendarRevision.fromWire(it)) }
+        val requestedDefinitionHash=(row["requested_definition_hash"] as? String)?.let { requireNotNull(CalendarHash.fromWire(it)) }
+        val preflightId=(row["preflight_id"] as? UUID)?.let { requireNotNull(CalendarPreflightId.fromWire(it)) }
+        val canonicalPayload=if(operation==CalendarOperation.CREATE) {
+            require(actorId!=null && requestedDefinitionHash==null && preflightId==null)
+            payload(listOf("calendar-create-v1",actorId.toString(),after.definition.hash.value))
+        } else {
+            require(expected!=null && row["reason"] is String)
+            payload(listOf("calendar-command-v1",actorId?.toString() ?: "SYSTEM",eventId.value.toString(),operation.wire,expected.value.toString(),row["reason"] as String,requestedDefinitionHash?.value ?: "",preflightId?.value?.toString() ?: ""))
+        }
+        require(canonicalPayload==payloadHash)
         if(operation!=CalendarOperation.CREATE) {
             require(before!=null && expected!=null)
             if(outcome==CalendarOutcome.REVISION_CONFLICT) require(before.revision!=expected) else require(before.revision==expected)
@@ -181,7 +191,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             }
         }
         return CalendarReceipt(requireNotNull(CalendarCommandId.fromWire(row["command_id"] as UUID)),eventId,actorId,operation,
-            payloadHash,outcome,before,after,recordedAt,expected,(row["reason"] as? String)?.let { requireNotNull(CalendarReason.fromWire(it)) })
+            payloadHash,outcome,before,after,recordedAt,expected,(row["reason"] as? String)?.let { requireNotNull(CalendarReason.fromWire(it)) },requestedDefinitionHash,preflightId)
     }
     private fun validApplied(operation: CalendarOperation,before: CalendarEvent,after: CalendarEvent,at: Instant): Boolean {
         if(before.createdAt!=after.createdAt) return false
