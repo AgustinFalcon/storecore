@@ -82,19 +82,76 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         writeReceipt(receipt)
         return CalendarPersistenceResult.Recorded(receipt)
     }
-    override fun advance(eventId: CalendarEventId,expectedRevision: CalendarRevision,step: CalendarStep): CalendarPersistenceResult=tx {
-        if(!step.operation.system) return@tx CalendarPersistenceResult.Unauthorized
-        // Read only to derive identity, then follow the same command -> event lock order as USER commands.
-        val observed=read(eventId) ?: return@tx CalendarPersistenceResult.Missing
-        if(observed.approvedDefinitionRevision==null) return@tx CalendarPersistenceResult.Unauthorized
-        val boundary=if(step==CalendarStep.Activate) observed.definition.start.instant else observed.definition.end.instant
-        val request=CalendarChangeRequest(hasher.systemCommand(eventId,expectedRevision,step.operation,boundary),eventId,expectedRevision,step,requireNotNull(CalendarReason.fromWire("Authoritative calendar boundary")))
-        lock(request.commandId)
+    override fun select(observedAt: Instant,batchSize: CalendarSystemBatchSize): CalendarSystemSelectionResult=tx {
+        val at=Timestamp.from(observedAt)
+        val raw=jdbc.query("""WITH validated AS MATERIALIZED (
+                SELECT e.*,calendar_event_valid(e.snapshot) AS valid FROM calendar_events e
+            ), decoded AS MATERIALIZED (
+                SELECT v.*,CASE WHEN valid THEN (snapshot->'definition'->>'startAt')::timestamptz END AS start_at,
+                    CASE WHEN valid THEN (snapshot->'definition'->>'endAt')::timestamptz END AS end_at FROM validated v
+            ), eligible AS MATERIALIZED (
+                SELECT d.*,CASE WHEN NOT valid THEN 'UNKNOWN'
+                    WHEN lifecycle IN ('SCHEDULED','ACTIVE','PAUSED') AND end_at<=? THEN 'SYSTEM_COMPLETE'
+                    WHEN lifecycle='SCHEDULED' AND start_at<=? AND ?<end_at THEN 'SYSTEM_ACTIVATE' END AS system_operation
+                FROM decoded d
+            ) SELECT e.snapshot::text
+            FROM eligible e
+            WHERE (e.system_operation='UNKNOWN' OR e.system_operation IN ('SYSTEM_ACTIVATE','SYSTEM_COMPLETE')
+              AND NOT EXISTS(SELECT 1 FROM calendar_command_receipts r
+                WHERE r.event_id=e.id AND r.actor_id IS NULL AND r.expected_revision=e.revision AND r.outcome='REVISION_EXHAUSTED'
+                  AND r.operation=e.system_operation))
+            ORDER BY CASE WHEN e.system_operation='UNKNOWN' THEN '-infinity'::timestamptz WHEN e.system_operation='SYSTEM_COMPLETE' THEN e.end_at ELSE e.start_at END,
+              CASE e.system_operation WHEN 'UNKNOWN' THEN -1 WHEN 'SYSTEM_COMPLETE' THEN 0 ELSE 1 END,e.id
+            LIMIT ?""",{ rs,_ -> rs.getString(1) },at,at,at,batchSize.value)
+        try {
+            val candidates=raw.map { CalendarSystemCandidate.from(codec.event(it),observedAt) ?: return@tx CalendarSystemSelectionResult.Corrupt }
+            CalendarSystemSelectionResult.Page(observedAt,candidates)
+        } catch(_: Exception) { CalendarSystemSelectionResult.Corrupt }
+    }
+    override fun advance(candidate: CalendarSystemCandidate): CalendarSystemAdvanceResult=tx {
+        val recreated=CalendarSystemCandidate.from(candidate.observedEvent,candidate.observedAt)
+            ?: return@tx CalendarSystemAdvanceResult.Corrupt
+        if(recreated.operation!=candidate.operation || recreated.boundary!=candidate.boundary) return@tx CalendarSystemAdvanceResult.Corrupt
+        val request=CalendarChangeRequest(hasher.systemCommand(candidate.eventId,candidate.expectedRevision,candidate.operation,candidate.boundary),candidate.eventId,candidate.expectedRevision,candidate.step,requireNotNull(CalendarReason.fromWire("Authoritative calendar boundary")))
         val hash=commandHash(null,request)
-        binding(request.commandId)?.let { row -> return@tx if(sameBinding(row,null,eventId,CalendarCommandFamily.EVENT,hash)) loadReceipt(request.commandId) else CalendarPersistenceResult.IdempotencyConflict }
-        val before=read(eventId,true) ?: return@tx CalendarPersistenceResult.Missing
-        val now=clock.now()
-        record(null,request,before,CalendarDecision.apply(before,expectedRevision,step,now),hash,now)
+        systemReplay(request,hash)?.let { return@tx it }
+        val observed=when(val result=systemRead(candidate.eventId)) {
+            SystemEventRead.Corrupt -> return@tx CalendarSystemAdvanceResult.Corrupt
+            SystemEventRead.Missing -> return@tx CalendarSystemAdvanceResult.Missing
+            is SystemEventRead.Found -> result.event
+        }
+        if(observed.revision==candidate.expectedRevision && codec.event(observed)!=codec.event(candidate.observedEvent)) return@tx CalendarSystemAdvanceResult.Corrupt
+        lock(request.commandId)
+        systemReplay(request,hash)?.let { return@tx it }
+        val before=when(val result=systemRead(candidate.eventId,true)) {
+            SystemEventRead.Corrupt -> return@tx CalendarSystemAdvanceResult.Corrupt
+            SystemEventRead.Missing -> return@tx CalendarSystemAdvanceResult.Missing
+            is SystemEventRead.Found -> result.event
+        }
+        if(before.revision==candidate.expectedRevision && codec.event(before)!=codec.event(candidate.observedEvent)) return@tx CalendarSystemAdvanceResult.Corrupt
+        when(val result=record(null,request,before,CalendarDecision.apply(before,candidate.expectedRevision,candidate.step,candidate.observedAt),hash,candidate.observedAt)) {
+            is CalendarPersistenceResult.Recorded -> CalendarSystemAdvanceResult.Recorded(result.receipt,CalendarSystemReceiptDisposition.NEW)
+            else -> CalendarSystemAdvanceResult.Corrupt
+        }
+    }
+    private fun systemReplay(request: CalendarChangeRequest,hash: CalendarCommandPayloadHash): CalendarSystemAdvanceResult? {
+        val row=binding(request.commandId) ?: return null
+        if(!sameBinding(row,null,request.eventId,CalendarCommandFamily.EVENT,hash)) return CalendarSystemAdvanceResult.Corrupt
+        val stored=receiptRow(request.commandId) ?: return CalendarSystemAdvanceResult.Corrupt
+        val receipt=try { decodeReceipt(stored) } catch(_: Exception) { return CalendarSystemAdvanceResult.Corrupt }
+        return if(receipt.actorId==null && receipt.operation==request.step.operation && receipt.expectedRevision==request.expectedRevision)
+            CalendarSystemAdvanceResult.Recorded(receipt,CalendarSystemReceiptDisposition.REPLAY)
+        else CalendarSystemAdvanceResult.Corrupt
+    }
+    private sealed interface SystemEventRead {
+        class Found(val event: CalendarEvent): SystemEventRead
+        data object Missing: SystemEventRead
+        data object Corrupt: SystemEventRead
+    }
+    private fun systemRead(id: CalendarEventId,locked: Boolean=false): SystemEventRead {
+        val raw=jdbc.query("SELECT snapshot::text FROM calendar_events WHERE id=?"+if(locked) " FOR UPDATE" else "",{ rs,_ -> rs.getString(1) },id.value).singleOrNull()
+            ?: return SystemEventRead.Missing
+        return try { SystemEventRead.Found(codec.event(raw)) } catch(_: Exception) { SystemEventRead.Corrupt }
     }
     override fun preflight(actor: InternalUserPrincipal,request: CalendarPreflightRequest): CalendarPreflightResult=tx {
         if(!authorized(actor)) return@tx CalendarPreflightResult.Unauthorized
@@ -157,11 +214,9 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             VALUES(?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?)""",r.commandId.value,r.eventId.value,r.actorId,r.operation.wire,r.expectedRevision?.value,r.reason?.value,r.requestedDefinitionHash?.value,r.preflightId?.value,r.payloadHash.value,r.outcome.wire,r.before?.let(codec::event),codec.event(r.after),Timestamp.from(r.recordedAt))
         jdbc.update("INSERT INTO calendar_audit(command_id) VALUES(?)",r.commandId.value)
     }
-    private fun loadReceipt(id: CalendarCommandId): CalendarPersistenceResult {
-        val row=jdbc.queryForList("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
-            FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.command_id=?""",id.value).singleOrNull() ?: return CalendarPersistenceResult.Unknown
-        return CalendarPersistenceResult.Recorded(decodeReceipt(row))
-    }
+    private fun receiptRow(id: CalendarCommandId)=jdbc.queryForList("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
+        FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.command_id=?""",id.value).singleOrNull()
+    private fun loadReceipt(id: CalendarCommandId): CalendarPersistenceResult = receiptRow(id)?.let { CalendarPersistenceResult.Recorded(decodeReceipt(it)) } ?: CalendarPersistenceResult.Unknown
     internal fun historicalReceipt(id: CalendarCommandId): CalendarReceipt =
         (loadReceipt(id) as? CalendarPersistenceResult.Recorded)?.receipt ?: throw IllegalStateException("Calendar receipt unavailable")
     private fun decodeReceipt(row: Map<String,Any?>): CalendarReceipt {

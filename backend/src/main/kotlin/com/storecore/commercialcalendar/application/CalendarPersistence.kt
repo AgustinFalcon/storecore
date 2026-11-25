@@ -40,5 +40,3 @@ interface CalendarPersistencePort {
     fun audit(actor: InternalUserPrincipal,eventId: CalendarEventId): List<CalendarReceipt>?
     fun reminderSwitch(): CalendarReminderSwitch
 }
-/** Internal authority only. No runner or public route is installed in PCC-007A. */
-interface CalendarSystemPersistencePort { fun advance(eventId: CalendarEventId,expectedRevision: CalendarRevision,step: CalendarStep): CalendarPersistenceResult }

@@ -16,6 +16,7 @@ import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DataSourceTransactionManager
 import org.springframework.jdbc.datasource.DriverManagerDataSource
+import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.PostgreSQLContainer
 import java.sql.Connection
@@ -41,6 +42,10 @@ class CalendarPersistencePostgresTest {
         val source=runtime()
         return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,ids,CalendarFixtures.hasher)
     }
+    private fun repo(connection: Connection,clock: CalendarClock=MutableCalendarClock()): JdbcCalendarPersistence {
+        val source=SingleConnectionDataSource(connection,true)
+        return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,RandomCalendarIds(),CalendarFixtures.hasher)
+    }
     private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true): JdbcCalendarSwitchPersistence {
         val source=runtime()
         val capability=object: CapabilityDecisionPort { override fun decide(module: String,action: String,actor: CapabilityActor) { if(!active) throw CapabilityDisabled() } }
@@ -58,7 +63,9 @@ class CalendarPersistencePostgresTest {
         return InternalUserPrincipal(session,id,setOf(role))
     }
     private fun recorded(result: CalendarPersistenceResult)=assertInstanceOf(CalendarPersistenceResult.Recorded::class.java,result).receipt
+    private fun systemRecorded(result: CalendarSystemAdvanceResult)=assertInstanceOf(CalendarSystemAdvanceResult.Recorded::class.java,result)
     private fun create(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,rules: List<CalendarReminderRule> = emptyList())=recorded(repo.create(actor,CalendarCreateRequest(CalendarFixtures.command(),CalendarFixtures.definition(rules=rules)))).after
+    private fun create(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,definition: CalendarDefinition)=recorded(repo.create(actor,CalendarCreateRequest(CalendarFixtures.command(),definition))).after
     private fun request(event: CalendarEvent,step: CalendarStep,id: CalendarCommandId=CalendarFixtures.command(),revision: CalendarRevision=event.revision,definition: CalendarDefinition?=null,preflight: CalendarPreflightId?=null)=
         CalendarChangeRequest(id,event.id,revision,step,CalendarFixtures.reason,definition,preflight)
     private fun preflight(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=assertInstanceOf(CalendarPreflightResult.Recorded::class.java,repo.preflight(actor,CalendarPreflightRequest(CalendarFixtures.command(),event.id,event.revision))).preflight!!
@@ -206,7 +213,7 @@ class CalendarPersistencePostgresTest {
     @Test fun `live role session and original actor are checked again for commands recovery and preflight`() {
         val repository=repo(); val admin=actor(); val operator=actor(InternalRole.OPERATOR); val foreign=actor(); val event=create(repository,admin)
         val command=request(event,CalendarStep.Cancel)
-        assertEquals(CalendarPersistenceResult.Unauthorized,repository.advance(event.id,event.revision,CalendarStep.Activate))
+        assertNull(CalendarSystemCandidate.from(event,event.definition.start.instant))
         recorded(repository.change(admin,command))
         assertEquals(CalendarPersistenceResult.Unauthorized,repository.change(operator,command))
         assertEquals(CalendarPersistenceResult.Missing,repository.receipt(foreign,command.commandId,event.id))
@@ -327,10 +334,13 @@ class CalendarPersistencePostgresTest {
     @Test fun `system boundaries are deterministic internal receipts and audit plus definitions are append only`() {
         val clock=MutableCalendarClock(); val repository=repo(clock); val admin=actor(); val scheduled=schedule(repository,admin,create(repository,admin,listOf(CalendarFixtures.rule())))
         clock.instant=scheduled.definition.end.instant
-        val complete=recorded(repository.advance(scheduled.id,scheduled.revision,CalendarStep.Complete))
+        val candidate=requireNotNull(CalendarSystemCandidate.from(scheduled,clock.instant))
+        val completeResult=systemRecorded(repository.advance(candidate)); val complete=completeResult.receipt
+        assertEquals(CalendarSystemReceiptDisposition.NEW,completeResult.disposition)
         assertNull(complete.actorId); assertEquals(CalendarLifecycle.COMPLETED,complete.after.lifecycle)
         clock.instant=clock.instant.plusSeconds(86400)
-        val retry=recorded(repository.advance(scheduled.id,scheduled.revision,CalendarStep.Complete))
+        val retryResult=systemRecorded(repository.advance(candidate)); val retry=retryResult.receipt
+        assertEquals(CalendarSystemReceiptDisposition.REPLAY,retryResult.disposition)
         assertEquals(complete.commandId,retry.commandId); assertEquals(complete.recordedAt,retry.recordedAt)
         assertEquals(CalendarPersistenceResult.Missing,repository.receipt(admin,complete.commandId))
         for(table in listOf("calendar_definitions","calendar_reminder_rules","calendar_preflights","calendar_command_bindings","calendar_preflight_requests","calendar_command_receipts","calendar_audit")) {
@@ -338,7 +348,102 @@ class CalendarPersistencePostgresTest {
         }
         assertThrows(DataAccessException::class.java) { root.update("DELETE FROM calendar_events WHERE id=?",scheduled.id.value) }
         assertThrows(DataAccessException::class.java) { root.update("UPDATE calendar_events SET snapshot=jsonb_set(snapshot,'{definition,title}','\"tampered\"') WHERE id=?",scheduled.id.value) }
-        assertEquals(CalendarOutcome.INVALID_TRANSITION,recorded(repository.advance(scheduled.id,complete.after.revision,CalendarStep.Activate)).outcome)
+        assertNull(CalendarSystemCandidate.from(complete.after,complete.after.definition.start.instant))
+    }
+    @Test fun `system selection is bounded completion first and a missed window completes without activation`() {
+        val repository=repo(); val admin=actor()
+        val completes=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Complete first",start=CalendarFixtures.now.plusSeconds(300),end=CalendarFixtures.now.plusSeconds(600))))
+        val activates=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Activate second",start=CalendarFixtures.now.plusSeconds(600),end=CalendarFixtures.now.plusSeconds(1200))))
+        val observedAt=CalendarFixtures.now.plusSeconds(600)
+        val one=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(observedAt,requireNotNull(CalendarSystemBatchSize.from(1))))
+        assertEquals(1,one.candidates.size); assertEquals(completes.id,one.candidates.single().eventId); assertEquals(CalendarOperation.SYSTEM_COMPLETE,one.candidates.single().operation)
+        val page=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(observedAt,requireNotNull(CalendarSystemBatchSize.from(2))))
+        assertEquals(listOf(completes.id,activates.id),page.candidates.map { it.eventId })
+        val completed=systemRecorded(repository.advance(page.candidates.first()))
+        assertEquals(CalendarSystemReceiptDisposition.NEW,completed.disposition); assertEquals(CalendarLifecycle.COMPLETED,completed.receipt.after.lifecycle)
+        assertEquals(0,root.queryForObject("SELECT count(*) FROM calendar_command_receipts WHERE event_id=? AND operation='SYSTEM_ACTIVATE'",Int::class.java,completes.id.value))
+        assertEquals(0,root.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+    }
+    @Test fun `concurrent system advance applies once and exact loser replays while revision races are recorded`() {
+        val repository=repo(); val admin=actor(); val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(start=CalendarFixtures.now.plusSeconds(300),end=CalendarFixtures.now.plusSeconds(900))))
+        val candidate=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(CalendarFixtures.now.plusSeconds(300),CalendarSystemBatchSize.Default)).candidates.single()
+        val barrier=CyclicBarrier(2); val pool=Executors.newFixedThreadPool(2)
+        try {
+            val results=(1..2).map { pool.submit<CalendarSystemAdvanceResult.Recorded> { barrier.await(); systemRecorded(repo().advance(candidate)) } }.map { it.get(20,TimeUnit.SECONDS) }
+            assertEquals(setOf(CalendarSystemReceiptDisposition.NEW,CalendarSystemReceiptDisposition.REPLAY),results.map { it.disposition }.toSet())
+            assertTrue(results.all { it.receipt.commandId==results.first().receipt.commandId && it.receipt.outcome==CalendarOutcome.APPLIED })
+            assertEquals(1,root.queryForObject("SELECT count(*) FROM calendar_command_receipts WHERE command_id=?",Int::class.java,results.first().receipt.commandId.value))
+        } finally { pool.shutdownNow() }
+
+        val later=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Race",start=CalendarFixtures.now.plusSeconds(300),end=CalendarFixtures.now.plusSeconds(900))))
+        val stale=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(CalendarFixtures.now.plusSeconds(300),CalendarSystemBatchSize.Default)).candidates.single { it.eventId==later.id }
+        recorded(repository.change(admin,request(later,CalendarStep.Cancel)))
+        val conflict=systemRecorded(repository.advance(stale))
+        assertEquals(CalendarSystemReceiptDisposition.NEW,conflict.disposition); assertEquals(CalendarOutcome.REVISION_CONFLICT,conflict.receipt.outcome)
+    }
+    @Test fun `revision exhausted identity is audited once then omitted so a later candidate progresses`() {
+        val repository=repo(); val admin=actor()
+        val first=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Exhausted",start=CalendarFixtures.now.plusSeconds(300),end=CalendarFixtures.now.plusSeconds(1200))))
+        val second=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Progress",start=CalendarFixtures.now.plusSeconds(400),end=CalendarFixtures.now.plusSeconds(1200))))
+        root.execute("ALTER TABLE calendar_events DISABLE TRIGGER trg_calendar_event")
+        try {
+            root.update("UPDATE calendar_events SET revision=?,snapshot=jsonb_set(snapshot,'{revision}',to_jsonb(CAST(? AS text))) WHERE id=?",Long.MAX_VALUE,Long.MAX_VALUE.toString(),first.id.value)
+        } finally { root.execute("ALTER TABLE calendar_events ENABLE TRIGGER trg_calendar_event") }
+        val observedAt=CalendarFixtures.now.plusSeconds(500); val sizeOne=requireNotNull(CalendarSystemBatchSize.from(1))
+        val exhausted=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(observedAt,sizeOne)).candidates.single()
+        assertEquals(first.id,exhausted.eventId)
+        val rejected=systemRecorded(repository.advance(exhausted)); assertEquals(CalendarOutcome.REVISION_EXHAUSTED,rejected.receipt.outcome)
+        val next=assertInstanceOf(CalendarSystemSelectionResult.Page::class.java,repository.select(observedAt,sizeOne)).candidates.single()
+        assertEquals(second.id,next.eventId); assertEquals(CalendarOutcome.APPLIED,systemRecorded(repository.advance(next)).receipt.outcome)
+        assertEquals(1,root.queryForObject("SELECT count(*) FROM calendar_command_receipts WHERE event_id=? AND outcome='REVISION_EXHAUSTED'",Int::class.java,first.id.value))
+    }
+    @Test fun `cycle instant captured before a real database lock cannot cross into the activation window`() {
+        val clock=MutableCalendarClock(); val repository=repo(clock); val admin=actor()
+        val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Blocked boundary",start=CalendarFixtures.now.plusSeconds(300),end=CalendarFixtures.now.plusSeconds(900))))
+        clock.instant=scheduled.definition.start.instant.minusSeconds(1)
+        val pool=Executors.newSingleThreadExecutor()
+        DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false; blocker.createStatement().use { it.execute("LOCK TABLE calendar_events IN ACCESS EXCLUSIVE MODE") }
+            val future=pool.submit<CalendarSystemCycleResult> { CalendarSystemCycleService(clock,repository).run() }
+            try {
+                awaitDatabase { root.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%WITH validated AS MATERIALIZED%')",Boolean::class.java)!! }
+                clock.instant=scheduled.definition.start.instant; blocker.commit()
+                val early=assertInstanceOf(CalendarSystemCycleResult.Completed::class.java,future.get(15,TimeUnit.SECONDS))
+                assertEquals(scheduled.definition.start.instant.minusSeconds(1),early.observedAt); assertEquals(0,early.selected)
+                assertEquals(0,root.queryForObject("SELECT count(*) FROM calendar_command_receipts WHERE event_id=? AND actor_id IS NULL",Int::class.java,scheduled.id.value))
+                val due=assertInstanceOf(CalendarSystemCycleResult.Completed::class.java,CalendarSystemCycleService(clock,repository).run())
+                assertEquals(1,due.selected); assertEquals(1,due.applied)
+            } finally { blocker.rollback(); pool.shutdownNow() }
+        }
+    }
+    @Test fun `corrupt selection and replay fail closed without effects`() {
+        DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password).connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("CREATE TEMP TABLE calendar_events(id uuid,revision bigint,lifecycle text,snapshot jsonb)")
+                statement.execute("CREATE TEMP TABLE calendar_command_receipts(event_id uuid,actor_id bigint,expected_revision bigint,outcome text,operation text)")
+            }
+            JdbcTemplate(SingleConnectionDataSource(connection,true)).update("INSERT INTO calendar_events VALUES(?,0,'SCHEDULED',?::jsonb)",UUID.randomUUID(),"{\"future\":true}")
+            assertEquals(CalendarSystemSelectionResult.Corrupt,repo(connection).select(CalendarFixtures.now,CalendarSystemBatchSize.Default))
+        }
+
+        val draft=CalendarFixtures.draft(); val preflight=CalendarPreflight.check(CalendarFixtures.preflightId(),draft,CalendarFixtures.now)
+        val scheduled=CalendarDecision.apply(draft,draft.revision,CalendarStep.Schedule,CalendarFixtures.now,preflight).event
+        val candidate=requireNotNull(CalendarSystemCandidate.from(scheduled,scheduled.definition.start.instant))
+        val command=CalendarFixtures.hasher.systemCommand(candidate.eventId,candidate.expectedRevision,candidate.operation,candidate.boundary)
+        val reason="Authoritative calendar boundary"
+        val hash=CalendarFixtures.hasher.hash(listOf("calendar-command-v1","SYSTEM",candidate.eventId.value.toString(),candidate.operation.wire,candidate.expectedRevision.value.toString(),reason,"",""))
+        DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password).connection.use { connection ->
+            connection.createStatement().use { statement ->
+                statement.execute("CREATE TEMP TABLE calendar_command_bindings(command_id uuid,family text,actor_id bigint,event_id uuid,payload_hash text)")
+                statement.execute("""CREATE TEMP TABLE calendar_command_receipts(command_id uuid,event_id uuid,actor_id bigint,operation text,expected_revision bigint,reason text,
+                    requested_definition_hash text,preflight_id uuid,payload_hash text,outcome text,before_snapshot jsonb,after_snapshot jsonb,recorded_at timestamptz)""")
+            }
+            val jdbc=JdbcTemplate(SingleConnectionDataSource(connection,true))
+            jdbc.update("INSERT INTO calendar_command_bindings VALUES(?,'EVENT',NULL,?,?)",command.value,candidate.eventId.value,hash.value)
+            jdbc.update("INSERT INTO calendar_command_receipts VALUES(?,?,NULL,?,?,?,NULL,NULL,?,'APPLIED','{}'::jsonb,'{}'::jsonb,?)",command.value,candidate.eventId.value,candidate.operation.wire,candidate.expectedRevision.value,reason,hash.value,java.sql.Timestamp.from(candidate.observedAt))
+            assertEquals(CalendarSystemAdvanceResult.Corrupt,repo(connection).advance(candidate))
+            assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM calendar_command_receipts",Int::class.java))
+        }
     }
     private fun shortSession(actor: InternalUserPrincipal): InternalUserPrincipal {
         val session=UUID.randomUUID()

@@ -1,5 +1,6 @@
 package com.storecore.commercialcalendar
 
+import com.storecore.commercialcalendar.application.*
 import com.storecore.commercialcalendar.domain.*
 import com.storecore.commercialcalendar.infrastructure.*
 import org.junit.jupiter.api.Test
@@ -98,6 +99,19 @@ class CalendarDomainTest {
         val event=CalendarFixtures.draft(); val h=CalendarFixtures.hasher
         assertEquals(h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant),h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant))
         assertNotEquals(h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant),h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_COMPLETE,event.definition.end.instant))
+    }
+    @Test fun `system candidate derives its closed operation and boundary from an approved snapshot`() {
+        val draft=CalendarFixtures.draft(); val preflight=CalendarPreflight.check(CalendarFixtures.preflightId(),draft,CalendarFixtures.now)
+        val scheduled=CalendarDecision.apply(draft,draft.revision,CalendarStep.Schedule,CalendarFixtures.now,preflight).event
+        assertNull(CalendarSystemCandidate.from(scheduled,scheduled.definition.start.instant.minusSeconds(1)))
+        val activation=requireNotNull(CalendarSystemCandidate.from(scheduled,scheduled.definition.start.instant))
+        assertEquals(CalendarOperation.SYSTEM_ACTIVATE,activation.operation); assertEquals(scheduled.definition.start.instant,activation.boundary)
+        val completion=requireNotNull(CalendarSystemCandidate.from(scheduled,scheduled.definition.end.instant))
+        assertEquals(CalendarOperation.SYSTEM_COMPLETE,completion.operation); assertEquals(scheduled.definition.end.instant,completion.boundary)
+        assertEquals(scheduled.revision,completion.expectedRevision); assertEquals(scheduled,completion.observedEvent)
+        assertNull(CalendarSystemCandidate.from(scheduled,scheduled.definition.start.instant.plusNanos(1)))
+        assertNull(CalendarSystemBatchSize.from(0)); assertEquals(1,CalendarSystemBatchSize.from(1)!!.value)
+        assertEquals(100,CalendarSystemBatchSize.from(100)!!.value); assertNull(CalendarSystemBatchSize.from(101))
     }
     @Test fun `temporary reminder switch is structurally closed and expires fail closed`() {
         val now=CalendarFixtures.now
