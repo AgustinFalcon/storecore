@@ -13,8 +13,8 @@ Date: 2026-11-25
 
 ## Local verification
 
-- Angular full unit suite: 240 files / 1,704 tests PASS.
-- Calendar focal suite: 4 files / 32 tests PASS.
+- Angular full unit suite after the CI remediation: 240 files / 1,705 tests PASS.
+- Calendar presentation focal suite after the CI remediation: 1 file / 15 tests PASS.
 - `npm run lint`: PASS.
 - `npm run check:architecture`: PASS, including the domain boundary and 33-surface productive manifest.
 - `npm run check:psd-real`: PASS: security checks, 13 node contract tests, TypeScript, ESLint and discovery of 144 PSD tests.
@@ -35,6 +35,12 @@ The first exact-head round on `7d43fbb5dd4ad7e8f10be67f3f6c66059f392a7d` request
 - native UTF-16 `maxlength` truncating valid code-point-bounded Unicode input.
 
 All four findings were corrected with regressions. The second exact-head round on `47b45104fa41ef7cbaddedd6ccf4c91cbfeb474e` returned APPROVE from all three lanes with no open P0–P3. Security additionally rechecked the USER/CUSTOMER boundary, ADMIN private-call gates, CSRF allowlist, IDOR, XSS/DOM selectors and journal replay.
+
+## First CI execution and remediation
+
+GitHub Actions run `45540686999` executed the disposable PostgreSQL/Spring/production-Angular/Chromium matrix. The persisted calendar fixture and every required backend read succeeded with HTTP 200, but the productive-routes job rejected the four calendar routes at all three widths (12 cases). The exact assertion was the skip-link focus contract: each calendar view rendered a nested `<main>` inside the shell's canonical `<main id="contenido-principal">`, so the target landmark was not unique.
+
+Commit `1385a70bcf4bb5537acfac404963b2bf315c8e14` replaces the three calendar view roots with non-landmark containers and adds a presentation regression covering center, detail and editor surfaces. The post-remediation local focal suite, full suite, lint, architecture, PSD-real contract check, build and diff check all pass. A new exact-head review round and a fresh CI execution are required before merge; the failed first execution is retained as evidence rather than reclassified as success.
 
 ## Explicit exclusions
 
