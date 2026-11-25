@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-24 — arranque 4C RLIMIT NOFILE del worker
+
+- `RestrictAddressFamilies` queda fuera: PID 1 `StartTransientUnit`
+  responde `ENXIO` Unexpected message contents, igual que `CPUQuota`.
+- El harness deriva `LimitNOFILE=1024` y PID 1 lo lee. `CPUQuota` y
+  familia de sockets siguen fuera.
+- No se marca `003B-4C`. No hay `Ready` ni HTTP de media.
+
 ## 2026-11-24 — persist reviews PR #366, 003B-4C sigue abierto
 
 - Merge #366 `ff30b8aaffa5b6ffea077a51c8dedf335ba3e935` sobre candidato
