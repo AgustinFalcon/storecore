@@ -71,7 +71,127 @@ class StoreCoreCreatedOrderReportPostgresTest(
         assertIs<StoreCoreCreatedOrderReadResult.Found>(result)
     }
 
-    private fun order(createdAt: String, total: String) {
+    @Test fun `late valid accreditation uses applied time and feeds bounded gross best sellers`() {
+        val order = order("2024-10-15T12:00:00Z", "310.00", "300.00", "10.00")
+        val variant = soldItem(order, 3, "Historic Drill", "DRILL-HIST")
+        accreditation(order, "310.00", "2024-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2024-11-01", "2024-12-01"))
+        val payments = found.report.appliedAccreditationsValue()!!
+        assertEquals("1", payments.count.wire)
+        assertEquals("310.00", payments.confirmedGross.wire)
+        assertEquals("300.00", payments.merchandiseSubtotal.wire)
+        assertEquals("10.00", payments.shippingAmount.wire)
+        val sellers = found.report.bestSellersValue()!!
+        assertEquals("1", sellers.total.wire)
+        assertEquals(false, sellers.truncated)
+        assertEquals(variant.toString(), sellers.items.single().variantId.wire)
+        assertEquals("3", sellers.items.single().grossUnits.wire)
+        assertEquals("Historic Drill", sellers.items.single().name)
+        assertEquals("DRILL-HIST", sellers.items.single().sku)
+    }
+
+    @Test fun `contradictory applied accreditation fails the aggregate closed`() {
+        val order = order("2023-10-15T12:00:00Z", "110.00", "100.00", "10.00")
+        soldItem(order, 1, "Contradictory Drill", "DRILL-BAD")
+        accreditation(order, "110.00", "2023-11-01T03:00:00Z", "PENDING")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2023-11-01", "2023-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.appliedAccreditations)
+        assertIs<ReportValue.Unavailable>(found.report.bestSellers)
+    }
+
+    @Test fun `nullable provider identity cannot disappear as an available zero`() {
+        val order = order("2022-10-15T12:00:00Z", "100.00")
+        soldItem(order, 1, "Null Provider Drill", "DRILL-NULL")
+        accreditation(order, "100.00", "2022-11-01T03:00:00Z", "APPROVED", attemptProviderPresent = false)
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2022-11-01", "2022-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.appliedAccreditations)
+    }
+
+    @Test fun `legitimate cancelled prior attempt does not poison later accreditation`() {
+        val order = order("2020-10-15T12:00:00Z", "100.00")
+        soldItem(order, 1, "Retry Drill", "DRILL-RETRY")
+        cancelledAttempt(order, "100.00")
+        accreditation(order, "100.00", "2020-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2020-11-01", "2020-12-01"))
+        assertEquals("1", found.report.appliedAccreditationsValue()!!.count.wire)
+    }
+
+    @Test fun `best seller keeps latest immutable historical tuple across ordinary rename`() {
+        val firstOrder = order("2019-10-01T12:00:00Z", "100.00")
+        val variant = soldItem(firstOrder, 1, "Drill Original", "DRILL-RENAMED")
+        accreditation(firstOrder, "100.00", "2019-11-01T03:00:00Z", "APPROVED")
+        val secondOrder = order("2019-10-02T12:00:00Z", "200.00")
+        soldItem(secondOrder, 2, "Drill Renamed", "DRILL-RENAMED", variant)
+        accreditation(secondOrder, "200.00", "2019-11-02T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2019-11-01", "2019-12-01"))
+        val item = found.report.bestSellersValue()!!.items.single()
+        assertEquals("3", item.grossUnits.wire)
+        assertEquals("Drill Renamed", item.name)
+    }
+
+    @Test fun `non textual historical snapshot fails only best seller projection closed`() {
+        val order = order("2018-10-15T12:00:00Z", "100.00")
+        soldItem(order, 1, "Typed Drill", "DRILL-TYPED", snapshotOverride = "{\"sku\":123,\"name\":true}")
+        accreditation(order, "100.00", "2018-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2018-11-01", "2018-12-01"))
+        assertIs<ReportValue.Available<*>>(found.report.appliedAccreditations)
+        assertIs<ReportValue.Unavailable>(found.report.bestSellers)
+    }
+
+    @Test fun `accreditation without item evidence keeps gross but not best sellers`() {
+        val order = order("2017-10-15T12:00:00Z", "100.00")
+        accreditation(order, "100.00", "2017-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2017-11-01", "2017-12-01"))
+        assertIs<ReportValue.Available<*>>(found.report.appliedAccreditations)
+        assertIs<ReportValue.Unavailable>(found.report.bestSellers)
+    }
+
+    @Test fun `best sellers expose exact total truncate at twenty and break unit ties by variant id`() {
+        val order = order("2016-10-15T12:00:00Z", "2100.00")
+        val variants = (1..21).map { index -> soldItem(order, 1, "Tool $index", "TOOL-$index") }
+        accreditation(order, "2100.00", "2016-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2016-11-01", "2016-12-01"))
+        val sellers = found.report.bestSellersValue()!!
+        assertEquals("21", sellers.total.wire)
+        assertEquals(true, sellers.truncated)
+        assertEquals(20, sellers.items.size)
+        assertEquals(variants.sorted().take(20).map(Long::toString), sellers.items.map { it.variantId.wire })
+    }
+
+    @Test fun `invalid historical text outside top twenty still fails complete ranking closed`() {
+        val order = order("2015-10-15T12:00:00Z", "2100.00")
+        (1..20).forEach { index -> soldItem(order, 1, "Valid Tool $index", "VALID-$index") }
+        soldItem(order, 1, "\tInvalid Tail", "INVALID-TAIL")
+        accreditation(order, "2100.00", "2015-11-01T03:00:00Z", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2015-11-01", "2015-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.bestSellers)
+    }
+
+    @Test fun `open stock incident preserves proven historical gross accreditation`() {
+        val order = order("2014-10-15T12:00:00Z", "100.00")
+        soldItem(order, 1, "Out Of Stock Drill", "DRILL-STOCK")
+        val attempt = accreditation(order, "100.00", "2014-11-01T03:00:00Z", "APPROVED")
+        jdbc.update(
+            """INSERT INTO mp_order_incidents(attempt_id,order_id,kind,review_status,evidence_redacted)
+               VALUES (?,?,'PAID_WITHOUT_STOCK','OPEN','{}')""",
+            attempt, order,
+        )
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2014-11-01", "2014-12-01"))
+        assertEquals("1", found.report.appliedAccreditationsValue()!!.count.wire)
+        assertEquals("100.00", found.report.appliedAccreditationsValue()!!.confirmedGross.wire)
+    }
+
+    private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {
         val customer = jdbc.queryForObject(
             "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Report','Buyer') RETURNING id",
             Long::class.java,
@@ -83,11 +203,80 @@ class StoreCoreCreatedOrderReportPostgresTest(
             "INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot) VALUES (?,?,?,'{}') RETURNING id",
             Long::class.java, customer, key, hash,
         )!!
-        jdbc.update(
+        return jdbc.queryForObject(
             """INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,
                 buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,created_at,updated_at)
-                VALUES (?,?,?,?,?,'CREATED','{}','{}',?::numeric,0,?::numeric,?::timestamptz,?::timestamptz)""",
-            "RP-${UUID.randomUUID()}", claim, key, hash, customer, total, total, createdAt, createdAt,
+                VALUES (?,?,?,?,?,'CREATED','{}','{}',?::numeric,?::numeric,?::numeric,?::timestamptz,?::timestamptz) RETURNING id""",
+            Long::class.java, "RP-${UUID.randomUUID()}", claim, key, hash, customer, subtotal, shipping, total, createdAt, createdAt,
+        )!!
+    }
+
+    private fun soldItem(
+        orderId: Long,
+        quantity: Int,
+        name: String,
+        sku: String,
+        existingVariant: Long? = null,
+        snapshotOverride: String? = null,
+    ): Long {
+        val variant = existingVariant ?: run {
+            val product = jdbc.queryForObject(
+                "INSERT INTO products(name,slug,base_price,status) VALUES (?,?,100,'ACTIVE') RETURNING id",
+                Long::class.java, name, "report-${UUID.randomUUID()}",
+            )!!
+            jdbc.queryForObject(
+                "INSERT INTO product_variants(product_id,sku,label) VALUES (?,?,?) RETURNING id",
+                Long::class.java, product, sku + UUID.randomUUID().toString().take(6), name,
+            )!!
+        }
+        jdbc.update(
+            """INSERT INTO order_items(order_id,variant_id,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal)
+               VALUES (?,?,COALESCE(?::jsonb,jsonb_build_object('sku',?::text,'name',?::text)),?,100,0,100,?::numeric)""",
+            orderId, variant, snapshotOverride, sku, name, quantity, (quantity * 100).toString(),
+        )
+        return variant
+    }
+
+    private fun accreditation(orderId: Long, total: String, appliedAt: String, paymentStatus: String, attemptProviderPresent: Boolean = true): Long {
+        val payment = jdbc.queryForObject(
+            "INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,?,?::numeric,'ARS') RETURNING id",
+            Long::class.java, orderId, "report-payment-${UUID.randomUUID()}", paymentStatus, total,
+        )!!
+        val provider = "report-provider-${UUID.randomUUID()}"
+        val attemptNo = jdbc.queryForObject("SELECT count(*)+1 FROM mp_checkout_attempts WHERE order_id=?", Int::class.java, orderId)!!
+        val attempt = jdbc.queryForObject(
+            """INSERT INTO mp_checkout_attempts(order_id,payment_id,attempt_no,external_reference,idempotency_key,request_hash,
+               amount,currency,snapshot,provider_order_id,state)
+               VALUES (?,?,?,?,?,?,?::numeric,'ARS','{}',?,'ACCREDITED') RETURNING id""",
+            Long::class.java, orderId, payment, attemptNo, "report-attempt-${UUID.randomUUID()}", UUID.randomUUID(),
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'), total, provider.takeIf { attemptProviderPresent },
+        )!!
+        val inbox = jdbc.queryForObject(
+            """INSERT INTO mp_order_notification_inbox(raw_topic,query_data_id,provider_order_id_candidate,x_request_id,
+               signature_version,signature_result,envelope_redacted,disposition)
+               VALUES ('merchant_order',?,?,?,'v1','ACCEPTED','{}','PROCESSABLE') RETURNING id""",
+            Long::class.java, provider, provider, "report-request-${UUID.randomUUID()}",
+        )!!
+        jdbc.update(
+            """INSERT INTO mp_order_commercial_applications(inbox_id,attempt_id,order_id,provider_order_id,transition,
+               confirmed_amount,confirmed_currency,applied_at)
+               VALUES (?,?,?,?,'PAYMENT_ACCREDITED',?::numeric,'ARS',?::timestamptz)""",
+            inbox, attempt, orderId, provider, total, appliedAt,
+        )
+        return attempt
+    }
+
+    private fun cancelledAttempt(orderId: Long, total: String) {
+        val payment = jdbc.queryForObject(
+            "INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,'CANCELLED',?::numeric,'ARS') RETURNING id",
+            Long::class.java, orderId, "report-cancelled-${UUID.randomUUID()}", total,
+        )!!
+        jdbc.update(
+            """INSERT INTO mp_checkout_attempts(order_id,payment_id,attempt_no,external_reference,idempotency_key,request_hash,
+               amount,currency,snapshot,state)
+               VALUES (?,?,1,?,?,?,?::numeric,'ARS','{}','TERMINAL_UNPAID_VERIFIED')""",
+            orderId, payment, "report-cancelled-attempt-${UUID.randomUUID()}", UUID.randomUUID(),
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'), total,
         )
     }
 
