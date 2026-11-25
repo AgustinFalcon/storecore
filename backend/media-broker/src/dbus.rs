@@ -293,6 +293,7 @@ pub(crate) fn worker_properties(
         ("LimitCPU", Value::from(WORKER_LIMIT_CPU)),
         ("PrivateNetwork", Value::from(true)),
         ("PrivateTmp", Value::from(true)),
+        ("PrivateDevices", Value::from(true)),
     ])
 }
 
@@ -663,6 +664,35 @@ mod tests {
         assert!(!keys.contains(&"ProtectHome"));
         assert!(!keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+    }
+
+    #[test]
+    fn derived_worker_private_devices() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"PrivateDevices"));
+        assert!(!keys.contains(&"ProtectHome"));
+        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(!keys.contains(&"CPUQuota"));
+        let private_devices = worker
+            .iter()
+            .find(|(key, _)| *key == "PrivateDevices")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            private_devices
+                .as_deref()
+                .is_some_and(|value| value.contains("true")),
+            "PrivateDevices must be the internal true, got {private_devices:?}"
+        );
     }
 
     #[test]
@@ -1690,6 +1720,61 @@ mod tests {
         assert!(
             protect_home == "no" || protect_home == "false" || protect_home.is_empty(),
             "PID 1 must not apply ProtectHome, got {protect_home}"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_private_devices() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x15; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived PrivateDevices");
+        }
+        let private_devices = systemctl_property(name, "PrivateDevices");
+        assert!(
+            private_devices == "yes" || private_devices == "true",
+            "PID 1 must apply derived PrivateDevices, got {private_devices}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(

@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C PrivateDevices del worker
+
+- El harness deriva `PrivateDevices=true` y PID 1 lo lee. `ProtectHome`,
+  `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #389, 003B-4C sigue abierto
 
 - Merge #389 `d6d1f9399504dbe150e9e5447e2696e9159a1247` sobre candidato
