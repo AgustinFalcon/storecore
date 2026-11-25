@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #401, 003B-4C sigue abierto
+
+- Merge #401 `e3f3cd4a59df5d57371062ac4989d97b779e73ba` sobre candidato
+  `80b9ff6bb3db93facccb15a3dbef8650a4dbe1ac`. Verify exact-head
+  `45682148495` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr401-architecture.md`
+  y `sdd/reviews/20261125-sol-pr401-security.md`.
+- El harness deriva `ProtectHostname=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectHostname del worker
 
 - El harness deriva `ProtectHostname=true` y PID 1 lo lee. `ProtectHome`,
