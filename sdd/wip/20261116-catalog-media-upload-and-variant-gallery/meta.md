@@ -99,7 +99,10 @@ APPROVED) deja `ProtectHome` fuera (`ENXIO`); no cierra cuota global ni
 7/7, dos Grok 4.7 APPROVED) deriva `PrivateDevices=true`; no cierra
 cuota global ni `Ready`. PR #393 (head `8c006b5`, merge `95d322c`, Verify
 `45643109921` 7/7, dos Grok 4.7 APPROVED) deriva
-`RestrictRealtime=true`; no cierra cuota global ni `Ready`. PR #326
+`RestrictRealtime=true`; no cierra cuota global ni `Ready`. PR #395 (head
+`0cd6c93`, merge `887949d`, Verify `45651635908` 7/7, dos Grok 4.7
+APPROVED) deriva `LockPersonality=true`; no cierra cuota global ni
+`Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

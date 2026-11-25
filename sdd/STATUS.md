@@ -1,13 +1,27 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C LockPersonality del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `LockPersonality=true`
-y PID 1 lo lee. `ProtectHome`, `CPUQuota` y `RestrictAddressFamilies`
-quedan fuera. Sigue sin familia de sockets, cuota global, terminales sin
-ACK, FD/mmap tras el seal, reinicio en cada transición durable, RLIMIT
-restantes ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de media.
+Siguiente corte: namespaces restantes del worker, cuota global,
+terminales sin ACK, FD/mmap tras el seal, reinicio en cada transición
+durable y RLIMIT restantes. `ProtectHome`, `RestrictAddressFamilies` y
+`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue sin
+familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP de media.
+
+## Master vigente — 2026-11-25, 4C LockPersonality PR #395
+
+`master 887949dc5523d4b66e69330c9c5c4b132d876ff7` integra PR #395. Su
+candidato exacto `0cd6c93a03c83020626d0d10495ef8f8ccbf90ec` pasó Verify
+`45651635908` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr395-architecture.md` y
+`sdd/reviews/20261125-sol-pr395-security.md`. El harness deriva
+`LockPersonality=true` y PID 1 lo lee. El corte no cierra `003B-4C`: no
+hay `CPUQuota`, familia de sockets, cuota global ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
 
 ## Master vigente — 2026-11-25, 4C RestrictRealtime PR #393
 
