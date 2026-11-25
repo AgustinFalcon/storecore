@@ -85,17 +85,113 @@ class PaymentDispositionReport private constructor(private val counts: Map<Repor
     }
 }
 
+enum class ReportInventoryEventType {
+    RESERVATION, RELEASE, SALE, REFUND, RETURN_RECEIVED, ADJUSTMENT, RECONCILIATION,
+    STOCK_COMMIT_EXTERNAL, RMA_RESTOCK, UNKNOWN;
+    fun accepts(channel: ReportInventoryChannel): Boolean = when (this) {
+        SALE -> channel in setOf(ReportInventoryChannel.WEB, ReportInventoryChannel.MERCADO_LIBRE)
+        STOCK_COMMIT_EXTERNAL -> channel == ReportInventoryChannel.EXTERNAL_BLACKSTORE
+        RESERVATION, RELEASE -> channel in setOf(ReportInventoryChannel.WEB, ReportInventoryChannel.MERCADO_LIBRE, ReportInventoryChannel.INTERNAL, ReportInventoryChannel.EXTERNAL_BLACKSTORE)
+        REFUND, RETURN_RECEIVED, ADJUSTMENT, RECONCILIATION -> channel in setOf(ReportInventoryChannel.WEB, ReportInventoryChannel.MERCADO_LIBRE, ReportInventoryChannel.INTERNAL)
+        RMA_RESTOCK -> channel == ReportInventoryChannel.INTERNAL
+        UNKNOWN -> false
+    }
+    companion object { fun fromWire(raw: String?) = entries.firstOrNull { it.name == raw } ?: UNKNOWN }
+}
+
+enum class ReportInventoryChannel {
+    WEB, MERCADO_LIBRE, INTERNAL, EXTERNAL_BLACKSTORE, UNKNOWN;
+    companion object { fun fromWire(raw: String?) = entries.firstOrNull { it.name == raw } ?: UNKNOWN }
+}
+
+class InventoryMovementMetric private constructor(
+    val eventType: ReportInventoryEventType,
+    val channel: ReportInventoryChannel,
+    val count: ReportUnsignedLong,
+    val signedQuantity: ReportSignedLong,
+) {
+    companion object {
+        fun create(
+            eventType: ReportInventoryEventType,
+            channel: ReportInventoryChannel,
+            count: ReportUnsignedLong,
+            signedQuantity: ReportSignedLong,
+        ): InventoryMovementMetric? = takeIf {
+            eventType.accepts(channel) && count.value > 0
+        }?.let { InventoryMovementMetric(eventType, channel, count, signedQuantity) }
+    }
+}
+
+class InventoryMovementReport private constructor(val groups: List<InventoryMovementMetric>) {
+    fun quantity(eventType: ReportInventoryEventType, channel: ReportInventoryChannel): ReportSignedLong =
+        requireNotNull(groups.singleOrNull { it.eventType == eventType && it.channel == channel }).signedQuantity
+
+    companion object {
+        fun create(groups: List<InventoryMovementMetric>): InventoryMovementReport? = groups.takeIf {
+            it.map { row -> row.eventType to row.channel }.distinct().size == it.size
+        }?.let { InventoryMovementReport(it.toList()) }
+    }
+}
+
+class LowStockItem private constructor(
+    val variantId: ReportUnsignedLong,
+    val sku: String,
+    val productName: String,
+    val variantLabel: String,
+    val availableQuantity: ReportUnsignedLong,
+    val safetyStock: ReportUnsignedLong,
+) {
+    companion object {
+        fun create(
+            variantId: ReportUnsignedLong,
+            sku: String?,
+            productName: String?,
+            variantLabel: String?,
+            availableQuantity: ReportUnsignedLong,
+            safetyStock: ReportUnsignedLong,
+        ): LowStockItem? {
+            fun text(raw: String?) = raw?.takeIf { it.isNotEmpty() && it.first().code > ASCII_SPACE && it.last().code > ASCII_SPACE }
+            return LowStockItem(
+                variantId,
+                text(sku) ?: return null,
+                text(productName) ?: return null,
+                text(variantLabel) ?: return null,
+                availableQuantity,
+                safetyStock,
+            ).takeIf { availableQuantity.value <= safetyStock.value }
+        }
+        private const val ASCII_SPACE = 0x20
+    }
+}
+
+class LowStockReport private constructor(
+    val items: List<LowStockItem>,
+    val total: ReportUnsignedLong,
+    val truncated: Boolean,
+) {
+    companion object {
+        const val LIMIT = 50
+        fun create(items: List<LowStockItem>, total: ReportUnsignedLong): LowStockReport? = items.takeIf {
+            it.size == minOf(total.value, LIMIT.toLong()).toInt() && it.map(LowStockItem::variantId).distinct().size == it.size
+        }?.let { LowStockReport(it.toList(), total, total.value > it.size) }
+    }
+}
+
 class StoreCoreCreatedOrderReport(
     val period: ReportPeriod,
     val createdOrders: ReportValue<CreatedOrderMetrics>,
     val appliedAccreditations: ReportValue<AppliedAccreditationMetrics>,
     val bestSellers: ReportValue<BestSellerReport>,
     val paymentDisposition: ReportValue<PaymentDispositionReport>,
+    val inventoryMovements: ReportValue<InventoryMovementReport>,
+    val lowStock: ReportValue<LowStockReport>,
 ) {
     fun createdOrdersValue(): CreatedOrderMetrics? = (createdOrders as? ReportValue.Available)?.value
     fun appliedAccreditationsValue(): AppliedAccreditationMetrics? = (appliedAccreditations as? ReportValue.Available)?.value
     fun bestSellersValue(): BestSellerReport? = (bestSellers as? ReportValue.Available)?.value
     fun paymentDispositionValue(): PaymentDispositionReport? = (paymentDisposition as? ReportValue.Available)?.value
+    fun inventoryMovementsValue(): InventoryMovementReport? = (inventoryMovements as? ReportValue.Available)?.value
+    fun lowStockValue(): LowStockReport? = (lowStock as? ReportValue.Available)?.value
 }
 
 sealed interface StoreCoreCreatedOrderReadResult {

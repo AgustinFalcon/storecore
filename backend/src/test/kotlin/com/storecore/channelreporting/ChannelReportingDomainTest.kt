@@ -1,6 +1,9 @@
 package com.storecore.channelreporting
 
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
+import com.storecore.channelreporting.application.InventoryMovementMetric
+import com.storecore.channelreporting.application.ReportInventoryChannel
+import com.storecore.channelreporting.application.ReportInventoryEventType
 import com.storecore.channelreporting.domain.*
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import java.time.Instant
@@ -41,6 +44,25 @@ class ChannelReportingDomainTest {
         assertEquals("-9223372036854775808", ReportSignedLong.fromWire("-9223372036854775808")?.wire)
         assertEquals("0", ReportSignedLong.fromWire("0")?.wire)
         for (raw in listOf("-0", "+1", "01", "-01", "9223372036854775808", "-9223372036854775809")) assertNull(ReportSignedLong.fromWire(raw))
+    }
+
+    @Test fun `inventory movement metric rejects schema illegal event channel pairings`() {
+        assertNull(
+            InventoryMovementMetric.create(
+                ReportInventoryEventType.RMA_RESTOCK,
+                ReportInventoryChannel.WEB,
+                ReportUnsignedLong.fromValue(1)!!,
+                ReportSignedLong.fromValue(1),
+            ),
+        )
+        assertNotNull(
+            InventoryMovementMetric.create(
+                ReportInventoryEventType.RMA_RESTOCK,
+                ReportInventoryChannel.INTERNAL,
+                ReportUnsignedLong.fromValue(1)!!,
+                ReportSignedLong.fromValue(1),
+            ),
+        )
     }
 
     @Test fun `ARS money is a nonnegative canonical scale two decimal`() {

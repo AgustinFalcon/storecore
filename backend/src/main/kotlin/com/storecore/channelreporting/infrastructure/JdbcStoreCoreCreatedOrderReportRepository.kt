@@ -56,12 +56,16 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                 } else {
                     val paymentProjection = appliedAccreditations(period)
                     val paymentDisposition = paymentDisposition(period)
+                    val inventoryMovements = inventoryMovements(period)
+                    val lowStock = lowStock(period)
                     StoreCoreCreatedOrderReadResult.Found(StoreCoreCreatedOrderReport(
                         period,
                         ReportValue.available(CreatedOrderMetrics(count, amount), evidence),
                         paymentProjection.metrics,
                         paymentProjection.bestSellers,
                         paymentDisposition,
+                        inventoryMovements,
+                        lowStock,
                     ))
                 }
             } ?: unavailable(ReportUnavailableReason.READ_FAILED)
@@ -280,6 +284,72 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         SELECT *,projected_payment_candidate projected_payment
         FROM projected
     ) """
+
+    private fun inventoryMovements(period: ReportPeriod): ReportValue<InventoryMovementReport> {
+        val rows = jdbc.query(
+            """SELECT event_type,channel,count(*) movement_count,sum(quantity_delta::numeric) signed_quantity
+               FROM inventory_ledger WHERE created_at>=? AND created_at<?
+               GROUP BY event_type,channel ORDER BY event_type,channel""",
+            { rs, _ ->
+                val event = ReportInventoryEventType.fromWire(rs.getString("event_type"))
+                val channel = ReportInventoryChannel.fromWire(rs.getString("channel"))
+                val count = ReportUnsignedLong.fromValue(rs.getLong("movement_count"))
+                val quantity = runCatching { rs.getBigDecimal("signed_quantity").longValueExact() }.getOrNull()?.let(ReportSignedLong::fromValue)
+                if (count == null || quantity == null) null else InventoryMovementMetric.create(event, channel, count, quantity)
+            },
+            Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive),
+        )
+        if (rows.any { it == null }) return unavailableValue()
+        val report = InventoryMovementReport.create(rows.filterNotNull()) ?: return unavailableValue()
+        val evidence = ReportEvidence.period(
+            ReportSource.STORECORE_INVENTORY_LEDGER,
+            ReportTimeBasis.LEDGER_RECORDED,
+            ReportFreshness.CURRENT,
+            period,
+        ) ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
+    }
+
+    private fun lowStock(period: ReportPeriod): ReportValue<LowStockReport> {
+        val summary = jdbc.queryForMap(
+            """SELECT count(*) FILTER (WHERE b.variant_id IS NULL) missing_count,
+                      count(*) FILTER (WHERE b.variant_id IS NOT NULL AND b.available_quantity<=b.safety_stock) low_count,
+                      count(*) FILTER (WHERE b.variant_id IS NOT NULL AND b.available_quantity<=b.safety_stock AND (
+                        length(v.sku)=0 OR length(p.name)=0 OR length(v.label)=0
+                        OR ascii(left(v.sku,1))<=32 OR ascii(right(v.sku,1))<=32
+                        OR ascii(left(p.name,1))<=32 OR ascii(right(p.name,1))<=32
+                        OR ascii(left(v.label,1))<=32 OR ascii(right(v.label,1))<=32
+                      )) invalid_text_count
+               FROM product_variants v JOIN products p ON p.id=v.product_id
+               LEFT JOIN inventory_balances b ON b.variant_id=v.id
+               WHERE v.active=TRUE AND p.status='ACTIVE'""",
+        )
+        if ((summary["missing_count"] as Number).toLong() != 0L) return unavailableValue()
+        if ((summary["invalid_text_count"] as Number).toLong() != 0L) return unavailableValue()
+        val total = ReportUnsignedLong.fromValue((summary["low_count"] as Number).toLong()) ?: return unavailableValue()
+        val items = jdbc.query(
+            """SELECT v.id,v.sku,p.name product_name,v.label,b.available_quantity,b.safety_stock
+               FROM product_variants v JOIN products p ON p.id=v.product_id JOIN inventory_balances b ON b.variant_id=v.id
+               WHERE v.active=TRUE AND p.status='ACTIVE' AND b.available_quantity<=b.safety_stock
+               ORDER BY b.available_quantity ASC,v.id ASC LIMIT ${LowStockReport.LIMIT}""",
+            { rs, _ ->
+                val id = ReportUnsignedLong.fromValue(rs.getLong("id"))
+                val available = ReportUnsignedLong.fromValue(rs.getLong("available_quantity"))
+                val safety = ReportUnsignedLong.fromValue(rs.getLong("safety_stock"))
+                if (id == null || available == null || safety == null) null else LowStockItem.create(
+                    id, rs.getString("sku"), rs.getString("product_name"), rs.getString("label"), available, safety,
+                )
+            },
+        )
+        if (items.any { it == null }) return unavailableValue()
+        val report = LowStockReport.create(items.filterNotNull(), total) ?: return unavailableValue()
+        val evidence = ReportEvidence.current(
+            ReportSource.STORECORE_CURRENT_INVENTORY,
+            period.generatedAt,
+            ReportFreshness.CURRENT,
+        ) ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
+    }
 
     private fun <T : Any> unavailableValue(): ReportValue<T> =
         requireNotNull(ReportValue.unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY))

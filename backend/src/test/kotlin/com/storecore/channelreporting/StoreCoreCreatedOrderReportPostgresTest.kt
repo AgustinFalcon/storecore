@@ -2,6 +2,8 @@ package com.storecore.channelreporting
 
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
 import com.storecore.channelreporting.application.ReportPaymentDisposition
+import com.storecore.channelreporting.application.ReportInventoryChannel
+import com.storecore.channelreporting.application.ReportInventoryEventType
 import com.storecore.channelreporting.domain.ReportEvidence
 import com.storecore.channelreporting.domain.ReportValue
 import com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository
@@ -243,6 +245,56 @@ class StoreCoreCreatedOrderReportPostgresTest(
         assertIs<ReportValue.Unavailable>(found.report.paymentDisposition)
     }
 
+    @Test fun `inventory movements stay grouped by event semantics and low stock is a current bounded snapshot`() {
+        val variant = inventoryVariant("LOW-STOCK", "Low Stock Drill")
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING")
+        jdbc.update("UPDATE inventory_balances SET available_quantity=0,safety_stock=5 WHERE variant_id=?", variant)
+        ledger(variant, "RESERVATION", "WEB", -2, "2009-11-02T12:00:00Z")
+        ledger(variant, "RELEASE", "WEB", 1, "2009-11-03T12:00:00Z")
+        ledger(variant, "RMA_RESTOCK", "INTERNAL", 4, "2009-11-04T12:00:00Z")
+        ledger(variant, "STOCK_COMMIT_EXTERNAL", "EXTERNAL_BLACKSTORE", -3, "2009-11-05T12:00:00Z")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2009-11-01", "2009-12-01"))
+        val movement = found.report.inventoryMovementsValue()!!
+        assertEquals("-2", movement.quantity(ReportInventoryEventType.RESERVATION, ReportInventoryChannel.WEB).wire)
+        assertEquals("1", movement.quantity(ReportInventoryEventType.RELEASE, ReportInventoryChannel.WEB).wire)
+        assertEquals("4", movement.quantity(ReportInventoryEventType.RMA_RESTOCK, ReportInventoryChannel.INTERNAL).wire)
+        assertEquals("-3", movement.quantity(ReportInventoryEventType.STOCK_COMMIT_EXTERNAL, ReportInventoryChannel.EXTERNAL_BLACKSTORE).wire)
+        val low = found.report.lowStockValue()!!
+        assertEquals(variant.toString(), low.items.first { it.variantId.wire == variant.toString() }.variantId.wire)
+        assertEquals("0", low.items.first { it.variantId.wire == variant.toString() }.availableQuantity.wire)
+    }
+
+    @Test fun `low stock validates the full cohort and truncates fifty by durable identity`() {
+        val variants = (1..51).map { inventoryVariant("BOUND-$it", "Bound Tool $it") }
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING")
+        jdbc.update("UPDATE inventory_balances SET available_quantity=10,safety_stock=0")
+        variants.forEach { jdbc.update("UPDATE inventory_balances SET available_quantity=1,safety_stock=1 WHERE variant_id=?", it) }
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2007-11-01", "2007-12-01"))
+        val low = found.report.lowStockValue()!!
+        assertEquals("51", low.total.wire)
+        assertEquals(true, low.truncated)
+        assertEquals(variants.sorted().take(50).map(Long::toString), low.items.map { it.variantId.wire })
+
+        val tailProduct = jdbc.queryForObject(
+            "SELECT product_id FROM product_variants WHERE id=?",
+            Long::class.java,
+            variants.max(),
+        )!!
+        jdbc.update("UPDATE products SET name=? WHERE id=?", "\tInvalid tail", tailProduct)
+        val invalid = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2007-11-01", "2007-12-01"))
+        assertIs<ReportValue.Unavailable>(invalid.report.lowStock)
+        jdbc.update("UPDATE products SET name=? WHERE id=?", "Bound Tool 51", tailProduct)
+    }
+
+    @Test fun `missing active inventory balance makes low stock unavailable instead of zero`() {
+        inventoryVariant("MISSING-BALANCE", "Missing Balance Drill")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2008-11-01", "2008-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.lowStock)
+    }
+
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {
         val customer = jdbc.queryForObject(
             "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Report','Buyer') RETURNING id",
@@ -336,6 +388,25 @@ class StoreCoreCreatedOrderReportPostgresTest(
         "INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,?,?::numeric,'ARS') RETURNING id",
         Long::class.java, orderId, "report-raw-${UUID.randomUUID()}", status, total,
     )!!
+
+    private fun inventoryVariant(sku: String, name: String): Long {
+        val product = jdbc.queryForObject(
+            "INSERT INTO products(name,slug,base_price,status) VALUES (?,?,100,'ACTIVE') RETURNING id",
+            Long::class.java, name, "inventory-${UUID.randomUUID()}",
+        )!!
+        return jdbc.queryForObject(
+            "INSERT INTO product_variants(product_id,sku,label,active) VALUES (?,?,?,TRUE) RETURNING id",
+            Long::class.java, product, sku + UUID.randomUUID().toString().take(6), name,
+        )!!
+    }
+
+    private fun ledger(variantId: Long, eventType: String, channel: String, delta: Int, createdAt: String) {
+        jdbc.update(
+            """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor,created_at)
+               VALUES (?,?,?,?,?,'REPORT_TEST',?::timestamptz)""",
+            variantId, UUID.randomUUID(), eventType, channel, delta, createdAt,
+        )
+    }
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
