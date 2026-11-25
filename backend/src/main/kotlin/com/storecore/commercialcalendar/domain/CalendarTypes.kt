@@ -25,6 +25,10 @@ enum class CalendarSwitchState(val wire: String) {
     DISABLED("DISABLED"), ENABLED("ENABLED"), UNKNOWN("UNKNOWN");
     companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
 }
+enum class CalendarReminderReadiness(val wire: String) {
+    UNAVAILABLE("UNAVAILABLE"), READY("READY"), UNKNOWN("UNKNOWN");
+    companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
+}
 enum class CalendarOutcome(val wire: String) {
     APPLIED("APPLIED"), REVISION_CONFLICT("REVISION_CONFLICT"), INVALID_TRANSITION("INVALID_TRANSITION"), INVALID_DEFINITION("INVALID_DEFINITION"), PREFLIGHT_REQUIRED("PREFLIGHT_REQUIRED"), PREFLIGHT_EXPIRED("PREFLIGHT_EXPIRED"), PREFLIGHT_STALE("PREFLIGHT_STALE"), REVISION_EXHAUSTED("REVISION_EXHAUSTED"), UNKNOWN("UNKNOWN");
     companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }

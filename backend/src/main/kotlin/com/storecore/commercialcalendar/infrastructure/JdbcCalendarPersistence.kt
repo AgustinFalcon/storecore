@@ -126,7 +126,8 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         if(!authorized(actor)) return@tx CalendarPersistenceResult.Unauthorized
         val row=binding(commandId) ?: return@tx CalendarPersistenceResult.Missing
         if((row["actor_id"] as? Number)?.toLong()!=actor.userId || CalendarCommandFamily.fromWire(row["family"] as? String)!=CalendarCommandFamily.EVENT || eventId!=null && row["event_id"]!=eventId.value) return@tx CalendarPersistenceResult.Missing
-        loadReceipt(commandId)
+        val result=loadReceipt(commandId)
+        if(!authorized(actor)) CalendarPersistenceResult.Unauthorized else result
     }
     override fun audit(actor: InternalUserPrincipal,eventId: CalendarEventId): List<CalendarReceipt>?=tx {
         if(!authorized(actor)) return@tx emptyList()
@@ -155,6 +156,8 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.command_id=?""",id.value).singleOrNull() ?: return CalendarPersistenceResult.Unknown
         return CalendarPersistenceResult.Recorded(decodeReceipt(row))
     }
+    internal fun historicalReceipt(id: CalendarCommandId): CalendarReceipt =
+        (loadReceipt(id) as? CalendarPersistenceResult.Recorded)?.receipt ?: throw IllegalStateException("Calendar receipt unavailable")
     private fun decodeReceipt(row: Map<String,Any?>): CalendarReceipt {
         val operation=CalendarOperation.fromWire(row["operation"] as String); val outcome=CalendarOutcome.fromWire(row["outcome"] as String)
         require(operation!=CalendarOperation.UNKNOWN && outcome!=CalendarOutcome.UNKNOWN)
