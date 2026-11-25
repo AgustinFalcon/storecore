@@ -1,14 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C RLIMIT FSIZE del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `LimitFSIZE` al tamaño
-del workspace (`48 MiB`) y PID 1 lo lee. `RestrictAddressFamilies` y
-`CPUQuota` quedan fuera. Sigue sin familia de sockets, cuota global,
-terminales sin ACK, FD/mmap tras el seal, reinicio en cada transición
-durable, RLIMIT restantes ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable y RLIMIT restantes.
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento no
+cierra `003B-4C`. Sigue sin familia de sockets, cuota global ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-25, 4C RLIMIT FSIZE PR #383
+
+`master f5e27b37b587a355bfc866431fbf9d255f1d691f` integra PR #383. Su
+candidato exacto `d7f773a5a88c7cc71c901433276a7a3e9910ef04` pasó Verify
+`45560675895` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr383-architecture.md` y
+`sdd/reviews/20261125-sol-pr383-security.md`. El harness deriva
+`LimitFSIZE` al tamaño del workspace (`48 MiB`) y PID 1 lo lee. El corte
+no cierra `003B-4C`: no hay `CPUQuota`, familia de sockets, cuota global
+ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C RLIMIT CORE PR #381
 
