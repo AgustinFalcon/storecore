@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C ProtectControlGroups del worker
+
+- El harness deriva `ProtectControlGroups=true` y PID 1 lo lee.
+  `ProtectHome`, `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #397, 003B-4C sigue abierto
 
 - Merge #397 `1fad60f03fc1a17788281cce2c42d5dbe79cbf30` sobre candidato
