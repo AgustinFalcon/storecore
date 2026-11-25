@@ -31,6 +31,8 @@ const WORKER_TASKS_MAX: u64 = 64;
 const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
 /// Stop grace after `RuntimeMax`. Derived internally; the client cannot supply it.
 const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
+/// Open-file ceiling. Derived internally; the client cannot supply it.
+const WORKER_LIMIT_NOFILE: u64 = 1024;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -274,10 +276,7 @@ pub(crate) fn worker_properties(
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
         ("KillSignal", Value::from(9i32)),
-        (
-            "RestrictAddressFamilies",
-            Value::from(vec!["AF_UNIX".to_owned(), "AF_NETLINK".to_owned()]),
-        ),
+        ("LimitNOFILE", Value::from(WORKER_LIMIT_NOFILE)),
     ])
 }
 
@@ -519,22 +518,18 @@ mod tests {
                 .is_some_and(|value| value.contains('9')),
             "KillSignal must be SIGKILL, got {kill_signal:?}"
         );
-        assert!(keys.contains(&"RestrictAddressFamilies"));
-        let families = worker
+        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"LimitNOFILE"));
+        let nofile = worker
             .iter()
-            .find(|(key, _)| *key == "RestrictAddressFamilies")
+            .find(|(key, _)| *key == "LimitNOFILE")
             .map(|(_, value)| format!("{value:?}"));
         assert!(
-            families
+            nofile
                 .as_deref()
-                .is_some_and(|value| value.contains("AF_UNIX") && value.contains("AF_NETLINK")),
-            "RestrictAddressFamilies must allow UNIX/NETLINK, got {families:?}"
-        );
-        assert!(
-            families
-                .as_deref()
-                .is_some_and(|value| !value.contains("AF_INET")),
-            "RestrictAddressFamilies must omit AF_INET, got {families:?}"
+                .is_some_and(|value| value.contains(&WORKER_LIMIT_NOFILE.to_string())),
+            "LimitNOFILE must be the internal 1024 ceiling, got {nofile:?}"
         );
     }
 
@@ -1136,7 +1131,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
-    fn pid1_worker_restricts_address_families() {
+    fn pid1_worker_limit_nofile() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
                 .expect("pid1 comm")
@@ -1170,16 +1165,12 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
-            panic!("StartTransientUnit rejected derived RestrictAddressFamilies");
+            panic!("StartTransientUnit rejected derived LimitNOFILE");
         }
-        let families = systemctl_property(name, "RestrictAddressFamilies");
+        let nofile = systemctl_property(name, "LimitNOFILE");
         assert!(
-            families.contains("AF_UNIX") && families.contains("AF_NETLINK"),
-            "PID 1 must apply derived RestrictAddressFamilies, got {families}"
-        );
-        assert!(
-            !families.contains("AF_INET"),
-            "PID 1 must omit AF_INET, got {families}"
+            nofile == "1024" || nofile.starts_with("1024:"),
+            "PID 1 must apply derived LimitNOFILE, got {nofile}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
