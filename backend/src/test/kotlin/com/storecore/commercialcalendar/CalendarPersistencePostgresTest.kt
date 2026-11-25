@@ -5,6 +5,8 @@ import com.storecore.commercialcalendar.application.*
 import com.storecore.commercialcalendar.domain.*
 import com.storecore.commercialcalendar.infrastructure.*
 import com.storecore.identity.domain.*
+import com.storecore.configuration.application.*
+import com.storecore.configuration.domain.CapabilityActor
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeAll
@@ -39,6 +41,14 @@ class CalendarPersistencePostgresTest {
         val source=runtime()
         return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,ids,CalendarFixtures.hasher)
     }
+    private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true): JdbcCalendarSwitchPersistence {
+        val source=runtime()
+        val capability=object: CapabilityDecisionPort { override fun decide(module: String,action: String,actor: CapabilityActor) { if(!active) throw CapabilityDisabled() } }
+        return JdbcCalendarSwitchPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,CalendarFixtures.hasher,capability)
+    }
+    private fun switchRequest(id: CalendarCommandId=CalendarFixtures.command(),revision: CalendarRevision=CalendarRevision.Zero,operation: CalendarSwitchOperation=CalendarSwitchOperation.ENABLE,expires: Instant=CalendarFixtures.now.plusSeconds(3600))=
+        CalendarSwitchCommandRequest(id,revision,operation,requireNotNull(CalendarSwitchOwner.fromWire("Operations owner")),CalendarFixtures.reason,expires,requireNotNull(CalendarRemovalTicket.fromWire("OPS-442")),CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER)
+    private fun switchRecorded(value: CalendarSwitchPersistenceResult)=assertInstanceOf(CalendarSwitchPersistenceResult.Recorded::class.java,value).receipt
     private fun actor(role: InternalRole=InternalRole.ADMIN): InternalUserPrincipal {
         val id=root.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Calendar','Fixture') RETURNING id",Long::class.java,"calendar-${UUID.randomUUID()}@example.test","${'$'}argon2id${'$'}fixture")!!
         root.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code=?",id,role.name)
@@ -55,14 +65,18 @@ class CalendarPersistencePostgresTest {
     private fun schedule(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=recorded(repo.change(actor,request(event,CalendarStep.Schedule,preflight=preflight(repo,actor,event).id))).after
 
     @Test fun `PCC 008B migration closes singleton governance global identity and least privilege`() {
-        val columns=root.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='calendar_reminder_switch'",String::class.java).toSet()
+        root.execute("CREATE DATABASE calendar_switch_contract")
+        val contractUrl=postgres.jdbcUrl.substringBeforeLast('/')+"/calendar_switch_contract"
+        flyway(contractUrl).migrate()
+        val contract=JdbcTemplate(DriverManagerDataSource(contractUrl,postgres.username,postgres.password))
+        val columns=contract.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='calendar_reminder_switch'",String::class.java).toSet()
         assertTrue(columns.containsAll(setOf("owner","reason","created_at","expires_at","removal_ticket","affected_action")))
-        val bootstrap=root.queryForMap("SELECT * FROM calendar_reminder_switch WHERE id=1")
+        val bootstrap=contract.queryForMap("SELECT * FROM calendar_reminder_switch WHERE id=1")
         assertEquals("DISABLED",bootstrap["state"]); assertEquals(0L,(bootstrap["revision"] as Number).toLong())
         for(column in listOf("owner","reason","created_at","expires_at","removal_ticket","affected_action")) assertNull(bootstrap[column])
-        assertFalse(root.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='COMMERCIAL_CALENDAR'",Boolean::class.java)!!)
-        assertEquals("DISABLED",root.queryForObject("SELECT state FROM module_configurations WHERE module_code='COMMERCIAL_CALENDAR'",String::class.java))
-        assertEquals("PUBLISH",root.queryForObject("SELECT action_kind FROM capability_actions WHERE module_code='COMMERCIAL_CALENDAR' AND action_code='EMIT_IN_APP_CAMPAIGN_REMINDER'",String::class.java))
+        assertFalse(contract.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='COMMERCIAL_CALENDAR'",Boolean::class.java)!!)
+        assertEquals("DISABLED",contract.queryForObject("SELECT state FROM module_configurations WHERE module_code='COMMERCIAL_CALENDAR'",String::class.java))
+        assertEquals("PUBLISH",contract.queryForObject("SELECT action_kind FROM capability_actions WHERE module_code='COMMERCIAL_CALENDAR' AND action_code='EMIT_IN_APP_CAMPAIGN_REMINDER'",String::class.java))
         for(table in listOf("calendar_switch_command_receipts","calendar_switch_audit")) {
             assertFalse(root.queryForObject("SELECT has_table_privilege('storecore_runtime',?,'INSERT,UPDATE,DELETE')",Boolean::class.java,table)!!)
         }
@@ -72,6 +86,23 @@ class CalendarPersistencePostgresTest {
         val event=create(repo(),admin)
         assertThrows(DataAccessException::class.java) { root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'REMINDER_SWITCH',?,?,?)",UUID.randomUUID(),admin.userId,event.id.value,"c".repeat(64)) }
         assertThrows(DataAccessException::class.java) { JdbcTemplate(runtime()).update("UPDATE calendar_reminder_switch SET state='ENABLED',revision=1 WHERE id=1") }
+    }
+    @Test fun `switch writer replays before clock guards and preserves global collisions and safety disable`() {
+        val clock=MutableCalendarClock(); val admin=actor(); val foreign=actor(); val active=switchRepo(clock,true)
+        val enable=switchRequest(); val enabled=switchRecorded(active.change(admin,enable))
+        assertEquals(CalendarOutcome.APPLIED,enabled.outcome); assertEquals(CalendarSwitchState.ENABLED,enabled.after.configuredState)
+        clock.instant=enable.expiresAt.plusSeconds(60)
+        val replay=switchRecorded(active.change(admin,enable))
+        assertEquals(enabled.recordedAt,replay.recordedAt); assertEquals(enabled.after.revision,replay.after.revision)
+        assertEquals(CalendarSwitchPersistenceResult.IdempotencyConflict,active.change(admin,enable.copy(owner=requireNotNull(CalendarSwitchOwner.fromWire("Other owner")))))
+        assertEquals(CalendarSwitchPersistenceResult.Missing,active.receipt(foreign,enable.commandId))
+        val disable=switchRequest(revision=enabled.after.revision,operation=CalendarSwitchOperation.DISABLE,expires=clock.instant.plusSeconds(3600))
+        val disabled=switchRecorded(switchRepo(clock,false).change(admin,disable))
+        assertEquals(CalendarOutcome.INVALID_TRANSITION,disabled.outcome)
+        val renewed=switchRecorded(active.change(admin,switchRequest(revision=enabled.after.revision,expires=clock.instant.plusSeconds(3600))))
+        val safe=switchRecorded(switchRepo(clock,false).change(admin,switchRequest(revision=renewed.after.revision,operation=CalendarSwitchOperation.DISABLE,expires=clock.instant.plusSeconds(3600))))
+        assertEquals(CalendarOutcome.APPLIED,safe.outcome); assertEquals(CalendarSwitchState.DISABLED,safe.after.configuredState)
+        assertEquals(4L,(assertInstanceOf(CalendarQueryResult.Found::class.java,active.audit(admin,CalendarPageRequest.create()!!)).value as CalendarPage<*>).total)
     }
 
     @Test fun `clean and V35 upgrade preserve every published checksum and default disabled least privilege`() {

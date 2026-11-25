@@ -129,10 +129,41 @@ END $$;
 CREATE TRIGGER trg_calendar_protect_reminder_switch BEFORE INSERT OR UPDATE OR DELETE ON calendar_reminder_switch
  FOR EACH ROW EXECUTE FUNCTION calendar_protect_reminder_switch();
 
+CREATE FUNCTION calendar_lock_reminder_switch() RETURNS SETOF calendar_reminder_switch
+LANGUAGE SQL SECURITY DEFINER SET search_path=pg_catalog,public AS $$
+ SELECT * FROM public.calendar_reminder_switch WHERE id=1 FOR UPDATE
+$$;
+ALTER FUNCTION calendar_lock_reminder_switch() OWNER TO storecore_migrator;
+REVOKE ALL ON FUNCTION calendar_lock_reminder_switch() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION calendar_lock_reminder_switch() TO storecore_runtime;
+
 CREATE TRIGGER trg_calendar_switch_receipts_immutable BEFORE UPDATE OR DELETE ON calendar_switch_command_receipts
  FOR EACH ROW EXECUTE FUNCTION prevent_immutable_mutation();
 CREATE TRIGGER trg_calendar_switch_audit_immutable BEFORE UPDATE OR DELETE ON calendar_switch_audit
  FOR EACH ROW EXECUTE FUNCTION prevent_immutable_mutation();
+
+CREATE FUNCTION calendar_record_switch_command(
+ p_actor BIGINT,p_session UUID,p_command UUID,p_operation TEXT,p_expected BIGINT,p_requested JSONB,p_hash TEXT,
+ p_outcome TEXT,p_before JSONB,p_after JSONB,p_recorded TIMESTAMPTZ
+) RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ IF NOT public.calendar_admin_authorized(p_actor,p_session) THEN RAISE EXCEPTION 'calendar switch actor unauthorized'; END IF;
+ INSERT INTO public.calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash)
+ VALUES(p_command,'REMINDER_SWITCH',p_actor,NULL,p_hash);
+ IF p_outcome='APPLIED' THEN
+  UPDATE public.calendar_reminder_switch SET state=p_after->>'configuredState',revision=(p_after->>'revision')::bigint,
+   owner=p_requested->>'owner',reason=p_requested->>'reason',created_at=(p_requested->>'createdAt')::timestamptz,
+   expires_at=(p_requested->>'expiresAt')::timestamptz,removal_ticket=p_requested->>'removalTicket',affected_action=p_requested->>'affectedAction'
+  WHERE id=1 AND revision=p_expected;
+  IF NOT FOUND THEN RAISE EXCEPTION 'calendar switch revision changed'; END IF;
+ END IF;
+ INSERT INTO public.calendar_switch_command_receipts(command_id,actor_id,operation,expected_revision,requested_metadata,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
+ VALUES(p_command,p_actor,p_operation,p_expected,p_requested,p_hash,p_outcome,p_before,p_after,p_recorded);
+ INSERT INTO public.calendar_switch_audit(command_id) VALUES(p_command);
+END $$;
+ALTER FUNCTION calendar_record_switch_command(BIGINT,UUID,UUID,TEXT,BIGINT,JSONB,TEXT,TEXT,JSONB,JSONB,TIMESTAMPTZ) OWNER TO storecore_migrator;
+REVOKE ALL ON FUNCTION calendar_record_switch_command(BIGINT,UUID,UUID,TEXT,BIGINT,JSONB,TEXT,TEXT,JSONB,JSONB,TIMESTAMPTZ) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION calendar_record_switch_command(BIGINT,UUID,UUID,TEXT,BIGINT,JSONB,TEXT,TEXT,JSONB,JSONB,TIMESTAMPTZ) TO storecore_runtime;
 
 REVOKE ALL ON calendar_switch_command_receipts,calendar_switch_audit FROM PUBLIC,storecore_runtime;
 GRANT SELECT ON calendar_switch_command_receipts,calendar_switch_audit TO storecore_runtime;
