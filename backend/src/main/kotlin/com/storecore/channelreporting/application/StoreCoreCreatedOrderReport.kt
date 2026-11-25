@@ -66,15 +66,36 @@ class BestSellerReport private constructor(
     }
 }
 
+enum class ReportPaymentDisposition {
+    PENDING, APPROVED, REJECTED, CANCELLED, REFUNDED, CHARGED_BACK, UNKNOWN;
+    companion object {
+        fun fromWire(raw: String?): ReportPaymentDisposition = entries.firstOrNull { it.name == raw } ?: UNKNOWN
+        val admitted: Set<ReportPaymentDisposition> = entries.filterTo(linkedSetOf()) { it != UNKNOWN }
+    }
+}
+
+class PaymentDispositionReport private constructor(private val counts: Map<ReportPaymentDisposition, ReportUnsignedLong>) {
+    fun count(disposition: ReportPaymentDisposition): ReportUnsignedLong =
+        requireNotNull(counts[disposition.takeIf { it != ReportPaymentDisposition.UNKNOWN }])
+
+    companion object {
+        fun create(counts: Map<ReportPaymentDisposition, ReportUnsignedLong>): PaymentDispositionReport? =
+            counts.takeIf { it.keys == ReportPaymentDisposition.admitted }
+                ?.let { PaymentDispositionReport(it.toMap()) }
+    }
+}
+
 class StoreCoreCreatedOrderReport(
     val period: ReportPeriod,
     val createdOrders: ReportValue<CreatedOrderMetrics>,
     val appliedAccreditations: ReportValue<AppliedAccreditationMetrics>,
     val bestSellers: ReportValue<BestSellerReport>,
+    val paymentDisposition: ReportValue<PaymentDispositionReport>,
 ) {
     fun createdOrdersValue(): CreatedOrderMetrics? = (createdOrders as? ReportValue.Available)?.value
     fun appliedAccreditationsValue(): AppliedAccreditationMetrics? = (appliedAccreditations as? ReportValue.Available)?.value
     fun bestSellersValue(): BestSellerReport? = (bestSellers as? ReportValue.Available)?.value
+    fun paymentDispositionValue(): PaymentDispositionReport? = (paymentDisposition as? ReportValue.Available)?.value
 }
 
 sealed interface StoreCoreCreatedOrderReadResult {

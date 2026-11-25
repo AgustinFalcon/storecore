@@ -55,11 +55,13 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                     unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY)
                 } else {
                     val paymentProjection = appliedAccreditations(period)
+                    val paymentDisposition = paymentDisposition(period)
                     StoreCoreCreatedOrderReadResult.Found(StoreCoreCreatedOrderReport(
                         period,
                         ReportValue.available(CreatedOrderMetrics(count, amount), evidence),
                         paymentProjection.metrics,
                         paymentProjection.bestSellers,
+                        paymentDisposition,
                     ))
                 }
             } ?: unavailable(ReportUnavailableReason.READ_FAILED)
@@ -196,6 +198,88 @@ class JdbcStoreCoreCreatedOrderReportRepository(
     ) """
 
     private fun contradictoryPaymentProjection() = PaymentProjection(unavailableValue(), unavailableValue())
+
+    private fun paymentDisposition(period: ReportPeriod): ReportValue<PaymentDispositionReport> {
+        val rows = jdbc.query(
+            paymentDispositionCte() + """SELECT projected_payment,count(*) disposition_count
+                FROM classified GROUP BY projected_payment ORDER BY projected_payment""",
+            { rs, _ -> ReportPaymentDisposition.fromWire(rs.getString("projected_payment")) to rs.getLong("disposition_count") },
+            Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive),
+        )
+        if (rows.any { it.first == ReportPaymentDisposition.UNKNOWN || it.second < 0 }) return unavailableValue()
+        val observed = rows.associate { it.first to it.second }
+        val counts = ReportPaymentDisposition.admitted.associateWith { disposition ->
+            ReportUnsignedLong.fromValue(observed[disposition] ?: 0L) ?: return unavailableValue()
+        }
+        val report = PaymentDispositionReport.create(counts) ?: return unavailableValue()
+        val evidence = ReportEvidence.period(
+            ReportSource.STORECORE_PAYMENT_APPLICATION,
+            ReportTimeBasis.ORDER_CREATED,
+            ReportFreshness.CURRENT,
+            period,
+        ) ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
+    }
+
+    private fun paymentDispositionCte(): String = """WITH scoped_orders AS (
+        SELECT o.id,o.status,o.total,o.currency
+        FROM orders o WHERE o.created_at>=? AND o.created_at<?
+    ), authority AS (
+        SELECT so.*,
+          (SELECT count(*) FROM mp_order_commercial_applications c
+             WHERE c.order_id=so.id AND c.transition='PAYMENT_ACCREDITED') credits,
+          (SELECT count(*) FROM mp_order_commercial_applications c
+             JOIN mp_checkout_attempts a ON a.id=c.attempt_id
+             JOIN payments p ON p.id=a.payment_id
+             WHERE c.order_id=so.id AND c.transition='PAYMENT_ACCREDITED'
+               AND a.order_id=c.order_id AND p.order_id=c.order_id
+               AND a.provider_order_id=c.provider_order_id AND a.state='ACCREDITED'
+               AND p.amount=a.amount AND a.amount=c.confirmed_amount AND c.confirmed_amount=so.total
+               AND p.currency=a.currency AND a.currency=c.confirmed_currency AND c.confirmed_currency=so.currency
+               AND p.status IN ('APPROVED','CANCELLED','REFUNDED','CHARGED_BACK')) valid_credits,
+          (SELECT min(p.status) FROM mp_order_commercial_applications c
+             JOIN mp_checkout_attempts a ON a.id=c.attempt_id JOIN payments p ON p.id=a.payment_id
+             WHERE c.order_id=so.id AND c.transition='PAYMENT_ACCREDITED') credited_status,
+          (SELECT count(*) FROM payments p WHERE p.order_id=so.id) payment_count,
+          (SELECT min(p.status) FROM payments p WHERE p.order_id=so.id) raw_status,
+          (SELECT count(*) FROM payments p WHERE p.order_id=so.id AND p.status IN ('APPROVED','REFUNDED','CHARGED_BACK')
+             AND NOT EXISTS (SELECT 1 FROM mp_order_commercial_applications c
+               JOIN mp_checkout_attempts a ON a.id=c.attempt_id
+               WHERE c.order_id=so.id AND c.transition='PAYMENT_ACCREDITED' AND a.payment_id=p.id)) orphan_funded,
+          EXISTS(SELECT 1 FROM mp_order_incidents i WHERE i.order_id=so.id
+             AND i.review_status NOT IN ('RESOLVED','REJECTED')) incident,
+          EXISTS(SELECT 1 FROM mp_order_reversal_cases r JOIN mp_checkout_attempts a ON a.id=r.attempt_id
+             WHERE a.order_id=so.id AND (r.review_status NOT IN ('RESOLVED','REJECTED')
+               OR (r.review_status='RESOLVED' AND (r.provider_order_id IS DISTINCT FROM a.provider_order_id
+                 OR NOT EXISTS (SELECT 1 FROM mp_order_commercial_applications c
+                    WHERE c.order_id=so.id AND c.attempt_id=a.id AND c.provider_order_id=r.provider_order_id
+                      AND c.transition='PAYMENT_ACCREDITED'))))) ambiguous_reversal,
+          (SELECT min(r.kind) FROM mp_order_reversal_cases r JOIN mp_checkout_attempts a ON a.id=r.attempt_id
+             WHERE a.order_id=so.id AND r.review_status='RESOLVED' AND r.provider_order_id=a.provider_order_id
+               AND EXISTS (SELECT 1 FROM mp_order_commercial_applications c
+                 WHERE c.order_id=so.id AND c.attempt_id=a.id AND c.provider_order_id=r.provider_order_id
+                   AND c.transition='PAYMENT_ACCREDITED')) reversal_kind
+        FROM scoped_orders so
+    ), checked AS (
+        SELECT *, (incident OR ambiguous_reversal OR orphan_funded>0
+          OR (credits>0 AND (credits<>1 OR valid_credits<>1))
+          OR (credits=0 AND (status IN ('PAID','PAID_STOCK_REVIEW','REFUNDED')
+            OR reversal_kind IS NOT NULL OR raw_status IN ('APPROVED','REFUNDED','CHARGED_BACK')))) contradictory
+        FROM authority
+    ), projected AS (
+        SELECT *,CASE
+          WHEN contradictory THEN 'UNKNOWN'
+          WHEN credits=1 AND valid_credits=1 THEN
+            CASE WHEN reversal_kind='CHARGEBACK' THEN 'CHARGED_BACK'
+                 WHEN reversal_kind IS NOT NULL THEN 'REFUNDED'
+                 ELSE COALESCE(credited_status,'UNKNOWN') END
+          WHEN credits=0 AND payment_count=1 AND raw_status IN ('PENDING','REJECTED','CANCELLED') THEN raw_status
+          ELSE 'UNKNOWN' END projected_payment_candidate
+        FROM checked
+    ), classified AS (
+        SELECT *,projected_payment_candidate projected_payment
+        FROM projected
+    ) """
 
     private fun <T : Any> unavailableValue(): ReportValue<T> =
         requireNotNull(ReportValue.unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY))

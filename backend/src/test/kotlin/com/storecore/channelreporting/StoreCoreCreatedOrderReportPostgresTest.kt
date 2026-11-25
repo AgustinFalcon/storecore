@@ -1,6 +1,7 @@
 package com.storecore.channelreporting
 
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
+import com.storecore.channelreporting.application.ReportPaymentDisposition
 import com.storecore.channelreporting.domain.ReportEvidence
 import com.storecore.channelreporting.domain.ReportValue
 import com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository
@@ -189,6 +190,57 @@ class StoreCoreCreatedOrderReportPostgresTest(
         val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2014-11-01", "2014-12-01"))
         assertEquals("1", found.report.appliedAccreditationsValue()!!.count.wire)
         assertEquals("100.00", found.report.appliedAccreditationsValue()!!.confirmedGross.wire)
+        val createdCohort = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2014-10-01", "2014-11-01"))
+        assertIs<ReportValue.Unavailable>(createdCohort.report.paymentDisposition)
+    }
+
+    @Test fun `payment disposition classifies the created order cohort with strict authority`() {
+        val pending = order("2013-11-05T12:00:00Z", "100.00")
+        rawPayment(pending, "100.00", "PENDING")
+        val approved = order("2013-11-06T12:00:00Z", "100.00")
+        soldItem(approved, 1, "Approved Drill", "DRILL-APPROVED")
+        accreditation(approved, "100.00", "2013-11-07T12:00:00Z", "APPROVED")
+        jdbc.update("UPDATE orders SET status='PAID' WHERE id=?", approved)
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2013-11-01", "2013-12-01"))
+        val disposition = found.report.paymentDispositionValue()!!
+        assertEquals("1", disposition.count(ReportPaymentDisposition.PENDING).wire)
+        assertEquals("1", disposition.count(ReportPaymentDisposition.APPROVED).wire)
+        assertEquals("0", disposition.count(ReportPaymentDisposition.REJECTED).wire)
+    }
+
+    @Test fun `orphan approved payment makes complete disposition unavailable`() {
+        val order = order("2012-11-05T12:00:00Z", "100.00")
+        rawPayment(order, "100.00", "APPROVED")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2012-11-01", "2012-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.paymentDisposition)
+    }
+
+    @Test fun `current terminal credited status is retained when order projection becomes inconsistent`() {
+        val order = order("2011-11-05T12:00:00Z", "100.00")
+        soldItem(order, 1, "Refunded Drill", "DRILL-REFUNDED")
+        accreditation(order, "100.00", "2011-11-06T12:00:00Z", "REFUNDED")
+        jdbc.update("UPDATE orders SET status='PAID' WHERE id=?", order)
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2011-11-01", "2011-12-01"))
+        val disposition = found.report.paymentDispositionValue()!!
+        assertEquals("1", disposition.count(ReportPaymentDisposition.REFUNDED).wire)
+    }
+
+    @Test fun `pending credited row cannot be promoted by resolved reversal evidence`() {
+        val order = order("2010-11-05T12:00:00Z", "100.00")
+        soldItem(order, 1, "Pending Drill", "DRILL-PENDING")
+        val attempt = accreditation(order, "100.00", "2010-11-06T12:00:00Z", "PENDING")
+        val provider = jdbc.queryForObject("SELECT provider_order_id FROM mp_checkout_attempts WHERE id=?", String::class.java, attempt)!!
+        jdbc.update(
+            """INSERT INTO mp_order_reversal_cases(attempt_id,provider_order_id,provider_refund_id,kind,review_status,evidence_redacted)
+               VALUES (?,?,?,'REFUND_TOTAL','RESOLVED','{}')""",
+            attempt, provider, "report-refund-${UUID.randomUUID()}",
+        )
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2010-11-01", "2010-12-01"))
+        assertIs<ReportValue.Unavailable>(found.report.paymentDisposition)
     }
 
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {
@@ -279,6 +331,11 @@ class StoreCoreCreatedOrderReportPostgresTest(
             UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'), total,
         )
     }
+
+    private fun rawPayment(orderId: Long, total: String, status: String): Long = jdbc.queryForObject(
+        "INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,?,?::numeric,'ARS') RETURNING id",
+        Long::class.java, orderId, "report-raw-${UUID.randomUUID()}", status, total,
+    )!!
 
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")
