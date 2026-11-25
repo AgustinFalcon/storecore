@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #397, 003B-4C sigue abierto
+
+- Merge #397 `1fad60f03fc1a17788281cce2c42d5dbe79cbf30` sobre candidato
+  `8156b7c7def82711603395d80038dee904112502`. Verify exact-head
+  `45661670755` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr397-architecture.md`
+  y `sdd/reviews/20261125-sol-pr397-security.md`.
+- El harness deriva `ProtectKernelTunables=true` y PID 1 lo lee. No se
+  marca `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectKernelTunables del worker
 
 - El harness deriva `ProtectKernelTunables=true` y PID 1 lo lee.
