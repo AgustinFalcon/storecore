@@ -1120,8 +1120,26 @@ mod tests {
         let job = JobId::create([0xbb; 16]).expect("job");
         let runtime = approved_pid1_runtime();
         let worker = Principal::create(2102, 2102);
-        let spec = start_pid1_self_test_worker(&mut systemd, job, &runtime, worker);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
         let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived KillMode");
+        }
+        freeze_worker_main_pid(name);
         assert_eq!(
             systemctl_property(name, "KillMode"),
             "control-group",
@@ -1243,11 +1261,7 @@ mod tests {
     }
 
     fn spawn_cgroup_sleeper(name: &str) -> std::process::Child {
-        let relative = systemctl_property(name, "ControlGroup");
-        assert!(
-            !relative.is_empty(),
-            "KillMode attest needs ControlGroup for {name}"
-        );
+        let relative = wait_control_group(name);
         let procs = Path::new("/sys/fs/cgroup")
             .join(relative.trim_start_matches('/'))
             .join("cgroup.procs");
@@ -1259,6 +1273,21 @@ mod tests {
         fs::write(&procs, pid.to_string())
             .unwrap_or_else(|error| panic!("move sleeper {pid} into {}: {error}", procs.display()));
         child
+    }
+
+    fn wait_control_group(name: &str) -> String {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let relative = systemctl_property(name, "ControlGroup");
+            if !relative.is_empty() {
+                return relative;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "KillMode attest needs ControlGroup for {name}"
+            );
+            thread::sleep(Duration::from_millis(50));
+        }
     }
 
     fn wait_proc_gone(pid: u32, timeout: Duration) {
