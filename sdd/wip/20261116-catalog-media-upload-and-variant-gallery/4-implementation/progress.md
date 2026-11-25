@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C RLIMIT FSIZE del worker
+
+- El harness deriva `LimitFSIZE` al tamaño del workspace (`48 MiB`) y
+  PID 1 lo lee. `RestrictAddressFamilies` y `CPUQuota` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #381, 003B-4C sigue abierto
 
 - Merge #381 `083d8340209ad6f8f4a7f85139377df5f60338dc` sobre candidato
