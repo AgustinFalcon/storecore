@@ -77,7 +77,7 @@ class NotificationPersistencePostgresTest {
         flyway("32",upgradeUrl).migrate()
         val jdbc = JdbcTemplate(DriverManagerDataSource(upgradeUrl,postgres.username,postgres.password))
         val history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("35",flyway(url=upgradeUrl).migrate().targetSchemaVersion.toString())
+        assertEquals("36",flyway(url=upgradeUrl).migrate().targetSchemaVersion.toString())
         assertEquals(history,jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=32 ORDER BY installed_rank"))
         assertEquals(0,flyway(url=upgradeUrl).migrate().migrationsExecuted)
         flyway(url=upgradeUrl).validate()
