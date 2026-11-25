@@ -337,9 +337,9 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 mod tests {
     use super::{
         WORKER_LIMIT_CORE, WORKER_LIMIT_CPU, WORKER_LIMIT_FSIZE, WORKER_LIMIT_NOFILE,
-        WORKER_LIMIT_NPROC, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC,
-        WORKER_TASKS_MAX, WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name,
-        mount_properties, worker_properties,
+        WORKER_LIMIT_NPROC, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
+        WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
+        worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
