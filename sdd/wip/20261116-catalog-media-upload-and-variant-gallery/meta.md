@@ -68,7 +68,10 @@ sustituido y no arranca el worker; no cierra OOM/timeout,
 terminación del cgroup ni `Ready`. PR #358 (head `cda8f48`,
 merge `7694e77`, Verify `45000735868` 7/7, dos Grok 4.7
 APPROVED) congela el `MainPID` y atesta `RuntimeMax`; no
-cierra OOM, terminación del cgroup ni `Ready`. PR #326 arranca
+cierra OOM, terminación del cgroup ni `Ready`. PR #360 (head
+`873cffc`, merge `b658cf9`, Verify `45472580402` 7/7, dos Grok
+4.7 APPROVED) atesta oom-kill del cgroup worker; no cierra
+terminación del cgroup ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
