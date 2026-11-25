@@ -1,13 +1,14 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C ProtectHome del worker
+## En implementación — 2026-11-25, 4C ProtectHome queda fuera
 
-Este corte no cierra `003B-4C`. El harness deriva `ProtectHome=true` y PID 1
-lo lee. `CPUQuota` y `RestrictAddressFamilies` quedan fuera. Sigue sin
-familia de sockets, cuota global, terminales sin ACK, FD/mmap tras el
-seal, reinicio en cada transición durable, RLIMIT restantes ni `Ready`.
-`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
-abiertos. Este corte no agrega HTTP de media.
+Este corte no cierra `003B-4C`. `ProtectHome` queda fuera: PID 1
+`StartTransientUnit` responde `ENXIO` Unexpected message contents, igual
+que `RestrictAddressFamilies` y `CPUQuota`. Sigue sin familia de sockets,
+cuota global, terminales sin ACK, FD/mmap tras el seal, reinicio en cada
+transición durable, RLIMIT restantes ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C PrivateTmp PR #387
 

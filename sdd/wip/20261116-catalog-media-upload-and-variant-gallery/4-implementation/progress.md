@@ -1,9 +1,10 @@
 # Progreso
 
-## 2026-11-25 — arranque 4C ProtectHome del worker
+## 2026-11-25 — arranque 4C ProtectHome queda fuera
 
-- El harness deriva `ProtectHome=true` y PID 1 lo lee. `CPUQuota` y
-  `RestrictAddressFamilies` quedan fuera.
+- `ProtectHome` queda fuera: PID 1 `StartTransientUnit` responde `ENXIO`
+  Unexpected message contents, igual que `RestrictAddressFamilies` y
+  `CPUQuota`.
 - No se marca `003B-4C`. No hay familia de sockets, cuota global,
   `Ready` ni HTTP de media.
 

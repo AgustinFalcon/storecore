@@ -293,7 +293,6 @@ pub(crate) fn worker_properties(
         ("LimitCPU", Value::from(WORKER_LIMIT_CPU)),
         ("PrivateNetwork", Value::from(true)),
         ("PrivateTmp", Value::from(true)),
-        ("ProtectHome", Value::from(true)),
     ])
 }
 
@@ -661,19 +660,9 @@ mod tests {
         .expect("spec");
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
-        assert!(keys.contains(&"ProtectHome"));
+        assert!(!keys.contains(&"ProtectHome"));
         assert!(!keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
-        let protect_home = worker
-            .iter()
-            .find(|(key, _)| *key == "ProtectHome")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            protect_home
-                .as_deref()
-                .is_some_and(|value| value.contains("true")),
-            "ProtectHome must be the internal true, got {protect_home:?}"
-        );
     }
 
     #[test]
@@ -1695,12 +1684,12 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
-            panic!("StartTransientUnit rejected derived ProtectHome");
+            panic!("StartTransientUnit failed after leaving ProtectHome unset");
         }
         let protect_home = systemctl_property(name, "ProtectHome");
         assert!(
-            protect_home == "yes" || protect_home == "true",
-            "PID 1 must apply derived ProtectHome, got {protect_home}"
+            protect_home == "no" || protect_home == "false" || protect_home.is_empty(),
+            "PID 1 must not apply ProtectHome, got {protect_home}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
