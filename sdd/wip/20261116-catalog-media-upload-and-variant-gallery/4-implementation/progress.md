@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #385, 003B-4C sigue abierto
+
+- Merge #385 `f242dff98b9f78aae8dbc1b45f8dbc083c70b37d` sobre candidato
+  `792397cbdebf8e112c839ea3d16e37a427009752`. Verify exact-head
+  `45569539383` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr385-architecture.md`
+  y `sdd/reviews/20261125-sol-pr385-security.md`.
+- El harness deriva `LimitCPU=12` (`RLIMIT_CPU`) y PID 1 lo lee. No se
+  marca `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C RLIMIT CPU del worker
 
 - El harness deriva `LimitCPU=12` (`RLIMIT_CPU`) y PID 1 lo lee.
