@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #387, 003B-4C sigue abierto
+
+- Merge #387 `5a80863c3355ac1430ac5221a194683d7d1046c3` sobre candidato
+  `733a6aeec08d58e5756d2c950bddc03ffcf91579`. Verify exact-head
+  `45574676365` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr387-architecture.md`
+  y `sdd/reviews/20261125-sol-pr387-security.md`.
+- El harness deriva `PrivateTmp=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C PrivateTmp del worker
 
 - El harness deriva `PrivateTmp=true` y PID 1 lo lee. `CPUQuota` y
