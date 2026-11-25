@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #399, 003B-4C sigue abierto
+
+- Merge #399 `866a3dfdbaede11b65d62dd4e567a29f15c0fcc2` sobre candidato
+  `b8ab5a36848c33ff7834ecd9637c85d9f4b6cb61`. Verify exact-head
+  `45674345804` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr399-architecture.md`
+  y `sdd/reviews/20261125-sol-pr399-security.md`.
+- El harness deriva `ProtectControlGroups=true` y PID 1 lo lee. No se
+  marca `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectControlGroups del worker
 
 - El harness deriva `ProtectControlGroups=true` y PID 1 lo lee.

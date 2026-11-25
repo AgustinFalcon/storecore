@@ -104,7 +104,9 @@ cuota global ni `Ready`. PR #393 (head `8c006b5`, merge `95d322c`, Verify
 APPROVED) deriva `LockPersonality=true`; no cierra cuota global ni
 `Ready`. PR #397 (head `8156b7c`, merge `1fad60f`, Verify `45661670755`
 7/7, dos Grok 4.7 APPROVED) deriva `ProtectKernelTunables=true`; no
-cierra cuota global ni `Ready`. PR #326
+cierra cuota global ni `Ready`. PR #399 (head `b8ab5a3`, merge `866a3df`,
+Verify `45674345804` 7/7, dos Grok 4.7 APPROVED) deriva
+`ProtectControlGroups=true`; no cierra cuota global ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
