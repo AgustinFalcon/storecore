@@ -47,6 +47,9 @@ class CalendarHttpTranslatorTest {
         val from="2030-01-01T00:00:00Z"; val to="2030-02-01T00:00:00Z"
         val query=translator.query(params("from" to from,"to" to to,"page" to Int.MAX_VALUE.toString(),"size" to "100"))
         assertEquals(214748364700L,query.paging.offset)
+        val browserQuery=translator.query(params("from" to "2030-01-01T00:00:00.000Z","to" to "2030-02-01T00:00:00.100Z"))
+        assertEquals(java.time.Instant.parse(from),browserQuery.from)
+        assertEquals(java.time.Instant.parse("2030-02-01T00:00:00.100Z"),browserQuery.to)
         for(queryParams in listOf(params("from" to from),params("from" to from,"to" to from),params("from" to from,"to" to "2032-01-01T00:00:00Z"),params("from" to from,"to" to to,"lifecycle" to "FUTURE"),params("from" to from,"to" to to,"audience" to "UNKNOWN"),params("from" to from,"to" to to,"size" to "101"),params("from" to from,"from" to from,"to" to to),params("from" to from,"to" to to,"actorId" to "1"))) assertThrows(InvalidCalendarRequest::class.java) { translator.query(queryParams) }
         assertThrows(InvalidCalendarRequest::class.java) { translator.paging(params("from" to from)) }
         assertEquals(25,translator.paging(params()).size)

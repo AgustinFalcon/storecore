@@ -81,7 +81,7 @@ internal class CalendarHttpTranslator(mapper: ObjectMapper,private val hasher: C
         }
         return CalendarPageRequest.create(integer("page",0),integer("size",25)) ?: throw InvalidCalendarRequest()
     }
-    private fun instant(raw: String?): Instant = runCatching { Instant.parse(raw).also { require(it.toString()==raw) } }.getOrNull() ?: throw InvalidCalendarRequest()
+    private fun instant(raw: String?): Instant = runCatching { Instant.parse(raw) }.getOrNull() ?: throw InvalidCalendarRequest()
     fun query(params: MultiValueMap<String,String>): CalendarEventQuery {
         val paging=paging(params,setOf("from","to","lifecycle","audience"))
         return CalendarEventQuery.create(instant(params.getFirst("from")),instant(params.getFirst("to")),params.getFirst("lifecycle")?.let(CalendarLifecycle::fromWire),params.getFirst("audience")?.let(CalendarAudience::fromWire),paging) ?: throw InvalidCalendarRequest()
