@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #405, 003B-4C sigue abierto
+
+- Merge #405 `0fb102df9e60589ca2fe4b2c5ec5a2b9459b43c2` sobre candidato
+  `8cebbfcbaf9f6c4cf0dc76f1709b2e1c02ddfb76`. Verify exact-head
+  `45699737406` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr405-architecture.md`
+  y `sdd/reviews/20261125-sol-pr405-security.md`.
+- El harness deriva `ProtectClock=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectClock del worker
 
 - El harness deriva `ProtectClock=true` y PID 1 lo lee. `ProtectHome`,
