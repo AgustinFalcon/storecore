@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #407, 003B-4C sigue abierto
+
+- Merge #407 `3fd9f599c7e2e3c613f4829b09625276c12dec96` sobre candidato
+  `0289b53dcdd3d83202b484b469afde7ca0183cc4`. Verify exact-head
+  `45708331318` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr407-architecture.md`
+  y `sdd/reviews/20261125-sol-pr407-security.md`.
+- El harness deriva `ProtectKernelLogs=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectKernelLogs del worker
 
 - El harness deriva `ProtectKernelLogs=true` y PID 1 lo lee.
