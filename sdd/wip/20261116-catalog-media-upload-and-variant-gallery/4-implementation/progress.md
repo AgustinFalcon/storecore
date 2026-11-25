@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #383, 003B-4C sigue abierto
+
+- Merge #383 `f5e27b37b587a355bfc866431fbf9d255f1d691f` sobre candidato
+  `d7f773a5a88c7cc71c901433276a7a3e9910ef04`. Verify exact-head
+  `45560675895` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr383-architecture.md`
+  y `sdd/reviews/20261125-sol-pr383-security.md`.
+- El harness deriva `LimitFSIZE` al tamaño del workspace (`48 MiB`) y
+  PID 1 lo lee. No se marca `003B-4C`. No hay `CPUQuota`, familia de
+  sockets, cuota global, `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C RLIMIT FSIZE del worker
 
 - El harness deriva `LimitFSIZE` al tamaño del workspace (`48 MiB`) y
