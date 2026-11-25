@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C ProtectKernelTunables del worker
+
+- El harness deriva `ProtectKernelTunables=true` y PID 1 lo lee.
+  `ProtectHome`, `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #395, 003B-4C sigue abierto
 
 - Merge #395 `887949dc5523d4b66e69330c9c5c4b132d876ff7` sobre candidato
