@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C ProtectClock del worker
+
+- El harness deriva `ProtectClock=true` y PID 1 lo lee. `ProtectHome`,
+  `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #403, 003B-4C sigue abierto
 
 - Merge #403 `711c8c0ae46c9c970bc40b740a3be6f249b29063` sobre candidato
