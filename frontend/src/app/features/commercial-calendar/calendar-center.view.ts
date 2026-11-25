@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { CalendarAudience, CalendarEvent, CalendarLifecycle, CalendarLoadState, CalendarViewMode } from '../../domain/commercial-calendar/calendar';
 import { CalendarCenterState } from './calendar-center.store';
 @Component({ selector: 'sc-calendar-center-view', imports: [FormsModule, RouterLink], styleUrl: './calendar.css', changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `<main class="calendar-shell"><header><div><p class="eyebrow">Coordinación comercial</p><h1 id="calendar-title">Calendario comercial</h1><p>Agenda interna. No modifica precios, stock ni promociones.</p></div>@if (admin()) { <a class="button primary" routerLink="/user/commercial-calendar/new" [queryParams]="state().url.toWire()">Crear evento</a> }</header>
+  template: `<div class="calendar-shell"><header><div><p class="eyebrow">Coordinación comercial</p><h1 id="calendar-title">Calendario comercial</h1><p>Agenda interna. No modifica precios, stock ni promociones.</p></div>@if (admin()) { <a class="button primary" routerLink="/user/commercial-calendar/new" [queryParams]="state().url.toWire()">Crear evento</a> }</header>
   <form class="filters" (ngSubmit)="filters.emit(values())">
     <label>Vista<select name="view" [ngModel]="value('view')" (ngModelChange)="edit('view', $event)">@for (mode of modes; track mode.wire) { <option [value]="mode.wire">{{mode.label}}</option> }</select></label>
     <label>Mes<input name="month" type="month" [ngModel]="value('month')" (ngModelChange)="edit('month', $event)" required></label>
@@ -21,7 +21,7 @@ import { CalendarCenterState } from './calendar-center.store';
     @else { <ul class="event-list">@for (event of result.items; track event.id) { <li><a [id]="'event-' + event.id" [attr.data-calendar-event]="event.id" [routerLink]="['/user/commercial-calendar',event.id]" [queryParams]="state().url.toWire()">{{event.definition.title}}</a><span class="badge">{{event.lifecycle.label}}</span><p>{{event.definition.start.localDateTime}} · {{event.definition.start.timeZone}} {{event.definition.start.offset}}</p><p>{{event.definition.audience.label}}</p></li> }</ul> }
   }
   <nav class="pagination" aria-label="Páginas del calendario"><button type="button" (click)="page.emit(-1)" [disabled]="loading() || !state().page || state().url.query.page === 0">Anterior</button><button type="button" (click)="page.emit(1)" [disabled]="loading() || !state().page?.hasMore">Siguiente</button></nav>
-  </main>` })
+  </div>` })
 export class CalendarCenterViewComponent {
   readonly state = input.required<CalendarCenterState>(); readonly admin = input(false);
   readonly filters = output<Record<string, string>>(); readonly page = output<number>(); readonly reload = output<void>();
