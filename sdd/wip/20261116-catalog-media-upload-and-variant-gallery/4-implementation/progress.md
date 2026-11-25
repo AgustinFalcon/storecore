@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-24 — persist reviews PR #366, 003B-4C sigue abierto
+
+- Merge #366 `ff30b8aaffa5b6ffea077a51c8dedf335ba3e935` sobre candidato
+  `0a02b5834a9b1a8ae325caf041746dab18d499db`. Verify exact-head
+  `45534853760` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261124-sol-pr366-architecture.md`
+  y `sdd/reviews/20261124-sol-pr366-security.md`.
+- El harness deriva `KillMode=control-group` y `KillSignal=SIGKILL` y
+  atesta `StopUnit` del extra. No se marca `003B-4C`. No hay `CPUQuota`,
+  cuota global, `Ready` ni HTTP de media.
+
 ## 2026-11-24 — rebase 4C cgroup-kill sobre master 4b0e06a
 
 - Rebase de #366 sobre `origin/master` (`4b0e06a`, PR #371). No se

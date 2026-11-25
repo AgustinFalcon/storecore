@@ -71,7 +71,11 @@ APPROVED) congela el `MainPID` y atesta `RuntimeMax`; no
 cierra OOM, terminación del cgroup ni `Ready`. PR #360 (head
 `873cffc`, merge `b658cf9`, Verify `45472580402` 7/7, dos Grok
 4.7 APPROVED) atesta oom-kill del cgroup worker; no cierra
-terminación del cgroup ni `Ready`. PR #326 arranca
+terminación del cgroup ni `Ready`. PR #366 (head `0a02b58`,
+merge `ff30b8a`, Verify `45534853760` 7/7, dos Grok 4.7
+APPROVED) atesta `StopUnit` con `KillMode=control-group` y
+`KillSignal=SIGKILL`; no cierra `CPUQuota`, cuota global ni
+`Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
