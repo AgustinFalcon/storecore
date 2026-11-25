@@ -273,6 +273,7 @@ pub(crate) fn worker_properties(
         ("RuntimeMaxUSec", Value::from(WORKER_RUNTIME_MAX_USEC)),
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
+        ("KillSignal", Value::from(9i32)),
     ])
 }
 
@@ -491,6 +492,7 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"KillMode"));
+        assert!(keys.contains(&"KillSignal"));
         assert!(!keys.contains(&"MemoryOOMGroup"));
         assert!(!keys.contains(&"OOMPolicy"));
         let kill_mode = worker
@@ -502,6 +504,16 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("control-group")),
             "KillMode must be control-group, got {kill_mode:?}"
+        );
+        let kill_signal = worker
+            .iter()
+            .find(|(key, _)| *key == "KillSignal")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            kill_signal
+                .as_deref()
+                .is_some_and(|value| value.contains('9')),
+            "KillSignal must be SIGKILL, got {kill_signal:?}"
         );
     }
 
@@ -1145,8 +1157,21 @@ mod tests {
             "control-group",
             "PID 1 must apply derived KillMode"
         );
+        let kill_signal = systemctl_property(name, "KillSignal");
+        assert!(
+            kill_signal == "9" || kill_signal == "SIGKILL",
+            "PID 1 must apply derived KillSignal, got {kill_signal}"
+        );
         let extra = spawn_cgroup_sleeper(name);
         let extra_pid = extra.id();
+        let continued = Command::new("kill")
+            .args(["-CONT", &extra_pid.to_string()])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -CONT extra {extra_pid}: {error}"));
+        assert!(
+            continued.success(),
+            "kill -CONT extra {extra_pid} failed with {continued}"
+        );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
             stopped_worker,

@@ -7,10 +7,10 @@
 
 ## 2026-11-24 — arranque 4C terminación del cgroup
 
-- El harness PID 1 congela el `MainPID` (el cgroup vacío tras SELF_TEST
-  no atesta kill), congela un `sleep`, lo adjunta con
-  `AttachProcessesToUnit` y atesta que `StopUnit` con
-  `KillMode=control-group` lo mata. `CPUQuota` sigue fuera.
+- El harness PID 1 congela el `MainPID`, adjunta un `sleep` con
+  `AttachProcessesToUnit`, deriva `KillSignal=SIGKILL` y atesta que
+  `StopUnit` con `KillMode=control-group` lo mata. `CPUQuota` sigue
+  fuera.
 - No se marca `003B-4C`. No hay `Ready` ni HTTP.
 
 ## 2026-11-24 — persist reviews PR #360, 003B-4C sigue abierto

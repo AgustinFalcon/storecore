@@ -3,8 +3,8 @@
 ## En implementación — 2026-11-24, 4C terminación del cgroup
 
 Este corte no cierra `003B-4C`. El harness congela el `MainPID` para
-conservar el cgroup, congela un `sleep`, lo adjunta al cgroup y atesta
-que `StopUnit` con `KillMode=control-group` lo mata.
+conservar el cgroup, adjunta un `sleep`, deriva `KillSignal=SIGKILL` y
+atesta que `StopUnit` con `KillMode=control-group` lo mata.
 Sigue sin `CPUQuota` ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
 `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP.
 
