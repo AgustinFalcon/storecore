@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C PrivateTmp del worker
+
+- El harness deriva `PrivateTmp=true` y PID 1 lo lee. `CPUQuota` y
+  `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #385, 003B-4C sigue abierto
 
 - Merge #385 `f242dff98b9f78aae8dbc1b45f8dbc083c70b37d` sobre candidato
