@@ -33,6 +33,8 @@ const WORKER_RUNTIME_MAX_USEC: u64 = 12_000_000;
 const WORKER_TIMEOUT_STOP_USEC: u64 = 1_000_000;
 /// Open-file ceiling. Derived internally; the client cannot supply it.
 const WORKER_LIMIT_NOFILE: u64 = 1024;
+/// Process ceiling. Derived internally; the client cannot supply it.
+const WORKER_LIMIT_NPROC: u64 = 64;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -277,6 +279,7 @@ pub(crate) fn worker_properties(
         ("KillMode", Value::from("control-group".to_owned())),
         ("KillSignal", Value::from(9i32)),
         ("LimitNOFILE", Value::from(WORKER_LIMIT_NOFILE)),
+        ("LimitNPROC", Value::from(WORKER_LIMIT_NPROC)),
         ("PrivateNetwork", Value::from(true)),
     ])
 }
@@ -322,9 +325,9 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_LIMIT_NOFILE, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
-        WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
-        worker_properties,
+        WORKER_LIMIT_NOFILE, WORKER_LIMIT_NPROC, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC,
+        WORKER_TASKS_MAX, WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name,
+        mount_properties, worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -522,6 +525,7 @@ mod tests {
         assert!(!keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
         assert!(keys.contains(&"LimitNOFILE"));
+        assert!(keys.contains(&"LimitNPROC"));
         assert!(keys.contains(&"PrivateNetwork"));
         let nofile = worker
             .iter()
@@ -532,6 +536,16 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains(&WORKER_LIMIT_NOFILE.to_string())),
             "LimitNOFILE must be the internal 1024 ceiling, got {nofile:?}"
+        );
+        let nproc = worker
+            .iter()
+            .find(|(key, _)| *key == "LimitNPROC")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            nproc
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_LIMIT_NPROC.to_string())),
+            "LimitNPROC must be the internal 64 ceiling, got {nproc:?}"
         );
         let private_network = worker
             .iter()
@@ -1238,6 +1252,61 @@ mod tests {
         assert!(
             private_network == "yes" || private_network == "true",
             "PID 1 must apply derived PrivateNetwork, got {private_network}"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_limit_nproc() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0xee; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived LimitNPROC");
+        }
+        let nproc = systemctl_property(name, "LimitNPROC");
+        assert!(
+            nproc == "64" || nproc.starts_with("64:"),
+            "PID 1 must apply derived LimitNPROC, got {nproc}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
