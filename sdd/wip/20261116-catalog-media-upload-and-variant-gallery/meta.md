@@ -83,7 +83,9 @@ APPROVED) atesta `StopUnit` con `KillMode=control-group` y
 Grok 4.7 APPROVED) deriva `PrivateNetwork=true`; no cierra cuota
 global ni `Ready`. PR #379 (head `7b897cc`, merge `6704455`, Verify
 `45551795655` 7/7, dos Grok 4.7 APPROVED) deriva `LimitNPROC=64`;
-no cierra cuota global ni `Ready`. PR #326 arranca
+no cierra cuota global ni `Ready`. PR #381 (head `6e4d1c9`, merge
+`083d834`, Verify `45556235165` 7/7, dos Grok 4.7 APPROVED) deriva
+`LimitCORE=0`; no cierra cuota global ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
