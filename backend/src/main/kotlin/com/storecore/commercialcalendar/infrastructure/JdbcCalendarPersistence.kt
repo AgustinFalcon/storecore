@@ -57,6 +57,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         val before=read(request.eventId,true) ?: return@tx CalendarPersistenceResult.Missing
         if(!authorized(actor)) return@tx CalendarPersistenceResult.Unauthorized
         val preflight=request.preflightId?.let { loadPreflight(it,true) }
+        if(!authorized(actor)) return@tx CalendarPersistenceResult.Unauthorized
         val now=clock.now()
         val decision=CalendarDecision.apply(before,request.expectedRevision,request.step,now,preflight,request.definition)
         record(actor.userId,request,before,decision,hash,now)
@@ -130,7 +131,9 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
     override fun audit(actor: InternalUserPrincipal,eventId: CalendarEventId): List<CalendarReceipt>?=tx {
         if(!authorized(actor)) return@tx emptyList()
         if(read(eventId)==null) return@tx emptyList()
-        jdbc.query("SELECT r.* FROM calendar_command_receipts r JOIN calendar_audit a USING(command_id) WHERE r.event_id=? ORDER BY r.recorded_at,r.command_id",{ rs,_ -> decodeReceipt((1..rs.metaData.columnCount).associate { rs.metaData.getColumnLabel(it) to rs.getObject(it) }) },eventId.value)
+        jdbc.query("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
+            FROM calendar_command_receipts r JOIN calendar_audit a USING(command_id) JOIN calendar_command_bindings b USING(command_id)
+            WHERE r.event_id=? ORDER BY r.recorded_at,r.command_id""",{ rs,_ -> decodeReceipt((1..rs.metaData.columnCount).associate { rs.metaData.getColumnLabel(it) to rs.getObject(it) }) },eventId.value)
     }
     override fun reminderSwitch(): CalendarReminderSwitch {
         val row=jdbc.queryForMap("SELECT state,revision FROM calendar_reminder_switch WHERE id=1")
@@ -148,7 +151,8 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         jdbc.update("INSERT INTO calendar_audit(command_id) VALUES(?)",r.commandId.value)
     }
     private fun loadReceipt(id: CalendarCommandId): CalendarPersistenceResult {
-        val row=jdbc.queryForList("SELECT * FROM calendar_command_receipts WHERE command_id=?",id.value).singleOrNull() ?: return CalendarPersistenceResult.Unknown
+        val row=jdbc.queryForList("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
+            FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.command_id=?""",id.value).singleOrNull() ?: return CalendarPersistenceResult.Unknown
         return CalendarPersistenceResult.Recorded(decodeReceipt(row))
     }
     private fun decodeReceipt(row: Map<String,Any?>): CalendarReceipt {
@@ -156,11 +160,50 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         require(operation!=CalendarOperation.UNKNOWN && outcome!=CalendarOutcome.UNKNOWN)
         val before=row["before_snapshot"]?.let { codec.event(it.toString()) }; val after=codec.event(row["after_snapshot"].toString())
         val eventId=requireNotNull(CalendarEventId.fromWire(row["event_id"] as UUID))
+        val actorId=(row["actor_id"] as? Number)?.toLong(); val payloadHash=requireNotNull(CalendarCommandPayloadHash.fromWire(row["payload_hash"] as String))
+        require(CalendarCommandFamily.fromWire(row["binding_family"] as? String)==CalendarCommandFamily.EVENT)
+        require(actorId==(row["binding_actor_id"] as? Number)?.toLong() && eventId.value==row["binding_event_id"] && payloadHash.value==row["binding_payload_hash"])
         require(after.id==eventId && (before==null || before.id==eventId))
         if(operation==CalendarOperation.CREATE) require(before==null && outcome==CalendarOutcome.APPLIED && after.revision==CalendarRevision.Zero)
-        else { require(before!=null); if(outcome==CalendarOutcome.APPLIED) require(after.revision==before.revision.next()) else require(codec.event(before)==codec.event(after)) }
-        return CalendarReceipt(requireNotNull(CalendarCommandId.fromWire(row["command_id"] as UUID)),eventId,(row["actor_id"] as? Number)?.toLong(),operation,
-            requireNotNull(CalendarCommandPayloadHash.fromWire(row["payload_hash"] as String)),outcome,before,after,(row["recorded_at"] as Timestamp).toInstant(),
-            (row["expected_revision"] as? Number)?.toLong()?.let { requireNotNull(CalendarRevision.fromWire(it)) },(row["reason"] as? String)?.let { requireNotNull(CalendarReason.fromWire(it)) })
+        val recordedAt=(row["recorded_at"] as Timestamp).toInstant()
+        val expected=(row["expected_revision"] as? Number)?.toLong()?.let { requireNotNull(CalendarRevision.fromWire(it)) }
+        if(operation!=CalendarOperation.CREATE) {
+            require(before!=null && expected!=null)
+            if(outcome==CalendarOutcome.REVISION_CONFLICT) require(before.revision!=expected) else require(before.revision==expected)
+            if(outcome==CalendarOutcome.APPLIED) require(after.revision==before.revision.next() && validApplied(operation,before,after,recordedAt))
+            else require(codec.event(before)==codec.event(after))
+            when(outcome) {
+                CalendarOutcome.INVALID_TRANSITION -> require(invalidTransition(operation,before,recordedAt))
+                CalendarOutcome.INVALID_DEFINITION -> require(operation==CalendarOperation.EDIT || operation==CalendarOperation.SCHEDULE)
+                CalendarOutcome.PREFLIGHT_REQUIRED,CalendarOutcome.PREFLIGHT_EXPIRED,CalendarOutcome.PREFLIGHT_STALE -> require(operation==CalendarOperation.SCHEDULE)
+                CalendarOutcome.REVISION_EXHAUSTED -> require(before.revision.next()==null || operation==CalendarOperation.EDIT && before.definition.revision.next()==null)
+                else -> Unit
+            }
+        }
+        return CalendarReceipt(requireNotNull(CalendarCommandId.fromWire(row["command_id"] as UUID)),eventId,actorId,operation,
+            payloadHash,outcome,before,after,recordedAt,expected,(row["reason"] as? String)?.let { requireNotNull(CalendarReason.fromWire(it)) })
+    }
+    private fun validApplied(operation: CalendarOperation,before: CalendarEvent,after: CalendarEvent,at: Instant): Boolean {
+        if(before.createdAt!=after.createdAt) return false
+        val sameDefinition=codec.definition(before.definition)==codec.definition(after.definition)
+        return when(operation) {
+            CalendarOperation.EDIT -> before.lifecycle==CalendarLifecycle.DRAFT && after.lifecycle==CalendarLifecycle.DRAFT && after.definition.revision==before.definition.revision.next()
+            CalendarOperation.SCHEDULE -> sameDefinition && before.lifecycle==CalendarLifecycle.DRAFT && after.lifecycle==CalendarLifecycle.SCHEDULED && after.approvedDefinitionRevision==before.definition.revision
+            CalendarOperation.PAUSE -> sameDefinition && before.lifecycle in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE) && after.lifecycle==CalendarLifecycle.PAUSED && after.approvedDefinitionRevision==before.approvedDefinitionRevision
+            CalendarOperation.RESUME -> sameDefinition && before.lifecycle==CalendarLifecycle.PAUSED && at<before.definition.end.instant && after.lifecycle==(if(at<before.definition.start.instant) CalendarLifecycle.SCHEDULED else CalendarLifecycle.ACTIVE) && after.approvedDefinitionRevision==before.approvedDefinitionRevision
+            CalendarOperation.CANCEL -> sameDefinition && before.lifecycle in listOf(CalendarLifecycle.DRAFT,CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE,CalendarLifecycle.PAUSED) && after.lifecycle==CalendarLifecycle.CANCELLED && after.approvedDefinitionRevision==before.approvedDefinitionRevision
+            CalendarOperation.SYSTEM_ACTIVATE -> sameDefinition && before.lifecycle==CalendarLifecycle.SCHEDULED && at>=before.definition.start.instant && at<before.definition.end.instant && after.lifecycle==CalendarLifecycle.ACTIVE && after.approvedDefinitionRevision==before.approvedDefinitionRevision
+            CalendarOperation.SYSTEM_COMPLETE -> sameDefinition && before.lifecycle in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE,CalendarLifecycle.PAUSED) && at>=before.definition.end.instant && after.lifecycle==CalendarLifecycle.COMPLETED && after.approvedDefinitionRevision==before.approvedDefinitionRevision
+            else -> false
+        }
+    }
+    private fun invalidTransition(operation: CalendarOperation,before: CalendarEvent,at: Instant)=when(operation) {
+        CalendarOperation.EDIT,CalendarOperation.SCHEDULE -> before.lifecycle!=CalendarLifecycle.DRAFT
+        CalendarOperation.PAUSE -> before.lifecycle !in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE) || at>=before.definition.end.instant
+        CalendarOperation.RESUME -> before.lifecycle!=CalendarLifecycle.PAUSED || at>=before.definition.end.instant
+        CalendarOperation.CANCEL -> before.lifecycle !in listOf(CalendarLifecycle.DRAFT,CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE,CalendarLifecycle.PAUSED)
+        CalendarOperation.SYSTEM_ACTIVATE -> before.lifecycle!=CalendarLifecycle.SCHEDULED || at<before.definition.start.instant || at>=before.definition.end.instant
+        CalendarOperation.SYSTEM_COMPLETE -> before.lifecycle !in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE,CalendarLifecycle.PAUSED) || at<before.definition.end.instant
+        else -> false
     }
 }

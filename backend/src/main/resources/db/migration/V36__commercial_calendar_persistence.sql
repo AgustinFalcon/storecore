@@ -126,6 +126,12 @@ CREATE TABLE calendar_command_receipts (
 ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_revision_result CHECK(operation='CREATE'
  OR (outcome='REVISION_CONFLICT' AND (before_snapshot->>'revision')::bigint<>expected_revision)
  OR (outcome<>'REVISION_CONFLICT' AND (before_snapshot->>'revision')::bigint=expected_revision));
+ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_rejection_semantics CHECK(
+ (outcome NOT IN ('PREFLIGHT_REQUIRED','PREFLIGHT_EXPIRED','PREFLIGHT_STALE') OR operation='SCHEDULE')
+ AND (outcome<>'INVALID_DEFINITION' OR operation IN ('EDIT','SCHEDULE'))
+ AND (outcome<>'REVISION_EXHAUSTED' OR (before_snapshot->>'revision')::bigint=9223372036854775807
+  OR (operation='EDIT' AND (before_snapshot->'definition'->>'revision')::bigint=9223372036854775807))
+);
 ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_applied_transition CHECK(operation='CREATE' OR outcome<>'APPLIED' OR (
  before_snapshot->>'createdAt'=after_snapshot->>'createdAt' AND (
   (operation='EDIT' AND before_snapshot->>'lifecycle'='DRAFT' AND after_snapshot->>'lifecycle'='DRAFT'
@@ -146,6 +152,16 @@ ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_applied
   ))
  ));
 CREATE TABLE calendar_audit (command_id UUID PRIMARY KEY REFERENCES calendar_command_receipts(command_id) ON DELETE RESTRICT);
+CREATE FUNCTION calendar_consistent_receipt_binding() RETURNS TRIGGER LANGUAGE plpgsql SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM public.calendar_command_bindings b WHERE b.command_id=NEW.command_id AND b.family='EVENT'
+  AND b.actor_id IS NOT DISTINCT FROM NEW.actor_id AND b.event_id=NEW.event_id AND b.payload_hash=NEW.payload_hash) THEN
+  RAISE EXCEPTION 'calendar receipt binding mismatch' USING ERRCODE='23514';
+ END IF;
+ RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER trg_calendar_receipt_binding_consistency AFTER INSERT ON calendar_command_receipts
+ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION calendar_consistent_receipt_binding();
 CREATE TABLE calendar_reminder_occurrences (
  id UUID PRIMARY KEY CHECK(id<>'00000000-0000-0000-0000-000000000000'), event_id UUID NOT NULL, approved_definition_revision BIGINT NOT NULL,
  rule_id UUID NOT NULL, scheduled_at TIMESTAMPTZ NOT NULL, state TEXT NOT NULL CHECK(state IN ('PENDING','LEASED','EMITTED','SKIPPED','DEAD')),
@@ -220,11 +236,11 @@ CREATE TRIGGER trg_calendar_receipts_immutable BEFORE UPDATE OR DELETE ON calend
 CREATE TRIGGER trg_calendar_audit_immutable BEFORE UPDATE OR DELETE ON calendar_audit FOR EACH ROW EXECUTE FUNCTION prevent_immutable_mutation();
 CREATE TRIGGER trg_calendar_bindings_immutable BEFORE UPDATE OR DELETE ON calendar_command_bindings FOR EACH ROW EXECUTE FUNCTION prevent_immutable_mutation();
 CREATE TRIGGER trg_calendar_preflight_requests_immutable BEFORE UPDATE OR DELETE ON calendar_preflight_requests FOR EACH ROW EXECUTE FUNCTION prevent_immutable_mutation();
-CREATE FUNCTION calendar_occurrence_insert_valid() RETURNS TRIGGER LANGUAGE plpgsql SET search_path=pg_catalog,public AS $$
+CREATE FUNCTION calendar_occurrence_insert_valid() RETURNS TRIGGER LANGUAGE plpgsql SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
  IF NEW.state<>'PENDING' OR NEW.attempts<>0 OR NOT EXISTS(
-  SELECT 1 FROM calendar_events e JOIN calendar_definitions d ON d.event_id=e.id AND d.definition_revision=e.definition_revision
-   JOIN calendar_reminder_rules r ON r.event_id=d.event_id AND r.definition_revision=d.definition_revision
+  SELECT 1 FROM public.calendar_events e JOIN public.calendar_definitions d ON d.event_id=e.id AND d.definition_revision=e.definition_revision
+   JOIN public.calendar_reminder_rules r ON r.event_id=d.event_id AND r.definition_revision=d.definition_revision
   WHERE e.id=NEW.event_id AND e.lifecycle='SCHEDULED' AND e.snapshot->>'approvedDefinitionRevision'=NEW.approved_definition_revision::text
    AND r.rule_id=NEW.rule_id AND NEW.scheduled_at=(d.snapshot->>'startAt')::timestamptz-make_interval(secs=>r.offset_seconds::double precision)
  ) THEN RAISE EXCEPTION 'invalid initial calendar occurrence' USING ERRCODE='23514'; END IF;
