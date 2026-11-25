@@ -28,6 +28,8 @@ The contract was corrected to:
 
 Both reviewers then returned `APPROVE` with no P0–P3 findings. Their approval is limited to the corrected documentary contract. Migration, writer, adversarial tests, hosted CI and activation retain independent gates.
 
+During migration design, the implementation pass found that a rejected command has `after == before`; without a separate requested projection, its attempted owner/expiry/ticket would survive only as a hash. The contract was therefore tightened again so receipt/audit includes exact `requestedMetadata`, whose server-owned `createdAt` equals `recordedAt`; the field is also constrained against the applied after-snapshot. This correction was returned to both reviewers before SQL implementation.
+
 ## Local documentary checks
 
 - `git diff --check`: pass.
