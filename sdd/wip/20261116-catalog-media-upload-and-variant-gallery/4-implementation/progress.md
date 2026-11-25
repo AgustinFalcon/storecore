@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #395, 003B-4C sigue abierto
+
+- Merge #395 `887949dc5523d4b66e69330c9c5c4b132d876ff7` sobre candidato
+  `0cd6c93a03c83020626d0d10495ef8f8ccbf90ec`. Verify exact-head
+  `45651635908` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr395-architecture.md`
+  y `sdd/reviews/20261125-sol-pr395-security.md`.
+- El harness deriva `LockPersonality=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C LockPersonality del worker
 
 - El harness deriva `LockPersonality=true` y PID 1 lo lee. `ProtectHome`,
