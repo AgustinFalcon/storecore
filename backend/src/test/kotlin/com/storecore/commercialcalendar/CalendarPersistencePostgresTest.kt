@@ -20,6 +20,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource
 import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.PostgreSQLContainer
 import java.sql.Connection
+import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Callable
@@ -35,11 +36,11 @@ class CalendarPersistencePostgresTest {
         @JvmStatic @AfterAll fun stop() { postgres.stop() }
     }
     private val root by lazy { JdbcTemplate(DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password)) }
-    private fun runtime()=object: DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password) {
+    private fun runtime(url: String=postgres.jdbcUrl)=object: DriverManagerDataSource(url,postgres.username,postgres.password) {
         override fun getConnection(): Connection=super.getConnection().also { it.createStatement().use { s -> s.execute("SET ROLE storecore_runtime") } }
     }
-    private fun repo(clock: CalendarClock=MutableCalendarClock(),ids: CalendarIds=RandomCalendarIds()): JdbcCalendarPersistence {
-        val source=runtime()
+    private fun repo(clock: CalendarClock=MutableCalendarClock(),ids: CalendarIds=RandomCalendarIds(),url: String=postgres.jdbcUrl): JdbcCalendarPersistence {
+        val source=runtime(url)
         return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,ids,CalendarFixtures.hasher)
     }
     private fun repo(connection: Connection,clock: CalendarClock=MutableCalendarClock()): JdbcCalendarPersistence {
@@ -54,11 +55,11 @@ class CalendarPersistencePostgresTest {
     private fun switchRequest(id: CalendarCommandId=CalendarFixtures.command(),revision: CalendarRevision=CalendarRevision.Zero,operation: CalendarSwitchOperation=CalendarSwitchOperation.ENABLE,expires: Instant=CalendarFixtures.now.plusSeconds(3600))=
         CalendarSwitchCommandRequest(id,revision,operation,requireNotNull(CalendarSwitchOwner.fromWire("Operations owner")),CalendarFixtures.reason,expires,requireNotNull(CalendarRemovalTicket.fromWire("OPS-442")),CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER)
     private fun switchRecorded(value: CalendarSwitchPersistenceResult)=assertInstanceOf(CalendarSwitchPersistenceResult.Recorded::class.java,value).receipt
-    private fun actor(role: InternalRole=InternalRole.ADMIN): InternalUserPrincipal {
-        val id=root.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Calendar','Fixture') RETURNING id",Long::class.java,"calendar-${UUID.randomUUID()}@example.test","${'$'}argon2id${'$'}fixture")!!
-        root.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code=?",id,role.name)
+    private fun actor(role: InternalRole=InternalRole.ADMIN,database: JdbcTemplate=root): InternalUserPrincipal {
+        val id=database.queryForObject("INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?,'Calendar','Fixture') RETURNING id",Long::class.java,"calendar-${UUID.randomUUID()}@example.test","${'$'}argon2id${'$'}fixture")!!
+        database.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code=?",id,role.name)
         val session=UUID.randomUUID()
-        root.update("""INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,issued_at,last_seen_at,idle_expires_at,absolute_expires_at)
+        database.update("""INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,issued_at,last_seen_at,idle_expires_at,absolute_expires_at)
             VALUES(?,'USER',?,?,clock_timestamp(),clock_timestamp(),clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')""",session,id,UUID.randomUUID().toString().replace("-","").repeat(2))
         return InternalUserPrincipal(session,id,setOf(role))
     }
@@ -70,6 +71,20 @@ class CalendarPersistencePostgresTest {
         CalendarChangeRequest(id,event.id,revision,step,CalendarFixtures.reason,definition,preflight)
     private fun preflight(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=assertInstanceOf(CalendarPreflightResult.Recorded::class.java,repo.preflight(actor,CalendarPreflightRequest(CalendarFixtures.command(),event.id,event.revision))).preflight!!
     private fun schedule(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=recorded(repo.change(actor,request(event,CalendarStep.Schedule,preflight=preflight(repo,actor,event).id))).after
+    private fun forceSwitch(state: CalendarSwitchState,createdAt: Instant=CalendarFixtures.now,expiresAt: Instant=CalendarFixtures.now.plusSeconds(86_400),database: JdbcTemplate=root) {
+        database.execute("ALTER TABLE calendar_reminder_switch DISABLE TRIGGER trg_calendar_protect_reminder_switch")
+        try {
+            database.update("""UPDATE calendar_reminder_switch SET state=?,revision=revision+1,owner='PCC-008D fixture',reason='Deterministic worker fixture',created_at=?,expires_at=?,removal_ticket='PCC-008D',affected_action='EMIT_IN_APP_CAMPAIGN_REMINDER' WHERE id=1""",
+                state.wire,Timestamp.from(createdAt),Timestamp.from(expiresAt))
+        } finally { database.execute("ALTER TABLE calendar_reminder_switch ENABLE TRIGGER trg_calendar_protect_reminder_switch") }
+    }
+    private fun isolatedDatabase(label: String): Pair<String,JdbcTemplate> {
+        val name="calendar_${label}_${UUID.randomUUID().toString().replace("-","")}"
+        root.execute("CREATE DATABASE $name")
+        val url=postgres.jdbcUrl.substringBeforeLast('/')+"/$name"
+        flyway(url).migrate()
+        return url to JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
+    }
 
     @Test fun `PCC 008B migration closes singleton governance global identity and least privilege`() {
         root.execute("CREATE DATABASE calendar_switch_contract")
@@ -131,7 +146,7 @@ class CalendarPersistencePostgresTest {
         flyway(url,"35").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val history=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("37",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("38",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=35 ORDER BY installed_rank"))
         assertEquals(0,flyway(url).migrate().migrationsExecuted); flyway(url).validate()
         for(database in listOf(root,upgraded)) {
@@ -148,6 +163,318 @@ class CalendarPersistencePostgresTest {
         assertThrows(DataAccessException::class.java) { runtime.update("UPDATE calendar_reminder_switch SET state='ENABLED',revision=1 WHERE id=1") }
         assertThrows(DataAccessException::class.java) { runtime.update("UPDATE calendar_reminder_occurrences SET state='EMITTED'") }
         assertEquals(CalendarSwitchState.DISABLED,repo().reminderSwitch().state)
+    }
+
+    @Test fun `PCC 008D migration exposes only fenced mutation functions and protects occurrence shape`() {
+        val columns=root.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='calendar_reminder_occurrences'",String::class.java).toSet()
+        assertTrue(columns.containsAll(setOf("next_attempt_at","lease_started_at","terminal_reason","terminal_at","last_failure_class")))
+        assertFalse(root.queryForObject("SELECT has_table_privilege('storecore_runtime','calendar_reminder_occurrences','UPDATE')",Boolean::class.java)!!)
+        for(signature in listOf(
+            "calendar_lock_due_occurrences(timestamp with time zone,integer)",
+            "calendar_lease_occurrence(uuid,text,integer,uuid,timestamp with time zone,timestamp with time zone)",
+            "calendar_skip_occurrence(uuid,text,integer,uuid,text,timestamp with time zone)",
+            "calendar_exhaust_occurrence(uuid,uuid,integer,timestamp with time zone)",
+            "calendar_settle_occurrence_failure(uuid,uuid,integer,text,timestamp with time zone)",
+        )) assertTrue(root.queryForObject("SELECT has_function_privilege('storecore_runtime',?,'EXECUTE')",Boolean::class.java,signature)!!)
+        val runtime=JdbcTemplate(runtime())
+        assertThrows(DataAccessException::class.java) { runtime.queryForList("SELECT * FROM calendar_lock_due_occurrences(clock_timestamp(),51)") }
+        assertThrows(DataAccessException::class.java) { runtime.queryForObject("SELECT calendar_settle_occurrence_failure(?,?,?,?,?)",String::class.java,UUID.randomUUID(),UUID.randomUUID(),1,"FUTURE",Timestamp.from(CalendarFixtures.now)) }
+        assertThrows(DataAccessException::class.java) { root.update("UPDATE calendar_reminder_occurrences SET state='EMITTED'") }
+    }
+
+    @Test fun `occurrence claim leases retries fences stale owners and dies on third proven failure`() {
+        val (url,database)=isolatedDatabase("lease"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database); val rule=CalendarFixtures.rule()
+        val scheduled=schedule(repository,admin,create(repository,admin,listOf(rule)))
+        val due=scheduled.definition.start.instant.minusSeconds(rule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=due
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        val worker=CalendarOccurrenceWorkerService(clock,repository)
+        val first=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner))
+        assertEquals(1,first.selected); assertEquals(1,first.leased); assertEquals(due,first.observedAt)
+        val lease1=first.records.single(); assertEquals(1,lease1.token.attempt); assertEquals(due.plusSeconds(60),lease1.leaseUntil)
+
+        clock.instant=due.plusSeconds(10)
+        val retry1=assertInstanceOf(CalendarOccurrenceSettlementResult.RetryScheduled::class.java,worker.settleFailure(lease1.occurrence.id,lease1.token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF))
+        assertEquals(clock.instant.plusSeconds(30),retry1.nextAttemptAt)
+        assertSame(CalendarOccurrenceSettlementResult.LostFence,worker.settleFailure(lease1.occurrence.id,lease1.token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF))
+
+        clock.instant=retry1.nextAttemptAt
+        val lease2=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single()
+        assertEquals(2,lease2.token.attempt)
+        clock.instant=clock.instant.plusSeconds(10)
+        val retry2=assertInstanceOf(CalendarOccurrenceSettlementResult.RetryScheduled::class.java,worker.settleFailure(lease2.occurrence.id,lease2.token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF))
+        assertEquals(clock.instant.plusSeconds(120),retry2.nextAttemptAt)
+
+        clock.instant=retry2.nextAttemptAt
+        val lease3=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single()
+        assertEquals(3,lease3.token.attempt)
+        clock.instant=clock.instant.plusSeconds(10)
+        val dead=assertInstanceOf(CalendarOccurrenceSettlementResult.Dead::class.java,worker.settleFailure(lease3.occurrence.id,lease3.token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF))
+        assertEquals(CalendarOccurrenceTerminalReason.ATTEMPTS_EXHAUSTED,dead.reason)
+        assertEquals("DEAD",database.queryForObject("SELECT state FROM calendar_reminder_occurrences WHERE id=?",String::class.java,lease3.occurrence.id.value))
+        assertInstanceOf(CalendarOccurrenceClaimResult.Empty::class.java,worker.claim(owner))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+    }
+
+    @Test fun `occurrence no backfill skips disabled reenabled resumed and late work at exact boundaries`() {
+        val (url,database)=isolatedDatabase("cutoff")
+        fun scheduledOccurrence(title: String): Pair<CalendarEvent,CalendarReminderRule> {
+            val repository=repo(url=url); val admin=actor(database=database); val rule=CalendarFixtures.rule()
+            return schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title=title,rules=listOf(rule)))) to rule
+        }
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+
+        val (disabled,disabledRule)=scheduledOccurrence("Disabled")
+        val disabledDue=disabled.definition.start.instant.minusSeconds(disabledRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.DISABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val disabledClock=MutableCalendarClock(disabledDue)
+        val disabledPage=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(disabledClock,repo(disabledClock,url=url)).claim(owner))
+        assertEquals(0,disabledPage.leased); assertEquals(1,disabledPage.skipped)
+
+        val (expired,expiredRule)=scheduledOccurrence("Expired switch")
+        val expiredDue=expired.definition.start.instant.minusSeconds(expiredRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,expiredDue,database)
+        val expiredClock=MutableCalendarClock(expiredDue)
+        val expiredPage=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(expiredClock,repo(expiredClock,url=url)).claim(owner))
+        assertEquals(1,expiredPage.skipped); assertEquals(0,expiredPage.leased)
+
+        val (reenabled,reenabledRule)=scheduledOccurrence("Reenabled cutoff")
+        val reenabledDue=reenabled.definition.start.instant.minusSeconds(reenabledRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,reenabledDue,CalendarFixtures.now.plusSeconds(86_400),database)
+        val cutoffClock=MutableCalendarClock(reenabledDue)
+        val cutoff=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(cutoffClock,repo(cutoffClock,url=url)).claim(owner))
+        assertEquals(1,cutoff.skipped)
+
+        val resumeClock=MutableCalendarClock(); val resumeRepo=repo(resumeClock,url=url); val resumeAdmin=actor(database=database); val resumeRule=CalendarFixtures.rule()
+        var resumed=schedule(resumeRepo,resumeAdmin,create(resumeRepo,resumeAdmin,CalendarFixtures.definition(title="Resume cutoff",rules=listOf(resumeRule))))
+        val resumeDue=resumed.definition.start.instant.minusSeconds(resumeRule.offsetSeconds)
+        resumeClock.instant=CalendarFixtures.now.plusSeconds(60); resumed=recorded(resumeRepo.change(resumeAdmin,request(resumed,CalendarStep.Pause))).after
+        resumeClock.instant=resumeDue; resumed=recorded(resumeRepo.change(resumeAdmin,request(resumed,CalendarStep.Resume))).after
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val resumedPage=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(resumeClock,resumeRepo).claim(owner))
+        assertEquals(1,resumedPage.skipped); assertEquals(CalendarLifecycle.SCHEDULED,resumed.lifecycle)
+
+        val (boundary,boundaryRule)=scheduledOccurrence("Lateness boundary")
+        val boundaryDue=boundary.definition.start.instant.minusSeconds(boundaryRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val exactClock=MutableCalendarClock(boundaryDue.plusSeconds(900)); val exact=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(exactClock,repo(exactClock,url=url)).claim(owner))
+        assertEquals(1,exact.leased)
+        clock@ run {
+            val (late,lateRule)=scheduledOccurrence("Late")
+            val lateDue=late.definition.start.instant.minusSeconds(lateRule.offsetSeconds)
+            val lateClock=MutableCalendarClock(lateDue.plusSeconds(901)); val page=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(lateClock,repo(lateClock,url=url)).claim(owner))
+            assertEquals(1,page.skipped); assertEquals(0,page.leased)
+        }
+    }
+
+    @Test fun `concurrent occurrence claimers are disjoint and a blocked claim grants a fresh lease`() {
+        val (url,database)=isolatedDatabase("concurrent_claim"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        val rules=listOf(CalendarFixtures.rule(300),CalendarFixtures.rule(600))
+        val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Concurrent occurrences",rules=rules)))
+        val observedAt=scheduled.definition.start.instant.minusSeconds(300)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=observedAt
+        val barrier=CyclicBarrier(2); val pool=Executors.newFixedThreadPool(2)
+        try {
+            val pages=(1..2).map { pool.submit<CalendarOccurrenceClaimResult.Page> {
+                val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+                barrier.await(10,TimeUnit.SECONDS)
+                assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repo(clock,url=url)).claim(owner,CalendarOccurrenceBatchSize.from(1)!!))
+            } }.map { it.get(20,TimeUnit.SECONDS) }
+            assertTrue(pages.all { it.leased==1 && it.selected==1 })
+            assertEquals(2,pages.flatMap { it.records }.map { it.occurrence.id }.distinct().size)
+        } finally { pool.shutdownNow() }
+
+        val lateRule=CalendarFixtures.rule(300); val blocked=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Blocked grant",start=CalendarFixtures.now.plusSeconds(7200),rules=listOf(lateRule))))
+        val blockedDue=blocked.definition.start.instant.minusSeconds(lateRule.offsetSeconds)
+        clock.instant=blockedDue
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!; val waitPool=Executors.newSingleThreadExecutor()
+        DriverManagerDataSource(url,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false; blocker.createStatement().use { it.execute("LOCK TABLE calendar_reminder_switch IN ACCESS EXCLUSIVE MODE") }
+            val future=waitPool.submit<CalendarOccurrenceClaimResult> { CalendarOccurrenceWorkerService(clock,repo(clock,url=url)).claim(owner,CalendarOccurrenceBatchSize.from(3)!!) }
+            try {
+                awaitDatabase { database.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%calendar_lock_reminder_switch%')",Boolean::class.java)!! }
+                clock.instant=blockedDue.plusSeconds(120); blocker.commit()
+                val page=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,future.get(20,TimeUnit.SECONDS))
+                val lease=page.records.single()
+                assertEquals(blockedDue,page.observedAt)
+                assertEquals(blockedDue.plusSeconds(120),page.leaseGrantedAt)
+                assertEquals(blockedDue.plusSeconds(180),lease.leaseUntil)
+            } finally { blocker.rollback(); waitPool.shutdownNow() }
+        }
+    }
+
+    @Test fun `expired occurrence leases recover with a new fence and third expiry is terminal`() {
+        val (url,database)=isolatedDatabase("lease_recovery"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(); val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Lease recovery",rules=listOf(rule))))
+        val due=scheduled.definition.start.instant.minusSeconds(rule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val ownerA=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!; val ownerB=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        clock.instant=due
+        val first=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(ownerA)).records.single()
+        clock.instant=first.leaseUntil
+        assertSame(CalendarOccurrenceSettlementResult.LostFence,CalendarOccurrenceWorkerService(clock,repository).settleFailure(first.occurrence.id,first.token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF))
+        val second=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(ownerB)).records.single()
+        assertEquals(2,second.token.attempt); assertNotEquals(first.token.owner,second.token.owner)
+        clock.instant=second.leaseUntil
+        assertSame(CalendarOccurrenceSettlementResult.LostFence,CalendarOccurrenceWorkerService(clock,repository).settleFailure(first.occurrence.id,first.token,CalendarOccurrenceFailureClass.PERMANENT_PRE_HANDOFF))
+        val third=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(ownerB)).records.single()
+        assertEquals(3,third.token.attempt)
+        clock.instant=third.leaseUntil
+        forceSwitch(CalendarSwitchState.DISABLED,clock.instant,clock.instant.plusSeconds(3600),database)
+        val exhausted=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(ownerA))
+        assertEquals(1,exhausted.dead); assertEquals(0,exhausted.leased); assertTrue(exhausted.records.isEmpty())
+        assertEquals("ATTEMPTS_EXHAUSTED",database.queryForObject("SELECT terminal_reason FROM calendar_reminder_occurrences WHERE id=?",String::class.java,third.occurrence.id.value))
+
+        val permanentRule=CalendarFixtures.rule(); val permanent=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Permanent failure",start=CalendarFixtures.now.plusSeconds(7200),rules=listOf(permanentRule))))
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=permanent.definition.start.instant.minusSeconds(permanentRule.offsetSeconds)
+        val permanentLease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(ownerA)).records.single()
+        clock.instant=clock.instant.plusSeconds(1)
+        val dead=assertInstanceOf(CalendarOccurrenceSettlementResult.Dead::class.java,CalendarOccurrenceWorkerService(clock,repository).settleFailure(permanentLease.occurrence.id,permanentLease.token,CalendarOccurrenceFailureClass.PERMANENT_PRE_HANDOFF))
+        assertEquals(CalendarOccurrenceTerminalReason.PERMANENT_FAILURE,dead.reason)
+    }
+
+    @Test fun `corrupt switch rolls back the whole occurrence claim page`() {
+        val (url,database)=isolatedDatabase("corrupt_claim"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        val rules=listOf(CalendarFixtures.rule(300),CalendarFixtures.rule(600)); val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Corrupt page",rules=rules)))
+        val due=scheduled.definition.start.instant.minusSeconds(300)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        database.execute("ALTER TABLE calendar_reminder_switch DROP CONSTRAINT ck_calendar_reminder_switch_governance")
+        database.execute("ALTER TABLE calendar_reminder_switch DISABLE TRIGGER trg_calendar_protect_reminder_switch")
+        try { database.update("UPDATE calendar_reminder_switch SET affected_action='FUTURE' WHERE id=1") }
+        finally { database.execute("ALTER TABLE calendar_reminder_switch ENABLE TRIGGER trg_calendar_protect_reminder_switch") }
+        clock.instant=due
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        assertSame(CalendarOccurrenceClaimResult.Corrupt,CalendarOccurrenceWorkerService(clock,repository).claim(owner))
+        val states=database.queryForList("SELECT state FROM calendar_reminder_occurrences ORDER BY scheduled_at",String::class.java)
+        assertEquals(listOf("PENDING","PENDING"),states)
+        assertTrue(database.queryForList("SELECT lease_owner FROM calendar_reminder_occurrences").all { it["lease_owner"]==null })
+    }
+
+    @Test fun `claim propagates lock infrastructure failure and rolls back instead of reporting corrupt`() {
+        val (url,database)=isolatedDatabase("claim_timeout"); val clock=MutableCalendarClock(); val setup=repo(clock,url=url); val admin=actor(database=database); val rule=CalendarFixtures.rule()
+        val scheduled=schedule(setup,admin,create(setup,admin,CalendarFixtures.definition(title="Timeout",rules=listOf(rule))))
+        val due=scheduled.definition.start.instant.minusSeconds(rule.offsetSeconds); clock.instant=due
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        DriverManagerDataSource(url,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false; blocker.createStatement().use { it.execute("LOCK TABLE calendar_reminder_switch IN ACCESS EXCLUSIVE MODE") }
+            runtime(url).connection.use { workerConnection ->
+                workerConnection.createStatement().use { it.execute("SET lock_timeout='100ms'") }
+                assertThrows(DataAccessException::class.java) { CalendarOccurrenceWorkerService(clock,repo(workerConnection,clock)).claim(owner) }
+            }
+            blocker.rollback()
+        }
+        assertEquals("PENDING",database.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
+    }
+
+    @Test fun `latest resume cutoff is chosen by aggregate revision not inverted timestamps`() {
+        val (url,database)=isolatedDatabase("resume_revision"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database); val rule=CalendarFixtures.rule()
+        var event=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Resume ordering",rules=listOf(rule))))
+        val due=event.definition.start.instant.minusSeconds(rule.offsetSeconds)
+        clock.instant=CalendarFixtures.now.plusSeconds(10); event=recorded(repository.change(admin,request(event,CalendarStep.Pause))).after
+        clock.instant=CalendarFixtures.now.plusSeconds(20); val firstResume=recorded(repository.change(admin,request(event,CalendarStep.Resume))); event=firstResume.after
+        clock.instant=CalendarFixtures.now.plusSeconds(30); event=recorded(repository.change(admin,request(event,CalendarStep.Pause))).after
+        clock.instant=CalendarFixtures.now.plusSeconds(40); val secondResume=recorded(repository.change(admin,request(event,CalendarStep.Resume))); event=secondResume.after
+        assertTrue(secondResume.after.revision.value>firstResume.after.revision.value)
+        database.execute("ALTER TABLE calendar_command_receipts DISABLE TRIGGER trg_calendar_receipts_immutable")
+        try { database.update("UPDATE calendar_command_receipts SET recorded_at=? WHERE command_id=?",Timestamp.from(due.plusSeconds(1)),firstResume.commandId.value) }
+        finally { database.execute("ALTER TABLE calendar_command_receipts ENABLE TRIGGER trg_calendar_receipts_immutable") }
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=due.plusSeconds(2)
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        val page=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner))
+        assertEquals(1,page.leased); assertEquals(0,page.skipped); assertEquals(CalendarLifecycle.SCHEDULED,event.lifecycle)
+    }
+
+    @Test fun `claim page cap preserves scheduled order and settlement enforces both lease boundaries`() {
+        val (url,database)=isolatedDatabase("cap_boundaries"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        val rules=listOf(CalendarFixtures.rule(300),CalendarFixtures.rule(900),CalendarFixtures.rule(600))
+        val scheduled=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Ordered cap",rules=rules)))
+        val observed=scheduled.definition.start.instant.minusSeconds(300); clock.instant=observed
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        val capped=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner,CalendarOccurrenceBatchSize.from(2)!!))
+        assertEquals(2,capped.selected); assertEquals(listOf(rules[1].id,rules[2].id),capped.records.map { it.occurrence.ruleId })
+        val finalPage=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner,CalendarOccurrenceBatchSize.from(1)!!))
+        assertEquals(rules[0].id,finalPage.records.single().occurrence.ruleId)
+
+        val all=capped.records+finalPage.records
+        assertSame(CalendarOccurrenceSettlementResult.LostFence,repository.settleFailure(all[0].occurrence.id,all[0].token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF,capped.leaseGrantedAt.minusSeconds(1)))
+        assertInstanceOf(CalendarOccurrenceSettlementResult.RetryScheduled::class.java,repository.settleFailure(all[1].occurrence.id,all[1].token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF,all[1].leaseUntil.minusSeconds(1)))
+        assertSame(CalendarOccurrenceSettlementResult.LostFence,repository.settleFailure(all[2].occurrence.id,all[2].token,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF,finalPage.records.single().leaseUntil.plusSeconds(1)))
+    }
+
+    @Test fun `paused cancelled completed and changed definition occurrences are terminal without notification`() {
+        val (url,database)=isolatedDatabase("ineligible"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        fun scheduled(title: String,start: Instant=CalendarFixtures.now.plusSeconds(3600),end: Instant=start.plusSeconds(7200)): Pair<CalendarEvent,CalendarReminderRule> {
+            val rule=CalendarFixtures.rule(); return schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title=title,start=start,end=end,rules=listOf(rule)))) to rule
+        }
+        var (paused,pausedRule)=scheduled("Paused"); var (cancelled,cancelledRule)=scheduled("Cancelled")
+        val (completeCandidate,completeRule)=scheduled("Completed",end=CalendarFixtures.now.plusSeconds(3660))
+        clock.instant=CalendarFixtures.now.plusSeconds(60)
+        paused=recorded(repository.change(admin,request(paused,CalendarStep.Pause))).after
+        cancelled=recorded(repository.change(admin,request(cancelled,CalendarStep.Cancel))).after
+        val completeAt=completeCandidate.definition.end.instant
+        assertEquals(CalendarOutcome.APPLIED,systemRecorded(repository.advance(CalendarSystemCandidate.from(completeCandidate,completeAt)!!)).receipt.outcome)
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=completeAt
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        val terminal=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner,CalendarOccurrenceBatchSize.from(3)!!))
+        assertEquals(3,terminal.skipped); assertEquals(0,terminal.leased)
+        assertEquals(setOf("EVENT_INELIGIBLE"),database.queryForList("SELECT terminal_reason FROM calendar_reminder_occurrences WHERE rule_id IN (?,?,?)",String::class.java,pausedRule.id.value,cancelledRule.id.value,completeRule.id.value).toSet())
+
+        val (changed,changedRule)=scheduled("Definition changed",CalendarFixtures.now.plusSeconds(7200),CalendarFixtures.now.plusSeconds(9000))
+        val replacement=CalendarFixtures.definition(1,"Replacement",changed.definition.start.instant,changed.definition.end.instant,listOf(changedRule))
+        val replacementEvent=CalendarEvent.restore(changed.id,changed.revision.next()!!,CalendarLifecycle.SCHEDULED,replacement,replacement.revision,changed.createdAt)!!
+        val codec=CalendarSnapshotCodec(jacksonObjectMapper(),CalendarFixtures.hasher)
+        database.execute("ALTER TABLE calendar_definitions DISABLE TRIGGER trg_calendar_rules_definition")
+        try { database.update("INSERT INTO calendar_definitions(event_id,definition_revision,definition_hash,snapshot) VALUES(?,?,?,?::jsonb)",changed.id.value,replacement.revision.value,replacement.hash.value,codec.definition(replacement)) }
+        finally { database.execute("ALTER TABLE calendar_definitions ENABLE TRIGGER trg_calendar_rules_definition") }
+        database.update("INSERT INTO calendar_reminder_rules(event_id,definition_revision,rule_id,channel,offset_seconds) VALUES(?,?,?,?,?)",changed.id.value,replacement.revision.value,changedRule.id.value,changedRule.channel.wire,changedRule.offsetSeconds)
+        database.execute("ALTER TABLE calendar_events DISABLE TRIGGER trg_calendar_event")
+        try { database.update("UPDATE calendar_events SET revision=?,definition_revision=?,snapshot=?::jsonb WHERE id=?",replacementEvent.revision.value,replacement.revision.value,codec.event(replacementEvent),changed.id.value) }
+        finally { database.execute("ALTER TABLE calendar_events ENABLE TRIGGER trg_calendar_event") }
+        clock.instant=changed.definition.start.instant.minusSeconds(changedRule.offsetSeconds)
+        val changedPage=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner))
+        assertEquals(1,changedPage.skipped); assertEquals("DEFINITION_CHANGED",database.queryForObject("SELECT terminal_reason FROM calendar_reminder_occurrences WHERE rule_id=?",String::class.java,changedRule.id.value))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(CalendarLifecycle.PAUSED,paused.lifecycle); assertEquals(CalendarLifecycle.CANCELLED,cancelled.lifecycle)
+    }
+
+    @Test fun `later canonical event corruption and pending metadata corruption rollback before any page mutation`() {
+        val (url,database)=isolatedDatabase("page_corruption"); val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database)
+        val firstRule=CalendarFixtures.rule(600); val secondRule=CalendarFixtures.rule(300)
+        schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Valid first",rules=listOf(firstRule))))
+        val corruptEvent=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Corrupt second",rules=listOf(secondRule))))
+        val alteredDefinition=CalendarFixtures.definition(0,"Canonical mismatch",corruptEvent.definition.start.instant,corruptEvent.definition.end.instant,listOf(secondRule))
+        val alteredEvent=CalendarEvent.restore(corruptEvent.id,corruptEvent.revision,corruptEvent.lifecycle,alteredDefinition,corruptEvent.approvedDefinitionRevision,corruptEvent.createdAt)!!
+        val codec=CalendarSnapshotCodec(jacksonObjectMapper(),CalendarFixtures.hasher)
+        database.execute("ALTER TABLE calendar_events DISABLE TRIGGER trg_calendar_event")
+        database.execute("ALTER TABLE calendar_events DISABLE TRIGGER trg_calendar_definition_consistency")
+        try { database.update("UPDATE calendar_events SET snapshot=?::jsonb WHERE id=?",codec.event(alteredEvent),corruptEvent.id.value) }
+        finally {
+            database.execute("ALTER TABLE calendar_events ENABLE TRIGGER trg_calendar_definition_consistency")
+            database.execute("ALTER TABLE calendar_events ENABLE TRIGGER trg_calendar_event")
+        }
+        forceSwitch(CalendarSwitchState.DISABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=corruptEvent.definition.start.instant.minusSeconds(300)
+        val owner=CalendarLeaseOwner.fromWire(UUID.randomUUID())!!
+        assertSame(CalendarOccurrenceClaimResult.Corrupt,CalendarOccurrenceWorkerService(clock,repository).claim(owner,CalendarOccurrenceBatchSize.from(2)!!))
+        assertEquals(listOf("PENDING","PENDING"),database.queryForList("SELECT state FROM calendar_reminder_occurrences ORDER BY scheduled_at",String::class.java))
+
+        val (metadataUrl,metadataDb)=isolatedDatabase("pending_metadata"); val metadataClock=MutableCalendarClock(); val metadataRepo=repo(metadataClock,url=metadataUrl); val metadataAdmin=actor(database=metadataDb); val metadataRule=CalendarFixtures.rule()
+        val metadataEvent=schedule(metadataRepo,metadataAdmin,create(metadataRepo,metadataAdmin,CalendarFixtures.definition(title="Pending metadata",rules=listOf(metadataRule))))
+        metadataDb.execute("ALTER TABLE calendar_reminder_occurrences DROP CONSTRAINT ck_calendar_occurrence_worker_shape")
+        metadataDb.execute("ALTER TABLE calendar_reminder_occurrences DISABLE TRIGGER trg_calendar_occurrence_worker")
+        try { metadataDb.update("UPDATE calendar_reminder_occurrences SET terminal_reason='LATE',terminal_at=scheduled_at WHERE rule_id=?",metadataRule.id.value) }
+        finally { metadataDb.execute("ALTER TABLE calendar_reminder_occurrences ENABLE TRIGGER trg_calendar_occurrence_worker") }
+        forceSwitch(CalendarSwitchState.ENABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),metadataDb)
+        metadataClock.instant=metadataEvent.definition.start.instant.minusSeconds(metadataRule.offsetSeconds)
+        assertSame(CalendarOccurrenceClaimResult.Corrupt,CalendarOccurrenceWorkerService(metadataClock,metadataRepo).claim(owner))
+        assertEquals("PENDING",metadataDb.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
     }
     @Test fun `create retries allocate once and immutable historical receipt survives later definition and lifecycle changes`() {
         val clock=MutableCalendarClock(); val repository=repo(clock); val admin=actor()
@@ -219,7 +546,7 @@ class CalendarPersistencePostgresTest {
         assertEquals(CalendarPersistenceResult.Missing,repository.receipt(foreign,command.commandId,event.id))
         assertEquals(CalendarPreflightResult.Unauthorized,repository.preflight(operator,CalendarPreflightRequest(CalendarFixtures.command(),event.id,event.revision)))
         assertEquals(CalendarPersistenceResult.Unknown,repository.change(admin,request(event,CalendarStep.Activate)))
-        root.update("UPDATE identity_sessions SET revoked_at=clock_timestamp(),revocation_kind='SELF',revoked_by_user_id=?,revocation_correlation_id=?,revoked_reason='Fixture' WHERE id=?",admin.userId,UUID.randomUUID(),admin.sessionId)
+        root.update("UPDATE identity_sessions SET revoked_at=issued_at+interval '1 second',revocation_kind='SELF',revoked_by_user_id=?,revocation_correlation_id=?,revoked_reason='Fixture' WHERE id=?",admin.userId,UUID.randomUUID(),admin.sessionId)
         assertEquals(CalendarPersistenceResult.Unauthorized,repository.change(admin,command)); assertEquals(CalendarPersistenceResult.Unauthorized,repository.receipt(admin,command.commandId))
     }
     @Test fun `session expiring behind preflight lock cannot schedule or persist a receipt`() {
