@@ -274,6 +274,10 @@ pub(crate) fn worker_properties(
         ("TimeoutStopUSec", Value::from(WORKER_TIMEOUT_STOP_USEC)),
         ("KillMode", Value::from("control-group".to_owned())),
         ("KillSignal", Value::from(9i32)),
+        (
+            "RestrictAddressFamilies",
+            Value::from(vec!["AF_UNIX".to_owned(), "AF_NETLINK".to_owned()]),
+        ),
     ])
 }
 
@@ -514,6 +518,23 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains('9')),
             "KillSignal must be SIGKILL, got {kill_signal:?}"
+        );
+        assert!(keys.contains(&"RestrictAddressFamilies"));
+        let families = worker
+            .iter()
+            .find(|(key, _)| *key == "RestrictAddressFamilies")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            families
+                .as_deref()
+                .is_some_and(|value| value.contains("AF_UNIX") && value.contains("AF_NETLINK")),
+            "RestrictAddressFamilies must allow UNIX/NETLINK, got {families:?}"
+        );
+        assert!(
+            families
+                .as_deref()
+                .is_some_and(|value| !value.contains("AF_INET")),
+            "RestrictAddressFamilies must omit AF_INET, got {families:?}"
         );
     }
 
@@ -1100,6 +1121,65 @@ mod tests {
         assert!(
             !where_path.join("result.bin").exists(),
             "oom-killed worker must not finish SELF_TEST"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_restricts_address_families() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0xcc; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived RestrictAddressFamilies");
+        }
+        let families = systemctl_property(name, "RestrictAddressFamilies");
+        assert!(
+            families.contains("AF_UNIX") && families.contains("AF_NETLINK"),
+            "PID 1 must apply derived RestrictAddressFamilies, got {families}"
+        );
+        assert!(
+            !families.contains("AF_INET"),
+            "PID 1 must omit AF_INET, got {families}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(

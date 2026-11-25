@@ -1,13 +1,12 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-24, 4C sigue abierto
+## En implementación — 2026-11-24, 4C familia de sockets del worker
 
-Siguiente corte: cuota global, namespaces, sockets y RLIMIT. Este
-documento no cierra `003B-4C`. Sigue sin `CPUQuota`, cuota global,
-terminales sin ACK, FD/mmap tras el seal, reinicio en cada transición
-durable, namespaces, RLIMIT ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP de media.
+Este corte no cierra `003B-4C`. El harness deriva
+`RestrictAddressFamilies=AF_UNIX AF_NETLINK` y PID 1 lo lee. Sigue sin
+`CPUQuota`, `PrivateNetwork`, RLIMIT ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-24, 4C terminación del cgroup PR #366
 

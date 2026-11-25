@@ -1,5 +1,11 @@
 # Progreso
 
+## 2026-11-24 — arranque 4C familia de sockets del worker
+
+- El harness deriva `RestrictAddressFamilies=AF_UNIX AF_NETLINK` y PID 1
+  lo lee. `CPUQuota` y `PrivateNetwork` siguen fuera.
+- No se marca `003B-4C`. No hay `Ready` ni HTTP de media.
+
 ## 2026-11-24 — persist reviews PR #366, 003B-4C sigue abierto
 
 - Merge #366 `ff30b8aaffa5b6ffea077a51c8dedf335ba3e935` sobre candidato
