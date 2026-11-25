@@ -1,14 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C ProtectHome queda fuera
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. `ProtectHome` queda fuera: PID 1
-`StartTransientUnit` responde `ENXIO` Unexpected message contents, igual
-que `RestrictAddressFamilies` y `CPUQuota`. Sigue sin familia de sockets,
-cuota global, terminales sin ACK, FD/mmap tras el seal, reinicio en cada
-transición durable, RLIMIT restantes ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable y RLIMIT restantes.
+`ProtectHome`, `RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este
+documento no cierra `003B-4C`. Sigue sin familia de sockets, cuota global
+ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-25, 4C ProtectHome ENXIO PR #389
+
+`master d6d1f9399504dbe150e9e5447e2696e9159a1247` integra PR #389. Su
+candidato exacto `c847ca92a103397ca0c1178df4bdddbbd9f46e02` pasó Verify
+`45627692228` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr389-architecture.md` y
+`sdd/reviews/20261125-sol-pr389-security.md`. `ProtectHome` queda fuera
+(`ENXIO` Unexpected message contents). El corte no cierra `003B-4C`: no
+hay `CPUQuota`, familia de sockets, cuota global ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
 
 ## Master vigente — 2026-11-25, 4C PrivateTmp PR #387
 
