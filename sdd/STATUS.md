@@ -1,14 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C RLIMIT CPU del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `LimitCPU=12` (`RLIMIT_CPU`
-del timeout `IMAGE_IO_V1`) y PID 1 lo lee. `CPUQuota` y
-`RestrictAddressFamilies` quedan fuera. Sigue sin familia de sockets, cuota
-global, terminales sin ACK, FD/mmap tras el seal, reinicio en cada
-transición durable, RLIMIT restantes ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable y RLIMIT restantes.
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento no
+cierra `003B-4C`. Sigue sin familia de sockets, cuota global ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-25, 4C RLIMIT CPU PR #385
+
+`master f242dff98b9f78aae8dbc1b45f8dbc083c70b37d` integra PR #385. Su
+candidato exacto `792397cbdebf8e112c839ea3d16e37a427009752` pasó Verify
+`45569539383` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr385-architecture.md` y
+`sdd/reviews/20261125-sol-pr385-security.md`. El harness deriva
+`LimitCPU=12` (`RLIMIT_CPU`) y PID 1 lo lee. El corte no cierra
+`003B-4C`: no hay `CPUQuota`, familia de sockets, cuota global ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C RLIMIT FSIZE PR #383
 

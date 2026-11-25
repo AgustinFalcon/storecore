@@ -88,7 +88,9 @@ no cierra cuota global ni `Ready`. PR #381 (head `6e4d1c9`, merge
 `LimitCORE=0`; no cierra cuota global ni `Ready`. PR #383 (head
 `d7f773a`, merge `f5e27b3`, Verify `45560675895` 7/7, dos Grok 4.7
 APPROVED) deriva `LimitFSIZE` al workspace `48 MiB`; no cierra cuota
-global ni `Ready`. PR #326 arranca
+global ni `Ready`. PR #385 (head `792397c`, merge `f242dff`, Verify
+`45569539383` 7/7, dos Grok 4.7 APPROVED) deriva `LimitCPU=12`; no
+cierra `CPUQuota` ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos
