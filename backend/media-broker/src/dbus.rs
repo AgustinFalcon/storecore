@@ -1152,7 +1152,7 @@ mod tests {
             stopped_worker,
             UnitState::Inactive | UnitState::Failed
         ));
-        wait_proc_gone(extra_pid, Duration::from_secs(5));
+        wait_proc_gone(name, extra_pid, Duration::from_secs(8));
         std::mem::forget(extra);
         let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
         assert!(matches!(
@@ -1262,17 +1262,72 @@ mod tests {
 
     fn spawn_cgroup_sleeper(name: &str) -> std::process::Child {
         let relative = wait_control_group(name);
-        let procs = Path::new("/sys/fs/cgroup")
-            .join(relative.trim_start_matches('/'))
-            .join("cgroup.procs");
         let child = Command::new("sleep")
             .arg("60")
             .spawn()
             .unwrap_or_else(|error| panic!("sleep: {error}"));
         let pid = child.id();
-        fs::write(&procs, pid.to_string())
-            .unwrap_or_else(|error| panic!("move sleeper {pid} into {}: {error}", procs.display()));
+        let stopped = Command::new("kill")
+            .args(["-STOP", &pid.to_string()])
+            .status()
+            .unwrap_or_else(|error| panic!("kill -STOP extra {pid}: {error}"));
+        assert!(
+            stopped.success(),
+            "kill -STOP extra {pid} failed with {stopped}"
+        );
+        wait_proc_stopped(pid);
+        attach_pid_to_unit(name, pid);
+        assert_in_worker_cgroup(name, &relative, pid);
         child
+    }
+
+    fn attach_pid_to_unit(name: &str, pid: u32) {
+        let attached = Command::new("busctl")
+            .args([
+                "call",
+                "--system",
+                "org.freedesktop.systemd1",
+                "/org/freedesktop/systemd1",
+                "org.freedesktop.systemd1.Manager",
+                "AttachProcessesToUnit",
+                "ssau",
+                name,
+                "",
+                "1",
+                &pid.to_string(),
+            ])
+            .output()
+            .unwrap_or_else(|error| panic!("busctl AttachProcessesToUnit: {error}"));
+        if attached.status.success() {
+            return;
+        }
+        let relative = wait_control_group(name);
+        let procs = Path::new("/sys/fs/cgroup")
+            .join(relative.trim_start_matches('/'))
+            .join("cgroup.procs");
+        fs::write(&procs, pid.to_string()).unwrap_or_else(|error| {
+            panic!(
+                "AttachProcessesToUnit failed: {}; cgroup.procs {}: {error}",
+                String::from_utf8_lossy(&attached.stderr),
+                procs.display()
+            )
+        });
+    }
+
+    fn assert_in_worker_cgroup(name: &str, relative: &str, pid: u32) {
+        let marker = relative.trim_start_matches('/');
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let cgroup = fs::read_to_string(format!("/proc/{pid}/cgroup")).unwrap_or_default();
+            if !marker.is_empty() && cgroup.contains(marker) {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "extra {pid} not in {name} cgroup {marker}: {cgroup}"
+            );
+            thread::sleep(Duration::from_millis(20));
+        }
     }
 
     fn wait_control_group(name: &str) -> String {
@@ -1290,7 +1345,7 @@ mod tests {
         }
     }
 
-    fn wait_proc_gone(pid: u32, timeout: Duration) {
+    fn wait_proc_gone(name: &str, pid: u32, timeout: Duration) {
         let deadline = Instant::now() + timeout;
         let path = format!("/proc/{pid}");
         loop {
@@ -1299,7 +1354,11 @@ mod tests {
             }
             assert!(
                 Instant::now() < deadline,
-                "cgroup member {pid} still alive after KillMode stop"
+                "cgroup member {pid} still alive after KillMode stop of {name}; cgroup={} unit={}",
+                fs::read_to_string(format!("/proc/{pid}/cgroup"))
+                    .unwrap_or_default()
+                    .trim(),
+                systemctl_property(name, "ControlGroup")
             );
             thread::sleep(Duration::from_millis(50));
         }
