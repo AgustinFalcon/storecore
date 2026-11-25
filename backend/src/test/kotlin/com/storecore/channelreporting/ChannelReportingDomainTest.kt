@@ -1,5 +1,6 @@
 package com.storecore.channelreporting
 
+import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
 import com.storecore.channelreporting.domain.*
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import java.time.Instant
@@ -29,6 +30,9 @@ class ChannelReportingDomainTest {
         assertNull(ReportValue.notAvailable<Long>(ReportUnavailableReason.UNKNOWN))
         assertNull(ReportValue.notAvailable<Long>(ReportUnavailableReason.SOURCE_MISSING))
         assertNull(ReportValue.unavailable<Long>(ReportUnavailableReason.UNSUPPORTED_CONTRACT))
+        assertNull(StoreCoreCreatedOrderReadResult.SourceUnavailable.create(ReportUnavailableReason.UNKNOWN))
+        assertNull(StoreCoreCreatedOrderReadResult.SourceUnavailable.create(ReportUnavailableReason.UNSUPPORTED_CONTRACT))
+        assertNotNull(StoreCoreCreatedOrderReadResult.SourceUnavailable.create(ReportUnavailableReason.READ_FAILED))
     }
 
     @Test fun `lossless unsigned and signed quantities accept only canonical Long wires`() {

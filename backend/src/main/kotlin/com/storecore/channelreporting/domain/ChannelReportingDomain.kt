@@ -163,6 +163,12 @@ class ReportPeriod private constructor(
         const val CONTRACT_VERSION = "storecore-channel-report-v1"
         private val DATE = Regex("[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
+        fun validRequest(fromRaw: String?, toRaw: String?): Boolean {
+            val from = date(fromRaw) ?: return false
+            val to = date(toRaw) ?: return false
+            return ChronoUnit.DAYS.between(from, to) in 1..366
+        }
+
         fun create(fromRaw: String?, toRaw: String?, zoneRaw: String?, generatedAt: Instant?, hasher: ReportPeriodHasher): ReportPeriod? {
             val from = date(fromRaw) ?: return null
             val to = date(toRaw) ?: return null
