@@ -94,15 +94,28 @@ class CalendarPersistencePostgresTest {
         clock.instant=enable.expiresAt.plusSeconds(60)
         val replay=switchRecorded(active.change(admin,enable))
         assertEquals(enabled.recordedAt,replay.recordedAt); assertEquals(enabled.after.revision,replay.after.revision)
+        assertEquals(enabled.recordedAt,switchRecorded(switchRepo(clock,false).change(admin,enable)).recordedAt)
         assertEquals(CalendarSwitchPersistenceResult.IdempotencyConflict,active.change(admin,enable.copy(owner=requireNotNull(CalendarSwitchOwner.fromWire("Other owner")))))
         assertEquals(CalendarSwitchPersistenceResult.Missing,active.receipt(foreign,enable.commandId))
+        assertEquals(CalendarSwitchPersistenceResult.Invalid,active.change(admin,switchRequest(expires=clock.instant.plusSeconds(300))))
+        assertEquals(CalendarSwitchPersistenceResult.Invalid,active.change(admin,switchRequest(expires=clock.instant.plusSeconds(7L*86400+1))))
         val disable=switchRequest(revision=enabled.after.revision,operation=CalendarSwitchOperation.DISABLE,expires=clock.instant.plusSeconds(3600))
         val disabled=switchRecorded(switchRepo(clock,false).change(admin,disable))
         assertEquals(CalendarOutcome.INVALID_TRANSITION,disabled.outcome)
         val renewed=switchRecorded(active.change(admin,switchRequest(revision=enabled.after.revision,expires=clock.instant.plusSeconds(3600))))
         val safe=switchRecorded(switchRepo(clock,false).change(admin,switchRequest(revision=renewed.after.revision,operation=CalendarSwitchOperation.DISABLE,expires=clock.instant.plusSeconds(3600))))
         assertEquals(CalendarOutcome.APPLIED,safe.outcome); assertEquals(CalendarSwitchState.DISABLED,safe.after.configuredState)
-        assertEquals(4L,(assertInstanceOf(CalendarQueryResult.Found::class.java,active.audit(admin,CalendarPageRequest.create()!!)).value as CalendarPage<*>).total)
+        val barrier=CyclicBarrier(2); val pool=Executors.newFixedThreadPool(2)
+        try {
+            val raced=(1..2).map { pool.submit<CalendarOutcome> { barrier.await(); switchRecorded(active.change(admin,switchRequest(revision=safe.after.revision,expires=clock.instant.plusSeconds(3600)))).outcome } }.map { it.get(10,TimeUnit.SECONDS) }
+            assertEquals(setOf(CalendarOutcome.APPLIED,CalendarOutcome.REVISION_CONFLICT),raced.toSet())
+        } finally { pool.shutdownNow() }
+        root.update("DELETE FROM user_roles WHERE user_id=?",admin.userId)
+        assertEquals(CalendarSwitchPersistenceResult.Unauthorized,active.change(admin,enable))
+        root.update("INSERT INTO user_roles(user_id,role_id) SELECT ?,id FROM roles WHERE code='ADMIN'",admin.userId)
+        assertEquals(enabled.recordedAt,switchRecorded(active.change(admin,enable)).recordedAt)
+        assertThrows(DataAccessException::class.java) { root.update("UPDATE calendar_switch_command_receipts SET outcome='INVALID_TRANSITION' WHERE command_id=?",enable.commandId.value) }
+        assertEquals(6L,(assertInstanceOf(CalendarQueryResult.Found::class.java,active.audit(admin,CalendarPageRequest.create()!!)).value as CalendarPage<*>).total)
     }
 
     @Test fun `clean and V35 upgrade preserve every published checksum and default disabled least privilege`() {

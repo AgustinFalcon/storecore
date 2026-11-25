@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.support.TransactionTemplate
 import java.sql.Timestamp
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 class JdbcCalendarSwitchPersistence(
@@ -34,7 +35,7 @@ class JdbcCalendarSwitchPersistence(
         if(!authorized(actor)) return@tx CalendarSwitchPersistenceResult.Unauthorized
         val payload=hash(actor.userId,request)
         binding(request.commandId)?.let { return@tx if(it["family"]=="REMINDER_SWITCH" && (it["actor_id"] as Number).toLong()==actor.userId && it["payload_hash"]==payload.value) load(request.commandId) else CalendarSwitchPersistenceResult.IdempotencyConflict }
-        val now=clock.now()
+        val now=clock.now().truncatedTo(ChronoUnit.SECONDS)
         val metadata=CalendarSwitchMetadata.forNewCommand(request.owner,request.reason,now,request.expiresAt,request.removalTicket,request.affectedAction,now) ?: return@tx CalendarSwitchPersistenceResult.Invalid
         val before=read(true) ?: return@tx CalendarSwitchPersistenceResult.Missing
         val capabilityActive=request.operation!=CalendarSwitchOperation.ENABLE || runCatching { capabilities.decide("COMMERCIAL_CALENDAR",request.affectedAction.wire,CapabilityActor.Internal(actor)) }.isSuccess
@@ -55,9 +56,13 @@ class JdbcCalendarSwitchPersistence(
     }
     override fun audit(actor: InternalUserPrincipal,paging: CalendarPageRequest): CalendarQueryResult<CalendarPage<CalendarSwitchReceipt>> = tx {
         if(!authorized(actor)) return@tx CalendarQueryResult.Unauthorized
-        val total=jdbc.queryForObject("SELECT count(*) FROM calendar_switch_audit",Long::class.java)!!
-        val rows=jdbc.queryForList("""SELECT r.*,b.family,b.actor_id AS binding_actor,b.payload_hash AS binding_hash FROM calendar_switch_command_receipts r JOIN calendar_switch_audit a USING(command_id) JOIN calendar_command_bindings b USING(command_id) ORDER BY r.recorded_at,r.command_id LIMIT ? OFFSET ?""",paging.size,paging.offset)
-        CalendarQueryResult.Found(CalendarPage(rows.map(::decode),total,paging))
+        val rows=jdbc.queryForList("""WITH filtered AS MATERIALIZED (
+            SELECT r.*,b.family,b.actor_id AS binding_actor,b.payload_hash AS binding_hash
+            FROM calendar_switch_command_receipts r JOIN calendar_switch_audit a USING(command_id) JOIN calendar_command_bindings b USING(command_id)),
+            selected AS (SELECT * FROM filtered ORDER BY recorded_at,command_id LIMIT ? OFFSET ?)
+            SELECT (SELECT count(*) FROM filtered) AS total,selected.* FROM (SELECT 1) singleton LEFT JOIN selected ON TRUE ORDER BY selected.recorded_at,selected.command_id""",paging.size,paging.offset)
+        val receipts=rows.mapNotNull { if(it["command_id"]==null) null else decode(it) }
+        if(!authorized(actor)) CalendarQueryResult.Unauthorized else CalendarQueryResult.Found(CalendarPage(receipts,(rows.first()["total"] as Number).toLong(),paging))
     }
     private fun binding(id:CalendarCommandId)=jdbc.queryForList("SELECT family,actor_id,event_id,payload_hash FROM calendar_command_bindings WHERE command_id=?",id.value).singleOrNull()
     private fun read(locked:Boolean=false):CalendarSwitchSnapshot?=jdbc.queryForList(if(locked) "SELECT * FROM calendar_lock_reminder_switch()" else "SELECT * FROM calendar_reminder_switch WHERE id=1").singleOrNull()?.let { row ->

@@ -1,5 +1,5 @@
 import type { Observable } from 'rxjs';
-import { CalendarAudience, CalendarLifecycle, CalendarOperation, CalendarOutcome, CalendarPreflightIssue, CalendarReminderChannel, CalendarReminderReadiness, CalendarSwitchState } from './calendar-types';
+import { CalendarAudience, CalendarLifecycle, CalendarOperation, CalendarOutcome, CalendarPreflightIssue, CalendarReminderChannel, CalendarReminderReadiness, CalendarSwitchAction, CalendarSwitchEffectivity, CalendarSwitchState } from './calendar-types';
 export * from './calendar-types';
 export interface CalendarTimeInput { readonly localDateTime: string; readonly timeZone: string; readonly offset: string; }
 export interface CalendarTime extends CalendarTimeInput { readonly instant: string; }
@@ -12,7 +12,8 @@ export interface CalendarPage<T = CalendarEvent> { readonly items: readonly T[];
 export interface CalendarReceipt { readonly commandId: string; readonly eventId: string; readonly actorId: string | null; readonly operation: CalendarOperation; readonly expectedRevision: string | null; readonly reason: string | null; readonly outcome: CalendarOutcome; readonly before: CalendarEvent | null; readonly after: CalendarEvent; readonly recordedAt: string; }
 export interface CalendarPreflight { readonly id: string; readonly eventId: string; readonly revision: string; readonly definitionRevision: string; readonly definitionHash: string; readonly issues: readonly CalendarPreflightIssue[]; readonly checkedAt: string; readonly expiresAt: string; }
 export interface CalendarPreflightResult { readonly outcome: CalendarOutcome; readonly preflight: CalendarPreflight | null; readonly event: CalendarEvent; }
-export interface CalendarReminderSwitch { readonly state: CalendarSwitchState; readonly revision: string; readonly readiness: CalendarReminderReadiness; }
+export interface CalendarSwitchMetadata { readonly owner:string; readonly reason:string; readonly createdAt:string; readonly expiresAt:string; readonly removalTicket:string; readonly affectedAction:CalendarSwitchAction; }
+export interface CalendarReminderSwitch { readonly configuredState: CalendarSwitchState; readonly effectivity:CalendarSwitchEffectivity; readonly revision: string; readonly readiness: CalendarReminderReadiness; readonly metadata:CalendarSwitchMetadata|null; }
 export interface CalendarChange { readonly operation: CalendarOperation; readonly expectedRevision: string; readonly reason: string; readonly definition?: CalendarDefinitionInput; readonly preflightId?: string; }
 export abstract class CalendarRepository {
   abstract list(query: CalendarQuery): Observable<CalendarPage>;

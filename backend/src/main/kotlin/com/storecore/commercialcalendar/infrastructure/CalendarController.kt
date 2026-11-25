@@ -24,7 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 @RestController
 @RequestMapping("/api/v1/user/commercial-calendar")
 @ConditionalOnProperty(name=["storecore.identity.enabled"],havingValue="true",matchIfMissing=true)
-class CalendarController(private val queries: CalendarQueryService,private val commands: CalendarCommandService,private val auth: RequestAuth,
+class CalendarController(private val queries: CalendarQueryService,private val commands: CalendarCommandService,private val switches: CalendarSwitchCommandService,private val auth: RequestAuth,
     private val mutations: IdentityMutationCoordinator,mapper: ObjectMapper,hasher: CalendarHasher) {
     private val translator=CalendarHttpTranslator(mapper,hasher)
     @GetMapping("/events") fun list(http: HttpServletRequest,@RequestParam params: MultiValueMap<String,String>): ResponseEntity<BaseResponse<CalendarPageDto<CalendarEventDto>>> {
@@ -52,7 +52,21 @@ class CalendarController(private val queries: CalendarQueryService,private val c
     @GetMapping("/reminder-switch") fun reminderSwitch(http: HttpServletRequest): ResponseEntity<BaseResponse<CalendarReminderSwitchDto>> {
         val actor=auth.admin(http); noQuery(http)
         val value=found(queries.reminderSwitch(actor))
-        return ok(CalendarReminderSwitchDto(value.state.wire,value.revision.value.toString(),CalendarReminderReadiness.UNAVAILABLE.wire))
+        return ok(CalendarHttpMapper.switchDiagnostic(value))
+    }
+    @GetMapping("/reminder-switch/commands/{commandId}") fun switchReceipt(http: HttpServletRequest,@PathVariable commandId: String): ResponseEntity<BaseResponse<CalendarSwitchReceiptDto>> {
+        val actor=auth.admin(http); noQuery(http)
+        return ok(CalendarHttpMapper.switchReceipt(switchReceiptFound(switches.receipt(actor,translator.commandId(commandId)))))
+    }
+    @GetMapping("/reminder-switch/audit") fun switchAudit(http: HttpServletRequest,@RequestParam params: MultiValueMap<String,String>): ResponseEntity<BaseResponse<CalendarPageDto<CalendarSwitchReceiptDto>>> {
+        val actor=auth.admin(http)
+        return ok(CalendarHttpMapper.page(found(switches.audit(actor,translator.paging(params))),CalendarHttpMapper::switchReceipt))
+    }
+    @PostMapping("/reminder-switch/commands") fun changeSwitch(http: HttpServletRequest): ResponseEntity<BaseResponse<Any?>> {
+        val actor=mutationActor(http)
+        val request=translator.switchCommand(key(http),body(http,CalendarHttpTranslator.SWITCH_MAX_BYTES))
+        val mutation=mutations.execute(actor,csrf(http)) { switches.change(actor,request).also(::verifySwitchResult) }
+        return switchCommandResponse(mutation.value,mutation.nextCsrf)
     }
     @PostMapping("/events") fun create(http: HttpServletRequest): ResponseEntity<BaseResponse<Any?>> {
         val actor=mutationActor(http)
@@ -87,7 +101,7 @@ class CalendarController(private val queries: CalendarQueryService,private val c
     }
     private fun key(http: HttpServletRequest): String { val values=http.getHeaders("Idempotency-Key").toList(); if(values.size!=1) throw InvalidCalendarRequest(); return values.single() }
     private fun csrf(http: HttpServletRequest)=http.getHeader(RequestAuth.CSRF_HEADER) ?: throw CsrfInvalid()
-    private fun body(http: HttpServletRequest)=http.inputStream.readNBytes(CalendarHttpTranslator.MAX_BYTES+1)
+    private fun body(http: HttpServletRequest,maxBytes: Int=CalendarHttpTranslator.MAX_BYTES)=http.inputStream.readNBytes(maxBytes+1)
     private fun verifyResult(result: CalendarPersistenceResult) {
         if(result==CalendarPersistenceResult.Unknown || result is CalendarPersistenceResult.Recorded && (result.receipt.outcome==CalendarOutcome.UNKNOWN || result.receipt.operation==CalendarOperation.UNKNOWN)) throw CalendarUnavailable()
         if(result==CalendarPersistenceResult.Unauthorized) throw AuthorizationDenied()
@@ -97,7 +111,18 @@ class CalendarController(private val queries: CalendarQueryService,private val c
         val result: BaseResponse<Any?> = when(value) { is CalendarPersistenceResult.Recorded -> BaseResponse.ok(CalendarHttpMapper.receipt(value.receipt),status); else -> rejected(status,if(value==CalendarPersistenceResult.Missing) "RESOURCE_NOT_FOUND" else "IDEMPOTENCY_CONFLICT") }
         return ResponseEntity.status(status).cacheControl(CacheControl.noStore()).header(RequestAuth.CSRF_HEADER,csrf).body(result)
     }
+    private fun verifySwitchResult(result: CalendarSwitchPersistenceResult) {
+        if(result==CalendarSwitchPersistenceResult.Invalid) throw InvalidCalendarRequest()
+        if(result==CalendarSwitchPersistenceResult.Unauthorized) throw AuthorizationDenied()
+        if(result==CalendarSwitchPersistenceResult.Unknown || result is CalendarSwitchPersistenceResult.Recorded && (result.receipt.outcome==CalendarOutcome.UNKNOWN || result.receipt.operation==CalendarSwitchOperation.UNKNOWN)) throw CalendarUnavailable()
+    }
+    private fun switchCommandResponse(value: CalendarSwitchPersistenceResult,csrf: String): ResponseEntity<BaseResponse<Any?>> {
+        val status=when(value) { is CalendarSwitchPersistenceResult.Recorded -> if(value.receipt.outcome==CalendarOutcome.APPLIED) 200 else 409; CalendarSwitchPersistenceResult.IdempotencyConflict -> 409; CalendarSwitchPersistenceResult.Missing -> 404; else -> throw CalendarUnavailable() }
+        val result: BaseResponse<Any?> = when(value) { is CalendarSwitchPersistenceResult.Recorded -> BaseResponse.ok(CalendarHttpMapper.switchReceipt(value.receipt),status); else -> rejected(status,if(value==CalendarSwitchPersistenceResult.Missing) "RESOURCE_NOT_FOUND" else "IDEMPOTENCY_CONFLICT") }
+        return ResponseEntity.status(status).cacheControl(CacheControl.noStore()).header(RequestAuth.CSRF_HEADER,csrf).body(result)
+    }
     private fun receiptFound(value: CalendarPersistenceResult): CalendarReceipt=when(value) { is CalendarPersistenceResult.Recorded -> value.receipt; CalendarPersistenceResult.Unauthorized -> throw AuthorizationDenied(); CalendarPersistenceResult.Missing -> throw ResourceNotFound(); else -> throw CalendarUnavailable() }
+    private fun switchReceiptFound(value: CalendarSwitchPersistenceResult): CalendarSwitchReceipt=when(value) { is CalendarSwitchPersistenceResult.Recorded -> value.receipt; CalendarSwitchPersistenceResult.Unauthorized -> throw AuthorizationDenied(); CalendarSwitchPersistenceResult.Missing -> throw ResourceNotFound(); else -> throw CalendarUnavailable() }
     private fun <T> found(value: CalendarQueryResult<T>): T=when(value) { is CalendarQueryResult.Found -> value.value; CalendarQueryResult.Unauthorized -> throw AuthorizationDenied(); CalendarQueryResult.Missing -> throw ResourceNotFound(); CalendarQueryResult.Unknown -> throw CalendarUnavailable() }
     private fun <T> ok(value: T): ResponseEntity<BaseResponse<T>> = ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(BaseResponse.ok(value))
     private fun rejected(status: Int,code: String): BaseResponse<Any?> = BaseResponse(status,null,"Request rejected",code,false,null)

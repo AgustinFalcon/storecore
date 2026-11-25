@@ -79,6 +79,24 @@ export class CalendarSwitchState {
   static fromWire(raw: unknown): CalendarSwitchState { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
 
+export class CalendarSwitchEffectivity {
+  private constructor(readonly wire: string, readonly label: string) {}
+  static readonly Effective = new CalendarSwitchEffectivity('EFFECTIVE', 'Vigente');
+  static readonly Disabled = new CalendarSwitchEffectivity('DISABLED', 'Deshabilitado');
+  static readonly Expired = new CalendarSwitchEffectivity('EXPIRED', 'Vencido');
+  static readonly Unknown = new CalendarSwitchEffectivity('UNKNOWN', 'Desconocido');
+  static readonly all = Object.freeze([this.Effective, this.Disabled, this.Expired]);
+  static fromWire(raw: unknown): CalendarSwitchEffectivity { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class CalendarSwitchAction {
+  private constructor(readonly wire: string, readonly label: string) {}
+  static readonly EmitInAppCampaignReminder = new CalendarSwitchAction('EMIT_IN_APP_CAMPAIGN_REMINDER', 'Emitir recordatorio de campaña en la aplicación');
+  static readonly Unknown = new CalendarSwitchAction('UNKNOWN', 'Desconocida');
+  static readonly all = Object.freeze([this.EmitInAppCampaignReminder]);
+  static fromWire(raw: unknown): CalendarSwitchAction { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
 export class CalendarReminderReadiness {
   private constructor(readonly wire: string, readonly label: string) {}
   static readonly Unavailable = new CalendarReminderReadiness('UNAVAILABLE', 'No disponible');

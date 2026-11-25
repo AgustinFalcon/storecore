@@ -137,9 +137,15 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             WHERE r.event_id=? ORDER BY r.recorded_at,r.command_id""",{ rs,_ -> decodeReceipt((1..rs.metaData.columnCount).associate { rs.metaData.getColumnLabel(it) to rs.getObject(it) }) },eventId.value)
     }
     override fun reminderSwitch(): CalendarReminderSwitch {
-        val row=jdbc.queryForMap("SELECT state,revision FROM calendar_reminder_switch WHERE id=1")
+        val row=jdbc.queryForMap("SELECT * FROM calendar_reminder_switch WHERE id=1")
         val state=CalendarSwitchState.fromWire(row["state"] as String); require(state!=CalendarSwitchState.UNKNOWN)
-        return CalendarReminderSwitch(state,requireNotNull(CalendarRevision.fromWire((row["revision"] as Number).toLong())))
+        val revision=requireNotNull(CalendarRevision.fromWire((row["revision"] as Number).toLong()))
+        val metadata=if(revision==CalendarRevision.Zero) null else CalendarSwitchMetadata.restore(
+            requireNotNull(CalendarSwitchOwner.fromWire(row["owner"] as? String)),requireNotNull(CalendarReason.fromWire(row["reason"] as? String)),
+            (row["created_at"] as Timestamp).toInstant(),(row["expires_at"] as Timestamp).toInstant(),
+            requireNotNull(CalendarRemovalTicket.fromWire(row["removal_ticket"] as? String)),CalendarSwitchAction.fromWire(row["affected_action"] as? String),
+        )
+        return CalendarReminderSwitch(requireNotNull(CalendarSwitchSnapshot.restore(state,revision,metadata)),clock.now())
     }
     private fun writeDefinition(event: CalendarEvent) {
         val d=event.definition
