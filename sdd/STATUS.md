@@ -1,12 +1,27 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-24, 4C RLIMIT NOFILE del worker
+## En implementación — 2026-11-24, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. `RestrictAddressFamilies` queda fuera
-(`ENXIO` Unexpected message contents). El harness deriva `LimitNOFILE=1024`
-y PID 1 lo lee. Sigue sin `CPUQuota`, familia de sockets, namespaces ni
-`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+Siguiente corte: cuota global, namespaces, terminales sin ACK, FD/mmap
+tras el seal, reinicio en cada transición durable y RLIMIT restantes.
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento no
+cierra `003B-4C`. Sigue sin familia de sockets, namespaces, cuota global
+ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
 siguen abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-24, 4C RLIMIT NOFILE PR #374
+
+`master c146fdd8c062fa0e75da219e2e84a7d287a1cc14` integra PR #374. Su
+candidato exacto `69827b8ed2b41e91daf72c4ad7c50d57c26046df` pasó Verify
+`45541300889` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261124-sol-pr374-architecture.md` y
+`sdd/reviews/20261124-sol-pr374-security.md`. El harness deriva
+`LimitNOFILE=1024` y PID 1 lo lee. `RestrictAddressFamilies` queda fuera
+(`ENXIO` Unexpected message contents). El corte no cierra `003B-4C`: no
+hay `CPUQuota`, familia de sockets, namespaces, cuota global ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay
+HTTP de media.
 
 ## Master vigente — 2026-11-24, 4C terminación del cgroup PR #366
 

@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-24 — persist reviews PR #374, 003B-4C sigue abierto
+
+- Merge #374 `c146fdd8c062fa0e75da219e2e84a7d287a1cc14` sobre candidato
+  `69827b8ed2b41e91daf72c4ad7c50d57c26046df`. Verify exact-head
+  `45541300889` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261124-sol-pr374-architecture.md`
+  y `sdd/reviews/20261124-sol-pr374-security.md`.
+- El harness deriva `LimitNOFILE=1024` y PID 1 lo lee.
+  `RestrictAddressFamilies` queda fuera (`ENXIO`). No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, namespaces, cuota
+  global, `Ready` ni HTTP de media.
+
 ## 2026-11-24 — arranque 4C RLIMIT NOFILE del worker
 
 - `RestrictAddressFamilies` queda fuera: PID 1 `StartTransientUnit`
