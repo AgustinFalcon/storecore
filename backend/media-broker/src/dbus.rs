@@ -1162,7 +1162,7 @@ mod tests {
             kill_signal == "9" || kill_signal == "SIGKILL",
             "PID 1 must apply derived KillSignal, got {kill_signal}"
         );
-        let extra = spawn_cgroup_sleeper(name);
+        let mut extra = spawn_cgroup_sleeper(name);
         let extra_pid = extra.id();
         let continued = Command::new("kill")
             .args(["-CONT", &extra_pid.to_string()])
@@ -1177,8 +1177,7 @@ mod tests {
             stopped_worker,
             UnitState::Inactive | UnitState::Failed
         ));
-        wait_proc_gone(name, extra_pid, Duration::from_secs(8));
-        std::mem::forget(extra);
+        wait_child_reaped(&mut extra, Duration::from_secs(8));
         let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
         assert!(matches!(
             stopped_mount,
@@ -1370,22 +1369,27 @@ mod tests {
         }
     }
 
-    fn wait_proc_gone(name: &str, pid: u32, timeout: Duration) {
+    fn wait_child_reaped(child: &mut std::process::Child, timeout: Duration) {
+        let pid = child.id();
         let deadline = Instant::now() + timeout;
-        let path = format!("/proc/{pid}");
         loop {
-            if !Path::new(&path).exists() {
-                return;
+            match child.try_wait() {
+                Ok(Some(_)) => return,
+                Ok(None) => {
+                    let status =
+                        fs::read_to_string(format!("/proc/{pid}/status")).unwrap_or_default();
+                    if status.lines().any(|line| line.starts_with("State:\tZ")) {
+                        let _ = child.wait();
+                        return;
+                    }
+                    assert!(
+                        Instant::now() < deadline,
+                        "cgroup member {pid} still alive after KillMode stop; {status}"
+                    );
+                    thread::sleep(Duration::from_millis(50));
+                }
+                Err(error) => panic!("wait extra {pid}: {error}"),
             }
-            assert!(
-                Instant::now() < deadline,
-                "cgroup member {pid} still alive after KillMode stop of {name}; cgroup={} unit={}",
-                fs::read_to_string(format!("/proc/{pid}/cgroup"))
-                    .unwrap_or_default()
-                    .trim(),
-                systemctl_property(name, "ControlGroup")
-            );
-            thread::sleep(Duration::from_millis(50));
         }
     }
 

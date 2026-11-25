@@ -9,8 +9,8 @@
 
 - El harness PID 1 congela el `MainPID`, adjunta un `sleep` con
   `AttachProcessesToUnit`, deriva `KillSignal=SIGKILL` y atesta que
-  `StopUnit` con `KillMode=control-group` lo mata. `CPUQuota` sigue
-  fuera.
+  `StopUnit` con `KillMode=control-group` lo mata. El extra reaped por
+  `waitpid` (SIGKILL deja zombie). `CPUQuota` sigue fuera.
 - No se marca `003B-4C`. No hay `Ready` ni HTTP.
 
 ## 2026-11-24 — persist reviews PR #360, 003B-4C sigue abierto
