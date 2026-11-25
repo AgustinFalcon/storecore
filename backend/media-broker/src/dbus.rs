@@ -540,7 +540,6 @@ mod tests {
         assert!(keys.contains(&"LimitNPROC"));
         assert!(keys.contains(&"LimitCORE"));
         assert!(keys.contains(&"LimitFSIZE"));
-        assert!(keys.contains(&"LimitCPU"));
         assert!(keys.contains(&"PrivateNetwork"));
         let nofile = worker
             .iter()
@@ -581,15 +580,6 @@ mod tests {
                 .is_some_and(|value| value.contains(&WORKER_LIMIT_FSIZE.to_string())),
             "LimitFSIZE must be the internal workspace ceiling, got {fsize:?}"
         );
-        let cpu = worker
-            .iter()
-            .find(|(key, _)| *key == "LimitCPU")
-            .map(|(_, value)| format!("{value:?}"));
-        assert!(
-            cpu.as_deref()
-                .is_some_and(|value| value.contains(&WORKER_LIMIT_CPU.to_string())),
-            "LimitCPU must be the internal 12s ceiling, got {cpu:?}"
-        );
         let private_network = worker
             .iter()
             .find(|(key, _)| *key == "PrivateNetwork")
@@ -599,6 +589,32 @@ mod tests {
                 .as_deref()
                 .is_some_and(|value| value.contains("true")),
             "PrivateNetwork must be the internal true, got {private_network:?}"
+        );
+    }
+
+    #[test]
+    fn derived_worker_limit_cpu_is_rlimit_not_quota() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"LimitCPU"));
+        assert!(!keys.contains(&"CPUQuota"));
+        let cpu = worker
+            .iter()
+            .find(|(key, _)| *key == "LimitCPU")
+            .map(|(_, value)| format!("{value:?}"));
+        assert!(
+            cpu.as_deref()
+                .is_some_and(|value| value.contains(&WORKER_LIMIT_CPU.to_string())),
+            "LimitCPU must be the internal 12s ceiling, got {cpu:?}"
         );
     }
 
