@@ -192,7 +192,7 @@ class CalendarPersistencePostgresTest {
     }
     @Test fun `receipt binding result validation and audit failure are fail closed and atomic`() {
         val repository=repo(); val admin=actor(); val event=create(repository,admin); val snapshot=root.queryForObject("SELECT snapshot::text FROM calendar_events WHERE id=?",String::class.java,event.id.value)!!
-        fun bind(command: UUID,hash: String) { root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'EVENT',?,?,?)",command,admin.userId,event.id.value,hash) }
+        fun bind(command: UUID,hash: String,eventId: CalendarEventId=event.id) { root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'EVENT',?,?,?)",command,admin.userId,eventId.value,hash) }
         val mismatch=UUID.randomUUID(); bind(mismatch,"a".repeat(64))
         assertThrows(DataAccessException::class.java) {
             root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
@@ -233,12 +233,13 @@ class CalendarPersistencePostgresTest {
         val forgedEditCommand=UUID.randomUUID()
         val forgedEditPayload=CalendarFixtures.hasher.hash(listOf("calendar-command-v1",admin.userId.toString(),editEvent.id.value.toString(),CalendarOperation.EDIT.wire,
             editA.after.revision.value.toString(),CalendarFixtures.reason.value,definitionA.hash.value,"")).value
-        bind(forgedEditCommand,forgedEditPayload)
-        assertThrows(DataAccessException::class.java) {
+        bind(forgedEditCommand,forgedEditPayload,editEvent.id)
+        val forgedEditError=assertThrows(DataAccessException::class.java) {
             root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,requested_definition_hash,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
                 VALUES(?,?,?,'EDIT',?,?,?,?,'APPLIED',?::jsonb,?::jsonb,?)""",forgedEditCommand,editEvent.id.value,admin.userId,editA.after.revision.value,
                 CalendarFixtures.reason.value,definitionA.hash.value,forgedEditPayload,editBRow["before_snapshot"].toString(),editBRow["after_snapshot"].toString(),editBRow["recorded_at"])
         }
+        assertTrue(forgedEditError.mostSpecificCause.message!!.contains("ck_calendar_receipt_applied_transition"))
         val forgedEditRow=HashMap(editBRow).apply {
             this["requested_definition_hash"]=definitionA.hash.value
             this["payload_hash"]=forgedEditPayload
