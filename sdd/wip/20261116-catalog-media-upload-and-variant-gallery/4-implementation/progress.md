@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C ProtectKernelLogs del worker
+
+- El harness deriva `ProtectKernelLogs=true` y PID 1 lo lee.
+  `ProtectHome`, `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #405, 003B-4C sigue abierto
 
 - Merge #405 `0fb102df9e60589ca2fe4b2c5ec5a2b9459b43c2` sobre candidato
