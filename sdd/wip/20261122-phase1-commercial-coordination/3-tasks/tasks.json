@@ -15,7 +15,7 @@
     {"id":"PCC-008","slice":"calendar","status":"in_progress","title":"Deliver calendar UI and reminder activation through separately reviewed fail-closed cuts"},
     {"id":"PCC-008A","slice":"calendar-ui","status":"completed","title":"Build typed month/list/detail/editor/preflight/audit/recovery UI with reminder diagnostic unavailable"},
     {"id":"PCC-008B","slice":"calendar-switch","status":"completed","title":"Close and implement temporary audited reminder-switch commands without runner activation"},
-    {"id":"PCC-008C","slice":"calendar-system","status":"pending","title":"Implement bounded SYSTEM lifecycle candidate orchestration without public route or timer"},
+    {"id":"PCC-008C","slice":"calendar-system","status":"in_progress","title":"Implement bounded SYSTEM lifecycle candidate orchestration without public route or timer"},
     {"id":"PCC-008D","slice":"calendar-worker","status":"pending","title":"Implement durable no-backfill, leases, fencing, retry and crash recovery"},
     {"id":"PCC-008E","slice":"calendar-handoff","status":"pending","title":"Implement atomic in-app CAMPAIGN handoff without email or external transport"},
     {"id":"PCC-008F","slice":"calendar-activation","status":"pending","title":"Wire reviewed local activation/readiness gate while defaults remain fail closed"},
