@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #403, 003B-4C sigue abierto
+
+- Merge #403 `711c8c0ae46c9c970bc40b740a3be6f249b29063` sobre candidato
+  `c18fe2a92e8dfca8b622ec2c32920fc613f588dd`. Verify exact-head
+  `45690798203` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr403-architecture.md`
+  y `sdd/reviews/20261125-sol-pr403-security.md`.
+- El harness deriva `RestrictSUIDSGID=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C RestrictSUIDSGID del worker
 
 - El harness deriva `RestrictSUIDSGID=true` y PID 1 lo lee.
