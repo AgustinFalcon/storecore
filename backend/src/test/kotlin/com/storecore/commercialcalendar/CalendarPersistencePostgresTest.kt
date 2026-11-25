@@ -223,6 +223,30 @@ class CalendarPersistencePostgresTest {
         val invocation=assertThrows(java.lang.reflect.InvocationTargetException::class.java) { decode.invoke(repository,forgedRow) }
         assertInstanceOf(IllegalArgumentException::class.java,invocation.cause)
 
+        val editEvent=create(repository,admin)
+        val definitionA=CalendarFixtures.definition(1,"Requested definition")
+        val editA=recorded(repository.change(admin,request(editEvent,CalendarStep.Edit,definition=definitionA)))
+        val definitionB=CalendarFixtures.definition(2,"Different applied definition")
+        val editB=recorded(repository.change(admin,request(editA.after,CalendarStep.Edit,definition=definitionB)))
+        val editBRow=root.queryForMap("""SELECT r.*,b.family AS binding_family,b.actor_id AS binding_actor_id,b.event_id AS binding_event_id,b.payload_hash AS binding_payload_hash
+            FROM calendar_command_receipts r JOIN calendar_command_bindings b USING(command_id) WHERE r.command_id=?""",editB.commandId.value)
+        val forgedEditCommand=UUID.randomUUID()
+        val forgedEditPayload=CalendarFixtures.hasher.hash(listOf("calendar-command-v1",admin.userId.toString(),editEvent.id.value.toString(),CalendarOperation.EDIT.wire,
+            editA.after.revision.value.toString(),CalendarFixtures.reason.value,definitionA.hash.value,"")).value
+        bind(forgedEditCommand,forgedEditPayload)
+        assertThrows(DataAccessException::class.java) {
+            root.update("""INSERT INTO calendar_command_receipts(command_id,event_id,actor_id,operation,expected_revision,reason,requested_definition_hash,payload_hash,outcome,before_snapshot,after_snapshot,recorded_at)
+                VALUES(?,?,?,'EDIT',?,?,?,?,'APPLIED',?::jsonb,?::jsonb,?)""",forgedEditCommand,editEvent.id.value,admin.userId,editA.after.revision.value,
+                CalendarFixtures.reason.value,definitionA.hash.value,forgedEditPayload,editBRow["before_snapshot"].toString(),editBRow["after_snapshot"].toString(),editBRow["recorded_at"])
+        }
+        val forgedEditRow=HashMap(editBRow).apply {
+            this["requested_definition_hash"]=definitionA.hash.value
+            this["payload_hash"]=forgedEditPayload
+            this["binding_payload_hash"]=forgedEditPayload
+        }
+        val forgedEditInvocation=assertThrows(java.lang.reflect.InvocationTargetException::class.java) { decode.invoke(repository,forgedEditRow) }
+        assertInstanceOf(IllegalArgumentException::class.java,forgedEditInvocation.cause)
+
         val atomicEvent=create(repository,admin); val atomic=request(atomicEvent,CalendarStep.Cancel)
         root.execute("CREATE FUNCTION calendar_fixture_fail() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'} BEGIN RAISE EXCEPTION 'fixture failure'; END ${'$'}${'$'}")
         root.execute("CREATE TRIGGER calendar_fixture_audit BEFORE INSERT ON calendar_audit FOR EACH ROW EXECUTE FUNCTION calendar_fixture_fail()")

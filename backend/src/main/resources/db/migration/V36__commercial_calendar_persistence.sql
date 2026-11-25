@@ -143,6 +143,7 @@ ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_rejecti
 ALTER TABLE calendar_command_receipts ADD CONSTRAINT ck_calendar_receipt_applied_transition CHECK(operation='CREATE' OR outcome<>'APPLIED' OR (
  before_snapshot->>'createdAt'=after_snapshot->>'createdAt' AND (
   (operation='EDIT' AND before_snapshot->>'lifecycle'='DRAFT' AND after_snapshot->>'lifecycle'='DRAFT'
+   AND requested_definition_hash=after_snapshot->'definition'->>'hash'
    AND (after_snapshot->'definition'->>'revision')::bigint-1=(before_snapshot->'definition'->>'revision')::bigint)
   OR (operation<>'EDIT' AND before_snapshot->'definition'=after_snapshot->'definition' AND (
     (operation='SCHEDULE' AND before_snapshot->>'lifecycle'='DRAFT' AND after_snapshot->>'lifecycle'='SCHEDULED'

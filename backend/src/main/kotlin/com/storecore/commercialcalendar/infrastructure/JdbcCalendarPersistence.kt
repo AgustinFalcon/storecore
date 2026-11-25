@@ -180,7 +180,10 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         if(operation!=CalendarOperation.CREATE) {
             require(before!=null && expected!=null)
             if(outcome==CalendarOutcome.REVISION_CONFLICT) require(before.revision!=expected) else require(before.revision==expected)
-            if(outcome==CalendarOutcome.APPLIED) require(after.revision==before.revision.next() && validApplied(operation,before,after,recordedAt))
+            if(outcome==CalendarOutcome.APPLIED) {
+                require(operation!=CalendarOperation.EDIT || requestedDefinitionHash==after.definition.hash)
+                require(after.revision==before.revision.next() && validApplied(operation,before,after,recordedAt))
+            }
             else require(codec.event(before)==codec.event(after))
             when(outcome) {
                 CalendarOutcome.INVALID_TRANSITION -> require(invalidTransition(operation,before,recordedAt))
