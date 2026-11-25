@@ -1,12 +1,12 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-24, 4C sigue abierto
+## En implementación — 2026-11-24, 4C PrivateNetwork del worker
 
-Siguiente corte: cuota global, namespaces, terminales sin ACK, FD/mmap
-tras el seal, reinicio en cada transición durable y RLIMIT restantes.
-`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento no
-cierra `003B-4C`. Sigue sin familia de sockets, namespaces, cuota global
-ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+Este corte no cierra `003B-4C`. El harness deriva `PrivateNetwork=true`
+y PID 1 lo lee. `RestrictAddressFamilies` y `CPUQuota` quedan fuera.
+Sigue sin familia de sockets, cuota global, terminales sin ACK, FD/mmap
+tras el seal, reinicio en cada transición durable, RLIMIT restantes ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
 siguen abiertos. Este corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-24, 4C RLIMIT NOFILE PR #374

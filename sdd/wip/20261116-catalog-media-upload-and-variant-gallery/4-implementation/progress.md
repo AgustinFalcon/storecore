@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-24 — arranque 4C PrivateNetwork del worker
+
+- El harness deriva `PrivateNetwork=true` y PID 1 lo lee.
+  `RestrictAddressFamilies` y `CPUQuota` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-24 — persist reviews PR #374, 003B-4C sigue abierto
 
 - Merge #374 `c146fdd8c062fa0e75da219e2e84a7d287a1cc14` sobre candidato
