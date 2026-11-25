@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C LockPersonality del worker
+
+- El harness deriva `LockPersonality=true` y PID 1 lo lee. `ProtectHome`,
+  `CPUQuota` y `RestrictAddressFamilies` quedan fuera.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #393, 003B-4C sigue abierto
 
 - Merge #393 `95d322c0f901b8cdbc7bf1b20d104b7098a1ba30` sobre candidato
