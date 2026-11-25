@@ -25,12 +25,24 @@ enum class CalendarSwitchState(val wire: String) {
     DISABLED("DISABLED"), ENABLED("ENABLED"), UNKNOWN("UNKNOWN");
     companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
 }
+enum class CalendarSwitchOperation(val wire: String) {
+    ENABLE("ENABLE"), DISABLE("DISABLE"), UNKNOWN("UNKNOWN");
+    companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
+}
+enum class CalendarSwitchEffectivity(val wire: String) {
+    EFFECTIVE("EFFECTIVE"), DISABLED("DISABLED"), EXPIRED("EXPIRED"), UNKNOWN("UNKNOWN");
+    companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
+}
+enum class CalendarSwitchAction(val wire: String) {
+    EMIT_IN_APP_CAMPAIGN_REMINDER("EMIT_IN_APP_CAMPAIGN_REMINDER"), UNKNOWN("UNKNOWN");
+    companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
+}
 enum class CalendarReminderReadiness(val wire: String) {
     UNAVAILABLE("UNAVAILABLE"), READY("READY"), UNKNOWN("UNKNOWN");
     companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
 }
 enum class CalendarOutcome(val wire: String) {
-    APPLIED("APPLIED"), REVISION_CONFLICT("REVISION_CONFLICT"), INVALID_TRANSITION("INVALID_TRANSITION"), INVALID_DEFINITION("INVALID_DEFINITION"), PREFLIGHT_REQUIRED("PREFLIGHT_REQUIRED"), PREFLIGHT_EXPIRED("PREFLIGHT_EXPIRED"), PREFLIGHT_STALE("PREFLIGHT_STALE"), REVISION_EXHAUSTED("REVISION_EXHAUSTED"), UNKNOWN("UNKNOWN");
+    APPLIED("APPLIED"), REVISION_CONFLICT("REVISION_CONFLICT"), INVALID_TRANSITION("INVALID_TRANSITION"), INVALID_DEFINITION("INVALID_DEFINITION"), PREFLIGHT_REQUIRED("PREFLIGHT_REQUIRED"), PREFLIGHT_EXPIRED("PREFLIGHT_EXPIRED"), PREFLIGHT_STALE("PREFLIGHT_STALE"), CAPABILITY_NOT_ACTIVE("CAPABILITY_NOT_ACTIVE"), REVISION_EXHAUSTED("REVISION_EXHAUSTED"), UNKNOWN("UNKNOWN");
     companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.wire==raw } ?: UNKNOWN }
 }
 enum class CalendarCommandFamily(val wire: String) {

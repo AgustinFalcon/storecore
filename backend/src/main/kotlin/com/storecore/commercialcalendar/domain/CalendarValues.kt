@@ -26,6 +26,8 @@ internal fun calendarText(raw: String?, minimum: Int, maximum: Int): String? {
 @JvmInline value class CalendarTitle private constructor(val value: String) { companion object { fun fromWire(raw: String?)=calendarText(raw,1,120)?.let(::CalendarTitle) } }
 @JvmInline value class CalendarDescription private constructor(val value: String) { companion object { fun fromWire(raw: String?)=calendarText(raw,0,1000)?.let(::CalendarDescription) } }
 @JvmInline value class CalendarReason private constructor(val value: String) { companion object { fun fromWire(raw: String?)=calendarText(raw,1,500)?.let(::CalendarReason) } }
+@JvmInline value class CalendarSwitchOwner private constructor(val value: String) { companion object { fun fromWire(raw: String?)=calendarText(raw,1,160)?.let(::CalendarSwitchOwner) } }
+@JvmInline value class CalendarRemovalTicket private constructor(val value: String) { companion object { fun fromWire(raw: String?)=calendarText(raw,1,100)?.let(::CalendarRemovalTicket) } }
 @JvmInline value class CalendarCampaignReference private constructor(val value: String) { companion object { fun fromWire(raw: String?)=raw?.takeIf { it.matches(Regex("[A-Z0-9_.-]{1,64}")) }?.let(::CalendarCampaignReference) } }
 
 class CalendarTime private constructor(val localDateTime: LocalDateTime,val timeZone: String,val offset: ZoneOffset,val instant: Instant) {

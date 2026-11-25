@@ -33,6 +33,8 @@ class CalendarDomainTest {
         assertEquals(CalendarLifecycle.UNKNOWN,CalendarLifecycle.fromWire("future")); assertEquals(CalendarAudience.UNKNOWN,CalendarAudience.fromWire(null))
         assertEquals(CalendarOperation.UNKNOWN,CalendarOperation.fromWire("schedule")); assertEquals(CalendarReminderChannel.UNKNOWN,CalendarReminderChannel.fromWire("EMAIL"))
         assertEquals(CalendarOccurrenceState.UNKNOWN,CalendarOccurrenceState.fromWire("future")); assertEquals(CalendarSwitchState.UNKNOWN,CalendarSwitchState.fromWire("future"))
+        assertEquals(CalendarSwitchOperation.UNKNOWN,CalendarSwitchOperation.fromWire("enable")); assertEquals(CalendarSwitchEffectivity.UNKNOWN,CalendarSwitchEffectivity.fromWire("future"))
+        assertEquals(CalendarSwitchAction.UNKNOWN,CalendarSwitchAction.fromWire("ACTIVATE_CAMPAIGN"))
         assertEquals(CalendarOutcome.UNKNOWN,CalendarOutcome.fromWire("future")); assertEquals(CalendarPreflightIssue.UNKNOWN,CalendarPreflightIssue.fromWire("future"))
         assertEquals(CalendarCommandFamily.UNKNOWN,CalendarCommandFamily.fromWire("future"))
         CalendarOperation.entries.filter { it!=CalendarOperation.UNKNOWN }.forEach { assertEquals(it,CalendarOperation.fromWire(it.wire)) }
@@ -96,5 +98,40 @@ class CalendarDomainTest {
         val event=CalendarFixtures.draft(); val h=CalendarFixtures.hasher
         assertEquals(h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant),h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant))
         assertNotEquals(h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_ACTIVATE,event.definition.start.instant),h.systemCommand(event.id,event.revision,CalendarOperation.SYSTEM_COMPLETE,event.definition.end.instant))
+    }
+    @Test fun `temporary reminder switch is structurally closed and expires fail closed`() {
+        val now=CalendarFixtures.now
+        val owner=requireNotNull(CalendarSwitchOwner.fromWire("Operations owner"))
+        val ticket=requireNotNull(CalendarRemovalTicket.fromWire("OPS-442"))
+        val metadata=requireNotNull(CalendarSwitchMetadata.forNewCommand(owner,CalendarFixtures.reason,now,now.plusSeconds(301),ticket,CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER,now))
+        val bootstrap=CalendarSwitchSnapshot.bootstrap()
+        assertEquals(CalendarSwitchEffectivity.DISABLED,bootstrap.effectivity(now))
+        val enabled=requireNotNull(CalendarSwitchSnapshot.restore(CalendarSwitchState.ENABLED,CalendarRevision.fromWire(1)!!,metadata))
+        assertEquals(CalendarSwitchEffectivity.EFFECTIVE,enabled.effectivity(metadata.expiresAt.minusNanos(1)))
+        assertEquals(CalendarSwitchEffectivity.EXPIRED,enabled.effectivity(metadata.expiresAt))
+        assertNull(CalendarSwitchMetadata.forNewCommand(owner,CalendarFixtures.reason,now,now.plusSeconds(300),ticket,CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER,now))
+        assertNull(CalendarSwitchMetadata.forNewCommand(owner,CalendarFixtures.reason,now,now.plusSeconds(7L*86400+1),ticket,CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER,now))
+        assertNull(CalendarSwitchSnapshot.restore(CalendarSwitchState.ENABLED,CalendarRevision.Zero,null))
+        assertNull(CalendarSwitchOwner.fromWire(" ")); assertNull(CalendarRemovalTicket.fromWire("x".repeat(101)))
+    }
+    @Test fun `reminder switch decision enforces CAS capability and effective transitions`() {
+        val now=CalendarFixtures.now
+        fun metadata(at: Instant=now)=requireNotNull(CalendarSwitchMetadata.forNewCommand(
+            requireNotNull(CalendarSwitchOwner.fromWire("Operations owner")),CalendarFixtures.reason,at,at.plusSeconds(3600),
+            requireNotNull(CalendarRemovalTicket.fromWire("OPS-442")),CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER,at))
+        val bootstrap=CalendarSwitchSnapshot.bootstrap()
+        assertEquals(CalendarOutcome.CAPABILITY_NOT_ACTIVE,CalendarSwitchDecision.apply(bootstrap,bootstrap.revision,CalendarSwitchOperation.ENABLE,metadata(),false,now).outcome)
+        val enabled=CalendarSwitchDecision.apply(bootstrap,bootstrap.revision,CalendarSwitchOperation.ENABLE,metadata(),true,now)
+        assertEquals(CalendarOutcome.APPLIED,enabled.outcome); assertEquals(CalendarSwitchState.ENABLED,enabled.snapshot.configuredState)
+        assertEquals(CalendarOutcome.INVALID_TRANSITION,CalendarSwitchDecision.apply(enabled.snapshot,enabled.snapshot.revision,CalendarSwitchOperation.ENABLE,metadata(),true,now).outcome)
+        assertEquals(CalendarOutcome.REVISION_CONFLICT,CalendarSwitchDecision.apply(enabled.snapshot,bootstrap.revision,CalendarSwitchOperation.DISABLE,metadata(),false,now).outcome)
+        val disabled=CalendarSwitchDecision.apply(enabled.snapshot,enabled.snapshot.revision,CalendarSwitchOperation.DISABLE,metadata(),false,now)
+        assertEquals(CalendarOutcome.APPLIED,disabled.outcome); assertEquals(CalendarSwitchState.DISABLED,disabled.snapshot.configuredState)
+        val expired=requireNotNull(CalendarSwitchSnapshot.restore(CalendarSwitchState.ENABLED,CalendarRevision.fromWire(7)!!,metadata(now.minusSeconds(7200))))
+        assertEquals(CalendarSwitchEffectivity.EXPIRED,expired.effectivity(now))
+        assertEquals(CalendarOutcome.APPLIED,CalendarSwitchDecision.apply(expired,expired.revision,CalendarSwitchOperation.ENABLE,metadata(),true,now).outcome)
+        assertEquals(CalendarOutcome.INVALID_TRANSITION,CalendarSwitchDecision.apply(expired,expired.revision,CalendarSwitchOperation.DISABLE,metadata(),false,now).outcome)
+        val exhausted=requireNotNull(CalendarSwitchSnapshot.restore(CalendarSwitchState.DISABLED,CalendarRevision.fromWire(Long.MAX_VALUE)!!,metadata()))
+        assertEquals(CalendarOutcome.REVISION_EXHAUSTED,CalendarSwitchDecision.apply(exhausted,exhausted.revision,CalendarSwitchOperation.ENABLE,metadata(),true,now).outcome)
     }
 }
