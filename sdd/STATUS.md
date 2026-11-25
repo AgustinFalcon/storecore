@@ -1,13 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C PrivateDevices del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `PrivateDevices=true` y
-PID 1 lo lee. `ProtectHome`, `CPUQuota` y `RestrictAddressFamilies`
-quedan fuera. Sigue sin familia de sockets, cuota global, terminales sin
-ACK, FD/mmap tras el seal, reinicio en cada transición durable, RLIMIT
-restantes ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable y RLIMIT restantes.
+`ProtectHome`, `RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este
+documento no cierra `003B-4C`. Sigue sin familia de sockets, cuota global
+ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-25, 4C PrivateDevices PR #391
+
+`master 5f77f39d741786ad82451528b2cc0ea24323252b` integra PR #391. Su
+candidato exacto `d9d191399590618d45df860b6b8ea7b2605c1d4f` pasó Verify
+`45635171309` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr391-architecture.md` y
+`sdd/reviews/20261125-sol-pr391-security.md`. El harness deriva
+`PrivateDevices=true` y PID 1 lo lee. El corte no cierra `003B-4C`: no
+hay `CPUQuota`, familia de sockets, cuota global ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
 
 ## Master vigente — 2026-11-25, 4C ProtectHome ENXIO PR #389
 
