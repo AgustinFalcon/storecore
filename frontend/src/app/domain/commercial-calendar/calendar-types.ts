@@ -63,9 +63,9 @@ export class CalendarPreflightIssue {
 }
 
 export class CalendarReminderChannel {
-  private constructor(readonly wire: string, readonly label: string) {}
-  static readonly InApp = new CalendarReminderChannel('IN_APP', 'En la aplicación');
-  static readonly Unknown = new CalendarReminderChannel('UNKNOWN', 'Desconocido');
+  private constructor(readonly wire: string, readonly label: string, readonly guidance: string) {}
+  static readonly InApp = new CalendarReminderChannel('IN_APP', 'En la aplicación', 'La entrega depende de la disponibilidad del runner y del interruptor operativo. Guardar reglas no implica que estén activas.');
+  static readonly Unknown = new CalendarReminderChannel('UNKNOWN', 'Desconocido', 'No se pudo determinar el canal del recordatorio.');
   static readonly all = Object.freeze([this.InApp]);
   static fromWire(raw: unknown): CalendarReminderChannel { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
@@ -98,10 +98,10 @@ export class CalendarSwitchAction {
 }
 
 export class CalendarReminderReadiness {
-  private constructor(readonly wire: string, readonly label: string) {}
-  static readonly Unavailable = new CalendarReminderReadiness('UNAVAILABLE', 'No disponible');
-  static readonly Ready = new CalendarReminderReadiness('READY', 'Disponible');
-  static readonly Unknown = new CalendarReminderReadiness('UNKNOWN', 'Desconocido');
+  private constructor(readonly wire: string, readonly label: string, readonly message: string) {}
+  static readonly Unavailable = new CalendarReminderReadiness('UNAVAILABLE', 'No disponible', 'La ejecuci\u00f3n autom\u00e1tica de recordatorios no est\u00e1 disponible en esta instancia. Las reglas guardadas siguen siendo datos de agenda.');
+  static readonly Ready = new CalendarReminderReadiness('READY', 'Disponible', 'El ejecutor local de recordatorios est\u00e1 disponible en esta instancia. Esto no confirma que el interruptor est\u00e9 efectivo ni que un recordatorio haya sido entregado.');
+  static readonly Unknown = new CalendarReminderReadiness('UNKNOWN', 'Desconocido', 'No se pudo determinar la disponibilidad de los recordatorios autom\u00e1ticos.');
   static readonly all = Object.freeze([this.Unavailable, this.Ready]);
   static fromWire(raw: unknown): CalendarReminderReadiness { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }

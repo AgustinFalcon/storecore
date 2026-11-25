@@ -66,8 +66,8 @@ class CalendarPersistencePostgresTest {
         val notifications=JdbcNotificationPersistence(jdbc,transactions,mapper,notificationClock,emailProjection)
         return JdbcCalendarPersistence(jdbc,transactions,mapper,clock,RandomCalendarIds(),CalendarFixtures.hasher,notifications)
     }
-    private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true): JdbcCalendarSwitchPersistence {
-        val source=runtime()
+    private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true,url: String=postgres.jdbcUrl): JdbcCalendarSwitchPersistence {
+        val source=runtime(url)
         val capability=object: CapabilityDecisionPort { override fun decide(module: String,action: String,actor: CapabilityActor) { if(!active) throw CapabilityDisabled() } }
         return JdbcCalendarSwitchPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,CalendarFixtures.hasher,capability)
     }
@@ -173,6 +173,34 @@ class CalendarPersistencePostgresTest {
         assertEquals(enabled.recordedAt,switchRecorded(active.change(admin,enable)).recordedAt)
         assertThrows(DataAccessException::class.java) { root.update("UPDATE calendar_switch_command_receipts SET outcome='INVALID_TRANSITION' WHERE command_id=?",enable.commandId.value) }
         assertEquals(6L,(assertInstanceOf(CalendarQueryResult.Found::class.java,active.audit(admin,CalendarPageRequest.create()!!)).value as CalendarPage<*>).total)
+    }
+
+    @Test fun `blocked enable takes its no backfill cutoff after the singleton lock`() {
+        val (url,database)=isolatedDatabase("blocked_enable_cutoff")
+        val clock=MutableCalendarClock(); val repository=repo(clock,url=url); val admin=actor(database=database); val rule=CalendarFixtures.rule()
+        val event=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Blocked enable cutoff",rules=listOf(rule))))
+        val due=event.definition.start.instant.minusSeconds(rule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.DISABLED,CalendarFixtures.now,CalendarFixtures.now.plusSeconds(86_400),database)
+        clock.instant=due.minusSeconds(10)
+        val switchRevision=requireNotNull(CalendarRevision.fromWire(database.queryForObject("SELECT revision FROM calendar_reminder_switch WHERE id=1",Long::class.java)))
+        val request=switchRequest(revision=switchRevision,expires=due.plusSeconds(3600)); val pool=Executors.newSingleThreadExecutor()
+        DriverManagerDataSource(url,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false
+            blocker.prepareStatement("SELECT * FROM calendar_reminder_switch WHERE id=1 FOR UPDATE").use { it.executeQuery().use { rows -> assertTrue(rows.next()) } }
+            val future=pool.submit<CalendarSwitchPersistenceResult> { switchRepo(clock,true,url).change(admin,request) }
+            try {
+                awaitDatabase { database.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%calendar_lock_reminder_switch%')",Boolean::class.java)!! }
+                clock.instant=due.plusSeconds(10)
+                blocker.commit()
+                val receipt=switchRecorded(future.get(20,TimeUnit.SECONDS))
+                assertEquals(CalendarOutcome.APPLIED,receipt.outcome)
+                assertEquals(clock.instant,receipt.recordedAt)
+                assertEquals(clock.instant,receipt.requestedMetadata.createdAt)
+                val page=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repo(clock,url=url)).claim(CalendarLeaseOwner.fromWire(UUID.randomUUID())!!))
+                assertEquals(1,page.skipped); assertEquals(0,page.leased)
+                assertEquals("ENABLE_CUTOFF",database.queryForObject("SELECT terminal_reason FROM calendar_reminder_occurrences",String::class.java))
+            } finally { blocker.rollback(); pool.shutdownNow() }
+        }
     }
 
     @Test fun `clean and V35 upgrade preserve every published checksum and default disabled least privilege`() {

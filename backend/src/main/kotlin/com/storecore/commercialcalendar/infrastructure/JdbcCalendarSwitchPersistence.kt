@@ -35,10 +35,11 @@ class JdbcCalendarSwitchPersistence(
         if(!authorized(actor)) return@tx CalendarSwitchPersistenceResult.Unauthorized
         val payload=hash(actor.userId,request)
         binding(request.commandId)?.let { return@tx if(it["family"]=="REMINDER_SWITCH" && (it["actor_id"] as Number).toLong()==actor.userId && it["payload_hash"]==payload.value) load(request.commandId) else CalendarSwitchPersistenceResult.IdempotencyConflict }
-        val now=clock.now().truncatedTo(ChronoUnit.SECONDS)
-        val metadata=CalendarSwitchMetadata.forNewCommand(request.owner,request.reason,now,request.expiresAt,request.removalTicket,request.affectedAction,now) ?: return@tx CalendarSwitchPersistenceResult.Invalid
         val before=read(true) ?: return@tx CalendarSwitchPersistenceResult.Missing
         val capabilityActive=request.operation!=CalendarSwitchOperation.ENABLE || runCatching { capabilities.decide("COMMERCIAL_CALENDAR",request.affectedAction.wire,CapabilityActor.Internal(actor)) }.isSuccess
+        if(!authorized(actor)) return@tx CalendarSwitchPersistenceResult.Unauthorized
+        val now=clock.now().truncatedTo(ChronoUnit.SECONDS)
+        val metadata=CalendarSwitchMetadata.forNewCommand(request.owner,request.reason,now,request.expiresAt,request.removalTicket,request.affectedAction,now) ?: return@tx CalendarSwitchPersistenceResult.Invalid
         val decision=CalendarSwitchDecision.apply(before,request.expectedRevision,request.operation,metadata,capabilityActive,now)
         val requestedJson=metadata(metadata); val beforeJson=snapshot(before,now); val afterJson=snapshot(decision.snapshot,now)
         jdbc.query(
