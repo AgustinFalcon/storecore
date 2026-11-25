@@ -54,13 +54,33 @@ class CalendarPersistencePostgresTest {
     private fun preflight(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=assertInstanceOf(CalendarPreflightResult.Recorded::class.java,repo.preflight(actor,CalendarPreflightRequest(CalendarFixtures.command(),event.id,event.revision))).preflight!!
     private fun schedule(repo: JdbcCalendarPersistence,actor: InternalUserPrincipal,event: CalendarEvent)=recorded(repo.change(actor,request(event,CalendarStep.Schedule,preflight=preflight(repo,actor,event).id))).after
 
+    @Test fun `PCC 008B migration closes singleton governance global identity and least privilege`() {
+        val columns=root.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='calendar_reminder_switch'",String::class.java).toSet()
+        assertTrue(columns.containsAll(setOf("owner","reason","created_at","expires_at","removal_ticket","affected_action")))
+        val bootstrap=root.queryForMap("SELECT * FROM calendar_reminder_switch WHERE id=1")
+        assertEquals("DISABLED",bootstrap["state"]); assertEquals(0L,(bootstrap["revision"] as Number).toLong())
+        for(column in listOf("owner","reason","created_at","expires_at","removal_ticket","affected_action")) assertNull(bootstrap[column])
+        assertFalse(root.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='COMMERCIAL_CALENDAR'",Boolean::class.java)!!)
+        assertEquals("DISABLED",root.queryForObject("SELECT state FROM module_configurations WHERE module_code='COMMERCIAL_CALENDAR'",String::class.java))
+        assertEquals("PUBLISH",root.queryForObject("SELECT action_kind FROM capability_actions WHERE module_code='COMMERCIAL_CALENDAR' AND action_code='EMIT_IN_APP_CAMPAIGN_REMINDER'",String::class.java))
+        for(table in listOf("calendar_switch_command_receipts","calendar_switch_audit")) {
+            assertFalse(root.queryForObject("SELECT has_table_privilege('storecore_runtime',?,'INSERT,UPDATE,DELETE')",Boolean::class.java,table)!!)
+        }
+        val admin=actor(); val switchId=UUID.randomUUID()
+        root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'REMINDER_SWITCH',?,NULL,?)",switchId,admin.userId,"a".repeat(64))
+        assertThrows(DataAccessException::class.java) { root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'EVENT',?,NULL,?)",UUID.randomUUID(),admin.userId,"b".repeat(64)) }
+        val event=create(repo(),admin)
+        assertThrows(DataAccessException::class.java) { root.update("INSERT INTO calendar_command_bindings(command_id,family,actor_id,event_id,payload_hash) VALUES(?,'REMINDER_SWITCH',?,?,?)",UUID.randomUUID(),admin.userId,event.id.value,"c".repeat(64)) }
+        assertThrows(DataAccessException::class.java) { JdbcTemplate(runtime()).update("UPDATE calendar_reminder_switch SET state='ENABLED',revision=1 WHERE id=1") }
+    }
+
     @Test fun `clean and V35 upgrade preserve every published checksum and default disabled least privilege`() {
         root.execute("CREATE DATABASE calendar_upgrade")
         val url=postgres.jdbcUrl.substringBeforeLast('/')+"/calendar_upgrade"
         flyway(url,"35").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val history=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("36",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("37",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=35 ORDER BY installed_rank"))
         assertEquals(0,flyway(url).migrate().migrationsExecuted); flyway(url).validate()
         for(database in listOf(root,upgraded)) {
