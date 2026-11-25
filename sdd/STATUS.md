@@ -1,14 +1,27 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C ProtectControlGroups del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva
-`ProtectControlGroups=true` y PID 1 lo lee. `ProtectHome`, `CPUQuota` y
-`RestrictAddressFamilies` quedan fuera. Sigue sin familia de sockets,
-cuota global, terminales sin ACK, FD/mmap tras el seal, reinicio en cada
-transición durable, RLIMIT restantes ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP de media.
+Siguiente corte: namespaces restantes del worker, cuota global,
+terminales sin ACK, FD/mmap tras el seal, reinicio en cada transición
+durable y RLIMIT restantes. `ProtectHome`, `RestrictAddressFamilies` y
+`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue sin
+familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP de media.
+
+## Master vigente — 2026-11-25, 4C ProtectControlGroups PR #399
+
+`master 866a3dfdbaede11b65d62dd4e567a29f15c0fcc2` integra PR #399. Su
+candidato exacto `b8ab5a36848c33ff7834ecd9637c85d9f4b6cb61` pasó Verify
+`45674345804` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr399-architecture.md` y
+`sdd/reviews/20261125-sol-pr399-security.md`. El harness deriva
+`ProtectControlGroups=true` y PID 1 lo lee. El corte no cierra
+`003B-4C`: no hay `CPUQuota`, familia de sockets, cuota global ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C ProtectKernelTunables PR #397
 
