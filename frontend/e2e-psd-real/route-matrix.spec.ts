@@ -26,7 +26,7 @@ let bindings: readonly ProductiveRouteAcceptance[];
 test.beforeAll(async ({ browser }) => {
   receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync(resolve('psd-real-results/fixture-receipt.json'), 'utf8')));
   bindings = bindProductiveRealRoutes(receipt);
-  expect(bindings).toHaveLength(32);
+  expect(bindings).toHaveLength(36);
   for (const actor of [RouteActor.Anonymous, RouteActor.Customer, RouteActor.Admin, RouteActor.Operator]) {
     const authDir = process.env['STORECORE_PSD_AUTH_DIR'];
     if (!authDir) throw new Error('Missing ephemeral route auth directory');
@@ -88,6 +88,12 @@ for (const width of [390, 768, 1440]) {
         await expect(page.locator('[aria-busy="true"], .status--loading')).toHaveCount(0);
         await expect(page.locator('[role="alert"]')).toHaveCount(0);
         if (binding.surface === SurfaceIdentity.Profile) await expect(page.locator('input[name="profileEmail"]')).toHaveValue(receipt.customerEmail);
+        if (binding.surface === SurfaceIdentity.CommercialCalendarEdit) {
+          await expect(page.locator('input[name="title"]')).toHaveValue(receipt.commercialCalendar!.title);
+        }
+        if (binding.surface === SurfaceIdentity.CommercialCalendarNew) {
+          await expect(page.locator('input[name="title"]')).toHaveValue('');
+        }
         if (binding.pattern === 'reset-password') await expect(page.getByText(RecoveryOutcome.Invalid.label, { exact: true })).toBeVisible();
         if (binding.surface === SurfaceIdentity.EmailVerification) await expect(page.getByText(VerificationOutcome.Invalid.label, { exact: true })).toBeVisible();
         const skip = page.getByRole('link', { name: 'Saltar al contenido' });

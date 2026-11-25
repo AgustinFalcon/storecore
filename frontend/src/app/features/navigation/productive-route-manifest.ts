@@ -57,6 +57,10 @@ export const productiveRouteDefinitions: readonly ProductiveRouteDefinition[] = 
   definition('user/profile-import', SurfaceIdentity.Configuration, RouteActor.Admin, RouteScenario.Populated),
   definition('user/notifications', SurfaceIdentity.Notifications, RouteActor.Operator, RouteScenario.Populated),
   definition('user/notifications/:alertId', SurfaceIdentity.NotificationDetail, RouteActor.Operator, RouteScenario.Populated),
+  definition('user/commercial-calendar', SurfaceIdentity.CommercialCalendar, RouteActor.Operator, RouteScenario.Populated),
+  definition('user/commercial-calendar/new', SurfaceIdentity.CommercialCalendarNew, RouteActor.Admin, RouteScenario.Empty),
+  definition('user/commercial-calendar/:eventId', SurfaceIdentity.CommercialCalendarDetail, RouteActor.Operator, RouteScenario.Populated),
+  definition('user/commercial-calendar/:eventId/edit', SurfaceIdentity.CommercialCalendarEdit, RouteActor.Admin, RouteScenario.Populated),
 ]);
 
 function canonical(pattern: string): ProductiveRouteDefinition {
@@ -101,6 +105,10 @@ export const productiveHttpRouteBindings: readonly ProductiveRouteAcceptance[] =
   httpBinding('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
   httpBinding('user/notifications', '/user/notifications', 'Centro de notificaciones', '#notifications-title'),
   httpBinding('user/notifications/:alertId', '/user/notifications/00000000-0000-4000-8000-000000000001', 'Detalle de notificación', '#notification-detail-title'),
+  httpBinding('user/commercial-calendar', '/user/commercial-calendar?view=month&month=2026-11&zone=America%2FArgentina%2FBuenos_Aires&page=0&size=25', 'Calendario comercial', '#calendar-title'),
+  httpBinding('user/commercial-calendar/new', '/user/commercial-calendar/new', 'Crear evento', '#calendar-editor-title'),
+  httpBinding('user/commercial-calendar/:eventId', '/user/commercial-calendar/00000000-0000-4000-8000-000000000010', 'Detalle del evento', '#calendar-detail-title'),
+  httpBinding('user/commercial-calendar/:eventId/edit', '/user/commercial-calendar/00000000-0000-4000-8000-000000000010/edit', 'Editar borrador', '#calendar-editor-title'),
 ]);
 
 // Existing HTTP consumers retain their source; evidence never changes globally.
@@ -119,6 +127,10 @@ export const productiveWildcardManifest = ['**', 'customer/**', 'user/**'] as co
 export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly ProductiveRouteAcceptance[] {
   if (!(receipt instanceof RealRouteReceipt) || receipt.pendingOrderId === null) throw new Error('Real matrix requires a validated pending order');
   if (!receipt.notification) throw new Error('Real matrix requires a persisted notification receipt');
+  if (!receipt.commercialCalendar) throw new Error('Real matrix requires a persisted calendar event receipt');
+  const calendar = receipt.commercialCalendar;
+  const calendarQuery = '?view=month&month=2026-11&zone=America%2FArgentina%2FBuenos_Aires&page=0&size=25';
+  const calendarEventUrl = `/user/commercial-calendar/${calendar.eventId.wire}`;
   const product = receipt.products[0];
   const cartProduct = receipt.products.find(item => item.sku === receipt.cart.skus[0]);
   if (!cartProduct) throw new Error('Real matrix requires a receipt cart product');
@@ -163,5 +175,9 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('user/profile-import', '/user/profile-import', 'Importar perfil', '#import-title'),
     real('user/notifications', '/user/notifications', 'Centro de notificaciones', textSelector(receipt.notification.sourceId)),
     real('user/notifications/:alertId', `/user/notifications/${receipt.notification.id.wire}`, 'Detalle de notificación', textSelector(receipt.notification.sourceId)),
+    real('user/commercial-calendar', `/user/commercial-calendar${calendarQuery}`, 'Calendario comercial', textSelector(calendar.title)),
+    real('user/commercial-calendar/new', `/user/commercial-calendar/new${calendarQuery}`, 'Crear evento', '#calendar-editor-title'),
+    real('user/commercial-calendar/:eventId', `${calendarEventUrl}${calendarQuery}`, 'Detalle del evento', textSelector(calendar.title)),
+    real('user/commercial-calendar/:eventId/edit', `${calendarEventUrl}/edit${calendarQuery}`, 'Editar borrador', '#calendar-editor-title'),
   ]);
 }

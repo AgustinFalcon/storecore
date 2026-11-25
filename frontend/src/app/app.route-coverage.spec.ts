@@ -15,7 +15,8 @@ function receiptWire() {
     addressStreet: 'Calle persistida', pendingOrderId: '8001', offerId: 799,
     cart: { revision: 'revision-from-backend', skus: ['REAL-SKU / 7'] }, homeTitle: 'Inicio persistido',
     notification: { id: '77777777-7777-4777-8777-777777777777', sourceId: 'Persisted-stock-17' },
-    scenarios: [RouteScenario.Populated, RouteScenario.InvalidSecret].map(scenario =>
+    commercialCalendar: { eventId: '22222222-2222-4222-8222-222222222222', title: 'PSD calendario comercial' },
+    scenarios: [RouteScenario.Populated, RouteScenario.Empty, RouteScenario.InvalidSecret].map(scenario =>
       ({ scenario: scenario.wire, evidence: RouteEvidenceMode.RealBackend.wire })),
   };
 }
@@ -27,9 +28,9 @@ function check(tree: readonly Route[] = routes, definitions = productiveRouteDef
 }
 
 describe('productive route acceptance contract', () => {
-  it('reconciles 32 leaves, four redirects and three wildcards with both evidence sources', () => {
+  it('reconciles 36 leaves, four redirects and three wildcards with both evidence sources', () => {
     const actual = censusProductiveRoutes(routes);
-    expect(actual.leaves).toHaveLength(32); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
+    expect(actual.leaves).toHaveLength(36); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
     check();
     expect(productiveRouteManifest).toBe(productiveHttpRouteBindings);
     expect(productiveRouteDefinitions.every(entry => !('url' in entry) && !('evidence' in entry))).toBe(true);
@@ -105,5 +106,6 @@ describe('productive route acceptance contract', () => {
     expect(() => bindProductiveRealRoutes(RealRouteReceipt.fromWire({ ...receiptWire(), scenarios: receiptWire().scenarios.slice(0, 1) }))).toThrow(/scenario/);
     expect(() => bindProductiveRealRoutes({} as RealRouteReceipt)).toThrow();
     expect(() => bindProductiveRealRoutes(RealRouteReceipt.fromWire({ ...receiptWire(), notification: undefined }))).toThrow(/notification/);
+    expect(() => bindProductiveRealRoutes(RealRouteReceipt.fromWire({ ...receiptWire(), commercialCalendar: undefined }))).toThrow(/calendar/);
   });
 });

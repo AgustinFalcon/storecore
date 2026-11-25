@@ -53,13 +53,13 @@ function controllerContracts() {
 test('productive surface manifest covers the closed identity set exactly once', () => {
   assert.equal(manifest.schemaVersion, 1);
   assert.deepEqual(manifest.states, ['REAL', 'DEMO_ONLY', 'EXTERNAL_BLOCKED', 'NOT_APPLICABLE']);
-  assert.equal(identities.length, 29);
-  assert.equal(manifest.surfaces.length, 29);
+  assert.equal(identities.length, 33);
+  assert.equal(manifest.surfaces.length, 33);
   assert.deepEqual(
     manifest.surfaces.map((surface) => surface.id).sort(),
     identities.map((surface) => surface.id).sort(),
   );
-  assert.equal(new Set(manifest.surfaces.map((surface) => surface.id)).size, 29);
+  assert.equal(new Set(manifest.surfaces.map((surface) => surface.id)).size, 33);
 });
 
 test('manifest current routes agree with productive SurfaceIdentity ownership', () => {

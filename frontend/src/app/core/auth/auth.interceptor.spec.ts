@@ -28,6 +28,29 @@ describe('authInterceptor', () => {
     ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'foreign' } }); await result;
     expect(session.csrf()).toBe('old'); ctrl.verify();
   });
+  it.each([
+    '/api/v1/user/commercial-calendar/events',
+    '/api/v1/user/commercial-calendar/events/11111111-1111-4111-8111-111111111111/commands',
+    '/api/v1/user/commercial-calendar/events/11111111-1111-4111-8111-111111111111/preflights',
+  ])('accepts calendar business 409 rotation on %s', async path => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old');
+    const ctrl = TestBed.inject(HttpTestingController);
+    const result = firstValueFrom(TestBed.inject(HttpClient).post(path, {})).catch(error => error);
+    ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'next' } });
+    await result; expect(session.csrf()).toBe('next'); ctrl.verify();
+  });
+  it.each([
+    '/api/v1/user/commercial-calendar/events/not-a-uuid/commands',
+    '/api/v1/user/commercial-calendar/events/00000000-0000-0000-0000-000000000000/commands',
+    '/api/v1/user/commercial-calendar/events/11111111-1111-4111-8111-111111111111/audit',
+    '/api/v1/user/commercial-calendar/reminder-switch/commands',
+  ])('does not trust a 409 token outside exact calendar commands: %s', async path => {
+    const session = TestBed.inject(UserSession); session.setCsrf('old');
+    const ctrl = TestBed.inject(HttpTestingController);
+    const result = firstValueFrom(TestBed.inject(HttpClient).post(path, {})).catch(error => error);
+    ctrl.expectOne(path).flush({}, { status: 409, statusText: 'Conflict', headers: { [CSRF_HEADER]: 'foreign' } });
+    await result; expect(session.csrf()).toBe('old'); ctrl.verify();
+  });
   it('ignores notification 409 rotation after the USER mutation fence changes', async () => {
     const session = TestBed.inject(UserSession); session.setCsrf('old'); const ctrl = TestBed.inject(HttpTestingController);
     const path = '/api/v1/user/notifications/email-preferences/commands';

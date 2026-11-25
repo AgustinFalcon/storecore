@@ -11,6 +11,7 @@ export class ReturnDestination {
   static readonly UserOrders = new ReturnDestination('USER_ORDERS', '/user/orders', AccessContext.User);
   static readonly UserAccount = new ReturnDestination('USER_ACCOUNT', '/user/account', AccessContext.User);
   static readonly UserNotifications = new ReturnDestination('USER_NOTIFICATIONS', '/user/notifications', AccessContext.User);
+  static readonly UserCommercialCalendar = new ReturnDestination('USER_COMMERCIAL_CALENDAR', '/user/commercial-calendar', AccessContext.User);
   static readonly Unknown = new ReturnDestination('', null, AccessContext.Unknown);
   static fromWire(raw: unknown): ReturnDestination { return DESTINATIONS.get(raw) ?? ReturnDestination.Unknown; }
   /** Only exact v1 routes survive the browser boundary; arbitrary query/encoding input never does. */
@@ -25,7 +26,7 @@ export class ReturnDestination {
 }
 const KNOWN = [ReturnDestination.Home, ReturnDestination.Catalog, ReturnDestination.Cart, ReturnDestination.Checkout,
   ReturnDestination.CustomerProfile, ReturnDestination.CustomerOrders, ReturnDestination.UserOrders, ReturnDestination.UserAccount,
-  ReturnDestination.UserNotifications];
+  ReturnDestination.UserNotifications, ReturnDestination.UserCommercialCalendar];
 const DESTINATIONS = new Map<unknown, ReturnDestination>(KNOWN.map((destination) => [destination.wire, destination]));
 const PATHS = new Map<unknown, ReturnDestination>([
   ['/', ReturnDestination.Home], ['/user', ReturnDestination.Home], ['/user/home', ReturnDestination.Home],
@@ -33,4 +34,5 @@ const PATHS = new Map<unknown, ReturnDestination>([
   ['/customer/profile', ReturnDestination.CustomerProfile],
   ['/customer/orders', ReturnDestination.CustomerOrders], ['/user/orders', ReturnDestination.UserOrders],
   ['/user/account', ReturnDestination.UserAccount], ['/user/notifications', ReturnDestination.UserNotifications],
+  ['/user/commercial-calendar', ReturnDestination.UserCommercialCalendar],
 ]);

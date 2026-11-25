@@ -1,0 +1,69 @@
+import { CalendarAudience, CalendarChange, CalendarDefinition, CalendarDefinitionInput, CalendarEvent, CalendarLifecycle, CalendarOperation, CalendarOutcome, CalendarPage, CalendarPreflight, CalendarPreflightIssue, CalendarPreflightResult, CalendarReceipt, CalendarReminderChannel, CalendarReminderReadiness, CalendarReminderSwitch, CalendarRevision, CalendarSwitchState, CalendarTime, CalendarUuid } from '../../domain/commercial-calendar/calendar';
+function invalid(): never { throw new Error('Calendario no disponible: contrato inválido'); }
+function object(raw: unknown, keys: string): Record<string, unknown> { if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return invalid(); const value = raw as Record<string, unknown>; if (Object.keys(value).sort().join(',') !== keys.split(',').sort().join(',')) return invalid(); return value; }
+function text(raw: unknown): string { return typeof raw === 'string' ? raw : invalid(); }
+function uuid(raw: unknown): string { return CalendarUuid.fromWire(raw)?.wire ?? invalid(); }
+function revision(raw: unknown): string { return CalendarRevision.fromWire(raw)?.wire ?? invalid(); }
+function instant(raw: unknown): string { const value = text(raw); return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value) && Number.isFinite(Date.parse(value)) ? value : invalid(); }
+function hash(raw: unknown): string { return typeof raw === 'string' && /^[0-9a-f]{64}$/.test(raw) ? raw : invalid(); }
+function finite<T>(value: T, unknown: T): T { return value !== unknown ? value : invalid(); }
+function bounded(raw: unknown, min: number, max: number): string { const value = text(raw); return value === value.trim() && !value.includes(String.fromCharCode(0)) && !/[\uD800-\uDFFF]/u.test(value) && Array.from(value).length >= min && Array.from(value).length <= max ? value : invalid(); }
+function integer(raw: unknown, min: number, max: number): number { return typeof raw === 'number' && Number.isSafeInteger(raw) && raw >= min && raw <= max ? raw : invalid(); }
+function array(raw: unknown): unknown[] { return Array.isArray(raw) ? raw : invalid(); }
+function time(raw: unknown): CalendarTime {
+  const v = object(raw, 'localDateTime,timeZone,offset,instant'); const localDateTime = text(v['localDateTime']); const timeZone = text(v['timeZone']); const offset = text(v['offset']); const at = instant(v['instant']);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(localDateTime) || !/^(Z|[+-]\d{2}:\d{2})$/.test(offset) || !(timeZone.includes('/') || ['CET','EET','MET','WET'].includes(timeZone)) || timeZone.startsWith('Etc/')) return invalid();
+  if (at.includes('.')) return invalid();
+  const local = new Date(localDateTime + 'Z'); if (!Number.isFinite(+local) || local.toISOString().slice(0,19) !== localDateTime) return invalid();
+  const minutes = offset === 'Z' ? 0 : (Number(offset.slice(1,3)) * 60 + Number(offset.slice(4,6))) * (offset[0] === '-' ? -1 : 1);
+  if (Math.abs(minutes) > 1080 || Number(offset.slice(4,6)) > 59 || +local - minutes * 60000 !== Date.parse(at)) return invalid();
+  try { const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(at)); const part = (key: string) => parts.find(p => p.type === key)?.value; if (`${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}:${part('second')}` !== localDateTime) return invalid(); } catch { return invalid(); }
+  return Object.freeze({ localDateTime, timeZone, offset, instant: at });
+}
+export class CalendarMapper {
+  static definition(raw: unknown): CalendarDefinition {
+    const v = object(raw,'definitionRevision,hash,title,description,start,end,audience,campaignReference,reminders');
+    const start = time(v['start']); const end = time(v['end']);
+    if (start.timeZone !== end.timeZone || Date.parse(end.instant) <= Date.parse(start.instant) || Date.parse(end.instant) - Date.parse(start.instant) > 90 * 86400000) return invalid();
+    const reminders = array(v['reminders']).map(rawRule => { const rule = object(rawRule,'id,channel,offsetSeconds'); return Object.freeze({id:uuid(rule['id']),channel:finite(CalendarReminderChannel.fromWire(rule['channel']),CalendarReminderChannel.Unknown),offsetSeconds:integer(rule['offsetSeconds'],300,2592000)}); });
+    if (reminders.length > 5 || new Set(reminders.map(r=>r.id)).size !== reminders.length || new Set(reminders.map(r=>r.offsetSeconds)).size !== reminders.length || reminders.some((r,i)=>i>0 && reminders[i-1].id >= r.id)) return invalid();
+    const campaignReference = v['campaignReference'] === null ? null : text(v['campaignReference']); if (campaignReference !== null && !/^[A-Z0-9_.-]{1,64}$/.test(campaignReference)) return invalid();
+    return Object.freeze({definitionRevision:revision(v['definitionRevision']),hash:hash(v['hash']),title:bounded(v['title'],1,120),description:bounded(v['description'],0,1000),start,end,audience:finite(CalendarAudience.fromWire(v['audience']),CalendarAudience.Unknown),campaignReference,reminders:Object.freeze(reminders)});
+  }
+  static event(raw: unknown): CalendarEvent {
+    const v = object(raw,'id,revision,lifecycle,approvedDefinitionRevision,createdAt,definition'); const definition = this.definition(v['definition']); const rev = revision(v['revision']); const lifecycle = finite(CalendarLifecycle.fromWire(v['lifecycle']),CalendarLifecycle.Unknown); const approved = v['approvedDefinitionRevision'] === null ? null : revision(v['approvedDefinitionRevision']);
+    if (BigInt(rev) < BigInt(definition.definitionRevision) || approved !== null && approved !== definition.definitionRevision || lifecycle === CalendarLifecycle.Draft && approved !== null || [CalendarLifecycle.Scheduled,CalendarLifecycle.Active,CalendarLifecycle.Paused,CalendarLifecycle.Completed].includes(lifecycle) && approved === null) return invalid();
+    return Object.freeze({id:uuid(v['id']),revision:rev,lifecycle,approvedDefinitionRevision:approved,createdAt:instant(v['createdAt']),definition});
+  }
+  static page<T>(raw: unknown, mapper: (raw: unknown)=>T): CalendarPage<T> { const v=object(raw,'items,total,page,size,hasMore'); const total=integer(v['total'],0,Number.MAX_SAFE_INTEGER); const page=integer(v['page'],0,2147483647); const size=integer(v['size'],1,100); const items=array(v['items']).map(mapper); if(items.length>size || BigInt(page)*BigInt(size)+BigInt(items.length)>BigInt(total) && items.length>0 || typeof v['hasMore']!=='boolean' || v['hasMore'] !== (BigInt(page)*BigInt(size)+BigInt(items.length)<BigInt(total))) return invalid(); return Object.freeze({items:Object.freeze(items),total,page,size,hasMore:v['hasMore']}); }
+  static receipt(raw: unknown): CalendarReceipt {
+    const v=object(raw,'commandId,eventId,actorId,operation,expectedRevision,reason,outcome,before,after,recordedAt'); const eventId=uuid(v['eventId']); const after=this.event(v['after']); const before=v['before']===null?null:this.event(v['before']); const operation=finite(CalendarOperation.fromWire(v['operation']),CalendarOperation.Unknown); const outcome=finite(CalendarOutcome.fromWire(v['outcome']),CalendarOutcome.Unknown); const expectedRevision=v['expectedRevision']===null?null:revision(v['expectedRevision']); const actorId=v['actorId']===null?null:text(v['actorId']); const reason=v['reason']===null?null:bounded(v['reason'],1,500);
+    if (after.id!==eventId || before!==null && before.id!==eventId || actorId!==null && (!/^[1-9][0-9]{0,18}$/.test(actorId) || BigInt(actorId)>9223372036854775807n) || operation.system !== (actorId===null) || operation===CalendarOperation.Create && (before!==null || expectedRevision!==null || reason!==null || after.revision!=='0' || after.definition.definitionRevision!=='0' || after.lifecycle!==CalendarLifecycle.Draft || outcome!==CalendarOutcome.Applied) || operation!==CalendarOperation.Create && (before===null || expectedRevision===null || !operation.system && reason===null)) return invalid();
+    if(before && (outcome===CalendarOutcome.Applied ? CalendarRevision.fromWire(before.revision)?.next()?.wire!==after.revision : JSON.stringify(before)!==JSON.stringify(after))) return invalid();
+    return Object.freeze({commandId:uuid(v['commandId']),eventId,actorId,operation,expectedRevision,reason,outcome,before,after,recordedAt:instant(v['recordedAt'])});
+  }
+  static preflightResult(raw: unknown): CalendarPreflightResult {
+    const v=object(raw,'outcome,preflight,event'); const event=this.event(v['event']); const outcome=finite(CalendarOutcome.fromWire(v['outcome']),CalendarOutcome.Unknown); let preflight:CalendarPreflight|null=null;
+    if(v['preflight']!==null) { const p=object(v['preflight'],'id,eventId,revision,definitionRevision,definitionHash,issues,checkedAt,expiresAt'); const issues=array(p['issues']).map(i=>finite(CalendarPreflightIssue.fromWire(i),CalendarPreflightIssue.Unknown)); preflight=Object.freeze({id:uuid(p['id']),eventId:uuid(p['eventId']),revision:revision(p['revision']),definitionRevision:revision(p['definitionRevision']),definitionHash:hash(p['definitionHash']),issues:Object.freeze(issues),checkedAt:instant(p['checkedAt']),expiresAt:instant(p['expiresAt'])}); if(new Set(issues).size!==issues.length || preflight.eventId!==event.id || preflight.revision!==event.revision || preflight.definitionRevision!==event.definition.definitionRevision || preflight.definitionHash!==event.definition.hash || Date.parse(preflight.expiresAt)-Date.parse(preflight.checkedAt)!==600000) return invalid(); }
+    if((outcome===CalendarOutcome.Applied)!==(preflight!==null)) return invalid(); return Object.freeze({outcome,preflight,event});
+  }
+  static reminderSwitch(raw:unknown):CalendarReminderSwitch { const v=object(raw,'state,revision,readiness'); const readiness=finite(CalendarReminderReadiness.fromWire(v['readiness']),CalendarReminderReadiness.Unknown); if(readiness!==CalendarReminderReadiness.Unavailable) return invalid(); return Object.freeze({state:finite(CalendarSwitchState.fromWire(v['state']),CalendarSwitchState.Unknown),revision:revision(v['revision']),readiness}); }
+  static definitionFromInputWire(raw: unknown): CalendarDefinitionInput {
+    const value = object(raw,'definitionRevision,title,description,start,end,audience,campaignReference,reminders');
+    const boundary=(rawTime:unknown)=>{ const t=object(rawTime,'localDateTime,timeZone,offset'); const local=text(t['localDateTime']); const rawOffset=text(t['offset']); const offset=['+00:00','-00:00'].includes(rawOffset)?'Z':rawOffset; const milliseconds=Date.parse(local+offset); if(!Number.isFinite(milliseconds)) return invalid(); return {...t,offset,instant:new Date(milliseconds).toISOString().replace('.000Z','Z')}; };
+    const result=this.definition({...value,hash:'0'.repeat(64),start:boundary(value['start']),end:boundary(value['end'])});
+    return Object.freeze({definitionRevision:result.definitionRevision,title:result.title,description:result.description,start:Object.freeze({localDateTime:result.start.localDateTime,timeZone:result.start.timeZone,offset:result.start.offset}),end:Object.freeze({localDateTime:result.end.localDateTime,timeZone:result.end.timeZone,offset:result.end.offset}),audience:result.audience,campaignReference:result.campaignReference,reminders:result.reminders});
+  }
+  static changeFromInputWire(raw: unknown): CalendarChange {
+    if(!raw||typeof raw!=='object') return invalid(); const operation=CalendarOperation.fromWire((raw as Record<string,unknown>)['operation']);
+    const v=object(raw,'operation,expectedRevision,reason'+(operation===CalendarOperation.Edit?',definition':operation===CalendarOperation.Schedule?',preflightId':''));
+    const result={operation,expectedRevision:revision(v['expectedRevision']),reason:bounded(v['reason'],1,500),...(operation===CalendarOperation.Edit?{definition:this.definitionFromInputWire(v['definition'])}:{}),...(operation===CalendarOperation.Schedule?{preflightId:uuid(v['preflightId'])}:{})}; this.changeInput(result); return Object.freeze(result);
+  }
+  static definitionInput(value:CalendarDefinitionInput): unknown {
+    const boundary=(t:CalendarDefinitionInput['start'])=>({localDateTime:t.localDateTime,timeZone:t.timeZone,offset:['+00:00','-00:00'].includes(t.offset)?'Z':t.offset});
+    revision(value.definitionRevision); bounded(value.title,1,120); bounded(value.description,0,1000); if(value.audience!==CalendarAudience.InternalAll) return invalid();
+    const wire = {definitionRevision:value.definitionRevision,title:value.title,description:value.description,start:boundary(value.start),end:boundary(value.end),audience:value.audience.wire,campaignReference:value.campaignReference,reminders:value.reminders.map(r=>({id:uuid(r.id),channel:finite(r.channel,CalendarReminderChannel.Unknown).wire,offsetSeconds:integer(r.offsetSeconds,300,2592000)}))};
+    this.definitionFromInputWire(wire); return wire;
+  }
+  static changeInput(value:CalendarChange):unknown { revision(value.expectedRevision); bounded(value.reason,1,500); if(![CalendarOperation.Edit,CalendarOperation.Schedule,CalendarOperation.Pause,CalendarOperation.Resume,CalendarOperation.Cancel].includes(value.operation)) return invalid(); if((value.operation===CalendarOperation.Edit)!==(value.definition!==undefined) || (value.operation===CalendarOperation.Schedule)!==(value.preflightId!==undefined)) return invalid(); return {operation:value.operation.wire,expectedRevision:value.expectedRevision,reason:value.reason,...(value.definition?{definition:this.definitionInput(value.definition)}:{}),...(value.preflightId?{preflightId:uuid(value.preflightId)}:{})}; }
+}

@@ -48,6 +48,35 @@ const notificationPreference = {
   readiness: 'UNCONFIGURED',
 };
 
+const calendarEvent = {
+  id: '00000000-0000-4000-8000-000000000010',
+  revision: '0',
+  lifecycle: 'DRAFT',
+  approvedDefinitionRevision: null,
+  createdAt: '2026-11-14T10:00:00Z',
+  definition: {
+    definitionRevision: '0',
+    hash: 'a'.repeat(64),
+    title: 'Campaña de herramientas de verano',
+    description: 'Coordinación interna de catálogo, comunicación y preparación comercial.',
+    start: {
+      localDateTime: '2026-11-25T09:00:00',
+      timeZone: 'America/Argentina/Buenos_Aires',
+      offset: '-03:00',
+      instant: '2026-11-25T12:00:00Z',
+    },
+    end: {
+      localDateTime: '2026-11-25T11:00:00',
+      timeZone: 'America/Argentina/Buenos_Aires',
+      offset: '-03:00',
+      instant: '2026-11-25T14:00:00Z',
+    },
+    audience: 'INTERNAL_ALL',
+    campaignReference: 'DEMO-HERRAMIENTAS-2026',
+    reminders: [],
+  },
+};
+
 const home = {
   revision: 1,
   sections: [{ key: 'route-home', kind: 'HERO', active: true, sortOrder: 0, content: { title: 'Portada de ruta', body: 'Experiencia demostrable y determinista.' }, updatedAt: null }],
@@ -141,6 +170,8 @@ export async function installProductiveRouteFixture(page: Page, actor: RouteActo
     if (path === '/api/v1/user/notifications' && get) return route.fulfill({ json: envelope({ items: [notification], total: 1, page: 0, size: 25, hasMore: false }) });
     if (path === '/api/v1/user/notifications/email-preferences' && get) return route.fulfill({ json: envelope(notificationPreference) });
     if (path === '/api/v1/user/notifications/00000000-0000-4000-8000-000000000001' && get) return route.fulfill({ json: envelope(notification) });
+    if (path === '/api/v1/user/commercial-calendar/events' && get) return route.fulfill({ json: envelope({ items: [calendarEvent], total: 1, page: 0, size: 25, hasMore: false }) });
+    if (path === '/api/v1/user/commercial-calendar/events/00000000-0000-4000-8000-000000000010' && get) return route.fulfill({ json: envelope(calendarEvent) });
 
     if (!get) evidence.writes.push(`${method} ${path}`);
     evidence.unhandled.push(`${method} ${path}${url.search}`);

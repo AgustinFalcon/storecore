@@ -140,6 +140,30 @@ export const routes: Routes = [
             canActivate: [userGuard],
           },
           {
+            path: 'commercial-calendar',
+            loadComponent: () => import('./features/commercial-calendar/calendar-center.component').then((module) => module.CalendarCenterComponent),
+            title: 'Calendario comercial',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'commercial-calendar/new',
+            loadComponent: () => import('./features/commercial-calendar/calendar-editor.component').then((module) => module.CalendarEditorComponent),
+            title: 'Nuevo evento comercial',
+            canActivate: [userGuard, adminGuard],
+          },
+          {
+            path: 'commercial-calendar/:eventId/edit',
+            loadComponent: () => import('./features/commercial-calendar/calendar-editor.component').then((module) => module.CalendarEditorComponent),
+            title: 'Editar evento comercial',
+            canActivate: [userGuard, adminGuard],
+          },
+          {
+            path: 'commercial-calendar/:eventId',
+            loadComponent: () => import('./features/commercial-calendar/calendar-detail.component').then((module) => module.CalendarDetailComponent),
+            title: 'Detalle de evento comercial',
+            canActivate: [userGuard],
+          },
+          {
             path: 'notifications',
             loadComponent: () => import('./features/notifications/notification-center.component').then((module) => module.NotificationCenterComponent),
             title: 'Notificaciones',

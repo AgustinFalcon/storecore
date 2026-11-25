@@ -99,7 +99,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         // Only committed mutation contracts rotate CSRF on business rejection.
         const notificationCommand = req.method === 'POST' && (/^\/api\/v1\/user\/notifications\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/commands$/.test(path)
           || path === '/api/v1/user/notifications/email-preferences/commands');
-        if (((err.status === 409 || err.status === 422) && path.includes('/user/inventory/') && path.endsWith('/adjustments') || err.status === 409 && notificationCommand)
+        const calendarCommand = req.method === 'POST' && (path === '/api/v1/user/commercial-calendar/events'
+          || /^\/api\/v1\/user\/commercial-calendar\/events\/(?!00000000-0000-0000-0000-000000000000)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(?:commands|preflights)$/.test(path));
+        if (((err.status === 409 || err.status === 422) && path.includes('/user/inventory/') && path.endsWith('/adjustments') || err.status === 409 && (notificationCommand || calendarCommand))
           && context === AccessContext.User && fence.accepts(context, generation)) {
           const token = err.headers.get(CSRF_HEADER);
           if (token) user.setCsrf(token);
