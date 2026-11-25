@@ -18,6 +18,7 @@ Date: 2026-11-25
 - `npm run lint`: PASS.
 - `npm run check:architecture`: PASS, including the domain boundary and 33-surface productive manifest.
 - `npm run check:psd-real`: PASS: security checks, 13 node contract tests, TypeScript, ESLint and discovery of 144 PSD tests.
+- `npm run test:a11y`: PASS after remediation, 197/197 backend-less Playwright cases, including all productive calendar routes at mobile and desktop widths.
 - `npm run build`: PASS. The existing non-fatal initial-bundle budget warning remains visible; the produced initial bundle is 713.77 kB against the 700 kB warning threshold.
 - `git diff --check`: PASS.
 
@@ -39,6 +40,8 @@ All four findings were corrected with regressions. The second exact-head round o
 ## First CI execution and remediation
 
 GitHub Actions run `45540686999` executed the disposable PostgreSQL/Spring/production-Angular/Chromium matrix. The persisted calendar fixture and every required backend read succeeded with HTTP 200, but the productive-routes job rejected the four calendar routes at all three widths (12 cases). The exact assertion was the skip-link focus contract: each calendar view rendered a nested `<main>` inside the shell's canonical `<main id="contenido-principal">`, so the target landmark was not unique.
+
+The same run also reported an exit-code failure in the frontend job's backend-less Playwright step. This credential cannot retrieve that job log, so this evidence does not invent its individual failing assertions. The exact local command from the workflow, `npm run test:a11y`, passes all 197 cases after the landmark remediation, including the HTTP-fixture calendar acceptances.
 
 Commit `1385a70bcf4bb5537acfac404963b2bf315c8e14` replaces the three calendar view roots with non-landmark containers and adds a presentation regression covering center, detail and editor surfaces. The post-remediation local focal suite, full suite, lint, architecture, PSD-real contract check, build and diff check all pass. A new exact-head review round and a fresh CI execution are required before merge; the failed first execution is retained as evidence rather than reclassified as success.
 
