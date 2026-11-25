@@ -18,7 +18,7 @@
     {"id":"PCC-008C","slice":"calendar-system","status":"completed","title":"Implement bounded SYSTEM lifecycle candidate orchestration without public route or timer"},
     {"id":"PCC-008D","slice":"calendar-worker","status":"completed","title":"Implement durable no-backfill, leases, fencing, retry and crash recovery"},
     {"id":"PCC-008E","slice":"calendar-handoff","status":"completed","title":"Implement atomic in-app CAMPAIGN handoff without email or external transport"},
-    {"id":"PCC-008F","slice":"calendar-activation","status":"in_progress","title":"Wire reviewed local activation/readiness gate while defaults remain fail closed"},
+    {"id":"PCC-008F","slice":"calendar-activation","status":"completed","title":"Wire reviewed local activation/readiness gate while defaults remain fail closed"},
     {"id":"PCC-009","slice":"calendar","status":"pending","title":"Validate local, browser, reviews, CI and merge before next slice"},
     {"id":"PCC-010","slice":"reporting","status":"pending","title":"Define exact period, source, freshness and NOT_AVAILABLE contracts"},
     {"id":"PCC-011","slice":"reporting","status":"pending","title":"Implement authoritative StoreCore aggregates and BlackStore stock-status projection only"},

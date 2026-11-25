@@ -153,6 +153,14 @@ class CalendarHttpIntegrationTest @Autowired constructor(private val http: TestR
         jdbc.update("DELETE FROM user_roles WHERE user_id=?",admin.userId)
         assertEquals(401,exchange("$base/commands/$key",session=admin).statusCode.value())
     }
+    @Test fun `calendar activation exposes no public trigger route`() {
+        val admin=provision()
+        for(path in listOf("$base/runner","$base/trigger","$base/reminders/run")) {
+            val response=exchange(path,session=admin)
+            assertEquals(404,response.statusCode.value(),response.body)
+            assertEquals("no-store",response.headers.cacheControl)
+        }
+    }
     @Test fun `overlap boundaries stable ordering bounded pagination filters and nanos are real SQL reads`() {
         val admin=provision(); val from=Instant.parse("2080-01-10T00:00:00Z"); val to=from.plusSeconds(86400)
         create(admin,definition(start=from.minusSeconds(3600),end=from))

@@ -276,6 +276,43 @@ class CalendarPersistencePostgresTest {
         assertSame(CalendarOccurrenceHandoffResult.LostFence,CalendarOccurrenceHandoffService(repository).handoff(staleAttempt))
     }
 
+    @Test fun `concurrent runners claim once emit one alert and never create email intent`() {
+        val (url,database)=isolatedDatabase("runner_once")
+        val clock=MutableCalendarClock()
+        val setup=handoffRepo(clock,url)
+        val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600)
+        schedule(setup,admin,create(setup,admin,CalendarFixtures.definition(title="Runner activation",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant()
+        forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database)
+        clock.instant=due
+
+        fun runner(): CalendarReminderRunner {
+            val repository=handoffRepo(clock,url)
+            return CalendarReminderRunner(
+                CalendarSystemCycleService(clock,repository),
+                CalendarOccurrenceWorkerService(clock,repository),
+                CalendarOccurrenceHandoffService(repository),
+                requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())),
+            )
+        }
+
+        val barrier=CyclicBarrier(2)
+        val pool=Executors.newFixedThreadPool(2)
+        try {
+            val results=listOf(runner(),runner()).map { worker ->
+                pool.submit<CalendarRunnerTickResult> { barrier.await(); worker.tick() }
+            }.map { it.get(15,TimeUnit.SECONDS) }
+            assertEquals(2,results.count { it is CalendarRunnerTickResult.Completed })
+            assertEquals(1,results.filterIsInstance<CalendarRunnerTickResult.Completed>().sumOf { it.progress.emitted })
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+            assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_email_outbox",Int::class.java))
+            assertEquals("EMITTED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
+        } finally { pool.shutdownNow() }
+    }
+
     @Test fun `replay validates evidence before stale fence classification`() {
         val (url,database)=isolatedDatabase("handoff_corrupt_replay"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
         val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Corrupt replay",rules=listOf(rule))))

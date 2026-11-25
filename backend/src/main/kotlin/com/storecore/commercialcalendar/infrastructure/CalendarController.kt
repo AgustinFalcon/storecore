@@ -25,7 +25,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 @RequestMapping("/api/v1/user/commercial-calendar")
 @ConditionalOnProperty(name=["storecore.identity.enabled"],havingValue="true",matchIfMissing=true)
 class CalendarController(private val queries: CalendarQueryService,private val commands: CalendarCommandService,private val switches: CalendarSwitchCommandService,private val auth: RequestAuth,
-    private val mutations: IdentityMutationCoordinator,mapper: ObjectMapper,hasher: CalendarHasher) {
+    private val mutations: IdentityMutationCoordinator,private val reminderReadiness: CalendarReminderReadinessPort,mapper: ObjectMapper,hasher: CalendarHasher) {
     private val translator=CalendarHttpTranslator(mapper,hasher)
     @GetMapping("/events") fun list(http: HttpServletRequest,@RequestParam params: MultiValueMap<String,String>): ResponseEntity<BaseResponse<CalendarPageDto<CalendarEventDto>>> {
         val actor=auth.operatorOrAdmin(http)
@@ -52,7 +52,7 @@ class CalendarController(private val queries: CalendarQueryService,private val c
     @GetMapping("/reminder-switch") fun reminderSwitch(http: HttpServletRequest): ResponseEntity<BaseResponse<CalendarReminderSwitchDto>> {
         val actor=auth.admin(http); noQuery(http)
         val value=found(queries.reminderSwitch(actor))
-        return ok(CalendarHttpMapper.switchDiagnostic(value))
+        return ok(CalendarHttpMapper.switchDiagnostic(value,reminderReadiness.readiness()))
     }
     @GetMapping("/reminder-switch/commands/{commandId}") fun switchReceipt(http: HttpServletRequest,@PathVariable commandId: String): ResponseEntity<BaseResponse<CalendarSwitchReceiptDto>> {
         val actor=auth.admin(http); noQuery(http)
