@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #389, 003B-4C sigue abierto
+
+- Merge #389 `d6d1f9399504dbe150e9e5447e2696e9159a1247` sobre candidato
+  `c847ca92a103397ca0c1178df4bdddbbd9f46e02`. Verify exact-head
+  `45627692228` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr389-architecture.md`
+  y `sdd/reviews/20261125-sol-pr389-security.md`.
+- `ProtectHome` queda fuera (`ENXIO`). No se marca `003B-4C`. No hay
+  `CPUQuota`, familia de sockets, cuota global, `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C ProtectHome queda fuera
 
 - `ProtectHome` queda fuera: PID 1 `StartTransientUnit` responde `ENXIO`
