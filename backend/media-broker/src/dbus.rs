@@ -556,7 +556,8 @@ mod tests {
             .find(|(key, _)| *key == "LimitCORE")
             .map(|(_, value)| format!("{value:?}"));
         assert!(
-            core.as_deref().is_some_and(|value| value.contains('0')),
+            core.as_deref()
+                .is_some_and(|value| value.contains(&WORKER_LIMIT_CORE.to_string())),
             "LimitCORE must be the internal zero, got {core:?}"
         );
         let private_network = worker
