@@ -77,7 +77,7 @@ class NotificationPersistencePostgresTest {
         flyway("32",upgradeUrl).migrate()
         val jdbc = JdbcTemplate(DriverManagerDataSource(upgradeUrl,postgres.username,postgres.password))
         val history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("38",flyway(url=upgradeUrl).migrate().targetSchemaVersion.toString())
+        assertEquals("39",flyway(url=upgradeUrl).migrate().targetSchemaVersion.toString())
         assertEquals(history,jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=32 ORDER BY installed_rank"))
         assertEquals(0,flyway(url=upgradeUrl).migrate().migrationsExecuted)
         flyway(url=upgradeUrl).validate()
@@ -102,11 +102,17 @@ class NotificationPersistencePostgresTest {
 
     @Test fun `delivery replay conflicts and episode evidence preserve resolved projection and original severity`() {
         val repo=repository(); val admin=actor(); val event=event()
-        val alert=ingest(repo,event)
-        assertEquals(alert.id,ingest(repo,event).id)
+        val created=assertInstanceOf(NotificationIngestionResult.Recorded::class.java,repo.ingest(event))
+        assertEquals(NotificationIngestionDisposition.CREATED,created.disposition)
+        val alert=created.alert
+        val replay=assertInstanceOf(NotificationIngestionResult.Recorded::class.java,repo.ingest(event))
+        assertEquals(NotificationIngestionDisposition.DELIVERY_REPLAY,replay.disposition)
+        assertEquals(alert.id,replay.alert.id)
         val resolved=recorded(repo.execute(admin,request(alert))).result as NotificationCommandResult.Applied
         val additional=event(episode=event.episode.value,severity=NotificationSeverity.CRITICAL)
-        val result=ingest(repo,additional)
+        val reused=assertInstanceOf(NotificationIngestionResult.Recorded::class.java,repo.ingest(additional))
+        assertEquals(NotificationIngestionDisposition.EPISODE_REUSED,reused.disposition)
+        val result=reused.alert
         assertEquals(alert.id,result.id); assertEquals(NotificationLifecycle.RESOLVED,result.lifecycle)
         assertEquals(NotificationSeverity.WARNING,result.severity); assertEquals(1L,result.revision.value)
         assertEquals(2,root.queryForObject("SELECT count(*) FROM notification_source_events WHERE alert_id=?",Int::class.java,alert.id.value))
@@ -199,6 +205,8 @@ class NotificationPersistencePostgresTest {
         val event=event()
         val ingestions=race({repo.ingest(event)},{repo.ingest(event(episode=event.episode.value))})
         assertEquals(1,ingestions.map { (it as NotificationIngestionResult.Recorded).alert.id }.distinct().size)
+        assertEquals(setOf(NotificationIngestionDisposition.CREATED,NotificationIngestionDisposition.EPISODE_REUSED),
+            ingestions.map { (it as NotificationIngestionResult.Recorded).disposition }.toSet())
     }
 
     @Test fun `session expiring behind command advisory lock cannot replay a receipt`() {

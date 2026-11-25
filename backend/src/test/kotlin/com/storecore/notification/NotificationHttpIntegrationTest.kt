@@ -175,7 +175,7 @@ class NotificationHttpIntegrationTest @Autowired constructor(private val http: T
         migration("33").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val before=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("38",migration().migrate().targetSchemaVersion.toString())
+        assertEquals("39",migration().migrate().targetSchemaVersion.toString())
         assertEquals(before,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=33 ORDER BY installed_rank"))
         listOf(jdbc,upgraded).forEach { database ->
             assertTrue(database.queryForObject("SELECT has_function_privilege('storecore_runtime','notification_read_authorized(bigint,uuid)','EXECUTE')",Boolean::class.java)!!)

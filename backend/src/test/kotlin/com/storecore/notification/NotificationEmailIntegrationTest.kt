@@ -278,7 +278,7 @@ class NotificationEmailIntegrationTest @Autowired constructor(private val http: 
         upgraded.update("INSERT INTO notification_command_receipts VALUES (?,?,?,'RESOLVE',0,'Historical',?,'APPLIED',?::jsonb,?)",historicalCommand.id.value,historical.id.value,historicalActor,historicalCommand.payloadHash().value,NotificationSnapshotCodec(mapper).encode(historical),Timestamp.from(historicalCommand.occurredAt))
         upgraded.update("INSERT INTO notification_lifecycle_audit VALUES (?)",historicalCommand.id.value)
         val before=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("38",flyway().migrate().targetSchemaVersion.toString()); assertEquals(before,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=34 ORDER BY installed_rank"))
+        assertEquals("39",flyway().migrate().targetSchemaVersion.toString()); assertEquals(before,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=34 ORDER BY installed_rank"))
         assertEquals("LIFECYCLE",upgraded.queryForObject("SELECT family FROM notification_command_bindings WHERE command_id=?",String::class.java,historicalCommand.id.value))
         assertEquals(historicalCommand.payloadHash().value,upgraded.queryForObject("SELECT payload_hash FROM notification_command_bindings WHERE command_id=?",String::class.java,historicalCommand.id.value))
         listOf(jdbc,upgraded).forEach { database ->

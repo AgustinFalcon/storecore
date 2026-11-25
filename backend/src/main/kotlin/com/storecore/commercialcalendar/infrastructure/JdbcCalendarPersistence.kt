@@ -5,6 +5,10 @@ import com.storecore.commercialcalendar.application.*
 import com.storecore.commercialcalendar.domain.*
 import com.storecore.identity.domain.InternalRole
 import com.storecore.identity.domain.InternalUserPrincipal
+import com.storecore.notification.application.NotificationIngestionDisposition
+import com.storecore.notification.application.NotificationIngestionResult
+import com.storecore.notification.application.NotificationPersistencePort
+import com.storecore.notification.domain.*
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.transaction.support.TransactionTemplate
 import java.sql.Timestamp
@@ -13,7 +17,8 @@ import java.util.UUID
 
 /** Explicitly constructed persistence adapter. PCC-007A installs no bean, endpoint or background task. */
 class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transactions: TransactionTemplate,private val mapper: ObjectMapper,
-    private val clock: CalendarClock,private val ids: CalendarIds,private val hasher: CalendarHasher): CalendarPersistencePort,CalendarSystemPersistencePort,CalendarOccurrencePersistencePort {
+    private val clock: CalendarClock,private val ids: CalendarIds,private val hasher: CalendarHasher,
+    private val notifications: NotificationPersistencePort?=null): CalendarPersistencePort,CalendarSystemPersistencePort,CalendarOccurrencePersistencePort,CalendarOccurrenceHandoffPort {
     private val codec=CalendarSnapshotCodec(mapper,hasher)
     private fun <T: Any> tx(action: () -> T): T=transactions.execute { action() }!!
     private fun authorized(actor: InternalUserPrincipal)=InternalRole.ADMIN in actor.roles && jdbc.queryForObject("SELECT calendar_admin_authorized(?,?)",Boolean::class.java,actor.userId,actor.sessionId)==true
@@ -155,6 +160,95 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         companion object { fun fromWire(raw: String?)=entries.firstOrNull { it!=UNKNOWN && it.name==raw } ?: UNKNOWN }
     }
 
+    override fun handoff(lease: CalendarOccurrenceLease): CalendarOccurrenceHandoffResult = try {
+        tx {
+            val row=loadOccurrence(lease.occurrence.id,true) ?: return@tx CalendarOccurrenceHandoffResult.Missing
+            if(!sameOccurrenceIdentity(row.occurrence,lease.occurrence)) throw OccurrenceCorrupt()
+            if(row.occurrence.state==CalendarOccurrenceState.EMITTED) return@tx replayHandoff(row.occurrence,lease.token)
+            if(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM calendar_occurrence_handoffs WHERE occurrence_id=?)",Boolean::class.java,row.occurrence.id.value)==true)
+                throw OccurrenceCorrupt()
+            if(row.occurrence.state!=CalendarOccurrenceState.LEASED || row.occurrence.attempts!=lease.token.attempt || row.occurrence.leaseOwner!=lease.token.owner.value)
+                return@tx CalendarOccurrenceHandoffResult.LostFence
+
+            val switchSnapshot=lockOccurrenceSwitchSnapshot()
+            val context=loadOccurrenceContext(row)
+            val event=notificationEvent(row.occurrence)
+            notificationLock("notification-delivery",event.deliveryId.value.toString())
+            notificationLock("notification-episode","${event.source.type.wire}:${event.source.id.value}:${event.fingerprint.value}")
+            if(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM notification_source_events WHERE delivery_id=?)",Boolean::class.java,event.deliveryId.value)==true ||
+                jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM notification_alerts WHERE source_type=? AND source_id=? AND fingerprint=?)",Boolean::class.java,event.source.type.wire,event.source.id.value,event.fingerprint.value)==true)
+                throw OccurrenceCorrupt()
+
+            val handoffAt=clock.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+            if(row.leaseStartedAt==null || handoffAt<row.leaseStartedAt || handoffAt>=lease.leaseUntil || row.occurrence.leaseUntil!=lease.leaseUntil)
+                return@tx CalendarOccurrenceHandoffResult.LostFence
+            val switch=CalendarReminderSwitch(switchSnapshot,handoffAt)
+            occurrenceSkipReason(context,switch,handoffAt)?.let { reason ->
+                if(jdbc.queryForObject("SELECT calendar_skip_leased_occurrence(?,?,?,?,?)",Boolean::class.java,row.occurrence.id.value,lease.token.owner.value,lease.token.attempt,reason.wire,Timestamp.from(handoffAt))!=true) throw OccurrenceCorrupt()
+                return@tx CalendarOccurrenceHandoffResult.Skipped.from(reason) ?: throw OccurrenceCorrupt()
+            }
+
+            val ingestion=notifications?.ingest(event) ?: throw OccurrenceCorrupt()
+            val recorded=ingestion as? NotificationIngestionResult.Recorded ?: throw OccurrenceCorrupt()
+            val alert=recorded.alert
+            if(recorded.disposition!=NotificationIngestionDisposition.CREATED || !sameNotification(alert,event) || alert.lifecycle!=NotificationLifecycle.OPEN || alert.revision.value!=0L)
+                throw OccurrenceCorrupt()
+            if(jdbc.queryForObject("SELECT calendar_complete_occurrence_handoff(?,?,?,?,?)",Boolean::class.java,row.occurrence.id.value,lease.token.owner.value,lease.token.attempt,alert.id.value,Timestamp.from(handoffAt))!=true)
+                throw OccurrenceCorrupt()
+            CalendarOccurrenceHandoffResult.Emitted.from(alert.id)
+        }
+    } catch(_: OccurrenceCorrupt) { CalendarOccurrenceHandoffResult.Corrupt }
+
+    private fun sameOccurrenceIdentity(current: CalendarReminderOccurrence,retained: CalendarReminderOccurrence)=
+        current.id==retained.id && current.eventId==retained.eventId && current.approvedDefinitionRevision==retained.approvedDefinitionRevision &&
+            current.ruleId==retained.ruleId && current.scheduledAt==retained.scheduledAt
+
+    private fun notificationEvent(occurrence: CalendarReminderOccurrence): NotificationSourceEvent {
+        val identity=occurrence.id.value.toString().lowercase()
+        return NotificationSourceEvent.create(
+            requireNotNull(NotificationDeliveryId.fromWire(occurrence.id.value)),
+            requireNotNull(NotificationSourceIdentity.create(NotificationSourceType.SYSTEM_CAMPAIGN,requireNotNull(NotificationSourceId.fromWire(identity)))),
+            NotificationCategory.CAMPAIGN,NotificationSeverity.INFO,requireNotNull(NotificationConditionCode.fromWire("CALENDAR_REMINDER_DUE")),
+            requireNotNull(NotificationEpisodeKey.fromWire(identity)),
+        ) ?: throw OccurrenceCorrupt()
+    }
+
+    private fun sameNotification(alert: NotificationAlert,event: NotificationSourceEvent)=
+        alert.source==event.source && alert.fingerprint==event.fingerprint && alert.category==event.category && alert.severity==event.severity
+
+    private fun replayHandoff(occurrence: CalendarReminderOccurrence,token: CalendarOccurrenceLeaseToken): CalendarOccurrenceHandoffResult {
+        val rows=jdbc.queryForList("""SELECT h.lease_owner,h.attempt,h.delivery_id,h.alert_id,h.emitted_at,
+            n.source_type,n.source_id,n.fingerprint,n.category,n.severity,n.condition_code,n.episode_key,n.event_hash,n.alert_id AS source_alert_id,
+            a.source_type AS alert_source_type,a.source_id AS alert_source_id,a.fingerprint AS alert_fingerprint,a.category AS alert_category,a.severity AS alert_severity,
+            a.lifecycle AS alert_lifecycle,a.revision AS alert_revision
+            FROM calendar_occurrence_handoffs h JOIN notification_source_events n ON n.delivery_id=h.delivery_id
+            JOIN notification_alerts a ON a.id=h.alert_id WHERE h.occurrence_id=?""",occurrence.id.value)
+        if(rows.size!=1) throw OccurrenceCorrupt()
+        val row=rows.single()
+        val event=notificationEvent(occurrence)
+        val emitted=(row["emitted_at"] as? Timestamp)?.toInstant() ?: throw OccurrenceCorrupt()
+        val alertId=NotificationId.fromWire(row["alert_id"] as? UUID) ?: throw OccurrenceCorrupt()
+        val evidenceOwner=CalendarLeaseOwner.fromWire(row["lease_owner"] as? UUID) ?: throw OccurrenceCorrupt()
+        val evidenceAttempt=(row["attempt"] as? Number)?.toInt() ?: throw OccurrenceCorrupt()
+        val alertLifecycle=NotificationLifecycle.fromWire(row["alert_lifecycle"] as? String)
+        val alertRevision=NotificationRevision.fromWire((row["alert_revision"] as? Number)?.toLong())
+        val exact=evidenceAttempt==occurrence.attempts && emitted.nano==0 && row["delivery_id"]==occurrence.id.value && row["source_alert_id"]==alertId.value &&
+            row["source_type"]==event.source.type.wire && row["source_id"]==event.source.id.value && row["fingerprint"]==event.fingerprint.value &&
+            row["category"]==event.category.wire && row["severity"]==event.severity.wire && row["condition_code"]==event.condition.value &&
+            row["episode_key"]==event.episode.value && row["event_hash"]==event.canonicalHash().value &&
+            row["alert_source_type"]==event.source.type.wire && row["alert_source_id"]==event.source.id.value && row["alert_fingerprint"]==event.fingerprint.value &&
+            row["alert_category"]==event.category.wire && row["alert_severity"]==event.severity.wire &&
+            alertLifecycle!=NotificationLifecycle.UNKNOWN && alertRevision!=null
+        if(!exact) throw OccurrenceCorrupt()
+        if(evidenceOwner!=token.owner || evidenceAttempt!=token.attempt) return CalendarOccurrenceHandoffResult.LostFence
+        return CalendarOccurrenceHandoffResult.Replayed.from(alertId)
+    }
+
+    private fun notificationLock(namespace: String,value: String) {
+        val digest=java.security.MessageDigest.getInstance("SHA-256").digest("$namespace:$value".toByteArray(Charsets.UTF_8))
+        jdbc.query("SELECT pg_advisory_xact_lock(?)",{ _,_ -> Unit },java.nio.ByteBuffer.wrap(digest).long)
+    }
+
     override fun claim(observedAt: Instant,owner: CalendarLeaseOwner,batchSize: CalendarOccurrenceBatchSize): CalendarOccurrenceClaimResult = try {
         tx {
             val rows=jdbc.query("SELECT * FROM calendar_lock_due_occurrences(?,?)",{ rs,_ ->
@@ -163,7 +257,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             },Timestamp.from(observedAt),batchSize.value)
             if(rows.isEmpty()) return@tx CalendarOccurrenceClaimResult.Empty(observedAt)
 
-            val switch=lockOccurrenceSwitch(observedAt)
+            val switch=CalendarReminderSwitch(lockOccurrenceSwitchSnapshot(),observedAt)
             val contexts=rows.map(::loadOccurrenceContext)
             val decisions=contexts.map { context -> occurrenceDecision(context,switch,observedAt) }
             val leaseGrantedAt=clock.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
@@ -197,20 +291,25 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
         val row=context.row
         val occurrence=row.occurrence
         if(occurrence.state==CalendarOccurrenceState.LEASED && occurrence.attempts==3) return OccurrenceDecision.Dead(row)
-        if(occurrence.scheduledAt<observedAt.minusSeconds(900)) return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.LATE)
+        return occurrenceSkipReason(context,switch,observedAt)?.let { OccurrenceDecision.Skip(row,it) } ?: OccurrenceDecision.Lease(row)
+    }
+
+    private fun occurrenceSkipReason(context: OccurrenceContext,switch: CalendarReminderSwitch,observedAt: Instant): CalendarOccurrenceTerminalReason? {
+        val occurrence=context.row.occurrence
+        if(occurrence.scheduledAt<observedAt.minusSeconds(900)) return CalendarOccurrenceTerminalReason.LATE
         when(switch.effectivity) {
-            CalendarSwitchEffectivity.DISABLED -> return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.SWITCH_DISABLED)
-            CalendarSwitchEffectivity.EXPIRED -> return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.SWITCH_EXPIRED)
+            CalendarSwitchEffectivity.DISABLED -> return CalendarOccurrenceTerminalReason.SWITCH_DISABLED
+            CalendarSwitchEffectivity.EXPIRED -> return CalendarOccurrenceTerminalReason.SWITCH_EXPIRED
             CalendarSwitchEffectivity.UNKNOWN -> throw OccurrenceCorrupt()
             CalendarSwitchEffectivity.EFFECTIVE -> Unit
         }
         val enabledAt=switch.metadata?.createdAt ?: throw OccurrenceCorrupt()
-        if(occurrence.scheduledAt<=enabledAt) return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.ENABLE_CUTOFF)
+        if(occurrence.scheduledAt<=enabledAt) return CalendarOccurrenceTerminalReason.ENABLE_CUTOFF
         val event=context.event
-        if(event.approvedDefinitionRevision!=occurrence.approvedDefinitionRevision) return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.DEFINITION_CHANGED)
-        if(event.lifecycle !in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE)) return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.EVENT_INELIGIBLE)
-        if(context.resumedAt!=null && occurrence.scheduledAt<=context.resumedAt) return OccurrenceDecision.Skip(row,CalendarOccurrenceTerminalReason.RESUME_CUTOFF)
-        return OccurrenceDecision.Lease(row)
+        if(event.approvedDefinitionRevision!=occurrence.approvedDefinitionRevision) return CalendarOccurrenceTerminalReason.DEFINITION_CHANGED
+        if(event.lifecycle !in listOf(CalendarLifecycle.SCHEDULED,CalendarLifecycle.ACTIVE)) return CalendarOccurrenceTerminalReason.EVENT_INELIGIBLE
+        if(context.resumedAt!=null && occurrence.scheduledAt<=context.resumedAt) return CalendarOccurrenceTerminalReason.RESUME_CUTOFF
+        return null
     }
 
     private fun loadOccurrenceContext(row: OccurrenceRow): OccurrenceContext {
@@ -251,7 +350,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
           catch(_: Exception) { throw OccurrenceCorrupt() }
     }
 
-    private fun lockOccurrenceSwitch(observedAt: Instant): CalendarReminderSwitch {
+    private fun lockOccurrenceSwitchSnapshot(): CalendarSwitchSnapshot {
         val rows=jdbc.queryForList("SELECT * FROM calendar_lock_reminder_switch()")
         if(rows.size!=1) throw OccurrenceCorrupt()
         return try {
@@ -266,13 +365,15 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
                 CalendarRemovalTicket.fromWire(row["removal_ticket"] as? String) ?: throw OccurrenceCorrupt(),
                 CalendarSwitchAction.fromWire(row["affected_action"] as? String),
             ) ?: throw OccurrenceCorrupt()
-            val snapshot=CalendarSwitchSnapshot.restore(state,revision,metadata) ?: throw OccurrenceCorrupt()
-            CalendarReminderSwitch(snapshot,observedAt)
+            CalendarSwitchSnapshot.restore(state,revision,metadata) ?: throw OccurrenceCorrupt()
         } catch(_: OccurrenceCorrupt) { throw OccurrenceCorrupt() }
           catch(_: Exception) { throw OccurrenceCorrupt() }
     }
 
-    private fun loadOccurrence(id: CalendarOccurrenceId): OccurrenceRow?=jdbc.queryForList("SELECT * FROM calendar_reminder_occurrences WHERE id=?",id.value).singleOrNull()?.let(::decodeOccurrence)
+    private fun loadOccurrence(id: CalendarOccurrenceId,locked: Boolean=false): OccurrenceRow?=jdbc.queryForList(
+        if(locked) "SELECT * FROM calendar_lock_occurrence(?)" else "SELECT * FROM calendar_reminder_occurrences WHERE id=?",
+        id.value
+    ).singleOrNull()?.let(::decodeOccurrence)
 
     private fun decodeOccurrence(row: Map<String,Any?>): OccurrenceRow {
         val id=CalendarOccurrenceId.fromWire(row["id"] as? UUID) ?: throw OccurrenceCorrupt()
@@ -296,7 +397,7 @@ class JdbcCalendarPersistence(private val jdbc: JdbcTemplate,private val transac
             CalendarOccurrenceState.PENDING -> leaseStarted==null && owner==null && leaseUntil==null && terminal==null && terminalAt==null &&
                 (if(attempts==0) next==scheduled && failure==null else attempts in 1..2 && next!=null && failure==CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF)
             CalendarOccurrenceState.LEASED -> attempts in 1..3 && leaseStarted!=null && leaseUntil==leaseStarted.plusSeconds(60) && next==null && terminal==null && terminalAt==null && failure==null
-            CalendarOccurrenceState.SKIPPED -> attempts in 0..2 && next==null && leaseStarted==null && owner==null && leaseUntil==null && terminal?.skip==true && terminalAt!=null && failure==null
+            CalendarOccurrenceState.SKIPPED -> attempts in 0..3 && next==null && leaseStarted==null && owner==null && leaseUntil==null && terminal?.skip==true && terminalAt!=null && failure==null
             CalendarOccurrenceState.DEAD -> attempts in 1..3 && next==null && leaseStarted==null && owner==null && leaseUntil==null && terminalAt!=null &&
                 (terminal==CalendarOccurrenceTerminalReason.ATTEMPTS_EXHAUSTED && attempts==3 && failure in setOf(null,CalendarOccurrenceFailureClass.RETRYABLE_PRE_HANDOFF) ||
                  terminal==CalendarOccurrenceTerminalReason.PERMANENT_FAILURE && failure==CalendarOccurrenceFailureClass.PERMANENT_PRE_HANDOFF)

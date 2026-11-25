@@ -23,12 +23,13 @@ class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val tr
 
     override fun ingest(event: NotificationSourceEvent): NotificationIngestionResult = transactions.execute {
         lock("notification-delivery", event.deliveryId.value.toString())
+        lock("notification-episode", "${event.source.type.wire}:${event.source.id.value}:${event.fingerprint.value}")
         val existing = jdbc.queryForList("SELECT * FROM notification_source_events WHERE delivery_id=?", event.deliveryId.value).singleOrNull()
         if (existing != null) {
             val exact = existing["event_hash"] == event.canonicalHash().value && existing["source_type"] == event.source.type.wire &&
                 existing["source_id"] == event.source.id.value && existing["category"] == event.category.wire && existing["severity"] == event.severity.wire &&
                 existing["condition_code"] == event.condition.value && existing["episode_key"] == event.episode.value && existing["fingerprint"] == event.fingerprint.value
-            return@execute if (exact) NotificationIngestionResult.Recorded(requireNotNull(find(requireNotNull(NotificationId.fromWire(existing["alert_id"] as UUID)))))
+            return@execute if (exact) requireNotNull(NotificationIngestionResult.Recorded.from(requireNotNull(find(requireNotNull(NotificationId.fromWire(existing["alert_id"] as UUID)))),NotificationIngestionDisposition.DELIVERY_REPLAY))
                 else NotificationIngestionResult.DeliveryConflict
         }
         val at = Timestamp.from(clock.instant().truncatedTo(ChronoUnit.MICROS))
@@ -42,7 +43,7 @@ class JdbcNotificationPersistence(private val jdbc: JdbcTemplate, private val tr
             VALUES (?,?,?,?,?,?,?,?,?,?,?)""", event.deliveryId.value, alert.id.value, event.source.type.wire, event.source.id.value,
             event.fingerprint.value, event.category.wire, event.severity.wire, event.condition.value, event.episode.value, event.canonicalHash().value, at)
         if(inserted==1) emailProjection.firstAlert(alert)
-        NotificationIngestionResult.Recorded(alert)
+        requireNotNull(NotificationIngestionResult.Recorded.from(alert,if(inserted==1) NotificationIngestionDisposition.CREATED else NotificationIngestionDisposition.EPISODE_REUSED))
     }!!
 
     override fun execute(actor: InternalUserPrincipal, request: NotificationLifecycleRequest): NotificationExecutionResult = transactions.execute {

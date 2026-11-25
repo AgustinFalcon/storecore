@@ -7,6 +7,13 @@ import com.storecore.commercialcalendar.infrastructure.*
 import com.storecore.identity.domain.*
 import com.storecore.configuration.application.*
 import com.storecore.configuration.domain.CapabilityActor
+import com.storecore.notification.application.NotificationEmailReadinessPort
+import com.storecore.notification.application.NotificationEmailIntentProjection
+import com.storecore.notification.application.NotificationIngestionResult
+import com.storecore.notification.domain.NotificationEmailReadiness
+import com.storecore.notification.domain.*
+import com.storecore.notification.infrastructure.JdbcNotificationEmailProjection
+import com.storecore.notification.infrastructure.JdbcNotificationPersistence
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeAll
@@ -22,6 +29,8 @@ import org.testcontainers.containers.PostgreSQLContainer
 import java.sql.Connection
 import java.sql.Timestamp
 import java.time.Instant
+import java.time.Clock
+import java.time.ZoneOffset
 import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.CyclicBarrier
@@ -47,6 +56,16 @@ class CalendarPersistencePostgresTest {
         val source=SingleConnectionDataSource(connection,true)
         return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,RandomCalendarIds(),CalendarFixtures.hasher)
     }
+    private fun handoffRepo(clock: CalendarClock,url: String=postgres.jdbcUrl): JdbcCalendarPersistence {
+        val source=runtime(url); val jdbc=JdbcTemplate(source)
+        return handoffRepo(clock,jdbc,TransactionTemplate(DataSourceTransactionManager(source)),JdbcNotificationEmailProjection(jdbc,NotificationEmailReadinessPort { NotificationEmailReadiness.READY }))
+    }
+    private fun handoffRepo(clock: CalendarClock,jdbc: JdbcTemplate,transactions: TransactionTemplate,emailProjection: NotificationEmailIntentProjection): JdbcCalendarPersistence {
+        val mapper=jacksonObjectMapper()
+        val notificationClock=Clock.fixed(clock.now(),ZoneOffset.UTC)
+        val notifications=JdbcNotificationPersistence(jdbc,transactions,mapper,notificationClock,emailProjection)
+        return JdbcCalendarPersistence(jdbc,transactions,mapper,clock,RandomCalendarIds(),CalendarFixtures.hasher,notifications)
+    }
     private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true): JdbcCalendarSwitchPersistence {
         val source=runtime()
         val capability=object: CapabilityDecisionPort { override fun decide(module: String,action: String,actor: CapabilityActor) { if(!active) throw CapabilityDisabled() } }
@@ -62,6 +81,22 @@ class CalendarPersistencePostgresTest {
         database.update("""INSERT INTO identity_sessions(id,subject_kind,user_id,token_hash,issued_at,last_seen_at,idle_expires_at,absolute_expires_at)
             VALUES(?,'USER',?,?,clock_timestamp(),clock_timestamp(),clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')""",session,id,UUID.randomUUID().toString().replace("-","").repeat(2))
         return InternalUserPrincipal(session,id,setOf(role))
+    }
+    private fun enableOperationalEmailPreference(database: JdbcTemplate,userId: Long,url: String) {
+        val source=DriverManagerDataSource(url,postgres.username,postgres.password)
+        TransactionTemplate(DataSourceTransactionManager(source)).executeWithoutResult {
+            val jdbc=JdbcTemplate(source); val token=UUID.randomUUID(); val correlation=UUID.randomUUID()
+            jdbc.update("""WITH issued AS(SELECT clock_timestamp() value) INSERT INTO identity_email_verification_tokens(id,realm,user_id,token_hash,email_version,email_digest,issued_at,expires_at,correlation_id)
+                SELECT ?,'USER',id,?,email_version,encode(sha256(convert_to(email,'UTF8')),'hex'),value,value+interval '30 minutes',? FROM users CROSS JOIN issued WHERE id=?""",
+                token,UUID.randomUUID().toString().replace("-","").repeat(2),correlation,userId)
+            jdbc.update("UPDATE identity_email_verification_tokens SET state='CONSUMED',terminal_at=clock_timestamp(),terminal_correlation_id=? WHERE id=?",correlation,token)
+            jdbc.update("""INSERT INTO identity_email_verification_evidence(id,verification_token_id,realm,user_id,email_version,email_digest,verified_at,correlation_id)
+                SELECT ?,id,realm,user_id,email_version,email_digest,terminal_at,terminal_correlation_id FROM identity_email_verification_tokens WHERE id=?""",UUID.randomUUID(),token)
+            jdbc.update("INSERT INTO notification_email_preferences(user_id,state,revision) VALUES (?,'DISABLED',0)",userId)
+            jdbc.update("""UPDATE notification_email_preferences p SET state='ENABLED',revision=1,categories=ARRAY['STOCK'],severities=ARRAY['WARNING'],
+                email_version=u.email_version,email_digest=encode(sha256(convert_to(u.email,'UTF8')),'hex'),consented_at=clock_timestamp() FROM users u WHERE p.user_id=u.id AND p.user_id=?""",userId)
+        }
+        assertEquals(true,database.queryForObject("SELECT eligible AND verified FROM notification_email_account(?)",Boolean::class.java,userId))
     }
     private fun recorded(result: CalendarPersistenceResult)=assertInstanceOf(CalendarPersistenceResult.Recorded::class.java,result).receipt
     private fun systemRecorded(result: CalendarSystemAdvanceResult)=assertInstanceOf(CalendarSystemAdvanceResult.Recorded::class.java,result)
@@ -146,7 +181,7 @@ class CalendarPersistencePostgresTest {
         flyway(url,"35").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val history=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("38",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("39",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=35 ORDER BY installed_rank"))
         assertEquals(0,flyway(url).migrate().migrationsExecuted); flyway(url).validate()
         for(database in listOf(root,upgraded)) {
@@ -165,6 +200,20 @@ class CalendarPersistencePostgresTest {
         assertEquals(CalendarSwitchState.DISABLED,repo().reminderSwitch().state)
     }
 
+    @Test fun `V38 upgrade preserves all published calendar migration checksums`() {
+        val name="calendar_v38_upgrade_${UUID.randomUUID().toString().replace("-","")}"
+        root.execute("CREATE DATABASE $name")
+        val url=postgres.jdbcUrl.substringBeforeLast('/')+"/$name"
+        flyway(url,"38").migrate()
+        val database=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
+        val published=database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank")
+        assertEquals("39",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals(published,database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank"))
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='39' AND success",Int::class.java))
+        assertEquals(0,flyway(url).migrate().migrationsExecuted)
+        flyway(url).validate()
+    }
+
     @Test fun `PCC 008D migration exposes only fenced mutation functions and protects occurrence shape`() {
         val columns=root.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='calendar_reminder_occurrences'",String::class.java).toSet()
         assertTrue(columns.containsAll(setOf("next_attempt_at","lease_started_at","terminal_reason","terminal_at","last_failure_class")))
@@ -180,6 +229,316 @@ class CalendarPersistencePostgresTest {
         assertThrows(DataAccessException::class.java) { runtime.queryForList("SELECT * FROM calendar_lock_due_occurrences(clock_timestamp(),51)") }
         assertThrows(DataAccessException::class.java) { runtime.queryForObject("SELECT calendar_settle_occurrence_failure(?,?,?,?,?)",String::class.java,UUID.randomUUID(),UUID.randomUUID(),1,"FUTURE",Timestamp.from(CalendarFixtures.now)) }
         assertThrows(DataAccessException::class.java) { root.update("UPDATE calendar_reminder_occurrences SET state='EMITTED'") }
+    }
+
+    @Test fun `PCC 008E migration exposes only fenced handoff writers and immutable evidence`() {
+        assertFalse(root.queryForObject("SELECT has_table_privilege('storecore_runtime','calendar_occurrence_handoffs','INSERT,UPDATE,DELETE')",Boolean::class.java)!!)
+        assertTrue(root.queryForObject("SELECT has_table_privilege('storecore_runtime','calendar_occurrence_handoffs','SELECT')",Boolean::class.java)!!)
+        assertFalse(root.queryForObject("SELECT has_table_privilege('storecore_runtime','calendar_reminder_occurrences','UPDATE')",Boolean::class.java)!!)
+        for(signature in listOf(
+            "calendar_lock_occurrence(uuid)",
+            "calendar_skip_leased_occurrence(uuid,uuid,integer,text,timestamp with time zone)",
+            "calendar_complete_occurrence_handoff(uuid,uuid,integer,uuid,timestamp with time zone)",
+        )) assertTrue(root.queryForObject("SELECT has_function_privilege('storecore_runtime',?,'EXECUTE')",Boolean::class.java,signature)!!)
+        val runtime=JdbcTemplate(runtime())
+        assertThrows(DataAccessException::class.java) { runtime.update("INSERT INTO calendar_occurrence_handoffs VALUES (?,?,?,?,?,?)",UUID.randomUUID(),UUID.randomUUID(),1,UUID.randomUUID(),UUID.randomUUID(),Timestamp.from(CalendarFixtures.now)) }
+        assertThrows(DataAccessException::class.java) { runtime.queryForList("SELECT * FROM calendar_lock_occurrence(NULL)") }
+        assertThrows(DataAccessException::class.java) { runtime.queryForList("SELECT * FROM calendar_lock_occurrence('00000000-0000-0000-0000-000000000000')") }
+        assertThrows(DataAccessException::class.java) { runtime.queryForObject("SELECT calendar_complete_occurrence_handoff(?,?,?,?,?)",Boolean::class.java,UUID.randomUUID(),UUID.randomUUID(),1,UUID.randomUUID(),Timestamp.from(CalendarFixtures.now)) }
+    }
+
+    @Test fun `atomic handoff emits once replays lost response and never creates email intent`() {
+        val (url,database)=isolatedDatabase("handoff_once"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        enableOperationalEmailPreference(database,admin.userId,url)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Atomic handoff",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant()
+        forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database)
+        clock.instant=due
+        val owner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID()))
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner)).records.single()
+        val emitted=assertInstanceOf(CalendarOccurrenceHandoffResult.Emitted::class.java,CalendarOccurrenceHandoffService(repository).handoff(lease))
+        assertEquals("EMITTED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences WHERE id=?",String::class.java,lease.occurrence.id.value))
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs WHERE occurrence_id=?",Int::class.java,lease.occurrence.id.value))
+        val source=database.queryForMap("SELECT * FROM notification_source_events WHERE delivery_id=?",lease.occurrence.id.value)
+        assertEquals("SYSTEM_CAMPAIGN",source["source_type"]); assertEquals("CAMPAIGN",source["category"]); assertEquals("INFO",source["severity"])
+        assertEquals("CALENDAR_REMINDER_DUE",source["condition_code"]); assertEquals(lease.occurrence.id.value.toString(),source["episode_key"])
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_email_outbox",Int::class.java))
+        val replay=assertInstanceOf(CalendarOccurrenceHandoffResult.Replayed::class.java,CalendarOccurrenceHandoffService(repository).handoff(lease))
+        assertEquals(emitted.alertId,replay.alertId)
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        val staleOwner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID()))
+        val staleOccurrence=requireNotNull(CalendarReminderOccurrence.restore(lease.occurrence.id,lease.occurrence.eventId,lease.occurrence.approvedDefinitionRevision,lease.occurrence.ruleId,lease.occurrence.scheduledAt,CalendarOccurrenceState.LEASED,lease.token.attempt,staleOwner.value,lease.leaseUntil))
+        val stale=requireNotNull(CalendarOccurrenceLease.from(staleOccurrence,lease.observedAt,lease.leaseGrantedAt))
+        assertSame(CalendarOccurrenceHandoffResult.LostFence,CalendarOccurrenceHandoffService(repository).handoff(stale))
+        val staleAttemptOccurrence=requireNotNull(CalendarReminderOccurrence.restore(lease.occurrence.id,lease.occurrence.eventId,lease.occurrence.approvedDefinitionRevision,lease.occurrence.ruleId,lease.occurrence.scheduledAt,CalendarOccurrenceState.LEASED,lease.token.attempt+1,lease.token.owner.value,lease.leaseUntil))
+        val staleAttempt=requireNotNull(CalendarOccurrenceLease.from(staleAttemptOccurrence,lease.observedAt,lease.leaseGrantedAt))
+        assertSame(CalendarOccurrenceHandoffResult.LostFence,CalendarOccurrenceHandoffService(repository).handoff(staleAttempt))
+    }
+
+    @Test fun `replay validates evidence before stale fence classification`() {
+        val (url,database)=isolatedDatabase("handoff_corrupt_replay"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Corrupt replay",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+        assertInstanceOf(CalendarOccurrenceHandoffResult.Emitted::class.java,CalendarOccurrenceHandoffService(repository).handoff(lease))
+        database.execute("ALTER TABLE calendar_occurrence_handoffs DISABLE TRIGGER trg_calendar_handoff_immutable")
+        try { database.update("UPDATE calendar_occurrence_handoffs SET attempt=attempt+1 WHERE occurrence_id=?",lease.occurrence.id.value) }
+        finally { database.execute("ALTER TABLE calendar_occurrence_handoffs ENABLE TRIGGER trg_calendar_handoff_immutable") }
+        val staleOwner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID()))
+        val staleOccurrence=requireNotNull(CalendarReminderOccurrence.restore(lease.occurrence.id,lease.occurrence.eventId,lease.occurrence.approvedDefinitionRevision,lease.occurrence.ruleId,lease.occurrence.scheduledAt,CalendarOccurrenceState.LEASED,lease.token.attempt,staleOwner.value,lease.leaseUntil))
+        val stale=requireNotNull(CalendarOccurrenceLease.from(staleOccurrence,lease.observedAt,lease.leaseGrantedAt))
+        assertSame(CalendarOccurrenceHandoffResult.Corrupt,CalendarOccurrenceHandoffService(repository).handoff(stale))
+    }
+
+    @Test fun `partial handoff evidence corruption always fails closed without extra effects`() {
+        val (url,database)=isolatedDatabase("handoff_partial_corruption"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        fun emitted(title: String): CalendarOccurrenceLease {
+            clock.instant=CalendarFixtures.now
+            val rule=CalendarFixtures.rule(600); val event=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title=title,rules=listOf(rule))))
+            val occurrenceId=database.queryForObject("SELECT id FROM calendar_reminder_occurrences WHERE event_id=?",UUID::class.java,event.id.value)!!
+            val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences WHERE id=?",Timestamp::class.java,occurrenceId)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+            val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single { it.occurrence.id.value==occurrenceId }
+            assertInstanceOf(CalendarOccurrenceHandoffResult.Emitted::class.java,CalendarOccurrenceHandoffService(repository).handoff(lease))
+            return lease
+        }
+
+        val missing=emitted("Missing evidence")
+        database.execute("ALTER TABLE calendar_occurrence_handoffs DISABLE TRIGGER trg_calendar_handoff_immutable")
+        try { database.update("DELETE FROM calendar_occurrence_handoffs WHERE occurrence_id=?",missing.occurrence.id.value) }
+        finally { database.execute("ALTER TABLE calendar_occurrence_handoffs ENABLE TRIGGER trg_calendar_handoff_immutable") }
+        assertSame(CalendarOccurrenceHandoffResult.Corrupt,CalendarOccurrenceHandoffService(repository).handoff(missing))
+
+        val nonEmitted=emitted("Evidence on leased state")
+        database.execute("ALTER TABLE calendar_reminder_occurrences DISABLE TRIGGER trg_calendar_occurrence_worker")
+        database.execute("ALTER TABLE calendar_reminder_occurrences DISABLE TRIGGER trg_calendar_occurrence_handoff_consistency")
+        try { database.update("""UPDATE calendar_reminder_occurrences SET state='LEASED',next_attempt_at=NULL,lease_owner=?,lease_started_at=?,lease_until=?,terminal_reason=NULL,terminal_at=NULL,last_failure_class=NULL WHERE id=?""",
+            nonEmitted.token.owner.value,Timestamp.from(clock.instant),Timestamp.from(clock.instant.plusSeconds(60)),nonEmitted.occurrence.id.value) }
+        finally {
+            database.execute("ALTER TABLE calendar_reminder_occurrences ENABLE TRIGGER trg_calendar_occurrence_handoff_consistency")
+            database.execute("ALTER TABLE calendar_reminder_occurrences ENABLE TRIGGER trg_calendar_occurrence_worker")
+        }
+        assertSame(CalendarOccurrenceHandoffResult.Corrupt,CalendarOccurrenceHandoffService(repository).handoff(nonEmitted))
+
+        val badSource=emitted("Bad source hash")
+        database.execute("ALTER TABLE notification_source_events DISABLE TRIGGER trg_notification_source_immutable")
+        database.execute("ALTER TABLE notification_source_events DROP CONSTRAINT notification_source_events_check1")
+        try { database.update("UPDATE notification_source_events SET event_hash=? WHERE delivery_id=?","0".repeat(64),badSource.occurrence.id.value) }
+        finally { database.execute("ALTER TABLE notification_source_events ENABLE TRIGGER trg_notification_source_immutable") }
+        assertSame(CalendarOccurrenceHandoffResult.Corrupt,CalendarOccurrenceHandoffService(repository).handoff(badSource))
+
+        val badAlert=emitted("Bad alert identity")
+        database.execute("ALTER TABLE notification_alerts DISABLE TRIGGER trg_notification_projection")
+        database.execute("ALTER TABLE notification_alerts DISABLE TRIGGER trg_calendar_alert_handoff_consistency")
+        try { database.update("UPDATE notification_alerts SET severity='WARNING' WHERE source_type='SYSTEM_CAMPAIGN' AND source_id=?",badAlert.occurrence.id.value.toString()) }
+        finally {
+            database.execute("ALTER TABLE notification_alerts ENABLE TRIGGER trg_calendar_alert_handoff_consistency")
+            database.execute("ALTER TABLE notification_alerts ENABLE TRIGGER trg_notification_projection")
+        }
+        assertSame(CalendarOccurrenceHandoffResult.Corrupt,CalendarOccurrenceHandoffService(repository).handoff(badAlert))
+        assertEquals(4,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(4,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(3,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+    }
+
+    @Test fun `concurrent handoff has one emission and one replay with one alert`() {
+        val (url,database)=isolatedDatabase("handoff_race"); val clock=MutableCalendarClock(); val setup=handoffRepo(clock,url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(setup,admin,create(setup,admin,CalendarFixtures.definition(title="Concurrent handoff",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,setup).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+        val barrier=CyclicBarrier(2); val pool=Executors.newFixedThreadPool(2)
+        try {
+            val results=(1..2).map { pool.submit<CalendarOccurrenceHandoffResult> { barrier.await(); CalendarOccurrenceHandoffService(handoffRepo(clock,url)).handoff(lease) } }.map { it.get(15,TimeUnit.SECONDS) }
+            assertEquals(1,results.count { it is CalendarOccurrenceHandoffResult.Emitted }); assertEquals(1,results.count { it is CalendarOccurrenceHandoffResult.Replayed })
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+        } finally { pool.shutdownNow() }
+    }
+
+    @Test fun `concurrent alternative delivery for reserved episode never masquerades as created handoff`() {
+        val (url,database)=isolatedDatabase("handoff_alternative_delivery"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Alternative delivery",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+        val identity=lease.occurrence.id.value.toString().lowercase()
+        val alternative=requireNotNull(NotificationSourceEvent.create(
+            requireNotNull(NotificationDeliveryId.fromWire(UUID.randomUUID())),
+            requireNotNull(NotificationSourceIdentity.create(NotificationSourceType.SYSTEM_CAMPAIGN,requireNotNull(NotificationSourceId.fromWire(identity)))),
+            NotificationCategory.CAMPAIGN,NotificationSeverity.INFO,requireNotNull(NotificationConditionCode.fromWire("CALENDAR_REMINDER_DUE")),requireNotNull(NotificationEpisodeKey.fromWire(identity)),
+        ))
+        val source=runtime(url); val jdbc=JdbcTemplate(source); val transactions=TransactionTemplate(DataSourceTransactionManager(source))
+        val producer=JdbcNotificationPersistence(jdbc,transactions,jacksonObjectMapper(),Clock.fixed(clock.instant,ZoneOffset.UTC))
+        val barrier=CyclicBarrier(2); val pool=Executors.newFixedThreadPool(2)
+        try {
+            val handoffFuture=pool.submit<CalendarOccurrenceHandoffResult> { barrier.await(); CalendarOccurrenceHandoffService(repository).handoff(lease) }
+            val alternativeFuture=pool.submit<NotificationIngestionResult> { barrier.await(); producer.ingest(alternative) }
+            val handoff=assertInstanceOf(CalendarOccurrenceHandoffResult.Emitted::class.java,handoffFuture.get(15,TimeUnit.SECONDS))
+            val rejected=assertThrows(java.util.concurrent.ExecutionException::class.java) { alternativeFuture.get(15,TimeUnit.SECONDS) }
+            assertInstanceOf(org.springframework.transaction.TransactionSystemException::class.java,rejected.cause)
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE delivery_id=?",Int::class.java,lease.occurrence.id.value))
+            assertEquals("EMITTED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
+            assertEquals(1,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+        } finally { pool.shutdownNow() }
+    }
+
+    @Test fun `valid third lease can skip after disable while expired third lease remains dead`() {
+        val (url,database)=isolatedDatabase("handoff_third"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Third handoff",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val owner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())); val worker=CalendarOccurrenceWorkerService(clock,repository)
+        val first=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single(); clock.instant=first.leaseUntil
+        val second=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single(); clock.instant=second.leaseUntil
+        val third=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single()
+        forceSwitch(CalendarSwitchState.DISABLED,clock.instant,clock.instant.plusSeconds(3600),database)
+        val skipped=assertInstanceOf(CalendarOccurrenceHandoffResult.Skipped::class.java,CalendarOccurrenceHandoffService(repository).handoff(third))
+        assertEquals(CalendarOccurrenceTerminalReason.SWITCH_DISABLED,skipped.reason); assertEquals("SKIPPED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
+        assertEquals(3,database.queryForObject("SELECT attempts FROM calendar_reminder_occurrences",Int::class.java)); assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+    }
+
+    @Test fun `every handoff guard can terminalize a still valid third lease without effects`() {
+        val (url,database)=isolatedDatabase("handoff_third_guards"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        data class ThirdFixture(val event: CalendarEvent,val rule: CalendarReminderRule,val due: Instant,val lease: CalendarOccurrenceLease)
+        fun third(title: String,offset: Long=600,thirdAt: (Instant,CalendarEvent)->Instant = { due,_->due.plusSeconds(120) },endAfterStart: Long=7200): ThirdFixture {
+            clock.instant=CalendarFixtures.now
+            val rule=CalendarFixtures.rule(offset); val start=CalendarFixtures.now.plusSeconds(3600)
+            val event=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title=title,start=start,end=start.plusSeconds(endAfterStart),rules=listOf(rule))))
+            val due=event.definition.start.instant.minusSeconds(rule.offsetSeconds)
+            forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(20_000),database)
+            val worker=CalendarOccurrenceWorkerService(clock,repository); val owner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID()))
+            clock.instant=due
+            val first=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single { it.occurrence.eventId==event.id }
+            clock.instant=first.leaseUntil
+            val second=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single { it.occurrence.eventId==event.id }
+            clock.instant=thirdAt(due,event)
+            assertTrue(clock.instant>=second.leaseUntil)
+            val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(owner)).records.single { it.occurrence.eventId==event.id }
+            assertEquals(3,lease.token.attempt)
+            return ThirdFixture(event,rule,due,lease)
+        }
+        fun assertSkipped(fixture: ThirdFixture,reason: CalendarOccurrenceTerminalReason) {
+            val result=assertInstanceOf(CalendarOccurrenceHandoffResult.Skipped::class.java,CalendarOccurrenceHandoffService(repository).handoff(fixture.lease))
+            assertEquals(reason,result.reason)
+            val row=database.queryForMap("SELECT state,attempts,lease_owner,lease_until,terminal_reason FROM calendar_reminder_occurrences WHERE id=?",fixture.lease.occurrence.id.value)
+            assertEquals("SKIPPED",row["state"]); assertEquals(3,(row["attempts"] as Number).toInt()); assertNull(row["lease_owner"]); assertNull(row["lease_until"]); assertEquals(reason.wire,row["terminal_reason"])
+            assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE delivery_id=?",Int::class.java,fixture.lease.occurrence.id.value))
+            assertEquals(0,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs WHERE occurrence_id=?",Int::class.java,fixture.lease.occurrence.id.value))
+        }
+
+        val late=third("Third late",thirdAt={ due,_->due.plusSeconds(900) }); clock.instant=late.due.plusSeconds(901); assertSkipped(late,CalendarOccurrenceTerminalReason.LATE)
+        val disabled=third("Third disabled"); forceSwitch(CalendarSwitchState.DISABLED,clock.instant,clock.instant.plusSeconds(3600),database); assertSkipped(disabled,CalendarOccurrenceTerminalReason.SWITCH_DISABLED)
+        val expired=third("Third expired"); forceSwitch(CalendarSwitchState.ENABLED,expired.due.minusSeconds(1),clock.instant.plusSeconds(1),database); clock.instant=clock.instant.plusSeconds(1); assertSkipped(expired,CalendarOccurrenceTerminalReason.SWITCH_EXPIRED)
+        val reenabled=third("Third re-enabled"); forceSwitch(CalendarSwitchState.ENABLED,reenabled.due,clock.instant.plusSeconds(3600),database); assertSkipped(reenabled,CalendarOccurrenceTerminalReason.ENABLE_CUTOFF)
+
+        val changed=third("Third definition changed")
+        val replacement=CalendarFixtures.definition(1,"Replacement",changed.event.definition.start.instant,changed.event.definition.end.instant,listOf(changed.rule))
+        val replacementEvent=CalendarEvent.restore(changed.event.id,changed.event.revision.next()!!,CalendarLifecycle.SCHEDULED,replacement,replacement.revision,changed.event.createdAt)!!
+        val codec=CalendarSnapshotCodec(jacksonObjectMapper(),CalendarFixtures.hasher)
+        database.execute("ALTER TABLE calendar_definitions DISABLE TRIGGER trg_calendar_rules_definition")
+        try { database.update("INSERT INTO calendar_definitions(event_id,definition_revision,definition_hash,snapshot) VALUES(?,?,?,?::jsonb)",changed.event.id.value,replacement.revision.value,replacement.hash.value,codec.definition(replacement)) }
+        finally { database.execute("ALTER TABLE calendar_definitions ENABLE TRIGGER trg_calendar_rules_definition") }
+        database.update("INSERT INTO calendar_reminder_rules(event_id,definition_revision,rule_id,channel,offset_seconds) VALUES(?,?,?,?,?)",changed.event.id.value,replacement.revision.value,changed.rule.id.value,changed.rule.channel.wire,changed.rule.offsetSeconds)
+        database.execute("ALTER TABLE calendar_events DISABLE TRIGGER trg_calendar_event")
+        try { database.update("UPDATE calendar_events SET revision=?,definition_revision=?,snapshot=?::jsonb WHERE id=?",replacementEvent.revision.value,replacement.revision.value,codec.event(replacementEvent),changed.event.id.value) }
+        finally { database.execute("ALTER TABLE calendar_events ENABLE TRIGGER trg_calendar_event") }
+        assertSkipped(changed,CalendarOccurrenceTerminalReason.DEFINITION_CHANGED)
+
+        val paused=third("Third paused"); recorded(repository.change(admin,request(paused.event,CalendarStep.Pause))); assertSkipped(paused,CalendarOccurrenceTerminalReason.EVENT_INELIGIBLE)
+        val cancelled=third("Third cancelled"); recorded(repository.change(admin,request(cancelled.event,CalendarStep.Cancel))); assertSkipped(cancelled,CalendarOccurrenceTerminalReason.EVENT_INELIGIBLE)
+        val completed=third("Third completed",offset=300,thirdAt={ _,event->event.definition.end.instant },endAfterStart=1)
+        systemRecorded(repository.advance(requireNotNull(CalendarSystemCandidate.from(completed.event,completed.event.definition.end.instant))))
+        assertSkipped(completed,CalendarOccurrenceTerminalReason.EVENT_INELIGIBLE)
+        val resumed=third("Third resumed"); val pausedEvent=recorded(repository.change(admin,request(resumed.event,CalendarStep.Pause))).after; recorded(repository.change(admin,request(pausedEvent,CalendarStep.Resume))); assertSkipped(resumed,CalendarOccurrenceTerminalReason.RESUME_CUTOFF)
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_email_outbox",Int::class.java))
+    }
+
+    @Test fun `delivery lock wait crossing lease boundary loses fence without partial notification`() {
+        val (url,database)=isolatedDatabase("handoff_lock_expiry"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Blocked handoff",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+        val digest=java.security.MessageDigest.getInstance("SHA-256").digest("notification-delivery:${lease.occurrence.id.value}".toByteArray(Charsets.UTF_8))
+        val lockKey=java.nio.ByteBuffer.wrap(digest).long
+        val pool=Executors.newSingleThreadExecutor()
+        DriverManagerDataSource(url,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false
+            blocker.prepareStatement("SELECT pg_advisory_xact_lock(?)").use { statement -> statement.setLong(1,lockKey); statement.execute() }
+            val future=pool.submit<CalendarOccurrenceHandoffResult> { CalendarOccurrenceHandoffService(repository).handoff(lease) }
+            try {
+                awaitDatabase { database.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%pg_advisory_xact_lock%')",Boolean::class.java)!! }
+                clock.instant=lease.leaseUntil
+                blocker.commit()
+                assertSame(CalendarOccurrenceHandoffResult.LostFence,future.get(15,TimeUnit.SECONDS))
+            } finally { blocker.rollback(); pool.shutdownNow() }
+        }
+        assertEquals("LEASED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences WHERE id=?",String::class.java,lease.occurrence.id.value))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+    }
+
+    @Test fun `handoff lease boundary is half open and expired ownership can be taken over`() {
+        listOf(-1L,0L,1L).forEach { delta ->
+            val (url,database)=isolatedDatabase("handoff_boundary_${delta+1}"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+            val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Boundary $delta",rules=listOf(rule))))
+            val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+            val worker=CalendarOccurrenceWorkerService(clock,repository)
+            val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+            clock.instant=lease.leaseUntil.plusSeconds(delta)
+            val result=CalendarOccurrenceHandoffService(repository).handoff(lease)
+            if(delta<0) assertInstanceOf(CalendarOccurrenceHandoffResult.Emitted::class.java,result)
+            else assertSame(CalendarOccurrenceHandoffResult.LostFence,result)
+            assertEquals(if(delta<0) 1 else 0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+            if(delta>0) {
+                val takeover=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,worker.claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+                assertEquals(2,takeover.token.attempt)
+                assertSame(CalendarOccurrenceHandoffResult.LostFence,CalendarOccurrenceHandoffService(repository).handoff(lease))
+            }
+        }
+    }
+
+    @Test fun `notification projection failure rolls back alert source and occurrence handoff`() {
+        val (url,database)=isolatedDatabase("handoff_rollback"); val clock=MutableCalendarClock(); val source=runtime(url); val jdbc=JdbcTemplate(source); val transactions=TransactionTemplate(DataSourceTransactionManager(source))
+        val repository=handoffRepo(clock,jdbc,transactions,NotificationEmailIntentProjection { throw IllegalStateException("projection fixture failure") }); val admin=actor(database=database)
+        val rule=CalendarFixtures.rule(600); schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Rollback handoff",rules=listOf(rule))))
+        val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences",Timestamp::class.java)!!.toInstant(); forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single()
+        assertThrows(IllegalStateException::class.java) { CalendarOccurrenceHandoffService(repository).handoff(lease) }
+        assertEquals("LEASED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences WHERE id=?",String::class.java,lease.occurrence.id.value))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+    }
+
+    @Test fun `every handoff write failure rolls back the whole transaction`() {
+        val (url,database)=isolatedDatabase("handoff_write_failures"); val clock=MutableCalendarClock(); val repository=handoffRepo(clock,url); val admin=actor(database=database)
+        database.execute("CREATE FUNCTION calendar_fixture_handoff_fail() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'} BEGIN RAISE EXCEPTION 'handoff fixture failure'; END ${'$'}${'$'}")
+        database.execute("CREATE FUNCTION calendar_fixture_handoff_drop() RETURNS trigger LANGUAGE plpgsql AS ${'$'}${'$'} BEGIN RETURN NULL; END ${'$'}${'$'}")
+        val targets=listOf(
+            "BEFORE INSERT ON notification_alerts",
+            "BEFORE INSERT ON notification_source_events",
+            "BEFORE INSERT ON calendar_occurrence_handoffs",
+            "BEFORE UPDATE ON calendar_reminder_occurrences",
+        )
+        try {
+            targets.forEachIndexed { index,target ->
+                clock.instant=CalendarFixtures.now
+                val rule=CalendarFixtures.rule(600); val event=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Write rollback $index",rules=listOf(rule))))
+                val occurrenceId=database.queryForObject("SELECT id FROM calendar_reminder_occurrences WHERE event_id=?",UUID::class.java,event.id.value)!!
+                val due=database.queryForObject("SELECT scheduled_at FROM calendar_reminder_occurrences WHERE id=?",Timestamp::class.java,occurrenceId)!!.toInstant()
+                forceSwitch(CalendarSwitchState.ENABLED,due.minusSeconds(1),due.plusSeconds(3600),database); clock.instant=due
+                val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID())))).records.single { it.occurrence.id.value==occurrenceId }
+                val fixtureFunction=if(target.startsWith("BEFORE UPDATE")) "calendar_fixture_handoff_drop" else "calendar_fixture_handoff_fail"
+                database.execute("CREATE TRIGGER fixture_handoff_failure $target FOR EACH ROW EXECUTE FUNCTION $fixtureFunction()")
+                try { assertThrows(DataAccessException::class.java) { CalendarOccurrenceHandoffService(repository).handoff(lease) } }
+                finally { database.execute("DROP TRIGGER fixture_handoff_failure ON ${target.substringAfter(" ON ")}") }
+                assertEquals("LEASED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences WHERE id=?",String::class.java,occurrenceId))
+                assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN' AND source_id=?",Int::class.java,occurrenceId.toString()))
+                assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_source_events WHERE delivery_id=?",Int::class.java,occurrenceId))
+                assertEquals(0,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs WHERE occurrence_id=?",Int::class.java,occurrenceId))
+            }
+        } finally { database.execute("DROP FUNCTION calendar_fixture_handoff_fail()"); database.execute("DROP FUNCTION calendar_fixture_handoff_drop()") }
     }
 
     @Test fun `occurrence claim leases retries fences stale owners and dies on third proven failure`() {

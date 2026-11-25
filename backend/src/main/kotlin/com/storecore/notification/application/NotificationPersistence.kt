@@ -30,8 +30,17 @@ sealed interface NotificationExecutionResult {
     data object IdempotencyConflict : NotificationExecutionResult
     data object Unknown : NotificationExecutionResult
 }
+enum class NotificationIngestionDisposition {
+    CREATED, DELIVERY_REPLAY, EPISODE_REUSED, DELIVERY_CONFLICT, UNKNOWN;
+}
+
 sealed interface NotificationIngestionResult {
-    class Recorded(val alert: NotificationAlert) : NotificationIngestionResult
+    class Recorded private constructor(val alert: NotificationAlert,val disposition: NotificationIngestionDisposition) : NotificationIngestionResult {
+        companion object {
+            fun from(alert: NotificationAlert,disposition: NotificationIngestionDisposition)=
+                if(disposition in setOf(NotificationIngestionDisposition.CREATED,NotificationIngestionDisposition.DELIVERY_REPLAY,NotificationIngestionDisposition.EPISODE_REUSED)) Recorded(alert,disposition) else null
+        }
+    }
     data object DeliveryConflict : NotificationIngestionResult
     data object Unknown : NotificationIngestionResult
 }
