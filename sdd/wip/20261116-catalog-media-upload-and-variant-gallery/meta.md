@@ -95,7 +95,9 @@ Verify `45574676365` 7/7, dos Grok 4.7 APPROVED) deriva
 `PrivateTmp=true`; no cierra cuota global ni `Ready`. PR #389 (head
 `c847ca9`, merge `d6d1f93`, Verify `45627692228` 7/7, dos Grok 4.7
 APPROVED) deja `ProtectHome` fuera (`ENXIO`); no cierra cuota global ni
-`Ready`. PR #326 arranca
+`Ready`. PR #391 (head `d9d1913`, merge `5f77f39`, Verify `45635171309`
+7/7, dos Grok 4.7 APPROVED) deriva `PrivateDevices=true`; no cierra
+cuota global ni `Ready`. PR #326 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
 bloqueada; no devuelve `Ready` ni cierra el agregado. Siguen abiertos

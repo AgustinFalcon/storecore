@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #391, 003B-4C sigue abierto
+
+- Merge #391 `5f77f39d741786ad82451528b2cc0ea24323252b` sobre candidato
+  `d9d191399590618d45df860b6b8ea7b2605c1d4f`. Verify exact-head
+  `45635171309` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr391-architecture.md`
+  y `sdd/reviews/20261125-sol-pr391-security.md`.
+- El harness deriva `PrivateDevices=true` y PID 1 lo lee. No se marca
+  `003B-4C`. No hay `CPUQuota`, familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — arranque 4C PrivateDevices del worker
 
 - El harness deriva `PrivateDevices=true` y PID 1 lo lee. `ProtectHome`,
