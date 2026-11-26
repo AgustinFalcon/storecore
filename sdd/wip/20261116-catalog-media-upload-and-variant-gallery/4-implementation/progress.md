@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C FD del origen tras el seal
+
+- `copy_snapshot` publica un inode nuevo. El harness PID 1 mantiene el
+  FD del origen abierto y prueba overwrite, crecimiento y truncado
+  sin alterar el snapshot del tmpfs.
+- No se marca `003B-4C`. No hay mmap, familia de sockets, `Ready` ni
+  HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #424, 003B-4C sigue abierto
 
 - Merge #424 `abfc24c1a623707e62014279eaa6f953b857c519` sobre candidato
