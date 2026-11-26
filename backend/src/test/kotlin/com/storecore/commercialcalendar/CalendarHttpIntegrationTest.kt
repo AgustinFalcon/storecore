@@ -73,7 +73,7 @@ class CalendarHttpIntegrationTest @Autowired constructor(private val http: TestR
     private fun runtimeSource()=object: DriverManagerDataSource(postgres.jdbcUrl,postgres.username,postgres.password) { override fun getConnection(): Connection=super.getConnection().also { it.createStatement().use { s -> s.execute("SET ROLE storecore_runtime") } } }
     private fun runtimeQueries(): JdbcCalendarQueries {
         val source=runtimeSource(); val jdbc=JdbcTemplate(source); val tx=TransactionTemplate(DataSourceTransactionManager(source)); val hasher=Sha256CalendarHasher()
-        return JdbcCalendarQueries(jdbc,tx,mapper,hasher,JdbcCalendarPersistence(jdbc,tx,mapper,SystemCalendarClock(),RandomCalendarIds(),hasher))
+        return JdbcCalendarQueries(jdbc,tx,mapper,hasher,JdbcCalendarPersistence(jdbc,tx,mapper,SystemCalendarClock(),RandomCalendarIds(),hasher,CalendarReminderRuntimeAdmissionPort { CalendarReminderRuntimeAdmission.ADMITTED }))
     }
     @Test fun `create lost response recovery exact replay edit preflight approval and immutable historical audit are HTTP contracts`() {
         val admin=provision(); val key=UUID.randomUUID().toString(); val initialDefinition=definition(); val initialToken=admin.csrf

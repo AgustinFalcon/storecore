@@ -2,11 +2,11 @@
 
 Date: 2026-11-26
 
-## Exact reviewed delivery
+## Delivery identity
 
 - Pull request: `#415`, `feat: deliver commercial coordination and reporting`.
 - Base: `master`.
-- Reviewed and gated head: `3f1bdf0d586a157d93e3983bcb79b2be372fdcc4`.
+- Delivered feature head: `3f1bdf0d586a157d93e3983bcb79b2be372fdcc4`.
 - Merge commit on `master`: `52922f5edd043d73563bba43467dab58613fbab9`.
 - Merged at: `2026-11-26T16:37:03Z`.
 
@@ -14,21 +14,31 @@ The merge contains the previously reviewed calendar activation cuts and the
 reporting delivery cuts. It does not activate SMTP, Mercado Pago, Mercado
 Libre, BlackStore, fiscal, carrier or any other external provider.
 
-## Review evidence
+## Governance correction
 
-- Calendar close-out: two independent GPT-6.1 Sol reviews approved the final
-  concurrency, no-backfill, closed-type and presentation repairs with no open
-  P0–P3 findings. The detailed local evidence remains in
-  `pcc-009-local-validation-20261125.md`.
-- Reporting close-out: independent GPT-6.1 Sol architecture/security and
-  UX/accessibility reviews returned GO / APPROVE with no P0–P3 findings. The
-  detailed exact implementation and local suites remain in
-  `pcc-012e-report-export-browser-20261126.md`.
+PR `#415` was merged without the two mandatory review receipts persisted
+against its final feature head. Earlier slice reviews and local evidence exist,
+but they do not satisfy that final-head gate and are not represented here as
+if they did. The reviews requested after merge are corrective reviews, not
+retroactive pre-merge approval.
+
+Those corrective reviews found two real gaps. UX/SDD found a stale route in
+the technical specification (`/user/channel-reports` instead of the delivered
+`/user/reports`). Architecture/security found that reminder claim and handoff
+did not revalidate the capability state and kill switch after the local
+reminder switch had been enabled. PR `#417` owns both corrections, including a
+closed runtime-admission type, fail-closed translation, serialization with
+capability administration and PostgreSQL regression coverage.
 
 ## Hosted CI evidence
 
-GitHub Actions run `45856138284` completed successfully on the exact reviewed
-head. All seven jobs passed:
+GitHub Actions run `45856138284` was associated with PR head
+`3f1bdf0d586a157d93e3983bcb79b2be372fdcc4`, but GitHub Actions executed the
+synthetic pull-request merge SHA
+`049002adea38c3bca9fa95b5ee886b72b1bbd258`, built against base
+`cca4c899936a59d602baae49ab7ec34d735778b9`. It therefore must not be
+described as an exact-head run. All
+seven jobs passed:
 
 - `repository-hygiene` — 10 s;
 - `frontend` — 6 min 4 s;
@@ -44,13 +54,16 @@ the production Angular build and Chromium under the isolated Linux contract.
 
 ## Gate result
 
-PCC-008 and PCC-009 are complete: the bounded calendar UI, local runner
-activation and reminder flow have independent reviews, hosted CI and a merge
-on `master`.
+The feature implementation is present on `master`, but the close-out gate is
+complete only after PR `#417` has two persisted independent GPT-6.1 Sol
+approvals, green hosted CI and a merge. Its runtime repair must prove that a
+non-active capability or action kill blocks both claim and not-yet-emitted
+handoff, including a kill created concurrently with admission.
 
-PCC-013 is complete: the consolidated report, partial/unavailable semantics,
-safe CSV delivery and responsive browser journeys have independent reviews,
-hosted CI and a merge on `master`.
+The consolidated report, partial/unavailable semantics, safe CSV delivery and
+responsive browser journeys remain delivered. The specification route
+correction is part of the same PR `#417` close-out.
 
-The next authorized delivery slice is loyalty (`PCC-014` onward). Live
-provider credentials, deployment and homologation remain outside this gate.
+Loyalty (`PCC-014` onward) does not start until that gate is actually closed.
+Live provider credentials, deployment and homologation remain outside this
+gate.

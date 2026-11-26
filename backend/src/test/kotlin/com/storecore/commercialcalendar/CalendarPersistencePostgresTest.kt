@@ -6,7 +6,8 @@ import com.storecore.commercialcalendar.domain.*
 import com.storecore.commercialcalendar.infrastructure.*
 import com.storecore.identity.domain.*
 import com.storecore.configuration.application.*
-import com.storecore.configuration.domain.CapabilityActor
+import com.storecore.configuration.domain.*
+import com.storecore.configuration.infrastructure.JdbcCapabilityService
 import com.storecore.notification.application.NotificationEmailReadinessPort
 import com.storecore.notification.application.NotificationEmailIntentProjection
 import com.storecore.notification.application.NotificationIngestionResult
@@ -50,21 +51,22 @@ class CalendarPersistencePostgresTest {
     }
     private fun repo(clock: CalendarClock=MutableCalendarClock(),ids: CalendarIds=RandomCalendarIds(),url: String=postgres.jdbcUrl): JdbcCalendarPersistence {
         val source=runtime(url)
-        return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,ids,CalendarFixtures.hasher)
+        return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,ids,CalendarFixtures.hasher,CalendarReminderRuntimeAdmissionPort { CalendarReminderRuntimeAdmission.ADMITTED })
     }
     private fun repo(connection: Connection,clock: CalendarClock=MutableCalendarClock()): JdbcCalendarPersistence {
         val source=SingleConnectionDataSource(connection,true)
-        return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,RandomCalendarIds(),CalendarFixtures.hasher)
+        return JdbcCalendarPersistence(JdbcTemplate(source),TransactionTemplate(DataSourceTransactionManager(source)),jacksonObjectMapper(),clock,RandomCalendarIds(),CalendarFixtures.hasher,CalendarReminderRuntimeAdmissionPort { CalendarReminderRuntimeAdmission.ADMITTED })
     }
     private fun handoffRepo(clock: CalendarClock,url: String=postgres.jdbcUrl): JdbcCalendarPersistence {
         val source=runtime(url); val jdbc=JdbcTemplate(source)
         return handoffRepo(clock,jdbc,TransactionTemplate(DataSourceTransactionManager(source)),JdbcNotificationEmailProjection(jdbc,NotificationEmailReadinessPort { NotificationEmailReadiness.READY }))
     }
-    private fun handoffRepo(clock: CalendarClock,jdbc: JdbcTemplate,transactions: TransactionTemplate,emailProjection: NotificationEmailIntentProjection): JdbcCalendarPersistence {
+    private fun handoffRepo(clock: CalendarClock,jdbc: JdbcTemplate,transactions: TransactionTemplate,emailProjection: NotificationEmailIntentProjection,
+        admission: CalendarReminderRuntimeAdmissionPort = CalendarReminderRuntimeAdmissionPort { CalendarReminderRuntimeAdmission.ADMITTED }): JdbcCalendarPersistence {
         val mapper=jacksonObjectMapper()
         val notificationClock=Clock.fixed(clock.now(),ZoneOffset.UTC)
         val notifications=JdbcNotificationPersistence(jdbc,transactions,mapper,notificationClock,emailProjection)
-        return JdbcCalendarPersistence(jdbc,transactions,mapper,clock,RandomCalendarIds(),CalendarFixtures.hasher,notifications)
+        return JdbcCalendarPersistence(jdbc,transactions,mapper,clock,RandomCalendarIds(),CalendarFixtures.hasher,admission,notifications)
     }
     private fun switchRepo(clock: CalendarClock=MutableCalendarClock(),active: Boolean=true,url: String=postgres.jdbcUrl): JdbcCalendarSwitchPersistence {
         val source=runtime(url)
@@ -209,7 +211,7 @@ class CalendarPersistencePostgresTest {
         flyway(url,"35").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val history=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("39",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("40",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=35 ORDER BY installed_rank"))
         assertEquals(0,flyway(url).migrate().migrationsExecuted); flyway(url).validate()
         for(database in listOf(root,upgraded)) {
@@ -235,9 +237,10 @@ class CalendarPersistencePostgresTest {
         flyway(url,"38").migrate()
         val database=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val published=database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank")
-        assertEquals("39",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("40",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(published,database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank"))
         assertEquals(1,database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='39' AND success",Int::class.java))
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='40' AND success",Int::class.java))
         assertEquals(0,flyway(url).migrate().migrationsExecuted)
         flyway(url).validate()
     }
@@ -459,6 +462,79 @@ class CalendarPersistencePostgresTest {
         val skipped=assertInstanceOf(CalendarOccurrenceHandoffResult.Skipped::class.java,CalendarOccurrenceHandoffService(repository).handoff(third))
         assertEquals(CalendarOccurrenceTerminalReason.SWITCH_DISABLED,skipped.reason); assertEquals("SKIPPED",database.queryForObject("SELECT state FROM calendar_reminder_occurrences",String::class.java))
         assertEquals(3,database.queryForObject("SELECT attempts FROM calendar_reminder_occurrences",Int::class.java)); assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+    }
+
+    @Test fun `capability state and kill are revalidated before claim and handoff`() {
+        val (url,database)=isolatedDatabase("runtime_admission"); val clock=MutableCalendarClock(); val admin=actor(database=database)
+        val source=runtime(url); val jdbc=JdbcTemplate(source); val transactions=TransactionTemplate(DataSourceTransactionManager(source))
+        val admission=JdbcCalendarReminderRuntimeAdmission(jdbc)
+        val repository=handoffRepo(clock,jdbc,transactions,JdbcNotificationEmailProjection(jdbc,NotificationEmailReadinessPort { NotificationEmailReadiness.READY }),admission)
+        val administration=JdbcCapabilityService(database)
+        fun version()=database.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='COMMERCIAL_CALENDAR'",Int::class.java)!!
+        fun state(value: CapabilityState)=administration.changeState(admin,"COMMERCIAL_CALENDAR",value,version(),"Calendar runtime admission fixture",UUID.randomUUID())
+
+        state(CapabilityState.ACTIVE)
+        assertEquals(CalendarReminderRuntimeAdmission.ADMITTED,admission.admit())
+        listOf(CapabilityState.DISABLED,CapabilityState.READ_ONLY,CapabilityState.PAUSED).forEach { blockedState ->
+            state(blockedState)
+            assertEquals(CalendarReminderRuntimeAdmission.BLOCKED,admission.admit(),blockedState.name)
+            state(CapabilityState.ACTIVE)
+        }
+        state(CapabilityState.ERROR)
+        assertEquals(CalendarReminderRuntimeAdmission.BLOCKED,admission.admit(),CapabilityState.ERROR.name)
+        state(CapabilityState.DISABLED)
+        state(CapabilityState.ACTIVE)
+        val blockedRule=CalendarFixtures.rule(600)
+        val blockedEvent=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Blocked before claim",rules=listOf(blockedRule))))
+        val blockedDue=blockedEvent.definition.start.instant.minusSeconds(blockedRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,blockedDue.minusSeconds(1),blockedDue.plusSeconds(3600),database)
+        state(CapabilityState.DISABLED); clock.instant=blockedDue
+        val owner=requireNotNull(CalendarLeaseOwner.fromWire(UUID.randomUUID()))
+        val blocked=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner))
+        assertEquals(1,blocked.skipped); assertEquals(0,blocked.leased)
+        assertEquals("CAPABILITY_BLOCKED",database.queryForObject("SELECT terminal_reason FROM calendar_reminder_occurrences WHERE event_id=?",String::class.java,blockedEvent.id.value))
+
+        state(CapabilityState.ACTIVE); clock.instant=CalendarFixtures.now
+        val killedRule=CalendarFixtures.rule(300)
+        val killedEvent=schedule(repository,admin,create(repository,admin,CalendarFixtures.definition(title="Killed before handoff",rules=listOf(killedRule))))
+        val killedDue=killedEvent.definition.start.instant.minusSeconds(killedRule.offsetSeconds)
+        forceSwitch(CalendarSwitchState.ENABLED,killedDue.minusSeconds(1),killedDue.plusSeconds(3600),database); clock.instant=killedDue
+        val lease=assertInstanceOf(CalendarOccurrenceClaimResult.Page::class.java,CalendarOccurrenceWorkerService(clock,repository).claim(owner)).records.single()
+        administration.createKill(admin,"COMMERCIAL_CALENDAR","EMIT_IN_APP_CAMPAIGN_REMINDER","calendar-fixture","Stop reminder publication",Instant.now().plusSeconds(3600),"CAL-STOP",UUID.randomUUID())
+        val skipped=assertInstanceOf(CalendarOccurrenceHandoffResult.Skipped::class.java,CalendarOccurrenceHandoffService(repository).handoff(lease))
+        assertEquals(CalendarOccurrenceTerminalReason.CAPABILITY_BLOCKED,skipped.reason)
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM notification_alerts WHERE source_type='SYSTEM_CAMPAIGN'",Int::class.java))
+        assertEquals(0,database.queryForObject("SELECT count(*) FROM calendar_occurrence_handoffs",Int::class.java))
+    }
+
+    @Test fun `runtime admission waits for an in-flight kill creation and observes the committed kill`() {
+        val (url,database)=isolatedDatabase("runtime_admission_kill_race"); val admin=actor(database=database)
+        val administration=JdbcCapabilityService(database)
+        val version=database.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='COMMERCIAL_CALENDAR'",Int::class.java)!!
+        administration.changeState(admin,"COMMERCIAL_CALENDAR",CapabilityState.ACTIVE,version,"Calendar runtime admission race fixture",UUID.randomUUID())
+        val pool=Executors.newSingleThreadExecutor()
+        DriverManagerDataSource(url,postgres.username,postgres.password).connection.use { blocker ->
+            blocker.autoCommit=false
+            blocker.prepareStatement("SELECT action_code FROM capability_actions WHERE module_code='COMMERCIAL_CALENDAR' AND action_code='EMIT_IN_APP_CAMPAIGN_REMINDER' FOR UPDATE").use { statement ->
+                statement.executeQuery().use { rows -> assertTrue(rows.next()) }
+            }
+            val future=pool.submit<CalendarReminderRuntimeAdmission> {
+                JdbcCalendarReminderRuntimeAdmission(JdbcTemplate(runtime(url))).admit()
+            }
+            try {
+                awaitDatabase { database.queryForObject("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%calendar_reminder_runtime_admission%')",Boolean::class.java)!! }
+                blocker.prepareStatement("SELECT capability_session_create_kill_switch(?,?,?,?,?,?,?,?,?)").use { statement ->
+                    statement.setLong(1,admin.userId); statement.setObject(2,admin.sessionId)
+                    statement.setString(3,"COMMERCIAL_CALENDAR"); statement.setString(4,"EMIT_IN_APP_CAMPAIGN_REMINDER")
+                    statement.setString(5,"calendar-race-fixture"); statement.setString(6,"Stop concurrent reminder publication")
+                    statement.setTimestamp(7,Timestamp.from(Instant.now().plusSeconds(3600))); statement.setString(8,"CAL-RACE")
+                    statement.setObject(9,UUID.randomUUID()); statement.executeQuery().use { rows -> assertTrue(rows.next()) }
+                }
+                blocker.commit()
+                assertEquals(CalendarReminderRuntimeAdmission.BLOCKED,future.get(15,TimeUnit.SECONDS))
+            } finally { blocker.rollback(); pool.shutdownNow() }
+        }
+        assertEquals(1,database.queryForObject("SELECT count(*) FROM capability_kill_switches WHERE module_code='COMMERCIAL_CALENDAR' AND action_code='EMIT_IN_APP_CAMPAIGN_REMINDER' AND active",Int::class.java))
     }
 
     @Test fun `every handoff guard can terminalize a still valid third lease without effects`() {
