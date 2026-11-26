@@ -1,5 +1,18 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #420, 003B-4C sigue abierto
+
+- Merge #420 `9d2093289059784a38fdab9e9853fb56ff7c9a52` sobre candidato
+  `f63631a062d4c4d986cdd3445a6811d06637f663`. Verify exact-head
+  `45887600304` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261126-sol-pr420-architecture.md` y
+  `sdd/reviews/20261126-sol-pr420-security.md`.
+- El harness admite el primer job, rechaza el segundo con `JobLimit` y
+  PID 1 no carga el segundo `.mount`. No se marca `003B-4C`. No hay
+  `CPUQuota`, familia de sockets, terminales sin ACK, `Ready` ni HTTP
+  de media.
+
 ## 2026-11-26 — arranque 4C cuota global de jobs
 
 - `BrokerStore.allocate` con `jobs=1` admite el primero y rechaza el
