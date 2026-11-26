@@ -1,5 +1,16 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #416, 003B-4C sigue abierto
+
+- Merge #416 `36b08b83d1f80e7642a9fcdfe134a5a16794b9df` sobre candidato
+  `037fadb1429a4b39bff79c95cdbba1fe2cbe1e9a`. Verify exact-head
+  `45866580240` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr416-architecture.md`
+  y `sdd/reviews/20261126-sol-pr416-security.md`.
+- El harness deriva `LimitSTACK` (`RLIMIT_STACK`, 8 MiB) y PID 1 lo
+  lee. No se marca `003B-4C`. No hay `CPUQuota`, familia de sockets,
+  cuota global, `Ready` ni HTTP de media.
+
 ## 2026-11-26 — arranque 4C RLIMIT STACK del worker
 
 - El harness deriva `LimitSTACK` (`RLIMIT_STACK`, 8 MiB) y PID 1 lo
