@@ -11,7 +11,8 @@ PCC-015A delivered the pure Kotlin loyalty domain cut only: closed wire-to-domai
 - Reviewed and merged head: `ce1b13a85bfd2dd7ce580840f15d75d8113bff8b`
 - Architecture/domain/security receipt: `sdd/reviews/20261126-sol-pr425-architecture-security.md`
 - SDD/tests/traceability receipt: `sdd/reviews/20261126-sol-pr425-sdd-traceability.md`
-- Both GPT-6.1 Sol medium lanes rechecked the exact final head and returned `APPROVED` with no P0-P3 findings.
+- Both persisted receipts record the substantive reviewed head `894042b1f38a8097445c3d63e3a017cf18818081`.
+- Both GPT-6.1 Sol medium lanes then rechecked the receipts-only final head `ce1b13a85bfd2dd7ce580840f15d75d8113bff8b` in the coordinating conversation and returned `APPROVED` with no P0-P3 findings; those final rechecks are not represented as content of the persisted receipts.
 
 ## Verification evidence
 
