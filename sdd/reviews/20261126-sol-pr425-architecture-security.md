@@ -45,4 +45,3 @@ The earlier exact-head review of `2e38d5e741c5555e476390d566f5435fc189e779` retu
 ## Conclusion
 
 The corrected exact range preserves the complete immutable quote evidence and exact item/variant correlation required by the SDD. Domain states and steps are closed, framework-independent and fail closed. PCC-015A remains in progress until receipts-only recheck, hosted CI, merge and post-merge evidence; PCC-015B through PCC-015F remain pending.
-

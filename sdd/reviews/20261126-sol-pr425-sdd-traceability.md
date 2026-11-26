@@ -45,4 +45,3 @@ The earlier exact-head review of `2e38d5e741c5555e476390d566f5435fc189e779` retu
 ## Conclusion
 
 The corrected exact range is traceable to the approved PCC-015A scope and keeps later persistence, checkout, accreditation and correction runtime cuts open. Evidence distinguishes local passing gates from the failed monolithic gate and pending hosted checks. Approval is limited to the reviewed SHA and does not close PCC-015A.
-
