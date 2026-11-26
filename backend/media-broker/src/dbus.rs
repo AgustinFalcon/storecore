@@ -43,9 +43,11 @@ const WORKER_LIMIT_FSIZE: u64 = crate::systemd::MOUNT_BYTES;
 /// CPU-time ceiling in seconds (`IMAGE_IO_V1` timeout). Derived internally;
 /// the client cannot supply it. This is `RLIMIT_CPU`, not `CPUQuota`.
 const WORKER_LIMIT_CPU: u64 = WORKER_RUNTIME_MAX_USEC / 1_000_000;
-/// Address-space ceiling in bytes (`IMAGE_IO_V1` heap). Derived internally;
-/// the client cannot supply it. This is `RLIMIT_AS`, not `MemoryMax`.
-const WORKER_LIMIT_AS: u64 = WORKER_MEMORY_MAX_BYTES;
+/// Address-space ceiling. Derived internally as 32× `IMAGE_IO_V1` heap so
+/// HotSpot can map the runtime while remaining bounded. Equal to
+/// `MemoryMax` core-dumps the JVM because virtual size exceeds RSS. This is
+/// `RLIMIT_AS`, not `MemoryMax`. The client cannot supply it.
+const WORKER_LIMIT_AS: u64 = 32 * WORKER_MEMORY_MAX_BYTES;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -655,6 +657,10 @@ mod tests {
             .iter()
             .find(|(key, _)| *key == "LimitAS")
             .map(|(_, value)| format!("{value:?}"));
+        assert_ne!(
+            WORKER_LIMIT_AS, WORKER_MEMORY_MAX_BYTES,
+            "LimitAS must exceed MemoryMax so HotSpot can map the runtime"
+        );
         assert!(
             limit_as
                 .as_deref()

@@ -2,8 +2,9 @@
 
 ## 2026-11-25 — arranque 4C RLIMIT AS del worker
 
-- El harness deriva `LimitAS` (`RLIMIT_AS`, mismo techo que `MemoryMax`)
-  y PID 1 lo lee. No es `MemoryMax` ni `CPUQuota`.
+- El harness deriva `LimitAS` (`RLIMIT_AS`, 32× heap `IMAGE_IO_V1`) y
+  PID 1 lo lee. Un techo igual a `MemoryMax` core-dump del JVM. No es
+  `MemoryMax` ni `CPUQuota`.
 - No se marca `003B-4C`. No hay familia de sockets, cuota global,
   `Ready` ni HTTP de media.
 

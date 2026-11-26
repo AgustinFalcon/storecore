@@ -2,8 +2,9 @@
 
 ## En implementación — 2026-11-25, 4C RLIMIT AS del worker
 
-Este corte no cierra `003B-4C`. El harness deriva `LimitAS` al mismo
-techo que `MemoryMax` (`RLIMIT_AS`) y PID 1 lo lee. `ProtectHome`,
+Este corte no cierra `003B-4C`. El harness deriva `LimitAS` a 32× el
+heap `IMAGE_IO_V1` (`RLIMIT_AS`) y PID 1 lo lee. Un techo igual a
+`MemoryMax` provoca core-dump del JVM. `ProtectHome`,
 `CPUQuota` y `RestrictAddressFamilies` quedan fuera. Sigue sin familia
 de sockets, cuota global, terminales sin ACK, FD/mmap tras el seal,
 reinicio en cada transición durable, RLIMIT restantes (`LimitDATA`,
