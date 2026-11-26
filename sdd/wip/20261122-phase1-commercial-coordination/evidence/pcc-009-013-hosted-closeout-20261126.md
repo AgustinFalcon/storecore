@@ -54,16 +54,48 @@ the production Angular build and Chromium under the isolated Linux contract.
 
 ## Gate result
 
-The feature implementation is present on `master`, but the close-out gate is
-complete only after PR `#417` has two persisted independent GPT-6.1 Sol
-approvals, green hosted CI and a merge. Its runtime repair must prove that a
-non-active capability or action kill blocks both claim and not-yet-emitted
-handoff, including a kill created concurrently with admission.
+PR `#417`, `fix: close calendar runtime and reporting gates`, closed the
+corrective gate. Its reviewed head was
+`c46a5f2bd54b8ae4b693bfb75aeb3fd996c00f42`; GitHub merged it into `master`
+as `1e02bb32a060d7d9ab5a75772b0e07e88177a4c9` at
+`2026-11-26T18:50:11Z`.
+
+The two mandatory independent GPT-6.1 Sol receipts are persisted at:
+
+- `sdd/reviews/20261126-sol-pr417-architecture-security.md`;
+- `sdd/reviews/20261126-sol-pr417-ux-sdd.md`.
+
+Both lanes approved exact head `c46a5f2bd54b8ae4b693bfb75aeb3fd996c00f42`
+with no open P0-P3. The receipt-only successor was rechecked by both lanes
+without further edits. The runtime repair proves fail-closed admission for a
+non-active capability, a live action kill and database uncertainty, including
+serialization with concurrent kill creation before claim or handoff.
+
+GitHub Actions run `45874700499`, attempt 2, completed successfully. It was
+associated with head `c46a5f2bd54b8ae4b693bfb75aeb3fd996c00f42` and executed
+GitHub's synthetic pull-request merge candidate
+`f471af5025dd73653972de835dff0fe172de1fd5`, built against base
+`36b08b83d1f80e7642a9fcdfe134a5a16794b9df`; it is not described as an
+exact-head checkout. All seven required jobs passed:
+
+- `repository-hygiene`;
+- `frontend`;
+- `backend`;
+- `productive-routes-real-e2e`;
+- `unified-access-real-e2e`;
+- `media-broker`;
+- `media-broker-pid1`.
+
+Attempt 1 was cancelled after Maven Central returned HTTP 429 while resolving
+Surefire; it did not execute the backend suite and is not represented as a
+code failure or a green run. The unchanged second attempt is the hosted CI
+evidence used by this close-out.
 
 The consolidated report, partial/unavailable semantics, safe CSV delivery and
 responsive browser journeys remain delivered. The specification route
 correction is part of the same PR `#417` close-out.
 
-Loyalty (`PCC-014` onward) does not start until that gate is actually closed.
-Live provider credentials, deployment and homologation remain outside this
-gate.
+PCC-009 and PCC-013 are therefore complete. Loyalty contract work may proceed
+from PCC-014, but this close-out does not approve loyalty implementation by
+itself. Live provider credentials, deployment and homologation remain outside
+this gate.
