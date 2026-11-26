@@ -2,13 +2,15 @@
 
 ## En implementación — 2026-11-26, 4C sigue abierto
 
-Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el
-seal y reinicio en cada transición durable. Los RLIMIT del worker
-quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
-`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue sin
-familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
-HTTP de media.
+Siguiente corte: terminales sin ACK, FD/mmap tras el seal y reinicio
+en cada transición durable. Este corte atesta la cuota global: un
+`BudgetLimits` de un job admite el primero, el segundo falla
+`JobLimit` y PID 1 no arranca el segundo `.mount`. Los RLIMIT del
+worker quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
+`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue
+sin familia de sockets, terminales sin ACK ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C LimitSTACK PR #416
 
