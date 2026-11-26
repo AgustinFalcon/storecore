@@ -2,6 +2,10 @@ package com.storecore.channelreporting.infrastructure
 
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReportRepository
+import com.storecore.channelreporting.application.ChannelReportCsvPreparationPort
+import com.storecore.channelreporting.application.ChannelReportCsvPreparationRequest
+import com.storecore.channelreporting.application.ChannelReportCsvPreparationResult
+import com.storecore.channelreporting.application.PreparedChannelReportCsv
 import com.storecore.identity.application.AuthenticationFailed
 import com.storecore.identity.application.AuthorizationDenied
 import com.storecore.identity.infrastructure.web.BaseResponse
@@ -18,6 +22,8 @@ import org.springframework.core.annotation.Order
 import org.springframework.dao.DataAccessException
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Component
 import org.springframework.transaction.TransactionException
 import org.springframework.util.MultiValueMap
@@ -29,19 +35,25 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.filter.OncePerRequestFilter
 import javax.sql.DataSource
+import java.io.OutputStream
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicReference
 
 class InvalidChannelReportRequest : RuntimeException()
 class ChannelReportUnavailable : RuntimeException()
+class ChannelReportPeriodStale : RuntimeException()
+class ChannelReportExportTooLarge : RuntimeException()
 
 @RestController
-@RequestMapping("/api/v1/user/channel-reports")
+@RequestMapping("/api/v1/user")
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class ChannelReportController(
     private val reports: StoreCoreCreatedOrderReportRepository,
+    private val exports: ChannelReportCsvPreparationPort,
     private val auth: RequestAuth,
     private val origins: ChannelReportReadOriginPolicy,
 ) {
-    @GetMapping
+    @GetMapping("/channel-reports")
     fun report(
         http: HttpServletRequest,
         @RequestParam params: MultiValueMap<String, String>,
@@ -60,6 +72,80 @@ class ChannelReportController(
             throw AuthenticationFailed()
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(BaseResponse.ok(dto))
+    }
+
+    @GetMapping("/channel-reports.csv")
+    fun export(
+        http: HttpServletRequest,
+        response: HttpServletResponse,
+        @RequestParam params: MultiValueMap<String, String>,
+    ) {
+        origins.requireAdmitted(http)
+        val initialActor = auth.operatorOrAdmin(http)
+        val query = ChannelReportCsvQuery.fromWire(params) ?: throw InvalidChannelReportRequest()
+        val request = ChannelReportCsvPreparationRequest.create(query.fromDate, query.toDateExclusive, query.periodToken)
+            ?: throw InvalidChannelReportRequest()
+        val artifact = when (val result = exports.prepare(request)) {
+            is ChannelReportCsvPreparationResult.Prepared -> result.artifact
+            ChannelReportCsvPreparationResult.InvalidPeriod -> throw InvalidChannelReportRequest()
+            ChannelReportCsvPreparationResult.StalePeriod -> throw ChannelReportPeriodStale()
+            ChannelReportCsvPreparationResult.TooLarge -> throw ChannelReportExportTooLarge()
+            ChannelReportCsvPreparationResult.SourceUnavailable -> throw ChannelReportUnavailable()
+        }
+        val finalActor = try {
+            auth.operatorOrAdmin(http)
+        } catch (failure: RuntimeException) {
+            artifact.close()
+            throw failure
+        }
+        if (finalActor.userId != initialActor.userId || finalActor.sessionId != initialActor.sessionId || finalActor.roles != initialActor.roles) {
+            artifact.close()
+            throw AuthenticationFailed()
+        }
+        val transport = PreparedChannelReportCsvTransport.takeOwnership(artifact) ?: throw ChannelReportUnavailable()
+        val filename = "storecore-channel-report-${query.fromDate}-to-${query.toDateExclusive}.csv"
+        transport.use {
+            response.status = HttpServletResponse.SC_OK
+            response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store")
+            response.contentType = MediaType("text", "csv", StandardCharsets.UTF_8).toString()
+            response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"$filename\"")
+            it.writeTo(response.outputStream)
+        }
+    }
+}
+
+internal enum class PreparedChannelReportCsvTransportState { READY, WRITING, RELEASED }
+
+internal class PreparedChannelReportCsvTransport private constructor(source: ByteArray) : AutoCloseable {
+    private val ownedBytes = AtomicReference<ByteArray?>(source)
+    private val state = AtomicReference(PreparedChannelReportCsvTransportState.READY)
+
+    fun writeTo(output: OutputStream) {
+        if (!state.compareAndSet(PreparedChannelReportCsvTransportState.READY, PreparedChannelReportCsvTransportState.WRITING)) return
+        val bytes = requireNotNull(ownedBytes.getAndSet(null))
+        try {
+            output.write(bytes)
+            output.flush()
+        } finally {
+            bytes.fill(0)
+            state.set(PreparedChannelReportCsvTransportState.RELEASED)
+        }
+    }
+
+    override fun close() {
+        if (state.compareAndSet(PreparedChannelReportCsvTransportState.READY, PreparedChannelReportCsvTransportState.RELEASED)) {
+            ownedBytes.getAndSet(null)?.fill(0)
+        }
+    }
+
+    fun isReleased(): Boolean = state.get() == PreparedChannelReportCsvTransportState.RELEASED
+
+    companion object {
+        fun takeOwnership(artifact: PreparedChannelReportCsv): PreparedChannelReportCsvTransport? = try {
+            artifact.readBytes()?.let(::PreparedChannelReportCsvTransport)
+        } finally {
+            artifact.close()
+        }
     }
 }
 
@@ -109,6 +195,12 @@ class ChannelReportExceptionAdvice {
 
     @ExceptionHandler(AuthorizationDenied::class)
     fun denied() = error(403, "AUTHORIZATION_DENIED")
+
+    @ExceptionHandler(ChannelReportPeriodStale::class)
+    fun stale() = error(409, "REPORT_PERIOD_STALE")
+
+    @ExceptionHandler(ChannelReportExportTooLarge::class)
+    fun tooLarge() = error(422, "REPORT_EXPORT_TOO_LARGE")
 
     @ExceptionHandler(
         ChannelReportUnavailable::class,

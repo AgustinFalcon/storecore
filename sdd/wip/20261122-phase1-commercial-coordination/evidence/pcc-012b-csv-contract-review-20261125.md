@@ -69,4 +69,14 @@ Evidence executed locally against PostgreSQL 16 and all 39 migrations:
 - Combined focal gate — 45 tests, 0 failures, 0 errors.
 - `git diff --check` — no whitespace errors.
 
-The architecture and concurrency reviewers independently returned **APPROVE** with no P0-P3 after inspecting the final diff and Surefire evidence. PCC-012B remains `in_progress`: the authenticated HTTP streaming adapter, response mapping and disconnect cleanup are not claimed by this checkpoint.
+The architecture and concurrency reviewers independently returned **APPROVE** with no P0-P3 after inspecting the final diff and Surefire evidence.
+
+## Authenticated transport checkpoint
+
+The exact CSV route is now `GET /api/v1/user/channel-reports.csv` with only the two canonical dates and one canonical period token. Same-origin policy and initial USER `ADMIN|OPERATOR` authentication run before preparation; a successful preparation is followed by actor/session/role revalidation before any response header. Closed preparation outcomes map to ordinary no-store JSON errors: invalid `400`, stale `409 REPORT_PERIOD_STALE`, too large `422 REPORT_EXPORT_TOO_LARGE`, and unavailable `503`.
+
+After successful revalidation, a dedicated transport takes ownership of a copied byte buffer and immediately releases the prepared artifact. The transport has the closed lifecycle `READY|WRITING|RELEASED`, admits exactly one writer with compare-and-set, holds no monitor during servlet I/O and clears bytes on success or disconnect. Servlet writing is synchronous inside `use`, so there is no executor handoff that can be cancelled before cleanup; response/header/output acquisition failure closes the still-ready transport, pre-write cancellation is idempotent and a second writer emits nothing. Transport performs no database query, authorization call or business decision.
+
+The first transport review found a P2 in the draft asynchronous callback: cancellation before callback start could strand bytes. The async handoff was removed at the cause and regressions cover close-before-first-write, output failure and double invocation. The final combined HTTP/contract/preparation gate passed 20 tests with 0 failures/errors (`ChannelReportControllerTest` 7, `ChannelReportHttpContractTest` 5, `ChannelReportCsvPreparationTest` 8). Both architecture and concurrency reviewers returned **APPROVE** with no P0-P3, and `git diff --check` is clean.
+
+PCC-012B is complete. Angular wire validation, dashboard state/navigation, browser download behavior and integrated browser/CI evidence remain PCC-012C through PCC-013; they are not claimed here.
