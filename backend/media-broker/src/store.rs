@@ -505,13 +505,7 @@ mod tests {
         assert_eq!(store.usage().jobs(), 1);
         assert_eq!(store.usage().bytes(), 100);
         assert_eq!(
-            store.allocate(
-                [0x25; 16],
-                principal(),
-                [0xaf; 16],
-                reservation(1, 1, 1),
-                5,
-            ),
+            store.allocate([0x25; 16], principal(), [0xaf; 16], reservation(1, 1, 1), 5,),
             Err(StoreError::Budget(BudgetError::JobLimit))
         );
         assert_eq!(store.record(terminal.job_id()), Ok(terminal));
