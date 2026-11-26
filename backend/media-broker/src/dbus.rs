@@ -44,7 +44,7 @@ const WORKER_LIMIT_FSIZE: u64 = crate::systemd::MOUNT_BYTES;
 /// the client cannot supply it. This is `RLIMIT_CPU`, not `CPUQuota`.
 const WORKER_LIMIT_CPU: u64 = WORKER_RUNTIME_MAX_USEC / 1_000_000;
 /// Address-space ceiling. Derived internally as 32× `IMAGE_IO_V1` heap so
-/// HotSpot can map the runtime while remaining bounded. Equal to
+/// `HotSpot` can map the runtime while remaining bounded. Equal to
 /// `MemoryMax` core-dumps the JVM because virtual size exceeds RSS. This is
 /// `RLIMIT_AS`, not `MemoryMax`. The client cannot supply it.
 const WORKER_LIMIT_AS: u64 = 32 * WORKER_MEMORY_MAX_BYTES;
@@ -659,7 +659,7 @@ mod tests {
             .map(|(_, value)| format!("{value:?}"));
         assert_ne!(
             WORKER_LIMIT_AS, WORKER_MEMORY_MAX_BYTES,
-            "LimitAS must exceed MemoryMax so HotSpot can map the runtime"
+            "LimitAS must exceed MemoryMax so the JVM can map the runtime"
         );
         assert!(
             limit_as
