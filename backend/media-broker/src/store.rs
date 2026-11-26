@@ -433,7 +433,13 @@ mod tests {
         let limits = BudgetLimits::create(1, 1, 100, 2, 100, 2).expect("limits");
         let mut store = fixture.ready_store(limits);
         let first = store
-            .allocate([0x22; 16], principal(), [0xae; 16], reservation(100, 2, 1), 1)
+            .allocate(
+                [0x22; 16],
+                principal(),
+                [0xae; 16],
+                reservation(100, 2, 1),
+                1,
+            )
             .expect("first");
         assert_eq!(store.usage().jobs(), 1);
         assert_eq!(

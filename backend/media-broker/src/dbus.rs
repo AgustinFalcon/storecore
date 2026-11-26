@@ -2856,7 +2856,8 @@ mod tests {
         let journal_root = PathBuf::from("/run/storecore_media/journal-4c-global-quota");
         let _ = fs::remove_dir_all(&journal_root);
         fs::create_dir(&journal_root).expect("journal root");
-        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700)).expect("journal mode");
+        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700))
+            .expect("journal mode");
         let owner = rustix::process::geteuid().as_raw();
         let limits =
             BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
