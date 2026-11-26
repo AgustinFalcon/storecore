@@ -55,4 +55,24 @@ class CalendarHttpTranslatorTest {
         assertEquals(25,translator.paging(params()).size)
         assertEquals(CalendarReminderReadiness.UNKNOWN,CalendarReminderReadiness.fromWire("FUTURE"))
     }
+    @Test fun `reminder switch command is exact closed canonical and independently bounded`() {
+        val body=linkedMapOf(
+            "operation" to CalendarSwitchOperation.ENABLE.wire,
+            "expectedRevision" to "0",
+            "owner" to "Commercial operations",
+            "reason" to "Temporary reviewed activation",
+            "expiresAt" to "2030-01-10T12:00:00Z",
+            "removalTicket" to "OPS-442",
+            "affectedAction" to CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER.wire,
+        )
+        val translated=translator.switchCommand(key,bytes(body))
+        assertEquals(CalendarSwitchOperation.ENABLE,translated.operation)
+        assertEquals(CalendarRevision.Zero,translated.expectedRevision)
+        assertEquals(java.time.Instant.parse("2030-01-10T12:00:00Z"),translated.expiresAt)
+        for(field in body.keys) assertThrows(InvalidCalendarRequest::class.java) { translator.switchCommand(key,bytes(body-field)) }
+        for(value in listOf("UNKNOWN","FUTURE")) assertThrows(InvalidCalendarRequest::class.java) { translator.switchCommand(key,bytes(body+("operation" to value))) }
+        for(value in listOf("2030-01-10T12:00:00.000Z","2030-01-10T09:00:00-03:00","2030-01-10T12:00:00.100Z")) assertThrows(InvalidCalendarRequest::class.java) { translator.switchCommand(key,bytes(body+("expiresAt" to value))) }
+        assertThrows(InvalidCalendarRequest::class.java) { translator.switchCommand(key,bytes(body+("extra" to true))) }
+        assertThrows(InvalidCalendarRequest::class.java) { translator.switchCommand(key,ByteArray(CalendarHttpTranslator.SWITCH_MAX_BYTES+1) { 32 }) }
+    }
 }

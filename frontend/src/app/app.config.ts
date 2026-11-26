@@ -46,6 +46,8 @@ import { OverviewHttpRepository } from './data/overview/overview-http.repository
 import { UserHttpRepository } from './data/user/user-http.repository';
 import { ProductOptionsHttpRepository } from './data/catalog/product-options-http.repository';
 import { PRODUCT_OPTIONS_REPOSITORY } from './core/tokens/product-options.tokens';
+import { CHANNEL_REPORT_REPOSITORY } from './core/tokens/reporting.tokens';
+import { ChannelReportHttpRepository } from './data/reporting/report-http.repository';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -80,6 +82,7 @@ export const appConfig: ApplicationConfig = {
     { provide: RECOVERY_REPOSITORY, useClass: RecoveryHttpRepository },
     { provide: EMAIL_VERIFICATION_REPOSITORY, useClass: EmailVerificationHttpRepository },
     { provide: BRANDING_REPOSITORY, useClass: BrandingHttpRepository },
+    { provide: CHANNEL_REPORT_REPOSITORY, useClass: ChannelReportHttpRepository },
     ...USE_CASE_PROVIDERS,
   ],
 };

@@ -19,9 +19,10 @@ export class RouteActor {
 export class RouteScenario {
   private constructor(readonly wire: string) {}
   static readonly Populated = new RouteScenario('POPULATED');
+  static readonly Empty = new RouteScenario('EMPTY');
   static readonly InvalidSecret = new RouteScenario('INVALID_SECRET');
   static readonly Unknown = new RouteScenario('UNKNOWN');
-  static readonly all = [this.Populated, this.InvalidSecret, this.Unknown] as const;
+  static readonly all = [this.Populated, this.Empty, this.InvalidSecret, this.Unknown] as const;
   static fromWire(raw: unknown): RouteScenario {
     return this.all.find(scenario => scenario.wire === raw) ?? this.Unknown;
   }

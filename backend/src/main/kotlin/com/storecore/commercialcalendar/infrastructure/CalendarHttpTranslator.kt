@@ -17,7 +17,7 @@ internal class CalendarUnavailable: RuntimeException()
 /** The sole public wire boundary; nested fields are exact and finite values fail closed. */
 internal class CalendarHttpTranslator(mapper: ObjectMapper,private val hasher: CalendarHasher) {
     private val json=mapper.copy().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION).enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-    companion object { const val MAX_BYTES=32768 }
+    companion object { const val MAX_BYTES=32768; const val SWITCH_MAX_BYTES=8192 }
     fun uuid(raw: String?): UUID=runCatching { UUID.fromString(raw) }.getOrNull()?.takeIf { it!=UUID(0,0) && it.toString()==raw } ?: throw InvalidCalendarRequest()
     fun eventId(raw: String)=requireNotNull(CalendarEventId.fromWire(uuid(raw)))
     fun commandId(raw: String?)=requireNotNull(CalendarCommandId.fromWire(uuid(raw)))
@@ -27,8 +27,8 @@ internal class CalendarHttpTranslator(mapper: ObjectMapper,private val hasher: C
     }
     private fun text(node: JsonNode,key: String): String { if(!node.path(key).isTextual) throw InvalidCalendarRequest(); return node[key].textValue() }
     private fun exact(node: JsonNode,fields: Set<String>) { if(!node.isObject || node.fieldNames().asSequence().toSet()!=fields) throw InvalidCalendarRequest() }
-    private fun parse(raw: ByteArray): JsonNode {
-        if(raw.size>MAX_BYTES) throw InvalidCalendarRequest()
+    private fun parse(raw: ByteArray,maxBytes: Int=MAX_BYTES): JsonNode {
+        if(raw.size>maxBytes) throw InvalidCalendarRequest()
         val text=raw.toString(Charsets.UTF_8)
         if(!text.toByteArray(Charsets.UTF_8).contentEquals(raw)) throw InvalidCalendarRequest()
         return runCatching { json.readTree(text) }.getOrNull() ?: throw InvalidCalendarRequest()
@@ -72,6 +72,22 @@ internal class CalendarHttpTranslator(mapper: ObjectMapper,private val hasher: C
             if(step==CalendarStep.Edit) definition(node["definition"]) else null,
             if(step==CalendarStep.Schedule) CalendarPreflightId.fromWire(uuid(text(node,"preflightId"))) else null)
     }
+    fun switchCommand(key: String?,raw: ByteArray): CalendarSwitchCommandRequest {
+        val node=parse(raw,SWITCH_MAX_BYTES)
+        exact(node,setOf("operation","expectedRevision","owner","reason","expiresAt","removalTicket","affectedAction"))
+        val operation=CalendarSwitchOperation.fromWire(text(node,"operation"))
+        val action=CalendarSwitchAction.fromWire(text(node,"affectedAction"))
+        if(operation==CalendarSwitchOperation.UNKNOWN || action!=CalendarSwitchAction.EMIT_IN_APP_CAMPAIGN_REMINDER) throw InvalidCalendarRequest()
+        val expiresRaw=text(node,"expiresAt")
+        val expires=runCatching { Instant.parse(expiresRaw) }.getOrNull()
+            ?.takeIf { it.nano==0 && it.toString()==expiresRaw } ?: throw InvalidCalendarRequest()
+        return CalendarSwitchCommandRequest(
+            commandId(key),revision(text(node,"expectedRevision")),operation,
+            CalendarSwitchOwner.fromWire(text(node,"owner")) ?: throw InvalidCalendarRequest(),
+            CalendarReason.fromWire(text(node,"reason")) ?: throw InvalidCalendarRequest(),expires,
+            CalendarRemovalTicket.fromWire(text(node,"removalTicket")) ?: throw InvalidCalendarRequest(),action,
+        )
+    }
     fun paging(params: MultiValueMap<String,String>,additional: Set<String> = emptySet()): CalendarPageRequest {
         if(params.keys.any { it !in additional+setOf("page","size") } || params.values.any { it.size!=1 }) throw InvalidCalendarRequest()
         fun integer(key: String,default: Int): Int {
@@ -96,7 +112,10 @@ data class CalendarPageDto<T>(val items: List<T>,val total: Long,val page: Int,v
 data class CalendarReceiptDto(val commandId: String,val eventId: String,val actorId: String?,val operation: String,val expectedRevision: String?,val reason: String?,val outcome: String,val before: CalendarEventDto?,val after: CalendarEventDto,val recordedAt: String)
 data class CalendarPreflightDto(val id: String,val eventId: String,val revision: String,val definitionRevision: String,val definitionHash: String,val issues: List<String>,val checkedAt: String,val expiresAt: String)
 data class CalendarPreflightResultDto(val outcome: String,val preflight: CalendarPreflightDto?,val event: CalendarEventDto)
-data class CalendarReminderSwitchDto(val state: String,val revision: String,val readiness: String)
+data class CalendarSwitchMetadataDto(val owner: String,val reason: String,val createdAt: String,val expiresAt: String,val removalTicket: String,val affectedAction: String)
+data class CalendarSwitchSnapshotDto(val configuredState: String,val effectivity: String,val revision: String,val metadata: CalendarSwitchMetadataDto?)
+data class CalendarReminderSwitchDto(val configuredState: String,val effectivity: String,val revision: String,val readiness: String,val metadata: CalendarSwitchMetadataDto?)
+data class CalendarSwitchReceiptDto(val commandId: String,val actorId: String,val operation: String,val outcome: String,val expectedRevision: String,val requestedMetadata: CalendarSwitchMetadataDto,val before: CalendarSwitchSnapshotDto,val after: CalendarSwitchSnapshotDto,val recordedAt: String)
 internal object CalendarHttpMapper {
     private fun time(value: CalendarTime)=CalendarTimeDto(value.localDateTime.toString().let { if(it.length==16) "$it:00" else it },value.timeZone,value.offset.id,value.instant.toString())
     fun event(value: CalendarEvent): CalendarEventDto {
@@ -106,5 +125,9 @@ internal object CalendarHttpMapper {
     }
     fun receipt(value: CalendarReceipt)=CalendarReceiptDto(value.commandId.value.toString(),value.eventId.value.toString(),value.actorId?.toString(),value.operation.wire,value.expectedRevision?.value?.toString(),value.reason?.value,value.outcome.wire,value.before?.let(::event),event(value.after),value.recordedAt.toString())
     fun preflight(value: CalendarPreflightResult.Recorded)=CalendarPreflightResultDto(value.outcome.wire,value.preflight?.let { CalendarPreflightDto(it.id.value.toString(),it.eventId.value.toString(),it.revision.value.toString(),it.definitionRevision.value.toString(),it.definitionHash.value,it.issues.map { issue -> issue.wire }.sorted(),it.checkedAt.toString(),it.expiresAt.toString()) },event(value.event))
+    private fun switchMetadata(value: CalendarSwitchMetadata)=CalendarSwitchMetadataDto(value.owner.value,value.reason.value,value.createdAt.toString(),value.expiresAt.toString(),value.removalTicket.value,value.affectedAction.wire)
+    private fun switchSnapshot(value: CalendarSwitchSnapshot,at: Instant)=CalendarSwitchSnapshotDto(value.configuredState.wire,value.effectivity(at).wire,value.revision.value.toString(),value.metadata?.let(::switchMetadata))
+    fun switchDiagnostic(value: CalendarReminderSwitch,readiness: CalendarReminderReadiness)=CalendarReminderSwitchDto(value.state.wire,value.effectivity.wire,value.revision.value.toString(),readiness.wire,value.metadata?.let(::switchMetadata))
+    fun switchReceipt(value: CalendarSwitchReceipt)=CalendarSwitchReceiptDto(value.commandId.value.toString(),value.actorId.toString(),value.operation.wire,value.outcome.wire,value.expectedRevision.value.toString(),switchMetadata(value.requestedMetadata),switchSnapshot(value.before,value.recordedAt),switchSnapshot(value.after,value.recordedAt),value.recordedAt.toString())
     fun <T,R> page(value: CalendarPage<T>,map: (T)->R)=CalendarPageDto(value.items.map(map),value.total,value.paging.page,value.paging.size,value.hasMore)
 }

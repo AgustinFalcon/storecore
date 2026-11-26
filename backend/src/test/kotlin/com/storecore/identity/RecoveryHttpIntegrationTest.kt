@@ -199,10 +199,15 @@ class RecoveryHttpIntegrationTest(
         val executor = Executors.newSingleThreadExecutor()
         try {
             lateinit var result: Future<RecoveryCompletionResult>
+            val workerPid = CompletableFuture<Int>()
             transactions.executeWithoutResult {
+                val blockerPid = jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)!!
                 jdbc.queryForList("SELECT id FROM identity_recovery_tokens WHERE customer_id=? FOR UPDATE", account.customer)
-                result = executor.submit<RecoveryCompletionResult> { recovery.complete(RecoveryRealm.CUSTOMER, raw, replacement, "expiry-test") }
-                awaitLock()
+                result = executor.submit<RecoveryCompletionResult> { transactions.execute<RecoveryCompletionResult> {
+                    workerPid.complete(jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)!!)
+                    recovery.complete(RecoveryRealm.CUSTOMER, raw, replacement, "expiry-test")
+                }!! }
+                awaitBlockedBy(workerPid.get(5, TimeUnit.SECONDS), blockerPid)
                 Thread.sleep(1300)
             }
             assertEquals(RecoveryCompletionResult.EXPIRED_LINK, result.get(10, TimeUnit.SECONDS))
@@ -242,10 +247,15 @@ class RecoveryHttpIntegrationTest(
         val executor = Executors.newSingleThreadExecutor()
         try {
             lateinit var result: Future<RecoveryCompletionResult>
+            val workerPid = CompletableFuture<Int>()
             transactions.executeWithoutResult {
+                val blockerPid = jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)!!
                 locks.acquire(locks.customerTarget(admin, account.customer))
-                result = executor.submit<RecoveryCompletionResult> { recovery.complete(RecoveryRealm.CUSTOMER, token.secret.value, replacement, "suspension-race") }
-                awaitLock()
+                result = executor.submit<RecoveryCompletionResult> { transactions.execute<RecoveryCompletionResult> {
+                    workerPid.complete(jdbc.queryForObject("SELECT pg_backend_pid()", Int::class.java)!!)
+                    recovery.complete(RecoveryRealm.CUSTOMER, token.secret.value, replacement, "suspension-race")
+                }!! }
+                awaitBlockedBy(workerPid.get(5, TimeUnit.SECONDS), blockerPid)
                 repository.changeState(admin, account.customer, com.storecore.customers.domain.CustomerAccountState.SUSPENDED)
             }
             assertEquals(RecoveryCompletionResult.SUPERSEDED_LINK, result.get(10, TimeUnit.SECONDS))
@@ -277,7 +287,7 @@ class RecoveryHttpIntegrationTest(
 
     @Test fun `V17 upgrade preserves history and recovery privileges constraints and immutable evidence`() {
         assertEquals(baselineHistory, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE version::int <= 17 ORDER BY installed_rank"))
-        assertEquals("36", jdbc.queryForObject("SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1", String::class.java))
+        assertEquals("39", jdbc.queryForObject("SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1", String::class.java))
         assertEquals(true, jdbc.queryForObject("SELECT has_table_privilege('storecore_runtime','identity_recovery_tokens','SELECT,INSERT,UPDATE')", Boolean::class.java))
         assertEquals(false, jdbc.queryForObject("SELECT has_table_privilege('storecore_runtime','identity_recovery_tokens','DELETE')", Boolean::class.java))
         val token = token(fixture())
@@ -341,13 +351,22 @@ class RecoveryHttpIntegrationTest(
             INSERT INTO identity_recovery_tokens(id,realm,customer_id,token_hash,credential_version,email_digest,issued_at,expires_at,correlation_id)
             SELECT ?,'CUSTOMER',?,?,1,?,value,value+interval '15 minutes',? FROM issued""", ageSeconds, UUID.randomUUID(), account.customer, tokens.sha256(raw), tokens.sha256(account.email), UUID.randomUUID())
     }
-    private fun awaitLock() {
+    private fun awaitBlockedBy(workerPid: Int, blockerPid: Int) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
         while (System.nanoTime() < deadline) {
-            if ((jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'", Int::class.java) ?: 0) > 0) return
+            if (jdbc.queryForObject(
+                    "SELECT ? = ANY(pg_blocking_pids(?))",
+                    Boolean::class.java,
+                    blockerPid,
+                    workerPid,
+                ) == true
+            ) return
             Thread.sleep(10)
         }
-        fail<Unit>("Recovery did not reach lock wait")
+        val waiting = jdbc.queryForList(
+            "SELECT pid,pg_blocking_pids(pid) blockers,wait_event_type,wait_event,state,query FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()",
+        )
+        fail<Unit>("Recovery backend $workerPid was not blocked by $blockerPid: $waiting")
     }
     companion object {
         private val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine")

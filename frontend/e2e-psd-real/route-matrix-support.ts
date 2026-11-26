@@ -205,6 +205,7 @@ export class RealReadTrace {
 }
 
 export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealRouteReceipt): readonly RealReadRequirement[] {
+  if (binding.pattern.startsWith('user/commercial-calendar') && !receipt.commercialCalendar) throw new Error('Missing persisted calendar event readiness receipt');
   const product = receipt.products[0];
   const order = receipt.pendingOrderId;
   const reads = new Map<string, readonly string[]>([
@@ -225,6 +226,11 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
     ['user/capabilities', ['user/capabilities']], ['user/profile-import', []],
     ['user/notifications', ['user/notifications', 'user/notifications/email-preferences']],
     ['user/notifications/:alertId', [`user/notifications/${receipt.notification?.id.wire}`]],
+    ['user/commercial-calendar', ['user/commercial-calendar/events']],
+    ['user/commercial-calendar/new', []],
+    ['user/commercial-calendar/:eventId', [`user/commercial-calendar/events/${receipt.commercialCalendar?.eventId.wire}`]],
+    ['user/commercial-calendar/:eventId/edit', [`user/commercial-calendar/events/${receipt.commercialCalendar?.eventId.wire}`]],
+    ['user/reports', ['user/channel-reports']],
   ]);
   const own = reads.get(binding.pattern);
   if (!own) throw new Error('Missing explicit real readiness binding');

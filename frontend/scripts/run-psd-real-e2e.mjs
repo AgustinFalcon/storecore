@@ -11,6 +11,7 @@ import { databaseEnvironment, query } from './ua-real-database.mjs';
 import { ShowcaseConfig, ShowcaseLoader, ShowcaseDiscountKind, ShowcaseAdapterMode,
   ShowcaseExternalCapability, ShowcaseCapabilityState } from './showcase/load-storecore-showcase.mjs';
 import { readShowcaseDataset } from './showcase/read-showcase-dataset.mjs';
+import { CalendarFixtureSeedStep } from './psd-calendar-fixture.mjs';
 import { NotificationFixtureSeedStep } from './psd-notification-fixture.mjs';
 
 const frontend = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -113,7 +114,7 @@ class PublishedAxeImpact extends PublicationValue {
 }
 const publishedActionIds = new Set(Object.values(evidenceWire.actionIds));
 const publishedSurfaces = new Set([
-  ...Array.from({ length: 29 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
+  ...Array.from({ length: 34 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
   'RD-VERIFY-EMAIL', 'RD-USER-ACCOUNT',
 ]);
 const publishedFailureFiles = new Set([
@@ -293,6 +294,8 @@ function checkSecurityContracts() {
     writeFileSync(invalid, JSON.stringify(invalidAttachment(overrides)));
     assert.throws(() => publishEvidence(invalid, join(scratch, 'invalid-output')));
   }
+  assert.equal(publishedSurfaces.has('SC-SURF-34'), true);
+  assert.equal(publishedSurfaces.has('SC-SURF-35'), false);
   assert.equal(BrowserOutcome.fromWire('future-outcome'), BrowserOutcome.Unknown);
   console.log('PSD environment, closed outcomes and evidence redaction checks passed');
 }
@@ -521,7 +524,9 @@ async function run() {
   assert.equal(query("SELECT count(*) FROM customer_favorites WHERE customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '12');
   assert.equal(query("SELECT count(*) FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=(SELECT id FROM customers WHERE email='showcase.customer@storecore.invalid');"), '5');
   const notification = await new NotificationFixtureSeedStep(query, first.context.admin).run();
-  writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify({ ...firstResult.receipt, notification }, null, 2)}\n`);
+  const commercialCalendar = await new CalendarFixtureSeedStep(first.context.admin).run();
+  const scenarios = [...firstResult.receipt.scenarios, { scenario: 'EMPTY', evidence: 'REAL_BACKEND' }];
+  writeFileSync(join(results, 'fixture-receipt.json'), `${JSON.stringify({ ...firstResult.receipt, scenarios, notification, commercialCalendar }, null, 2)}\n`);
   const unrelated = await first.context.admin.request('/api/v1/user/offers', {
     method: 'POST', csrf: true, expected: [201], envelopeCode: 200,
     body: { name: 'PSD_OPERATOR_OWNED', priority: 7, startsAt: new Date().toISOString(),
@@ -585,7 +590,7 @@ async function run() {
   });
   await checkSafety();
   const evidence = publishEvidence(process.env.STORECORE_PSD_RAW_REPORT);
-  if (evidence.failures > 0 || evidence.routeAcceptances !== 96 || evidence.actionAcceptances !== 17) process.exitCode = 1;
+  if (evidence.failures > 0 || evidence.routeAcceptances !== 111 || evidence.actionAcceptances !== 17) process.exitCode = 1;
   writeFileSync(join(results, 'runtime-summary.json'), `${JSON.stringify({ sha: process.env.GITHUB_SHA ?? 'local',
     externalSafetyBefore: true, externalSafetyAfter: true, ...evidence, exitCode: process.exitCode })}\n`);
 }

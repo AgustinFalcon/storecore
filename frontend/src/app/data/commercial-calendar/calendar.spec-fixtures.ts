@@ -1,0 +1,6 @@
+import { CalendarMapper } from './calendar.mapper';
+export const calendarFixtureIds = Object.freeze({event:'11111111-1111-1111-1111-111111111111',command:'22222222-2222-2222-2222-222222222222',preflight:'33333333-3333-3333-3333-333333333333'});
+export function calendarEventWire() { return {id:calendarFixtureIds.event,revision:'0',lifecycle:'DRAFT',approvedDefinitionRevision:null,createdAt:'2026-11-24T12:00:00Z',definition:{definitionRevision:'0',hash:'a'.repeat(64),title:'Evento comercial',description:'',start:{localDateTime:'2026-12-01T09:00:00',timeZone:'America/Argentina/Buenos_Aires',offset:'-03:00',instant:'2026-12-01T12:00:00Z'},end:{localDateTime:'2026-12-01T10:00:00',timeZone:'America/Argentina/Buenos_Aires',offset:'-03:00',instant:'2026-12-01T13:00:00Z'},audience:'INTERNAL_ALL',campaignReference:null,reminders:[]}}; }
+export function calendarReceiptWire() { return {commandId:calendarFixtureIds.command,eventId:calendarFixtureIds.event,actorId:'1',operation:'CREATE',expectedRevision:null,reason:null,outcome:'APPLIED',before:null,after:calendarEventWire(),recordedAt:'2026-11-24T12:00:00Z'}; }
+export function calendarEventFixture() { return CalendarMapper.event(calendarEventWire()); }
+export function calendarReceiptFixture() { return CalendarMapper.receipt(calendarReceiptWire()); }

@@ -9,6 +9,7 @@ import com.storecore.configuration.application.CapabilityConfigurationMissing
 import com.storecore.configuration.application.CapabilityDecisionPort
 import com.storecore.configuration.application.CapabilityDisabled
 import com.storecore.configuration.application.CapabilityErrorState
+import com.storecore.configuration.application.CapabilityException
 import com.storecore.configuration.application.CapabilityKillSwitchActive
 import com.storecore.configuration.application.CapabilityKillSwitchInvalid
 import com.storecore.configuration.application.CapabilityKillSwitchVersionConflict
@@ -33,7 +34,7 @@ import javax.sql.DataSource
 @Service
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class JdbcCapabilityService(private val jdbc: JdbcTemplate) : CapabilityDecisionPort, CapabilityAdministrationPort {
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
+    @Transactional(isolation = Isolation.REPEATABLE_READ,noRollbackFor=[CapabilityException::class])
     override fun decide(module: String, action: String, actor: CapabilityActor) {
         val kills = jdbc.queryForList(
             """SELECT id, expires_at, owner, reason FROM capability_kill_switches

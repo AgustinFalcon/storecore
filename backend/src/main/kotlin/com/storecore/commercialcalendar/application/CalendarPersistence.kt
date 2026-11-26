@@ -25,7 +25,12 @@ sealed interface CalendarPreflightResult {
     data object IdempotencyConflict: CalendarPreflightResult
     data object Unknown: CalendarPreflightResult
 }
-class CalendarReminderSwitch(val state: CalendarSwitchState,val revision: CalendarRevision)
+class CalendarReminderSwitch(val snapshot: CalendarSwitchSnapshot,val observedAt: Instant) {
+    val state get()=snapshot.configuredState
+    val revision get()=snapshot.revision
+    val metadata get()=snapshot.metadata
+    val effectivity get()=snapshot.effectivity(observedAt)
+}
 interface CalendarPersistencePort {
     fun create(actor: InternalUserPrincipal,request: CalendarCreateRequest): CalendarPersistenceResult
     fun change(actor: InternalUserPrincipal,request: CalendarChangeRequest): CalendarPersistenceResult
@@ -35,5 +40,3 @@ interface CalendarPersistencePort {
     fun audit(actor: InternalUserPrincipal,eventId: CalendarEventId): List<CalendarReceipt>?
     fun reminderSwitch(): CalendarReminderSwitch
 }
-/** Internal authority only. No runner or public route is installed in PCC-007A. */
-interface CalendarSystemPersistencePort { fun advance(eventId: CalendarEventId,expectedRevision: CalendarRevision,step: CalendarStep): CalendarPersistenceResult }

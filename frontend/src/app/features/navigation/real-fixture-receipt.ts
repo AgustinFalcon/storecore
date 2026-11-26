@@ -1,4 +1,5 @@
 import { RouteEvidenceMode, RouteScenario } from './route-evidence';
+import { CalendarUuid } from '../../domain/commercial-calendar/calendar';
 import { NotificationId } from '../../domain/notification/notification';
 
 export interface RealFixtureProduct {
@@ -59,6 +60,7 @@ export class RealRouteReceipt {
     readonly homeTitle: string,
     readonly scenarios: readonly RealFixtureScenario[],
     readonly notification: { readonly id: NotificationId; readonly sourceId: string } | null,
+    readonly commercialCalendar: { readonly eventId: CalendarUuid; readonly title: string } | null,
   ) { Object.freeze(this); }
 
   static fromWire(raw: unknown): RealRouteReceipt {
@@ -93,10 +95,17 @@ export class RealRouteReceipt {
       if (id === NotificationId.Unknown) throw new Error('Invalid persisted notification identifier');
       return Object.freeze({ id, sourceId: text(row['sourceId']) });
     })();
+    const commercialCalendar = value['commercialCalendar'] === undefined ? null : (() => {
+      const row = record(value['commercialCalendar']);
+      if (Object.keys(row).sort().join(',') !== 'eventId,title') throw new Error('Invalid persisted calendar receipt fields');
+      const eventId = CalendarUuid.fromWire(row['eventId']);
+      if (!eventId) throw new Error('Invalid persisted calendar event identifier');
+      return Object.freeze({ eventId, title: text(row['title']) });
+    })();
     return new RealRouteReceipt(text(value['scenarioPrefix']), Object.freeze(products), positive(value['customerId']), email,
       identifier(value['addressId']), addressRevision, identifier(value['pendingOrderId']),
       positive(value['offerId']), Object.freeze({ revision: text(cart['revision']), skus: Object.freeze(skus) }),
-      text(value['addressStreet']), text(value['homeTitle']), Object.freeze(scenarios), notification);
+      text(value['addressStreet']), text(value['homeTitle']), Object.freeze(scenarios), notification, commercialCalendar);
   }
 
   requireScenario(scenario: RouteScenario): void {

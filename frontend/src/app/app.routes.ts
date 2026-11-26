@@ -116,6 +116,12 @@ export const routes: Routes = [
             canActivate: [userGuard],
           },
           {
+            path: 'reports',
+            loadComponent: () => import('./features/reporting/report-dashboard.component').then((module) => module.ReportDashboardComponent),
+            title: 'Reportes comerciales',
+            canActivate: [userGuard],
+          },
+          {
             path: 'orders/:id',
             loadComponent: () => import('./features/admin/user-order-detail.component').then((module) => module.UserOrderDetailComponent),
             title: 'Fulfillment',
@@ -137,6 +143,30 @@ export const routes: Routes = [
             path: 'capabilities',
             loadComponent: () => import('./features/admin/user-capabilities.component').then((module) => module.UserCapabilitiesComponent),
             title: 'Capabilities',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'commercial-calendar',
+            loadComponent: () => import('./features/commercial-calendar/calendar-center.component').then((module) => module.CalendarCenterComponent),
+            title: 'Calendario comercial',
+            canActivate: [userGuard],
+          },
+          {
+            path: 'commercial-calendar/new',
+            loadComponent: () => import('./features/commercial-calendar/calendar-editor.component').then((module) => module.CalendarEditorComponent),
+            title: 'Nuevo evento comercial',
+            canActivate: [userGuard, adminGuard],
+          },
+          {
+            path: 'commercial-calendar/:eventId/edit',
+            loadComponent: () => import('./features/commercial-calendar/calendar-editor.component').then((module) => module.CalendarEditorComponent),
+            title: 'Editar evento comercial',
+            canActivate: [userGuard, adminGuard],
+          },
+          {
+            path: 'commercial-calendar/:eventId',
+            loadComponent: () => import('./features/commercial-calendar/calendar-detail.component').then((module) => module.CalendarDetailComponent),
+            title: 'Detalle de evento comercial',
             canActivate: [userGuard],
           },
           {
