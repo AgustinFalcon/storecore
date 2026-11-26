@@ -4,6 +4,10 @@ import java.math.BigInteger
 
 class LoyaltyQuote internal constructor(
     val maximumPoints: LoyaltyPoints,
+    val availablePoints: LoyaltyPoints,
+    val monetaryValuePoints: LoyaltyPoints,
+    val percentageCapPoints: LoyaltyPoints,
+    val orderCapPoints: LoyaltyPoints,
     val requestedPoints: LoyaltyPoints,
     val discountMinor: LoyaltyMinorUnits,
     val finalEarningMinor: LoyaltyMinorUnits,
@@ -14,6 +18,7 @@ class LoyaltyQuoteDecision internal constructor(val outcome: LoyaltyOutcome, val
 
 class LoyaltyEligibilitySnapshot private constructor(
     val itemId: Long,
+    val variantId: Long,
     val classification: LoyaltyItemClassification,
     val quantity: Long,
     val postDiscountMerchandise: LoyaltyMinorUnits,
@@ -28,6 +33,7 @@ class LoyaltyEligibilitySnapshot private constructor(
     companion object {
         fun create(
             itemId: Long,
+            variantId: Long,
             classification: LoyaltyItemClassification,
             quantity: Long,
             postDiscountMerchandise: LoyaltyMinorUnits,
@@ -37,7 +43,7 @@ class LoyaltyEligibilitySnapshot private constructor(
             finalEarning: LoyaltyMinorUnits,
             policy: LoyaltyPolicyId,
         ): LoyaltyEligibilitySnapshot? {
-            if (itemId <= 0 || quantity <= 0 || classification == LoyaltyItemClassification.UNKNOWN || policy != LoyaltyPolicyId.V1) return null
+            if (itemId <= 0 || variantId <= 0 || quantity <= 0 || classification == LoyaltyItemClassification.UNKNOWN || policy != LoyaltyPolicyId.V1) return null
             val evidencedFinal = allocatedDiscount.value.toBigInteger() + finalEarning.value.toBigInteger()
             val validAmounts = if (classification.isEligible) {
                 postDiscountMerchandise.value == preRedemption.value && preRedemption.value.toBigInteger() == evidencedFinal
@@ -46,7 +52,7 @@ class LoyaltyEligibilitySnapshot private constructor(
             }
             if (!validAmounts) return null
             return LoyaltyEligibilitySnapshot(
-                itemId, classification, quantity, postDiscountMerchandise, excludedTax,
+                itemId, variantId, classification, quantity, postDiscountMerchandise, excludedTax,
                 preRedemption, allocatedDiscount, finalEarning, policy,
             )
         }
@@ -66,13 +72,24 @@ object LoyaltyPolicyV1 {
         if (discountState == LoyaltyDiscountState.PRESENT) return LoyaltyQuoteDecision(LoyaltyOutcome.STACKING_FORBIDDEN)
         if (requested.value == 0L || preRedemption.value == 0L) return LoyaltyQuoteDecision(LoyaltyOutcome.INVALID_DEFINITION)
         if (requested.value > available.value) return LoyaltyQuoteDecision(LoyaltyOutcome.INSUFFICIENT_BALANCE)
-        val maximum = minOf(available.value, preRedemption.value / 100, preRedemption.value / 1000, 10_000)
+        val monetaryValue = preRedemption.value / 100
+        val percentageCap = preRedemption.value / 1000
+        val orderCap = 10_000L
+        val maximum = minOf(available.value, monetaryValue, percentageCap, orderCap)
         if (requested.value > maximum) return LoyaltyQuoteDecision(LoyaltyOutcome.INVALID_DEFINITION)
         // The cap proves multiplication and subtraction stay inside signed Long.
         val discount = requireNotNull(LoyaltyMinorUnits.of(Math.multiplyExact(requested.value, 100)))
         val finalEarning = requireNotNull(LoyaltyMinorUnits.of(Math.subtractExact(preRedemption.value, discount.value)))
         return LoyaltyQuoteDecision(LoyaltyOutcome.APPLIED, LoyaltyQuote(
-            requireNotNull(LoyaltyPoints.of(maximum)), requested, discount, finalEarning, earn(finalEarning),
+            requireNotNull(LoyaltyPoints.of(maximum)),
+            available,
+            requireNotNull(LoyaltyPoints.of(monetaryValue)),
+            requireNotNull(LoyaltyPoints.of(percentageCap)),
+            requireNotNull(LoyaltyPoints.of(orderCap)),
+            requested,
+            discount,
+            finalEarning,
+            earn(finalEarning),
         ))
     }
 }

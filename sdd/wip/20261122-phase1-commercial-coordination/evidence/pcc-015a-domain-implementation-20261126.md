@@ -68,10 +68,16 @@ After merging `origin/master` at `a88be5a32ebad961ce98daa1a62b2e3ff2b4c963`, the
 - `node --test .github/scripts/repository-hygiene.test.mjs`: 11 tests passed;
 - `git diff origin/master...HEAD --check`: pass.
 
-The monolithic `mvn -B test` run completed 878 tests in 23:40 with 0 assertion failures, 2 errors and 9 skipped. Both errors were in pre-existing identity integration tests (`IdentityDeliveryQueuePostgresTest` and `RecoveryHttpIntegrationTest`) and no changed file in PCC-015A is under identity, migration, Spring, JDBC or HTTP code. To distinguish a loyalty regression from suite-order contamination, those same two classes were executed together against clean `master` (`a88be5a32ebad961ce98daa1a62b2e3ff2b4c963`): 22 tests passed, 0 failures, 0 errors, 0 skipped (`BUILD SUCCESS`, 05:10). This is recorded as an inherited order/isolation defect; it is not represented as a green monolithic gate and must not be hidden inside the loyalty cut.
+The monolithic `mvn -B test` run completed 878 tests in 23:40 with 0 assertion failures, 2 errors and 9 skipped. Both errors occurred in identity integration tests (`IdentityDeliveryQueuePostgresTest` and `RecoveryHttpIntegrationTest`) and no changed file in PCC-015A is under identity, migration, Spring, JDBC or HTTP code. As a bounded diagnostic, those same two classes were executed together against clean `master` (`a88be5a32ebad961ce98daa1a62b2e3ff2b4c963`): 22 tests passed, 0 failures, 0 errors, 0 skipped (`BUILD SUCCESS`, 05:10). That isolated pass does not prove whether the monolithic failure is inherited, order-dependent or environmental; a monolithic base run is still required to attribute its cause. The failed monolithic gate is recorded honestly and is not represented as green.
+
+### Exact-head review repair
+
+The first formal dual review of PR #425 at head `2e38d5e741c5555e476390d566f5435fc189e779` returned `REQUEST_CHANGES`. Both reviewers identified that the quote retained only the selected minimum instead of every frozen cap component, and that the item eligibility snapshot omitted exact variant identity. The traceability reviewer also rejected attribution of the monolithic identity errors without an equivalent base run.
+
+Tests were changed first to require the available-points, monetary-value, percentage and per-order cap components, a positive variant identity and rejection of variant zero. The focused command failed at test compilation on those deliberately absent fields and factory parameter. Production code then added only the reviewed immutable evidence and validation; the evidence wording was narrowed to state that the monolithic cause is unproven. The identical focused command passed in 03:05: 22 tests, 0 failures, 0 errors, 0 skipped. After updating to base `99ee22f5793d4a1a94f2eecf18f099c2425d9b36`, repository hygiene passed with 2525 tracked files and its regression suite remained 11/11.
 
 ## Residual gates
 
-- Track the inherited monolithic identity-suite order/isolation defect in a separate corrective cut.
+- Reproduce the monolithic identity failures on the exact base before attributing their cause; track any confirmed isolation defect in a separate corrective cut.
 - Obtain two independent exact-head GPT-6.1 Sol medium approvals, commit their receipts, recheck the receipts-only head and pass hosted CI before merge.
 - Mark PCC-015A complete only in post-merge evidence. Do not begin PCC-015B on an unmerged A base.

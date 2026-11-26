@@ -60,6 +60,10 @@ class LoyaltyPolicyTest {
         assertSame(LoyaltyOutcome.APPLIED, decision.outcome)
         val quote = requireNotNull(decision.quote)
         assertEquals(500L, quote.maximumPoints.value)
+        assertEquals(800L, quote.availablePoints.value)
+        assertEquals(5_000L, quote.monetaryValuePoints.value)
+        assertEquals(500L, quote.percentageCapPoints.value)
+        assertEquals(10_000L, quote.orderCapPoints.value)
         assertEquals(500L, quote.requestedPoints.value)
         assertEquals(50_000L, quote.discountMinor.value)
         assertEquals(450_000L, quote.finalEarningMinor.value)
@@ -109,6 +113,7 @@ class LoyaltyPolicyTest {
         assertSame(LoyaltyPolicyId.UNKNOWN, LoyaltyPolicyId.fromWire("LOYALTY-POLICY-V1"))
         val snapshot = requireNotNull(LoyaltyEligibilitySnapshot.create(
             itemId = 7,
+            variantId = 70,
             classification = LoyaltyItemClassification.STANDARD,
             quantity = 2,
             postDiscountMerchandise = minor(100_000),
@@ -119,13 +124,15 @@ class LoyaltyPolicyTest {
             policy = LoyaltyPolicyId.V1,
         ))
         assertEquals(90_000L, snapshot.finalEarning.value)
+        assertEquals(70L, snapshot.variantId)
         assertTrue(snapshot.eligible)
-        val outlet = requireNotNull(LoyaltyEligibilitySnapshot.create(8, LoyaltyItemClassification.OUTLET, 1, minor(50_000), minor(10_500), minor(0), minor(0), minor(0), LoyaltyPolicyId.V1))
+        val outlet = requireNotNull(LoyaltyEligibilitySnapshot.create(8, 80, LoyaltyItemClassification.OUTLET, 1, minor(50_000), minor(10_500), minor(0), minor(0), minor(0), LoyaltyPolicyId.V1))
         assertFalse(outlet.eligible)
-        assertNull(LoyaltyEligibilitySnapshot.create(7, LoyaltyItemClassification.OUTLET, 2, minor(100_000), minor(20_000), minor(1), minor(0), minor(1), LoyaltyPolicyId.V1))
-        assertNull(LoyaltyEligibilitySnapshot.create(7, LoyaltyItemClassification.STANDARD, 2, minor(100_000), minor(21_000), minor(100_000), minor(10_001), minor(90_000), LoyaltyPolicyId.V1))
-        assertNull(LoyaltyEligibilitySnapshot.create(7, LoyaltyItemClassification.STANDARD, 2, minor(100_000), minor(21_000), minor(100_000), minor(10_000), minor(90_000), LoyaltyPolicyId.UNKNOWN))
-        assertNull(LoyaltyEligibilitySnapshot.create(7, LoyaltyItemClassification.UNKNOWN, 2, minor(100_000), minor(21_000), minor(0), minor(0), minor(0), LoyaltyPolicyId.V1))
+        assertNull(LoyaltyEligibilitySnapshot.create(7, 70, LoyaltyItemClassification.OUTLET, 2, minor(100_000), minor(20_000), minor(1), minor(0), minor(1), LoyaltyPolicyId.V1))
+        assertNull(LoyaltyEligibilitySnapshot.create(7, 70, LoyaltyItemClassification.STANDARD, 2, minor(100_000), minor(21_000), minor(100_000), minor(10_001), minor(90_000), LoyaltyPolicyId.V1))
+        assertNull(LoyaltyEligibilitySnapshot.create(7, 70, LoyaltyItemClassification.STANDARD, 2, minor(100_000), minor(21_000), minor(100_000), minor(10_000), minor(90_000), LoyaltyPolicyId.UNKNOWN))
+        assertNull(LoyaltyEligibilitySnapshot.create(7, 70, LoyaltyItemClassification.UNKNOWN, 2, minor(100_000), minor(21_000), minor(0), minor(0), minor(0), LoyaltyPolicyId.V1))
+        assertNull(LoyaltyEligibilitySnapshot.create(7, 0, LoyaltyItemClassification.STANDARD, 2, minor(100_000), minor(21_000), minor(100_000), minor(10_000), minor(90_000), LoyaltyPolicyId.V1))
     }
 
     private fun item(id: Long, basis: Long) = requireNotNull(LoyaltyItemBasis.create(id, minor(basis)))
