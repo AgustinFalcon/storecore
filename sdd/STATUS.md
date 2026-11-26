@@ -1,14 +1,26 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C ProtectKernelModules del worker
+## En implementación — 2026-11-25, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva
-`ProtectKernelModules=true` y PID 1 lo lee. `ProtectHome`, `CPUQuota` y
-`RestrictAddressFamilies` quedan fuera. Sigue sin familia de sockets,
-cuota global, terminales sin ACK, FD/mmap tras el seal, reinicio en cada
-transición durable, RLIMIT restantes ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable y RLIMIT restantes. `ProtectHome`,
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento no
+cierra `003B-4C`. Sigue sin familia de sockets, cuota global ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-25, 4C ProtectKernelModules PR #409
+
+`master 77fbe292b26dfac7c8e22310392ad454f288817e` integra PR #409. Su
+candidato exacto `dc6219c3eb0f31d7d539308a665705ddadc74621` pasó Verify
+`45727472681` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261125-sol-pr409-architecture.md` y
+`sdd/reviews/20261125-sol-pr409-security.md`. El harness deriva
+`ProtectKernelModules=true` y PID 1 lo lee. `media-broker-pid1` usa
+`timeout-minutes: 40`. El corte no cierra `003B-4C`: no hay `CPUQuota`,
+familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C ProtectKernelLogs PR #407
 

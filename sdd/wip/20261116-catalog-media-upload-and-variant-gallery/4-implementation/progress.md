@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-25 — persist reviews PR #409, 003B-4C sigue abierto
+
+- Merge #409 `77fbe292b26dfac7c8e22310392ad454f288817e` sobre candidato
+  `dc6219c3eb0f31d7d539308a665705ddadc74621`. Verify exact-head
+  `45727472681` terminó 7/7. Dos reviews independientes Grok 4.7
+  aprobaron sin P0–P3: `sdd/reviews/20261125-sol-pr409-architecture.md`
+  y `sdd/reviews/20261125-sol-pr409-security.md`.
+- El harness deriva `ProtectKernelModules=true` y PID 1 lo lee.
+  `media-broker-pid1` usa `timeout-minutes: 40`. No se marca `003B-4C`.
+  No hay `CPUQuota`, familia de sockets, cuota global, `Ready` ni HTTP
+  de media.
+
 ## 2026-11-25 — arranque 4C ProtectKernelModules del worker
 
 - El harness deriva `ProtectKernelModules=true` y PID 1 lo lee.
