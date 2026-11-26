@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C RLIMIT STACK del worker
+
+- El harness deriva `LimitSTACK` (`RLIMIT_STACK`, 8 MiB) y PID 1 lo
+  lee. No es `LimitAS`.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #413, 003B-4C sigue abierto
 
 - Merge #413 `cca4c899936a59d602baae49ab7ec34d735778b9` sobre candidato
