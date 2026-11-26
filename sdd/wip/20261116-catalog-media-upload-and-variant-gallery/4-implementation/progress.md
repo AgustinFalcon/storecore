@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C RLIMIT AS del worker
+
+- El harness deriva `LimitAS` (`RLIMIT_AS`, mismo techo que `MemoryMax`)
+  y PID 1 lo lee. No es `MemoryMax` ni `CPUQuota`.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #409, 003B-4C sigue abierto
 
 - Merge #409 `77fbe292b26dfac7c8e22310392ad454f288817e` sobre candidato
