@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C terminales sin ACK
+
+- Un job `Terminal` sin `AckOutput` conserva jobs/bytes/mounts. El
+  segundo allocate falla `JobLimit`. PID 1 deja el primer `.mount`
+  Active y no carga el segundo.
+- No se marca `003B-4C`. No hay FD/mmap, familia de sockets, `Ready`
+  ni HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #420, 003B-4C sigue abierto
 
 - Merge #420 `9d2093289059784a38fdab9e9853fb56ff7c9a52` sobre candidato

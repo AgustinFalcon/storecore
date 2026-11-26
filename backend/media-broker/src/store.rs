@@ -458,6 +458,67 @@ mod tests {
     }
 
     #[test]
+    fn a_terminal_job_without_ack_keeps_the_global_reservation() {
+        let fixture = Fixture::new();
+        let limits = BudgetLimits::create(1, 1, 100, 2, 100, 2).expect("limits");
+        let mut store = fixture.ready_store(limits);
+        let allocated = store
+            .allocate(
+                [0x24; 16],
+                principal(),
+                [0xaf; 16],
+                reservation(100, 2, 1),
+                1,
+            )
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal(),
+                allocated.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("start");
+        let terminal = store
+            .transition(
+                starting.job_id(),
+                3,
+                principal(),
+                allocated.boot_id(),
+                JobState::Terminal,
+                4,
+            )
+            .expect("terminal");
+        assert_eq!(terminal.state(), JobState::Terminal);
+        assert_eq!(store.usage().jobs(), 1);
+        assert_eq!(store.usage().bytes(), 100);
+        assert_eq!(
+            store.allocate(
+                [0x25; 16],
+                principal(),
+                [0xaf; 16],
+                reservation(1, 1, 1),
+                5,
+            ),
+            Err(StoreError::Budget(BudgetError::JobLimit))
+        );
+        assert_eq!(store.record(terminal.job_id()), Ok(terminal));
+        assert_eq!(store.admission_status(), AdmissionStatus::Open);
+    }
+
+    #[test]
     fn terminal_jobs_keep_budget_and_exhaustion_rejects_new_work() {
         let fixture = Fixture::new();
         let limits = BudgetLimits::create(1, 1, 100, 2, 100, 2).expect("limits");
