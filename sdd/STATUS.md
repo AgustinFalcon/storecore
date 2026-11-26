@@ -3,14 +3,25 @@
 ## En implementación — 2026-11-26, 4C sigue abierto
 
 Siguiente corte: terminales sin ACK, FD/mmap tras el seal y reinicio
-en cada transición durable. Este corte atesta la cuota global: un
-`BudgetLimits` de un job admite el primero, el segundo falla
-`JobLimit` y PID 1 no arranca el segundo `.mount`. Los RLIMIT del
-worker quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
+en cada transición durable. La cuota global y los RLIMIT del worker
+quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
 `CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue
 sin familia de sockets, terminales sin ACK ni `Ready`. `003B-4B-3`,
 `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
 corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-26, 4C cuota global PR #420
+
+`master 9d2093289059784a38fdab9e9853fb56ff7c9a52` integra PR #420. Su
+candidato exacto `f63631a062d4c4d986cdd3445a6811d06637f663` pasó Verify
+`45887600304` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr420-architecture.md` y
+`sdd/reviews/20261126-sol-pr420-security.md`. El harness admite el
+primer job, rechaza el segundo con `JobLimit` y PID 1 no carga el
+segundo `.mount`. El corte no cierra `003B-4C`: no hay `CPUQuota`,
+familia de sockets, terminales sin ACK ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
 
 ## Master vigente — 2026-11-26, 4C LimitSTACK PR #416
 
