@@ -114,7 +114,7 @@ class PublishedAxeImpact extends PublicationValue {
 }
 const publishedActionIds = new Set(Object.values(evidenceWire.actionIds));
 const publishedSurfaces = new Set([
-  ...Array.from({ length: 29 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
+  ...Array.from({ length: 34 }, (_, index) => `SC-SURF-${String(index + 1).padStart(2, '0')}`),
   'RD-VERIFY-EMAIL', 'RD-USER-ACCOUNT',
 ]);
 const publishedFailureFiles = new Set([
@@ -294,6 +294,8 @@ function checkSecurityContracts() {
     writeFileSync(invalid, JSON.stringify(invalidAttachment(overrides)));
     assert.throws(() => publishEvidence(invalid, join(scratch, 'invalid-output')));
   }
+  assert.equal(publishedSurfaces.has('SC-SURF-34'), true);
+  assert.equal(publishedSurfaces.has('SC-SURF-35'), false);
   assert.equal(BrowserOutcome.fromWire('future-outcome'), BrowserOutcome.Unknown);
   console.log('PSD environment, closed outcomes and evidence redaction checks passed');
 }
