@@ -27,3 +27,7 @@ PCC-012B remains `in_progress`: snapshot preparation, exact pre-count, full-deta
 The next reversible unit adds the exact three-parameter CSV query, canonical period-token translation, the separate preparation port with the five closed outcomes, and an owned prepared artifact. The artifact contains no JDBC, lazy callback or HTTP object; it copies both incoming and outgoing bytes, synchronizes read/release, clears its owned buffer and releases idempotently.
 
 The red compile named only the missing query and artifact symbols. `mvn.cmd -q -Dtest='ChannelReportCsvPreparationTest,ChannelReportHttpContractTest' test` then passed 6 tests with 0 failures and 0 errors. Architecture and concurrency reviewers both returned **APPROVE** with no P0-P3. Commit-before-`Prepared` remains an adapter obligation for the next checkpoint and is not claimed here.
+
+## Exact record-budget checkpoint
+
+The record-budget primitive sums section counts with unbounded `BigInteger`, rejects negative inputs, admits exactly 50,000, rejects 50,001 and verifies exact equality with the eventual prepared data-record count. The focused suite passed 2 tests with 0 failures/errors, including `Long.MAX_VALUE + 1` without bounded overflow. Both reviewers returned **APPROVE** and reiterated that the integrated section plan must own both count and emission before `Prepared` is published.

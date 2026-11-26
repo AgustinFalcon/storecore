@@ -3,6 +3,7 @@ package com.storecore.channelreporting.infrastructure
 import com.storecore.channelreporting.domain.ReportArsAmount
 import com.storecore.channelreporting.domain.ReportSignedLong
 import com.storecore.channelreporting.domain.ReportUnsignedLong
+import java.math.BigInteger
 
 enum class ChannelReportCsvColumn(val wire: String) {
     RECORD_KIND("recordKind"),
@@ -105,6 +106,29 @@ enum class ChannelReportCsvPart {
     companion object {
         fun fromWire(raw: String?): ChannelReportCsvPart =
             entries.firstOrNull { it != UNKNOWN && it.name == raw } ?: UNKNOWN
+    }
+}
+
+enum class ChannelReportCsvDataRecordAdmission { ADMITTED, TOO_LARGE }
+
+class ChannelReportCsvDataRecordBudget private constructor(private val expected: BigInteger) {
+    val admission: ChannelReportCsvDataRecordAdmission =
+        if (expected <= MAX_DATA_RECORDS) ChannelReportCsvDataRecordAdmission.ADMITTED
+        else ChannelReportCsvDataRecordAdmission.TOO_LARGE
+
+    fun matchesPreparedRecordCount(actual: BigInteger): Boolean = actual.signum() >= 0 && actual == expected
+
+    companion object {
+        fun create(sectionCounts: Iterable<BigInteger>): ChannelReportCsvDataRecordBudget? {
+            var total = BigInteger.ZERO
+            for (count in sectionCounts) {
+                if (count.signum() < 0) return null
+                total += count
+            }
+            return ChannelReportCsvDataRecordBudget(total)
+        }
+
+        private val MAX_DATA_RECORDS = BigInteger.valueOf(50_000)
     }
 }
 
