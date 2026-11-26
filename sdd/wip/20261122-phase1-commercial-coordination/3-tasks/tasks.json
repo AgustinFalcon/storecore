@@ -42,7 +42,7 @@
     {"id":"PCC-012E","slice":"reporting-delivery","status":"completed","title":"Deliver safe export download and integrated accessible browser journeys","evidence":"evidence/pcc-012e-report-export-browser-20261126.md"},
     {"id":"PCC-013","slice":"reporting","status":"completed","title":"Validate unavailable/stale/partial data, reviews, CI and merge","evidence":"evidence/pcc-009-013-hosted-closeout-20261126.md"},
     {"id":"PCC-013A","slice":"reporting-future","status":"deferred","title":"Design and review a separate BlackStore commercial-facts read contract before monetary channel mix"},
-    {"id":"PCC-014","slice":"loyalty","status":"in_progress","title":"Close Policy V1 POINT ledger, earning lots, recovery, reservation and reconciliation semantics"},
+    {"id":"PCC-014","slice":"loyalty","status":"completed","title":"Close Policy V1 POINT ledger, earning lots, recovery, reservation and reconciliation semantics","evidence":"evidence/pcc-014-hosted-closeout-20261126.md"},
     {"id":"PCC-015","slice":"loyalty","status":"pending","title":"Implement append-only ledger, checked balance and idempotent order saga"},
     {"id":"PCC-016","slice":"loyalty","status":"pending","title":"Build customer wallet and audited admin adjustment/reconciliation UI"},
     {"id":"PCC-017","slice":"loyalty","status":"pending","title":"Validate cumulative partial returns, late payment approval, expiry, concurrency, reviews, CI and merge"},
