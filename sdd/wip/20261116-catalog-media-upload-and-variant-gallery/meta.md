@@ -120,7 +120,10 @@ Verify `45708331318` 7/7, dos Grok 4.7 APPROVED) deriva
 APPROVED) deriva `ProtectKernelModules=true`; no cierra cuota global ni
 `Ready`. PR #411 (head `ca23f75`, merge `3aaced7`, Verify `45743360147`
 7/7, dos Grok 4.7 APPROVED) deriva `LimitAS` 32× heap (`RLIMIT_AS`); no
-cierra cuota global ni `Ready`. PR #326
+cierra cuota global ni `Ready`. PR #413 (head `af49a66`, merge
+`cca4c89`, Verify `45839402157` 7/7, dos Grok 4.7 APPROVED) deriva
+`LimitDATA` 32× heap (`RLIMIT_DATA`); no cierra cuota global ni
+`Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
