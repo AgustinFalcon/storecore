@@ -295,6 +295,176 @@ class StoreCoreCreatedOrderReportPostgresTest(
         assertIs<ReportValue.Unavailable>(found.report.lowStock)
     }
 
+    @Test fun `return receipt is reread after restatement while confirmed disposition uses immutable confirmation time`() {
+        val order = order("2026-02-01T12:00:00Z", "200.00")
+        val variant = soldItem(order, 2, "Return Drill", "RETURN-DRILL")
+        val orderItem = jdbc.queryForObject("SELECT id FROM order_items WHERE order_id=?", Long::class.java, order)!!
+        val returned = jdbc.queryForObject(
+            """INSERT INTO returns(rma_number,order_id,status,received_at,created_at,updated_at)
+               VALUES (?,?,'RETURN_RECEIVED','2026-03-10T12:00:00Z','2026-03-09T12:00:00Z','2026-03-10T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            order,
+        )!!
+        val returnItem = jdbc.queryForObject(
+            "INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,1) RETURNING id",
+            Long::class.java,
+            returned,
+            orderItem,
+        )!!
+
+        val first = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2026-03-01", "2026-04-01"))
+        assertEquals("1", first.report.returnReceiptsValue()!!.returnCount.wire)
+        assertEquals("1", first.report.returnReceiptsValue()!!.returnedUnits.wire)
+        assertEquals("0", first.report.confirmedReturnDispositionValue()!!.restockUnits.wire)
+
+        jdbc.update("UPDATE return_items SET quantity=2 WHERE id=?", returnItem)
+        val restated = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2026-03-01", "2026-04-01"))
+        assertEquals("2", restated.report.returnReceiptsValue()!!.returnedUnits.wire)
+
+        val actor = jdbc.queryForObject(
+            "INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?, 'Report','Admin') RETURNING id",
+            Long::class.java,
+            "return-report-${UUID.randomUUID()}@example.com",
+            "\$argon2id\$fixture",
+        )!!
+        val command = jdbc.queryForObject(
+            """INSERT INTO rma_disposition_commands(return_id,idempotency_key,request_hash,actor_id,confirmed_at,result)
+               VALUES (?,?,?,?,'2026-04-05T12:00:00Z','{}') RETURNING id""",
+            Long::class.java,
+            returned,
+            UUID.randomUUID(),
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'),
+            actor,
+        )!!
+        val ledger = jdbc.queryForObject(
+            """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor,created_at)
+               VALUES (?,?,'RMA_RESTOCK','INTERNAL',1,'REPORT_TEST','2026-04-05T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            variant,
+            UUID.randomUUID(),
+        )!!
+        jdbc.update(
+            """UPDATE return_items SET disposition_command_id=?,restock_quantity=1,damaged_quantity=1,rejected_quantity=0,
+               damage_reason='COSMETIC',rejection_reason=NULL,adjustment_ledger_id=? WHERE id=?""",
+            command,
+            ledger,
+            returnItem,
+        )
+        jdbc.update("UPDATE returns SET status='CLOSED',updated_at='2026-04-05T12:00:00Z' WHERE id=?", returned)
+
+        val disposition = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2026-04-01", "2026-05-01"))
+        assertEquals("1", disposition.report.confirmedReturnDispositionValue()!!.restockUnits.wire)
+        assertEquals("1", disposition.report.confirmedReturnDispositionValue()!!.damagedUnits.wire)
+        assertEquals("0", disposition.report.confirmedReturnDispositionValue()!!.rejectedUnits.wire)
+        assertIs<ReportValue.NotAvailable>(disposition.report.netRevenue)
+        assertIs<ReportValue.NotAvailable>(disposition.report.reversalAmount)
+        assertIs<ReportValue.NotAvailable>(disposition.report.fiscalTotal)
+    }
+
+    @Test fun `return item attached to a different order makes receipt metric unavailable`() {
+        val returnOrder = order("2006-02-01T12:00:00Z", "100.00")
+        val otherOrder = order("2006-02-02T12:00:00Z", "100.00")
+        soldItem(returnOrder, 1, "Expected Drill", "EXPECTED")
+        soldItem(otherOrder, 1, "Foreign Drill", "FOREIGN")
+        val foreignItem = jdbc.queryForObject("SELECT id FROM order_items WHERE order_id=?", Long::class.java, otherOrder)!!
+        val returned = jdbc.queryForObject(
+            """INSERT INTO returns(rma_number,order_id,status,received_at,created_at,updated_at)
+               VALUES (?,?,'RETURN_RECEIVED','2006-03-10T12:00:00Z','2006-03-09T12:00:00Z','2006-03-10T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            returnOrder,
+        )!!
+        jdbc.update("INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,1)", returned, foreignItem)
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2006-03-01", "2006-04-01"))
+        assertIs<ReportValue.Unavailable>(found.report.returnReceipts)
+    }
+
+    @Test fun `received state without receipt time cannot disappear as an available zero`() {
+        val order = order("2005-02-01T12:00:00Z", "100.00")
+        val returned = jdbc.queryForObject(
+            "INSERT INTO returns(rma_number,order_id,status,received_at) VALUES (?,?,'RETURN_RECEIVED',NULL) RETURNING id",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            order,
+        )!!
+
+        val result = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2005-03-01", "2005-04-01"))
+        jdbc.update("UPDATE returns SET status='REQUESTED' WHERE id=?", returned)
+        assertIs<ReportValue.Unavailable>(result.report.returnReceipts)
+    }
+
+    @Test fun `confirmed disposition rejects quantities above sold and incomplete order item sets`() {
+        val excessiveOrder = order("2004-01-01T12:00:00Z", "200.00")
+        val excessiveVariant = soldItem(excessiveOrder, 2, "Excess Drill", "EXCESS")
+        val excessiveOrderItem = jdbc.queryForObject("SELECT id FROM order_items WHERE order_id=?", Long::class.java, excessiveOrder)!!
+        val excessiveReturn = jdbc.queryForObject(
+            """INSERT INTO returns(rma_number,order_id,status,received_at,created_at,updated_at)
+               VALUES (?,?,'CLOSED','2004-02-01T12:00:00Z','2004-01-02T12:00:00Z','2004-03-01T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            excessiveOrder,
+        )!!
+        val excessiveReturnItem = jdbc.queryForObject(
+            "INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,3) RETURNING id",
+            Long::class.java,
+            excessiveReturn,
+            excessiveOrderItem,
+        )!!
+        confirmRestock(excessiveReturn, excessiveReturnItem, excessiveVariant, 3, "2004-03-01T12:00:00Z")
+        val excessive = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2004-03-01", "2004-04-01"))
+        assertIs<ReportValue.Unavailable>(excessive.report.confirmedReturnDisposition)
+
+        val incompleteOrder = order("2003-01-01T12:00:00Z", "200.00")
+        val includedVariant = soldItem(incompleteOrder, 1, "Included Drill", "INCLUDED")
+        soldItem(incompleteOrder, 1, "Missing Drill", "MISSING")
+        val includedOrderItem = jdbc.queryForObject(
+            "SELECT id FROM order_items WHERE order_id=? ORDER BY id LIMIT 1",
+            Long::class.java,
+            incompleteOrder,
+        )!!
+        val incompleteReturn = jdbc.queryForObject(
+            """INSERT INTO returns(rma_number,order_id,status,received_at,created_at,updated_at)
+               VALUES (?,?,'CLOSED','2003-02-01T12:00:00Z','2003-01-02T12:00:00Z','2003-03-01T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            incompleteOrder,
+        )!!
+        val includedReturnItem = jdbc.queryForObject(
+            "INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,1) RETURNING id",
+            Long::class.java,
+            incompleteReturn,
+            includedOrderItem,
+        )!!
+        confirmRestock(incompleteReturn, includedReturnItem, includedVariant, 1, "2003-03-01T12:00:00Z")
+        val incomplete = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2003-03-01", "2003-04-01"))
+        assertIs<ReportValue.Unavailable>(incomplete.report.confirmedReturnDisposition)
+    }
+
+    @Test fun `confirmed disposition rejects receipt before return creation`() {
+        val order = order("2002-01-01T12:00:00Z", "100.00")
+        val variant = soldItem(order, 1, "Chronology Drill", "CHRONOLOGY")
+        val orderItem = jdbc.queryForObject("SELECT id FROM order_items WHERE order_id=?", Long::class.java, order)!!
+        val returned = jdbc.queryForObject(
+            """INSERT INTO returns(rma_number,order_id,status,received_at,created_at,updated_at)
+               VALUES (?,?,'CLOSED','2002-02-01T12:00:00Z','2002-02-02T12:00:00Z','2002-03-01T12:00:00Z') RETURNING id""",
+            Long::class.java,
+            "RMA-${UUID.randomUUID()}",
+            order,
+        )!!
+        val returnItem = jdbc.queryForObject(
+            "INSERT INTO return_items(return_id,order_item_id,quantity) VALUES (?,?,1) RETURNING id",
+            Long::class.java,
+            returned,
+            orderItem,
+        )!!
+        confirmRestock(returned, returnItem, variant, 1, "2002-03-01T12:00:00Z")
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2002-03-01", "2002-04-01"))
+        assertIs<ReportValue.Unavailable>(found.report.confirmedReturnDisposition)
+    }
+
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {
         val customer = jdbc.queryForObject(
             "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Report','Buyer') RETURNING id",
@@ -405,6 +575,42 @@ class StoreCoreCreatedOrderReportPostgresTest(
             """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor,created_at)
                VALUES (?,?,?,?,?,'REPORT_TEST',?::timestamptz)""",
             variantId, UUID.randomUUID(), eventType, channel, delta, createdAt,
+        )
+    }
+
+    private fun confirmRestock(returnId: Long, returnItemId: Long, variantId: Long, quantity: Int, confirmedAt: String) {
+        val actor = jdbc.queryForObject(
+            "INSERT INTO users(email,password_hash,first_name,last_name) VALUES (?,?, 'Report','Admin') RETURNING id",
+            Long::class.java,
+            "return-report-${UUID.randomUUID()}@example.com",
+            "\$argon2id\$fixture",
+        )!!
+        val command = jdbc.queryForObject(
+            """INSERT INTO rma_disposition_commands(return_id,idempotency_key,request_hash,actor_id,confirmed_at,result)
+               VALUES (?,?,?,?,?::timestamptz,'{}') RETURNING id""",
+            Long::class.java,
+            returnId,
+            UUID.randomUUID(),
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'),
+            actor,
+            confirmedAt,
+        )!!
+        val ledger = jdbc.queryForObject(
+            """INSERT INTO inventory_ledger(variant_id,event_idempotency_key,event_type,channel,quantity_delta,actor,created_at)
+               VALUES (?,?,'RMA_RESTOCK','INTERNAL',?,'REPORT_TEST',?::timestamptz) RETURNING id""",
+            Long::class.java,
+            variantId,
+            UUID.randomUUID(),
+            quantity,
+            confirmedAt,
+        )!!
+        jdbc.update(
+            """UPDATE return_items SET disposition_command_id=?,restock_quantity=?,damaged_quantity=0,rejected_quantity=0,
+               adjustment_ledger_id=? WHERE id=?""",
+            command,
+            quantity,
+            ledger,
+            returnItemId,
         )
     }
 

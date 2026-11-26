@@ -177,6 +177,39 @@ class LowStockReport private constructor(
     }
 }
 
+class ReturnReceiptMetrics private constructor(
+    val returnCount: ReportUnsignedLong,
+    val returnedUnits: ReportUnsignedLong,
+) {
+    companion object {
+        fun create(returnCount: ReportUnsignedLong, returnedUnits: ReportUnsignedLong): ReturnReceiptMetrics? =
+            takeIf { (returnCount.value == 0L) == (returnedUnits.value == 0L) }
+                ?.let { ReturnReceiptMetrics(returnCount, returnedUnits) }
+    }
+}
+
+class ConfirmedReturnDispositionMetrics private constructor(
+    val confirmedReturnCount: ReportUnsignedLong,
+    val restockUnits: ReportUnsignedLong,
+    val damagedUnits: ReportUnsignedLong,
+    val rejectedUnits: ReportUnsignedLong,
+) {
+    companion object {
+        fun create(
+            confirmedReturnCount: ReportUnsignedLong,
+            restockUnits: ReportUnsignedLong,
+            damagedUnits: ReportUnsignedLong,
+            rejectedUnits: ReportUnsignedLong,
+        ): ConfirmedReturnDispositionMetrics? {
+            val total = runCatching {
+                Math.addExact(Math.addExact(restockUnits.value, damagedUnits.value), rejectedUnits.value)
+            }.getOrNull() ?: return null
+            return takeIf { (confirmedReturnCount.value == 0L) == (total == 0L) }
+                ?.let { ConfirmedReturnDispositionMetrics(confirmedReturnCount, restockUnits, damagedUnits, rejectedUnits) }
+        }
+    }
+}
+
 class StoreCoreCreatedOrderReport(
     val period: ReportPeriod,
     val createdOrders: ReportValue<CreatedOrderMetrics>,
@@ -185,6 +218,11 @@ class StoreCoreCreatedOrderReport(
     val paymentDisposition: ReportValue<PaymentDispositionReport>,
     val inventoryMovements: ReportValue<InventoryMovementReport>,
     val lowStock: ReportValue<LowStockReport>,
+    val returnReceipts: ReportValue<ReturnReceiptMetrics>,
+    val confirmedReturnDisposition: ReportValue<ConfirmedReturnDispositionMetrics>,
+    val netRevenue: ReportValue<ReportArsAmount>,
+    val reversalAmount: ReportValue<ReportArsAmount>,
+    val fiscalTotal: ReportValue<ReportArsAmount>,
 ) {
     fun createdOrdersValue(): CreatedOrderMetrics? = (createdOrders as? ReportValue.Available)?.value
     fun appliedAccreditationsValue(): AppliedAccreditationMetrics? = (appliedAccreditations as? ReportValue.Available)?.value
@@ -192,6 +230,9 @@ class StoreCoreCreatedOrderReport(
     fun paymentDispositionValue(): PaymentDispositionReport? = (paymentDisposition as? ReportValue.Available)?.value
     fun inventoryMovementsValue(): InventoryMovementReport? = (inventoryMovements as? ReportValue.Available)?.value
     fun lowStockValue(): LowStockReport? = (lowStock as? ReportValue.Available)?.value
+    fun returnReceiptsValue(): ReturnReceiptMetrics? = (returnReceipts as? ReportValue.Available)?.value
+    fun confirmedReturnDispositionValue(): ConfirmedReturnDispositionMetrics? =
+        (confirmedReturnDisposition as? ReportValue.Available)?.value
 }
 
 sealed interface StoreCoreCreatedOrderReadResult {

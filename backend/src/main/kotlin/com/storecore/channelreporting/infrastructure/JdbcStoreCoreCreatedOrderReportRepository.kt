@@ -58,6 +58,11 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                     val paymentDisposition = paymentDisposition(period)
                     val inventoryMovements = inventoryMovements(period)
                     val lowStock = lowStock(period)
+                    val returnReceipts = returnReceipts(period)
+                    val confirmedReturnDisposition = confirmedReturnDisposition(period)
+                    val reversalUnavailable = requireNotNull(
+                        ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.REVERSAL_AMOUNT_UNAVAILABLE),
+                    )
                     StoreCoreCreatedOrderReadResult.Found(StoreCoreCreatedOrderReport(
                         period,
                         ReportValue.available(CreatedOrderMetrics(count, amount), evidence),
@@ -66,6 +71,11 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                         paymentDisposition,
                         inventoryMovements,
                         lowStock,
+                        returnReceipts,
+                        confirmedReturnDisposition,
+                        reversalUnavailable,
+                        reversalUnavailable,
+                        reversalUnavailable,
                     ))
                 }
             } ?: unavailable(ReportUnavailableReason.READ_FAILED)
@@ -350,6 +360,102 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         ) ?: return unavailableValue()
         return ReportValue.available(report, evidence)
     }
+
+    private fun returnReceipts(period: ReportPeriod): ReportValue<ReturnReceiptMetrics> {
+        val row = jdbc.queryForMap(
+            """WITH selected AS (
+                 SELECT r.id,r.status,r.received_at,r.created_at,r.updated_at,
+                        count(ri.id) item_count,
+                        count(DISTINCT ri.order_item_id) distinct_item_count,
+                        COALESCE(sum(ri.quantity::numeric),0) returned_units,
+                        count(*) FILTER (WHERE ri.id IS NOT NULL AND (
+                          oi.id IS NULL OR oi.order_id<>r.order_id OR ri.quantity<=0 OR ri.quantity>oi.quantity
+                        )) invalid_item_count
+                 FROM returns r
+                 LEFT JOIN return_items ri ON ri.return_id=r.id
+                 LEFT JOIN order_items oi ON oi.id=ri.order_item_id
+                 WHERE r.received_at>=? AND r.received_at<?
+                 GROUP BY r.id,r.status,r.received_at,r.created_at,r.updated_at
+               )
+               SELECT count(*) return_count,COALESCE(sum(returned_units),0) returned_units,
+                      count(*) FILTER (WHERE status NOT IN ('RETURN_RECEIVED','INSPECTED','CLOSED')
+                        OR received_at<created_at OR received_at>updated_at OR item_count=0
+                        OR item_count<>distinct_item_count OR invalid_item_count<>0)
+                      + (SELECT count(*) FROM returns
+                         WHERE status IN ('RETURN_RECEIVED','INSPECTED','CLOSED') AND received_at IS NULL) contradiction_count
+               FROM selected""",
+            Timestamp.from(period.fromInclusive),
+            Timestamp.from(period.toExclusive),
+        )
+        if ((row["contradiction_count"] as Number).toLong() != 0L) return unavailableValue()
+        val count = ReportUnsignedLong.fromValue((row["return_count"] as Number).toLong()) ?: return unavailableValue()
+        val units = exactUnsigned(row["returned_units"]) ?: return unavailableValue()
+        val metrics = ReturnReceiptMetrics.create(count, units) ?: return unavailableValue()
+        val evidence = ReportEvidence.period(
+            ReportSource.STORECORE_RETURN,
+            ReportTimeBasis.RETURN_RECEIVED,
+            ReportFreshness.CURRENT,
+            period,
+        ) ?: return unavailableValue()
+        return ReportValue.available(metrics, evidence)
+    }
+
+    private fun confirmedReturnDisposition(period: ReportPeriod): ReportValue<ConfirmedReturnDispositionMetrics> {
+        val row = jdbc.queryForMap(
+            """WITH selected AS (
+                 SELECT c.id,c.confirmed_at,r.status,r.received_at,r.created_at,r.inspection_result,
+                        (SELECT count(*) FROM order_items expected WHERE expected.order_id=r.order_id) expected_item_count,
+                        count(ri.id) item_count,
+                        count(DISTINCT ri.order_item_id) distinct_item_count,
+                        COALESCE(sum(ri.restock_quantity::numeric),0) restock_units,
+                        COALESCE(sum(ri.damaged_quantity::numeric),0) damaged_units,
+                        COALESCE(sum(ri.rejected_quantity::numeric),0) rejected_units,
+                        count(*) FILTER (WHERE ri.id IS NULL OR ri.disposition_command_id IS DISTINCT FROM c.id
+                          OR oi.id IS NULL OR oi.order_id<>r.order_id OR ri.quantity<>oi.quantity
+                          OR ri.restock_quantity IS NULL OR ri.damaged_quantity IS NULL OR ri.rejected_quantity IS NULL
+                          OR ri.restock_quantity<0 OR ri.damaged_quantity<0 OR ri.rejected_quantity<0
+                          OR ri.restock_quantity::bigint+ri.damaged_quantity::bigint+ri.rejected_quantity::bigint<>ri.quantity::bigint
+                          OR (ri.restock_quantity=0 AND ri.adjustment_ledger_id IS NOT NULL)
+                          OR (ri.restock_quantity>0 AND (l.id IS NULL OR l.variant_id<>oi.variant_id
+                            OR l.event_type<>'RMA_RESTOCK' OR l.channel<>'INTERNAL' OR l.quantity_delta<>ri.restock_quantity))
+                        ) invalid_item_count
+                 FROM rma_disposition_commands c
+                 JOIN returns r ON r.id=c.return_id
+                 LEFT JOIN return_items ri ON ri.return_id=r.id
+                 LEFT JOIN order_items oi ON oi.id=ri.order_item_id
+                 LEFT JOIN inventory_ledger l ON l.id=ri.adjustment_ledger_id
+                 WHERE c.confirmed_at>=? AND c.confirmed_at<?
+                 GROUP BY c.id,c.confirmed_at,r.status,r.received_at,r.created_at,r.inspection_result,r.order_id
+               )
+               SELECT count(*) confirmed_count,
+                      COALESCE(sum(restock_units),0) restock_units,
+                      COALESCE(sum(damaged_units),0) damaged_units,
+                      COALESCE(sum(rejected_units),0) rejected_units,
+                      count(*) FILTER (WHERE status<>'CLOSED' OR received_at IS NULL
+                        OR received_at<created_at OR confirmed_at<received_at OR confirmed_at<created_at OR inspection_result IS NOT NULL
+                        OR item_count=0 OR item_count<>expected_item_count
+                        OR item_count<>distinct_item_count OR invalid_item_count<>0) contradiction_count
+               FROM selected""",
+            Timestamp.from(period.fromInclusive),
+            Timestamp.from(period.toExclusive),
+        )
+        if ((row["contradiction_count"] as Number).toLong() != 0L) return unavailableValue()
+        val count = ReportUnsignedLong.fromValue((row["confirmed_count"] as Number).toLong()) ?: return unavailableValue()
+        val restock = exactUnsigned(row["restock_units"]) ?: return unavailableValue()
+        val damaged = exactUnsigned(row["damaged_units"]) ?: return unavailableValue()
+        val rejected = exactUnsigned(row["rejected_units"]) ?: return unavailableValue()
+        val metrics = ConfirmedReturnDispositionMetrics.create(count, restock, damaged, rejected) ?: return unavailableValue()
+        val evidence = ReportEvidence.period(
+            ReportSource.STORECORE_RETURN,
+            ReportTimeBasis.DISPOSITION_CONFIRMED,
+            ReportFreshness.CURRENT,
+            period,
+        ) ?: return unavailableValue()
+        return ReportValue.available(metrics, evidence)
+    }
+
+    private fun exactUnsigned(raw: Any?): ReportUnsignedLong? =
+        (raw as? BigDecimal)?.let { runCatching { it.longValueExact() }.getOrNull() }?.let(ReportUnsignedLong::fromValue)
 
     private fun <T : Any> unavailableValue(): ReportValue<T> =
         requireNotNull(ReportValue.unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY))
