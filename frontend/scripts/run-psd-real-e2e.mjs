@@ -590,7 +590,7 @@ async function run() {
   });
   await checkSafety();
   const evidence = publishEvidence(process.env.STORECORE_PSD_RAW_REPORT);
-  if (evidence.failures > 0 || evidence.routeAcceptances !== 108 || evidence.actionAcceptances !== 17) process.exitCode = 1;
+  if (evidence.failures > 0 || evidence.routeAcceptances !== 111 || evidence.actionAcceptances !== 17) process.exitCode = 1;
   writeFileSync(join(results, 'runtime-summary.json'), `${JSON.stringify({ sha: process.env.GITHUB_SHA ?? 'local',
     externalSafetyBefore: true, externalSafetyAfter: true, ...evidence, exitCode: process.exitCode })}\n`);
 }
