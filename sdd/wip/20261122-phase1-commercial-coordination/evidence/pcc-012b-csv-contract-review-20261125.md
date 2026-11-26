@@ -39,3 +39,9 @@ The existing JDBC report adapter now has one private `executeOwnedSnapshot` owne
 `mvn.cmd -q -Dtest='StoreCoreCreatedOrderReportFailureTest,StoreCoreCreatedOrderReportPostgresTest' test` passed 29 tests with 0 failures/errors against a fresh PostgreSQL 16 Testcontainer and all 39 migrations. Both reviewers returned **APPROVE** with no P0-P3. No export behavior is claimed by this refactor-only checkpoint.
 
 Period resolution is now also separated from metric projection while remaining inside that owned snapshot. The order remains timezone → database clock → canonical period; only after a successful resolution can a caller project metrics. The same 29-test PostgreSQL/failure suite remained green, and both reviewers returned **APPROVE**. This creates the required seam for a stale-token comparison before metric queries; the comparison itself remains the next implementation cut.
+
+## Section-plan checkpoint
+
+The first executable section plan owns both count and emission for the minimal valid fixture: one metadata record outside the budget, 24 root status records and the available `createdOrders` value. It repeats authoritative context, emits typed canonical count/money cells and verifies the prepared record count against the same records before encoding.
+
+The first review found a P2 because the draft branched on HTTP availability strings. The plan was corrected to consume sealed `ReportValue<T>`, typed evidence and `ReportPeriod` directly; the HTTP mapper is invoked only as an integral correlation validator and its DTO is discarded. The affected CSV/HTTP suite passed 12 tests with 0 failures/errors, and both reviewers returned **APPROVE** with no remaining P0-P3. Other available metrics deliberately fail plan creation until their own section implementations land; this partial plan is not wired to the preparation port or HTTP.

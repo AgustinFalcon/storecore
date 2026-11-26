@@ -3,6 +3,7 @@ package com.storecore.channelreporting
 import com.storecore.channelreporting.application.PreparedChannelReportCsv
 import com.storecore.channelreporting.infrastructure.ChannelReportCsvDataRecordAdmission
 import com.storecore.channelreporting.infrastructure.ChannelReportCsvDataRecordBudget
+import com.storecore.channelreporting.infrastructure.ChannelReportCsvPlan
 import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -39,5 +40,18 @@ class ChannelReportCsvPreparationTest {
         val unbounded = ChannelReportCsvDataRecordBudget.create(listOf(BigInteger.valueOf(Long.MAX_VALUE), BigInteger.ONE))!!
         assertTrue(unbounded.admission == ChannelReportCsvDataRecordAdmission.TOO_LARGE)
         assertNull(ChannelReportCsvDataRecordBudget.create(listOf(BigInteger.ONE.negate())))
+    }
+
+    @Test fun `section plan owns twenty four statuses and the available created order value`() {
+        val plan = ChannelReportCsvPlan.create(channelReportFixture())!!
+        assertTrue(plan.budget.matchesPreparedRecordCount(BigInteger.valueOf(25)))
+        val csv = plan.encode()!!.toString(Charsets.UTF_8)
+        val records = csv.removeSuffix("\r\n").split("\r\n")
+
+        assertTrue(records.first().startsWith("recordKind,metric,part,"))
+        assertTrue(records[1].startsWith("META,,,"))
+        assertTrue(records.count { it.startsWith("STATUS,") } == 24)
+        assertTrue(records.count { it.startsWith("VALUE,createdOrders,ROOT,") } == 1)
+        assertTrue(records.size == 27)
     }
 }
