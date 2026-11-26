@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #424, 003B-4C sigue abierto
+
+- Merge #424 `abfc24c1a623707e62014279eaa6f953b857c519` sobre candidato
+  `c75a7e1c959ec27459ba5d22023ae90db92df90a`. Verify exact-head
+  `45898587594` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261126-sol-pr424-architecture.md` y
+  `sdd/reviews/20261126-sol-pr424-security.md`.
+- Un job `Terminal` sin `AckOutput` conserva la reserva; PID 1 deja
+  el primer `.mount` Active. No se marca `003B-4C`. No hay FD/mmap,
+  familia de sockets, `Ready` ni HTTP de media.
+
 ## 2026-11-26 — arranque 4C terminales sin ACK
 
 - Un job `Terminal` sin `AckOutput` conserva jobs/bytes/mounts. El

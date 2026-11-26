@@ -3,14 +3,25 @@
 ## En implementación — 2026-11-26, 4C sigue abierto
 
 Siguiente corte: FD/mmap tras el seal y reinicio en cada transición
-durable. Este corte atesta terminales sin ACK: el job `Terminal`
-conserva la reserva global, el segundo allocate falla `JobLimit` y
-PID 1 no desmonta el primer `.mount`. La cuota global y los RLIMIT
-del worker quedan atestados. `ProtectHome`, `RestrictAddressFamilies`
-y `CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue
-sin familia de sockets, FD/mmap ni `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
-agrega HTTP de media.
+durable. Terminales sin ACK, cuota global y RLIMIT del worker quedan
+atestados. `ProtectHome`, `RestrictAddressFamilies` y `CPUQuota`
+quedan fuera. Este documento no cierra `003B-4C`. Sigue sin familia
+de sockets, FD/mmap ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
+`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de
+media.
+
+## Master vigente — 2026-11-26, 4C terminales sin ACK PR #424
+
+`master abfc24c1a623707e62014279eaa6f953b857c519` integra PR #424. Su
+candidato exacto `c75a7e1c959ec27459ba5d22023ae90db92df90a` pasó Verify
+`45898587594` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr424-architecture.md` y
+`sdd/reviews/20261126-sol-pr424-security.md`. Un job `Terminal` sin
+`AckOutput` conserva la reserva; el segundo allocate falla `JobLimit`
+y PID 1 deja el primer `.mount` Active. El corte no cierra `003B-4C`:
+no hay `CPUQuota`, familia de sockets, FD/mmap ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de
+media.
 
 ## Master vigente — 2026-11-26, 4C cuota global PR #420
 
