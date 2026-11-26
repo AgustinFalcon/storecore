@@ -223,6 +223,9 @@ class StoreCoreCreatedOrderReport(
     val netRevenue: ReportValue<ReportArsAmount>,
     val reversalAmount: ReportValue<ReportArsAmount>,
     val fiscalTotal: ReportValue<ReportArsAmount>,
+    val blackStoreModuleState: ReportValue<ReportModuleState>,
+    val blackStoreRegistration: ReportValue<BlackStoreRegistrationReport>,
+    val blackStoreOperations: ReportValue<BlackStoreOperationDiagnostics>,
 ) {
     fun createdOrdersValue(): CreatedOrderMetrics? = (createdOrders as? ReportValue.Available)?.value
     fun appliedAccreditationsValue(): AppliedAccreditationMetrics? = (appliedAccreditations as? ReportValue.Available)?.value
@@ -233,6 +236,11 @@ class StoreCoreCreatedOrderReport(
     fun returnReceiptsValue(): ReturnReceiptMetrics? = (returnReceipts as? ReportValue.Available)?.value
     fun confirmedReturnDispositionValue(): ConfirmedReturnDispositionMetrics? =
         (confirmedReturnDisposition as? ReportValue.Available)?.value
+    fun blackStoreModuleStateValue(): ReportModuleState? = (blackStoreModuleState as? ReportValue.Available)?.value
+    fun blackStoreRegistrationValue(): BlackStoreRegistrationReport? =
+        (blackStoreRegistration as? ReportValue.Available)?.value
+    fun blackStoreOperationsValue(): BlackStoreOperationDiagnostics? =
+        (blackStoreOperations as? ReportValue.Available)?.value
 }
 
 sealed interface StoreCoreCreatedOrderReadResult {

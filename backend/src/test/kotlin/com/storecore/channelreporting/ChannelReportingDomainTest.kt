@@ -4,6 +4,8 @@ import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResul
 import com.storecore.channelreporting.application.InventoryMovementMetric
 import com.storecore.channelreporting.application.ReportInventoryChannel
 import com.storecore.channelreporting.application.ReportInventoryEventType
+import com.storecore.channelreporting.application.BlackStoreRegistrationReport
+import com.storecore.channelreporting.application.BlackStoreRegistrationState
 import com.storecore.channelreporting.domain.*
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import java.time.Instant
@@ -63,6 +65,15 @@ class ChannelReportingDomainTest {
                 ReportSignedLong.fromValue(1),
             ),
         )
+    }
+
+    @Test fun `blackstore registration state and revoked history cannot contradict`() {
+        val zero = ReportUnsignedLong.fromValue(0)!!
+        val one = ReportUnsignedLong.fromValue(1)!!
+        assertNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.ABSENT, one))
+        assertNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.REVOKED_ONLY, zero))
+        assertNotNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.ABSENT, zero))
+        assertNotNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.REVOKED_ONLY, one))
     }
 
     @Test fun `ARS money is a nonnegative canonical scale two decimal`() {

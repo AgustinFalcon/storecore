@@ -4,6 +4,10 @@ import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResul
 import com.storecore.channelreporting.application.ReportPaymentDisposition
 import com.storecore.channelreporting.application.ReportInventoryChannel
 import com.storecore.channelreporting.application.ReportInventoryEventType
+import com.storecore.channelreporting.application.BlackStoreOperationState
+import com.storecore.channelreporting.application.BlackStoreRegistrationState
+import com.storecore.channelreporting.application.BlackStoreRetiredOperationState
+import com.storecore.channelreporting.application.ReportModuleState
 import com.storecore.channelreporting.domain.ReportEvidence
 import com.storecore.channelreporting.domain.ReportValue
 import com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository
@@ -463,6 +467,64 @@ class StoreCoreCreatedOrderReportPostgresTest(
 
         val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2002-03-01", "2002-04-01"))
         assertIs<ReportValue.Unavailable>(found.report.confirmedReturnDisposition)
+    }
+
+    @Test fun `blackstore local diagnostics distinguish absent live revoked and retired evidence`() {
+        val empty = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2001-01-01", "2001-02-01"))
+        assertEquals(ReportModuleState.DISABLED, empty.report.blackStoreModuleStateValue())
+        assertEquals(BlackStoreRegistrationState.ABSENT, empty.report.blackStoreRegistrationValue()!!.state)
+        assertEquals("0", empty.report.blackStoreOperationsValue()!!.count(BlackStoreOperationState.PENDING).wire)
+        assertIs<ReportValue.Unavailable>(empty.report.blackStoreOperationsValue()!!.latestRetainedActivity)
+
+        val revokedClient = UUID.randomUUID()
+        jdbc.update(
+            """INSERT INTO blackstore_companions(client_instance_id,status,created_at,revoked_at)
+               VALUES (?,'REVOKED','2001-01-01T00:00:00Z','2001-01-02T00:00:00Z')""",
+            revokedClient,
+        )
+        val activeClient = UUID.randomUUID()
+        jdbc.update("INSERT INTO blackstore_companions(client_instance_id,status,created_at) VALUES (?,'ACTIVE','2001-01-03T00:00:00Z')", activeClient)
+        val operationId = UUID.randomUUID()
+        jdbc.update(
+            """INSERT INTO blackstore_integration_operations(client_instance_id,device_id,sale_id,operation_id,state,request_hash,created_at,updated_at)
+               VALUES (?,'DEVICE','SALE',?,'PENDING',?,'2001-01-04T00:00:00Z','2001-01-05T00:00:00Z')""",
+            activeClient,
+            operationId,
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'),
+        )
+        jdbc.update(
+            """INSERT INTO blackstore_integration_operation_tombstones(client_instance_id,device_id,sale_id,operation_id,request_hash,
+               final_state,receipt,reservation_ref,retired_at,retention_until)
+               VALUES (?,'OLD-DEVICE','OLD-SALE',?,?, 'COMMITTED',?,?, '2001-01-06T00:00:00Z','2008-01-07T00:00:00Z')""",
+            revokedClient,
+            UUID.randomUUID(),
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'),
+            "retired-${UUID.randomUUID()}",
+            UUID.randomUUID(),
+        )
+
+        val populated = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2001-01-01", "2001-02-01"))
+        assertEquals(BlackStoreRegistrationState.ACTIVE, populated.report.blackStoreRegistrationValue()!!.state)
+        assertEquals("1", populated.report.blackStoreRegistrationValue()!!.revokedHistoryCount.wire)
+        assertEquals("1", populated.report.blackStoreOperationsValue()!!.count(BlackStoreOperationState.PENDING).wire)
+        assertEquals("1", populated.report.blackStoreOperationsValue()!!.retiredCount(BlackStoreRetiredOperationState.COMMITTED).wire)
+
+        jdbc.update(
+            """INSERT INTO blackstore_integration_operation_tombstones(client_instance_id,device_id,sale_id,operation_id,request_hash,
+               final_state,receipt,reservation_ref,retired_at,retention_until)
+               VALUES (?,'DEVICE','SALE',?,?, 'RELEASED',?,?, '2001-01-07T00:00:00Z','2008-01-08T00:00:00Z')""",
+            activeClient,
+            operationId,
+            UUID.randomUUID().toString().replace("-", "").padEnd(64, '0'),
+            "collision-${UUID.randomUUID()}",
+            UUID.randomUUID(),
+        )
+        val collision = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2001-01-01", "2001-02-01"))
+        assertIs<ReportValue.Unavailable>(collision.report.blackStoreOperations)
+
+        jdbc.update("DELETE FROM blackstore_integration_operation_tombstones WHERE client_instance_id IN (?,?)", revokedClient, activeClient)
+        jdbc.update("DELETE FROM blackstore_integration_operations WHERE client_instance_id=?", activeClient)
+        jdbc.update("DELETE FROM blackstore_companions WHERE client_instance_id IN (?,?)", revokedClient, activeClient)
     }
 
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {

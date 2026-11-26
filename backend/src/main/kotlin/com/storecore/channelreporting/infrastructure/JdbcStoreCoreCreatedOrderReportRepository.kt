@@ -60,6 +60,9 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                     val lowStock = lowStock(period)
                     val returnReceipts = returnReceipts(period)
                     val confirmedReturnDisposition = confirmedReturnDisposition(period)
+                    val blackStoreModuleState = blackStoreModuleState(period)
+                    val blackStoreRegistration = blackStoreRegistration(period)
+                    val blackStoreOperations = blackStoreOperations(period)
                     val reversalUnavailable = requireNotNull(
                         ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.REVERSAL_AMOUNT_UNAVAILABLE),
                     )
@@ -76,6 +79,9 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                         reversalUnavailable,
                         reversalUnavailable,
                         reversalUnavailable,
+                        blackStoreModuleState,
+                        blackStoreRegistration,
+                        blackStoreOperations,
                     ))
                 }
             } ?: unavailable(ReportUnavailableReason.READ_FAILED)
@@ -456,6 +462,96 @@ class JdbcStoreCoreCreatedOrderReportRepository(
 
     private fun exactUnsigned(raw: Any?): ReportUnsignedLong? =
         (raw as? BigDecimal)?.let { runCatching { it.longValueExact() }.getOrNull() }?.let(ReportUnsignedLong::fromValue)
+
+    private fun blackStoreModuleState(period: ReportPeriod): ReportValue<ReportModuleState> {
+        val rows = jdbc.query(
+            """SELECT state,config_schema_version FROM module_configurations
+               WHERE module_code='BLACKSTORE_INTEGRATION' AND scope_kind='INSTALLATION' AND scope_key='DEFAULT'""",
+            { rs, _ -> ReportModuleState.fromWire(rs.getString("state")) to rs.getInt("config_schema_version") },
+        )
+        if (rows.isEmpty()) return missingValue()
+        val row = rows.singleOrNull() ?: return unavailableValue()
+        if (row.first == ReportModuleState.UNKNOWN || row.second != 2) return unavailableValue()
+        return ReportValue.available(row.first, blackStoreEvidence(period))
+    }
+
+    private fun blackStoreRegistration(period: ReportPeriod): ReportValue<BlackStoreRegistrationReport> {
+        val row = jdbc.queryForMap(
+            """SELECT count(*) FILTER (WHERE status='REVOKED') revoked_count,
+                      count(*) FILTER (WHERE status<>'REVOKED') live_count,
+                      min(status) FILTER (WHERE status<>'REVOKED') live_state,
+                      count(*) FILTER (WHERE status NOT IN ('DISABLED','ACTIVE','REVOKED')
+                        OR (status='REVOKED')<>(revoked_at IS NOT NULL)
+                        OR (revoked_at IS NOT NULL AND revoked_at<created_at)) contradiction_count
+               FROM blackstore_companions""",
+        )
+        val liveCount = (row["live_count"] as Number).toLong()
+        if ((row["contradiction_count"] as Number).toLong() != 0L || liveCount !in 0L..1L) return unavailableValue()
+        val revoked = ReportUnsignedLong.fromValue((row["revoked_count"] as Number).toLong()) ?: return unavailableValue()
+        val state = when (row["live_state"] as String?) {
+            "DISABLED" -> BlackStoreRegistrationState.DISABLED
+            "ACTIVE" -> BlackStoreRegistrationState.ACTIVE
+            null -> if (revoked.value == 0L) BlackStoreRegistrationState.ABSENT else BlackStoreRegistrationState.REVOKED_ONLY
+            else -> BlackStoreRegistrationState.UNKNOWN
+        }
+        val report = BlackStoreRegistrationReport.create(state, revoked) ?: return unavailableValue()
+        return ReportValue.available(report, blackStoreEvidence(period))
+    }
+
+    private fun blackStoreOperations(period: ReportPeriod): ReportValue<BlackStoreOperationDiagnostics> {
+        val overlap = jdbc.queryForObject(
+            """SELECT count(*) FROM blackstore_integration_operations o
+               JOIN blackstore_integration_operation_tombstones t
+                 ON t.client_instance_id=o.client_instance_id AND t.device_id=o.device_id
+                AND t.sale_id=o.sale_id AND t.operation_id=o.operation_id""",
+            Long::class.java,
+        ) ?: return unavailableValue()
+        if (overlap != 0L) return unavailableValue()
+
+        val retainedRows = jdbc.query(
+            """SELECT state,count(*) row_count FROM blackstore_integration_operations
+               GROUP BY state ORDER BY state""",
+            { rs, _ -> BlackStoreOperationState.fromWire(rs.getString("state")) to rs.getLong("row_count") },
+        )
+        val retiredRows = jdbc.query(
+            """SELECT final_state,count(*) row_count FROM blackstore_integration_operation_tombstones
+               GROUP BY final_state ORDER BY final_state""",
+            { rs, _ -> BlackStoreRetiredOperationState.fromWire(rs.getString("final_state")) to rs.getLong("row_count") },
+        )
+        if (retainedRows.any { it.first == BlackStoreOperationState.UNKNOWN || it.second < 0 } ||
+            retiredRows.any { it.first == BlackStoreRetiredOperationState.UNKNOWN || it.second < 0 }) return unavailableValue()
+        val retainedObserved = retainedRows.associate { it.first to it.second }
+        val retiredObserved = retiredRows.associate { it.first to it.second }
+        if (retainedObserved.size != retainedRows.size || retiredObserved.size != retiredRows.size) return unavailableValue()
+        val retained = BlackStoreOperationState.admitted.associateWith { state ->
+            ReportUnsignedLong.fromValue(retainedObserved[state] ?: 0L) ?: return unavailableValue()
+        }
+        val retired = BlackStoreRetiredOperationState.admitted.associateWith { state ->
+            ReportUnsignedLong.fromValue(retiredObserved[state] ?: 0L) ?: return unavailableValue()
+        }
+        val evidence = blackStoreEvidence(period)
+        val latestRetained = latestActivity("SELECT max(updated_at) FROM blackstore_integration_operations", evidence)
+        val latestRetired = latestActivity("SELECT max(retired_at) FROM blackstore_integration_operation_tombstones", evidence)
+        val report = BlackStoreOperationDiagnostics.create(retained, retired, latestRetained, latestRetired)
+            ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
+    }
+
+    private fun latestActivity(sql: String, evidence: ReportEvidence): ReportValue<java.time.Instant> {
+        val value = jdbc.queryForObject(sql, Timestamp::class.java)?.toInstant()
+        return if (value == null) {
+            requireNotNull(ReportValue.unavailable(ReportUnavailableReason.NO_EVIDENCE))
+        } else {
+            ReportValue.available(value, evidence)
+        }
+    }
+
+    private fun blackStoreEvidence(period: ReportPeriod): ReportEvidence = requireNotNull(
+        ReportEvidence.current(ReportSource.BLACKSTORE_STOCK_SAGA, period.generatedAt, ReportFreshness.CURRENT),
+    )
+
+    private fun <T : Any> missingValue(): ReportValue<T> =
+        requireNotNull(ReportValue.unavailable(ReportUnavailableReason.SOURCE_MISSING))
 
     private fun <T : Any> unavailableValue(): ReportValue<T> =
         requireNotNull(ReportValue.unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY))
