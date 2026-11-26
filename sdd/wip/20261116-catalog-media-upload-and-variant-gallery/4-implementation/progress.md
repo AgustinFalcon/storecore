@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C RLIMIT DATA del worker
+
+- El harness deriva `LimitDATA` (`RLIMIT_DATA`, mismo techo 32× heap
+  que `LimitAS`) y PID 1 lo lee. No es `LimitAS` ni `MemoryMax`.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #411, 003B-4C sigue abierto
 
 - Merge #411 `3aaced7ce133401286697a4c2a664646df1079fa` sobre candidato
