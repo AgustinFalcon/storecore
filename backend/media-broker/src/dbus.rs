@@ -372,7 +372,7 @@ mod tests {
     };
     use crate::budget::{BudgetError, BudgetLimits};
     use crate::runtime::{ApprovedRuntime, RuntimeError};
-    use crate::state::{JobId, JobState, Principal, Reservation};
+    use crate::state::{JobId, JobRecord, JobState, Principal, Reservation};
     use crate::store::{AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
@@ -2938,26 +2938,11 @@ mod tests {
             0,
             "PID 1 harness must run as root"
         );
-        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
-        let journal_root = PathBuf::from("/run/storecore_media/journal-4c-terminal-without-ack");
-        let _ = fs::remove_dir_all(&journal_root);
-        fs::create_dir(&journal_root).expect("journal root");
-        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700))
-            .expect("journal mode");
-        let owner = rustix::process::geteuid().as_raw();
         let principal = Principal::create(2101, 2101);
-        let limits =
-            BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
-                .expect("limits");
-        let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
-        assert_eq!(
-            store.finish_reconciliation(false),
-            Ok(AdmissionStatus::Open)
-        );
-        let first_id = JobId::create([0x24; 16]).expect("job a");
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-terminal-without-ack");
         let allocated = store
             .allocate(
-                first_id.bytes(),
+                [0x24; 16],
                 principal,
                 [0xaf; 16],
                 Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
@@ -2974,40 +2959,11 @@ mod tests {
             &runtime,
         )
         .expect("spec a");
-        let started_mount = systemd
-            .start_transient(UnitKind::Mount, &spec_a)
-            .expect("start mount");
-        assert_eq!(started_mount, UnitState::Active);
-        let sealed = store
-            .transition(
-                allocated.job_id(),
-                1,
-                principal,
-                allocated.boot_id(),
-                JobState::InputSealed,
-                2,
-            )
-            .expect("seal");
-        let starting = store
-            .transition(
-                sealed.job_id(),
-                2,
-                principal,
-                allocated.boot_id(),
-                JobState::Starting,
-                3,
-            )
-            .expect("start");
-        let terminal = store
-            .transition(
-                starting.job_id(),
-                3,
-                principal,
-                allocated.boot_id(),
-                JobState::Terminal,
-                4,
-            )
-            .expect("terminal");
+        assert_eq!(
+            systemd.start_transient(UnitKind::Mount, &spec_a),
+            Ok(UnitState::Active)
+        );
+        let terminal = reach_terminal_without_ack(&mut store, allocated, principal);
         assert_eq!(terminal.state(), JobState::Terminal);
         assert_eq!(store.usage().jobs(), 1);
         assert_eq!(store.usage().bytes(), MOUNT_BYTES);
@@ -3578,6 +3534,62 @@ mod tests {
             !probe.exists(),
             "UID A process must not leave a file in the job tmpfs"
         );
+    }
+
+    fn pid1_single_job_store(journal_name: &str) -> (PathBuf, BrokerStore) {
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let journal_root = PathBuf::from("/run/storecore_media").join(journal_name);
+        let _ = fs::remove_dir_all(&journal_root);
+        fs::create_dir(&journal_root).expect("journal root");
+        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700))
+            .expect("journal mode");
+        let owner = rustix::process::geteuid().as_raw();
+        let limits =
+            BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
+                .expect("limits");
+        let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
+        assert_eq!(
+            store.finish_reconciliation(false),
+            Ok(AdmissionStatus::Open)
+        );
+        (journal_root, store)
+    }
+
+    fn reach_terminal_without_ack(
+        store: &mut BrokerStore,
+        allocated: JobRecord,
+        principal: Principal,
+    ) -> JobRecord {
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                allocated.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("start");
+        store
+            .transition(
+                starting.job_id(),
+                3,
+                principal,
+                allocated.boot_id(),
+                JobState::Terminal,
+                4,
+            )
+            .expect("terminal")
     }
 
     fn start_pid1_self_test_worker(
