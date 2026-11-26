@@ -372,7 +372,7 @@ mod tests {
     };
     use crate::budget::{BudgetError, BudgetLimits};
     use crate::runtime::{ApprovedRuntime, RuntimeError};
-    use crate::state::{JobId, Principal, Reservation};
+    use crate::state::{JobId, JobRecord, JobState, Principal, Reservation};
     use crate::store::{AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
@@ -2926,6 +2926,83 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_terminal_without_ack_retains_the_mount_and_job_budget() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        let principal = Principal::create(2101, 2101);
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-terminal-without-ack");
+        let allocated = store
+            .allocate(
+                [0x24; 16],
+                principal,
+                [0xaf; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec_a = TransientUnits::derive(
+            allocated.job_id(),
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec a");
+        assert_eq!(
+            systemd.start_transient(UnitKind::Mount, &spec_a),
+            Ok(UnitState::Active)
+        );
+        let terminal = reach_terminal_without_ack(&mut store, allocated, principal);
+        assert_eq!(terminal.state(), JobState::Terminal);
+        assert_eq!(store.usage().jobs(), 1);
+        assert_eq!(store.usage().bytes(), MOUNT_BYTES);
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec_a),
+            Ok(UnitState::Active)
+        );
+        assert_eq!(
+            store.allocate(
+                [0x25; 16],
+                principal,
+                [0xaf; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                5,
+            ),
+            Err(StoreError::Budget(BudgetError::JobLimit))
+        );
+        let spec_b = TransientUnits::derive(
+            JobId::create([0x25; 16]).expect("job b"),
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec b");
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec_b),
+            Err(SystemdError::NotLoaded)
+        );
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec_a).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        drop(store);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
@@ -3457,6 +3534,62 @@ mod tests {
             !probe.exists(),
             "UID A process must not leave a file in the job tmpfs"
         );
+    }
+
+    fn pid1_single_job_store(journal_name: &str) -> (PathBuf, BrokerStore) {
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let journal_root = PathBuf::from("/run/storecore_media").join(journal_name);
+        let _ = fs::remove_dir_all(&journal_root);
+        fs::create_dir(&journal_root).expect("journal root");
+        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700))
+            .expect("journal mode");
+        let owner = rustix::process::geteuid().as_raw();
+        let limits =
+            BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
+                .expect("limits");
+        let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
+        assert_eq!(
+            store.finish_reconciliation(false),
+            Ok(AdmissionStatus::Open)
+        );
+        (journal_root, store)
+    }
+
+    fn reach_terminal_without_ack(
+        store: &mut BrokerStore,
+        allocated: JobRecord,
+        principal: Principal,
+    ) -> JobRecord {
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                allocated.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("start");
+        store
+            .transition(
+                starting.job_id(),
+                3,
+                principal,
+                allocated.boot_id(),
+                JobState::Terminal,
+                4,
+            )
+            .expect("terminal")
     }
 
     fn start_pid1_self_test_worker(
