@@ -1,4 +1,4 @@
-VERDICT: CHANGES_REQUIRED
+VERDICT: APPROVED
 
 # Independent architecture, security and concurrency review — PR #417
 
@@ -9,20 +9,20 @@ VERDICT: CHANGES_REQUIRED
 - PR: https://github.com/AgustinFalcon/storecore/pull/417
 - Title: `fix: close calendar runtime and reporting gates`
 - Base: `origin/master`, `52922f5edd043d73563bba43467dab58613fbab9`
-- Reviewed head: `3d6436d1814ae8e26efc26074f554b3e7edc6dba`
+- Reviewed head: `001e1add42c21ee30696302cb5d5d68e24a372a5`
 - Lane: architecture/security/concurrency; no production changes, commit or push.
 
 ## Review order and scope
 
 Read `.cursor/rules/pr-dual-sol-review.mdc`, `AGENTS.md`, STATUS/PROJECT/PATTERNS, PR title/body, the active Phase 1 functional objective and technical contracts, calendar activation evidence and corrective PR #415 architecture/security receipt. Fetched `origin master` and verified both full SHAs. Read the complete `origin/master...HEAD` diff, ran focused validation, then assessed the implementation against the repository's hexagonal architecture, closed-type, PostgreSQL integrity, least-privilege and fail-closed standards. Coordinated the final finding with the independent UX/SDD lane.
 
-## Finding
+## Resolved finding from the initial review
 
-P2 — validation and merge tasks are prematurely complete. At the reviewed head, `sdd/wip/20261122-phase1-commercial-coordination/3-tasks/tasks.json:22` and `:43` mark PCC-009 and PCC-013 `completed`, while their linked `evidence/pcc-009-013-hosted-closeout-20261126.md:55` says closure requires PR #417's two persisted approvals, hosted CI and merge. Those gates remain pending at this head. This contradicts the machine-readable task state and can advance the next slice prematurely. Keep both tasks `in_progress` with their evidence links until that gate actually closes. The coordinator has prepared this correction in the working tree; this verdict still evaluates committed head `3d6436d` and does not approve an unreviewed successor.
+P2 (resolved) — validation and merge tasks were prematurely complete. At the initial head `3d6436d1814ae8e26efc26074f554b3e7edc6dba`, `sdd/wip/20261122-phase1-commercial-coordination/3-tasks/tasks.json:22` and `:43` mark PCC-009 and PCC-013 `completed`, while their linked `evidence/pcc-009-013-hosted-closeout-20261126.md:55` says closure requires PR #417's two persisted approvals, hosted CI and merge. Those gates remain pending at this head. This contradicts the machine-readable task state and can advance the next slice prematurely. Keep both tasks `in_progress` with their evidence links until that gate actually closes. The successor `001e1add42c21ee30696302cb5d5d68e24a372a5` commits the correction: both tasks are `in_progress` and retain their evidence links. This finding is closed.
 
 No additional P0–P3 architecture/security/concurrency defect was found in the runtime repair.
 
-## Focused validation
+## Focused validation on initial head `3d6436d`
 
 - Executed offline Maven with the calendar domain, runtime-admission, PostgreSQL persistence and HTTP integration selections: 64 tests passed, zero failures/errors/skips, exit code 0. Fresh Surefire reports show `CalendarDomainTest` 10, `CalendarRuntimeAdmissionTest` 1, `CalendarPersistencePostgresTest` 45, and `CalendarHttpIntegrationTest` 8. The command also named two nonexistent generic capability test patterns; no capability test pass is claimed from those patterns.
 - Real PostgreSQL 16.14 tests exercised all denied capability states, disabled-capability claim producing `CAPABILITY_BLOCKED`, kill-before-handoff with zero alerts/evidence, and an admission blocked on a concurrent kill transaction observing its committed kill. Existing persistence cases exercised atomic handoff, replay, fencing, competing runners, rollback, late leases, no-backfill and zero email effects.
@@ -38,4 +38,17 @@ The database function locks the immutable action row before configuration and ki
 
 V40 only extends the skip vocabulary and installs the narrow admission function. Replaced writer functions retain their existing ownership/ACLs; the new function is schema-qualified and search-path pinned, with PUBLIC execution revoked and only runtime execution granted. Direct occurrence and handoff mutation privileges stay revoked. No SYSTEM publishing permission, external provider call, email path, public route or automatic capability promotion is added.
 
-This is local focused evidence, not full-backend or hosted #417 CI approval. Historical #415 CI remains explicitly identified as a synthetic merge run and is not reused as exact-head #417 evidence. After the task-state repair, two fresh exact-head approvals and the documented hosted/merge gate remain necessary. No deployment, live activation, secrets, archive or homologation is authorized by this receipt.
+This is local focused evidence, not full-backend or hosted #417 CI approval. Historical #415 CI remains explicitly identified as a synthetic merge run and is not reused as exact-head #417 evidence. The task-state repair is reviewed below. The independent approval and documented hosted/merge gate remain necessary. No deployment, live activation, secrets, archive or homologation is authorized by this receipt.
+
+## Re-review at exact successor head
+
+Re-read the GitHub PR title/body and verified base `52922f5edd043d73563bba43467dab58613fbab9` and head `001e1add42c21ee30696302cb5d5d68e24a372a5` against local refs. Read the full `origin/master...HEAD` diff and the successor delta, including the two initial CHANGES_REQUIRED receipts. After the focused checks, re-examined the runtime wiring, admission SQL and claim/handoff changes; no production regression or remaining P0–P3 finding exists. Coordinated that result with the UX/SDD lane.
+
+Fresh re-review validations:
+
+- Parsed tasks.json and asserted exactly one PCC-009 and PCC-013, both `in_progress`, each pointing to an existing evidence file.
+- `git diff --quiet 3d6436d1814ae8e26efc26074f554b3e7edc6dba HEAD -- backend frontend` passed: production, migration and tests are identical to the candidate on which the 64-test PostgreSQL/Kotlin/HTTP validation above ran.
+- Both committed-range and working-tree `git diff --check` passed.
+- Confirmed that close-out evidence still keeps loyalty blocked until dual approvals, hosted CI and merge; no live activation or retroactive approval claim was introduced.
+
+No Maven rerun is claimed for the documentation-only successor: prior execution is explicitly attributed to `3d6436d`, with exact code identity checked at this head. APPROVED applies to the exact successor head recorded above; it does not assert hosted CI success or completion of the still-open validation/merge tasks.
