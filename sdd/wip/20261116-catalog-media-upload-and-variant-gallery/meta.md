@@ -125,9 +125,11 @@ cierra cuota global ni `Ready`. PR #413 (head `af49a66`, merge
 `LimitDATA` 32× heap (`RLIMIT_DATA`); no cierra cuota global ni
 `Ready`. PR #416 (head `037fadb`, merge `36b08b8`, Verify `45866580240`
 7/7, dos Grok 4.7 APPROVED) deriva `LimitSTACK=8MiB` (`RLIMIT_STACK`);
-no cierra cuota global ni `Ready`. Este corte atesta cuota global
-(`JobLimit` en el segundo allocate; PID 1 no arranca el segundo
-`.mount`); no cierra terminales sin ACK ni `Ready`. PR #326
+no cierra cuota global ni `Ready`. PR #420 (head `f63631a`, merge
+`9d20932`, Verify `45887600304` 7/7, dos gpt-5.6-sol-medium APPROVED)
+atesta cuota global (`JobLimit` en el segundo allocate; PID 1 no
+arranca el segundo `.mount`); no cierra terminales sin ACK ni
+`Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
