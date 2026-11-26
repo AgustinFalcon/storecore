@@ -31,3 +31,9 @@ The red compile named only the missing query and artifact symbols. `mvn.cmd -q -
 ## Exact record-budget checkpoint
 
 The record-budget primitive sums section counts with unbounded `BigInteger`, rejects negative inputs, admits exactly 50,000, rejects 50,001 and verifies exact equality with the eventual prepared data-record count. The focused suite passed 2 tests with 0 failures/errors, including `Long.MAX_VALUE + 1` without bounded overflow. Both reviewers returned **APPROVE** and reiterated that the integrated section plan must own both count and emission before `Prepared` is published.
+
+## Owned-snapshot seam checkpoint
+
+The existing JDBC report adapter now has one private `executeOwnedSnapshot` owner and a separate `readWithinSnapshot` projection. Public `read()` still validates before database work, opens the same `REQUIRES_NEW` read-only repeatable-read transaction, verifies PostgreSQL settings and translates begin/read/commit failures to the closed unavailable result. Future export can call the within-snapshot work directly rather than nesting public `read()`.
+
+`mvn.cmd -q -Dtest='StoreCoreCreatedOrderReportFailureTest,StoreCoreCreatedOrderReportPostgresTest' test` passed 29 tests with 0 failures/errors against a fresh PostgreSQL 16 Testcontainer and all 39 migrations. Both reviewers returned **APPROVE** with no P0-P3. No export behavior is claimed by this refactor-only checkpoint.

@@ -25,95 +25,80 @@ class JdbcStoreCoreCreatedOrderReportRepository(
 
     override fun read(fromDate: String?, toDateExclusive: String?): StoreCoreCreatedOrderReadResult {
         if (!ReportPeriod.validRequest(fromDate, toDateExclusive)) return StoreCoreCreatedOrderReadResult.InvalidPeriod
-        return try {
-            transaction.execute {
-                val transactionContract = jdbc.queryForMap(
-                    "SELECT current_setting('transaction_isolation') isolation, current_setting('transaction_read_only') read_only",
-                )
-                if (transactionContract["isolation"] != "repeatable read" || transactionContract["read_only"] != "on") {
-                    return@execute unavailable(ReportUnavailableReason.READ_FAILED)
-                }
-                val zone = jdbc.query("SELECT timezone FROM installation_settings WHERE installation_id=1", { row, _ -> row.getString(1) }).singleOrNull()
-                    ?: return@execute StoreCoreCreatedOrderReadResult.TimezoneUnavailable
-                val generatedAt = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)?.toInstant()
-                    ?: return@execute unavailable(ReportUnavailableReason.READ_FAILED)
-                val period = ReportPeriod.create(fromDate, toDateExclusive, zone, generatedAt, hasher)
-                    ?: return@execute StoreCoreCreatedOrderReadResult.TimezoneUnavailable
-                val row = jdbc.queryForMap(
-                    """SELECT count(*) row_count, COALESCE(sum(total),0.00) nominal_total,
-                              count(*) FILTER (WHERE currency<>'ARS' OR total<0 OR subtotal<0 OR shipping_cost<0 OR total<>subtotal+shipping_cost) contradiction_count
-                       FROM orders WHERE created_at>=? AND created_at<?""",
-                    Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive),
-                )
-                if ((row["contradiction_count"] as Number).toLong() != 0L) {
-                    return@execute unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY)
-                }
-                val count = ReportUnsignedLong.fromValue((row["row_count"] as Number).toLong())
-                val amount = ReportArsAmount.fromValue(row["nominal_total"] as BigDecimal)
-                val evidence = ReportEvidence.period(ReportSource.STORECORE_ORDER, ReportTimeBasis.ORDER_CREATED, ReportFreshness.CURRENT, period)
-                if (count == null || amount == null || evidence == null) {
-                    unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY)
-                } else {
-                    val paymentProjection = appliedAccreditations(period)
-                    val paymentDisposition = paymentDisposition(period)
-                    val inventoryMovements = inventoryMovements(period)
-                    val lowStock = lowStock(period)
-                    val returnReceipts = returnReceipts(period)
-                    val confirmedReturnDisposition = confirmedReturnDisposition(period)
-                    val blackStoreModuleState = blackStoreModuleState(period)
-                    val blackStoreRegistration = blackStoreRegistration(period)
-                    val blackStoreOperations = blackStoreOperations(period)
-                    val blackStoreCatalogToken = blackStoreCatalogToken(period)
-                    val blackStoreCurrentStock = blackStoreCurrentStock(period)
-                    val remoteFreshness = requireNotNull(
-                        ReportValue.unavailable<ReportFreshness>(ReportUnavailableReason.NO_EVIDENCE),
-                    )
-                    val unsupportedCount = requireNotNull(
-                        ReportValue.notAvailable<ReportUnsignedLong>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
-                    )
-                    val unsupportedAmount = requireNotNull(
-                        ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
-                    )
-                    val unsupportedSynchronization = requireNotNull(
-                        ReportValue.notAvailable<ReportFreshness>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
-                    )
-                    val reversalUnavailable = requireNotNull(
-                        ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.REVERSAL_AMOUNT_UNAVAILABLE),
-                    )
-                    StoreCoreCreatedOrderReadResult.Found(StoreCoreCreatedOrderReport(
-                        period,
-                        ReportValue.available(CreatedOrderMetrics(count, amount), evidence),
-                        paymentProjection.metrics,
-                        paymentProjection.bestSellers,
-                        paymentDisposition,
-                        inventoryMovements,
-                        lowStock,
-                        returnReceipts,
-                        confirmedReturnDisposition,
-                        reversalUnavailable,
-                        reversalUnavailable,
-                        reversalUnavailable,
-                        blackStoreModuleState,
-                        blackStoreRegistration,
-                        blackStoreOperations,
-                        blackStoreCatalogToken,
-                        blackStoreCurrentStock,
-                        remoteFreshness,
-                        unsupportedCount,
-                        unsupportedAmount,
-                        unsupportedCount,
-                        unsupportedCount,
-                        unsupportedAmount,
-                        unsupportedCount,
-                        unsupportedSynchronization,
-                    ))
-                }
-            } ?: unavailable(ReportUnavailableReason.READ_FAILED)
-        } catch (_: DataAccessException) {
-            unavailable(ReportUnavailableReason.READ_FAILED)
-        } catch (_: TransactionException) {
-            unavailable(ReportUnavailableReason.READ_FAILED)
+        return executeOwnedSnapshot(
+            failure = { unavailable(ReportUnavailableReason.READ_FAILED) },
+            work = { readWithinSnapshot(fromDate!!, toDateExclusive!!) },
+        )
+    }
+
+    private fun readWithinSnapshot(fromDate: String, toDateExclusive: String): StoreCoreCreatedOrderReadResult {
+        val zone = jdbc.query("SELECT timezone FROM installation_settings WHERE installation_id=1", { row, _ -> row.getString(1) }).singleOrNull()
+            ?: return StoreCoreCreatedOrderReadResult.TimezoneUnavailable
+        val generatedAt = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)?.toInstant()
+            ?: return unavailable(ReportUnavailableReason.READ_FAILED)
+        val period = ReportPeriod.create(fromDate, toDateExclusive, zone, generatedAt, hasher)
+            ?: return StoreCoreCreatedOrderReadResult.TimezoneUnavailable
+        val row = jdbc.queryForMap(
+            """SELECT count(*) row_count, COALESCE(sum(total),0.00) nominal_total,
+                      count(*) FILTER (WHERE currency<>'ARS' OR total<0 OR subtotal<0 OR shipping_cost<0 OR total<>subtotal+shipping_cost) contradiction_count
+               FROM orders WHERE created_at>=? AND created_at<?""",
+            Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive),
+        )
+        if ((row["contradiction_count"] as Number).toLong() != 0L) {
+            return unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY)
         }
+        val count = ReportUnsignedLong.fromValue((row["row_count"] as Number).toLong())
+        val amount = ReportArsAmount.fromValue(row["nominal_total"] as BigDecimal)
+        val evidence = ReportEvidence.period(ReportSource.STORECORE_ORDER, ReportTimeBasis.ORDER_CREATED, ReportFreshness.CURRENT, period)
+        if (count == null || amount == null || evidence == null) {
+            return unavailable(ReportUnavailableReason.SOURCE_CONTRADICTORY)
+        }
+        val paymentProjection = appliedAccreditations(period)
+        val remoteFreshness = requireNotNull(ReportValue.unavailable<ReportFreshness>(ReportUnavailableReason.NO_EVIDENCE))
+        val unsupportedCount = requireNotNull(ReportValue.notAvailable<ReportUnsignedLong>(ReportUnavailableReason.UNSUPPORTED_CONTRACT))
+        val unsupportedAmount = requireNotNull(ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.UNSUPPORTED_CONTRACT))
+        val unsupportedSynchronization = requireNotNull(ReportValue.notAvailable<ReportFreshness>(ReportUnavailableReason.UNSUPPORTED_CONTRACT))
+        val reversalUnavailable = requireNotNull(ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.REVERSAL_AMOUNT_UNAVAILABLE))
+        return StoreCoreCreatedOrderReadResult.Found(StoreCoreCreatedOrderReport(
+            period,
+            ReportValue.available(CreatedOrderMetrics(count, amount), evidence),
+            paymentProjection.metrics,
+            paymentProjection.bestSellers,
+            paymentDisposition(period),
+            inventoryMovements(period),
+            lowStock(period),
+            returnReceipts(period),
+            confirmedReturnDisposition(period),
+            reversalUnavailable,
+            reversalUnavailable,
+            reversalUnavailable,
+            blackStoreModuleState(period),
+            blackStoreRegistration(period),
+            blackStoreOperations(period),
+            blackStoreCatalogToken(period),
+            blackStoreCurrentStock(period),
+            remoteFreshness,
+            unsupportedCount,
+            unsupportedAmount,
+            unsupportedCount,
+            unsupportedCount,
+            unsupportedAmount,
+            unsupportedCount,
+            unsupportedSynchronization,
+        ))
+    }
+
+    private fun <T : Any> executeOwnedSnapshot(failure: () -> T, work: () -> T): T = try {
+        transaction.execute {
+            val contract = jdbc.queryForMap(
+                "SELECT current_setting('transaction_isolation') isolation, current_setting('transaction_read_only') read_only",
+            )
+            if (contract["isolation"] != "repeatable read" || contract["read_only"] != "on") failure() else work()
+        } ?: failure()
+    } catch (_: DataAccessException) {
+        failure()
+    } catch (_: TransactionException) {
+        failure()
     }
 
     private fun unavailable(reason: ReportUnavailableReason): StoreCoreCreatedOrderReadResult.SourceUnavailable =
