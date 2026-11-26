@@ -3042,19 +3042,20 @@ mod tests {
             Ok(UnitState::Active)
         );
         let original = b"sealed-media";
+        let digest: [u8; 32] = Sha256::digest(original).into();
         let mut source = open_held_source(journal_root.join("source.bin"), original);
         let snapshot_path = spec.mount().where_path().join("snapshot.bin");
         let evidence = copy_snapshot(
             source.as_fd(),
             &snapshot_path,
             original.len() as u64,
-            Sha256::digest(original).into(),
+            digest,
         )
         .expect("snapshot");
         mutate_held_source(&mut source, original.len() as u64);
         assert_eq!(fs::read(&snapshot_path).expect("read snapshot"), original);
         assert_eq!(evidence.size(), original.len() as u64);
-        assert_eq!(evidence.digest(), Sha256::digest(original).into());
+        assert_eq!(evidence.digest(), digest);
         let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
         assert!(matches!(
             stopped_mount,
