@@ -1,14 +1,14 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-26, 4C sigue abierto
+## En implementación — 2026-11-26, 4C RLIMIT STACK del worker
 
-Siguiente corte: RLIMIT restante (`LimitSTACK`), cuota global,
-terminales sin ACK, FD/mmap tras el seal y reinicio en cada transición
-durable. `ProtectHome`, `RestrictAddressFamilies` y `CPUQuota` quedan
-fuera. Este documento no cierra `003B-4C`. Sigue sin familia de
-sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
-`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de
-media.
+Este corte no cierra `003B-4C`. El harness deriva `LimitSTACK=8MiB`
+(`RLIMIT_STACK`) y PID 1 lo lee. No es `LimitAS`. `ProtectHome`,
+`CPUQuota` y `RestrictAddressFamilies` quedan fuera. Sigue sin familia
+de sockets, cuota global, terminales sin ACK, FD/mmap tras el seal,
+reinicio en cada transición durable ni `Ready`. `003B-4B-3`,
+`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
+corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C LimitDATA PR #413
 
