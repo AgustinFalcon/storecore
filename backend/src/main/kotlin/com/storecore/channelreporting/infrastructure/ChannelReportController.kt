@@ -66,7 +66,7 @@ class ChannelReportController(
 @Configuration
 @ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 open class ChannelReportConfiguration {
-    @Bean open fun channelReportRepository(source: DataSource): StoreCoreCreatedOrderReportRepository =
+    @Bean open fun channelReportRepository(source: DataSource): JdbcStoreCoreCreatedOrderReportRepository =
         JdbcStoreCoreCreatedOrderReportRepository(source, Sha256ReportPeriodHasher())
 
     @Bean open fun channelReportReadOriginPolicy(origin: com.storecore.identity.infrastructure.web.InstallationOrigin) =

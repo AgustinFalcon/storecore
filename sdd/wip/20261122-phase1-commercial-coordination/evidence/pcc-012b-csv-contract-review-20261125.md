@@ -53,3 +53,20 @@ The same typed plan now implements every non-large available section: applied ac
 Best sellers, low stock and current BlackStore stock now contribute their exact totals to section counts without requiring complete details. Admission is checked before any section emitter runs. An admitted caller supplies separate complete typed collections; emission validates exact size, identity uniqueness, contract order, aggregate equations and a field-by-field prefix match against the bounded sample already validated in the report. This prevents a complete list from contradicting facts observed during summary projection. Formula protection remains on every open-text item cell.
 
 The first review found the missing prefix correlation (P2) and insufficient item-column evidence (P3). Regressions now reject a same-size/same-order payload contradiction, export 55 rows for each collection beyond the 20/50 dashboard bounds, assert exact ITEM and summary columns, successfully encode exactly 50,000 data records and reject 50,001 before emission. The clean affected suite passed 17 tests with 0 failures/errors; the final focused 8-test collection suite also passed. Both reviewers returned **APPROVE** with no P0-P3.
+
+## JDBC preparation and transaction checkpoint
+
+The JDBC adapter now implements the preparation port through the same owned `REQUIRES_NEW`, read-only, repeatable-read snapshot as the report projection. It resolves the canonical period, rejects a stale typed token before metric projection, computes the complete record budget before detail reads, and selects dashboard versus complete collection queries through the closed `ReportCollectionMode`. Each collection has one shared query and mapper; only the closed mode owns the SQL limit.
+
+For an admitted request, complete best-seller, low-stock and current-stock collections are loaded and encoded inside the snapshot. A provisional owned artifact is created before commit but cannot become the public `Prepared` result until `TransactionTemplate.execute` returns. Any begin, read, pre-commit or ambiguous post-delegate commit failure returns the closed unavailable result and idempotently clears/releases provisional bytes.
+
+Evidence executed locally against PostgreSQL 16 and all 39 migrations:
+
+- `ChannelReportCsvPreparationTest` — 8 tests, 0 failures, 0 errors.
+- `StoreCoreCreatedOrderReportFailureTest` — 2 tests, 0 failures, 0 errors.
+- `StoreCoreCreatedOrderReportPostgresTest` — 34 tests, 0 failures, 0 errors, including stale-before-metrics, a real latch between admission and detail reads, weaker outer transaction ownership, and commit failure before/after the physical delegate with artifact cleanup.
+- `ChannelReportCsvRepositoryLimitPostgresTest` — isolated database, 1 test, 0 failures, 0 errors. The fixture derives the fixed contract baseline, bulk-creates exactly 50,000 data records and receives a complete `Prepared`; one additional current-stock record yields 50,001 and returns `TooLarge` before `DETAIL_COLLECTION` with zero artifacts created.
+- Combined focal gate — 45 tests, 0 failures, 0 errors.
+- `git diff --check` — no whitespace errors.
+
+The architecture and concurrency reviewers independently returned **APPROVE** with no P0-P3 after inspecting the final diff and Surefire evidence. PCC-012B remains `in_progress`: the authenticated HTTP streaming adapter, response mapping and disconnect cleanup are not claimed by this checkpoint.

@@ -1,6 +1,9 @@
 package com.storecore.channelreporting
 
 import com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult
+import com.storecore.channelreporting.application.ChannelReportCsvPreparationRequest
+import com.storecore.channelreporting.application.ChannelReportCsvPreparationResult
+import com.storecore.channelreporting.application.PreparedChannelReportCsv
 import com.storecore.channelreporting.application.ReportPaymentDisposition
 import com.storecore.channelreporting.application.ReportInventoryChannel
 import com.storecore.channelreporting.application.ReportInventoryEventType
@@ -12,6 +15,9 @@ import com.storecore.channelreporting.domain.ReportEvidence
 import com.storecore.channelreporting.domain.ReportValue
 import com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository
 import com.storecore.channelreporting.infrastructure.ChannelReportHttpMapper
+import com.storecore.channelreporting.infrastructure.ChannelReportCsvPreparationObserver
+import com.storecore.channelreporting.infrastructure.ChannelReportCsvPreparationStage
+import com.storecore.channelreporting.infrastructure.PreparedChannelReportCsvFactory
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -25,10 +31,20 @@ import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.PostgreSQLContainer
 import java.time.Instant
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Proxy
+import java.sql.Connection
+import java.sql.SQLException
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import javax.sql.DataSource
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.concurrent.thread
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = ["storecore.installation-guard.enabled=false"])
 class StoreCoreCreatedOrderReportPostgresTest(
@@ -77,6 +93,108 @@ class StoreCoreCreatedOrderReportPostgresTest(
         }
 
         assertIs<StoreCoreCreatedOrderReadResult.Found>(result)
+    }
+
+    @Test fun `CSV preparation rejects stale token before publishing and returns committed owned bytes`() {
+        val from = "1990-01-01"
+        val to = "1990-01-02"
+        val shown = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read(from, to))
+        val stale = ChannelReportCsvPreparationRequest.create(
+            from, to, com.storecore.channelreporting.domain.ReportPeriodToken.fromWire("a".repeat(64)),
+        )!!
+        assertIs<ChannelReportCsvPreparationResult.StalePeriod>(repository.prepare(stale))
+
+        val request = ChannelReportCsvPreparationRequest.create(from, to, shown.report.period.token)!!
+        val prepared = assertIs<ChannelReportCsvPreparationResult.Prepared>(repository.prepare(request))
+        assertFalse(prepared.artifact.isReleased())
+        val csv = prepared.artifact.readBytes()!!.toString(Charsets.UTF_8)
+        assertTrue(csv.startsWith("recordKind,metric,part,"))
+        assertTrue(csv.contains("\r\nMETA,,,storecore-channel-report-csv-v1,"))
+        prepared.artifact.close()
+        assertTrue(prepared.artifact.isReleased())
+    }
+
+    @Test fun `CSV preparation owns repeatable read snapshot inside weaker transaction`() {
+        val from = "1991-01-01"
+        val to = "1991-01-02"
+        val shown = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read(from, to))
+        val request = ChannelReportCsvPreparationRequest.create(from, to, shown.report.period.token)!!
+        val outer = TransactionTemplate(DataSourceTransactionManager(source)).apply {
+            isolationLevel = TransactionDefinition.ISOLATION_READ_COMMITTED
+            isReadOnly = false
+        }
+
+        val result = outer.execute { repository.prepare(request) }
+
+        val prepared = assertIs<ChannelReportCsvPreparationResult.Prepared>(result)
+        prepared.artifact.close()
+    }
+
+    @Test fun `stale CSV token stops before metric projection`() {
+        val stages = mutableListOf<ChannelReportCsvPreparationStage>()
+        val observed = JdbcStoreCoreCreatedOrderReportRepository(
+            source,
+            Sha256ReportPeriodHasher(),
+            ChannelReportCsvPreparationObserver(stages::add),
+            PreparedChannelReportCsvFactory(com.storecore.channelreporting.application.PreparedChannelReportCsv::create),
+        )
+        val stale = ChannelReportCsvPreparationRequest.create(
+            "1992-01-01", "1992-01-02", com.storecore.channelreporting.domain.ReportPeriodToken.fromWire("a".repeat(64)),
+        )!!
+
+        assertIs<ChannelReportCsvPreparationResult.StalePeriod>(observed.prepare(stale))
+
+        assertTrue(stages.isEmpty())
+    }
+
+    @Test fun `CSV detail collections stay inside the admitted repeatable read snapshot`() {
+        jdbc.update(
+            "INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) " +
+                "SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING",
+        )
+        val initial = inventoryVariant("SNAPSHOT-INITIAL-", "Snapshot Initial Tool")
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) VALUES (?,1,0,2)", initial)
+        val initialSku = jdbc.queryForObject("SELECT sku FROM product_variants WHERE id=?", String::class.java, initial)!!
+        val from = "1993-01-01"
+        val to = "1993-01-02"
+        val shown = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read(from, to))
+        val request = ChannelReportCsvPreparationRequest.create(from, to, shown.report.period.token)!!
+        val detailReached = CountDownLatch(1)
+        val continueDetails = CountDownLatch(1)
+        val observed = JdbcStoreCoreCreatedOrderReportRepository(
+            source,
+            Sha256ReportPeriodHasher(),
+            ChannelReportCsvPreparationObserver { stage ->
+                if (stage == ChannelReportCsvPreparationStage.DETAIL_COLLECTION) {
+                    detailReached.countDown()
+                    check(continueDetails.await(10, TimeUnit.SECONDS))
+                }
+            },
+            PreparedChannelReportCsvFactory(com.storecore.channelreporting.application.PreparedChannelReportCsv::create),
+        )
+        val result = AtomicReference<ChannelReportCsvPreparationResult>()
+        val worker = thread(start = true, name = "csv-snapshot-test") { result.set(observed.prepare(request)) }
+        assertTrue(detailReached.await(10, TimeUnit.SECONDS))
+        val lateSku = "SNAPSHOT-LATE-${UUID.randomUUID()}"
+        val late = inventoryVariant(lateSku, "Snapshot Late Tool")
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) VALUES (?,0,0,2)", late)
+        continueDetails.countDown()
+        worker.join(10_000)
+        assertFalse(worker.isAlive)
+
+        val prepared = assertIs<ChannelReportCsvPreparationResult.Prepared>(result.get())
+        val csv = prepared.artifact.readBytes()!!.toString(Charsets.UTF_8)
+        assertTrue(csv.contains(initialSku))
+        assertFalse(csv.contains(lateSku))
+        prepared.artifact.close()
+    }
+
+    @Test fun `CSV artifact is released when commit fails before the physical commit`() {
+        assertCommitFailureReleasesArtifact(CommitFailureMode.BEFORE_DELEGATE)
+    }
+
+    @Test fun `CSV artifact is released when commit reports failure after the physical commit`() {
+        assertCommitFailureReleasesArtifact(CommitFailureMode.AFTER_DELEGATE)
     }
 
     @Test fun `late valid accreditation uses applied time and feeds bounded gross best sellers`() {
@@ -605,6 +723,28 @@ class StoreCoreCreatedOrderReportPostgresTest(
         )!!
     }
 
+    private fun assertCommitFailureReleasesArtifact(mode: CommitFailureMode) {
+        val from = "1994-01-01"
+        val to = "1994-01-02"
+        val shown = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read(from, to))
+        val request = ChannelReportCsvPreparationRequest.create(from, to, shown.report.period.token)!!
+        val recorded = AtomicReference<PreparedChannelReportCsv>()
+        val failing = JdbcStoreCoreCreatedOrderReportRepository(
+            CommitFailingDataSource(source, mode),
+            Sha256ReportPeriodHasher(),
+            ChannelReportCsvPreparationObserver { },
+            PreparedChannelReportCsvFactory { bytes ->
+                PreparedChannelReportCsv.create(bytes).also(recorded::set)
+            },
+        )
+
+        assertIs<ChannelReportCsvPreparationResult.SourceUnavailable>(failing.prepare(request))
+
+        val artifact = requireNotNull(recorded.get())
+        assertTrue(artifact.isReleased())
+        assertEquals(null, artifact.readBytes())
+    }
+
     private fun soldItem(
         orderId: Long,
         quantity: Int,
@@ -741,6 +881,37 @@ class StoreCoreCreatedOrderReportPostgresTest(
             registry.add("spring.datasource.url") { postgres.jdbcUrl }
             registry.add("spring.datasource.username") { postgres.username }
             registry.add("spring.datasource.password") { postgres.password }
+        }
+    }
+
+    private enum class CommitFailureMode { BEFORE_DELEGATE, AFTER_DELEGATE }
+
+    private class CommitFailingDataSource(
+        private val delegate: DataSource,
+        private val mode: CommitFailureMode,
+    ) : DataSource by delegate {
+        override fun getConnection(): Connection = failingCommit(delegate.connection)
+
+        override fun getConnection(username: String?, password: String?): Connection =
+            failingCommit(delegate.getConnection(username, password))
+
+        private fun failingCommit(connection: Connection): Connection = Proxy.newProxyInstance(
+            Connection::class.java.classLoader,
+            arrayOf(Connection::class.java),
+        ) { _, method, arguments ->
+            val args = arguments ?: emptyArray()
+            if (method.name == "commit" && method.parameterCount == 0) {
+                if (mode == CommitFailureMode.BEFORE_DELEGATE) throw SQLException("simulated commit failure")
+                invoke(connection, method, args)
+                throw SQLException("simulated ambiguous commit result")
+            }
+            invoke(connection, method, args)
+        } as Connection
+
+        private fun invoke(target: Connection, method: java.lang.reflect.Method, args: Array<out Any?>): Any? = try {
+            method.invoke(target, *args)
+        } catch (failure: InvocationTargetException) {
+            throw failure.targetException
         }
     }
 }

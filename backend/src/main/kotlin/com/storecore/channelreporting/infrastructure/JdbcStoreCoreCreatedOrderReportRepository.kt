@@ -12,10 +12,32 @@ import java.math.BigDecimal
 import java.sql.Timestamp
 import javax.sql.DataSource
 
-class JdbcStoreCoreCreatedOrderReportRepository(
+internal enum class ChannelReportCsvPreparationStage {
+    METRIC_PROJECTION,
+    DETAIL_COLLECTION,
+}
+
+internal fun interface ChannelReportCsvPreparationObserver {
+    fun reached(stage: ChannelReportCsvPreparationStage)
+}
+
+internal fun interface PreparedChannelReportCsvFactory {
+    fun create(bytes: ByteArray): PreparedChannelReportCsv
+}
+
+class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
     source: DataSource,
     private val hasher: ReportPeriodHasher,
-) : StoreCoreCreatedOrderReportRepository {
+    private val preparationObserver: ChannelReportCsvPreparationObserver,
+    private val artifactFactory: PreparedChannelReportCsvFactory,
+) : StoreCoreCreatedOrderReportRepository, ChannelReportCsvPreparationPort {
+    constructor(source: DataSource, hasher: ReportPeriodHasher) : this(
+        source,
+        hasher,
+        ChannelReportCsvPreparationObserver { },
+        PreparedChannelReportCsvFactory(PreparedChannelReportCsv::create),
+    )
+
     private val jdbc = JdbcTemplate(source)
     private val transaction = TransactionTemplate(DataSourceTransactionManager(source)).apply {
         isolationLevel = TransactionDefinition.ISOLATION_REPEATABLE_READ
@@ -29,6 +51,53 @@ class JdbcStoreCoreCreatedOrderReportRepository(
             failure = { unavailable(ReportUnavailableReason.READ_FAILED) },
             work = { readWithinSnapshot(fromDate!!, toDateExclusive!!) },
         )
+    }
+
+    override fun prepare(request: ChannelReportCsvPreparationRequest): ChannelReportCsvPreparationResult {
+        var provisional: PreparedChannelReportCsv? = null
+        val result = executeOwnedSnapshot(
+            failure = { SnapshotCsvPreparation.SourceUnavailable },
+            onFailure = { provisional?.close() },
+            work = {
+                when (val prepared = prepareWithinSnapshot(request)) {
+                    is SnapshotCsvPreparation.Ready -> {
+                        val artifact = artifactFactory.create(prepared.bytes)
+                        provisional = artifact
+                        SnapshotCsvPreparation.CommittedCandidate(artifact)
+                    }
+                    else -> prepared
+                }
+            },
+        )
+        return when (result) {
+            is SnapshotCsvPreparation.CommittedCandidate -> ChannelReportCsvPreparationResult.Prepared.create(result.artifact)
+            SnapshotCsvPreparation.StalePeriod -> ChannelReportCsvPreparationResult.StalePeriod
+            SnapshotCsvPreparation.TooLarge -> ChannelReportCsvPreparationResult.TooLarge
+            SnapshotCsvPreparation.SourceUnavailable,
+            is SnapshotCsvPreparation.Ready -> ChannelReportCsvPreparationResult.SourceUnavailable
+        }
+    }
+
+    private fun prepareWithinSnapshot(request: ChannelReportCsvPreparationRequest): SnapshotCsvPreparation {
+        val period = when (val resolution = resolvePeriodWithinSnapshot(request.fromDate, request.toDateExclusive)) {
+            is SnapshotPeriodResolution.Found -> resolution.period
+            SnapshotPeriodResolution.TimezoneUnavailable,
+            SnapshotPeriodResolution.SourceUnavailable -> return SnapshotCsvPreparation.SourceUnavailable
+        }
+        if (period.token != request.periodToken) return SnapshotCsvPreparation.StalePeriod
+        preparationObserver.reached(ChannelReportCsvPreparationStage.METRIC_PROJECTION)
+        val report = when (val projection = projectWithinSnapshot(period)) {
+            is StoreCoreCreatedOrderReadResult.Found -> projection.report
+            else -> return SnapshotCsvPreparation.SourceUnavailable
+        }
+        val plan = ChannelReportCsvPlan.create(report) ?: return SnapshotCsvPreparation.SourceUnavailable
+        if (plan.budget.admission == ChannelReportCsvDataRecordAdmission.TOO_LARGE) return SnapshotCsvPreparation.TooLarge
+        preparationObserver.reached(ChannelReportCsvPreparationStage.DETAIL_COLLECTION)
+        val bestSellers = if (report.bestSellers is ReportValue.Available) bestSellerItems(period, ReportCollectionMode.EXPORT_ALL) ?: return SnapshotCsvPreparation.SourceUnavailable else emptyList()
+        val lowStock = if (report.lowStock is ReportValue.Available) lowStockItems(ReportCollectionMode.EXPORT_ALL) ?: return SnapshotCsvPreparation.SourceUnavailable else emptyList()
+        val currentStock = if (report.blackStoreCurrentStock is ReportValue.Available) blackStoreStockItems(ReportCollectionMode.EXPORT_ALL) ?: return SnapshotCsvPreparation.SourceUnavailable else emptyList()
+        val details = ChannelReportCsvCompleteCollections.create(bestSellers, lowStock, currentStock)
+        return plan.encode(details)?.let(SnapshotCsvPreparation::Ready) ?: SnapshotCsvPreparation.SourceUnavailable
     }
 
     private fun readWithinSnapshot(fromDate: String, toDateExclusive: String): StoreCoreCreatedOrderReadResult {
@@ -100,16 +169,22 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         ))
     }
 
-    private fun <T : Any> executeOwnedSnapshot(failure: () -> T, work: () -> T): T = try {
+    private fun <T : Any> executeOwnedSnapshot(
+        failure: () -> T,
+        onFailure: () -> Unit = {},
+        work: () -> T,
+    ): T = try {
         transaction.execute {
             val contract = jdbc.queryForMap(
                 "SELECT current_setting('transaction_isolation') isolation, current_setting('transaction_read_only') read_only",
             )
             if (contract["isolation"] != "repeatable read" || contract["read_only"] != "on") failure() else work()
-        } ?: failure()
+        } ?: run { onFailure(); failure() }
     } catch (_: DataAccessException) {
+        onFailure()
         failure()
     } catch (_: TransactionException) {
+        onFailure()
         failure()
     }
 
@@ -173,29 +248,9 @@ class JdbcStoreCoreCreatedOrderReportRepository(
             Long::class.java,
             *parameters,
         ) ?: return PaymentProjection(ReportValue.available(metrics, paymentEvidence), unavailableValue())
-        val items = jdbc.query(
-            paymentAuthorityCte() + """, seller_units AS (
-                SELECT oi.variant_id,sum(oi.quantity) gross_units
-                FROM authority a JOIN order_items oi ON oi.order_id=a.order_id
-                WHERE a.valid_authority IS TRUE GROUP BY oi.variant_id
-            ), seller_labels AS (
-                SELECT DISTINCT ON (oi.variant_id) oi.variant_id,oi.product_snapshot->>'sku' sku,
-                    oi.product_snapshot->>'name' item_name
-                FROM authority a JOIN order_items oi ON oi.order_id=a.order_id
-                WHERE a.valid_authority IS TRUE
-                ORDER BY oi.variant_id,a.applied_at DESC,oi.id DESC
-            ) SELECT u.variant_id,l.sku,l.item_name,u.gross_units
-                FROM seller_units u JOIN seller_labels l ON l.variant_id=u.variant_id
-                ORDER BY u.gross_units DESC,u.variant_id ASC LIMIT ${BestSellerReport.LIMIT}""",
-            { rs, _ ->
-                val id = ReportUnsignedLong.fromValue(rs.getLong("variant_id"))
-                val units = ReportUnsignedLong.fromValue(rs.getLong("gross_units"))
-                if (id == null || units == null) null else BestSellerItem.create(id, rs.getString("sku"), rs.getString("item_name"), units)
-            },
-            *parameters,
-        )
-        if (items.any { it == null }) return PaymentProjection(ReportValue.available(metrics, paymentEvidence), unavailableValue())
-        val sellerReport = BestSellerReport.create(items.filterNotNull(), ReportUnsignedLong.fromValue(total) ?: return contradictoryPaymentProjection())
+        val items = bestSellerItems(period, ReportCollectionMode.DASHBOARD)
+            ?: return PaymentProjection(ReportValue.available(metrics, paymentEvidence), unavailableValue())
+        val sellerReport = BestSellerReport.create(items, ReportUnsignedLong.fromValue(total) ?: return contradictoryPaymentProjection())
             ?: return contradictoryPaymentProjection()
         return PaymentProjection(
             ReportValue.available(metrics, paymentEvidence),
@@ -364,22 +419,8 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         if ((summary["missing_count"] as Number).toLong() != 0L) return unavailableValue()
         if ((summary["invalid_text_count"] as Number).toLong() != 0L) return unavailableValue()
         val total = ReportUnsignedLong.fromValue((summary["low_count"] as Number).toLong()) ?: return unavailableValue()
-        val items = jdbc.query(
-            """SELECT v.id,v.sku,p.name product_name,v.label,b.available_quantity,b.safety_stock
-               FROM product_variants v JOIN products p ON p.id=v.product_id JOIN inventory_balances b ON b.variant_id=v.id
-               WHERE v.active=TRUE AND p.status='ACTIVE' AND b.available_quantity<=b.safety_stock
-               ORDER BY b.available_quantity ASC,v.id ASC LIMIT ${LowStockReport.LIMIT}""",
-            { rs, _ ->
-                val id = ReportUnsignedLong.fromValue(rs.getLong("id"))
-                val available = ReportUnsignedLong.fromValue(rs.getLong("available_quantity"))
-                val safety = ReportUnsignedLong.fromValue(rs.getLong("safety_stock"))
-                if (id == null || available == null || safety == null) null else LowStockItem.create(
-                    id, rs.getString("sku"), rs.getString("product_name"), rs.getString("label"), available, safety,
-                )
-            },
-        )
-        if (items.any { it == null }) return unavailableValue()
-        val report = LowStockReport.create(items.filterNotNull(), total) ?: return unavailableValue()
+        val items = lowStockItems(ReportCollectionMode.DASHBOARD) ?: return unavailableValue()
+        val report = LowStockReport.create(items, total) ?: return unavailableValue()
         val evidence = ReportEvidence.current(
             ReportSource.STORECORE_CURRENT_INVENTORY,
             period.generatedAt,
@@ -597,13 +638,72 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         val total = ReportUnsignedLong.fromValue((summary["active_count"] as Number).toLong()) ?: return unavailableValue()
         val sellable = exactUnsigned(summary["sellable_units"]) ?: return unavailableValue()
         val zero = ReportUnsignedLong.fromValue((summary["zero_sellable_count"] as Number).toLong()) ?: return unavailableValue()
-        val items = jdbc.query(
+        val items = blackStoreStockItems(ReportCollectionMode.DASHBOARD) ?: return unavailableValue()
+        val report = BlackStoreCurrentStockReport.create(items, total, sellable, zero)
+            ?: return unavailableValue()
+        val evidence = ReportEvidence.current(
+            ReportSource.STORECORE_CURRENT_INVENTORY,
+            period.generatedAt,
+            ReportFreshness.CURRENT,
+        ) ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
+    }
+
+    private fun bestSellerItems(period: ReportPeriod, mode: ReportCollectionMode): List<BestSellerItem>? {
+        val parameters = arrayOf(Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive))
+        val limitSql = mode.sqlLimit(BestSellerReport.LIMIT)
+        val rows = jdbc.query(
+            paymentAuthorityCte() + """, seller_units AS (
+                SELECT oi.variant_id,sum(oi.quantity) gross_units
+                FROM authority a JOIN order_items oi ON oi.order_id=a.order_id
+                WHERE a.valid_authority IS TRUE GROUP BY oi.variant_id
+            ), seller_labels AS (
+                SELECT DISTINCT ON (oi.variant_id) oi.variant_id,oi.product_snapshot->>'sku' sku,
+                    oi.product_snapshot->>'name' item_name
+                FROM authority a JOIN order_items oi ON oi.order_id=a.order_id
+                WHERE a.valid_authority IS TRUE
+                ORDER BY oi.variant_id,a.applied_at DESC,oi.id DESC
+            ) SELECT u.variant_id,l.sku,l.item_name,u.gross_units
+                FROM seller_units u JOIN seller_labels l ON l.variant_id=u.variant_id
+                ORDER BY u.gross_units DESC,u.variant_id ASC$limitSql""",
+            { rs, _ ->
+                val id = ReportUnsignedLong.fromValue(rs.getLong("variant_id"))
+                val units = ReportUnsignedLong.fromValue(rs.getLong("gross_units"))
+                if (id == null || units == null) null else BestSellerItem.create(id, rs.getString("sku"), rs.getString("item_name"), units)
+            },
+            *parameters,
+        )
+        return rows.takeIf { it.none { row -> row == null } }?.filterNotNull()
+    }
+
+    private fun lowStockItems(mode: ReportCollectionMode): List<LowStockItem>? {
+        val limitSql = mode.sqlLimit(LowStockReport.LIMIT)
+        val rows = jdbc.query(
+            """SELECT v.id,v.sku,p.name product_name,v.label,b.available_quantity,b.safety_stock
+               FROM product_variants v JOIN products p ON p.id=v.product_id JOIN inventory_balances b ON b.variant_id=v.id
+               WHERE v.active=TRUE AND p.status='ACTIVE' AND b.available_quantity<=b.safety_stock
+               ORDER BY b.available_quantity ASC,v.id ASC$limitSql""",
+            { rs, _ ->
+                val id = ReportUnsignedLong.fromValue(rs.getLong("id"))
+                val available = ReportUnsignedLong.fromValue(rs.getLong("available_quantity"))
+                val safety = ReportUnsignedLong.fromValue(rs.getLong("safety_stock"))
+                if (id == null || available == null || safety == null) null else LowStockItem.create(
+                    id, rs.getString("sku"), rs.getString("product_name"), rs.getString("label"), available, safety,
+                )
+            },
+        )
+        return rows.takeIf { it.none { row -> row == null } }?.filterNotNull()
+    }
+
+    private fun blackStoreStockItems(mode: ReportCollectionMode): List<BlackStoreStockItem>? {
+        val limitSql = mode.sqlLimit(BlackStoreCurrentStockReport.LIMIT)
+        val rows = jdbc.query(
             """SELECT v.id,v.sku,p.name product_name,v.label,
                       GREATEST(0,b.available_quantity-b.safety_stock) sellable_quantity
                FROM product_variants v JOIN products p ON p.id=v.product_id
                JOIN inventory_balances b ON b.variant_id=v.id
                WHERE v.active=TRUE AND p.status='ACTIVE'
-               ORDER BY v.id ASC LIMIT ${BlackStoreCurrentStockReport.LIMIT}""",
+               ORDER BY v.id ASC$limitSql""",
             { rs, _ ->
                 val id = ReportUnsignedLong.fromValue(rs.getLong("id"))
                 val quantity = ReportUnsignedLong.fromValue(rs.getLong("sellable_quantity"))
@@ -612,15 +712,7 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                 )
             },
         )
-        if (items.any { it == null }) return unavailableValue()
-        val report = BlackStoreCurrentStockReport.create(items.filterNotNull(), total, sellable, zero)
-            ?: return unavailableValue()
-        val evidence = ReportEvidence.current(
-            ReportSource.STORECORE_CURRENT_INVENTORY,
-            period.generatedAt,
-            ReportFreshness.CURRENT,
-        ) ?: return unavailableValue()
-        return ReportValue.available(report, evidence)
+        return rows.takeIf { it.none { row -> row == null } }?.filterNotNull()
     }
 
     private fun blackStoreEvidence(period: ReportPeriod): ReportEvidence = requireNotNull(
@@ -642,5 +734,22 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         class Found(val period: ReportPeriod) : SnapshotPeriodResolution
         data object TimezoneUnavailable : SnapshotPeriodResolution
         data object SourceUnavailable : SnapshotPeriodResolution
+    }
+
+    private sealed interface SnapshotCsvPreparation {
+        class Ready(val bytes: ByteArray) : SnapshotCsvPreparation
+        class CommittedCandidate(val artifact: PreparedChannelReportCsv) : SnapshotCsvPreparation
+        data object StalePeriod : SnapshotCsvPreparation
+        data object TooLarge : SnapshotCsvPreparation
+        data object SourceUnavailable : SnapshotCsvPreparation
+    }
+
+    private enum class ReportCollectionMode {
+        DASHBOARD, EXPORT_ALL;
+
+        fun sqlLimit(dashboardLimit: Int): String = when (this) {
+            DASHBOARD -> " LIMIT $dashboardLimit"
+            EXPORT_ALL -> ""
+        }
     }
 }
