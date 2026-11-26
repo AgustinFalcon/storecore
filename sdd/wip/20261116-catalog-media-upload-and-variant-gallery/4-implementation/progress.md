@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-25 — arranque 4C RLIMIT AS del worker
+
+- El harness deriva `LimitAS` (`RLIMIT_AS`, 32× heap `IMAGE_IO_V1`) y
+  PID 1 lo lee. Un techo igual a `MemoryMax` core-dump del JVM. No es
+  `MemoryMax` ni `CPUQuota`.
+- No se marca `003B-4C`. No hay familia de sockets, cuota global,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-25 — persist reviews PR #409, 003B-4C sigue abierto
 
 - Merge #409 `77fbe292b26dfac7c8e22310392ad454f288817e` sobre candidato

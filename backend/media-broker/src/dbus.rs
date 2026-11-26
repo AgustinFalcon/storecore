@@ -43,6 +43,11 @@ const WORKER_LIMIT_FSIZE: u64 = crate::systemd::MOUNT_BYTES;
 /// CPU-time ceiling in seconds (`IMAGE_IO_V1` timeout). Derived internally;
 /// the client cannot supply it. This is `RLIMIT_CPU`, not `CPUQuota`.
 const WORKER_LIMIT_CPU: u64 = WORKER_RUNTIME_MAX_USEC / 1_000_000;
+/// Address-space ceiling. Derived internally as 32× `IMAGE_IO_V1` heap so
+/// `HotSpot` can map the runtime while remaining bounded. Equal to
+/// `MemoryMax` core-dumps the JVM because virtual size exceeds RSS. This is
+/// `RLIMIT_AS`, not `MemoryMax`. The client cannot supply it.
+const WORKER_LIMIT_AS: u64 = 32 * WORKER_MEMORY_MAX_BYTES;
 
 /// System-bus client for the allowlisted Manager methods. Construction is the
 /// only way to open D-Bus; unit tests never call it.
@@ -291,6 +296,7 @@ pub(crate) fn worker_properties(
         ("LimitCORE", Value::from(WORKER_LIMIT_CORE)),
         ("LimitFSIZE", Value::from(WORKER_LIMIT_FSIZE)),
         ("LimitCPU", Value::from(WORKER_LIMIT_CPU)),
+        ("LimitAS", Value::from(WORKER_LIMIT_AS)),
         ("PrivateNetwork", Value::from(true)),
         ("PrivateTmp", Value::from(true)),
         ("PrivateDevices", Value::from(true)),
@@ -347,10 +353,10 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_LIMIT_CORE, WORKER_LIMIT_CPU, WORKER_LIMIT_FSIZE, WORKER_LIMIT_NOFILE,
-        WORKER_LIMIT_NPROC, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
-        WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
-        worker_properties,
+        WORKER_LIMIT_AS, WORKER_LIMIT_CORE, WORKER_LIMIT_CPU, WORKER_LIMIT_FSIZE,
+        WORKER_LIMIT_NOFILE, WORKER_LIMIT_NPROC, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC,
+        WORKER_TASKS_MAX, WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name,
+        mount_properties, worker_properties,
     };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::state::{JobId, Principal};
@@ -626,6 +632,40 @@ mod tests {
             cpu.as_deref()
                 .is_some_and(|value| value.contains(&WORKER_LIMIT_CPU.to_string())),
             "LimitCPU must be the internal 12s ceiling, got {cpu:?}"
+        );
+    }
+
+    #[test]
+    fn derived_worker_limit_as_is_rlimit_not_cgroup() {
+        let job = JobId::create([0xab; 16]).expect("job");
+        let runtime = approved_runtime();
+        let spec = TransientUnits::derive(
+            job,
+            std::path::PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2000, 2000),
+            &runtime,
+        )
+        .expect("spec");
+        let worker = worker_properties(&spec).expect("worker");
+        let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
+        assert!(keys.contains(&"LimitAS"));
+        assert!(keys.contains(&"MemoryMax"));
+        assert!(!keys.contains(&"ProtectHome"));
+        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(!keys.contains(&"CPUQuota"));
+        let limit_as = worker
+            .iter()
+            .find(|(key, _)| *key == "LimitAS")
+            .map(|(_, value)| format!("{value:?}"));
+        assert_ne!(
+            WORKER_LIMIT_AS, WORKER_MEMORY_MAX_BYTES,
+            "LimitAS must exceed MemoryMax so the JVM can map the runtime"
+        );
+        assert!(
+            limit_as
+                .as_deref()
+                .is_some_and(|value| value.contains(&WORKER_LIMIT_AS.to_string())),
+            "LimitAS must be the internal address-space ceiling, got {limit_as:?}"
         );
     }
 
@@ -2540,6 +2580,62 @@ mod tests {
         assert!(
             protect_kernel_modules == "yes" || protect_kernel_modules == "true",
             "PID 1 must apply derived ProtectKernelModules, got {protect_kernel_modules}"
+        );
+        let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
+        assert!(matches!(
+            stopped_worker,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_worker_limit_as() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let job = JobId::create([0x1f; 16]).expect("job");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec = TransientUnits::derive(
+            job,
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec)
+            .expect("start mount");
+        assert_eq!(started_mount, UnitState::Active);
+        let where_path = spec.mount().where_path().to_path_buf();
+        write_self_test_request(&where_path, 2101, worker.gid());
+        let name = spec.worker().name().as_str().expect("worker unit name");
+        let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
+        if started_worker.is_err() {
+            dump_worker_unit(&spec, started_worker, &where_path);
+            panic!("StartTransientUnit rejected derived LimitAS");
+        }
+        let limit_as = systemctl_property(name, "LimitAS");
+        let expected = WORKER_LIMIT_AS.to_string();
+        assert!(
+            limit_as == expected || limit_as.starts_with(&format!("{expected}:")),
+            "PID 1 must apply derived LimitAS, got {limit_as}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
