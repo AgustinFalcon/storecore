@@ -38,20 +38,20 @@ class ChannelReportCsvPlan private constructor(
             ) ?: return null
             val sections = listOfNotNull(
                 ChannelReportCsvSectionPlan.createdOrders(context, report.createdOrders),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.APPLIED_ACCREDITATIONS, report.appliedAccreditations),
+                ChannelReportCsvSectionPlan.appliedAccreditations(context, report.appliedAccreditations),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BEST_SELLERS, report.bestSellers),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.PAYMENT_DISPOSITION, report.paymentDisposition),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.INVENTORY_MOVEMENTS, report.inventoryMovements),
+                ChannelReportCsvSectionPlan.paymentDisposition(context, report.paymentDisposition),
+                ChannelReportCsvSectionPlan.inventoryMovements(context, report.inventoryMovements),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.LOW_STOCK, report.lowStock),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.RETURN_RECEIPTS, report.returnReceipts),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.CONFIRMED_RETURN_DISPOSITION, report.confirmedReturnDisposition),
+                ChannelReportCsvSectionPlan.returnReceipts(context, report.returnReceipts),
+                ChannelReportCsvSectionPlan.confirmedReturnDisposition(context, report.confirmedReturnDisposition),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.NET_REVENUE, report.netRevenue),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.REVERSAL_AMOUNT, report.reversalAmount),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.FISCAL_TOTAL, report.fiscalTotal),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_MODULE_STATE, report.blackStoreModuleState),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_REGISTRATION, report.blackStoreRegistration),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_OPERATIONS, report.blackStoreOperations),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_CATALOG_TOKEN, report.blackStoreCatalogToken),
+                ChannelReportCsvSectionPlan.blackStoreModuleState(context, report.blackStoreModuleState),
+                ChannelReportCsvSectionPlan.blackStoreRegistration(context, report.blackStoreRegistration),
+                ChannelReportCsvSectionPlan.blackStoreOperations(context, report.blackStoreOperations),
+                ChannelReportCsvSectionPlan.blackStoreCatalogToken(context, report.blackStoreCatalogToken),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_CURRENT_STOCK, report.blackStoreCurrentStock),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_REMOTE_FRESHNESS, report.blackStoreRemoteFreshness),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_SALES, report.blackStoreSales),
@@ -86,7 +86,7 @@ private class ChannelReportCsvSectionPlan private constructor(
                     val row = context.record(
                         ChannelReportCsvRecordKind.VALUE,
                         ChannelReportCsvMetric.CREATED_ORDERS,
-                        mapOf(
+                        additions = mapOf(
                             ChannelReportCsvColumn.COUNT to (ChannelReportCsvCell.unsigned(value.count.wire) ?: return null),
                             ChannelReportCsvColumn.NOMINAL_TOTAL to (ChannelReportCsvCell.money(value.nominalTotal.wire) ?: return null),
                             ChannelReportCsvColumn.CURRENCY to ChannelReportCsvCell.openText("ARS"),
@@ -100,6 +100,123 @@ private class ChannelReportCsvSectionPlan private constructor(
             return ChannelReportCsvSectionPlan(BigInteger.valueOf(records.size.toLong()), records)
         }
 
+        fun appliedAccreditations(context: ChannelReportCsvContext, source: ReportValue<AppliedAccreditationMetrics>) =
+            valuePlan(context, ChannelReportCsvMetric.APPLIED_ACCREDITATIONS, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.APPLIED_ACCREDITATIONS, additions = mapOf(
+                    ChannelReportCsvColumn.COUNT to unsigned(value.count),
+                    ChannelReportCsvColumn.CONFIRMED_GROSS to money(value.confirmedGross),
+                    ChannelReportCsvColumn.MERCHANDISE_SUBTOTAL to money(value.merchandiseSubtotal),
+                    ChannelReportCsvColumn.SHIPPING_AMOUNT to money(value.shippingAmount),
+                    ChannelReportCsvColumn.CURRENCY to ChannelReportCsvCell.openText("ARS"),
+                ))?.let(::listOf)
+            }
+
+        fun paymentDisposition(context: ChannelReportCsvContext, source: ReportValue<PaymentDispositionReport>) =
+            valuePlan(context, ChannelReportCsvMetric.PAYMENT_DISPOSITION, source) { value ->
+                ReportPaymentDisposition.admitted.map { disposition ->
+                    context.record(ChannelReportCsvRecordKind.GROUP, ChannelReportCsvMetric.PAYMENT_DISPOSITION, additions = mapOf(
+                        ChannelReportCsvColumn.STATE to ChannelReportCsvCell.openText(disposition.name),
+                        ChannelReportCsvColumn.COUNT to unsigned(value.count(disposition)),
+                    )) ?: return@valuePlan null
+                }
+            }
+
+        fun inventoryMovements(context: ChannelReportCsvContext, source: ReportValue<InventoryMovementReport>) =
+            valuePlan(context, ChannelReportCsvMetric.INVENTORY_MOVEMENTS, source) { value ->
+                if (value.groups.isEmpty()) {
+                    context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.INVENTORY_MOVEMENTS, additions = mapOf(
+                        ChannelReportCsvColumn.EMPTY to ChannelReportCsvCell.openText("true"),
+                    ))?.let(::listOf)
+                } else {
+                    value.groups.sortedWith(compareBy({ it.eventType.name }, { it.channel.name })).map { group ->
+                        context.record(ChannelReportCsvRecordKind.GROUP, ChannelReportCsvMetric.INVENTORY_MOVEMENTS, additions = mapOf(
+                            ChannelReportCsvColumn.EVENT_TYPE to ChannelReportCsvCell.openText(group.eventType.name),
+                            ChannelReportCsvColumn.CHANNEL to ChannelReportCsvCell.openText(group.channel.name),
+                            ChannelReportCsvColumn.COUNT to unsigned(group.count),
+                            ChannelReportCsvColumn.QUANTITY_DELTA_SUM to signed(group.signedQuantity),
+                        )) ?: return@valuePlan null
+                    }
+                }
+            }
+
+        fun returnReceipts(context: ChannelReportCsvContext, source: ReportValue<ReturnReceiptMetrics>) =
+            valuePlan(context, ChannelReportCsvMetric.RETURN_RECEIPTS, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.RETURN_RECEIPTS, additions = mapOf(
+                    ChannelReportCsvColumn.COUNT to unsigned(value.returnCount),
+                    ChannelReportCsvColumn.UNITS to unsigned(value.returnedUnits),
+                ))?.let(::listOf)
+            }
+
+        fun confirmedReturnDisposition(context: ChannelReportCsvContext, source: ReportValue<ConfirmedReturnDispositionMetrics>) =
+            valuePlan(context, ChannelReportCsvMetric.CONFIRMED_RETURN_DISPOSITION, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.CONFIRMED_RETURN_DISPOSITION, additions = mapOf(
+                    ChannelReportCsvColumn.COUNT to unsigned(value.confirmedReturnCount),
+                    ChannelReportCsvColumn.RESTOCK_UNITS to unsigned(value.restockUnits),
+                    ChannelReportCsvColumn.DAMAGED_UNITS to unsigned(value.damagedUnits),
+                    ChannelReportCsvColumn.REJECTED_UNITS to unsigned(value.rejectedUnits),
+                ))?.let(::listOf)
+            }
+
+        fun blackStoreModuleState(context: ChannelReportCsvContext, source: ReportValue<ReportModuleState>) =
+            valuePlan(context, ChannelReportCsvMetric.BLACK_STORE_MODULE_STATE, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.BLACK_STORE_MODULE_STATE, additions = mapOf(
+                    ChannelReportCsvColumn.STATE to ChannelReportCsvCell.openText(value.name),
+                ))?.let(::listOf)
+            }
+
+        fun blackStoreRegistration(context: ChannelReportCsvContext, source: ReportValue<BlackStoreRegistrationReport>) =
+            valuePlan(context, ChannelReportCsvMetric.BLACK_STORE_REGISTRATION, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.BLACK_STORE_REGISTRATION, additions = mapOf(
+                    ChannelReportCsvColumn.STATE to ChannelReportCsvCell.openText(value.state.name),
+                    ChannelReportCsvColumn.REVOKED_HISTORY_COUNT to unsigned(value.revokedHistoryCount),
+                ))?.let(::listOf)
+            }
+
+        fun blackStoreOperations(context: ChannelReportCsvContext, source: ReportValue<BlackStoreOperationDiagnostics>) =
+            valuePlan(context, ChannelReportCsvMetric.BLACK_STORE_OPERATIONS, source) { value ->
+                val records = mutableListOf<ChannelReportCsvRecord>()
+                for (state in BlackStoreOperationState.admitted) {
+                    records += context.record(
+                        ChannelReportCsvRecordKind.GROUP,
+                        ChannelReportCsvMetric.BLACK_STORE_OPERATIONS,
+                        ChannelReportCsvPart.RETAINED,
+                        mapOf(
+                            ChannelReportCsvColumn.STATE to ChannelReportCsvCell.openText(state.name),
+                            ChannelReportCsvColumn.COUNT to unsigned(value.count(state)),
+                        ),
+                    ) ?: return@valuePlan null
+                }
+                for (state in BlackStoreRetiredOperationState.admitted) {
+                    records += context.record(
+                        ChannelReportCsvRecordKind.GROUP,
+                        ChannelReportCsvMetric.BLACK_STORE_OPERATIONS,
+                        ChannelReportCsvPart.RETIRED,
+                        mapOf(
+                            ChannelReportCsvColumn.STATE to ChannelReportCsvCell.openText(state.name),
+                            ChannelReportCsvColumn.COUNT to unsigned(value.retiredCount(state)),
+                        ),
+                    ) ?: return@valuePlan null
+                }
+                records += context.activity(
+                    ChannelReportCsvMetric.BLACK_STORE_OPERATIONS,
+                    ChannelReportCsvPart.LATEST_RETAINED_ACTIVITY,
+                    value.latestRetainedActivity,
+                ) ?: return@valuePlan null
+                records += context.activity(
+                    ChannelReportCsvMetric.BLACK_STORE_OPERATIONS,
+                    ChannelReportCsvPart.LATEST_RETIRED_ACTIVITY,
+                    value.latestRetiredActivity,
+                ) ?: return@valuePlan null
+                records
+            }
+
+        fun blackStoreCatalogToken(context: ChannelReportCsvContext, source: ReportValue<OpaqueCatalogToken>) =
+            valuePlan(context, ChannelReportCsvMetric.BLACK_STORE_CATALOG_TOKEN, source) { value ->
+                context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.BLACK_STORE_CATALOG_TOKEN, additions = mapOf(
+                    ChannelReportCsvColumn.CATALOG_TOKEN to ChannelReportCsvCell.openText(value.wire),
+                ))?.let(::listOf)
+            }
+
         fun statusOnly(
             context: ChannelReportCsvContext,
             metric: ChannelReportCsvMetric,
@@ -109,6 +226,28 @@ private class ChannelReportCsvSectionPlan private constructor(
             val status = context.status(metric, source) ?: return null
             return ChannelReportCsvSectionPlan(BigInteger.ONE, listOf(status))
         }
+
+        private fun <T : Any> valuePlan(
+            context: ChannelReportCsvContext,
+            metric: ChannelReportCsvMetric,
+            source: ReportValue<T>,
+            details: (T) -> List<ChannelReportCsvRecord>?,
+        ): ChannelReportCsvSectionPlan? {
+            val status = context.status(metric, source) ?: return null
+            val records = when (source) {
+                is ReportValue.Available -> listOf(status) + (details(source.value) ?: return null)
+                is ReportValue.Unavailable, is ReportValue.NotAvailable -> listOf(status)
+                ReportValue.Unknown -> return null
+            }
+            return ChannelReportCsvSectionPlan(BigInteger.valueOf(records.size.toLong()), records)
+        }
+
+        private fun unsigned(value: ReportUnsignedLong): ChannelReportCsvCell =
+            requireNotNull(ChannelReportCsvCell.unsigned(value.wire))
+        private fun signed(value: ReportSignedLong): ChannelReportCsvCell =
+            requireNotNull(ChannelReportCsvCell.signed(value.wire))
+        private fun money(value: ReportArsAmount): ChannelReportCsvCell =
+            requireNotNull(ChannelReportCsvCell.money(value.wire))
     }
 }
 
@@ -116,10 +255,11 @@ private class ChannelReportCsvContext private constructor(val values: Map<Channe
     fun record(
         kind: ChannelReportCsvRecordKind,
         metric: ChannelReportCsvMetric,
+        part: ChannelReportCsvPart = ChannelReportCsvPart.ROOT,
         additions: Map<ChannelReportCsvColumn, ChannelReportCsvCell>,
     ): ChannelReportCsvRecord? {
         if (additions.keys.any(values::containsKey)) return null
-        return ChannelReportCsvRecord.create(kind, metric, ChannelReportCsvPart.ROOT, values + additions)
+        return ChannelReportCsvRecord.create(kind, metric, part, values + additions)
     }
 
     fun status(metric: ChannelReportCsvMetric, source: ReportValue<*>): ChannelReportCsvRecord? {
@@ -146,7 +286,38 @@ private class ChannelReportCsvContext private constructor(val values: Map<Channe
             }
             ReportValue.Unknown -> return null
         }
-        return record(ChannelReportCsvRecordKind.STATUS, metric, fields)
+        return record(ChannelReportCsvRecordKind.STATUS, metric, additions = fields)
+    }
+
+    fun activity(
+        metric: ChannelReportCsvMetric,
+        part: ChannelReportCsvPart,
+        source: ReportValue<java.time.Instant>,
+    ): List<ChannelReportCsvRecord>? {
+        val status = status(metric, part, source) ?: return null
+        return when (source) {
+            is ReportValue.Available -> {
+                val value = record(ChannelReportCsvRecordKind.VALUE, metric, part, mapOf(
+                    ChannelReportCsvColumn.ACTIVITY_AT to ChannelReportCsvCell.openText(source.value.toString()),
+                )) ?: return null
+                listOf(status, value)
+            }
+            is ReportValue.Unavailable -> listOf(status)
+            else -> null
+        }
+    }
+
+    private fun status(
+        metric: ChannelReportCsvMetric,
+        part: ChannelReportCsvPart,
+        source: ReportValue<*>,
+    ): ChannelReportCsvRecord? {
+        val root = status(metric, source) ?: return null
+        val additions = ChannelReportCsvColumn.entries
+            .filterNot { it in setOf(ChannelReportCsvColumn.RECORD_KIND, ChannelReportCsvColumn.METRIC, ChannelReportCsvColumn.PART) }
+            .mapNotNull { column -> root.cells[column.ordinal].takeIf { it.wire.isNotEmpty() }?.let { column to it } }
+            .toMap()
+        return ChannelReportCsvRecord.create(ChannelReportCsvRecordKind.STATUS, metric, part, additions)
     }
 
     companion object {
