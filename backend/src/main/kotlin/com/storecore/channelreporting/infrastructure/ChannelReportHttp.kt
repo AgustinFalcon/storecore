@@ -21,6 +21,22 @@ data class ChannelReportQuery private constructor(val fromDate: String, val toDa
     }
 }
 
+data class ChannelReportCsvQuery private constructor(
+    val fromDate: String,
+    val toDateExclusive: String,
+    val periodToken: ReportPeriodToken,
+) {
+    companion object {
+        fun fromWire(raw: MultiValueMap<String, String>): ChannelReportCsvQuery? {
+            if (raw.keys != setOf("fromDate", "toDateExclusive", "periodToken") || raw.values.any { it.size != 1 }) return null
+            val from = raw["fromDate"]?.singleOrNull()
+            val to = raw["toDateExclusive"]?.singleOrNull()
+            val token = ReportPeriodToken.fromWire(raw["periodToken"]?.singleOrNull()) ?: return null
+            return takeIf { ReportPeriod.validRequest(from, to) }?.let { ChannelReportCsvQuery(from!!, to!!, token) }
+        }
+    }
+}
+
 class ChannelReportReadOriginPolicy(private val installationOrigin: InstallationOrigin) {
     fun requireAdmitted(request: HttpServletRequest) {
         val origin = unique(request, "Origin")

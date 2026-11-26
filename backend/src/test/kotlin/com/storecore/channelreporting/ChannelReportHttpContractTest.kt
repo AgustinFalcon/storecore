@@ -34,6 +34,24 @@ class ChannelReportHttpContractTest {
         )) assertNull(ChannelReportQuery.fromWire(invalid))
     }
 
+    @Test fun `CSV query additionally owns one canonical period token and rejects every ambiguity`() {
+        val token = "a".repeat(64)
+        val valid = LinkedMultiValueMap<String, String>().apply {
+            add("fromDate", "2026-11-01")
+            add("toDateExclusive", "2026-11-26")
+            add("periodToken", token)
+        }
+        val query = assertNotNull(ChannelReportCsvQuery.fromWire(valid))
+        assertEquals(token, query.periodToken.wire)
+        for (invalid in listOf(
+            LinkedMultiValueMap(valid).apply { add("periodToken", token) },
+            LinkedMultiValueMap(valid).apply { set("periodToken", "A".repeat(64)) },
+            LinkedMultiValueMap(valid).apply { remove("periodToken") },
+            LinkedMultiValueMap(valid).apply { add("extra", "1") },
+            LinkedMultiValueMap(valid).apply { set("fromDate", "2026-1-01") },
+        )) assertNull(ChannelReportCsvQuery.fromWire(invalid))
+    }
+
     @Test fun `read origin policy admits normal same origin browser evidence and rejects ambiguity`() {
         val policy = ChannelReportReadOriginPolicy(InstallationOrigin("https://store.example.test"))
         assertDoesNotThrow { policy.requireAdmitted(request("Sec-Fetch-Site" to "same-origin")) }

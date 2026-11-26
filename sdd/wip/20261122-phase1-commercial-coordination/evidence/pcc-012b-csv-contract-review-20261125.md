@@ -21,3 +21,9 @@ Evidence executed locally:
 - `git diff --check` — no whitespace errors at this checkpoint.
 
 PCC-012B remains `in_progress`: snapshot preparation, exact pre-count, full-detail emission, the 50,000/50,001 boundary, transport mapping and cleanup are deliberately not claimed by this checkpoint.
+
+## Preparation boundary checkpoint
+
+The next reversible unit adds the exact three-parameter CSV query, canonical period-token translation, the separate preparation port with the five closed outcomes, and an owned prepared artifact. The artifact contains no JDBC, lazy callback or HTTP object; it copies both incoming and outgoing bytes, synchronizes read/release, clears its owned buffer and releases idempotently.
+
+The red compile named only the missing query and artifact symbols. `mvn.cmd -q -Dtest='ChannelReportCsvPreparationTest,ChannelReportHttpContractTest' test` then passed 6 tests with 0 failures and 0 errors. Architecture and concurrency reviewers both returned **APPROVE** with no P0-P3. Commit-before-`Prepared` remains an adapter obligation for the next checkpoint and is not claimed here.
