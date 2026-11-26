@@ -10,9 +10,9 @@ class ChannelReportCsvPlan private constructor(
     private val sections: List<ChannelReportCsvSectionPlan>,
     val budget: ChannelReportCsvDataRecordBudget,
 ) {
-    fun encode(): ByteArray? {
+    fun encode(details: ChannelReportCsvCompleteCollections = ChannelReportCsvCompleteCollections.empty()): ByteArray? {
         if (budget.admission != ChannelReportCsvDataRecordAdmission.ADMITTED) return null
-        val records = sections.flatMap(ChannelReportCsvSectionPlan::records)
+        val records = sections.flatMap { it.records(details) ?: return null }
         if (!budget.matchesPreparedRecordCount(BigInteger.valueOf(records.size.toLong()))) return null
         val csv = buildString {
             append(ChannelReportCsvEncoder.header())
@@ -39,10 +39,10 @@ class ChannelReportCsvPlan private constructor(
             val sections = listOfNotNull(
                 ChannelReportCsvSectionPlan.createdOrders(context, report.createdOrders),
                 ChannelReportCsvSectionPlan.appliedAccreditations(context, report.appliedAccreditations),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BEST_SELLERS, report.bestSellers),
+                ChannelReportCsvSectionPlan.bestSellers(context, report.bestSellers),
                 ChannelReportCsvSectionPlan.paymentDisposition(context, report.paymentDisposition),
                 ChannelReportCsvSectionPlan.inventoryMovements(context, report.inventoryMovements),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.LOW_STOCK, report.lowStock),
+                ChannelReportCsvSectionPlan.lowStock(context, report.lowStock),
                 ChannelReportCsvSectionPlan.returnReceipts(context, report.returnReceipts),
                 ChannelReportCsvSectionPlan.confirmedReturnDisposition(context, report.confirmedReturnDisposition),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.NET_REVENUE, report.netRevenue),
@@ -52,7 +52,7 @@ class ChannelReportCsvPlan private constructor(
                 ChannelReportCsvSectionPlan.blackStoreRegistration(context, report.blackStoreRegistration),
                 ChannelReportCsvSectionPlan.blackStoreOperations(context, report.blackStoreOperations),
                 ChannelReportCsvSectionPlan.blackStoreCatalogToken(context, report.blackStoreCatalogToken),
-                ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_CURRENT_STOCK, report.blackStoreCurrentStock),
+                ChannelReportCsvSectionPlan.blackStoreCurrentStock(context, report.blackStoreCurrentStock),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_REMOTE_FRESHNESS, report.blackStoreRemoteFreshness),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_SALES, report.blackStoreSales),
                 ChannelReportCsvSectionPlan.statusOnly(context, ChannelReportCsvMetric.BLACK_STORE_REVENUE, report.blackStoreRevenue),
@@ -72,8 +72,10 @@ class ChannelReportCsvPlan private constructor(
 
 private class ChannelReportCsvSectionPlan private constructor(
     val dataRecordCount: BigInteger,
-    val records: List<ChannelReportCsvRecord>,
+    private val emitter: (ChannelReportCsvCompleteCollections) -> List<ChannelReportCsvRecord>?,
 ) {
+    fun records(details: ChannelReportCsvCompleteCollections): List<ChannelReportCsvRecord>? = emitter(details)
+
     companion object {
         fun createdOrders(
             context: ChannelReportCsvContext,
@@ -97,7 +99,41 @@ private class ChannelReportCsvSectionPlan private constructor(
                 is ReportValue.Unavailable, is ReportValue.NotAvailable -> listOf(status)
                 ReportValue.Unknown -> return null
             }
-            return ChannelReportCsvSectionPlan(BigInteger.valueOf(records.size.toLong()), records)
+            return fixed(records)
+        }
+
+        fun bestSellers(context: ChannelReportCsvContext, source: ReportValue<BestSellerReport>): ChannelReportCsvSectionPlan? {
+            val status = context.status(ChannelReportCsvMetric.BEST_SELLERS, source) ?: return null
+            return when (source) {
+                is ReportValue.Available -> {
+                    val total = source.value.total.value
+                    val count = BigInteger.valueOf(total).add(BigInteger.TWO)
+                    ChannelReportCsvSectionPlan(count) { details ->
+                        val items = details.bestSellers
+                        if (items.size.toLong() != total || items.map { it.variantId.wire }.distinct().size != items.size ||
+                            items != items.sortedWith(compareByDescending<BestSellerItem> { it.grossUnits.value }.thenBy { it.variantId.value }) ||
+                            !sameBestSellerPrefix(source.value.items, items)
+                        ) return@ChannelReportCsvSectionPlan null
+                        val summary = context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.BEST_SELLERS, additions = mapOf(
+                            ChannelReportCsvColumn.TOTAL to unsigned(source.value.total),
+                            ChannelReportCsvColumn.EMPTY to ChannelReportCsvCell.openText((total == 0L).toString()),
+                            ChannelReportCsvColumn.TRUNCATED to ChannelReportCsvCell.openText("false"),
+                        )) ?: return@ChannelReportCsvSectionPlan null
+                        listOf(status, summary) + items.map { item ->
+                            context.record(ChannelReportCsvRecordKind.ITEM, ChannelReportCsvMetric.BEST_SELLERS, additions = mapOf(
+                                ChannelReportCsvColumn.ENTITY_ID to unsigned(item.variantId),
+                                ChannelReportCsvColumn.SKU to ChannelReportCsvCell.openText(item.sku),
+                                ChannelReportCsvColumn.NAME to ChannelReportCsvCell.openText(item.name),
+                                ChannelReportCsvColumn.UNITS to unsigned(item.grossUnits),
+                            )) ?: return@ChannelReportCsvSectionPlan null
+                        }
+                    }
+                }
+                is ReportValue.Unavailable, is ReportValue.NotAvailable -> ChannelReportCsvSectionPlan(BigInteger.ONE) { details ->
+                    if (details.bestSellers.isNotEmpty()) null else listOf(status)
+                }
+                ReportValue.Unknown -> null
+            }
         }
 
         fun appliedAccreditations(context: ChannelReportCsvContext, source: ReportValue<AppliedAccreditationMetrics>) =
@@ -217,6 +253,86 @@ private class ChannelReportCsvSectionPlan private constructor(
                 ))?.let(::listOf)
             }
 
+        fun lowStock(context: ChannelReportCsvContext, source: ReportValue<LowStockReport>): ChannelReportCsvSectionPlan? {
+            val status = context.status(ChannelReportCsvMetric.LOW_STOCK, source) ?: return null
+            return when (source) {
+                is ReportValue.Available -> {
+                    val total = source.value.total.value
+                    ChannelReportCsvSectionPlan(BigInteger.valueOf(total).add(BigInteger.TWO)) { details ->
+                        val items = details.lowStock
+                        if (items.size.toLong() != total || items.map { it.variantId.wire }.distinct().size != items.size ||
+                            items != items.sortedWith(compareBy<LowStockItem> { it.availableQuantity.value }.thenBy { it.variantId.value }) ||
+                            !sameLowStockPrefix(source.value.items, items)
+                        ) return@ChannelReportCsvSectionPlan null
+                        val summary = context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.LOW_STOCK, additions = mapOf(
+                            ChannelReportCsvColumn.TOTAL to unsigned(source.value.total),
+                            ChannelReportCsvColumn.EMPTY to ChannelReportCsvCell.openText((total == 0L).toString()),
+                            ChannelReportCsvColumn.TRUNCATED to ChannelReportCsvCell.openText("false"),
+                        )) ?: return@ChannelReportCsvSectionPlan null
+                        listOf(status, summary) + items.map { item ->
+                            context.record(ChannelReportCsvRecordKind.ITEM, ChannelReportCsvMetric.LOW_STOCK, additions = mapOf(
+                                ChannelReportCsvColumn.ENTITY_ID to unsigned(item.variantId),
+                                ChannelReportCsvColumn.SKU to ChannelReportCsvCell.openText(item.sku),
+                                ChannelReportCsvColumn.NAME to ChannelReportCsvCell.openText(item.productName),
+                                ChannelReportCsvColumn.LABEL to ChannelReportCsvCell.openText(item.variantLabel),
+                                ChannelReportCsvColumn.AVAILABLE_QUANTITY to unsigned(item.availableQuantity),
+                                ChannelReportCsvColumn.SAFETY_STOCK to unsigned(item.safetyStock),
+                            )) ?: return@ChannelReportCsvSectionPlan null
+                        }
+                    }
+                }
+                is ReportValue.Unavailable, is ReportValue.NotAvailable -> ChannelReportCsvSectionPlan(BigInteger.ONE) { details ->
+                    if (details.lowStock.isNotEmpty()) null else listOf(status)
+                }
+                ReportValue.Unknown -> null
+            }
+        }
+
+        fun blackStoreCurrentStock(
+            context: ChannelReportCsvContext,
+            source: ReportValue<BlackStoreCurrentStockReport>,
+        ): ChannelReportCsvSectionPlan? {
+            val status = context.status(ChannelReportCsvMetric.BLACK_STORE_CURRENT_STOCK, source) ?: return null
+            return when (source) {
+                is ReportValue.Available -> {
+                    val total = source.value.total.value
+                    ChannelReportCsvSectionPlan(BigInteger.valueOf(total).add(BigInteger.TWO)) { details ->
+                        val items = details.blackStoreCurrentStock
+                        if (items.size.toLong() != total || items.map { it.variantId.wire }.distinct().size != items.size ||
+                            items != items.sortedBy { it.variantId.value } ||
+                            !sameBlackStoreStockPrefix(source.value.items, items)
+                        ) return@ChannelReportCsvSectionPlan null
+                        var sellable = 0L
+                        for (item in items) sellable = runCatching { Math.addExact(sellable, item.sellableQuantity.value) }.getOrNull()
+                            ?: return@ChannelReportCsvSectionPlan null
+                        if (sellable != source.value.sellableUnits.value ||
+                            items.count { it.sellableQuantity.value == 0L }.toLong() != source.value.zeroSellableVariantCount.value
+                        ) return@ChannelReportCsvSectionPlan null
+                        val summary = context.record(ChannelReportCsvRecordKind.VALUE, ChannelReportCsvMetric.BLACK_STORE_CURRENT_STOCK, additions = mapOf(
+                            ChannelReportCsvColumn.TOTAL to unsigned(source.value.total),
+                            ChannelReportCsvColumn.SELLABLE_UNITS to unsigned(source.value.sellableUnits),
+                            ChannelReportCsvColumn.ZERO_SELLABLE_VARIANT_COUNT to unsigned(source.value.zeroSellableVariantCount),
+                            ChannelReportCsvColumn.EMPTY to ChannelReportCsvCell.openText((total == 0L).toString()),
+                            ChannelReportCsvColumn.TRUNCATED to ChannelReportCsvCell.openText("false"),
+                        )) ?: return@ChannelReportCsvSectionPlan null
+                        listOf(status, summary) + items.map { item ->
+                            context.record(ChannelReportCsvRecordKind.ITEM, ChannelReportCsvMetric.BLACK_STORE_CURRENT_STOCK, additions = mapOf(
+                                ChannelReportCsvColumn.ENTITY_ID to unsigned(item.variantId),
+                                ChannelReportCsvColumn.SKU to ChannelReportCsvCell.openText(item.sku),
+                                ChannelReportCsvColumn.NAME to ChannelReportCsvCell.openText(item.productName),
+                                ChannelReportCsvColumn.LABEL to ChannelReportCsvCell.openText(item.variantLabel),
+                                ChannelReportCsvColumn.SELLABLE_QUANTITY to unsigned(item.sellableQuantity),
+                            )) ?: return@ChannelReportCsvSectionPlan null
+                        }
+                    }
+                }
+                is ReportValue.Unavailable, is ReportValue.NotAvailable -> ChannelReportCsvSectionPlan(BigInteger.ONE) { details ->
+                    if (details.blackStoreCurrentStock.isNotEmpty()) null else listOf(status)
+                }
+                ReportValue.Unknown -> null
+            }
+        }
+
         fun statusOnly(
             context: ChannelReportCsvContext,
             metric: ChannelReportCsvMetric,
@@ -224,7 +340,7 @@ private class ChannelReportCsvSectionPlan private constructor(
         ): ChannelReportCsvSectionPlan? {
             if (source is ReportValue.Available) return null
             val status = context.status(metric, source) ?: return null
-            return ChannelReportCsvSectionPlan(BigInteger.ONE, listOf(status))
+            return ChannelReportCsvSectionPlan(BigInteger.ONE) { listOf(status) }
         }
 
         private fun <T : Any> valuePlan(
@@ -239,8 +355,11 @@ private class ChannelReportCsvSectionPlan private constructor(
                 is ReportValue.Unavailable, is ReportValue.NotAvailable -> listOf(status)
                 ReportValue.Unknown -> return null
             }
-            return ChannelReportCsvSectionPlan(BigInteger.valueOf(records.size.toLong()), records)
+            return fixed(records)
         }
+
+        private fun fixed(records: List<ChannelReportCsvRecord>): ChannelReportCsvSectionPlan =
+            ChannelReportCsvSectionPlan(BigInteger.valueOf(records.size.toLong())) { records }
 
         private fun unsigned(value: ReportUnsignedLong): ChannelReportCsvCell =
             requireNotNull(ChannelReportCsvCell.unsigned(value.wire))
@@ -248,6 +367,47 @@ private class ChannelReportCsvSectionPlan private constructor(
             requireNotNull(ChannelReportCsvCell.signed(value.wire))
         private fun money(value: ReportArsAmount): ChannelReportCsvCell =
             requireNotNull(ChannelReportCsvCell.money(value.wire))
+
+        private fun sameBestSellerPrefix(expected: List<BestSellerItem>, actual: List<BestSellerItem>): Boolean =
+            expected.size <= actual.size && expected.indices.all { index ->
+                val left = expected[index]
+                val right = actual[index]
+                left.variantId == right.variantId && left.sku == right.sku && left.name == right.name && left.grossUnits == right.grossUnits
+            }
+
+        private fun sameLowStockPrefix(expected: List<LowStockItem>, actual: List<LowStockItem>): Boolean =
+            expected.size <= actual.size && expected.indices.all { index ->
+                val left = expected[index]
+                val right = actual[index]
+                left.variantId == right.variantId && left.sku == right.sku && left.productName == right.productName &&
+                    left.variantLabel == right.variantLabel && left.availableQuantity == right.availableQuantity && left.safetyStock == right.safetyStock
+            }
+
+        private fun sameBlackStoreStockPrefix(expected: List<BlackStoreStockItem>, actual: List<BlackStoreStockItem>): Boolean =
+            expected.size <= actual.size && expected.indices.all { index ->
+                val left = expected[index]
+                val right = actual[index]
+                left.variantId == right.variantId && left.sku == right.sku && left.productName == right.productName &&
+                    left.variantLabel == right.variantLabel && left.sellableQuantity == right.sellableQuantity
+            }
+    }
+}
+
+class ChannelReportCsvCompleteCollections private constructor(
+    val bestSellers: List<BestSellerItem>,
+    val lowStock: List<LowStockItem>,
+    val blackStoreCurrentStock: List<BlackStoreStockItem>,
+) {
+    companion object {
+        fun create(
+            bestSellers: List<BestSellerItem>,
+            lowStock: List<LowStockItem>,
+            blackStoreCurrentStock: List<BlackStoreStockItem>,
+        ): ChannelReportCsvCompleteCollections = ChannelReportCsvCompleteCollections(
+            bestSellers.toList(), lowStock.toList(), blackStoreCurrentStock.toList(),
+        )
+
+        fun empty(): ChannelReportCsvCompleteCollections = create(emptyList(), emptyList(), emptyList())
     }
 }
 

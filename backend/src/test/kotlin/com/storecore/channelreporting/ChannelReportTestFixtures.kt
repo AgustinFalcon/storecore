@@ -10,6 +10,9 @@ internal fun channelReportFixture(
     netRevenue: ((ReportPeriod) -> ReportValue<ReportArsAmount>)? = null,
     operations: ((ReportPeriod) -> ReportValue<BlackStoreOperationDiagnostics>)? = null,
     scalarMetricsAvailable: Boolean = false,
+    collectionMetricsAvailable: Boolean = false,
+    bestSellerTotal: Long? = null,
+    collectionTotal: Long? = null,
 ): StoreCoreCreatedOrderReport {
     val period = ReportPeriod.create(
         "2026-11-01", "2026-11-26", "America/Argentina/Buenos_Aires",
@@ -38,6 +41,9 @@ internal fun channelReportFixture(
     )!!
     val blackStoreEvidence = ReportEvidence.current(
         ReportSource.BLACKSTORE_STOCK_SAGA, period.generatedAt, ReportFreshness.CURRENT,
+    )!!
+    val inventorySnapshotEvidence = ReportEvidence.current(
+        ReportSource.STORECORE_CURRENT_INVENTORY, period.generatedAt, ReportFreshness.CURRENT,
     )!!
     val zero = ReportUnsignedLong.fromValue(0)!!
     val one = ReportUnsignedLong.fromValue(1)!!
@@ -79,12 +85,56 @@ internal fun channelReportFixture(
         ReportValue.available(BlackStoreOperationDiagnostics.create(retained, retired, activity, noEvidence)!!, blackStoreEvidence)
     } else operations?.invoke(period) ?: missing()
     val catalogToken = if (scalarMetricsAvailable) ReportValue.available(OpaqueCatalogToken.fromWire("catalog-v1")!!, blackStoreEvidence) else missing()
+    val requestedSellerTotal = bestSellerTotal ?: collectionTotal ?: if (collectionMetricsAvailable) 2L else null
+    val bestSellers = requestedSellerTotal?.let { total ->
+        val items = (1..minOf(total, BestSellerReport.LIMIT.toLong()).toInt()).map { index ->
+            BestSellerItem.create(
+                ReportUnsignedLong.fromValue(index.toLong())!!,
+                if (index == 1) "=DRILL-$index" else "DRILL-$index",
+                "Drill $index",
+                ReportUnsignedLong.fromValue((total - index + 1).coerceAtLeast(1))!!,
+            )!!
+        }
+        ReportValue.available(BestSellerReport.create(items, ReportUnsignedLong.fromValue(total)!!)!!, paymentEvidence)
+    } ?: missing()
+    val lowStock = if (collectionMetricsAvailable) {
+        val total = collectionTotal ?: 2L
+        val items = (1..minOf(total, LowStockReport.LIMIT.toLong()).toInt()).map { index ->
+            LowStockItem.create(
+                ReportUnsignedLong.fromValue(100L + index)!!,
+                "LOW-$index",
+                if (index == 1) "+Low stock drill" else "Low stock tool $index",
+                "Variant $index",
+                ReportUnsignedLong.fromValue(index.toLong() - 1)!!,
+                ReportUnsignedLong.fromValue(total)!!,
+            )!!
+        }
+        ReportValue.available(LowStockReport.create(items, ReportUnsignedLong.fromValue(total)!!)!!, inventorySnapshotEvidence)
+    } else missing()
+    val currentStock = if (collectionMetricsAvailable) {
+        val total = collectionTotal ?: 2L
+        val items = (1..minOf(total, BlackStoreCurrentStockReport.LIMIT.toLong()).toInt()).map { index ->
+            BlackStoreStockItem.create(
+                ReportUnsignedLong.fromValue(200L + index)!!,
+                "STOCK-$index",
+                "Stock tool $index",
+                if (index == 1) "@Red" else "Variant $index",
+                one,
+            )!!
+        }
+        ReportValue.available(
+            BlackStoreCurrentStockReport.create(
+                items, ReportUnsignedLong.fromValue(total)!!, ReportUnsignedLong.fromValue(total)!!, zero,
+            )!!,
+            inventorySnapshotEvidence,
+        )
+    } else missing()
     return StoreCoreCreatedOrderReport(
         period,
         ReportValue.available(CreatedOrderMetrics(ReportUnsignedLong.fromValue(2)!!, ReportArsAmount.fromWire("1234.50")!!), orderEvidence),
-        applied, missing(), paymentDisposition, inventoryMovements, missing(), returnReceipts, confirmedReturns,
+        applied, bestSellers, paymentDisposition, inventoryMovements, lowStock, returnReceipts, confirmedReturns,
         netRevenue?.invoke(period) ?: reversal(), reversal(), reversal(),
-        moduleState, registration, operationDiagnostics, catalogToken, missing(),
+        moduleState, registration, operationDiagnostics, catalogToken, currentStock,
         requireNotNull(ReportValue.unavailable(ReportUnavailableReason.NO_EVIDENCE)),
         unsupported(), unsupported(), unsupported(), unsupported(), unsupported(), unsupported(), unsupported(),
     )
