@@ -11,6 +11,7 @@ import com.storecore.channelreporting.application.ReportModuleState
 import com.storecore.channelreporting.domain.ReportEvidence
 import com.storecore.channelreporting.domain.ReportValue
 import com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository
+import com.storecore.channelreporting.infrastructure.ChannelReportHttpMapper
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -570,6 +571,18 @@ class StoreCoreCreatedOrderReportPostgresTest(
         val invalid = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
         jdbc.update("UPDATE products SET name=? WHERE id=?", "BlackStore Tool 51", invalidProduct)
         assertIs<ReportValue.Unavailable>(invalid.report.blackStoreCurrentStock)
+    }
+
+    @Test fun `explicit HTTP mapper accepts the complete authoritative PostgreSQL projection`() {
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING")
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
+        val dto = ChannelReportHttpMapper.toDto(found.report)
+        assertEquals("storecore-channel-report-v1", dto.contractVersion)
+        assertEquals("AVAILABLE", dto.metrics.createdOrders.availability)
+        assertEquals("STORECORE_ORDER", dto.metrics.createdOrders.evidence?.source)
+        assertEquals("CURRENT_SNAPSHOT", dto.metrics.lowStock.evidence?.timeBasis)
+        assertEquals("NOT_AVAILABLE", dto.metrics.netRevenue.availability)
+        assertEquals("UNAVAILABLE", dto.metrics.blackStoreRemoteFreshness.availability)
     }
 
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {

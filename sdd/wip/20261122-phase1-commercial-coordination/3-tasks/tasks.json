@@ -35,7 +35,7 @@
     {"id":"PCC-011C1","slice":"reporting-blackstore-local-diagnostics","status":"completed","title":"Implement bounded module, registration and retained-operation diagnostics"},
     {"id":"PCC-011C2","slice":"reporting-blackstore-stock-contract","status":"completed","title":"Implement opaque catalog token, current StoreCore stock proof and unsupported remote facts"},
     {"id":"PCC-012","slice":"reporting","status":"in_progress","title":"Build consolidated dashboard, honest navigation and safe CSV export"},
-    {"id":"PCC-012A","slice":"reporting-http","status":"in_progress","title":"Expose the strict explicit report DTO and authenticated no-store GET"},
+    {"id":"PCC-012A","slice":"reporting-http","status":"completed","title":"Expose the strict explicit report DTO and authenticated no-store GET"},
     {"id":"PCC-012B","slice":"reporting-export","status":"pending","title":"Prepare complete bounded CSV evidence inside one fresh reporting snapshot"},
     {"id":"PCC-012C","slice":"reporting-frontend-domain","status":"pending","title":"Implement closed Angular report wire types, validation, repository and URL boundary"},
     {"id":"PCC-012D","slice":"reporting-frontend-dashboard","status":"pending","title":"Build the actor-bound dashboard, partial metric states and honest navigation"},
