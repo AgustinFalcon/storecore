@@ -428,6 +428,36 @@ mod tests {
     }
 
     #[test]
+    fn a_second_allocation_is_rejected_when_the_global_job_cap_is_one() {
+        let fixture = Fixture::new();
+        let limits = BudgetLimits::create(1, 1, 100, 2, 100, 2).expect("limits");
+        let mut store = fixture.ready_store(limits);
+        let first = store
+            .allocate(
+                [0x22; 16],
+                principal(),
+                [0xae; 16],
+                reservation(100, 2, 1),
+                1,
+            )
+            .expect("first");
+        assert_eq!(store.usage().jobs(), 1);
+        assert_eq!(
+            store.allocate(
+                [0x23; 16],
+                principal(),
+                [0xae; 16],
+                reservation(100, 2, 1),
+                2,
+            ),
+            Err(StoreError::Budget(BudgetError::JobLimit))
+        );
+        assert_eq!(store.record(first.job_id()), Ok(first));
+        assert_eq!(store.usage().jobs(), 1);
+        assert_eq!(store.admission_status(), AdmissionStatus::Open);
+    }
+
+    #[test]
     fn terminal_jobs_keep_budget_and_exhaustion_rejects_new_work() {
         let fixture = Fixture::new();
         let limits = BudgetLimits::create(1, 1, 100, 2, 100, 2).expect("limits");

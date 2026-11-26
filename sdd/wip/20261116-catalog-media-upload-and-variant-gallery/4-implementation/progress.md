@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C cuota global de jobs
+
+- `BrokerStore.allocate` con `jobs=1` admite el primero y rechaza el
+  segundo con `BudgetError::JobLimit`. El harness PID 1 monta el
+  primer job y atesta que el segundo `.mount` no está cargado.
+- No se marca `003B-4C`. No hay terminales sin ACK, familia de
+  sockets, `Ready` ni HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #416, 003B-4C sigue abierto
 
 - Merge #416 `36b08b83d1f80e7642a9fcdfe134a5a16794b9df` sobre candidato
