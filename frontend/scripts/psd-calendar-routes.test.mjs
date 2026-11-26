@@ -43,7 +43,7 @@ test('calendar receipt rejects malformed or noncanonical persisted IDs and extra
 });
 test('all four real routes bind deterministic month state, persisted identity and exact read ownership', () => {
   const receipt = RealRouteReceipt.fromWire(wire()), bindings = bindProductiveRealRoutes(receipt);
-  assert.equal(bindings.length, 36);
+  assert.equal(bindings.length, 37);
   const calendar = bindings.filter(binding => binding.pattern.startsWith('user/commercial-calendar'));
   assert.equal(calendar.length, 4);
   const ownReads = [['user/commercial-calendar/events'], [], [`user/commercial-calendar/events/${eventId}`], [`user/commercial-calendar/events/${eventId}`]];

@@ -1,9 +1,27 @@
-import { ReportPeriodQuery } from './report';
+import { ReportExportQuery, ReportPeriodQuery } from './report';
 
 function canonicalDate(raw: string | null): string | null {
   if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
   const parsed = new Date(`${raw}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === raw ? raw : null;
+}
+
+export class ReportExportBoundary {
+  private constructor(readonly query: ReportExportQuery) {}
+
+  static create(fromDate: string | null, toDateExclusive: string | null, periodToken: string | null): ReportExportBoundary | null {
+    const period = ReportQueryBoundary.create(fromDate, toDateExclusive);
+    if (period === null || periodToken === null || !/^[0-9a-f]{64}$/.test(periodToken)) return null;
+    return new ReportExportBoundary(Object.freeze({ ...period.query, periodToken }));
+  }
+
+  toUrlQuery(): Readonly<Record<string, string>> {
+    return Object.freeze({
+      fromDate: this.query.fromDate,
+      toDateExclusive: this.query.toDateExclusive,
+      periodToken: this.query.periodToken,
+    });
+  }
 }
 
 export class ReportQueryBoundary {

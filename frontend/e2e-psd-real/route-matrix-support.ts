@@ -230,6 +230,7 @@ export function requiredReads(binding: ProductiveRouteAcceptance, receipt: RealR
     ['user/commercial-calendar/new', []],
     ['user/commercial-calendar/:eventId', [`user/commercial-calendar/events/${receipt.commercialCalendar?.eventId.wire}`]],
     ['user/commercial-calendar/:eventId/edit', [`user/commercial-calendar/events/${receipt.commercialCalendar?.eventId.wire}`]],
+    ['user/reports', ['user/channel-reports']],
   ]);
   const own = reads.get(binding.pattern);
   if (!own) throw new Error('Missing explicit real readiness binding');

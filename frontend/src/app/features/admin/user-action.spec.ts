@@ -18,6 +18,7 @@ describe('UserAction', () => {
     expect(actions).toContain(UserAction.Capabilities);
     expect(actions).toContain(UserAction.Notifications);
     expect(actions).toContain(UserAction.CommercialCalendar);
+    expect(actions).toContain(UserAction.Reports);
     expect(actions).not.toContain(UserAction.ProfileImport);
   });
   it('recomputes role loss and grants all known actions to an admin', () => {

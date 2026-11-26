@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, Route } from '@playwright/test';
 import { RouteActor } from '../../src/app/features/navigation/productive-route-manifest';
 
 const envelope = (data: unknown) => ({ code: 200, data, message: null, errorCode: null, retryable: null, traceId: null });
@@ -77,6 +77,32 @@ const calendarEvent = {
   },
 };
 
+const reportPeriod = {
+  fromDate: '2026-11-01', toDateExclusive: '2026-11-26', timezone: 'America/Argentina/Buenos_Aires',
+  fromInclusive: '2026-11-01T03:00:00Z', toExclusive: '2026-11-26T03:00:00Z',
+  generatedAt: '2026-11-26T12:00:00Z', periodToken: 'a'.repeat(64),
+};
+const reportUnavailable = () => ({ availability: 'UNAVAILABLE', reason: 'NO_EVIDENCE' });
+const reportUnsupported = () => ({ availability: 'NOT_AVAILABLE', reason: 'UNSUPPORTED_CONTRACT' });
+const reportReversalUnavailable = () => ({ availability: 'NOT_AVAILABLE', reason: 'REVERSAL_AMOUNT_UNAVAILABLE' });
+const channelReport = {
+  contractVersion: 'storecore-channel-report-v1', period: reportPeriod,
+  metrics: {
+    createdOrders: { availability: 'AVAILABLE', value: { count: '2', nominalTotal: '1234.50' }, evidence: {
+      source: 'STORECORE_ORDER', timeBasis: 'ORDER_CREATED', observedAt: reportPeriod.generatedAt, freshness: 'CURRENT',
+      fromInclusive: reportPeriod.fromInclusive, toExclusive: reportPeriod.toExclusive, periodToken: reportPeriod.periodToken,
+    } },
+    appliedAccreditations: reportUnavailable(), bestSellers: reportUnavailable(), paymentDisposition: reportUnavailable(),
+    inventoryMovements: reportUnavailable(), lowStock: reportUnavailable(), returnReceipts: reportUnavailable(), confirmedReturnDisposition: reportUnavailable(),
+    netRevenue: reportReversalUnavailable(), reversalAmount: reportReversalUnavailable(), fiscalTotal: reportReversalUnavailable(),
+    blackStoreModuleState: reportUnavailable(), blackStoreRegistration: reportUnavailable(), blackStoreOperations: reportUnavailable(),
+    blackStoreCatalogToken: reportUnavailable(), blackStoreCurrentStock: reportUnavailable(), blackStoreRemoteFreshness: reportUnavailable(),
+    blackStoreSales: reportUnsupported(), blackStoreRevenue: reportUnsupported(), blackStorePayments: reportUnsupported(),
+    blackStoreReturns: reportUnsupported(), blackStoreMonetaryChannelMix: reportUnsupported(), blackStoreHistoricalStock: reportUnsupported(),
+    blackStoreSynchronization: reportUnsupported(),
+  },
+};
+
 const home = {
   revision: 1,
   sections: [{ key: 'route-home', kind: 'HERO', active: true, sortOrder: 0, content: { title: 'Portada de ruta', body: 'Experiencia demostrable y determinista.' }, updatedAt: null }],
@@ -87,7 +113,11 @@ export interface ProductiveRouteFixtureEvidence {
   readonly writes: string[];
 }
 
-export async function installProductiveRouteFixture(page: Page, actor: RouteActor): Promise<ProductiveRouteFixtureEvidence> {
+export interface ProductiveRouteFixtureOptions {
+  readonly reportExport?: (route: Route) => Promise<void>;
+}
+
+export async function installProductiveRouteFixture(page: Page, actor: RouteActor, options: ProductiveRouteFixtureOptions = {}): Promise<ProductiveRouteFixtureEvidence> {
   const evidence: ProductiveRouteFixtureEvidence = { unhandled: [], writes: [] };
   await page.route('**/*', async route => {
     const request = route.request();
@@ -172,6 +202,12 @@ export async function installProductiveRouteFixture(page: Page, actor: RouteActo
     if (path === '/api/v1/user/notifications/00000000-0000-4000-8000-000000000001' && get) return route.fulfill({ json: envelope(notification) });
     if (path === '/api/v1/user/commercial-calendar/events' && get) return route.fulfill({ json: envelope({ items: [calendarEvent], total: 1, page: 0, size: 25, hasMore: false }) });
     if (path === '/api/v1/user/commercial-calendar/events/00000000-0000-4000-8000-000000000010' && get) return route.fulfill({ json: envelope(calendarEvent) });
+    if (path === '/api/v1/user/channel-reports' && get) return route.fulfill({ json: envelope(channelReport) });
+    if (path === '/api/v1/user/channel-reports.csv' && get && options.reportExport) return options.reportExport(route);
+    if (path === '/api/v1/user/channel-reports.csv' && get) return route.fulfill({
+      body: 'recordKind,metric\r\nMETA,\r\n', contentType: 'text/csv;charset=UTF-8',
+      headers: { 'Content-Disposition': 'attachment; filename="storecore-channel-report-2026-11-01-to-2026-11-26.csv"', 'Cache-Control': 'no-store' },
+    });
 
     if (!get) evidence.writes.push(`${method} ${path}`);
     evidence.unhandled.push(`${method} ${path}${url.search}`);

@@ -22,7 +22,8 @@
     "SC-SURF-30": "calendar_events+calendar_definitions+calendar_reminder_rules",
     "SC-SURF-31": "calendar_events+calendar_definitions+calendar_reminder_rules+calendar_command_bindings+calendar_command_receipts+calendar_audit",
     "SC-SURF-32": "calendar_events+calendar_definitions+calendar_preflights+calendar_preflight_requests+calendar_command_bindings+calendar_command_receipts+calendar_audit+calendar_reminder_switch",
-    "SC-SURF-33": "calendar_events+calendar_definitions+calendar_reminder_rules+calendar_command_bindings+calendar_command_receipts+calendar_audit"
+    "SC-SURF-33": "calendar_events+calendar_definitions+calendar_reminder_rules+calendar_command_bindings+calendar_command_receipts+calendar_audit",
+    "SC-SURF-34": "orders+payments+inventory_ledger+returns+inventory_balances+channel_accounts+channel_stock_operations+installation_settings"
   },
   "targets": {
     "SC-SURF-03": { "ownerTask": "EXTERNAL", "operations": ["real email provider and delivery homologation", "verified email policy"], "fields": ["delivery result"] },
@@ -35,6 +36,7 @@
     { "id": "SC-SURF-31", "name": "New commercial event", "route": "/user/commercial-calendar/new", "state": "REAL", "read": ["GET /api/v1/user/commercial-calendar/commands/{commandId}"], "writes": ["POST /api/v1/user/commercial-calendar/events"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-32", "name": "Commercial event detail", "route": "/user/commercial-calendar/:eventId", "state": "REAL", "read": ["GET /api/v1/user/commercial-calendar/events/{eventId}", "GET /api/v1/user/commercial-calendar/events/{eventId}/audit", "GET /api/v1/user/commercial-calendar/events/{eventId}/commands/{commandId}", "GET /api/v1/user/commercial-calendar/reminder-switch"], "writes": ["POST /api/v1/user/commercial-calendar/events/{eventId}/preflights", "POST /api/v1/user/commercial-calendar/events/{eventId}/commands"], "loaderStage": null, "coverage": "LOCAL_COMPLETE_REMINDER_DIAGNOSTIC_ONLY" },
     { "id": "SC-SURF-33", "name": "Edit commercial event", "route": "/user/commercial-calendar/:eventId/edit", "state": "REAL", "read": ["GET /api/v1/user/commercial-calendar/events/{eventId}", "GET /api/v1/user/commercial-calendar/events/{eventId}/commands/{commandId}"], "writes": ["POST /api/v1/user/commercial-calendar/events/{eventId}/commands"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
+    { "id": "SC-SURF-34", "name": "Commercial reports", "route": "/user/reports", "state": "REAL", "read": ["GET /api/v1/user/channel-reports", "GET /api/v1/user/channel-reports.csv"], "writes": [], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-27", "name": "Merchant appearance", "route": "/user/settings", "state": "REAL", "read": ["GET /api/v1/user/settings/branding", "GET /api/v1/storefront/branding"], "writes": ["PUT /api/v1/user/settings/branding"], "loaderStage": null, "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-01", "name": "Home", "route": "/", "state": "REAL", "read": ["GET /api/v1/content/home"], "writes": [], "loaderStage": "COMMERCIAL_CONTENT", "coverage": "LOCAL_COMPLETE" },
     { "id": "SC-SURF-02", "name": "Unified login", "route": "/login", "state": "REAL", "read": ["GET /api/v1/customer/me", "GET /api/v1/internal/me"], "writes": ["POST /api/v1/auth/login", "POST /api/v1/auth/context-selection"], "loaderStage": "CUSTOMER_IDENTITY", "coverage": "COMPLETE" },

@@ -176,3 +176,30 @@ export class ReportLoadState extends ClosedWireValue {
   static readonly all = Object.freeze([this.Unselected, this.Loading, this.Refreshing, this.Ready, this.Stale, this.Denied, this.Invalid, this.Unavailable, this.Corrupt]);
   static fromWire(raw: unknown): ReportLoadState { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
+
+export class ReportExportState extends ClosedWireValue {
+  private constructor(wire: string, label: string) { super(wire, label); }
+  static readonly Idle = new ReportExportState('IDLE', 'Lista para exportar');
+  static readonly Downloading = new ReportExportState('DOWNLOADING', 'Preparando descarga');
+  static readonly Completed = new ReportExportState('COMPLETED', 'Descarga solicitada');
+  static readonly Stale = new ReportExportState('STALE', 'El período cambió; actualizá el reporte');
+  static readonly TooLarge = new ReportExportState('TOO_LARGE', 'El reporte supera el límite de exportación');
+  static readonly Denied = new ReportExportState('DENIED', 'La sesión ya no puede exportar');
+  static readonly Unavailable = new ReportExportState('UNAVAILABLE', 'La exportación no está disponible');
+  static readonly Failed = new ReportExportState('FAILED', 'No se pudo descargar');
+  static readonly Unknown = new ReportExportState('UNKNOWN', 'Estado desconocido');
+  static readonly all = Object.freeze([this.Idle, this.Downloading, this.Completed, this.Stale, this.TooLarge, this.Denied, this.Unavailable, this.Failed]);
+  static fromWire(raw: unknown): ReportExportState { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+}
+
+export class ReportExportFailureKind extends ClosedWireValue {
+  private constructor(wire: string, label: string) { super(wire, label); }
+  static readonly StalePeriod = new ReportExportFailureKind('REPORT_PERIOD_STALE', 'El período cambió');
+  static readonly TooLarge = new ReportExportFailureKind('REPORT_EXPORT_TOO_LARGE', 'El reporte supera el límite');
+  static readonly Denied = new ReportExportFailureKind('DENIED', 'Sin autorización');
+  static readonly Unavailable = new ReportExportFailureKind('UNAVAILABLE', 'Servicio no disponible');
+  static readonly InvalidResponse = new ReportExportFailureKind('INVALID_RESPONSE', 'Respuesta inválida');
+  static readonly Unknown = new ReportExportFailureKind('UNKNOWN', 'Error desconocido');
+  static readonly all = Object.freeze([this.StalePeriod, this.TooLarge, this.Denied, this.Unavailable, this.InvalidResponse]);
+  static fromWire(raw: unknown): ReportExportFailureKind { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
+}

@@ -2,10 +2,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Inject, Injectable, OnDestroy } from '@angular/core';
 import { ParamMap } from '@angular/router';
 import { ComponentStore } from '@ngrx/component-store';
-import { Subscription } from 'rxjs';
+import { filter, Observable, Subscription, take } from 'rxjs';
 import { UserSession } from '../../core/auth/user-session';
 import { CHANNEL_REPORT_REPOSITORY } from '../../core/tokens/reporting.tokens';
-import { ChannelReport, ChannelReportRepository, ReportLoadState, ReportPeriodQuery } from '../../domain/reporting/report';
+import { ChannelReport, ChannelReportRepository, ReportExportFile, ReportLoadState, ReportPeriodQuery } from '../../domain/reporting/report';
 import { ReportQueryBoundary } from '../../domain/reporting/report-query';
 import { ReportQueryAdapter } from '../../data/reporting/report-query.adapter';
 
@@ -74,6 +74,26 @@ export class ReportDashboardStore extends ComponentStore<ReportDashboardState> i
     if (applied === null) return;
     const boundary = ReportQueryBoundary.create(applied.fromDate, applied.toDateExclusive);
     if (boundary !== null) this.read(boundary);
+  }
+
+  exportFile(): Observable<ReportExportFile> | null {
+    const state = this.snapshot;
+    const identity = this.actorIdentity();
+    if (identity === null || identity !== this.identity || state.applied === null || state.report === null) return null;
+    const sequence = this.sequence;
+    const fromDate = state.applied.fromDate;
+    const toDateExclusive = state.applied.toDateExclusive;
+    const periodToken = state.report.period.periodToken;
+    return this.repository.export({ fromDate, toDateExclusive, periodToken }).pipe(
+      filter(() => {
+        const current = this.snapshot;
+        return this.current(identity, sequence)
+          && current.applied?.fromDate === fromDate
+          && current.applied.toDateExclusive === toDateExclusive
+          && current.report?.period.periodToken === periodToken;
+      }),
+      take(1),
+    );
   }
 
   override ngOnDestroy(): void { this.cancel(); super.ngOnDestroy(); }

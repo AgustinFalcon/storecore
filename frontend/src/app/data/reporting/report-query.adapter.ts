@@ -1,6 +1,6 @@
 import { HttpParams } from '@angular/common/http';
 import { ParamMap } from '@angular/router';
-import { ReportQueryBoundary } from '../../domain/reporting/report-query';
+import { ReportExportBoundary, ReportQueryBoundary } from '../../domain/reporting/report-query';
 
 export class ReportQueryAdapter {
   static fromUrl(params: ParamMap): ReportQueryBoundary | null {
@@ -8,6 +8,10 @@ export class ReportQueryAdapter {
   }
 
   static toHttpParams(boundary: ReportQueryBoundary): HttpParams {
+    return new HttpParams({ fromObject: boundary.toUrlQuery() });
+  }
+
+  static toExportHttpParams(boundary: ReportExportBoundary): HttpParams {
     return new HttpParams({ fromObject: boundary.toUrlQuery() });
   }
 }

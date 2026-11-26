@@ -1,8 +1,13 @@
 import type { Observable } from 'rxjs';
-import { BlackStoreOperationState, BlackStoreRegistrationState, BlackStoreRetiredOperationState, ReportAvailability, ReportFreshness, ReportInventoryChannel, ReportInventoryEventType, ReportModuleState, ReportPaymentDisposition, ReportSource, ReportTimeBasis, ReportUnavailableReason } from './report-types';
+import { BlackStoreOperationState, BlackStoreRegistrationState, BlackStoreRetiredOperationState, ReportAvailability, ReportExportFailureKind, ReportFreshness, ReportInventoryChannel, ReportInventoryEventType, ReportModuleState, ReportPaymentDisposition, ReportSource, ReportTimeBasis, ReportUnavailableReason } from './report-types';
 export * from './report-types';
 
 export interface ReportPeriodQuery { readonly fromDate: string; readonly toDateExclusive: string; }
+export interface ReportExportQuery extends ReportPeriodQuery { readonly periodToken: string; }
+export interface ReportExportFile { readonly filename: string; readonly blob: Blob; }
+export class ReportExportFailure extends Error {
+  constructor(readonly kind: ReportExportFailureKind) { super(kind.label); this.name = 'ReportExportFailure'; }
+}
 export interface ReportPeriod extends ReportPeriodQuery { readonly timezone: string; readonly fromInclusive: string; readonly toExclusive: string; readonly generatedAt: string; readonly periodToken: string; }
 export interface ReportEvidence { readonly source: ReportSource; readonly timeBasis: ReportTimeBasis; readonly observedAt: string; readonly freshness: ReportFreshness; readonly fromInclusive: string | null; readonly toExclusive: string | null; readonly periodToken: string | null; }
 
@@ -75,4 +80,5 @@ export interface ChannelReport { readonly contractVersion: 'storecore-channel-re
 
 export abstract class ChannelReportRepository {
   abstract read(query: ReportPeriodQuery): Observable<ChannelReport>;
+  abstract export(query: ReportExportQuery): Observable<ReportExportFile>;
 }

@@ -12,11 +12,11 @@ import { ReportDashboardStore } from './report-dashboard.store';
 
 describe('ReportDashboardStore', () => {
   let session: UserSession;
-  let repository: { read: ReturnType<typeof vi.fn> };
+  let repository: { read: ReturnType<typeof vi.fn>; export: ReturnType<typeof vi.fn> };
   let store: ReportDashboardStore;
 
   beforeEach(() => {
-    repository = { read: vi.fn() };
+    repository = { read: vi.fn(), export: vi.fn() };
     TestBed.configureTestingModule({ providers: [ReportDashboardStore, { provide: CHANNEL_REPORT_REPOSITORY, useValue: repository }] });
     session = TestBed.inject(UserSession);
     session.commit({ id: 'operator-1', roles: [UserRole.Operator] }, 'csrf');
@@ -54,5 +54,28 @@ describe('ReportDashboardStore', () => {
     store.bindUrl(convertToParamMap({ fromDate: '2026-11-01', toDateExclusive: '2026-11-26' }));
     request.error(new HttpErrorResponse({ status: 403 }));
     expect(store.snapshot.report).toBeNull(); expect(store.snapshot.loadState).toBe(ReportLoadState.Denied);
+  });
+
+  it('does not publish an export artifact after the actor is revoked', () => {
+    const read = new Subject<ChannelReport>(); repository.read.mockReturnValue(read);
+    store.bindUrl(convertToParamMap({ fromDate: '2026-11-01', toDateExclusive: '2026-11-26' }));
+    read.next(ReportMapper.envelope(reportEnvelopeFixture())); read.complete();
+    const exportResponse = new Subject<{ filename: string; blob: Blob }>(); repository.export.mockReturnValue(exportResponse);
+    const received = vi.fn(); store.exportFile()?.subscribe(received);
+    session.clear(); store.setActor();
+    exportResponse.next({ filename: 'report.csv', blob: new Blob(['csv']) }); exportResponse.complete();
+    expect(received).not.toHaveBeenCalled();
+  });
+
+  it('does not publish an export artifact after a different period starts loading', () => {
+    const firstRead = new Subject<ChannelReport>(); repository.read.mockReturnValue(firstRead);
+    store.bindUrl(convertToParamMap({ fromDate: '2026-11-01', toDateExclusive: '2026-11-26' }));
+    firstRead.next(ReportMapper.envelope(reportEnvelopeFixture())); firstRead.complete();
+    const exportResponse = new Subject<{ filename: string; blob: Blob }>(); repository.export.mockReturnValue(exportResponse);
+    const received = vi.fn(); store.exportFile()?.subscribe(received);
+    repository.read.mockReturnValue(new Subject<ChannelReport>());
+    store.bindUrl(convertToParamMap({ fromDate: '2026-10-01', toDateExclusive: '2026-11-01' }));
+    exportResponse.next({ filename: 'old.csv', blob: new Blob(['csv']) }); exportResponse.complete();
+    expect(received).not.toHaveBeenCalled();
   });
 });
