@@ -38,6 +38,34 @@ fn snapshot_is_private_exact_and_independent_from_later_source_mutation() {
 }
 
 #[test]
+fn snapshot_survives_source_growth_and_truncation_on_the_held_fd() {
+    let fixture = Fixture::new();
+    let original = b"sealed-media";
+    let mut source = fixture.source(original);
+    let destination = fixture.root.join("snapshot.bin");
+
+    copy_snapshot(
+        source.as_fd(),
+        &destination,
+        original.len() as u64,
+        sha256(original),
+    )
+    .expect("snapshot succeeds");
+    source.seek(SeekFrom::Start(0)).expect("rewind source");
+    source.write_all(b"changed-media").expect("overwrite source");
+    source
+        .set_len((original.len() * 2) as u64)
+        .expect("grow source");
+    source.set_len(4).expect("truncate source");
+    source.sync_all().expect("sync mutation");
+
+    assert_eq!(
+        std::fs::read(&destination).expect("read snapshot"),
+        original
+    );
+}
+
+#[test]
 fn mismatch_fails_closed_and_removes_the_partial_destination() {
     let fixture = Fixture::new();
     let source = fixture.source(b"actual");

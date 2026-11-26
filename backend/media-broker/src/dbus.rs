@@ -372,13 +372,15 @@ mod tests {
     };
     use crate::budget::{BudgetError, BudgetLimits};
     use crate::runtime::{ApprovedRuntime, RuntimeError};
+    use crate::snapshot::copy_snapshot;
     use crate::state::{JobId, JobRecord, JobState, Principal, Reservation};
     use crate::store::{AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
-    use std::fs::{self, OpenOptions};
-    use std::io::Write;
+    use std::fs::{self, File, OpenOptions};
+    use std::io::{Seek, SeekFrom, Write};
+    use std::os::fd::AsFd;
     use std::os::unix::fs::{self as unix_fs, OpenOptionsExt, PermissionsExt};
     use std::path::{Path, PathBuf};
     use std::process::Command;
@@ -3003,6 +3005,67 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_snapshot_survives_held_source_fd_mutations() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-fd-after-seal");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x26; 16],
+                principal,
+                [0xb0; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let runtime = approved_pid1_runtime();
+        let spec = TransientUnits::derive(
+            allocated.job_id(),
+            PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2102, 2102),
+            &runtime,
+        )
+        .expect("spec");
+        assert_eq!(
+            systemd.start_transient(UnitKind::Mount, &spec),
+            Ok(UnitState::Active)
+        );
+        let original = b"sealed-media";
+        let mut source = open_held_source(journal_root.join("source.bin"), original);
+        let snapshot_path = spec.mount().where_path().join("snapshot.bin");
+        let evidence = copy_snapshot(
+            source.as_fd(),
+            &snapshot_path,
+            original.len() as u64,
+            Sha256::digest(original).into(),
+        )
+        .expect("snapshot");
+        mutate_held_source(&mut source, original.len() as u64);
+        assert_eq!(fs::read(&snapshot_path).expect("read snapshot"), original);
+        assert_eq!(evidence.size(), original.len() as u64);
+        assert_eq!(evidence.digest(), Sha256::digest(original).into());
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        drop(store);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
@@ -3534,6 +3597,27 @@ mod tests {
             !probe.exists(),
             "UID A process must not leave a file in the job tmpfs"
         );
+    }
+
+    fn open_held_source(path: PathBuf, original: &[u8]) -> File {
+        let mut source = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(path)
+            .expect("source");
+        source.write_all(original).expect("write source");
+        source.sync_all().expect("sync source");
+        source
+    }
+
+    fn mutate_held_source(source: &mut File, original_len: u64) {
+        source.seek(SeekFrom::Start(0)).expect("rewind");
+        source.write_all(b"changed-media").expect("overwrite");
+        source.set_len(original_len.saturating_mul(2)).expect("grow");
+        source.set_len(4).expect("truncate");
+        source.sync_all().expect("sync mutation");
     }
 
     fn pid1_single_job_store(journal_name: &str) -> (PathBuf, BrokerStore) {

@@ -2,13 +2,14 @@
 
 ## En implementación — 2026-11-26, 4C sigue abierto
 
-Siguiente corte: FD/mmap tras el seal y reinicio en cada transición
-durable. Terminales sin ACK, cuota global y RLIMIT del worker quedan
-atestados. `ProtectHome`, `RestrictAddressFamilies` y `CPUQuota`
-quedan fuera. Este documento no cierra `003B-4C`. Sigue sin familia
-de sockets, FD/mmap ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
-`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de
-media.
+Siguiente corte: mmap del origen tras el seal y reinicio en cada
+transición durable. Este corte atesta el FD del origen: el snapshot
+en el tmpfs PID 1 no cambia tras overwrite, crecimiento y truncado.
+Terminales sin ACK, cuota global y RLIMIT quedan atestados.
+`ProtectHome`, `RestrictAddressFamilies` y `CPUQuota` quedan fuera.
+Este documento no cierra `003B-4C`. Sigue sin mmap, familia de
+sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
+TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C terminales sin ACK PR #424
 
