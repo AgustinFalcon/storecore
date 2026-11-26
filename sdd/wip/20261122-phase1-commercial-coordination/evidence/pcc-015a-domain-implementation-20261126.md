@@ -59,10 +59,19 @@ Result: `BUILD SUCCESS` in 2:58; 22 tests, 0 failures, 0 errors, 0 skipped:
 
 Repository-preexisting Kotlin warnings were emitted outside the new loyalty package; no loyalty compilation warning or test failure remained.
 
+## Integrated local gates
+
+After merging `origin/master` at `a88be5a32ebad961ce98daa1a62b2e3ff2b4c963`, the bounded loyalty tests remained green and the repository hygiene gates passed:
+
+- focused loyalty suite: 22 tests, 0 failures, 0 errors, 0 skipped;
+- `node .github/scripts/repository-hygiene.mjs`: pass with 2523 tracked files;
+- `node --test .github/scripts/repository-hygiene.test.mjs`: 11 tests passed;
+- `git diff origin/master...HEAD --check`: pass.
+
+The monolithic `mvn -B test` run completed 878 tests in 23:40 with 0 assertion failures, 2 errors and 9 skipped. Both errors were in pre-existing identity integration tests (`IdentityDeliveryQueuePostgresTest` and `RecoveryHttpIntegrationTest`) and no changed file in PCC-015A is under identity, migration, Spring, JDBC or HTTP code. To distinguish a loyalty regression from suite-order contamination, those same two classes were executed together against clean `master` (`a88be5a32ebad961ce98daa1a62b2e3ff2b4c963`): 22 tests passed, 0 failures, 0 errors, 0 skipped (`BUILD SUCCESS`, 05:10). This is recorded as an inherited order/isolation defect; it is not represented as a green monolithic gate and must not be hidden inside the loyalty cut.
+
 ## Residual gates
 
-- Re-review the corrected uncommitted delta, then commit it as one bounded cut.
-- Integrate the independently merged PCC-014 closeout from PR #422.
-- Run affected/full backend and repository hygiene gates.
+- Track the inherited monolithic identity-suite order/isolation defect in a separate corrective cut.
 - Obtain two independent exact-head GPT-6.1 Sol medium approvals, commit their receipts, recheck the receipts-only head and pass hosted CI before merge.
 - Mark PCC-015A complete only in post-merge evidence. Do not begin PCC-015B on an unmerged A base.
