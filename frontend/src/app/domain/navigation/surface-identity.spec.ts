@@ -2,8 +2,8 @@ import { NotFoundRecovery, SurfaceIdentity, SurfaceTarget } from './surface-iden
 
 describe('canonical surface identity', () => {
   it('round trips every closed surface and excludes the remaining Demo-only Real routes', () => {
-    expect(SurfaceIdentity.all).toHaveLength(35);
-    expect(new Set(SurfaceIdentity.all.map(surface => surface.wire)).size).toBe(35);
+    expect(SurfaceIdentity.all).toHaveLength(36);
+    expect(new Set(SurfaceIdentity.all.map(surface => surface.wire)).size).toBe(36);
     for (const surface of SurfaceIdentity.all) {
       expect(SurfaceIdentity.fromWire(surface.wire)).toBe(surface);
       expect(SurfaceIdentity.fromMatchedPath(surface.path, SurfaceTarget.Demo)).toBe(surface.demo ? surface : SurfaceIdentity.Unknown);
@@ -37,5 +37,6 @@ describe('canonical surface identity', () => {
     expect(SurfaceIdentity.fromMatchedPath('user/commercial-calendar/new', SurfaceTarget.Real)).toBe(SurfaceIdentity.CommercialCalendarNew);
     expect(SurfaceIdentity.fromMatchedPath('user/commercial-calendar/:eventId', SurfaceTarget.Real)).toBe(SurfaceIdentity.CommercialCalendarDetail);
     expect(SurfaceIdentity.fromMatchedPath('user/commercial-calendar/:eventId/edit', SurfaceTarget.Real)).toBe(SurfaceIdentity.CommercialCalendarEdit);
+    expect(SurfaceIdentity.fromMatchedPath('user/reports', SurfaceTarget.Real)).toBe(SurfaceIdentity.Reports);
   });
 });

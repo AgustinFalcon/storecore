@@ -61,6 +61,7 @@ export const productiveRouteDefinitions: readonly ProductiveRouteDefinition[] = 
   definition('user/commercial-calendar/new', SurfaceIdentity.CommercialCalendarNew, RouteActor.Admin, RouteScenario.Empty),
   definition('user/commercial-calendar/:eventId', SurfaceIdentity.CommercialCalendarDetail, RouteActor.Operator, RouteScenario.Populated),
   definition('user/commercial-calendar/:eventId/edit', SurfaceIdentity.CommercialCalendarEdit, RouteActor.Admin, RouteScenario.Populated),
+  definition('user/reports', SurfaceIdentity.Reports, RouteActor.Operator, RouteScenario.Populated),
 ]);
 
 function canonical(pattern: string): ProductiveRouteDefinition {
@@ -109,6 +110,7 @@ export const productiveHttpRouteBindings: readonly ProductiveRouteAcceptance[] =
   httpBinding('user/commercial-calendar/new', '/user/commercial-calendar/new', 'Crear evento', '#calendar-editor-title'),
   httpBinding('user/commercial-calendar/:eventId', '/user/commercial-calendar/00000000-0000-4000-8000-000000000010', 'Detalle del evento', '#calendar-detail-title'),
   httpBinding('user/commercial-calendar/:eventId/edit', '/user/commercial-calendar/00000000-0000-4000-8000-000000000010/edit', 'Editar borrador', '#calendar-editor-title'),
+  httpBinding('user/reports', '/user/reports?fromDate=2026-11-01&toDateExclusive=2026-11-26', 'Reportes comerciales', '#report-title'),
 ]);
 
 // Existing HTTP consumers retain their source; evidence never changes globally.
@@ -179,5 +181,6 @@ export function bindProductiveRealRoutes(receipt: RealRouteReceipt): readonly Pr
     real('user/commercial-calendar/new', `/user/commercial-calendar/new${calendarQuery}`, 'Crear evento', '#calendar-editor-title'),
     real('user/commercial-calendar/:eventId', `${calendarEventUrl}${calendarQuery}`, 'Detalle del evento', textSelector(calendar.title)),
     real('user/commercial-calendar/:eventId/edit', `${calendarEventUrl}/edit${calendarQuery}`, 'Editar borrador', '#calendar-editor-title'),
+    real('user/reports', '/user/reports?fromDate=2026-11-01&toDateExclusive=2026-11-26', 'Reportes comerciales', '#report-title'),
   ]);
 }

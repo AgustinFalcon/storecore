@@ -116,6 +116,12 @@ export const routes: Routes = [
             canActivate: [userGuard],
           },
           {
+            path: 'reports',
+            loadComponent: () => import('./features/reporting/report-dashboard.component').then((module) => module.ReportDashboardComponent),
+            title: 'Reportes comerciales',
+            canActivate: [userGuard],
+          },
+          {
             path: 'orders/:id',
             loadComponent: () => import('./features/admin/user-order-detail.component').then((module) => module.UserOrderDetailComponent),
             title: 'Fulfillment',

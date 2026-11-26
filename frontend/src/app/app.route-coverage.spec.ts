@@ -28,9 +28,9 @@ function check(tree: readonly Route[] = routes, definitions = productiveRouteDef
 }
 
 describe('productive route acceptance contract', () => {
-  it('reconciles 36 leaves, four redirects and three wildcards with both evidence sources', () => {
+  it('reconciles 37 leaves, four redirects and three wildcards with both evidence sources', () => {
     const actual = censusProductiveRoutes(routes);
-    expect(actual.leaves).toHaveLength(36); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
+    expect(actual.leaves).toHaveLength(37); expect(actual.redirects).toHaveLength(4); expect(actual.wildcards).toHaveLength(3);
     check();
     expect(productiveRouteManifest).toBe(productiveHttpRouteBindings);
     expect(productiveRouteDefinitions.every(entry => !('url' in entry) && !('evidence' in entry))).toBe(true);

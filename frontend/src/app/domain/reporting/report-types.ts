@@ -163,6 +163,7 @@ export class BlackStoreRetiredOperationState extends ClosedWireValue {
 
 export class ReportLoadState extends ClosedWireValue {
   private constructor(wire: string, label: string) { super(wire, label); }
+  static readonly Unselected = new ReportLoadState('UNSELECTED', 'Elegí un período');
   static readonly Loading = new ReportLoadState('LOADING', 'Cargando');
   static readonly Refreshing = new ReportLoadState('REFRESHING', 'Actualizando');
   static readonly Ready = new ReportLoadState('READY', 'Disponible');
@@ -172,6 +173,6 @@ export class ReportLoadState extends ClosedWireValue {
   static readonly Unavailable = new ReportLoadState('UNAVAILABLE', 'No disponible');
   static readonly Corrupt = new ReportLoadState('CORRUPT', 'Respuesta inválida');
   static readonly Unknown = new ReportLoadState('UNKNOWN', 'Desconocido');
-  static readonly all = Object.freeze([this.Loading, this.Refreshing, this.Ready, this.Stale, this.Denied, this.Invalid, this.Unavailable, this.Corrupt]);
+  static readonly all = Object.freeze([this.Unselected, this.Loading, this.Refreshing, this.Ready, this.Stale, this.Denied, this.Invalid, this.Unavailable, this.Corrupt]);
   static fromWire(raw: unknown): ReportLoadState { return this.all.find(value => value.wire === raw) ?? this.Unknown; }
 }
