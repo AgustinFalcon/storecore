@@ -52,7 +52,9 @@ fn snapshot_survives_source_growth_and_truncation_on_the_held_fd() {
     )
     .expect("snapshot succeeds");
     source.seek(SeekFrom::Start(0)).expect("rewind source");
-    source.write_all(b"changed-media").expect("overwrite source");
+    source
+        .write_all(b"changed-media")
+        .expect("overwrite source");
     source
         .set_len((original.len() * 2) as u64)
         .expect("grow source");

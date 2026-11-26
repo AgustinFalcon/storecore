@@ -3615,7 +3615,9 @@ mod tests {
     fn mutate_held_source(source: &mut File, original_len: u64) {
         source.seek(SeekFrom::Start(0)).expect("rewind");
         source.write_all(b"changed-media").expect("overwrite");
-        source.set_len(original_len.saturating_mul(2)).expect("grow");
+        source
+            .set_len(original_len.saturating_mul(2))
+            .expect("grow");
         source.set_len(4).expect("truncate");
         source.sync_all().expect("sync mutation");
     }
