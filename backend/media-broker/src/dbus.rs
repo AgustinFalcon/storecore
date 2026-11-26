@@ -370,9 +370,11 @@ mod tests {
         WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
         worker_properties,
     };
+    use crate::budget::{BudgetError, BudgetLimits};
     use crate::runtime::{ApprovedRuntime, RuntimeError};
-    use crate::state::{JobId, Principal};
-    use crate::systemd::{SystemdControl, SystemdError, TransientUnits};
+    use crate::state::{JobId, Principal, Reservation};
+    use crate::store::{AdmissionStatus, BrokerStore, StoreError};
+    use crate::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
     use std::fs::{self, OpenOptions};
@@ -2834,6 +2836,91 @@ mod tests {
             stopped_mount,
             UnitState::Inactive | UnitState::Failed
         ));
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_global_job_budget_rejects_second_allocation() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
+        let journal_root = PathBuf::from("/run/storecore_media/journal-4c-global-quota");
+        let _ = fs::remove_dir_all(&journal_root);
+        fs::create_dir(&journal_root).expect("journal root");
+        fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700)).expect("journal mode");
+        let owner = rustix::process::geteuid().as_raw();
+        let limits =
+            BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
+                .expect("limits");
+        let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
+        assert_eq!(
+            store.finish_reconciliation(false),
+            Ok(AdmissionStatus::Open)
+        );
+        let first_id = JobId::create([0x22; 16]).expect("job a");
+        let first = store
+            .allocate(
+                first_id.bytes(),
+                Principal::create(2101, 2101),
+                [0xae; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("first allocate");
+        assert_eq!(store.usage().jobs(), 1);
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let runtime = approved_pid1_runtime();
+        let worker = Principal::create(2102, 2102);
+        let spec_a = TransientUnits::derive(
+            first.job_id(),
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec a");
+        let started_mount = systemd
+            .start_transient(UnitKind::Mount, &spec_a)
+            .expect("start first mount");
+        assert_eq!(started_mount, UnitState::Active);
+        assert_eq!(
+            store.allocate(
+                [0x23; 16],
+                Principal::create(2101, 2101),
+                [0xae; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                2,
+            ),
+            Err(StoreError::Budget(BudgetError::JobLimit))
+        );
+        assert_eq!(store.record(first.job_id()), Ok(first));
+        assert_eq!(store.usage().jobs(), 1);
+        let spec_b = TransientUnits::derive(
+            JobId::create([0x23; 16]).expect("job b"),
+            PathBuf::from("/run/storecore_media/jobs"),
+            worker,
+            &runtime,
+        )
+        .expect("spec b");
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec_b),
+            Err(SystemdError::NotLoaded)
+        );
+        let stopped_mount = systemd.stop(UnitKind::Mount, &spec_a).expect("stop mount");
+        assert!(matches!(
+            stopped_mount,
+            UnitState::Inactive | UnitState::Failed
+        ));
+        drop(store);
+        let _ = fs::remove_dir_all(&journal_root);
     }
 
     #[test]
