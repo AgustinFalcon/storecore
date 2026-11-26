@@ -26,7 +26,7 @@ let bindings: readonly ProductiveRouteAcceptance[];
 test.beforeAll(async ({ browser }) => {
   receipt = RealRouteReceipt.fromWire(JSON.parse(readFileSync(resolve('psd-real-results/fixture-receipt.json'), 'utf8')));
   bindings = bindProductiveRealRoutes(receipt);
-  expect(bindings).toHaveLength(36);
+  expect(bindings).toHaveLength(37);
   for (const actor of [RouteActor.Anonymous, RouteActor.Customer, RouteActor.Admin, RouteActor.Operator]) {
     const authDir = process.env['STORECORE_PSD_AUTH_DIR'];
     if (!authDir) throw new Error('Missing ephemeral route auth directory');
