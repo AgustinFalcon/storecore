@@ -63,6 +63,20 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                     val blackStoreModuleState = blackStoreModuleState(period)
                     val blackStoreRegistration = blackStoreRegistration(period)
                     val blackStoreOperations = blackStoreOperations(period)
+                    val blackStoreCatalogToken = blackStoreCatalogToken(period)
+                    val blackStoreCurrentStock = blackStoreCurrentStock(period)
+                    val remoteFreshness = requireNotNull(
+                        ReportValue.unavailable<ReportFreshness>(ReportUnavailableReason.NO_EVIDENCE),
+                    )
+                    val unsupportedCount = requireNotNull(
+                        ReportValue.notAvailable<ReportUnsignedLong>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
+                    )
+                    val unsupportedAmount = requireNotNull(
+                        ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
+                    )
+                    val unsupportedSynchronization = requireNotNull(
+                        ReportValue.notAvailable<ReportFreshness>(ReportUnavailableReason.UNSUPPORTED_CONTRACT),
+                    )
                     val reversalUnavailable = requireNotNull(
                         ReportValue.notAvailable<ReportArsAmount>(ReportUnavailableReason.REVERSAL_AMOUNT_UNAVAILABLE),
                     )
@@ -82,6 +96,16 @@ class JdbcStoreCoreCreatedOrderReportRepository(
                         blackStoreModuleState,
                         blackStoreRegistration,
                         blackStoreOperations,
+                        blackStoreCatalogToken,
+                        blackStoreCurrentStock,
+                        remoteFreshness,
+                        unsupportedCount,
+                        unsupportedAmount,
+                        unsupportedCount,
+                        unsupportedCount,
+                        unsupportedAmount,
+                        unsupportedCount,
+                        unsupportedSynchronization,
                     ))
                 }
             } ?: unavailable(ReportUnavailableReason.READ_FAILED)
@@ -544,6 +568,62 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         } else {
             ReportValue.available(value, evidence)
         }
+    }
+
+    private fun blackStoreCatalogToken(period: ReportPeriod): ReportValue<OpaqueCatalogToken> {
+        val raw = jdbc.queryForObject("SELECT COALESCE(MAX(updated_at)::text,'empty') FROM products", String::class.java)
+        val token = OpaqueCatalogToken.fromWire(raw) ?: return unavailableValue()
+        return ReportValue.available(token, blackStoreEvidence(period))
+    }
+
+    private fun blackStoreCurrentStock(period: ReportPeriod): ReportValue<BlackStoreCurrentStockReport> {
+        val summary = jdbc.queryForMap(
+            """SELECT count(*) active_count,
+                      count(*) FILTER (WHERE b.variant_id IS NULL) missing_count,
+                      count(*) FILTER (WHERE b.variant_id IS NOT NULL AND (
+                        b.available_quantity<0 OR b.safety_stock<0 OR b.reserved_quantity<0
+                        OR length(v.sku)=0 OR length(p.name)=0 OR length(v.label)=0
+                        OR ascii(left(v.sku,1))<=32 OR ascii(right(v.sku,1))<=32
+                        OR ascii(left(p.name,1))<=32 OR ascii(right(p.name,1))<=32
+                        OR ascii(left(v.label,1))<=32 OR ascii(right(v.label,1))<=32
+                      )) contradiction_count,
+                      COALESCE(sum(GREATEST(0,b.available_quantity-b.safety_stock)::numeric)
+                        FILTER (WHERE b.variant_id IS NOT NULL),0) sellable_units,
+                      count(*) FILTER (WHERE b.variant_id IS NOT NULL
+                        AND GREATEST(0,b.available_quantity-b.safety_stock)=0) zero_sellable_count
+               FROM product_variants v JOIN products p ON p.id=v.product_id
+               LEFT JOIN inventory_balances b ON b.variant_id=v.id
+               WHERE v.active=TRUE AND p.status='ACTIVE'""",
+        )
+        if ((summary["missing_count"] as Number).toLong() != 0L) return missingValue()
+        if ((summary["contradiction_count"] as Number).toLong() != 0L) return unavailableValue()
+        val total = ReportUnsignedLong.fromValue((summary["active_count"] as Number).toLong()) ?: return unavailableValue()
+        val sellable = exactUnsigned(summary["sellable_units"]) ?: return unavailableValue()
+        val zero = ReportUnsignedLong.fromValue((summary["zero_sellable_count"] as Number).toLong()) ?: return unavailableValue()
+        val items = jdbc.query(
+            """SELECT v.id,v.sku,p.name product_name,v.label,
+                      GREATEST(0,b.available_quantity-b.safety_stock) sellable_quantity
+               FROM product_variants v JOIN products p ON p.id=v.product_id
+               JOIN inventory_balances b ON b.variant_id=v.id
+               WHERE v.active=TRUE AND p.status='ACTIVE'
+               ORDER BY v.id ASC LIMIT ${BlackStoreCurrentStockReport.LIMIT}""",
+            { rs, _ ->
+                val id = ReportUnsignedLong.fromValue(rs.getLong("id"))
+                val quantity = ReportUnsignedLong.fromValue(rs.getLong("sellable_quantity"))
+                if (id == null || quantity == null) null else BlackStoreStockItem.create(
+                    id, rs.getString("sku"), rs.getString("product_name"), rs.getString("label"), quantity,
+                )
+            },
+        )
+        if (items.any { it == null }) return unavailableValue()
+        val report = BlackStoreCurrentStockReport.create(items.filterNotNull(), total, sellable, zero)
+            ?: return unavailableValue()
+        val evidence = ReportEvidence.current(
+            ReportSource.STORECORE_CURRENT_INVENTORY,
+            period.generatedAt,
+            ReportFreshness.CURRENT,
+        ) ?: return unavailableValue()
+        return ReportValue.available(report, evidence)
     }
 
     private fun blackStoreEvidence(period: ReportPeriod): ReportEvidence = requireNotNull(

@@ -527,6 +527,51 @@ class StoreCoreCreatedOrderReportPostgresTest(
         jdbc.update("DELETE FROM blackstore_companions WHERE client_instance_id IN (?,?)", revokedClient, activeClient)
     }
 
+    @Test fun `blackstore stock proves the full local cohort while catalog token stays opaque`() {
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING")
+        val variants = (1..51).map { inventoryVariant("BS-STOCK-$it", "BlackStore Tool $it") }
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) SELECT id,10,0,0 FROM product_variants ON CONFLICT(variant_id) DO NOTHING")
+        val firstVariant = jdbc.queryForObject(
+            """SELECT min(v.id) FROM product_variants v JOIN products p ON p.id=v.product_id
+               WHERE v.active=TRUE AND p.status='ACTIVE'""",
+            Long::class.java,
+        )!!
+        jdbc.update("UPDATE inventory_balances SET available_quantity=10,reserved_quantity=7,safety_stock=3 WHERE variant_id=?", firstVariant)
+
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
+        val stock = found.report.blackStoreCurrentStockValue()!!
+        val expectedTotal = jdbc.queryForObject(
+            """SELECT count(*) FROM product_variants v JOIN products p ON p.id=v.product_id
+               WHERE v.active=TRUE AND p.status='ACTIVE'""",
+            Long::class.java,
+        )!!
+        assertEquals(expectedTotal.toString(), stock.total.wire)
+        assertEquals(expectedTotal > 50, stock.truncated)
+        assertEquals(minOf(expectedTotal, 50).toInt(), stock.items.size)
+        assertEquals(stock.items.map { it.variantId.value }.sorted(), stock.items.map { it.variantId.value })
+        assertEquals("7", stock.items.first { it.variantId.value == firstVariant }.sellableQuantity.wire)
+        val token = found.report.blackStoreCatalogTokenValue()!!.wire
+
+        jdbc.update("UPDATE inventory_balances SET available_quantity=available_quantity+1 WHERE variant_id=?", firstVariant)
+        val moved = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
+        assertEquals(token, moved.report.blackStoreCatalogTokenValue()!!.wire)
+        assertIs<ReportValue.Unavailable>(moved.report.blackStoreRemoteFreshness)
+        assertIs<ReportValue.NotAvailable>(moved.report.blackStoreSales)
+        assertIs<ReportValue.NotAvailable>(moved.report.blackStoreSynchronization)
+
+        val missing = inventoryVariant("BS-MISSING", "Missing BlackStore Balance")
+        val missingResult = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
+        assertIs<ReportValue.Unavailable>(missingResult.report.blackStoreCurrentStock)
+        jdbc.update("INSERT INTO inventory_balances(variant_id,available_quantity,reserved_quantity,safety_stock) VALUES (?,0,0,0)", missing)
+
+        val invalidVariant = variants.max()
+        val invalidProduct = jdbc.queryForObject("SELECT product_id FROM product_variants WHERE id=?", Long::class.java, invalidVariant)!!
+        jdbc.update("UPDATE products SET name=? WHERE id=?", "\tInvalid hidden text", invalidProduct)
+        val invalid = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2000-01-01", "2000-02-01"))
+        jdbc.update("UPDATE products SET name=? WHERE id=?", "BlackStore Tool 51", invalidProduct)
+        assertIs<ReportValue.Unavailable>(invalid.report.blackStoreCurrentStock)
+    }
+
     private fun order(createdAt: String, total: String, subtotal: String = total, shipping: String = "0.00"): Long {
         val customer = jdbc.queryForObject(
             "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Report','Buyer') RETURNING id",

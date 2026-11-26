@@ -77,3 +77,91 @@ class BlackStoreOperationDiagnostics private constructor(
             }
     }
 }
+
+@JvmInline
+value class OpaqueCatalogToken private constructor(val wire: String) {
+    companion object {
+        fun fromWire(raw: String?): OpaqueCatalogToken? = raw
+            ?.takeIf { it.isNotEmpty() && it.length <= 64 && it.first().code > ASCII_SPACE && it.last().code > ASCII_SPACE }
+            ?.let(::OpaqueCatalogToken)
+
+        private const val ASCII_SPACE = 0x20
+    }
+}
+
+class BlackStoreStockItem private constructor(
+    val variantId: ReportUnsignedLong,
+    val sku: String,
+    val productName: String,
+    val variantLabel: String,
+    val sellableQuantity: ReportUnsignedLong,
+) {
+    companion object {
+        fun create(
+            variantId: ReportUnsignedLong,
+            sku: String?,
+            productName: String?,
+            variantLabel: String?,
+            sellableQuantity: ReportUnsignedLong,
+        ): BlackStoreStockItem? {
+            fun text(raw: String?) = raw?.takeIf {
+                it.isNotEmpty() && it.first().code > ASCII_SPACE && it.last().code > ASCII_SPACE
+            }
+            return BlackStoreStockItem(
+                variantId,
+                text(sku) ?: return null,
+                text(productName) ?: return null,
+                text(variantLabel) ?: return null,
+                sellableQuantity,
+            )
+        }
+
+        private const val ASCII_SPACE = 0x20
+    }
+}
+
+class BlackStoreCurrentStockReport private constructor(
+    val items: List<BlackStoreStockItem>,
+    val total: ReportUnsignedLong,
+    val sellableUnits: ReportUnsignedLong,
+    val zeroSellableVariantCount: ReportUnsignedLong,
+    val truncated: Boolean,
+) {
+    companion object {
+        const val LIMIT = 50
+        fun create(
+            items: List<BlackStoreStockItem>,
+            total: ReportUnsignedLong,
+            sellableUnits: ReportUnsignedLong,
+            zeroSellableVariantCount: ReportUnsignedLong,
+        ): BlackStoreCurrentStockReport? {
+            if (items.size != minOf(total.value, LIMIT.toLong()).toInt() ||
+                items.map(BlackStoreStockItem::variantId).distinct().size != items.size
+            ) return null
+            val visibleSellable = items.fold(0L) { sum, item ->
+                runCatching { Math.addExact(sum, item.sellableQuantity.value) }.getOrNull() ?: return null
+            }
+            val visibleZeroCount = items.count { it.sellableQuantity.value == 0L }.toLong()
+            val hiddenCount = total.value - items.size
+            val complete = hiddenCount == 0L
+            val aggregatesProven = if (complete) {
+                sellableUnits.value == visibleSellable && zeroSellableVariantCount.value == visibleZeroCount
+            } else {
+                val zeroCountValid = zeroSellableVariantCount.value in
+                    visibleZeroCount..Math.addExact(visibleZeroCount, hiddenCount)
+                val unitsValid = sellableUnits.value >= visibleSellable
+                if (!zeroCountValid || !unitsValid) false else {
+                    val hiddenZeroCount = zeroSellableVariantCount.value - visibleZeroCount
+                    val hiddenPositiveCount = hiddenCount - hiddenZeroCount
+                    val hiddenSellableUnits = sellableUnits.value - visibleSellable
+                    if (hiddenPositiveCount == 0L) hiddenSellableUnits == 0L
+                    else hiddenSellableUnits >= hiddenPositiveCount
+                }
+            }
+            if (!aggregatesProven) return null
+            return BlackStoreCurrentStockReport(
+                items.toList(), total, sellableUnits, zeroSellableVariantCount, !complete,
+            )
+        }
+    }
+}

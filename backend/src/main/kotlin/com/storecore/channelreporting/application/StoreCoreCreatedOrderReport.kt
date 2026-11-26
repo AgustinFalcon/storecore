@@ -226,6 +226,16 @@ class StoreCoreCreatedOrderReport(
     val blackStoreModuleState: ReportValue<ReportModuleState>,
     val blackStoreRegistration: ReportValue<BlackStoreRegistrationReport>,
     val blackStoreOperations: ReportValue<BlackStoreOperationDiagnostics>,
+    val blackStoreCatalogToken: ReportValue<OpaqueCatalogToken>,
+    val blackStoreCurrentStock: ReportValue<BlackStoreCurrentStockReport>,
+    val blackStoreRemoteFreshness: ReportValue<ReportFreshness>,
+    val blackStoreSales: ReportValue<ReportUnsignedLong>,
+    val blackStoreRevenue: ReportValue<ReportArsAmount>,
+    val blackStorePayments: ReportValue<ReportUnsignedLong>,
+    val blackStoreReturns: ReportValue<ReportUnsignedLong>,
+    val blackStoreMonetaryChannelMix: ReportValue<ReportArsAmount>,
+    val blackStoreHistoricalStock: ReportValue<ReportUnsignedLong>,
+    val blackStoreSynchronization: ReportValue<ReportFreshness>,
 ) {
     fun createdOrdersValue(): CreatedOrderMetrics? = (createdOrders as? ReportValue.Available)?.value
     fun appliedAccreditationsValue(): AppliedAccreditationMetrics? = (appliedAccreditations as? ReportValue.Available)?.value
@@ -241,6 +251,9 @@ class StoreCoreCreatedOrderReport(
         (blackStoreRegistration as? ReportValue.Available)?.value
     fun blackStoreOperationsValue(): BlackStoreOperationDiagnostics? =
         (blackStoreOperations as? ReportValue.Available)?.value
+    fun blackStoreCatalogTokenValue(): OpaqueCatalogToken? = (blackStoreCatalogToken as? ReportValue.Available)?.value
+    fun blackStoreCurrentStockValue(): BlackStoreCurrentStockReport? =
+        (blackStoreCurrentStock as? ReportValue.Available)?.value
 }
 
 sealed interface StoreCoreCreatedOrderReadResult {

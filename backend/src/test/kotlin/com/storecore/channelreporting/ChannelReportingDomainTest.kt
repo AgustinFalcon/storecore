@@ -6,6 +6,8 @@ import com.storecore.channelreporting.application.ReportInventoryChannel
 import com.storecore.channelreporting.application.ReportInventoryEventType
 import com.storecore.channelreporting.application.BlackStoreRegistrationReport
 import com.storecore.channelreporting.application.BlackStoreRegistrationState
+import com.storecore.channelreporting.application.BlackStoreCurrentStockReport
+import com.storecore.channelreporting.application.BlackStoreStockItem
 import com.storecore.channelreporting.domain.*
 import com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher
 import java.time.Instant
@@ -74,6 +76,29 @@ class ChannelReportingDomainTest {
         assertNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.REVOKED_ONLY, zero))
         assertNotNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.ABSENT, zero))
         assertNotNull(BlackStoreRegistrationReport.create(BlackStoreRegistrationState.REVOKED_ONLY, one))
+    }
+
+    @Test fun `blackstore stock aggregate proves visible quantities without overflow`() {
+        fun number(value: Long) = ReportUnsignedLong.fromValue(value)!!
+        fun item(id: Long, quantity: Long) = BlackStoreStockItem.create(
+            number(id), "SKU-$id", "Tool $id", "Default", number(quantity),
+        )!!
+
+        val oneItem = listOf(item(1, 7))
+        assertNull(BlackStoreCurrentStockReport.create(oneItem, number(1), number(0), number(1)))
+        assertNotNull(BlackStoreCurrentStockReport.create(oneItem, number(1), number(7), number(0)))
+
+        val truncated = (1L..50L).map { item(it, if (it == 1L) 0 else 1) }
+        assertNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(48), number(1)))
+        assertNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(49), number(0)))
+        assertNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(49), number(3)))
+        assertNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(49), number(1)))
+        assertNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(50), number(2)))
+        assertNotNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(50), number(1)))
+        assertNotNull(BlackStoreCurrentStockReport.create(truncated, number(51), number(49), number(2)))
+
+        val overflowing = truncated.dropLast(1) + item(50, Long.MAX_VALUE)
+        assertNull(BlackStoreCurrentStockReport.create(items = overflowing, total = number(51), sellableUnits = number(Long.MAX_VALUE), zeroSellableVariantCount = number(1)))
     }
 
     @Test fun `ARS money is a nonnegative canonical scale two decimal`() {
