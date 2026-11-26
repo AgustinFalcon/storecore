@@ -1,15 +1,28 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-25, 4C RLIMIT AS del worker
+## En implementación — 2026-11-26, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `LimitAS` a 32× el
-heap `IMAGE_IO_V1` (`RLIMIT_AS`) y PID 1 lo lee. Un techo igual a
-`MemoryMax` provoca core-dump del JVM. `ProtectHome`,
-`CPUQuota` y `RestrictAddressFamilies` quedan fuera. Sigue sin familia
-de sockets, cuota global, terminales sin ACK, FD/mmap tras el seal,
-reinicio en cada transición durable, RLIMIT restantes (`LimitDATA`,
-`LimitSTACK`) ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`,
-TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de media.
+Siguiente corte: RLIMIT restantes (`LimitDATA`, `LimitSTACK`), cuota
+global, terminales sin ACK, FD/mmap tras el seal y reinicio en cada
+transición durable. `ProtectHome`, `RestrictAddressFamilies` y
+`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue sin
+familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP de media.
+
+## Master vigente — 2026-11-26, 4C LimitAS PR #411
+
+`master 3aaced7ce133401286697a4c2a664646df1079fa` integra PR #411. Su
+candidato exacto `ca23f75174ed3a71ab1b4efabe1a52dfdd76449a` pasó Verify
+`45743360147` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261126-sol-pr411-architecture.md` y
+`sdd/reviews/20261126-sol-pr411-security.md`. El harness deriva
+`LimitAS` a 32× el heap `IMAGE_IO_V1` (`RLIMIT_AS`) y PID 1 lo lee. Un
+techo igual a `MemoryMax` provoca core-dump del JVM. El corte no cierra
+`003B-4C`: no hay `CPUQuota`, familia de sockets, cuota global ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-25, 4C ProtectKernelModules PR #409
 
