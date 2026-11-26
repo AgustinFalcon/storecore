@@ -8,8 +8,9 @@ VERDICT: APPROVED
 - Date: 2026-11-26
 - PR: https://github.com/AgustinFalcon/storecore/pull/417
 - Title: `fix: close calendar runtime and reporting gates`
-- Base: `origin/master`, `52922f5edd043d73563bba43467dab58613fbab9`
-- Reviewed head: `001e1add42c21ee30696302cb5d5d68e24a372a5`
+- Current base ref: `origin/master`, `36b08b83d1f80e7642a9fcdfe134a5a16794b9df`
+- Comparison merge-base: `52922f5edd043d73563bba43467dab58613fbab9`
+- Reviewed head: `f091d4fc58ed25d8a9f345f592e386c2364f81fb`
 - Lane: architecture/security/concurrency; no production changes, commit or push.
 
 ## Review order and scope
@@ -52,3 +53,15 @@ Fresh re-review validations:
 - Confirmed that close-out evidence still keeps loyalty blocked until dual approvals, hosted CI and merge; no live activation or retroactive approval claim was introduced.
 
 No Maven rerun is claimed for the documentation-only successor: prior execution is explicitly attributed to `3d6436d`, with exact code identity checked at this head. APPROVED applies to the exact successor head recorded above; it does not assert hosted CI success or completion of the still-open validation/merge tasks.
+
+## Re-review of Flyway expectation repair — f091d4f
+
+VERDICT: APPROVED for exact head `f091d4fc58ed25d8a9f345f592e386c2364f81fb`; no open P0–P3. Read the complete `origin/master...HEAD` change set and successor delta after the prior reviews. The current origin/master is `36b08b83d1f80e7642a9fcdfe134a5a16794b9df`; its comparison merge-base with this head remains `52922f5edd043d73563bba43467dab58613fbab9`. This receipt distinguishes the moving base ref from the three-dot diff baseline and does not claim a merged-current-master test run.
+
+The successor changes exactly 14 expected latest-schema assertions across 13 Kotlin test files. Independently checked the complete changed lines and programmatically asserted that each new line equals its predecessor with only the literal expected version `39` replaced by `40`. All operations under test, upgrade starting versions, checksum/history comparisons, privilege checks, business fixture assertions, Flyway validation and idempotent migration checks remain intact. V40 is the legitimate latest migration added by this PR; demanding V39 after unrestricted migration was a stale test expectation. These changes neither skip tests nor relax a domain invariant and introduce no domain string comparison or SOLID boundary change.
+
+Fresh checks passed: full-range `git diff --check`; task JSON parse; PCC-009/PCC-013 still `in_progress`; no delta from previously approved f8e5dce in production code, migrations, frontend, WIP tasks or evidence. Rechecked the runtime admission and V40 safety assessment against that unchanged production content. Coordinated with the UX/SDD lane, which independently reached the same result.
+
+Local execution evidence supplied by the coordinator: the focal 13-class suite exited 0, followed by the full backend suite with 856 tests, zero failures, zero errors and nine skips. Independently parsed all 143 local Surefire XML reports and reproduced exactly those full-suite totals. These executions were not rerun by this reviewer; the earlier 64-test execution remains my independent runtime/migration validation, while this re-review verifies the narrowly changed assertions and current full-suite report evidence. The nine skips are retained as skips, not passes. No hosted CI result is inferred from local reports.
+
+The initial P2 remains resolved. This approval covers the reviewed diff and exact head only; live providers, deployment, archive, homologation and the hosted/merge close-out gates remain outside the verdict.
