@@ -32,12 +32,24 @@ class JdbcStoreCoreCreatedOrderReportRepository(
     }
 
     private fun readWithinSnapshot(fromDate: String, toDateExclusive: String): StoreCoreCreatedOrderReadResult {
+        return when (val resolution = resolvePeriodWithinSnapshot(fromDate, toDateExclusive)) {
+            is SnapshotPeriodResolution.Found -> projectWithinSnapshot(resolution.period)
+            SnapshotPeriodResolution.TimezoneUnavailable -> StoreCoreCreatedOrderReadResult.TimezoneUnavailable
+            SnapshotPeriodResolution.SourceUnavailable -> unavailable(ReportUnavailableReason.READ_FAILED)
+        }
+    }
+
+    private fun resolvePeriodWithinSnapshot(fromDate: String, toDateExclusive: String): SnapshotPeriodResolution {
         val zone = jdbc.query("SELECT timezone FROM installation_settings WHERE installation_id=1", { row, _ -> row.getString(1) }).singleOrNull()
-            ?: return StoreCoreCreatedOrderReadResult.TimezoneUnavailable
+            ?: return SnapshotPeriodResolution.TimezoneUnavailable
         val generatedAt = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)?.toInstant()
-            ?: return unavailable(ReportUnavailableReason.READ_FAILED)
+            ?: return SnapshotPeriodResolution.SourceUnavailable
         val period = ReportPeriod.create(fromDate, toDateExclusive, zone, generatedAt, hasher)
-            ?: return StoreCoreCreatedOrderReadResult.TimezoneUnavailable
+            ?: return SnapshotPeriodResolution.TimezoneUnavailable
+        return SnapshotPeriodResolution.Found(period)
+    }
+
+    private fun projectWithinSnapshot(period: ReportPeriod): StoreCoreCreatedOrderReadResult {
         val row = jdbc.queryForMap(
             """SELECT count(*) row_count, COALESCE(sum(total),0.00) nominal_total,
                       count(*) FILTER (WHERE currency<>'ARS' OR total<0 OR subtotal<0 OR shipping_cost<0 OR total<>subtotal+shipping_cost) contradiction_count
@@ -625,4 +637,10 @@ class JdbcStoreCoreCreatedOrderReportRepository(
         val metrics: ReportValue<AppliedAccreditationMetrics>,
         val bestSellers: ReportValue<BestSellerReport>,
     )
+
+    private sealed interface SnapshotPeriodResolution {
+        class Found(val period: ReportPeriod) : SnapshotPeriodResolution
+        data object TimezoneUnavailable : SnapshotPeriodResolution
+        data object SourceUnavailable : SnapshotPeriodResolution
+    }
 }
