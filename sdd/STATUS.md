@@ -1,14 +1,27 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-26, 4C RLIMIT STACK del worker
+## En implementación — 2026-11-26, 4C sigue abierto
 
-Este corte no cierra `003B-4C`. El harness deriva `LimitSTACK=8MiB`
-(`RLIMIT_STACK`) y PID 1 lo lee. No es `LimitAS`. `ProtectHome`,
-`CPUQuota` y `RestrictAddressFamilies` quedan fuera. Sigue sin familia
-de sockets, cuota global, terminales sin ACK, FD/mmap tras el seal,
-reinicio en cada transición durable ni `Ready`. `003B-4B-3`,
-`003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este
-corte no agrega HTTP de media.
+Siguiente corte: cuota global, terminales sin ACK, FD/mmap tras el
+seal y reinicio en cada transición durable. Los RLIMIT del worker
+quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
+`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue sin
+familia de sockets, cuota global ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega
+HTTP de media.
+
+## Master vigente — 2026-11-26, 4C LimitSTACK PR #416
+
+`master 36b08b83d1f80e7642a9fcdfe134a5a16794b9df` integra PR #416. Su
+candidato exacto `037fadb1429a4b39bff79c95cdbba1fe2cbe1e9a` pasó Verify
+`45866580240` 7/7. Dos reviews independientes Grok 4.7 (autorizadas
+porque gpt-5.6-sol-medium estaba sin cupo) aprobaron sin P0–P3:
+`sdd/reviews/20261126-sol-pr416-architecture.md` y
+`sdd/reviews/20261126-sol-pr416-security.md`. El harness deriva
+`LimitSTACK=8MiB` (`RLIMIT_STACK`) y PID 1 lo lee. El corte no cierra
+`003B-4C`: no hay `CPUQuota`, familia de sockets, cuota global ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C LimitDATA PR #413
 
