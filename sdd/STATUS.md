@@ -2,13 +2,14 @@
 
 ## En implementación — 2026-11-27, 4C sigue abierto
 
-Siguiente corte: familia de sockets y `Ready`. El reinicio tras
+Siguiente corte: `CPUQuota` y `Ready`. El reinicio tras
 `Allocated`, `InputSealed`, `Starting`, `Running`, `Terminating`,
 `Terminal` y `Quarantined`, inventario Active esperado e inesperado,
 mmap, FD,
-terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`,
-`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento
-no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`
+y `RestrictAddressFamilies` quedan atestados ausentes. `CPUQuota` queda
+fuera. Este documento no cierra `003B-4C`. Sigue sin `CPUQuota` ni
+`Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 

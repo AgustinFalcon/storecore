@@ -155,8 +155,8 @@ inventario Active esperado (`Running` → terminate verificado →
 (head `58730de`, merge `bf41bf8`, Verify `46071306234` 7/7, dos
 grok-4.7-medium-fast APPROVED) atesta inventario Active inesperado
 (`Allocated` → terminate + cuarentena + admisión cerrada); no cubre
-sockets ni `Ready`. El corte de familia de sockets está en
-implementación; no cubre `Ready`. PR #326
+sockets ni `Ready`. El corte de `RestrictAddressFamilies` ausente está
+en implementación; no cubre `CPUQuota` ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

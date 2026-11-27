@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C RestrictAddressFamilies ausente
+
+- PID 1 no aplica `RestrictAddressFamilies` al worker derivado. El
+  harness arranca `.mount` y worker, lee la propiedad efectiva vacía y
+  detiene ambas unidades.
+- No se marca `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C inventario Active inesperado
 
 - Tras `Allocated` con `.mount` y worker Active, reabrir el journal deja
