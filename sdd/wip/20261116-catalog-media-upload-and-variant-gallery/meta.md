@@ -147,8 +147,8 @@ transiciones ni `Ready`. PR #438 (head `966f986`, merge `02ef551`,
 Verify `45944646863` 7/7, dos gpt-5.6-sol-medium APPROVED) atesta
 reinicio tras `Starting` (cuarentena con inventario ausente); no cubre
 `Running` ni el resto de transiciones ni `Ready`. El corte de reinicio
-tras `Terminal` está en implementación; no cubre `Quarantined` ni el
-resto ni `Ready`. PR #326
+tras `Quarantined` está en implementación; no cubre inventario Active
+ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

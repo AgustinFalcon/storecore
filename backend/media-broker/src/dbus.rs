@@ -3594,6 +3594,69 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_quarantined_job_stays_blocked_after_restart_with_absent_units() {
+        pid1_require_root();
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-quarantined");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x34; 16],
+                principal,
+                [0xb8; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                sealed.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("starting");
+        let job_id = starting.job_id();
+        let owner = rustix::process::geteuid().as_raw();
+        drop(store);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        pid1_assert_absent_quarantine(&mut restored, job_id, 4);
+        drop(restored);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        assert_eq!(
+            restored.allocate(
+                [0x35; 16],
+                principal,
+                [0xb8; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                5,
+            ),
+            Err(StoreError::AdmissionClosed)
+        );
+        pid1_assert_absent_quarantine(&mut restored, job_id, 5);
+        drop(restored);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")

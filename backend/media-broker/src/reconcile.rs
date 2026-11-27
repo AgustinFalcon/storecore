@@ -588,6 +588,65 @@ mod tests {
     }
 
     #[test]
+    fn quarantined_job_stays_blocked_after_restart_with_absent_runtime() {
+        let fixture = Fixture::new();
+        let mut store = fixture.ready_store();
+        let allocated = store
+            .allocate([60; 16], principal(), [61; 16], reservation(), 2)
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                3,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal(),
+                sealed.boot_id(),
+                JobState::Starting,
+                4,
+            )
+            .expect("starting");
+        drop(store);
+        let mut restored = fixture.pending_store();
+        let mut adapter = FakeAdapter::empty();
+        let first = reconcile(&mut restored, &mut adapter, 5).expect("first reconcile");
+        assert_eq!(first.status(), ReconcileStatus::AdmissionBlocked);
+        assert_eq!(
+            restored.record(starting.job_id()).expect("record").state(),
+            JobState::Quarantined
+        );
+        drop(restored);
+        let mut restored = fixture.pending_store();
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        let mut adapter = FakeAdapter::empty();
+        let report = reconcile(&mut restored, &mut adapter, 6).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::AdmissionBlocked);
+        assert_eq!(
+            restored.record(starting.job_id()).expect("record").state(),
+            JobState::Quarantined
+        );
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::ReconciliationMismatch)
+        );
+        assert_eq!(
+            restored.allocate([62; 16], principal(), [63; 16], reservation(), 7),
+            Err(StoreError::AdmissionClosed)
+        );
+    }
+
+    #[test]
     fn expected_active_runtime_is_terminated_and_made_terminal() {
         let fixture = Fixture::new();
         let mut active = fixture.ready_store();
