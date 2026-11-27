@@ -376,6 +376,36 @@ mod tests {
     }
 
     #[test]
+    fn input_sealed_job_survives_restart_with_absent_runtime() {
+        let fixture = Fixture::new();
+        let mut store = fixture.ready_store();
+        let allocated = store
+            .allocate([42; 16], principal(), [43; 16], reservation(), 2)
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal(),
+                allocated.boot_id(),
+                JobState::InputSealed,
+                3,
+            )
+            .expect("seal");
+        drop(store);
+        let mut restored = fixture.pending_store();
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        let mut adapter = FakeAdapter::empty();
+        let report = reconcile(&mut restored, &mut adapter, 4).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::Clean);
+        assert_eq!(restored.admission_status(), AdmissionStatus::Open);
+        assert_eq!(restored.record(sealed.job_id()), Ok(sealed));
+    }
+
+    #[test]
     fn expected_active_runtime_is_terminated_and_made_terminal() {
         let fixture = Fixture::new();
         let mut active = fixture.ready_store();

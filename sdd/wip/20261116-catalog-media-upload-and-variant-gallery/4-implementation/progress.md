@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C reinicio tras InputSealed
+
+- Tras `InputSealed`, reabrir el journal deja `RecoveryPending` y PID 1
+  no carga `.mount` ni worker. `reconcile` con inventario ausente reabre
+  admisión y conserva el job sellado.
+- No se marca `003B-4C`. Faltan reinicios de `Starting` y el resto,
+  familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #433, 003B-4C sigue abierto
 
 - Merge #433 `514b18337854b198686f3af91b8fc1c7ca1107d2` sobre candidato
