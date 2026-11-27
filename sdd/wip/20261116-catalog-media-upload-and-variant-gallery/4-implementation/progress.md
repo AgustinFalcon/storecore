@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C reinicio tras Running
+
+- Tras `Running`, reabrir el journal deja `RecoveryPending` y PID 1 no
+  carga `.mount` ni worker. `reconcile` con inventario ausente cuarentena
+  el job y mantiene la admisión cerrada.
+- No se marca `003B-4C`. Faltan reinicios de `Terminating` y el resto,
+  familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — persist reviews PR #438, 003B-4C sigue abierto
 
 - Merge #438 `02ef551c652c842673826a2fd400330e791cef44` sobre candidato
