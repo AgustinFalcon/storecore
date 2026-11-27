@@ -3426,6 +3426,85 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_terminating_job_is_quarantined_after_restart_with_absent_units() {
+        pid1_require_root();
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-terminating");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x30; 16],
+                principal,
+                [0xb6; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                sealed.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("starting");
+        let running = store
+            .transition(
+                starting.job_id(),
+                3,
+                principal,
+                starting.boot_id(),
+                JobState::Running,
+                4,
+            )
+            .expect("running");
+        let terminating = store
+            .transition(
+                running.job_id(),
+                4,
+                principal,
+                running.boot_id(),
+                JobState::Terminating,
+                5,
+            )
+            .expect("terminating");
+        let job_id = terminating.job_id();
+        let owner = rustix::process::geteuid().as_raw();
+        drop(store);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        assert_eq!(
+            restored.allocate(
+                [0x31; 16],
+                principal,
+                [0xb6; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                6,
+            ),
+            Err(StoreError::AdmissionClosed)
+        );
+        pid1_assert_absent_quarantine(&mut restored, job_id, 6);
+        drop(restored);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
@@ -3980,6 +4059,39 @@ mod tests {
             .expect("grow");
         source.set_len(4).expect("truncate");
         source.sync_all().expect("sync mutation");
+    }
+
+    fn pid1_assert_absent_quarantine(store: &mut BrokerStore, job_id: JobId, now_ms: u64) {
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let spec = TransientUnits::derive(
+            job_id,
+            PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2102, 2102),
+            &approved_pid1_runtime(),
+        )
+        .expect("spec");
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Worker, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        let mut adapter = Pid1AbsentUnits {
+            systemd: &mut systemd,
+            spec: &spec,
+        };
+        let report = reconcile(store, &mut adapter, now_ms).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::AdmissionBlocked);
+        assert_eq!(
+            store.admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::ReconciliationMismatch)
+        );
+        assert_eq!(
+            store.record(job_id).expect("record").state(),
+            JobState::Quarantined
+        );
     }
 
     fn pid1_require_root() {

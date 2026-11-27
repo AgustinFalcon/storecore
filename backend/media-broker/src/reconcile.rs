@@ -518,6 +518,48 @@ mod tests {
     }
 
     #[test]
+    fn terminating_job_is_quarantined_after_restart_with_absent_runtime() {
+        let fixture = Fixture::new();
+        let mut store = fixture.ready_store();
+        let running = running_job(&mut store, [52; 16]);
+        let terminating = store
+            .transition(
+                running.job_id(),
+                running.revision(),
+                principal(),
+                running.boot_id(),
+                JobState::Terminating,
+                5,
+            )
+            .expect("terminating");
+        drop(store);
+        let mut restored = fixture.pending_store();
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        let mut adapter = FakeAdapter::empty();
+        let report = reconcile(&mut restored, &mut adapter, 6).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::AdmissionBlocked);
+        assert_eq!(report.mismatches(), 1);
+        assert_eq!(
+            restored
+                .record(terminating.job_id())
+                .expect("record")
+                .state(),
+            JobState::Quarantined
+        );
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::ReconciliationMismatch)
+        );
+        assert_eq!(
+            restored.allocate([53; 16], principal(), [54; 16], reservation(), 7),
+            Err(StoreError::AdmissionClosed)
+        );
+    }
+
+    #[test]
     fn expected_active_runtime_is_terminated_and_made_terminal() {
         let fixture = Fixture::new();
         let mut active = fixture.ready_store();
