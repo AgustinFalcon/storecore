@@ -211,7 +211,7 @@ class CalendarPersistencePostgresTest {
         flyway(url,"35").migrate()
         val upgraded=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val history=upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
-        assertEquals("41",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("42",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history,upgraded.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=35 ORDER BY installed_rank"))
         assertEquals(0,flyway(url).migrate().migrationsExecuted); flyway(url).validate()
         for(database in listOf(root,upgraded)) {
@@ -237,7 +237,7 @@ class CalendarPersistencePostgresTest {
         flyway(url,"38").migrate()
         val database=JdbcTemplate(DriverManagerDataSource(url,postgres.username,postgres.password))
         val published=database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank")
-        assertEquals("41",flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("42",flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(published,database.queryForList("SELECT version,script,checksum FROM flyway_schema_history WHERE version::int<=38 ORDER BY installed_rank"))
         assertEquals(1,database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='39' AND success",Int::class.java))
         assertEquals(1,database.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE version='40' AND success",Int::class.java))

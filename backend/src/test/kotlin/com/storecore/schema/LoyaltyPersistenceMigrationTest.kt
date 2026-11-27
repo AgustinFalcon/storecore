@@ -23,7 +23,7 @@ class LoyaltyPersistenceMigrationTest {
             PostgreSQLContainer<Nothing>("postgres:16-alpine").use { pg ->
                 pg.start()
                 fun flyway(target: String? = null) = Flyway.configure().dataSource(pg.jdbcUrl, pg.username, pg.password)
-                    .locations("classpath:db/migration").apply { if (target != null) target(target) }.load()
+                    .locations("classpath:db/migration").target(target ?: "41").load()
                 val jdbc = JdbcTemplate(DriverManagerDataSource(pg.jdbcUrl, pg.username, pg.password))
                 var history = emptyList<Map<String, Any>>()
                 if (upgrade) {
@@ -238,7 +238,7 @@ class LoyaltyPersistenceMigrationTest {
     private fun database(block: (JdbcTemplate) -> Unit) {
         PostgreSQLContainer<Nothing>("postgres:16-alpine").use { pg ->
             pg.start()
-            Flyway.configure().dataSource(pg.jdbcUrl,pg.username,pg.password).locations("classpath:db/migration").load().migrate()
+            Flyway.configure().dataSource(pg.jdbcUrl,pg.username,pg.password).locations("classpath:db/migration").target("41").load().migrate()
             block(JdbcTemplate(DriverManagerDataSource(pg.jdbcUrl,pg.username,pg.password)))
         }
     }
