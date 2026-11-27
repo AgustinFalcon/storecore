@@ -90,11 +90,33 @@ class LoyaltyPersistenceDomainTest {
     }
     @Test fun `operation admits only its authorized realm`() {
         val hash = LoyaltyFingerprint.canonical(listOf("x"))
-        for (realm in LoyaltyRealm.entries) for (op in LoyaltyCommandOperation.entries) {
-            val value = LoyaltyCommandBinding.create(UUID.randomUUID(), realm, 2, op, LoyaltyAggregateType.WALLET, "1", hash)
-            val valid = (realm == LoyaltyRealm.USER && op == LoyaltyCommandOperation.ADMIN_ADJUSTMENT) ||
-                (realm == LoyaltyRealm.SYSTEM && op == LoyaltyCommandOperation.MATERIALIZE_EXPIRY)
-            assertEquals(valid, value != null, "$realm $op")
+        val reservation = UUID.randomUUID().toString()
+        for (realm in LoyaltyRealm.entries) for (op in LoyaltyCommandOperation.entries) for (aggregate in LoyaltyAggregateType.entries) {
+            val ref = if (aggregate == LoyaltyAggregateType.RESERVATION) reservation else "1"
+            val value = LoyaltyCommandBinding.create(UUID.randomUUID(), realm, 2, op, aggregate, ref, hash)
+            val valid = when (op) {
+                LoyaltyCommandOperation.ADMIN_ADJUSTMENT -> realm == LoyaltyRealm.USER && aggregate == LoyaltyAggregateType.WALLET
+                LoyaltyCommandOperation.MATERIALIZE_EXPIRY -> realm == LoyaltyRealm.SYSTEM && aggregate == LoyaltyAggregateType.WALLET
+                LoyaltyCommandOperation.CREATE_RESERVATION -> realm == LoyaltyRealm.CUSTOMER && aggregate == LoyaltyAggregateType.WALLET
+                LoyaltyCommandOperation.CANCEL_RESERVATION -> realm == LoyaltyRealm.CUSTOMER && aggregate == LoyaltyAggregateType.RESERVATION
+                LoyaltyCommandOperation.EXPIRE_RESERVATION -> realm == LoyaltyRealm.SYSTEM && aggregate == LoyaltyAggregateType.RESERVATION
+                LoyaltyCommandOperation.UNKNOWN -> false
+            }
+            assertEquals(valid, value != null, "$realm $op $aggregate")
+        }
+    }
+
+    @Test fun `reservation command aggregates require their canonical identity shape`() {
+        val hash = LoyaltyFingerprint.canonical(listOf("x"))
+        val id = UUID.randomUUID()
+        assertNotNull(LoyaltyCommandBinding.create(id, LoyaltyRealm.CUSTOMER, 7,
+            LoyaltyCommandOperation.CREATE_RESERVATION, LoyaltyAggregateType.WALLET, "9", hash))
+        val reservation = UUID.randomUUID().toString()
+        assertNotNull(LoyaltyCommandBinding.create(id, LoyaltyRealm.CUSTOMER, 7,
+            LoyaltyCommandOperation.CANCEL_RESERVATION, LoyaltyAggregateType.RESERVATION, reservation, hash))
+        for (invalid in listOf(reservation.uppercase(), "{$reservation}", UUID(0, 0).toString(), "not-a-uuid")) {
+            assertNull(LoyaltyCommandBinding.create(id, LoyaltyRealm.CUSTOMER, 7,
+                LoyaltyCommandOperation.CANCEL_RESERVATION, LoyaltyAggregateType.RESERVATION, invalid, hash))
         }
     }
     @Test fun `receipt applies exactly one revision and rejections preserve state`() {

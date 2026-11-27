@@ -22,19 +22,26 @@ enum class LoyaltyRealm {
     companion object { fun fromWire(raw: String?): LoyaltyRealm = persistenceClosed(raw, UNKNOWN) }
 }
 enum class LoyaltyCommandOperation {
-    ADMIN_ADJUSTMENT, MATERIALIZE_EXPIRY, UNKNOWN;
+    ADMIN_ADJUSTMENT, MATERIALIZE_EXPIRY, CREATE_RESERVATION, CANCEL_RESERVATION, EXPIRE_RESERVATION, UNKNOWN;
     val wire: String get() = name
-    fun admits(realm: LoyaltyRealm): Boolean = when (this) {
-        ADMIN_ADJUSTMENT -> realm == LoyaltyRealm.USER
-        MATERIALIZE_EXPIRY -> realm == LoyaltyRealm.SYSTEM
+    fun admits(realm: LoyaltyRealm, aggregate: LoyaltyAggregateType): Boolean = when (this) {
+        ADMIN_ADJUSTMENT -> realm == LoyaltyRealm.USER && aggregate == LoyaltyAggregateType.WALLET
+        MATERIALIZE_EXPIRY -> realm == LoyaltyRealm.SYSTEM && aggregate == LoyaltyAggregateType.WALLET
+        CREATE_RESERVATION -> realm == LoyaltyRealm.CUSTOMER && aggregate == LoyaltyAggregateType.WALLET
+        CANCEL_RESERVATION -> realm == LoyaltyRealm.CUSTOMER && aggregate == LoyaltyAggregateType.RESERVATION
+        EXPIRE_RESERVATION -> realm == LoyaltyRealm.SYSTEM && aggregate == LoyaltyAggregateType.RESERVATION
         UNKNOWN -> false
     }
     companion object { fun fromWire(raw: String?): LoyaltyCommandOperation = persistenceClosed(raw, UNKNOWN) }
 }
 enum class LoyaltyAggregateType {
-    WALLET, UNKNOWN;
+    WALLET, RESERVATION, UNKNOWN;
     val wire: String get() = name
-    fun accepts(ref: String): Boolean = this == WALLET && ref.matches(Regex("[1-9][0-9]*")) && ref.toLongOrNull() != null
+    fun accepts(ref: String): Boolean = when (this) {
+        WALLET -> ref.matches(Regex("[1-9][0-9]*")) && ref.toLongOrNull() != null
+        RESERVATION -> runCatching { UUID.fromString(ref) }.getOrNull()?.let { it != UUID(0, 0) && it.toString() == ref } == true
+        UNKNOWN -> false
+    }
     companion object { fun fromWire(raw: String?): LoyaltyAggregateType = persistenceClosed(raw, UNKNOWN) }
 }
 enum class LoyaltyAllocationKind {
@@ -89,7 +96,7 @@ class LoyaltyCommandBinding private constructor(
         fun create(commandId: UUID, realm: LoyaltyRealm, actorId: Long, operation: LoyaltyCommandOperation,
                    aggregateType: LoyaltyAggregateType, aggregateRef: String, requestHash: LoyaltyFingerprint): LoyaltyCommandBinding? {
             if (commandId == UUID(0, 0) || realm == LoyaltyRealm.UNKNOWN || actorId <= 0 ||
-                !operation.admits(realm) || !aggregateType.accepts(aggregateRef)) return null
+                !operation.admits(realm, aggregateType) || !aggregateType.accepts(aggregateRef)) return null
             return LoyaltyCommandBinding(commandId, realm, actorId, operation, aggregateType, aggregateRef, requestHash)
         }
     }
