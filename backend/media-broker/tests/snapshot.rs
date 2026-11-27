@@ -3,7 +3,7 @@
     reason = "MAP_SHARED of the origin is attested only in tests"
 )]
 
-use rustix::mm::{mmap, msync, munmap, MapFlags, MsyncFlags, ProtFlags};
+use rustix::mm::{MapFlags, MsyncFlags, ProtFlags, mmap, msync, munmap};
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
@@ -200,7 +200,11 @@ fn mutate_held_source_via_mmap(source: &File, original_len: usize) {
     };
     // SAFETY: `mapping` is the live MAP_SHARED region of `original_len` bytes.
     unsafe {
-        ptr::copy_nonoverlapping(b"changed-media".as_ptr(), mapping.cast::<u8>(), original_len);
+        ptr::copy_nonoverlapping(
+            b"changed-media".as_ptr(),
+            mapping.cast::<u8>(),
+            original_len,
+        );
     }
     // SAFETY: `mapping` is still the region returned by `mmap` above.
     unsafe {

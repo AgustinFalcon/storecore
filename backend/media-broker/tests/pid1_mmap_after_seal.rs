@@ -4,21 +4,19 @@
     reason = "MAP_SHARED of the origin is attested only in tests"
 )]
 
-use rustix::mm::{mmap, msync, munmap, MapFlags, MsyncFlags, ProtFlags};
+use rustix::mm::{MapFlags, MsyncFlags, ProtFlags, mmap, msync, munmap};
 use sha2::{Digest, Sha256};
-use std::fs::{self, File, OpenOptions, Permissions};
+use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::os::fd::AsFd;
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::PathBuf;
 use std::ptr;
-use storecore_media_broker::budget::BudgetLimits;
 use storecore_media_broker::dbus::ZbusSystemd;
 use storecore_media_broker::runtime::ApprovedRuntime;
 use storecore_media_broker::snapshot::copy_snapshot;
-use storecore_media_broker::state::{Principal, Reservation};
-use storecore_media_broker::store::{AdmissionStatus, BrokerStore};
-use storecore_media_broker::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, TransientUnits};
+use storecore_media_broker::state::{JobId, Principal};
+use storecore_media_broker::systemd::{SystemdControl, TransientUnits};
 use storecore_media_broker::unit::{UnitKind, UnitState};
 
 #[test]
@@ -35,21 +33,11 @@ fn pid1_snapshot_survives_held_source_mmap_mutations() {
         0,
         "PID 1 harness must run as root"
     );
-    let (journal_root, mut store) = pid1_single_job_store("journal-4c-mmap-after-seal");
-    let principal = Principal::create(2101, 2101);
-    let allocated = store
-        .allocate(
-            [0x27; 16],
-            principal,
-            [0xb1; 16],
-            Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
-            1,
-        )
-        .expect("allocate");
+    fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
     let mut systemd = ZbusSystemd::connect_system().expect("system bus");
     let runtime = approved_pid1_runtime();
     let spec = TransientUnits::derive(
-        allocated.job_id(),
+        JobId::create([0x27; 16]).expect("job"),
         PathBuf::from("/run/storecore_media/jobs"),
         Principal::create(2102, 2102),
         &runtime,
@@ -61,7 +49,10 @@ fn pid1_snapshot_survives_held_source_mmap_mutations() {
     );
     let original = b"sealed-media";
     let digest: [u8; 32] = Sha256::digest(original).into();
-    let source = open_held_source(journal_root.join("source.bin"), original);
+    let source = open_held_source(
+        PathBuf::from("/run/storecore_media/mmap-origin.bin"),
+        original,
+    );
     let snapshot_path = spec.mount().where_path().join("snapshot.bin");
     let evidence = copy_snapshot(
         source.as_fd(),
@@ -79,13 +70,11 @@ fn pid1_snapshot_survives_held_source_mmap_mutations() {
         stopped_mount,
         UnitState::Inactive | UnitState::Failed
     ));
-    drop(store);
-    let _ = fs::remove_dir_all(&journal_root);
+    let _ = fs::remove_file("/run/storecore_media/mmap-origin.bin");
 }
 
 fn approved_pid1_runtime() -> ApprovedRuntime {
-    let java =
-        PathBuf::from(std::env::var("STORECORE_MEDIA_JAVA").expect("STORECORE_MEDIA_JAVA"));
+    let java = PathBuf::from(std::env::var("STORECORE_MEDIA_JAVA").expect("STORECORE_MEDIA_JAVA"));
     let jar = PathBuf::from(std::env::var("STORECORE_MEDIA_JAR").expect("STORECORE_MEDIA_JAR"));
     let java_digest = Sha256::digest(fs::read(&java).expect("java bytes")).into();
     let jar_digest = Sha256::digest(fs::read(&jar).expect("jar bytes")).into();
@@ -93,6 +82,7 @@ fn approved_pid1_runtime() -> ApprovedRuntime {
 }
 
 fn open_held_source(path: PathBuf, original: &[u8]) -> File {
+    let _ = fs::remove_file(&path);
     let mut source = OpenOptions::new()
         .read(true)
         .write(true)
@@ -124,7 +114,11 @@ fn mutate_held_source_via_mmap(source: &File, original_len: usize) {
     };
     // SAFETY: `mapping` is the live MAP_SHARED region of `original_len` bytes.
     unsafe {
-        ptr::copy_nonoverlapping(b"changed-media".as_ptr(), mapping.cast::<u8>(), original_len);
+        ptr::copy_nonoverlapping(
+            b"changed-media".as_ptr(),
+            mapping.cast::<u8>(),
+            original_len,
+        );
     }
     // SAFETY: `mapping` is still the region returned by `mmap` above.
     unsafe {
@@ -139,22 +133,4 @@ fn mutate_held_source_via_mmap(source: &File, original_len: usize) {
     unsafe {
         munmap(mapping, original_len).expect("munmap");
     }
-}
-
-fn pid1_single_job_store(journal_name: &str) -> (PathBuf, BrokerStore) {
-    fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
-    let journal_root = Path::new("/run/storecore_media").join(journal_name);
-    let _ = fs::remove_dir_all(&journal_root);
-    fs::create_dir(&journal_root).expect("journal root");
-    fs::set_permissions(&journal_root, Permissions::from_mode(0o700))
-        .expect("journal mode");
-    let owner = rustix::process::geteuid().as_raw();
-    let limits = BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
-        .expect("limits");
-    let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
-    assert_eq!(
-        store.finish_reconciliation(false),
-        Ok(AdmissionStatus::Open)
-    );
-    (journal_root, store)
 }
