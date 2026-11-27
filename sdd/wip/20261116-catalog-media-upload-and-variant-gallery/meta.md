@@ -135,8 +135,9 @@ terminales sin ACK (reserva completa, `JobLimit`, primer `.mount`
 Active); no cierra FD/mmap ni `Ready`. PR #428 (head `b800c65`, merge `a2cf84b`, Verify
 `45909048066` 7/7, dos gpt-5.6-sol-medium APPROVED) atesta el FD del
 origen tras el seal (overwrite/crecimiento/truncado); no cierra mmap
-ni `Ready`. El corte mmap `MAP_SHARED` del origen tras el seal está en
-implementación; no cierra reinicio ni `Ready`. PR #326
+ni `Ready`. PR #430 (head `695dee9`, merge `6e73d5a`, Verify
+`45916980019` 7/7, dos gpt-5.6-sol-medium APPROVED) atesta mmap
+`MAP_SHARED` del origen tras el seal; no cierra reinicio ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

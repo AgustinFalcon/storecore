@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #430, 003B-4C sigue abierto
+
+- Merge #430 `6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135` sobre candidato
+  `695dee9ddbccbe5743646820160ed174063cd7d3`. Verify exact-head
+  `45916980019` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261126-sol-pr430-architecture.md` y
+  `sdd/reviews/20261126-sol-pr430-security.md`.
+- El snapshot del tmpfs no cambia si un mmap `MAP_SHARED` del origen se
+  muta. No se marca `003B-4C`. No hay familia de sockets, reinicio,
+  `Ready` ni HTTP de media.
+
 ## 2026-11-26 — arranque 4C mmap del origen tras el seal
 
 - El harness mantiene un `mmap` `MAP_SHARED` del origen abierto y prueba
