@@ -34,6 +34,7 @@ class LoyaltyReservationPlannerTest {
         assertEquals(listOf(11L, 12L), reservation.allocations.map { it.lotId })
         assertEquals(listOf(400L, 200L), reservation.allocations.map { it.points.value })
         assertEquals(600, result.quote!!.requestedPoints.value)
+        assertEquals(0, result.materializedExpiryPoints.value)
         assertEquals(0, result.materializedLots.single { it.id == 11L }.free.value)
         assertEquals(200, result.materializedLots.single { it.id == 12L }.held.value)
     }
@@ -59,9 +60,22 @@ class LoyaltyReservationPlannerTest {
             listOf(due, future), listOf(item()), LoyaltyDiscountState.NONE, now)
         assertEquals(LoyaltyOutcome.INSUFFICIENT_BALANCE, result.outcome)
         assertNull(result.reservation)
+        assertEquals(1, result.nextWalletRevision!!.value)
+        assertEquals(100, result.materializedExpiryPoints.value)
         val expired = result.materializedLots.single { it.id == 11L }
         assertEquals(0, expired.free.value)
         assertEquals(100, expired.expired.value)
+    }
+
+    @Test fun `successful quote after due expiry advances one revision per independent effect`() {
+        val due = lot(11, now.minusSeconds(365L * 86_400), 100)
+        val future = lot(12, now.minusSeconds(100), 700)
+        val result = LoyaltyReservationPlanner.plan(command(requested = "600"), UUID.randomUUID(), 5, 7,
+            requireNotNull(LoyaltyRevision.fromWire("0")), LoyaltyPolicyId.V1,
+            listOf(due, future), listOf(item()), LoyaltyDiscountState.NONE, now)
+        assertEquals(LoyaltyOutcome.APPLIED, result.outcome)
+        assertEquals(2, result.nextWalletRevision!!.value)
+        assertEquals(100, result.materializedExpiryPoints.value)
     }
 
     @Test fun `revision exhaustion and stacking fail closed`() {
