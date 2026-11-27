@@ -12,6 +12,20 @@ no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C inventario Active inesperado PR #455
+
+`master bf41bf887e7a6b724bd6a88abd613821d4c32c75` integra PR #455. Su
+candidato exacto `58730de859f8418151e93fdbbcb2e66d047de36a` pasó Verify
+`46071306234` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261127-sol-pr455-architecture.md` y
+`sdd/reviews/20261127-sol-pr455-security.md`. Tras `Allocated` con
+unidades Active, reabrir el journal deja `RecoveryPending`; `reconcile`
+termina las unidades, cuarentena el job y mantiene la admisión cerrada.
+El corte no cierra `003B-4C`: faltan familia de sockets y `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No
+hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C inventario Active esperado PR #451
 
 `master f147256f8b66276b075c04a36e4ee84bf7490fc4` integra PR #451. Su

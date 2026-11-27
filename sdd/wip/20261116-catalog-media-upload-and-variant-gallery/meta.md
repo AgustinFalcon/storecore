@@ -151,9 +151,12 @@ tras `Quarantined` (latch de mismatch, admisión cerrada); no cubre
 inventario Active ni `Ready`. PR #451 (head `207f749`, merge `f147256`,
 Verify `46063548747` 7/7, dos grok-4.7-medium-fast APPROVED) atesta
 inventario Active esperado (`Running` → terminate verificado →
-`Terminal`); no cubre inventario Active inesperado ni `Ready`. El corte
-de inventario Active inesperado está en implementación; no cubre
-sockets ni `Ready`. PR #326
+`Terminal`); no cubre inventario Active inesperado ni `Ready`. PR #455
+(head `58730de`, merge `bf41bf8`, Verify `46071306234` 7/7, dos
+grok-4.7-medium-fast APPROVED) atesta inventario Active inesperado
+(`Allocated` → terminate + cuarentena + admisión cerrada); no cubre
+sockets ni `Ready`. El corte de familia de sockets está en
+implementación; no cubre `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
