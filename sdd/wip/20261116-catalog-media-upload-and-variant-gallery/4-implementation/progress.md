@@ -7,6 +7,18 @@
   detiene ambas unidades.
 - No se marca `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
 
+## 2026-11-27 — persist reviews PR #458, 003B-4C sigue abierto
+
+- Merge #458 `9ba69f7886b359b74cb28b940e6c3041ea81a711` sobre candidato
+  `5c03b5f7027c9d1ea68c2df4cc6d86a619167dda`. Verify exact-head
+  `46078357930` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr458-architecture.md` y
+  `sdd/reviews/20261127-sol-pr458-security.md`.
+- PID 1 no aplica `RestrictAddressFamilies` (vacío o `~`). No se marca
+  `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C inventario Active inesperado
 
 - Tras `Allocated` con `.mount` y worker Active, reabrir el journal deja

@@ -13,6 +13,19 @@ fuera. Este documento no cierra `003B-4C`. Sigue sin `CPUQuota` ni
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C RestrictAddressFamilies ausente PR #458
+
+`master 9ba69f7886b359b74cb28b940e6c3041ea81a711` integra PR #458. Su
+candidato exacto `5c03b5f7027c9d1ea68c2df4cc6d86a619167dda` pasó Verify
+`46078357930` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261127-sol-pr458-architecture.md` y
+`sdd/reviews/20261127-sol-pr458-security.md`. PID 1 no aplica
+`RestrictAddressFamilies` al worker derivado (valor efectivo vacío o
+`~`). El corte no cierra `003B-4C`: faltan `CPUQuota` y `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen abiertos. No
+hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C inventario Active inesperado PR #455
 
 `master bf41bf887e7a6b724bd6a88abd613821d4c32c75` integra PR #455. Su
