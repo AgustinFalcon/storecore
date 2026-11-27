@@ -8,6 +8,20 @@
 - No se marca `003B-4C`. Faltan familia de sockets, `Ready` y HTTP de
   media.
 
+## 2026-11-27 — persist reviews PR #455, 003B-4C sigue abierto
+
+- Merge #455 `bf41bf887e7a6b724bd6a88abd613821d4c32c75` sobre candidato
+  `58730de859f8418151e93fdbbcb2e66d047de36a`. Verify exact-head
+  `46071306234` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr455-architecture.md` y
+  `sdd/reviews/20261127-sol-pr455-security.md`.
+- Tras `Allocated` con unidades Active, reabrir el journal deja
+  `RecoveryPending`; `reconcile` termina, cuarentena el job y mantiene
+  la admisión cerrada. No se marca `003B-4C`. Faltan familia de sockets,
+  `Ready` y HTTP de media.
+
 ## 2026-11-27 — persist reviews PR #451, 003B-4C sigue abierto
 
 - Merge #451 `f147256f8b66276b075c04a36e4ee84bf7490fc4` sobre candidato
