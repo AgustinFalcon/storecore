@@ -9,11 +9,11 @@ The Kotlin persistence contract uses closed domain values and strict translators
 ## Exact review identity
 
 - Pull request: https://github.com/AgustinFalcon/storecore/pull/431
-- Merge-time base: `6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135`
+- Final exact-review base: `6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135`
 - Reviewed and merged head: `bac1699c4595e9834d6bdc9c424d05f760cc4732`
 - Architecture receipt: `sdd/reviews/20261126-sol-pr431-architecture.md`
 - Security receipt: `sdd/reviews/20261126-sol-pr431-security.md`
-- The persisted receipts record the amended implementation range through `a6d063c73985cf8149beb0b8b59c492a3e2d25fb`. After review receipts and the clean merge of the then-current `master`, both independent GPT-6.1 Sol medium lanes rechecked the exact merge-time base/head above. Each confirmed that the implementation diff was unchanged, the prior receipt-authority P2 remained closed and no P0-P3 finding remained.
+- The persisted receipts record the amended implementation range through `a6d063c73985cf8149beb0b8b59c492a3e2d25fb`. After review receipts and the clean merge of the then-current `master`, both independent GPT-6.1 Sol medium lanes rechecked the exact final-review base/head above. Each confirmed that the implementation diff was unchanged, the prior receipt-authority P2 remained closed and no P0-P3 finding remained.
 
 ## Verification evidence
 
@@ -28,6 +28,7 @@ The Kotlin persistence contract uses closed domain values and strict translators
 ## Merge evidence
 
 - Merge commit: `38cd39a48e840f2ad457aae8ac3a9ee4d892c59b`
+- Effective merge base / first parent: `1a68ab89072ae4c6b26616afba903fda8b3198b1`; the intervening commit was the documentation-only PR #432 and did not alter the reviewed loyalty implementation diff.
 - Merged at: `2026-11-27T01:34:08Z`.
 - Remote feature branch was deleted after merge.
 
