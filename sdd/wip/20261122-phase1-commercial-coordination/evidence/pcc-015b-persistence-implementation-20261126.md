@@ -59,5 +59,5 @@ The current installation capability keeps `LOYALTY` future-only and does not def
   - The first combined rerun correctly failed one stale schema expectation that still required zero exposed loyalty functions. The expectation was narrowed to the exact singleton `loyalty_admin_authorized`; the repeated domain, adapter, migration and architecture command then passed 53/53 with zero failures, errors or skips.
   - The six affected integration suites were repeated against the amended V41 and passed 95/95 with zero failures, errors or skips.
 - No Spring bean, controller, HTTP route, writer, capability promotion or runtime mutation grant was added.
-- Exact-head reviews: pending.
+- Exact-head reviews: independent GPT-6.1 Sol medium architecture and security lanes APPROVED base `800eae4fabc526ced302b6f50b7c14b06fe0729b` to head `a6d063c73985cf8149beb0b8b59c492a3e2d25fb`, with no P0-P3. Receipts are persisted in `sdd/reviews/20261126-sol-pr431-{architecture,security}.md`.
 - Hosted CI and merge: pending.
