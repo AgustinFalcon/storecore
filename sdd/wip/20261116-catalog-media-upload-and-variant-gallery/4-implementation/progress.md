@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #433, 003B-4C sigue abierto
+
+- Merge #433 `514b18337854b198686f3af91b8fc1c7ca1107d2` sobre candidato
+  `f54c78857a6c1dd8b2a39191872338bd5b383a26`. Verify exact-head
+  `45923481080` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261126-sol-pr433-architecture.md` y
+  `sdd/reviews/20261126-sol-pr433-security.md`.
+- Tras `Allocated`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades. No se marca `003B-4C`. Faltan reinicios del resto de
+  transiciones, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-26 — arranque 4C reinicio tras Allocated
 
 - Tras `Allocated`, reabrir el journal deja `RecoveryPending` y PID 1 no
