@@ -38,7 +38,7 @@ class LoyaltyReservationCommandMigrationTest {
 
     @Test fun `latest schema installs quote writer without runtime activation`() {
         val version = owner.queryForObject("SELECT max(version::int) FROM flyway_schema_history WHERE success", Int::class.java)
-        assertEquals(43, version)
+        assertEquals(44, version)
         val signature = "loyalty_quote_reservation(bigint,uuid,uuid,uuid,bigint,bigint,bigint,bigint,bigint,boolean,character varying)"
         assertFalse(owner.queryForObject("SELECT has_function_privilege('storecore_runtime',?,'EXECUTE')", Boolean::class.java, signature)!!)
         assertThrows(DataAccessException::class.java) { runtime.queryForObject(callSql, String::class.java,
@@ -222,7 +222,7 @@ class LoyaltyReservationCommandMigrationTest {
                 )!!
             }
             assertTrue(started.await(5, TimeUnit.SECONDS))
-            Thread.sleep(2_500)
+            awaitDatabaseReservationExpiry(reservation)
             lock.commit()
             assertTrue(expiry.get(20, TimeUnit.SECONDS).contains("APPLIED"))
         } finally {
@@ -511,7 +511,7 @@ class LoyaltyReservationCommandMigrationTest {
                 )!!
             }
             assertTrue(quoteStarted.await(5, TimeUnit.SECONDS))
-            Thread.sleep(2_500)
+            awaitDatabaseSessionExpiry(quoteSession)
             quoteLock.commit()
             val error = assertThrows(ExecutionException::class.java) { quote.get(20, TimeUnit.SECONDS) }
             assertTrue(error.cause is DataAccessException)
@@ -551,7 +551,7 @@ class LoyaltyReservationCommandMigrationTest {
                 )!!
             }
             assertTrue(cancelStarted.await(5, TimeUnit.SECONDS))
-            Thread.sleep(2_500)
+            awaitDatabaseSessionExpiry(cancelSession)
             cancelLock.commit()
             val error = assertThrows(ExecutionException::class.java) { cancel.get(20, TimeUnit.SECONDS) }
             assertTrue(error.cause is DataAccessException)
@@ -704,6 +704,26 @@ class LoyaltyReservationCommandMigrationTest {
     private fun customer(): Long = owner.queryForObject(
         "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Quote','Customer') RETURNING id",
         Long::class.java, "quote-${UUID.randomUUID()}@example.test", "${'$'}argon2id${'$'}fixture")!!
+    private fun awaitDatabaseReservationExpiry(reservation: UUID) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            if (owner.queryForObject("SELECT clock_timestamp() >= expires_at FROM loyalty_reservations WHERE id=?",
+                Boolean::class.java, reservation) == true) return
+            Thread.sleep(25)
+        }
+        fail<Unit>("PostgreSQL reservation did not expire while the wallet lock was held")
+    }
+
+    private fun awaitDatabaseSessionExpiry(session: UUID) {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            if (owner.queryForObject("""SELECT clock_timestamp() >= least(idle_expires_at,absolute_expires_at)
+                FROM identity_sessions WHERE id=?""", Boolean::class.java, session) == true) return
+            Thread.sleep(25)
+        }
+        fail<Unit>("PostgreSQL session did not expire while the wallet lock was held")
+    }
+
     private fun session(customer: Long, idleSeconds: Long = 3_600, absoluteSeconds: Long = 7_200): UUID = UUID.randomUUID().also { id -> owner.update(
         """INSERT INTO identity_sessions(id,subject_kind,customer_id,token_hash,issued_at,last_seen_at,idle_expires_at,absolute_expires_at)
             VALUES (?,'CUSTOMER',?,?,clock_timestamp(),clock_timestamp(),clock_timestamp()+(? * interval '1 second'),clock_timestamp()+(? * interval '1 second'))""",
@@ -733,7 +753,8 @@ class LoyaltyReservationCommandMigrationTest {
     ): UUID =
         TransactionTemplate(DataSourceTransactionManager(requireNotNull(owner.dataSource))).execute {
             val reservation = reservationId
-            val created = Instant.now().plusSeconds(expiresAfterSeconds - 900)
+            val created = owner.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
+                .plusSeconds(expiresAfterSeconds - 900)
                 .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
             val lot = lot(wallet, created.minusSeconds(60), 1_000)
             owner.update("""INSERT INTO loyalty_reservations(id,wallet_id,cart_revision,wallet_revision,points,created_at,expires_at)
