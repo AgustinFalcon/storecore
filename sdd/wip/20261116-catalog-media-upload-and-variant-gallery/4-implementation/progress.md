@@ -1,5 +1,25 @@
 # Progreso
 
+## 2026-11-26 — persist reviews PR #428, 003B-4C sigue abierto
+
+- Merge #428 `a2cf84bdea16f3620148e0edebe5c670329fe270` sobre candidato
+  `b800c659b315d76317374fb77fcf62dcf9bdd560`. Verify exact-head
+  `45909048066` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261126-sol-pr428-architecture.md` y
+  `sdd/reviews/20261126-sol-pr428-security.md`.
+- El snapshot del tmpfs no cambia si el FD del origen se muta. No se
+  marca `003B-4C`. No hay mmap, familia de sockets, `Ready` ni HTTP de
+  media.
+
+## 2026-11-26 — arranque 4C FD del origen tras el seal
+
+- `copy_snapshot` publica un inode nuevo. El harness PID 1 mantiene el
+  FD del origen abierto y prueba overwrite, crecimiento y truncado
+  sin alterar el snapshot del tmpfs.
+- No se marca `003B-4C`. No hay mmap, familia de sockets, `Ready` ni
+  HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #424, 003B-4C sigue abierto
 
 - Merge #424 `abfc24c1a623707e62014279eaa6f953b857c519` sobre candidato

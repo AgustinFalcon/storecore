@@ -2,13 +2,25 @@
 
 ## En implementación — 2026-11-26, 4C sigue abierto
 
-Siguiente corte: FD/mmap tras el seal y reinicio en cada transición
-durable. Terminales sin ACK, cuota global y RLIMIT del worker quedan
-atestados. `ProtectHome`, `RestrictAddressFamilies` y `CPUQuota`
-quedan fuera. Este documento no cierra `003B-4C`. Sigue sin familia
-de sockets, FD/mmap ni `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`,
-`003B-4`, TASK-005 y #7 siguen abiertos. Este corte no agrega HTTP de
-media.
+Siguiente corte: mmap del origen tras el seal y reinicio en cada
+transición durable. El FD del origen, terminales sin ACK, cuota
+global y RLIMIT quedan atestados. `ProtectHome`,
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento
+no cierra `003B-4C`. Sigue sin mmap, familia de sockets ni `Ready`.
+`003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7 siguen
+abiertos. Este corte no agrega HTTP de media.
+
+## Master vigente — 2026-11-26, 4C FD tras el seal PR #428
+
+`master a2cf84bdea16f3620148e0edebe5c670329fe270` integra PR #428. Su
+candidato exacto `b800c659b315d76317374fb77fcf62dcf9bdd560` pasó Verify
+`45909048066` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr428-architecture.md` y
+`sdd/reviews/20261126-sol-pr428-security.md`. El snapshot del tmpfs no
+cambia si el FD del origen se sobreescribe, crece o trunca. El corte
+no cierra `003B-4C`: no hay mmap, `CPUQuota`, familia de sockets ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C terminales sin ACK PR #424
 
