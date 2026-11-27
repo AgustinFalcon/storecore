@@ -3735,7 +3735,8 @@ mod tests {
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_allocated_job_with_active_units_is_quarantined_after_restart() {
         pid1_require_root();
-        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-unexpected-active");
+        let (journal_root, mut store) =
+            pid1_single_job_store("journal-4c-restart-unexpected-active");
         let principal = Principal::create(2101, 2101);
         let allocated = store
             .allocate(
