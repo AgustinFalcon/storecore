@@ -1,5 +1,19 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #446, 003B-4C sigue abierto
+
+- Merge #446 `0201151f98a57a272b62a1053b41c6187c3fe5de` sobre candidato
+  `8f220b36eea40a107a59999a5b4059cb562fcdb8`. Verify exact-head
+  `46050099421` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr446-architecture.md` y
+  `sdd/reviews/20261127-sol-pr446-security.md`.
+- Tras `Terminal`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades; `reconcile` deja el job en `Terminal` y reabre la
+  admisión. No se marca `003B-4C`. Faltan reinicios de `Quarantined` y el
+  resto, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Terminal
 
 - Tras `Terminal`, reabrir el journal deja `RecoveryPending` y PID 1 no

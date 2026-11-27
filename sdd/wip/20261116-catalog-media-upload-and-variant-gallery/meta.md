@@ -146,9 +146,15 @@ atesta reinicio tras `InputSealed`; no cubre `Starting` ni el resto de
 transiciones ni `Ready`. PR #438 (head `966f986`, merge `02ef551`,
 Verify `45944646863` 7/7, dos gpt-5.6-sol-medium APPROVED) atesta
 reinicio tras `Starting` (cuarentena con inventario ausente); no cubre
-`Running` ni el resto de transiciones ni `Ready`. El corte de reinicio
-tras `Terminal` está en implementación; no cubre `Quarantined` ni el
-resto ni `Ready`. PR #326
+`Running` ni el resto de transiciones ni `Ready`. PR #442 (head
+`f1e8178`, merge `e43c70c`, Verify `46024181508` 7/7) atesta reinicio
+tras `Terminating` (cuarentena con inventario ausente); no cubre
+`Terminal` ni el resto ni `Ready`. PR #446 (head `8f220b3`, merge
+`0201151`, Verify `46050099421` 7/7, dos grok-4.7-medium-fast APPROVED)
+atesta reinicio tras `Terminal` (inventario ausente deja el job y reabre
+admisión); no cubre `Quarantined` ni el resto ni `Ready`. El corte de
+reinicio tras `Quarantined` está en implementación; no cubre inventario
+Active ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
