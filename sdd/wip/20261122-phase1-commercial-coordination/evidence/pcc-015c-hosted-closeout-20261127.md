@@ -14,8 +14,11 @@ No Spring bean, HTTP route, timer, scheduler, checkout/order/payment binding, pr
 - Reviewed and merged head: `823447119ee7e6283bce500a4d2d7664916ed3af`
 - GPT-6.1 Sol medium correctness/architecture review: `APPROVE`, no P0-P3.
 - GPT-6.1 Sol medium security/concurrency review: `APPROVE`, no P0-P3.
+- Architecture/correctness receipt: `sdd/reviews/20261127-sol-pr443-architecture.md`.
+- Security receipt: `sdd/reviews/20261127-sol-pr443-security.md`.
 - Both reviewers inspected the cumulative `master...head` range read-only and reconciled their conclusions before the final verdict.
 - The prior review findings were not waived: each was reproduced by a failing test, corrected and re-reviewed at the exact final SHA.
+- The durable receipt files were omitted before merge and recovered retrospectively afterward. They explicitly preserve that process deviation rather than claiming the files existed at merge time.
 
 ## Verification evidence
 
