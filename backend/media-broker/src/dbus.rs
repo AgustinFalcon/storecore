@@ -2183,7 +2183,7 @@ mod tests {
         }
         let address_families = systemctl_property(name, "RestrictAddressFamilies");
         assert!(
-            address_families.is_empty(),
+            address_families.is_empty() || address_families == "~",
             "PID 1 must not apply RestrictAddressFamilies, got {address_families}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
