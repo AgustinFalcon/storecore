@@ -52,7 +52,10 @@ object LoyaltyReservationPlanner {
         if (expiryMagnitude > Long.MAX_VALUE.toBigInteger()) return rejected(LoyaltyOutcome.INVALID_DEFINITION)
         val expiredPoints = requireNotNull(LoyaltyPoints.fromWire(expiryMagnitude.toString()))
         val revisionAfterExpiry = if (expiredPoints.value == 0L) walletRevision else
-            walletRevision.next() ?: return rejected(LoyaltyOutcome.REVISION_EXHAUSTED)
+            walletRevision.next() ?: return rejected(
+                if (command.expectedWalletRevision == walletRevision) LoyaltyOutcome.REVISION_EXHAUSTED
+                else LoyaltyOutcome.REVISION_CONFLICT,
+            )
         val expiryRevision = revisionAfterExpiry.takeIf { expiredPoints.value > 0L }
         if (items.isEmpty() || items.map { it.itemId }.toSet().size != items.size ||
             items.any { it.policy != walletPolicy }) return rejected(LoyaltyOutcome.INELIGIBLE, materialized, expiredPoints, expiryRevision)
@@ -64,7 +67,10 @@ object LoyaltyReservationPlanner {
         }
         val available = materialized.fold(BigInteger.ZERO) { sum, lot -> sum + lot.free.value.toBigInteger() }
         if (available > Long.MAX_VALUE.toBigInteger()) return rejected(LoyaltyOutcome.INVALID_DEFINITION, materialized, expiredPoints, expiryRevision)
-        if (command.expectedWalletRevision != walletRevision && command.points.value.toBigInteger() <= available) {
+        if (command.points.value.toBigInteger() > available) {
+            return rejected(LoyaltyOutcome.INSUFFICIENT_BALANCE, materialized, expiredPoints, expiryRevision)
+        }
+        if (command.expectedWalletRevision != walletRevision) {
             return rejected(LoyaltyOutcome.REVISION_CONFLICT, materialized, expiredPoints, expiryRevision)
         }
         val quoteDecision = LoyaltyPolicyV1.quote(

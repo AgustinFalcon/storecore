@@ -103,4 +103,24 @@ class LoyaltyReservationPlannerTest {
             lots, listOf(item()), LoyaltyDiscountState.PRESENT, now)
         assertEquals(LoyaltyOutcome.STACKING_FORBIDDEN, stacked.outcome)
     }
+
+    @Test fun `insufficient serialized balance precedes stacking rejection like the writer`() {
+        val result = LoyaltyReservationPlanner.plan(command(requested = "600"), UUID.randomUUID(), 5, 7,
+            requireNotNull(LoyaltyRevision.fromWire("0")), LoyaltyPolicyId.V1,
+            listOf(lot(11, now.minusSeconds(100), 500)), listOf(item()), LoyaltyDiscountState.PRESENT, now)
+        assertEquals(LoyaltyOutcome.INSUFFICIENT_BALANCE, result.outcome)
+        assertNull(result.reservation)
+    }
+
+    @Test fun `stale revision precedes expiry exhaustion like the writer`() {
+        val due = lot(11, now.minusSeconds(365L * 86_400), 100)
+        val result = LoyaltyReservationPlanner.plan(
+            command(walletRevision = (Long.MAX_VALUE - 1).toString(), requested = "100"),
+            UUID.randomUUID(), 5, 7, requireNotNull(LoyaltyRevision.fromWire(Long.MAX_VALUE.toString())),
+            LoyaltyPolicyId.V1, listOf(due), listOf(item()), LoyaltyDiscountState.NONE, now)
+        assertEquals(LoyaltyOutcome.REVISION_CONFLICT, result.outcome)
+        assertEquals(0, result.materializedExpiryPoints.value)
+        assertEquals(100, result.materializedLots.single().free.value)
+        assertNull(result.nextWalletRevision)
+    }
 }
