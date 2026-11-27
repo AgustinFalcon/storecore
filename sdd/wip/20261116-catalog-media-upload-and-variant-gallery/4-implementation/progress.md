@@ -1,5 +1,17 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #436, 003B-4C sigue abierto
+
+- Merge #436 `9f39872daed57e838d97ed316ed97f383e0d6816` sobre candidato
+  `4038b5cd33bad11a60be587395b9c1732c28c971`. Verify exact-head
+  `45936651108` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr436-architecture.md` y
+  `sdd/reviews/20261127-sol-pr436-security.md`.
+- Tras `InputSealed`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades. No se marca `003B-4C`. Faltan reinicios de `Starting`
+  y el resto, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras InputSealed
 
 - Tras `InputSealed`, reabrir el journal deja `RecoveryPending` y PID 1
