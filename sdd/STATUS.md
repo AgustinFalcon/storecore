@@ -2,8 +2,8 @@
 
 ## En implementación — 2026-11-27, 4C sigue abierto
 
-Siguiente corte: reinicio tras `Starting` y el resto de transiciones
-durables. El reinicio tras `Allocated` e `InputSealed`, mmap, FD,
+Siguiente corte: reinicio tras `Running` y el resto de transiciones
+durables. El reinicio tras `Allocated`, `InputSealed` y `Starting`, mmap, FD,
 terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`,
 `RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento
 no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,

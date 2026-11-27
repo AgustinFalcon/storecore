@@ -377,7 +377,7 @@ mod tests {
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::snapshot::copy_snapshot;
     use crate::state::{JobId, JobRecord, JobState, Principal, Reservation};
-    use crate::store::{AdmissionStatus, BrokerStore, StoreError};
+    use crate::store::{AdmissionBlock, AdmissionStatus, BrokerStore, StoreError};
     use crate::systemd::{MOUNT_BYTES, MOUNT_INODES, SystemdControl, SystemdError, TransientUnits};
     use crate::unit::{UnitKind, UnitState};
     use sha2::{Digest, Sha256};
@@ -3223,6 +3223,104 @@ mod tests {
         assert_eq!(
             restored.record(job_id).expect("record").state(),
             JobState::InputSealed
+        );
+        drop(restored);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_starting_job_is_quarantined_after_restart_with_absent_units() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-starting");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x2c; 16],
+                principal,
+                [0xb4; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                sealed.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("starting");
+        let job_id = starting.job_id();
+        let owner = rustix::process::geteuid().as_raw();
+        drop(store);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        assert_eq!(
+            restored.allocate(
+                [0x2d; 16],
+                principal,
+                [0xb4; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                4,
+            ),
+            Err(StoreError::AdmissionClosed)
+        );
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let spec = TransientUnits::derive(
+            job_id,
+            PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2102, 2102),
+            &approved_pid1_runtime(),
+        )
+        .expect("spec");
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Worker, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        let mut adapter = Pid1AbsentUnits {
+            systemd: &mut systemd,
+            spec: &spec,
+        };
+        let report = reconcile(&mut restored, &mut adapter, 4).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::AdmissionBlocked);
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::Blocked(AdmissionBlock::ReconciliationMismatch)
+        );
+        assert_eq!(
+            restored.record(job_id).expect("record").state(),
+            JobState::Quarantined
         );
         drop(restored);
         let _ = fs::remove_dir_all(&journal_root);
