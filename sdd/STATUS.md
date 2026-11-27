@@ -10,6 +10,18 @@ sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-26, 4C mmap tras el seal PR #430
+
+`master 6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135` integra PR #430. Su
+candidato exacto `695dee9ddbccbe5743646820160ed174063cd7d3` pasó Verify
+`45916980019` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr430-architecture.md` y
+`sdd/reviews/20261126-sol-pr430-security.md`. El snapshot del tmpfs no
+cambia si un mmap `MAP_SHARED` del origen escribe, crece o trunca. El
+corte no cierra `003B-4C`: no hay familia de sockets, reinicio ni
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-26, 4C FD tras el seal PR #428
 
 `master a2cf84bdea16f3620148e0edebe5c670329fe270` integra PR #428. Su
