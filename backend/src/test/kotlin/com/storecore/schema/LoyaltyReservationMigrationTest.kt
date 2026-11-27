@@ -27,14 +27,14 @@ class LoyaltyReservationMigrationTest {
                     prior = transaction(jdbc) { issue(it) }
                     history = jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank")
                 }
-                assertEquals("42", flyway().migrate().targetSchemaVersion.toString())
+                assertEquals("42", flyway("42").migrate().targetSchemaVersion.toString())
                 assertEquals(history, jdbc.queryForList("SELECT version,script,checksum FROM flyway_schema_history ORDER BY installed_rank").take(history.size))
                 prior?.let { assertEquals(1000L, jdbc.queryForObject("SELECT free FROM loyalty_lot_partitions WHERE lot_id=?", Long::class.java, it.second)) }
                 assertTrue(jdbc.queryForObject("SELECT future_optional FROM capability_modules WHERE module_code='LOYALTY'", Boolean::class.java)!!)
                 assertEquals("DISABLED", jdbc.queryForObject("SELECT state FROM module_configurations WHERE module_code='LOYALTY'", String::class.java))
                 exercise(jdbc)
-                flyway().validate()
-                assertEquals(0, flyway().migrate().migrationsExecuted)
+                flyway("42").validate()
+                assertEquals(0, flyway("42").migrate().migrationsExecuted)
             }
         }
     }

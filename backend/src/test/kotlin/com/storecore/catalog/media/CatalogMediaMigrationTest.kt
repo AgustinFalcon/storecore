@@ -52,7 +52,7 @@ class CatalogMediaMigrationTest {
 
         val result = flyway(url).migrate()
 
-        assertEquals("42", result.targetSchemaVersion.toString())
+        assertEquals("43", result.targetSchemaVersion.toString())
         assertEquals(preserved, sql.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=26 ORDER BY installed_rank"))
         assertEquals(25, sql.queryForObject("SELECT count(*) FROM product_images WHERE product_id=?", Int::class.java, product))
         assertEquals((0 until 25).toList(), sql.queryForList("SELECT sort_order FROM product_images WHERE product_id=? ORDER BY sort_order", Int::class.java, product))

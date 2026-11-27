@@ -333,7 +333,7 @@ class MediaProductCreationPostgresTest {
         val v29 = flyway(url, "29"); assertEquals("29", v29.migrate().targetSchemaVersion.toString())
         val jdbc = JdbcTemplate(DriverManagerDataSource(url, postgres.username, postgres.password))
         val history = jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success ORDER BY installed_rank")
-        assertEquals("42", flyway(url).migrate().targetSchemaVersion.toString())
+        assertEquals("43", flyway(url).migrate().targetSchemaVersion.toString())
         assertEquals(history, jdbc.queryForList("SELECT version,checksum FROM flyway_schema_history WHERE success AND version::int<=29 ORDER BY installed_rank"))
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name='catalog_media_product_creation_commands'", Int::class.java))
         flyway(url).validate()
