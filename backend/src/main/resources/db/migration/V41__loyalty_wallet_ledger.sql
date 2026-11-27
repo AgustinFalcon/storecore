@@ -205,6 +205,15 @@ CREATE CONSTRAINT TRIGGER trg_loyalty_partition_closure AFTER INSERT OR UPDATE O
  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION loyalty_check_lot_closure();
 CREATE CONSTRAINT TRIGGER trg_loyalty_event_lot_closure AFTER INSERT ON loyalty_allocation_events
  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION loyalty_check_lot_closure();
+-- Private receipt recovery is allowed only for a currently live USER ADMIN
+-- session. The security-definer wrapper exposes one narrow boolean decision.
+CREATE FUNCTION loyalty_admin_authorized(actor BIGINT,live_session UUID) RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ PERFORM public.capability_assert_live_admin_session(actor,live_session);
+ RETURN TRUE;
+EXCEPTION WHEN raise_exception THEN RETURN FALSE;
+END $$;
 DO $$
 DECLARE evidence TEXT;
 BEGIN
@@ -220,3 +229,6 @@ REVOKE ALL ON SEQUENCE loyalty_wallets_id_seq,loyalty_ledger_id_seq,loyalty_lots
 GRANT ALL ON SEQUENCE loyalty_wallets_id_seq,loyalty_ledger_id_seq,loyalty_lots_id_seq TO storecore_migrator;
 REVOKE ALL ON FUNCTION loyalty_reject_evidence_mutation(),loyalty_protect_wallet(),loyalty_protect_partition(),loyalty_validate_evidence(),loyalty_check_ledger_closure(),loyalty_check_lot_closure() FROM PUBLIC,storecore_runtime;
 GRANT EXECUTE ON FUNCTION loyalty_reject_evidence_mutation(),loyalty_protect_wallet(),loyalty_protect_partition(),loyalty_validate_evidence(),loyalty_check_ledger_closure(),loyalty_check_lot_closure() TO storecore_migrator;
+ALTER FUNCTION loyalty_admin_authorized(BIGINT,UUID) OWNER TO storecore_migrator;
+REVOKE ALL ON FUNCTION loyalty_admin_authorized(BIGINT,UUID) FROM PUBLIC,storecore_runtime;
+GRANT EXECUTE ON FUNCTION loyalty_admin_authorized(BIGINT,UUID) TO storecore_runtime;

@@ -1,5 +1,6 @@
 package com.storecore.loyalty.application
 
+import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.loyalty.domain.*
 import java.time.Instant
 import java.util.UUID
@@ -43,8 +44,8 @@ object LoyaltyWalletTranslator {
 
 interface LoyaltyWalletRepository { fun findByCustomer(customerId: Long, now: Instant): LoyaltyWalletRead }
 interface LoyaltyCommandPort {
-    /** Adapter must enforce current actor authority before returning a private historical receipt. */
-    fun findReceipt(commandId: UUID, realm: LoyaltyRealm, actorId: Long): LoyaltyCommandReceipt?
+    /** Adapter must revalidate the supplied USER ADMIN session before returning private history. */
+    fun findReceipt(commandId: UUID, actor: InternalUserPrincipal): LoyaltyCommandReceipt?
 }
 fun interface LoyaltyClock { fun now(): Instant }
 fun interface LoyaltyIds { fun next(): UUID }

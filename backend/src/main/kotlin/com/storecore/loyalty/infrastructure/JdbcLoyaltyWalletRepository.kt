@@ -4,16 +4,22 @@ import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.storecore.identity.domain.InternalRole
+import com.storecore.identity.domain.InternalUserPrincipal
 import com.storecore.loyalty.application.*
 import com.storecore.loyalty.domain.*
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ResultSetExtractor
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.DateTimeException
 import java.time.Instant
 import java.util.UUID
 
 /** Explicitly constructed read-only adapter; no production capability or Spring registration. */
-class JdbcLoyaltyWalletRepository(private val jdbc: JdbcTemplate) : LoyaltyWalletRepository, LoyaltyCommandPort {
+class JdbcLoyaltyWalletRepository(
+    private val jdbc: JdbcTemplate,
+    private val transactions: TransactionTemplate,
+) : LoyaltyWalletRepository, LoyaltyCommandPort {
     private val snapshots = HistoricalLoyaltySnapshotDecoder()
 
     override fun findByCustomer(customerId: Long, now: Instant): LoyaltyWalletRead = jdbc.query(
@@ -40,24 +46,31 @@ class JdbcLoyaltyWalletRepository(private val jdbc: JdbcTemplate) : LoyaltyWalle
             LoyaltyWalletTranslator.fromWire(wallet, lots, now)
         }, customerId)!!
 
-    override fun findReceipt(commandId: UUID, realm: LoyaltyRealm, actorId: Long): LoyaltyCommandReceipt? = jdbc.query(
-        """SELECT b.command_id,b.realm,b.actor_id,b.operation,b.aggregate_type,b.aggregate_ref,b.request_hash,
-            r.outcome,r.original_http_status,r.before_snapshot::text,r.after_snapshot::text,r.recorded_at
-            FROM public.loyalty_command_bindings b JOIN public.loyalty_command_receipts r ON r.command_id=b.command_id
-            WHERE b.command_id=? AND b.realm=? AND b.actor_id=?""",
-        ResultSetExtractor<LoyaltyCommandReceipt?> { rs ->
-            if (!rs.next()) return@ResultSetExtractor null
-            val binding = LoyaltyCommandBinding.create(rs.getObject("command_id", UUID::class.java),
-                LoyaltyRealm.fromWire(rs.getString("realm")), rs.getLong("actor_id"),
-                LoyaltyCommandOperation.fromWire(rs.getString("operation")), LoyaltyAggregateType.fromWire(rs.getString("aggregate_type")),
-                rs.getString("aggregate_ref"), LoyaltyFingerprint.fromWire(rs.getString("request_hash")) ?: return@ResultSetExtractor null)
-                ?: return@ResultSetExtractor null
-            val recordedAt = rs.getTimestamp("recorded_at").toInstant()
-            val before = snapshots.decode(rs.getString("before_snapshot"), recordedAt) ?: return@ResultSetExtractor null
-            val after = snapshots.decode(rs.getString("after_snapshot"), recordedAt) ?: return@ResultSetExtractor null
-            LoyaltyCommandReceipt.create(binding, LoyaltyOutcome.fromWire(rs.getString("outcome")),
-                LoyaltyReceiptStatus.fromWire(rs.getInt("original_http_status")), before, after, recordedAt)
-        }, commandId, realm.wire, actorId)
+    override fun findReceipt(commandId: UUID, actor: InternalUserPrincipal): LoyaltyCommandReceipt? = transactions.execute {
+        if (InternalRole.ADMIN !in actor.roles || !authorized(actor)) return@execute null
+        val receipt = jdbc.query(
+            """SELECT b.command_id,b.realm,b.actor_id,b.operation,b.aggregate_type,b.aggregate_ref,b.request_hash,
+                r.outcome,r.original_http_status,r.before_snapshot::text,r.after_snapshot::text,r.recorded_at
+                FROM public.loyalty_command_bindings b JOIN public.loyalty_command_receipts r ON r.command_id=b.command_id
+                WHERE b.command_id=? AND b.realm='USER' AND b.actor_id=?""",
+            ResultSetExtractor<LoyaltyCommandReceipt?> { rs ->
+                if (!rs.next()) return@ResultSetExtractor null
+                val binding = LoyaltyCommandBinding.create(rs.getObject("command_id", UUID::class.java),
+                    LoyaltyRealm.fromWire(rs.getString("realm")), rs.getLong("actor_id"),
+                    LoyaltyCommandOperation.fromWire(rs.getString("operation")), LoyaltyAggregateType.fromWire(rs.getString("aggregate_type")),
+                    rs.getString("aggregate_ref"), LoyaltyFingerprint.fromWire(rs.getString("request_hash")) ?: return@ResultSetExtractor null)
+                    ?: return@ResultSetExtractor null
+                val recordedAt = rs.getTimestamp("recorded_at").toInstant()
+                val before = snapshots.decode(rs.getString("before_snapshot"), recordedAt) ?: return@ResultSetExtractor null
+                val after = snapshots.decode(rs.getString("after_snapshot"), recordedAt) ?: return@ResultSetExtractor null
+                LoyaltyCommandReceipt.create(binding, LoyaltyOutcome.fromWire(rs.getString("outcome")),
+                    LoyaltyReceiptStatus.fromWire(rs.getInt("original_http_status")), before, after, recordedAt)
+            }, commandId, actor.userId)
+        if (!authorized(actor)) null else receipt
+    }
+
+    private fun authorized(actor: InternalUserPrincipal): Boolean = jdbc.queryForObject(
+        "SELECT loyalty_admin_authorized(?,?)", Boolean::class.java, actor.userId, actor.sessionId) == true
 }
 
 /** Version 1 stores canonical wallet/lot evidence, so historical derived values use the same domain translator. */

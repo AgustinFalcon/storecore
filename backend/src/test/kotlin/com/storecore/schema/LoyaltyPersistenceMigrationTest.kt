@@ -112,7 +112,12 @@ class LoyaltyPersistenceMigrationTest {
             })
         }
         assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM information_schema.tables WHERE table_name LIKE 'loyalty_%' AND (table_name LIKE '%reservation%' OR table_name LIKE '%correction%' OR table_name LIKE '%recovery%')",Int::class.java))
-        assertEquals(0,jdbc.queryForObject("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname LIKE 'loyalty_%' AND (p.prosecdef OR has_function_privilege('storecore_runtime',p.oid,'EXECUTE'))",Int::class.java))
+        assertEquals(listOf("loyalty_admin_authorized"),jdbc.queryForList(
+            """SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+                WHERE n.nspname='public' AND p.proname LIKE 'loyalty_%'
+                  AND (p.prosecdef OR has_function_privilege('storecore_runtime',p.oid,'EXECUTE')) ORDER BY p.proname""",
+            String::class.java))
+        assertFalse(jdbc.queryForObject("SELECT has_function_privilege('public','loyalty_admin_authorized(bigint,uuid)','EXECUTE')",Boolean::class.java)!!)
     }
 
     @Test fun `deferred ledger closure admits exact split and rejects absent under and over allocations`() = database { jdbc ->

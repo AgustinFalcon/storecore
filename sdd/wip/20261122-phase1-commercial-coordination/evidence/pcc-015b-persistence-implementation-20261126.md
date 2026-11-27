@@ -48,9 +48,16 @@ The current installation capability keeps `LOYALTY` future-only and does not def
   - `ArchitectureBoundaryTest` passed 2/2 after the infrastructure adapter was added; domain and application remain free of framework/HTTP dependencies.
 - JDBC adapter RED/GREEN:
   - The absent adapter failed compilation, then an explicit TODO adapter produced 9 expected PostgreSQL errors.
-  - The read-only adapter passed 9 PostgreSQL tests as `storecore_runtime`: one-statement wallet/lot reads, fail-closed translation, exact-boundary expiry, no DML privileges, private realm/actor-bound receipt lookup and historical receipt replay.
+  - The read-only adapter initially passed 9 PostgreSQL tests as `storecore_runtime`: one-statement wallet/lot reads, fail-closed translation, exact-boundary expiry, no DML privileges, private receipt lookup and historical receipt replay.
   - Receipt snapshot JSON is schema version 1 with exact keys and canonical string magnitudes/IDs. The decoder reconstructs domain state through the same strict translator and never consults the current wallet for a historical result.
   - After deferred closure was added, adapter fixtures were made atomic and the final combined domain/migration/adapter command passed 50 tests with zero failures, errors or skips.
+- Exact-head review remediation RED/GREEN:
+  - The first security lane rejected the raw `(realm, actorId)` receipt lookup because it did not prove current authority. Tests were changed first to require a typed `InternalUserPrincipal`; compilation failed at the old port/constructor, recording RED.
+  - The port now accepts only `InternalUserPrincipal`. The adapter requires the closed `ADMIN` role and calls the narrow `loyalty_admin_authorized(userId, sessionId)` security-definer decision before and after reading/decoding private evidence in one transaction.
+  - Runtime can execute exactly that one loyalty authorization function; PUBLIC cannot. All other loyalty functions remain unavailable to runtime and all loyalty tables remain SELECT-only.
+  - The focused PostgreSQL adapter suite passed 10/10, including missing actor, wrong in-memory role, expired session, live role removal, user deactivation and session revocation.
+  - The first combined rerun correctly failed one stale schema expectation that still required zero exposed loyalty functions. The expectation was narrowed to the exact singleton `loyalty_admin_authorized`; the repeated domain, adapter, migration and architecture command then passed 53/53 with zero failures, errors or skips.
+  - The six affected integration suites were repeated against the amended V41 and passed 95/95 with zero failures, errors or skips.
 - No Spring bean, controller, HTTP route, writer, capability promotion or runtime mutation grant was added.
 - Exact-head reviews: pending.
 - Hosted CI and merge: pending.
