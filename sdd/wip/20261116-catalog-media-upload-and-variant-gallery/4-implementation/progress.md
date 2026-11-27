@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C reinicio tras Terminal
+
+- Tras `Terminal`, reabrir el journal deja `RecoveryPending` y PID 1 no
+  carga `.mount` ni worker. `reconcile` con inventario ausente deja el
+  job en `Terminal` y reabre la admisión.
+- No se marca `003B-4C`. Faltan reinicios de `Quarantined` y el resto,
+  familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Terminating
 
 - Tras `Terminating`, reabrir el journal deja `RecoveryPending` y PID 1
