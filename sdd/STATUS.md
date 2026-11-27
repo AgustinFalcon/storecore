@@ -10,6 +10,19 @@ no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-26, 4C reinicio tras Allocated PR #433
+
+`master 514b18337854b198686f3af91b8fc1c7ca1107d2` integra PR #433. Su
+candidato exacto `f54c78857a6c1dd8b2a39191872338bd5b383a26` pasó Verify
+`45923481080` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261126-sol-pr433-architecture.md` y
+`sdd/reviews/20261126-sol-pr433-security.md`. Tras `Allocated`, reabrir
+el journal deja `RecoveryPending`; PID 1 no carga unidades; `reconcile`
+con inventario ausente reabre admisión. El corte no cierra `003B-4C`:
+faltan reinicios del resto de transiciones, familia de sockets y
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-26, 4C mmap tras el seal PR #430
 
 `master 6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135` integra PR #430. Su
