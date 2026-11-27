@@ -1,5 +1,18 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #442, 003B-4C sigue abierto
+
+- Merge #442 `e43c70c61704fdecc3b68b11705fa5460af1c8d6` sobre candidato
+  `f1e8178d1cca1794491cfb09a524bbcc6fe932ea`. Verify exact-head
+  `46024181508` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr442-architecture.md` y
+  `sdd/reviews/20261127-sol-pr442-security.md`.
+- Tras `Terminating`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades; `reconcile` cuarentena y mantiene la admisión
+  cerrada. No se marca `003B-4C`. Faltan reinicios de `Terminal` y el
+  resto, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Terminating
 
 - Tras `Terminating`, reabrir el journal deja `RecoveryPending` y PID 1

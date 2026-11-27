@@ -11,6 +11,19 @@ no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C reinicio tras Terminating PR #442
+
+`master e43c70c61704fdecc3b68b11705fa5460af1c8d6` integra PR #442. Su
+candidato exacto `f1e8178d1cca1794491cfb09a524bbcc6fe932ea` pasó Verify
+`46024181508` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261127-sol-pr442-architecture.md` y
+`sdd/reviews/20261127-sol-pr442-security.md`. Tras `Terminating`, reabrir
+el journal deja `RecoveryPending`; PID 1 no carga unidades; `reconcile`
+con inventario ausente cuarentena el job y mantiene la admisión
+cerrada. El corte no cierra `003B-4C`: faltan reinicios de `Terminal`
+y el resto, familia de sockets y `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C reinicio tras Starting PR #438
 
 `master 02ef551c652c842673826a2fd400330e791cef44` integra PR #438. Su
