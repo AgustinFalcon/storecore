@@ -4380,10 +4380,7 @@ mod tests {
         job_id: JobId,
         now_ms: u64,
     ) {
-        assert_eq!(
-            systemd.attest(UnitKind::Mount, spec),
-            Ok(UnitState::Active)
-        );
+        assert_eq!(systemd.attest(UnitKind::Mount, spec), Ok(UnitState::Active));
         assert_eq!(
             systemd.attest(UnitKind::Worker, spec),
             Ok(UnitState::Active)
@@ -4424,10 +4421,9 @@ mod tests {
                 self.systemd.attest(UnitKind::Mount, self.spec),
                 self.systemd.attest(UnitKind::Worker, self.spec),
             ) {
-                (Ok(UnitState::Active), Ok(UnitState::Active)) => Ok(vec![ObservedJob::create(
-                    self.job_id,
-                    RuntimeState::Active,
-                )]),
+                (Ok(UnitState::Active), Ok(UnitState::Active)) => {
+                    Ok(vec![ObservedJob::create(self.job_id, RuntimeState::Active)])
+                }
                 _ => Err(AdapterError::Unavailable),
             }
         }
