@@ -143,8 +143,12 @@ gpt-5.6-sol-medium APPROVED) atesta reinicio tras `Allocated`; no cubre
 el resto de transiciones ni `Ready`. PR #436 (head `4038b5c`, merge
 `9f39872`, Verify `45936651108` 7/7, dos gpt-5.6-sol-medium APPROVED)
 atesta reinicio tras `InputSealed`; no cubre `Starting` ni el resto de
-transiciones ni `Ready`. El corte de reinicio tras `Starting` está en
-implementación; no cubre `Running` ni el resto ni `Ready`. PR #326
+transiciones ni `Ready`. PR #438 (head `966f986`, merge `02ef551`,
+Verify `45944646863` 7/7, dos gpt-5.6-sol-medium APPROVED) atesta
+reinicio tras `Starting` (cuarentena con inventario ausente); no cubre
+`Running` ni el resto de transiciones ni `Ready`. El corte de reinicio
+tras `Running` está en implementación; no cubre `Terminating` ni el
+resto ni `Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
