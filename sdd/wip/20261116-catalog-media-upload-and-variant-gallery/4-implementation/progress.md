@@ -1,5 +1,19 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #448, 003B-4C sigue abierto
+
+- Merge #448 `69a8d53da972c5485eed44aa1c74e0c8f0a5e6b2` sobre candidato
+  `db8182e134ccf4b9accba0f25021c22bc4e45925`. Verify exact-head
+  `46054038347` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr448-architecture.md` y
+  `sdd/reviews/20261127-sol-pr448-security.md`.
+- Tras `Quarantined`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades; `reconcile` mantiene el job cuarentenado y la admisión
+  cerrada. No se marca `003B-4C`. Faltan inventario Active esperado,
+  familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Quarantined
 
 - Tras `Quarantined`, reabrir el journal deja `RecoveryPending` y PID 1
