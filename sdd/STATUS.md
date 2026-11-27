@@ -1,6 +1,6 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-26, 4C sigue abierto
+## En implementación — 2026-11-27, 4C sigue abierto
 
 Siguiente corte: reinicio tras `Starting` y el resto de transiciones
 durables. El reinicio tras `Allocated` e `InputSealed`, mmap, FD,
@@ -9,6 +9,19 @@ terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`,
 no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
+
+## Master vigente — 2026-11-27, 4C reinicio tras InputSealed PR #436
+
+`master 9f39872daed57e838d97ed316ed97f383e0d6816` integra PR #436. Su
+candidato exacto `4038b5cd33bad11a60be587395b9c1732c28c971` pasó Verify
+`45936651108` 7/7. Dos reviews independientes gpt-5.6-sol-medium
+aprobaron sin P0–P3: `sdd/reviews/20261127-sol-pr436-architecture.md` y
+`sdd/reviews/20261127-sol-pr436-security.md`. Tras `InputSealed`, reabrir
+el journal deja `RecoveryPending`; PID 1 no carga unidades; `reconcile`
+con inventario ausente reabre admisión. El corte no cierra `003B-4C`:
+faltan reinicios de `Starting` y el resto, familia de sockets y
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`, TASK-005 y #7 siguen
+abiertos. No hay HTTP de media.
 
 ## Master vigente — 2026-11-26, 4C reinicio tras Allocated PR #433
 
