@@ -67,6 +67,19 @@ class LoyaltyReservationPlannerTest {
         assertEquals(100, expired.expired.value)
     }
 
+    @Test fun `stale revision still materializes due expiry before serialized balance rejection`() {
+        val due = lot(11, now.minusSeconds(365L * 86_400), 100)
+        val future = lot(12, now.minusSeconds(100), 500)
+        val result = LoyaltyReservationPlanner.plan(command(walletRevision = "0", requested = "600"), UUID.randomUUID(), 5, 7,
+            requireNotNull(LoyaltyRevision.fromWire("1")), LoyaltyPolicyId.V1,
+            listOf(due, future), listOf(item()), LoyaltyDiscountState.NONE, now)
+        assertEquals(LoyaltyOutcome.INSUFFICIENT_BALANCE, result.outcome)
+        assertNull(result.reservation)
+        assertEquals(2, result.nextWalletRevision!!.value)
+        assertEquals(100, result.materializedExpiryPoints.value)
+        assertEquals(100, result.materializedLots.single { it.id == 11L }.expired.value)
+    }
+
     @Test fun `successful quote after due expiry advances one revision per independent effect`() {
         val due = lot(11, now.minusSeconds(365L * 86_400), 100)
         val future = lot(12, now.minusSeconds(100), 700)
@@ -76,6 +89,7 @@ class LoyaltyReservationPlannerTest {
         assertEquals(LoyaltyOutcome.APPLIED, result.outcome)
         assertEquals(2, result.nextWalletRevision!!.value)
         assertEquals(100, result.materializedExpiryPoints.value)
+        assertEquals(1, result.reservation!!.walletRevision.value)
     }
 
     @Test fun `revision exhaustion and stacking fail closed`() {

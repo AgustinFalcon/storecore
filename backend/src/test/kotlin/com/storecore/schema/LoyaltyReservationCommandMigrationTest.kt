@@ -568,6 +568,67 @@ class LoyaltyReservationCommandMigrationTest {
         assertEquals(0, owner.queryForObject("SELECT count(*) FROM loyalty_command_bindings WHERE command_id=?", Int::class.java, cancelCommand))
     }
 
+    @Test fun `loyalty command follows customer before session identity lock order`() {
+        val customer = customer()
+        val session = session(customer)
+        val wallet = wallet(customer)
+        lot(wallet, Instant.parse("2026-02-01T00:00:00Z"), 1_000)
+        val command = UUID.randomUUID()
+        val reservation = UUID.randomUUID()
+        val identityMutation = requireNotNull(owner.dataSource).connection
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            identityMutation.autoCommit = false
+            identityMutation.prepareStatement("SELECT id FROM customers WHERE id=? FOR UPDATE").use { statement ->
+                statement.setLong(1, customer)
+                statement.executeQuery().use { assertTrue(it.next()) }
+            }
+            val quote = executor.submit<String> {
+                owner.queryForObject(
+                    callSql,
+                    String::class.java,
+                    customer,
+                    session,
+                    command,
+                    reservation,
+                    wallet,
+                    1L,
+                    0L,
+                    100L,
+                    1_000_000L,
+                    false,
+                    "4".repeat(64)
+                )!!
+            }
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            var waitingOnCustomer = false
+            while (System.nanoTime() < deadline && !waitingOnCustomer) {
+                waitingOnCustomer = owner.queryForObject(
+                    """SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+                        WHERE query LIKE 'SELECT loyalty_quote_reservation%' AND wait_event_type='Lock')""",
+                    Boolean::class.java
+                )!!
+                if (!waitingOnCustomer) Thread.sleep(50)
+            }
+            assertTrue(waitingOnCustomer)
+            identityMutation.prepareStatement("SELECT id FROM identity_sessions WHERE id=? FOR UPDATE").use { statement ->
+                statement.setObject(1, session)
+                statement.executeQuery().use { assertTrue(it.next()) }
+            }
+            identityMutation.commit()
+            assertTrue(quote.get(20, TimeUnit.SECONDS).contains("APPLIED"))
+        } finally {
+            if (!identityMutation.autoCommit) identityMutation.rollback()
+            identityMutation.close()
+            executor.shutdownNow()
+        }
+        assertEquals(1, owner.queryForObject(
+            "SELECT count(*) FROM loyalty_command_receipts WHERE command_id=?",
+            Int::class.java,
+            command
+        ))
+    }
+
     @Test fun `concurrent identical system expiry returns one exact replay`() {
         val customer = customer()
         val wallet = wallet(customer)

@@ -40,7 +40,6 @@ object LoyaltyReservationPlanner {
             return rejected(LoyaltyOutcome.INVALID_DEFINITION)
         }
         if (walletPolicy != LoyaltyPolicyId.V1) return rejected(LoyaltyOutcome.POLICY_MISMATCH)
-        if (command.expectedWalletRevision != walletRevision) return rejected(LoyaltyOutcome.REVISION_CONFLICT)
         val expiry = LoyaltyLotAllocator.expire(lots, now)
         if (expiry.outcome != LoyaltyOutcome.APPLIED) return rejected(expiry.outcome)
         val materialized = expiry.lots
@@ -65,6 +64,9 @@ object LoyaltyReservationPlanner {
         }
         val available = materialized.fold(BigInteger.ZERO) { sum, lot -> sum + lot.free.value.toBigInteger() }
         if (available > Long.MAX_VALUE.toBigInteger()) return rejected(LoyaltyOutcome.INVALID_DEFINITION, materialized, expiredPoints, expiryRevision)
+        if (command.expectedWalletRevision != walletRevision && command.points.value.toBigInteger() <= available) {
+            return rejected(LoyaltyOutcome.REVISION_CONFLICT, materialized, expiredPoints, expiryRevision)
+        }
         val quoteDecision = LoyaltyPolicyV1.quote(
             requireNotNull(LoyaltyPoints.fromWire(available.toString())),
             requireNotNull(LoyaltyMinorUnits.fromWire(eligibleMinor.toString())),
@@ -83,7 +85,7 @@ object LoyaltyReservationPlanner {
                 ?: return rejected(LoyaltyOutcome.INVALID_DEFINITION, materialized, expiredPoints, expiryRevision)
         }
         val aggregate = LoyaltyReservationAggregate.create(
-            reservationId, walletId, walletCustomerId, command.cartRevision, walletRevision,
+            reservationId, walletId, walletCustomerId, command.cartRevision, revisionAfterExpiry,
             requireNotNull(LoyaltyRevision.fromWire("0")), walletPolicy, LoyaltyReservationState.QUOTED,
             command.points, window, allocations, now,
         ) ?: return rejected(LoyaltyOutcome.INVALID_DEFINITION, materialized, expiredPoints, expiryRevision)

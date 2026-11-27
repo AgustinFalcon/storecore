@@ -58,11 +58,11 @@ CREATE TRIGGER trg_loyalty_immutable_truncate BEFORE TRUNCATE ON loyalty_reserva
 CREATE FUNCTION loyalty_assert_live_customer_session(p_actor BIGINT,p_session UUID) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
+ PERFORM 1 FROM public.customers c WHERE c.id=p_actor AND c.active FOR UPDATE;
+ IF NOT FOUND THEN RAISE EXCEPTION 'LOYALTY_ACTOR_NOT_AUTHORIZED' USING ERRCODE='42501'; END IF;
  PERFORM 1 FROM public.identity_sessions s WHERE s.id=p_session AND s.subject_kind='CUSTOMER'
   AND s.customer_id=p_actor AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp()
   AND s.absolute_expires_at>clock_timestamp() FOR UPDATE;
- IF NOT FOUND THEN RAISE EXCEPTION 'LOYALTY_ACTOR_NOT_AUTHORIZED' USING ERRCODE='42501'; END IF;
- PERFORM 1 FROM public.customers c WHERE c.id=p_actor AND c.active FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'LOYALTY_ACTOR_NOT_AUTHORIZED' USING ERRCODE='42501'; END IF;
  PERFORM 1 FROM public.identity_sessions s WHERE s.id=p_session AND s.subject_kind='CUSTOMER'
   AND s.customer_id=p_actor AND s.revoked_at IS NULL AND s.idle_expires_at>clock_timestamp()
