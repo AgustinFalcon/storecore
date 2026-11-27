@@ -14,6 +14,7 @@ import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -433,16 +434,219 @@ class LoyaltyReservationCommandMigrationTest {
         assertEquals(0, owner.queryForObject("SELECT count(*) FROM loyalty_reservations WHERE id=?", Int::class.java, reservation))
     }
 
+    @Test fun `mandatory nullable writer inputs are rejected without evidence`() {
+        val customer = customer()
+        val session = session(customer)
+        val wallet = wallet(customer)
+        lot(wallet, Instant.parse("2026-02-01T00:00:00Z"), 1_000)
+        val attemptedCommands = mutableListOf<UUID>()
+        val attemptedReservations = mutableListOf<UUID>()
+        for (nullIndex in listOf(6, 8, 9)) {
+            val command = UUID.randomUUID()
+            val reservation = UUID.randomUUID()
+            attemptedCommands += command
+            attemptedReservations += reservation
+            val args = arrayOf<Any?>(
+                customer, session, command, reservation, wallet, 1L, 0L, 100L, 1_000_000L, false, "a".repeat(64)
+            )
+            args[nullIndex] = null
+            assertThrows(DataAccessException::class.java) {
+                owner.queryForObject(callSql, String::class.java, *args)
+            }
+        }
+        val terminalCommand = UUID.randomUUID()
+        attemptedCommands += terminalCommand
+        val historical = historicalQuotedReservation(wallet, 100)
+        assertThrows(DataAccessException::class.java) {
+            owner.queryForObject(expireSql, String::class.java, terminalCommand, historical, null, "b".repeat(64))
+        }
+        attemptedCommands.forEach { command ->
+            assertEquals(0, owner.queryForObject(
+                "SELECT count(*) FROM loyalty_command_bindings WHERE command_id=?",
+                Int::class.java,
+                command
+            ))
+        }
+        attemptedReservations.forEach { reservation ->
+            assertEquals(0, owner.queryForObject(
+                "SELECT count(*) FROM loyalty_reservations WHERE id=?",
+                Int::class.java,
+                reservation
+            ))
+        }
+    }
+
+    @Test fun `customer authority is revalidated after wallet lock wait`() {
+        val quoteCustomer = customer()
+        val quoteSession = session(quoteCustomer, idleSeconds = 2, absoluteSeconds = 3)
+        val quoteWallet = wallet(quoteCustomer)
+        lot(quoteWallet, Instant.parse("2026-02-01T00:00:00Z"), 1_000)
+        val quoteCommand = UUID.randomUUID()
+        val quoteReservation = UUID.randomUUID()
+        val quoteLock = requireNotNull(owner.dataSource).connection
+        val quoteStarted = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            quoteLock.autoCommit = false
+            quoteLock.prepareStatement("SELECT id FROM loyalty_wallets WHERE id=? FOR UPDATE").use { statement ->
+                statement.setLong(1, quoteWallet)
+                statement.executeQuery().use { assertTrue(it.next()) }
+            }
+            val quote = executor.submit<String> {
+                quoteStarted.countDown()
+                owner.queryForObject(
+                    callSql,
+                    String::class.java,
+                    quoteCustomer,
+                    quoteSession,
+                    quoteCommand,
+                    quoteReservation,
+                    quoteWallet,
+                    1L,
+                    0L,
+                    100L,
+                    1_000_000L,
+                    false,
+                    "c".repeat(64)
+                )!!
+            }
+            assertTrue(quoteStarted.await(5, TimeUnit.SECONDS))
+            Thread.sleep(2_500)
+            quoteLock.commit()
+            val error = assertThrows(ExecutionException::class.java) { quote.get(20, TimeUnit.SECONDS) }
+            assertTrue(error.cause is DataAccessException)
+        } finally {
+            if (!quoteLock.autoCommit) quoteLock.rollback()
+            quoteLock.close()
+            executor.shutdownNow()
+        }
+        assertEquals(0, owner.queryForObject("SELECT count(*) FROM loyalty_command_bindings WHERE command_id=?", Int::class.java, quoteCommand))
+        assertEquals(0, owner.queryForObject("SELECT count(*) FROM loyalty_reservations WHERE id=?", Int::class.java, quoteReservation))
+
+        val cancelCustomer = customer()
+        val cancelSession = session(cancelCustomer, idleSeconds = 2, absoluteSeconds = 3)
+        val cancelWallet = wallet(cancelCustomer)
+        val cancelReservation = historicalQuotedReservation(cancelWallet, 600, expiresAfterSeconds = 60)
+        val cancelCommand = UUID.randomUUID()
+        val cancelLock = requireNotNull(owner.dataSource).connection
+        val cancelStarted = CountDownLatch(1)
+        val cancelExecutor = Executors.newSingleThreadExecutor()
+        try {
+            cancelLock.autoCommit = false
+            cancelLock.prepareStatement("SELECT id FROM loyalty_wallets WHERE id=? FOR UPDATE").use { statement ->
+                statement.setLong(1, cancelWallet)
+                statement.executeQuery().use { assertTrue(it.next()) }
+            }
+            val cancel = cancelExecutor.submit<String> {
+                cancelStarted.countDown()
+                owner.queryForObject(
+                    cancelSql,
+                    String::class.java,
+                    cancelCustomer,
+                    cancelSession,
+                    cancelCommand,
+                    cancelReservation,
+                    0L,
+                    "d".repeat(64)
+                )!!
+            }
+            assertTrue(cancelStarted.await(5, TimeUnit.SECONDS))
+            Thread.sleep(2_500)
+            cancelLock.commit()
+            val error = assertThrows(ExecutionException::class.java) { cancel.get(20, TimeUnit.SECONDS) }
+            assertTrue(error.cause is DataAccessException)
+        } finally {
+            if (!cancelLock.autoCommit) cancelLock.rollback()
+            cancelLock.close()
+            cancelExecutor.shutdownNow()
+        }
+        assertEquals("QUOTED", owner.queryForObject(
+            "SELECT state FROM loyalty_reservation_states WHERE reservation_id=?",
+            String::class.java,
+            cancelReservation
+        ))
+        assertEquals(0, owner.queryForObject("SELECT count(*) FROM loyalty_command_bindings WHERE command_id=?", Int::class.java, cancelCommand))
+    }
+
+    @Test fun `concurrent identical system expiry returns one exact replay`() {
+        val customer = customer()
+        val wallet = wallet(customer)
+        val reservation = historicalQuotedReservation(wallet, 600)
+        val command = UUID.randomUUID()
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val calls = (1..2).map {
+                executor.submit<String> {
+                    start.await(5, TimeUnit.SECONDS)
+                    owner.queryForObject(expireSql, String::class.java, command, reservation, 0L, "e".repeat(64))!!
+                }
+            }
+            start.countDown()
+            val results = calls.map { it.get(20, TimeUnit.SECONDS) }
+            assertEquals(results.first(), results.last())
+            assertTrue(results.first().contains("APPLIED"))
+        } finally {
+            executor.shutdownNow()
+        }
+        assertEquals(1, owner.queryForObject("SELECT count(*) FROM loyalty_command_receipts WHERE command_id=?", Int::class.java, command))
+        assertEquals(1, owner.queryForObject("SELECT count(*) FROM loyalty_audit WHERE command_id=?", Int::class.java, command))
+    }
+
+    @Test fun `uuid v7 reservations can be quoted cancelled and explicitly expired`() {
+        val customer = customer()
+        val session = session(customer)
+        val wallet = wallet(customer)
+        lot(wallet, Instant.parse("2026-02-01T00:00:00Z"), 1_000)
+        val cancellable = UUID.fromString("0193bb00-0000-7000-8000-000000000001")
+        assertTrue(owner.queryForObject(
+            callSql,
+            String::class.java,
+            customer,
+            session,
+            UUID.randomUUID(),
+            cancellable,
+            wallet,
+            1L,
+            0L,
+            100L,
+            1_000_000L,
+            false,
+            "f".repeat(64)
+        )!!.contains("APPLIED"))
+        assertTrue(owner.queryForObject(
+            cancelSql,
+            String::class.java,
+            customer,
+            session,
+            UUID.randomUUID(),
+            cancellable,
+            0L,
+            "0".repeat(64)
+        )!!.contains("APPLIED"))
+
+        val expirable = UUID.fromString("0193bb00-0000-7000-8000-000000000002")
+        historicalQuotedReservation(wallet, 100, reservationId = expirable)
+        assertTrue(owner.queryForObject(
+            expireSql,
+            String::class.java,
+            UUID.randomUUID(),
+            expirable,
+            0L,
+            "1".repeat(64)
+        )!!.contains("APPLIED"))
+    }
+
     private val callSql = "SELECT loyalty_quote_reservation(?,?,?,?,?,?,?,?,?,?,?)::text"
     private val cancelSql = "SELECT loyalty_cancel_reservation(?,?,?,?,?,?)::text"
     private val expireSql = "SELECT loyalty_expire_reservation(?,?,?,?)::text"
     private fun customer(): Long = owner.queryForObject(
         "INSERT INTO customers(email,password_hash,first_name,last_name) VALUES (?,?,'Quote','Customer') RETURNING id",
         Long::class.java, "quote-${UUID.randomUUID()}@example.test", "${'$'}argon2id${'$'}fixture")!!
-    private fun session(customer: Long): UUID = UUID.randomUUID().also { id -> owner.update(
+    private fun session(customer: Long, idleSeconds: Long = 3_600, absoluteSeconds: Long = 7_200): UUID = UUID.randomUUID().also { id -> owner.update(
         """INSERT INTO identity_sessions(id,subject_kind,customer_id,token_hash,issued_at,last_seen_at,idle_expires_at,absolute_expires_at)
-            VALUES (?,'CUSTOMER',?,?,clock_timestamp(),clock_timestamp(),clock_timestamp()+interval '1 hour',clock_timestamp()+interval '2 hours')""",
-        id, customer, UUID.randomUUID().toString().replace("-", "").repeat(2)) }
+            VALUES (?,'CUSTOMER',?,?,clock_timestamp(),clock_timestamp(),clock_timestamp()+(? * interval '1 second'),clock_timestamp()+(? * interval '1 second'))""",
+        id, customer, UUID.randomUUID().toString().replace("-", "").repeat(2), idleSeconds, absoluteSeconds) }
     private fun wallet(customer: Long): Long = owner.queryForObject(
         "INSERT INTO loyalty_wallets(customer_id) VALUES (?) RETURNING id", Long::class.java, customer)!!
     private fun lot(wallet: Long, accepted: Instant, issued: Long): Long =
@@ -463,10 +667,11 @@ class LoyaltyReservationCommandMigrationTest {
     private fun historicalQuotedReservation(
         wallet: Long,
         points: Long,
-        expiresAfterSeconds: Long = -1
+        expiresAfterSeconds: Long = -1,
+        reservationId: UUID = UUID.randomUUID()
     ): UUID =
         TransactionTemplate(DataSourceTransactionManager(requireNotNull(owner.dataSource))).execute {
-            val reservation = UUID.randomUUID()
+            val reservation = reservationId
             val created = Instant.now().plusSeconds(expiresAfterSeconds - 900)
                 .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
             val lot = lot(wallet, created.minusSeconds(60), 1_000)

@@ -49,8 +49,9 @@ class LoyaltyReservationAggregate private constructor(
             if (id == UUID(0, 0) || walletId <= 0 || customerId <= 0 || policy != LoyaltyPolicyId.V1 ||
                 points.value == 0L || now.nano != 0 || window.createdAt > now) return null
             when (state) {
-                LoyaltyReservationState.QUOTED, LoyaltyReservationState.RELEASED -> Unit
-                LoyaltyReservationState.EXPIRED -> if (now < window.expiresAt) return null
+                LoyaltyReservationState.QUOTED -> if (revision.value != 0L) return null
+                LoyaltyReservationState.RELEASED -> if (revision.value != 1L) return null
+                LoyaltyReservationState.EXPIRED -> if (revision.value != 1L || now < window.expiresAt) return null
                 else -> return null
             }
             if (allocations.isEmpty() || allocations.map { it.lotId }.toSet().size != allocations.size ||

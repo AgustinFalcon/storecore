@@ -67,7 +67,7 @@ class LoyaltyReservationTranslatorTest {
             unavailable(read(row.copy(walletRevision = value)))
             unavailable(read(row.copy(revision = value)))
         }
-        assertTrue(read(row.copy(revision = Long.MAX_VALUE.toString())) is LoyaltyReservationRead.Available)
+        unavailable(read(row.copy(revision = Long.MAX_VALUE.toString())))
     }
 
     @Test fun `reservation window requires whole seconds exact TTL and nonfuture creation`() {
@@ -109,11 +109,13 @@ class LoyaltyReservationTranslatorTest {
     }
 
     @Test fun `only unbound lifecycle states are admitted in this cut`() {
-        for (state in listOf("QUOTED", "RELEASED")) {
-            assertTrue(read(row.copy(state = state)) is LoyaltyReservationRead.Available)
-        }
+        assertTrue(read(row.copy(state = "QUOTED", revision = "0")) is LoyaltyReservationRead.Available)
+        assertTrue(read(row.copy(state = "RELEASED", revision = "1")) is LoyaltyReservationRead.Available)
+        unavailable(read(row.copy(state = "QUOTED", revision = "1")))
+        unavailable(read(row.copy(state = "RELEASED", revision = "0")))
         unavailable(read(row.copy(state = "EXPIRED")))
-        assertTrue(read(row.copy(state = "EXPIRED"), at = row.expiresAt) is LoyaltyReservationRead.Available)
+        assertTrue(read(row.copy(state = "EXPIRED", revision = "1"), at = row.expiresAt) is LoyaltyReservationRead.Available)
+        unavailable(read(row.copy(state = "EXPIRED", revision = "0"), at = row.expiresAt))
         for (state in listOf("PAYMENT_PENDING", "RECONCILIATION_REQUIRED", "COMMITTED")) {
             unavailable(read(row.copy(state = state)))
         }

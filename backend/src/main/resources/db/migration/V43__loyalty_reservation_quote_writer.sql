@@ -5,7 +5,7 @@ ALTER TABLE loyalty_command_bindings DROP CONSTRAINT loyalty_command_bindings_ag
 ALTER TABLE loyalty_command_bindings DROP CONSTRAINT loyalty_command_bindings_aggregate_ref_check1;
 ALTER TABLE loyalty_command_bindings ADD CONSTRAINT ck_loyalty_command_aggregate CHECK(
  (aggregate_type='WALLET' AND aggregate_ref ~ '^[1-9][0-9]{0,18}$' AND aggregate_ref::numeric<=9223372036854775807)
- OR (aggregate_type='RESERVATION' AND aggregate_ref ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+ OR (aggregate_type='RESERVATION' AND aggregate_ref ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
      AND aggregate_ref<>'00000000-0000-0000-0000-000000000000')
 );
 ALTER TABLE loyalty_command_bindings ADD CONSTRAINT ck_loyalty_command_authority CHECK(
@@ -99,7 +99,10 @@ DECLARE
  v_expiry_total NUMERIC; v_source UUID; v_ledger BIGINT; v_expiry_command UUID; v_expiry_before JSONB; v_expiry_after JSONB;
  v_row RECORD; v_remaining BIGINT; v_take BIGINT; v_ordinal INTEGER:=0; v_result UUID;
 BEGIN
- IF p_command='00000000-0000-0000-0000-000000000000'::uuid OR p_reservation='00000000-0000-0000-0000-000000000000'::uuid
+ IF p_actor IS NULL OR p_session IS NULL OR p_command IS NULL OR p_reservation IS NULL OR p_wallet IS NULL
+  OR p_cart_revision IS NULL OR p_expected_wallet_revision IS NULL OR p_points IS NULL OR p_eligible_minor IS NULL
+  OR p_discount_present IS NULL OR p_request_hash IS NULL
+  OR p_command='00000000-0000-0000-0000-000000000000'::uuid OR p_reservation='00000000-0000-0000-0000-000000000000'::uuid
   OR p_wallet<=0 OR p_cart_revision<0 OR p_expected_wallet_revision<0 OR p_points<=0 OR p_eligible_minor<=0
   OR p_request_hash !~ '^[0-9a-f]{64}$' THEN
   RAISE EXCEPTION 'INVALID_LOYALTY_QUOTE' USING ERRCODE='22023';
@@ -123,6 +126,7 @@ BEGIN
  IF NOT FOUND THEN RAISE EXCEPTION 'LOYALTY_WALLET_NOT_FOUND' USING ERRCODE='P0002'; END IF;
  FOR v_row IN SELECT l.id FROM public.loyalty_lots l JOIN public.loyalty_lot_partitions p ON p.lot_id=l.id
   WHERE l.wallet_id=p_wallet ORDER BY l.accepted_at,l.id FOR UPDATE OF l,p LOOP NULL; END LOOP;
+ PERFORM public.loyalty_assert_live_customer_session(p_actor,p_session);
  v_recorded:=date_trunc('second',clock_timestamp());
  v_before:=public.loyalty_wallet_snapshot(p_wallet,v_recorded);
  v_revision_matches:=v_wallet_revision=p_expected_wallet_revision;
@@ -221,7 +225,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp A
 $$;
 
 CREATE FUNCTION loyalty_finish_reservation(
- p_realm VARCHAR,p_actor BIGINT,p_command UUID,p_reservation UUID,p_expected_revision BIGINT,
+ p_realm VARCHAR,p_actor BIGINT,p_session UUID,p_command UUID,p_reservation UUID,p_expected_revision BIGINT,
  p_operation VARCHAR,p_target VARCHAR,p_require_expired BOOLEAN,p_request_hash VARCHAR
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE
@@ -230,11 +234,14 @@ DECLARE
  v_recorded TIMESTAMPTZ; v_before JSONB; v_after JSONB; v_outcome TEXT;
  v_expired_total NUMERIC; v_source UUID; v_ledger BIGINT;
 BEGIN
- IF p_command='00000000-0000-0000-0000-000000000000'::uuid
+ IF p_realm IS NULL OR p_actor IS NULL OR p_command IS NULL OR p_reservation IS NULL
+  OR p_expected_revision IS NULL OR p_operation IS NULL OR p_target IS NULL
+  OR p_require_expired IS NULL OR p_request_hash IS NULL
+  OR p_command='00000000-0000-0000-0000-000000000000'::uuid
   OR p_reservation='00000000-0000-0000-0000-000000000000'::uuid
   OR p_expected_revision<0 OR p_request_hash !~ '^[0-9a-f]{64}$'
-  OR NOT ((p_realm='CUSTOMER' AND p_actor>0 AND p_operation='CANCEL_RESERVATION' AND p_target='RELEASED' AND NOT p_require_expired)
-       OR (p_realm='SYSTEM' AND p_actor=1 AND p_operation='EXPIRE_RESERVATION' AND p_target='EXPIRED' AND p_require_expired)) THEN
+  OR NOT ((p_realm='CUSTOMER' AND p_actor>0 AND p_session IS NOT NULL AND p_operation='CANCEL_RESERVATION' AND p_target='RELEASED' AND NOT p_require_expired)
+       OR (p_realm='SYSTEM' AND p_actor=1 AND p_session IS NULL AND p_operation='EXPIRE_RESERVATION' AND p_target='EXPIRED' AND p_require_expired)) THEN
   RAISE EXCEPTION 'INVALID_LOYALTY_TERMINAL_COMMAND' USING ERRCODE='22023';
  END IF;
 
@@ -260,6 +267,18 @@ BEGIN
  v_wallet:=v_definition.wallet_id;
  SELECT w.revision,w.customer_id,w.policy_version INTO STRICT v_wallet_revision,v_customer,v_policy
   FROM public.loyalty_wallets w WHERE w.id=v_wallet FOR UPDATE;
+ SELECT * INTO v_binding FROM public.loyalty_command_bindings b WHERE b.command_id=p_command;
+ IF FOUND THEN
+  IF v_binding.realm<>p_realm OR v_binding.actor_id<>p_actor OR v_binding.operation<>p_operation
+   OR v_binding.aggregate_type<>'RESERVATION' OR v_binding.aggregate_ref<>p_reservation::text
+   OR v_binding.request_hash<>p_request_hash THEN
+   RAISE EXCEPTION 'LOYALTY_IDEMPOTENCY_CONFLICT' USING ERRCODE='23505';
+  END IF;
+  SELECT r.outcome,x.reservation_id INTO STRICT v_outcome,v_result
+   FROM public.loyalty_command_receipts r JOIN public.loyalty_reservation_command_results x ON x.command_id=r.command_id
+   WHERE r.command_id=p_command;
+  RETURN jsonb_build_object('outcome',v_outcome,'reservationId',v_result);
+ END IF;
  SELECT * INTO v_state FROM public.loyalty_reservation_states s
   WHERE s.reservation_id=p_reservation AND s.wallet_id=v_wallet FOR UPDATE;
  IF NOT FOUND THEN RAISE EXCEPTION 'LOYALTY_RESERVATION_CORRUPT' USING ERRCODE='23514'; END IF;
@@ -267,6 +286,9 @@ BEGIN
   JOIN public.loyalty_lots l ON l.id=a.lot_id AND l.wallet_id=a.wallet_id
   JOIN public.loyalty_lot_partitions p ON p.lot_id=l.id AND p.wallet_id=l.wallet_id
   WHERE a.reservation_id=p_reservation ORDER BY l.id FOR UPDATE OF l,p LOOP NULL; END LOOP;
+ IF p_realm='CUSTOMER' THEN
+  PERFORM public.loyalty_assert_live_customer_session(p_actor,p_session);
+ END IF;
  v_recorded:=date_trunc('second',clock_timestamp());
  v_before:=public.loyalty_reservation_snapshot(p_reservation,v_recorded);
 
@@ -319,14 +341,14 @@ CREATE FUNCTION loyalty_cancel_reservation(
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
  PERFORM public.loyalty_assert_live_customer_session(p_actor,p_session);
- RETURN public.loyalty_finish_reservation('CUSTOMER',p_actor,p_command,p_reservation,p_expected_revision,
+ RETURN public.loyalty_finish_reservation('CUSTOMER',p_actor,p_session,p_command,p_reservation,p_expected_revision,
   'CANCEL_RESERVATION','RELEASED',false,p_request_hash);
 END $$;
 
 CREATE FUNCTION loyalty_expire_reservation(
  p_command UUID,p_reservation UUID,p_expected_revision BIGINT,p_request_hash VARCHAR
 ) RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
- SELECT public.loyalty_finish_reservation('SYSTEM',1,p_command,p_reservation,p_expected_revision,
+ SELECT public.loyalty_finish_reservation('SYSTEM',1,NULL,p_command,p_reservation,p_expected_revision,
   'EXPIRE_RESERVATION','EXPIRED',true,p_request_hash)
 $$;
 
@@ -337,18 +359,18 @@ ALTER FUNCTION loyalty_assert_live_customer_session(BIGINT,UUID) OWNER TO storec
 ALTER FUNCTION loyalty_wallet_snapshot(BIGINT,TIMESTAMPTZ) OWNER TO storecore_migrator;
 ALTER FUNCTION loyalty_quote_reservation(BIGINT,UUID,UUID,UUID,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BOOLEAN,VARCHAR) OWNER TO storecore_migrator;
 ALTER FUNCTION loyalty_reservation_snapshot(UUID,TIMESTAMPTZ) OWNER TO storecore_migrator;
-ALTER FUNCTION loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR) OWNER TO storecore_migrator;
+ALTER FUNCTION loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR) OWNER TO storecore_migrator;
 ALTER FUNCTION loyalty_cancel_reservation(BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR) OWNER TO storecore_migrator;
 ALTER FUNCTION loyalty_expire_reservation(UUID,UUID,BIGINT,VARCHAR) OWNER TO storecore_migrator;
 REVOKE ALL ON FUNCTION loyalty_assert_live_customer_session(BIGINT,UUID),loyalty_wallet_snapshot(BIGINT,TIMESTAMPTZ),
  loyalty_quote_reservation(BIGINT,UUID,UUID,UUID,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BOOLEAN,VARCHAR),
  loyalty_reservation_snapshot(UUID,TIMESTAMPTZ),
- loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR),
+ loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR),
  loyalty_cancel_reservation(BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR),
  loyalty_expire_reservation(UUID,UUID,BIGINT,VARCHAR) FROM PUBLIC,storecore_runtime;
 GRANT EXECUTE ON FUNCTION loyalty_assert_live_customer_session(BIGINT,UUID),loyalty_wallet_snapshot(BIGINT,TIMESTAMPTZ),
  loyalty_quote_reservation(BIGINT,UUID,UUID,UUID,BIGINT,BIGINT,BIGINT,BIGINT,BIGINT,BOOLEAN,VARCHAR),
  loyalty_reservation_snapshot(UUID,TIMESTAMPTZ),
- loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR),
+ loyalty_finish_reservation(VARCHAR,BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR,VARCHAR,BOOLEAN,VARCHAR),
  loyalty_cancel_reservation(BIGINT,UUID,UUID,UUID,BIGINT,VARCHAR),
  loyalty_expire_reservation(UUID,UUID,BIGINT,VARCHAR) TO storecore_migrator;
