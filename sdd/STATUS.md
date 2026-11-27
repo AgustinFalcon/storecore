@@ -11,6 +11,20 @@ no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C reinicio tras Quarantined PR #448
+
+`master 69a8d53da972c5485eed44aa1c74e0c8f0a5e6b2` integra PR #448. Su
+candidato exacto `db8182e134ccf4b9accba0f25021c22bc4e45925` pasó Verify
+`46054038347` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261127-sol-pr448-architecture.md` y
+`sdd/reviews/20261127-sol-pr448-security.md`. Tras `Quarantined`,
+reabrir el journal deja `RecoveryPending`; PID 1 no carga unidades;
+`reconcile` con inventario ausente mantiene el job cuarentenado y la
+admisión cerrada. El corte no cierra `003B-4C`: faltan inventario
+Active esperado, familia de sockets y `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C reinicio tras Starting PR #438
 
 `master 02ef551c652c842673826a2fd400330e791cef44` integra PR #438. Su
