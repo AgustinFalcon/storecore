@@ -1,5 +1,14 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C mmap del origen tras el seal
+
+- El harness mantiene un `mmap` `MAP_SHARED` del origen abierto y prueba
+  escritura, crecimiento y truncado sin alterar el snapshot del tmpfs.
+- El `unsafe` vive sólo en tests de integración: `src/lib.rs` sigue con
+  `#![forbid(unsafe_code)]`.
+- No se marca `003B-4C`. No hay familia de sockets, reinicio, `Ready` ni
+  HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #428, 003B-4C sigue abierto
 
 - Merge #428 `a2cf84bdea16f3620148e0edebe5c670329fe270` sobre candidato
