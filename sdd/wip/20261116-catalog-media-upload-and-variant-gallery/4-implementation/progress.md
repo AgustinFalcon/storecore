@@ -1,5 +1,18 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #440, 003B-4C sigue abierto
+
+- Merge #440 `2968857bafd7ec08c31c580c23d269df0454e475` sobre candidato
+  `dd2de3651427c93ab496aad35a1fa30529b9bfd2`. Verify exact-head
+  `45950722247` terminó 7/7. Dos reviews independientes
+  gpt-5.6-sol-medium aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr440-architecture.md` y
+  `sdd/reviews/20261127-sol-pr440-security.md`.
+- Tras `Running`, reabrir el journal deja `RecoveryPending`; PID 1 no
+  carga unidades; `reconcile` cuarentena y mantiene la admisión
+  cerrada. No se marca `003B-4C`. Faltan reinicios de `Terminating` y el
+  resto, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Running
 
 - Tras `Running`, reabrir el journal deja `RecoveryPending` y PID 1 no
