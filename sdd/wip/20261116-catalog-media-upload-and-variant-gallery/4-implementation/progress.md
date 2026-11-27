@@ -1,5 +1,19 @@
 # Progreso
 
+## 2026-11-27 — persist reviews PR #451, 003B-4C sigue abierto
+
+- Merge #451 `f147256f8b66276b075c04a36e4ee84bf7490fc4` sobre candidato
+  `207f7493eb5f1df79580d69b5216f8ca9bb72572`. Verify exact-head
+  `46063548747` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr451-architecture.md` y
+  `sdd/reviews/20261127-sol-pr451-security.md`.
+- Tras `Running` con unidades Active, reabrir el journal deja
+  `RecoveryPending`; `reconcile` termina, deja el job en `Terminal` y
+  reabre la admisión. No se marca `003B-4C`. Faltan inventario Active
+  inesperado, familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C inventario Active esperado
 
 - Tras `Running` con `.mount` y worker Active, reabrir el journal deja
