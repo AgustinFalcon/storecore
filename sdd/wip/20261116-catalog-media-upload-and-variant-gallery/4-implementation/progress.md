@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C reinicio tras Quarantined
+
+- Tras `Quarantined`, reabrir el journal deja `RecoveryPending` y PID 1
+  no carga `.mount` ni worker. `reconcile` con inventario ausente
+  mantiene el job cuarentenado y la admisión cerrada.
+- No se marca `003B-4C`. Faltan inventario Active esperado, familia de
+  sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C reinicio tras Terminal
 
 - Tras `Terminal`, reabrir el journal deja `RecoveryPending` y PID 1 no
