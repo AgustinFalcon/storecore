@@ -3657,6 +3657,82 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_running_job_with_active_units_is_terminated_after_restart() {
+        pid1_require_root();
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-active");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x36; 16],
+                principal,
+                [0xb9; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let sealed = store
+            .transition(
+                allocated.job_id(),
+                1,
+                principal,
+                allocated.boot_id(),
+                JobState::InputSealed,
+                2,
+            )
+            .expect("seal");
+        let starting = store
+            .transition(
+                sealed.job_id(),
+                2,
+                principal,
+                sealed.boot_id(),
+                JobState::Starting,
+                3,
+            )
+            .expect("starting");
+        let running = store
+            .transition(
+                starting.job_id(),
+                3,
+                principal,
+                starting.boot_id(),
+                JobState::Running,
+                4,
+            )
+            .expect("running");
+        let job_id = running.job_id();
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let spec = start_pid1_self_test_worker(
+            &mut systemd,
+            job_id,
+            &approved_pid1_runtime(),
+            Principal::create(2102, 2102),
+        );
+        let owner = rustix::process::geteuid().as_raw();
+        drop(store);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        assert_eq!(
+            restored.allocate(
+                [0x37; 16],
+                principal,
+                [0xb9; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                5,
+            ),
+            Err(StoreError::AdmissionClosed)
+        );
+        pid1_assert_expected_active_terminated(&mut restored, &mut systemd, &spec, job_id, 5);
+        drop(restored);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
@@ -4295,6 +4371,87 @@ mod tests {
     fn pid1_budget_limits() -> BudgetLimits {
         BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
             .expect("limits")
+    }
+
+    fn pid1_assert_expected_active_terminated(
+        store: &mut BrokerStore,
+        systemd: &mut ZbusSystemd,
+        spec: &TransientUnits,
+        job_id: JobId,
+        now_ms: u64,
+    ) {
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, spec),
+            Ok(UnitState::Active)
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Worker, spec),
+            Ok(UnitState::Active)
+        );
+        let mut adapter = Pid1ExpectedActive {
+            systemd,
+            spec,
+            job_id,
+        };
+        let report = reconcile(store, &mut adapter, now_ms).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::Clean);
+        assert_eq!(report.terminated(), 1);
+        assert_eq!(report.transitioned(), 1);
+        assert_eq!(store.admission_status(), AdmissionStatus::Open);
+        assert_eq!(
+            store.record(job_id).expect("record").state(),
+            JobState::Terminal
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, spec),
+            Err(SystemdError::NotLoaded)
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Worker, spec),
+            Err(SystemdError::NotLoaded)
+        );
+    }
+
+    struct Pid1ExpectedActive<'a> {
+        systemd: &'a mut ZbusSystemd,
+        spec: &'a TransientUnits,
+        job_id: JobId,
+    }
+
+    impl RuntimeAdapter for Pid1ExpectedActive<'_> {
+        fn enumerate(&mut self) -> Result<Vec<ObservedJob>, AdapterError> {
+            match (
+                self.systemd.attest(UnitKind::Mount, self.spec),
+                self.systemd.attest(UnitKind::Worker, self.spec),
+            ) {
+                (Ok(UnitState::Active), Ok(UnitState::Active)) => Ok(vec![ObservedJob::create(
+                    self.job_id,
+                    RuntimeState::Active,
+                )]),
+                _ => Err(AdapterError::Unavailable),
+            }
+        }
+
+        fn terminate(&mut self, job_id: JobId) -> Result<RuntimeState, AdapterError> {
+            if job_id != self.job_id {
+                return Err(AdapterError::Unavailable);
+            }
+            let worker = self
+                .systemd
+                .stop(UnitKind::Worker, self.spec)
+                .map_err(|_| AdapterError::Unavailable)?;
+            let mount = self
+                .systemd
+                .stop(UnitKind::Mount, self.spec)
+                .map_err(|_| AdapterError::Unavailable)?;
+            if matches!(worker, UnitState::Inactive | UnitState::Failed)
+                && matches!(mount, UnitState::Inactive | UnitState::Failed)
+            {
+                Ok(RuntimeState::Terminal)
+            } else {
+                Err(AdapterError::Unavailable)
+            }
+        }
     }
 
     struct Pid1AbsentUnits<'a> {

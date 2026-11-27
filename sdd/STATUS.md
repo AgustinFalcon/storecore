@@ -2,9 +2,10 @@
 
 ## En implementación — 2026-11-27, 4C sigue abierto
 
-Siguiente corte: inventario Active esperado y el resto de 4C. El
+Siguiente corte: inventario Active inesperado y el resto de 4C. El
 reinicio tras `Allocated`, `InputSealed`, `Starting`, `Running`,
-`Terminating`, `Terminal` y `Quarantined`, mmap, FD,
+`Terminating`, `Terminal` y `Quarantined`, inventario Active esperado,
+mmap, FD,
 terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`,
 `RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento
 no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,

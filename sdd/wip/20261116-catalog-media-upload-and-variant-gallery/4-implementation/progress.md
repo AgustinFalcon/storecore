@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C inventario Active esperado
+
+- Tras `Running` con `.mount` y worker Active, reabrir el journal deja
+  `RecoveryPending`. `reconcile` termina las unidades, deja el job en
+  `Terminal` y reabre la admisión.
+- No se marca `003B-4C`. Faltan inventario Active inesperado, familia de
+  sockets, `Ready` y HTTP de media.
+
 ## 2026-11-27 — persist reviews PR #448, 003B-4C sigue abierto
 
 - Merge #448 `69a8d53da972c5485eed44aa1c74e0c8f0a5e6b2` sobre candidato

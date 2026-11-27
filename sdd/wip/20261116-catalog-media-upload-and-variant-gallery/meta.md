@@ -149,7 +149,8 @@ reinicio tras `Starting` (cuarentena con inventario ausente); no cubre
 `Running` ni el resto de transiciones ni `Ready`. El corte de reinicio
 tras `Quarantined` (latch de mismatch, admisión cerrada); no cubre
 inventario Active ni `Ready`. El corte de inventario Active esperado
-está en implementación; no cubre sockets ni `Ready`. PR #326
+está en implementación; no cubre inventario Active inesperado ni
+`Ready`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability
