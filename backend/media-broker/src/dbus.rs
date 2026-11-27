@@ -371,6 +371,9 @@ mod tests {
         worker_properties,
     };
     use crate::budget::{BudgetError, BudgetLimits};
+    use crate::reconcile::{
+        AdapterError, ObservedJob, ReconcileStatus, RuntimeAdapter, RuntimeState, reconcile,
+    };
     use crate::runtime::{ApprovedRuntime, RuntimeError};
     use crate::snapshot::copy_snapshot;
     use crate::state::{JobId, JobRecord, JobState, Principal, Reservation};
@@ -3067,6 +3070,81 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
+    fn pid1_allocated_job_survives_restart_with_absent_units() {
+        assert_eq!(
+            fs::read_to_string("/proc/1/comm")
+                .expect("pid1 comm")
+                .trim(),
+            "systemd"
+        );
+        assert_eq!(
+            rustix::process::geteuid().as_raw(),
+            0,
+            "PID 1 harness must run as root"
+        );
+        let (journal_root, mut store) = pid1_single_job_store("journal-4c-restart-allocated");
+        let principal = Principal::create(2101, 2101);
+        let allocated = store
+            .allocate(
+                [0x28; 16],
+                principal,
+                [0xb2; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                1,
+            )
+            .expect("allocate");
+        let job_id = allocated.job_id();
+        let owner = rustix::process::geteuid().as_raw();
+        drop(store);
+        let mut restored =
+            BrokerStore::open(&journal_root, owner, pid1_budget_limits()).expect("reopen");
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        assert_eq!(
+            restored.allocate(
+                [0x29; 16],
+                principal,
+                [0xb2; 16],
+                Reservation::create(MOUNT_BYTES, MOUNT_INODES, 1).expect("reservation"),
+                2,
+            ),
+            Err(StoreError::AdmissionClosed)
+        );
+        let mut systemd = ZbusSystemd::connect_system().expect("system bus");
+        let spec = TransientUnits::derive(
+            job_id,
+            PathBuf::from("/run/storecore_media/jobs"),
+            Principal::create(2102, 2102),
+            &approved_pid1_runtime(),
+        )
+        .expect("spec");
+        assert_eq!(
+            systemd.attest(UnitKind::Mount, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        assert_eq!(
+            systemd.attest(UnitKind::Worker, &spec),
+            Err(SystemdError::NotLoaded)
+        );
+        let mut adapter = Pid1AbsentUnits {
+            systemd: &mut systemd,
+            spec: &spec,
+        };
+        let report = reconcile(&mut restored, &mut adapter, 2).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::Clean);
+        assert_eq!(restored.admission_status(), AdmissionStatus::Open);
+        assert_eq!(
+            restored.record(job_id).expect("record").state(),
+            JobState::Allocated
+        );
+        drop(restored);
+        let _ = fs::remove_dir_all(&journal_root);
+    }
+
+    #[test]
+    #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
     fn pid1_stop_kills_extra_cgroup_process() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
@@ -3623,6 +3701,32 @@ mod tests {
         source.sync_all().expect("sync mutation");
     }
 
+    fn pid1_budget_limits() -> BudgetLimits {
+        BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
+            .expect("limits")
+    }
+
+    struct Pid1AbsentUnits<'a> {
+        systemd: &'a mut ZbusSystemd,
+        spec: &'a TransientUnits,
+    }
+
+    impl RuntimeAdapter for Pid1AbsentUnits<'_> {
+        fn enumerate(&mut self) -> Result<Vec<ObservedJob>, AdapterError> {
+            match (
+                self.systemd.attest(UnitKind::Mount, self.spec),
+                self.systemd.attest(UnitKind::Worker, self.spec),
+            ) {
+                (Err(SystemdError::NotLoaded), Err(SystemdError::NotLoaded)) => Ok(Vec::new()),
+                _ => Err(AdapterError::Unavailable),
+            }
+        }
+
+        fn terminate(&mut self, _job_id: JobId) -> Result<RuntimeState, AdapterError> {
+            Err(AdapterError::Unavailable)
+        }
+    }
+
     fn pid1_single_job_store(journal_name: &str) -> (PathBuf, BrokerStore) {
         fs::create_dir_all("/run/storecore_media/jobs").expect("jobs root");
         let journal_root = PathBuf::from("/run/storecore_media").join(journal_name);
@@ -3631,9 +3735,7 @@ mod tests {
         fs::set_permissions(&journal_root, fs::Permissions::from_mode(0o700))
             .expect("journal mode");
         let owner = rustix::process::geteuid().as_raw();
-        let limits =
-            BudgetLimits::create(1, 1, MOUNT_BYTES, MOUNT_INODES, MOUNT_BYTES, MOUNT_INODES)
-                .expect("limits");
+        let limits = pid1_budget_limits();
         let mut store = BrokerStore::open(&journal_root, owner, limits).expect("store");
         assert_eq!(
             store.finish_reconciliation(false),

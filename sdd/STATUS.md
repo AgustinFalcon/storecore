@@ -2,11 +2,11 @@
 
 ## En implementación — 2026-11-26, 4C sigue abierto
 
-Siguiente corte: reinicio en cada transición durable. El mmap del
-origen tras el seal, el FD, terminales sin ACK, cuota global y
-RLIMIT quedan atestados. `ProtectHome`, `RestrictAddressFamilies` y
-`CPUQuota` quedan fuera. Este documento no cierra `003B-4C`. Sigue
-sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,
+Siguiente corte: reinicio tras `InputSealed` y el resto de transiciones
+durables. El reinicio tras `Allocated`, mmap, FD, terminales sin ACK,
+cuota global y RLIMIT quedan atestados. `ProtectHome`,
+`RestrictAddressFamilies` y `CPUQuota` quedan fuera. Este documento
+no cierra `003B-4C`. Sigue sin familia de sockets ni `Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 

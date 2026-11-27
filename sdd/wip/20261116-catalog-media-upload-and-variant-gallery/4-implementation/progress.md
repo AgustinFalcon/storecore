@@ -1,5 +1,13 @@
 # Progreso
 
+## 2026-11-26 — arranque 4C reinicio tras Allocated
+
+- Tras `Allocated`, reabrir el journal deja `RecoveryPending` y PID 1 no
+  carga `.mount` ni worker. `reconcile` con inventario ausente reabre
+  admisión y conserva el job.
+- No se marca `003B-4C`. Faltan reinicios del resto de transiciones,
+  familia de sockets, `Ready` y HTTP de media.
+
 ## 2026-11-26 — persist reviews PR #430, 003B-4C sigue abierto
 
 - Merge #430 `6e73d5afaf900a2daa3c0f0dfad91e33e2fc8135` sobre candidato

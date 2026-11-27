@@ -356,6 +356,26 @@ mod tests {
     static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(1);
 
     #[test]
+    fn allocated_job_survives_restart_with_absent_runtime() {
+        let fixture = Fixture::new();
+        let mut store = fixture.ready_store();
+        let allocated = store
+            .allocate([40; 16], principal(), [41; 16], reservation(), 2)
+            .expect("allocate");
+        drop(store);
+        let mut restored = fixture.pending_store();
+        assert_eq!(
+            restored.admission_status(),
+            AdmissionStatus::RecoveryPending
+        );
+        let mut adapter = FakeAdapter::empty();
+        let report = reconcile(&mut restored, &mut adapter, 3).expect("reconcile");
+        assert_eq!(report.status(), ReconcileStatus::Clean);
+        assert_eq!(restored.admission_status(), AdmissionStatus::Open);
+        assert_eq!(restored.record(allocated.job_id()), Ok(allocated));
+    }
+
+    #[test]
     fn expected_active_runtime_is_terminated_and_made_terminal() {
         let fixture = Fixture::new();
         let mut active = fixture.ready_store();
