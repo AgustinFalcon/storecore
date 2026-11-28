@@ -10,6 +10,20 @@
   no emite `Ready`.
 - No se marca `003B-4C`. Falta `Ready` y HTTP de media.
 
+## 2026-11-28 — persist reviews PR #464, 003B-4C sigue abierto
+
+- Merge #464 `454da38236286cae7a99355d6625721aabad769b` sobre candidato
+  `d1e125015bf34d7a32cb738919aa91ccb2607480`. Verify exact-head
+  `46124265198` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261128-sol-pr464-architecture.md` y
+  `sdd/reviews/20261128-sol-pr464-security.md`.
+- PID 1 aplica `CPUQuotaPerSecUSec=1000000` (`t`) y
+  `RestrictAddressFamilies` deny-list (`(bas)`). `ReadyAttestation`
+  queda `Unavailable`. `READY` en el wire es `Unknown`. No se marca
+  `003B-4C`. Faltan `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C Ready sigue Unavailable
 
 - El harness PID 1 arranca `.mount` y worker, lee `CPUQuotaPerSecUSec` y

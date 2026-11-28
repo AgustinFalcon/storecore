@@ -13,6 +13,20 @@ mmap, FD, terminales sin ACK, cuota global y RLIMIT quedan atestados.
 `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
 siguen abiertos. Este corte no agrega HTTP de media.
 
+## Master vigente — 2026-11-28, 4C tipos D-Bus CPUQuota y RestrictAddressFamilies PR #464
+
+`master 454da38236286cae7a99355d6625721aabad769b` integra PR #464. Su
+candidato exacto `d1e125015bf34d7a32cb738919aa91ccb2607480` pasó Verify
+`46124265198` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261128-sol-pr464-architecture.md` y
+`sdd/reviews/20261128-sol-pr464-security.md`. PID 1 aplica
+`CPUQuotaPerSecUSec=1000000` (`t`) y
+`RestrictAddressFamilies=(false, AF_INET/AF_INET6)` (`(bas)`).
+`ReadyAttestation` queda `Unavailable`. `READY` en el wire es `Unknown`.
+El corte no cierra `003B-4C`: sigue sin `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C Ready sigue Unavailable PR #462
 
 `master c85e4954839dbc7f9200df3253fcc91e06bfd49a` integra PR #462. Su
