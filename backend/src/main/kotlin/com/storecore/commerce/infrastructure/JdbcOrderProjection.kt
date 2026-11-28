@@ -118,10 +118,12 @@ class JdbcOrderProjection(private val jdbc: JdbcTemplate, private val mapper: Ob
                 OR NOT EXISTS (SELECT 1 FROM mp_order_commercial_applications rc WHERE rc.order_id=o.id AND rc.attempt_id=a.id AND rc.provider_order_id=r.provider_order_id AND rc.transition='PAYMENT_ACCREDITED'))))) ambiguous_reversal,
             (SELECT min(r.kind) FROM mp_order_reversal_cases r JOIN mp_checkout_attempts a ON a.id=r.attempt_id WHERE a.order_id=o.id AND r.review_status='RESOLVED' AND r.provider_order_id=a.provider_order_id) reversal,
             (SELECT count(*) FROM payments p WHERE p.order_id=o.id) payment_count,
-            (SELECT min(p.status) FROM payments p WHERE p.order_id=o.id) raw_status
+            (SELECT min(p.status) FROM payments p WHERE p.order_id=o.id) raw_status,
+            EXISTS(SELECT 1 FROM loyalty_order_snapshots los WHERE los.order_id=o.id
+              AND (o.currency<>'ARS' OR o.subtotal*100<>los.net_subtotal_minor OR o.shipping_cost*100<>los.shipping_minor OR o.total*100<>los.total_minor)) loyalty_contradiction
           FROM orders o LEFT JOIN shipments s ON s.order_id=o.id
         ), checked AS (
-          SELECT *, (incident OR ambiguous_reversal OR orphan_approved>0 OR (credits>0 AND (credits<>1 OR valid_credits<>1))
+          SELECT *, (incident OR ambiguous_reversal OR orphan_approved>0 OR loyalty_contradiction OR (credits>0 AND (credits<>1 OR valid_credits<>1))
             OR (credits=0 AND (status IN ('PAID','PAID_STOCK_REVIEW','REFUNDED') OR reversal IS NOT NULL OR raw_status IN ('APPROVED','REFUNDED','CHARGED_BACK')))) contradictory
           FROM authority
         ), payments_classified AS (

@@ -78,12 +78,48 @@ class MpCheckoutAttemptService(
         if (!commands.configured() && properties.adapterMode != MpOrdersAdapterMode.FAKE) throw CommerceValidation("MP_ORDERS_UNCONFIGURED")
         return transactions.execute {
             val order = jdbc.query(
-                "SELECT o.id,o.status,o.total,o.currency,p.id payment_id,p.status payment_status FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=? FOR UPDATE OF o",
+                "SELECT o.id,o.status,o.subtotal,o.shipping_cost,o.total,o.currency,p.id payment_id,p.status payment_status,p.amount payment_amount,p.currency payment_currency FROM orders o JOIN payments p ON p.order_id=o.id WHERE o.id=? FOR UPDATE OF o",
                 { rs, _ ->
-                    OrderLock(rs.getLong("id"), OrderStatus.fromWire(rs.getString("status")), rs.getBigDecimal("total"), rs.getString("currency"), rs.getLong("payment_id"), PaymentStatus.fromWire(rs.getString("payment_status")))
+                    OrderLock(
+                        rs.getLong("id"),
+                        OrderStatus.fromWire(rs.getString("status")),
+                        rs.getBigDecimal("subtotal"),
+                        rs.getBigDecimal("shipping_cost"),
+                        rs.getBigDecimal("total"),
+                        rs.getString("currency"),
+                        rs.getLong("payment_id"),
+                        PaymentStatus.fromWire(rs.getString("payment_status")),
+                        rs.getBigDecimal("payment_amount"),
+                        rs.getString("payment_currency"),
+                    )
                 },
                 orderId,
             ).singleOrNull() ?: throw CommerceValidation("ORDER_NOT_FOUND")
+            val loyaltyMismatch = jdbc.queryForObject(
+                """SELECT EXISTS(
+                     SELECT 1 FROM loyalty_order_snapshots los
+                     WHERE los.order_id=? AND (
+                       ?<>'ARS' OR ?<>'ARS'
+                       OR ?*100<>los.net_subtotal_minor
+                       OR ?*100<>los.shipping_minor
+                       OR ?*100<>los.total_minor
+                       OR ?*100<>los.total_minor
+                       OR (los.reservation_id IS NOT NULL AND NOT EXISTS (
+                         SELECT 1 FROM loyalty_checkout_bindings b
+                         JOIN loyalty_reservation_states st ON st.reservation_id=b.reservation_id
+                         WHERE b.reservation_id=los.reservation_id AND b.order_id=los.order_id
+                           AND b.payment_id=los.payment_id
+                           AND st.state IN ('PAYMENT_PENDING','RECONCILIATION_REQUIRED')
+                       ))
+                     )
+                   )""",
+                Boolean::class.java,
+                orderId, order.currency, order.paymentCurrency,
+                order.subtotal, order.shippingCost, order.total, order.paymentAmount,
+            ) ?: false
+            if (loyaltyMismatch || order.subtotal.add(order.shippingCost).compareTo(order.total) != 0) {
+                throw CommerceValidation("LOYALTY_ORDER_SNAPSHOT_MISMATCH")
+            }
             val existing = jdbc.query(
                 "SELECT order_id,attempt_no,external_reference,idempotency_key,state FROM mp_checkout_attempts WHERE order_id=? ORDER BY attempt_no",
                 { rs, _ ->
@@ -285,10 +321,14 @@ class MpCheckoutAttemptService(
     private data class OrderLock(
         val id: Long,
         val status: OrderStatus,
+        val subtotal: BigDecimal,
+        val shippingCost: BigDecimal,
         val total: BigDecimal,
         val currency: String,
         val paymentId: Long,
         val paymentStatus: PaymentStatus,
+        val paymentAmount: BigDecimal,
+        val paymentCurrency: String,
     )
 
     private data class StoredAttempt(

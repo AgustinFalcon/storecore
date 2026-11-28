@@ -128,3 +128,24 @@ class LoyaltyUnavailableEarningSnapshot private constructor(
             LoyaltyUnavailableEarningSnapshot(cartFingerprint, revision, reason)
     }
 }
+
+object LoyaltyCartFingerprint {
+    fun compute(customerId: Long, currency: LoyaltyEvidenceCurrency, lines: List<LoyaltyCartLine>): CartFingerprint? {
+        if (customerId <= 0 || currency != LoyaltyEvidenceCurrency.ARS || lines.isEmpty()) return null
+        val sorted = lines.sortedBy { it.cartItemId }
+        if (sorted.any { it.cartItemId <= 0 || it.variantId <= 0 || it.quantity <= 0 } ||
+            sorted.map { it.cartItemId }.toSet().size != sorted.size) return null
+        val fields = mutableListOf("loyalty-cart-fingerprint-v1", customerId.toString(), currency.wire)
+        sorted.forEach { line ->
+            fields += listOf(
+                line.cartItemId.toString(),
+                line.variantId.toString(),
+                line.quantity.toString(),
+                line.originalUnitPrice.value.toString(),
+                line.effectiveUnitPrice.value.toString(),
+                line.discountState.wire,
+            )
+        }
+        return CartFingerprint.fromWire(LoyaltyFingerprint.canonical(fields).value)
+    }
+}

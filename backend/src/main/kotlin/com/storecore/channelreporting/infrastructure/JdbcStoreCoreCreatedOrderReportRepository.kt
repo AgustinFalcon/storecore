@@ -120,9 +120,18 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
 
     private fun projectWithinSnapshot(period: ReportPeriod): StoreCoreCreatedOrderReadResult {
         val row = jdbc.queryForMap(
-            """SELECT count(*) row_count, COALESCE(sum(total),0.00) nominal_total,
-                      count(*) FILTER (WHERE currency<>'ARS' OR total<0 OR subtotal<0 OR shipping_cost<0 OR total<>subtotal+shipping_cost) contradiction_count
-               FROM orders WHERE created_at>=? AND created_at<?""",
+            """SELECT count(*) row_count, COALESCE(sum(o.total),0.00) nominal_total,
+                      count(*) FILTER (
+                        WHERE o.currency<>'ARS' OR o.total<0 OR o.subtotal<0 OR o.shipping_cost<0 OR o.total<>o.subtotal+o.shipping_cost
+                           OR (los.order_id IS NOT NULL AND (
+                               o.subtotal*100<>los.net_subtotal_minor
+                               OR o.shipping_cost*100<>los.shipping_minor
+                               OR o.total*100<>los.total_minor
+                           ))
+                      ) contradiction_count
+               FROM orders o
+               LEFT JOIN loyalty_order_snapshots los ON los.order_id=o.id
+               WHERE o.created_at>=? AND o.created_at<?""",
             Timestamp.from(period.fromInclusive), Timestamp.from(period.toExclusive),
         )
         if ((row["contradiction_count"] as Number).toLong() != 0L) {
@@ -218,10 +227,26 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
         val snapshotContradictions = jdbc.queryForObject(
             paymentAuthorityCte() + """SELECT count(*) FROM (
                 SELECT a.order_id
-                FROM authority a LEFT JOIN order_items oi ON oi.order_id=a.order_id
+                FROM authority a
+                LEFT JOIN order_items oi ON oi.order_id=a.order_id
+                LEFT JOIN loyalty_order_snapshots los ON los.order_id=a.order_id
                 WHERE a.valid_authority IS TRUE
-                GROUP BY a.order_id,a.subtotal
-                HAVING count(oi.id)=0 OR COALESCE(sum(oi.subtotal),0.00)<>a.subtotal
+                GROUP BY a.order_id,a.subtotal,a.shipping_cost,a.order_total,los.order_id,los.availability,los.net_subtotal_minor,los.shipping_minor,los.total_minor,los.discount_minor
+                HAVING count(oi.id)=0
+                    OR (los.order_id IS NULL AND COALESCE(sum(oi.subtotal),0.00)<>a.subtotal)
+                    OR (los.order_id IS NOT NULL AND (
+                        a.subtotal*100<>los.net_subtotal_minor
+                        OR a.shipping_cost*100<>los.shipping_minor
+                        OR a.order_total*100<>los.total_minor
+                        OR COALESCE(sum(oi.subtotal),0.00)*100<>(los.net_subtotal_minor+los.discount_minor)
+                        OR (los.availability='UNAVAILABLE' AND los.discount_minor<>0)
+                        OR (los.availability='AVAILABLE' AND (
+                            (SELECT count(*) FROM loyalty_order_lines lol WHERE lol.order_id=a.order_id)<>count(oi.id)
+                            OR (SELECT COALESCE(sum(lol.payable_minor),0) FROM loyalty_order_lines lol WHERE lol.order_id=a.order_id)<>los.net_subtotal_minor
+                            OR (SELECT COALESCE(sum(lol.allocated_discount_minor),0) FROM loyalty_order_lines lol WHERE lol.order_id=a.order_id)<>los.discount_minor
+                            OR (SELECT COALESCE(sum(lol.gross_minor),0) FROM loyalty_order_lines lol WHERE lol.order_id=a.order_id)<>COALESCE(sum(oi.subtotal),0.00)*100
+                        ))
+                    ))
                 UNION ALL
                 SELECT a.order_id
                 FROM authority a JOIN order_items oi ON oi.order_id=a.order_id
@@ -287,6 +312,15 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
              WHERE incident.order_id=sa.order_id AND incident.kind='DUPLICATE_REMOTE_CREDIT'
                AND incident.review_status NOT IN ('RESOLVED','REJECTED')
            )
+           AND NOT EXISTS (
+             SELECT 1 FROM loyalty_order_snapshots los
+             WHERE los.order_id=sa.order_id AND (
+               sa.order_currency<>'ARS'
+               OR sa.subtotal*100<>los.net_subtotal_minor
+               OR sa.shipping_cost*100<>los.shipping_minor
+               OR sa.order_total*100<>los.total_minor
+             )
+           )
           ),FALSE) valid_authority
         FROM scoped_applications sa
         LEFT JOIN mp_checkout_attempts a ON a.id=sa.attempt_id
@@ -318,7 +352,7 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
     }
 
     private fun paymentDispositionCte(): String = """WITH scoped_orders AS (
-        SELECT o.id,o.status,o.total,o.currency
+        SELECT o.id,o.status,o.subtotal,o.shipping_cost,o.total,o.currency
         FROM orders o WHERE o.created_at>=? AND o.created_at<?
     ), authority AS (
         SELECT so.*,
@@ -354,10 +388,13 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
              WHERE a.order_id=so.id AND r.review_status='RESOLVED' AND r.provider_order_id=a.provider_order_id
                AND EXISTS (SELECT 1 FROM mp_order_commercial_applications c
                  WHERE c.order_id=so.id AND c.attempt_id=a.id AND c.provider_order_id=r.provider_order_id
-                   AND c.transition='PAYMENT_ACCREDITED')) reversal_kind
+                   AND c.transition='PAYMENT_ACCREDITED')) reversal_kind,
+          EXISTS(SELECT 1 FROM loyalty_order_snapshots los WHERE los.order_id=so.id
+             AND (so.currency<>'ARS' OR so.subtotal*100<>los.net_subtotal_minor
+               OR so.shipping_cost*100<>los.shipping_minor OR so.total*100<>los.total_minor)) loyalty_contradiction
         FROM scoped_orders so
     ), checked AS (
-        SELECT *, (incident OR ambiguous_reversal OR orphan_funded>0
+        SELECT *, (incident OR ambiguous_reversal OR orphan_funded>0 OR loyalty_contradiction
           OR (credits>0 AND (credits<>1 OR valid_credits<>1))
           OR (credits=0 AND (status IN ('PAID','PAID_STOCK_REVIEW','REFUNDED')
             OR reversal_kind IS NOT NULL OR raw_status IN ('APPROVED','REFUNDED','CHARGED_BACK')))) contradictory
