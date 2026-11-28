@@ -1,16 +1,17 @@
 # Estado canónico del SDD — StoreCore
 
-## En implementación — 2026-11-27, 4C sigue abierto
+## En implementación — 2026-11-28, 4C sigue abierto
 
 Siguiente corte: `Ready` (sigue `Unavailable`). El reinicio tras
 `Allocated`, `InputSealed`, `Starting`, `Running`, `Terminating`,
 `Terminal` y `Quarantined`, inventario Active esperado e inesperado,
-mmap, FD,
-terminales sin ACK, cuota global y RLIMIT quedan atestados. `ProtectHome`,
-`RestrictAddressFamilies` y `CPUQuota` quedan atestados ausentes. Este
-documento no cierra `003B-4C`. Sigue sin `Ready`. `003B-4B-3`, `003B-4B-4`,
-`003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
-agrega HTTP de media.
+mmap, FD, terminales sin ACK, cuota global y RLIMIT quedan atestados.
+`ProtectHome` queda atestado ausente. Este corte deriva
+`CPUQuotaPerSecUSec=1000000` (`t`, 100%) y
+`RestrictAddressFamilies=(false, AF_INET/AF_INET6)` (`(bas)`) en
+`StartTransientUnit`. Este documento no cierra `003B-4C`. Sigue sin
+`Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4C`, `003B-4`, TASK-005 y #7
+siguen abiertos. Este corte no agrega HTTP de media.
 
 ## Master vigente — 2026-11-27, 4C Ready sigue Unavailable PR #462
 

@@ -43,6 +43,10 @@ const WORKER_LIMIT_FSIZE: u64 = crate::systemd::MOUNT_BYTES;
 /// CPU-time ceiling in seconds (`IMAGE_IO_V1` timeout). Derived internally;
 /// the client cannot supply it. This is `RLIMIT_CPU`, not `CPUQuota`.
 const WORKER_LIMIT_CPU: u64 = WORKER_RUNTIME_MAX_USEC / 1_000_000;
+/// One full CPU. systemd D-Bus exposes `CPUQuotaPerSecUSec` as `t`
+/// (microseconds per second). `1_000_000` is `CPUQuota=100%`. The unit-file
+/// string `CPUQuota` is not a StartTransientUnit property.
+const WORKER_CPU_QUOTA_PER_SEC_USEC: u64 = 1_000_000;
 /// Address-space ceiling. Derived internally as 32× `IMAGE_IO_V1` heap so
 /// `HotSpot` can map the runtime while remaining bounded. Equal to
 /// `MemoryMax` core-dumps the JVM because virtual size exceeds RSS. This is
@@ -103,6 +107,7 @@ impl ZbusSystemd {
             )
             .map_err(|error| {
                 eprintln!("StartTransientUnit {name}: {error}");
+                eprintln!("StartTransientUnit {name} debug: {error:?}");
                 SystemdError::Unavailable
             })?;
         validate_job_path(&job)
@@ -309,6 +314,8 @@ pub(crate) fn worker_properties(
         ("LimitDATA", Value::from(WORKER_LIMIT_DATA)),
         ("LimitSTACK", Value::from(WORKER_LIMIT_STACK)),
         ("PrivateNetwork", Value::from(true)),
+        ("CPUQuotaPerSecUSec", Value::from(WORKER_CPU_QUOTA_PER_SEC_USEC)),
+        ("RestrictAddressFamilies", restrict_address_families()),
         ("PrivateTmp", Value::from(true)),
         ("PrivateDevices", Value::from(true)),
         ("RestrictRealtime", Value::from(true)),
@@ -321,6 +328,13 @@ pub(crate) fn worker_properties(
         ("ProtectKernelLogs", Value::from(true)),
         ("ProtectKernelModules", Value::from(true)),
     ])
+}
+
+/// systemd D-Bus type `(bas)`: `(allow_list, families)`.
+/// `allow_list=false` denies `AF_INET`/`AF_INET6` (ADR-001) and leaves
+/// `AF_UNIX`/`AF_NETLINK` available for HotSpot under `PrivateNetwork=true`.
+fn restrict_address_families() -> Value<'static> {
+    Value::from((false, vec!["AF_INET".to_owned(), "AF_INET6".to_owned()]))
 }
 
 fn required_name(name: &UnitName) -> Result<String, SystemdError> {
@@ -364,11 +378,11 @@ fn validate_job_path(path: &OwnedObjectPath) -> Result<(), SystemdError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        WORKER_LIMIT_AS, WORKER_LIMIT_CORE, WORKER_LIMIT_CPU, WORKER_LIMIT_DATA,
-        WORKER_LIMIT_FSIZE, WORKER_LIMIT_NOFILE, WORKER_LIMIT_NPROC, WORKER_LIMIT_STACK,
-        WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
+        WORKER_CPU_QUOTA_PER_SEC_USEC, WORKER_LIMIT_AS, WORKER_LIMIT_CORE, WORKER_LIMIT_CPU,
+        WORKER_LIMIT_DATA, WORKER_LIMIT_FSIZE, WORKER_LIMIT_NOFILE, WORKER_LIMIT_NPROC,
+        WORKER_LIMIT_STACK, WORKER_MEMORY_MAX_BYTES, WORKER_RUNTIME_MAX_USEC, WORKER_TASKS_MAX,
         WORKER_TIMEOUT_STOP_USEC, ZbusSystemd, classify_dbus_name, mount_properties,
-        worker_properties,
+        restrict_address_families, worker_properties,
     };
     use crate::budget::{BudgetError, BudgetLimits};
     use crate::reconcile::{
@@ -570,8 +584,9 @@ mod tests {
                 .is_some_and(|value| value.contains('9')),
             "KillSignal must be SIGKILL, got {kill_signal:?}"
         );
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         assert!(keys.contains(&"LimitNOFILE"));
         assert!(keys.contains(&"LimitNPROC"));
         assert!(keys.contains(&"LimitCORE"));
@@ -643,6 +658,7 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"LimitCPU"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let cpu = worker
             .iter()
             .find(|(key, _)| *key == "LimitCPU")
@@ -670,8 +686,9 @@ mod tests {
         assert!(keys.contains(&"LimitAS"));
         assert!(keys.contains(&"MemoryMax"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let limit_as = worker
             .iter()
             .find(|(key, _)| *key == "LimitAS")
@@ -704,8 +721,9 @@ mod tests {
         assert!(keys.contains(&"LimitDATA"));
         assert!(keys.contains(&"LimitAS"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let limit_data = worker
             .iter()
             .find(|(key, _)| *key == "LimitDATA")
@@ -737,8 +755,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"LimitSTACK"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let limit_stack = worker
             .iter()
             .find(|(key, _)| *key == "LimitSTACK")
@@ -765,8 +784,9 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"PrivateTmp"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let private_tmp = worker
             .iter()
             .find(|(key, _)| *key == "PrivateTmp")
@@ -793,8 +813,9 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
     }
 
     #[test]
@@ -810,9 +831,30 @@ mod tests {
         .expect("spec");
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"ProtectHome"));
         assert!(!keys.contains(&"CPUQuota"));
+        let families = worker
+            .iter()
+            .find(|(key, _)| *key == "RestrictAddressFamilies")
+            .map(|(_, value)| value)
+            .expect("RestrictAddressFamilies");
+        assert_eq!(
+            families.value_signature().to_string(),
+            "(bas)",
+            "RestrictAddressFamilies D-Bus type must be (bas), got {families:?}"
+        );
+        let encoded = format!("{families:?}");
+        assert!(
+            encoded.contains("false")
+                && encoded.contains("AF_INET")
+                && encoded.contains("AF_INET6"),
+            "RestrictAddressFamilies must deny AF_INET/AF_INET6, got {families:?}"
+        );
+        assert_eq!(
+            restrict_address_families().value_signature().to_string(),
+            "(bas)"
+        );
     }
 
     #[test]
@@ -829,9 +871,24 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         assert!(keys.contains(&"LimitCPU"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
+        let quota = worker
+            .iter()
+            .find(|(key, _)| *key == "CPUQuotaPerSecUSec")
+            .map(|(_, value)| value)
+            .expect("CPUQuotaPerSecUSec");
+        assert_eq!(
+            quota.value_signature().to_string(),
+            "t",
+            "CPUQuotaPerSecUSec D-Bus type must be t, got {quota:?}"
+        );
+        assert!(
+            format!("{quota:?}").contains(&WORKER_CPU_QUOTA_PER_SEC_USEC.to_string()),
+            "CPUQuotaPerSecUSec must be 1_000_000 (100%), got {quota:?}"
+        );
     }
 
     #[test]
@@ -848,15 +905,34 @@ mod tests {
         let worker = worker_properties(&spec).expect("worker");
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(!keys.contains(&"CPUQuota"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert_eq!(
-            crate::ready::ReadyAttestation::from_effective("", ""),
+            crate::ready::ReadyAttestation::from_effective("1000000", "~AF_INET ~AF_INET6"),
             crate::ready::ReadyAttestation::Unavailable
         );
         assert_eq!(
             crate::ready::ReadyAttestation::from_wire("READY"),
             crate::ready::ReadyAttestation::Unknown
         );
+    }
+
+    #[test]
+    fn cpu_quota_per_sec_applied_accepts_100_percent() {
+        assert!(cpu_quota_per_sec_applied("1000000"));
+        assert!(cpu_quota_per_sec_applied("1s"));
+        assert!(!cpu_quota_per_sec_applied(""));
+        assert!(!cpu_quota_per_sec_applied("~"));
+        assert!(!cpu_quota_per_sec_applied("infinity"));
+    }
+
+    #[test]
+    fn restrict_address_families_applied_denies_inet() {
+        assert!(restrict_address_families_applied("~AF_INET ~AF_INET6"));
+        assert!(restrict_address_families_applied("AF_UNIX AF_NETLINK"));
+        assert!(!restrict_address_families_applied(""));
+        assert!(!restrict_address_families_applied("~"));
+        assert!(!restrict_address_families_applied("AF_UNIX AF_INET AF_INET6"));
     }
 
     #[test]
@@ -874,8 +950,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"PrivateDevices"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let private_devices = worker
             .iter()
             .find(|(key, _)| *key == "PrivateDevices")
@@ -903,8 +980,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"RestrictRealtime"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let restrict_realtime = worker
             .iter()
             .find(|(key, _)| *key == "RestrictRealtime")
@@ -932,8 +1010,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"LockPersonality"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let lock_personality = worker
             .iter()
             .find(|(key, _)| *key == "LockPersonality")
@@ -961,8 +1040,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectKernelTunables"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_kernel_tunables = worker
             .iter()
             .find(|(key, _)| *key == "ProtectKernelTunables")
@@ -990,8 +1070,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectControlGroups"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_control_groups = worker
             .iter()
             .find(|(key, _)| *key == "ProtectControlGroups")
@@ -1019,8 +1100,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectHostname"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_hostname = worker
             .iter()
             .find(|(key, _)| *key == "ProtectHostname")
@@ -1048,8 +1130,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"RestrictSUIDSGID"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let restrict_suidsgid = worker
             .iter()
             .find(|(key, _)| *key == "RestrictSUIDSGID")
@@ -1077,8 +1160,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectClock"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_clock = worker
             .iter()
             .find(|(key, _)| *key == "ProtectClock")
@@ -1106,8 +1190,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectKernelLogs"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_kernel_logs = worker
             .iter()
             .find(|(key, _)| *key == "ProtectKernelLogs")
@@ -1135,8 +1220,9 @@ mod tests {
         let keys: Vec<&str> = worker.iter().map(|(key, _)| *key).collect();
         assert!(keys.contains(&"ProtectKernelModules"));
         assert!(!keys.contains(&"ProtectHome"));
-        assert!(!keys.contains(&"RestrictAddressFamilies"));
+        assert!(keys.contains(&"RestrictAddressFamilies"));
         assert!(!keys.contains(&"CPUQuota"));
+        assert!(keys.contains(&"CPUQuotaPerSecUSec"));
         let protect_kernel_modules = worker
             .iter()
             .find(|(key, _)| *key == "ProtectKernelModules")
@@ -2223,12 +2309,14 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
-            panic!("StartTransientUnit failed after leaving RestrictAddressFamilies unset");
+            panic!(
+                "StartTransientUnit rejected RestrictAddressFamilies (bas) deny AF_INET/AF_INET6"
+            );
         }
         let address_families = systemctl_property(name, "RestrictAddressFamilies");
         assert!(
-            address_families.is_empty() || address_families == "~",
-            "PID 1 must not apply RestrictAddressFamilies, got {address_families}"
+            restrict_address_families_applied(&address_families),
+            "PID 1 must apply RestrictAddressFamilies deny-list, got {address_families}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
@@ -2278,15 +2366,12 @@ mod tests {
         let started_worker = systemd.start_transient(UnitKind::Worker, &spec);
         if started_worker.is_err() {
             dump_worker_unit(&spec, started_worker, &where_path);
-            panic!("StartTransientUnit failed after leaving CPUQuota unset");
+            panic!("StartTransientUnit rejected CPUQuotaPerSecUSec=1000000 (t)");
         }
         let cpu_quota = systemctl_property(name, "CPUQuotaPerSecUSec");
         assert!(
-            cpu_quota.is_empty()
-                || cpu_quota == "~"
-                || cpu_quota == "infinity"
-                || cpu_quota.eq_ignore_ascii_case("n/a"),
-            "PID 1 must not apply CPUQuota, got {cpu_quota}"
+            cpu_quota_per_sec_applied(&cpu_quota),
+            "PID 1 must apply CPUQuotaPerSecUSec=1000000 (100%), got {cpu_quota}"
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
@@ -4924,6 +5009,38 @@ mod tests {
         );
     }
 
+    fn cpu_quota_per_sec_applied(value: &str) -> bool {
+        let trimmed = value.trim();
+        trimmed == WORKER_CPU_QUOTA_PER_SEC_USEC.to_string()
+            || trimmed == "1s"
+            || trimmed == "1 s"
+            || trimmed == "1000000us"
+            || trimmed == "1,000,000"
+    }
+
+    fn restrict_address_families_applied(value: &str) -> bool {
+        let tokens: Vec<String> = value
+            .split_whitespace()
+            .map(|token| {
+                token
+                    .trim_matches(|c| c == '"' || c == '\'')
+                    .to_ascii_uppercase()
+            })
+            .filter(|token| !token.is_empty() && token != "~")
+            .collect();
+        if tokens.is_empty() {
+            return false;
+        }
+        let denies_inet = tokens.iter().any(|token| token == "~AF_INET");
+        let denies_inet6 = tokens.iter().any(|token| token == "~AF_INET6");
+        if denies_inet && denies_inet6 {
+            return true;
+        }
+        !tokens
+            .iter()
+            .any(|token| token == "AF_INET" || token == "AF_INET6")
+    }
+
     fn systemctl_property(name: &str, property: &str) -> String {
         let shown = Command::new("systemctl")
             .args(["show", name, "-p", property, "--value"])
@@ -5197,6 +5314,16 @@ mod tests {
                 "User",
                 "-p",
                 "FragmentPath",
+                "-p",
+                "RestrictAddressFamilies",
+                "-p",
+                "CPUQuotaPerSecUSec",
+                "-p",
+                "CPUQuota",
+                "-p",
+                "CPUAccounting",
+                "-p",
+                "PrivateNetwork",
             ])
             .output()
             .expect("systemctl show");
@@ -5204,6 +5331,12 @@ mod tests {
             "systemctl show:\n{}",
             String::from_utf8_lossy(&status.stdout)
         );
+        if !status.stderr.is_empty() {
+            eprintln!(
+                "systemctl show stderr:\n{}",
+                String::from_utf8_lossy(&status.stderr)
+            );
+        }
         let journal = Command::new("journalctl")
             .args(["-b", "-u", name, "--no-pager", "-n", "80"])
             .output()
