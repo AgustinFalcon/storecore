@@ -1,5 +1,12 @@
 # Progreso
 
+## 2026-11-27 — arranque 4C Ready sigue Unavailable
+
+- El harness PID 1 arranca `.mount` y worker, lee `CPUQuotaPerSecUSec` y
+  `RestrictAddressFamilies` efectivos y evalúa `ReadyAttestation`. El
+  resultado es `Unavailable`. `READY` en el wire es `Unknown`.
+- No se marca `003B-4C`. Falta `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C CPUQuota ausente
 
 - PID 1 no aplica `CPUQuota` al worker derivado. El harness arranca

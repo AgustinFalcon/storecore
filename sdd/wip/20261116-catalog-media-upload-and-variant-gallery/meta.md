@@ -161,7 +161,8 @@ sockets ni `Ready`. PR #458 (head `5c03b5f`, merge `9ba69f7`, Verify
 ni `Ready`. PR #460 (head `cb34813`, merge `dd18466`, Verify
 `46084963002` 7/7, dos grok-4.7-medium-fast APPROVED) atesta
 `CPUQuota` ausente (`CPUQuotaPerSecUSec` vacío, `~`, infinity o n/a);
-no cubre `Ready`. El corte de `Ready` no está en este persist. PR #326
+no cubre `Ready`. El corte de `Ready` sigue `Unavailable`; no cierra
+`003B-4C`. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

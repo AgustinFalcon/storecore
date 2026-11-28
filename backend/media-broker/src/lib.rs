@@ -6,6 +6,7 @@ pub mod daemon;
 pub mod dbus;
 pub mod journal;
 pub mod protocol;
+pub mod ready;
 pub mod reconcile;
 pub mod runtime;
 pub mod snapshot;
