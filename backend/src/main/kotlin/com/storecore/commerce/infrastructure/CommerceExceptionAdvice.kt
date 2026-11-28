@@ -16,6 +16,9 @@ import com.storecore.commerce.application.WebhookPayloadTooLarge
 import com.storecore.commerce.application.WebhookRateLimited
 import com.storecore.commerce.application.ReturnDispositionRejected
 import com.storecore.identity.infrastructure.web.BaseResponse
+import com.storecore.loyalty.application.LoyaltyCheckoutConflict
+import com.storecore.loyalty.application.LoyaltyEvidenceIneligible
+import com.storecore.loyalty.application.LoyaltyReservationNotFound
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -23,6 +26,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class CommerceExceptionAdvice {
+    @ExceptionHandler(LoyaltyReservationNotFound::class)
+    fun loyaltyNotFound() = error(HttpStatus.NOT_FOUND, "NOT_FOUND", false)
+
+    @ExceptionHandler(LoyaltyCheckoutConflict::class, LoyaltyEvidenceIneligible::class)
+    fun loyaltyConflict(exception: RuntimeException) = error(HttpStatus.CONFLICT, exception.message ?: "LOYALTY_CONFLICT", false)
+
     @ExceptionHandler(ReturnDispositionRejected::class)
     fun disposition(exception: ReturnDispositionRejected) = error(HttpStatus.CONFLICT, exception.message ?: "RMA_CONFLICT", false)
     @ExceptionHandler(InvalidWebhookSignature::class)

@@ -785,9 +785,29 @@ class MpOrdersCheckoutIntegrationTest(
             assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())
         }
         jdbc.update("UPDATE payments SET status='APPROVED' WHERE order_id=?", orderId)
-        jdbc.update("UPDATE payments SET amount=amount+1 WHERE order_id=?", orderId)
-        assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())
-        jdbc.update("UPDATE payments SET amount=amount-1 WHERE order_id=?", orderId)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataIntegrityViolationException::class.java) {
+            jdbc.update("UPDATE payments SET amount=amount+1 WHERE order_id=?", orderId)
+        }
+        val unfrozenKey = UUID.randomUUID()
+        val unfrozenClaimId = jdbc.queryForObject(
+            "INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) SELECT customer_id,?,checkout_request_hash,checkout_snapshot,'COMPLETED' FROM orders WHERE id=? RETURNING id",
+            Long::class.java,
+            unfrozenKey, orderId,
+        )!!
+        val unfrozenOrderId = jdbc.queryForObject(
+            """INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency)
+               SELECT 'SC-UNFROZEN-'||id, ?, ?, checkout_request_hash, customer_id, 'PAID', buyer_snapshot, checkout_snapshot, subtotal, shipping_cost, total, currency
+               FROM orders WHERE id=? RETURNING id""",
+            Long::class.java,
+            unfrozenClaimId, unfrozenKey, orderId,
+        )!!
+        jdbc.update(
+            "INSERT INTO order_items(order_id,variant_id,offer_id,campaign_reference,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal) SELECT ?,variant_id,offer_id,campaign_reference,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal FROM order_items WHERE order_id=?",
+            unfrozenOrderId, orderId,
+        )
+        jdbc.update("INSERT INTO payments(order_id,external_reference,status,amount,currency) SELECT ?,external_reference||'-UNFROZEN','APPROVED',amount+1,currency FROM payments WHERE order_id=?", unfrozenOrderId, orderId)
+        jdbc.update("INSERT INTO shipments(order_id,status) VALUES (?,'PENDING')", unfrozenOrderId)
+        assertEquals(400, command(unfrozenOrderId, "shipments", "PACKED").statusCode.value())
         val reservationId = jdbc.queryForObject("SELECT reservation_id FROM inventory_ledger WHERE actor=? AND event_type='SALE' AND channel='WEB'", Long::class.java, "MP_ORDERS:$orderId")!!
         jdbc.update("UPDATE inventory_reservations SET quantity=quantity+1 WHERE id=?", reservationId)
         assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())

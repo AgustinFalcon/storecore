@@ -44,7 +44,25 @@ class JdbcFulfillmentEvidence(private val jdbc: JdbcTemplate,private val mapper:
                   WHERE c.order_id=p.order_id AND c.transition='PAYMENT_ACCREDITED' AND a.payment_id=p.id
                     AND a.order_id=c.order_id AND a.provider_order_id=c.provider_order_id))""", Boolean::class.java, orderId,
         ) ?: true
-        return FulfillmentSnapshot(header.status, header.total, header.currency, payments, blocked, items, sales, contradictoryPayment,header.decision)
+        val contradictoryLoyalty = jdbc.queryForObject(
+            """SELECT EXISTS(
+                 SELECT 1 FROM orders o
+                 JOIN loyalty_order_snapshots los ON los.order_id=o.id
+                 WHERE o.id=? AND (
+                   o.currency<>'ARS'
+                   OR o.subtotal*100<>los.net_subtotal_minor
+                   OR o.shipping_cost*100<>los.shipping_minor
+                   OR o.total*100<>los.total_minor
+                   OR (los.reservation_id IS NOT NULL AND NOT EXISTS (
+                     SELECT 1 FROM loyalty_checkout_bindings b
+                     JOIN loyalty_reservation_states st ON st.reservation_id=b.reservation_id
+                     WHERE b.reservation_id=los.reservation_id AND b.order_id=o.id
+                       AND st.state IN ('PAYMENT_PENDING','RECONCILIATION_REQUIRED','COMMITTED')
+                   ))
+                 )
+               )""", Boolean::class.java, orderId,
+        ) ?: true
+        return FulfillmentSnapshot(header.status, header.total, header.currency, payments, blocked, items, sales, contradictoryPayment || contradictoryLoyalty, header.decision)
     }
 
     fun paymentStatus(orderId: Long, snapshot: FulfillmentSnapshot): PaymentStatus {

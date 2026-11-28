@@ -29,6 +29,25 @@ object LoyaltyQuoteEvidenceStep {
             ?: return unavailable(LoyaltyEvidenceUnavailableReason.CONTRADICTORY_BREAKDOWN)
         return LoyaltyEvidenceAdmission.Available(LoyaltyQuoteEvidence(cartFingerprint, revision, lines, selectedPoints, quote.discountMinor, base))
     }
+
+    fun rehydrate(
+        cartFingerprint: CartFingerprint,
+        revision: LoyaltyEvidenceRevision,
+        expectedHash: LoyaltyFingerprint,
+        lines: List<LoyaltyFrozenLine>,
+        selectedPoints: LoyaltyPoints,
+        discountMinor: LoyaltyMinorUnits,
+    ): LoyaltyQuoteEvidence? {
+        if (lines.isEmpty() || lines.map { it.cart.cartItemId }.toSet().size != lines.size) return null
+        if (lines.any { it.cart.discountState != LoyaltyDiscountState.NONE }) return null
+        if (selectedPoints.value <= 0 || discountMinor.value <= 0) return null
+        val base = LoyaltyCheckedMoney.sum(lines.map { it.eligiblePreRedemption }) ?: return null
+        if (LoyaltyCheckedMoney.sum(lines.map { it.grossLineBeforeLoyalty }) == null) return null
+        val quote = LoyaltyPolicyV1.quote(selectedPoints, base, selectedPoints, LoyaltyDiscountState.NONE).quote ?: return null
+        if (quote.discountMinor != discountMinor) return null
+        val evidence = LoyaltyQuoteEvidence(cartFingerprint, revision, lines, selectedPoints, discountMinor, base)
+        return evidence.takeIf { it.hash == expectedHash }
+    }
 }
 
 data class LoyaltyOrderItemCorrelation(val orderItemId: Long, val evidence: LoyaltyFrozenLine)
