@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-28 — arranque 4C tipos D-Bus CPUQuota y RestrictAddressFamilies
+
+- `StartTransientUnit` deriva `CPUQuotaPerSecUSec=1000000` (`t`, 100%) y
+  `RestrictAddressFamilies=(false, ["AF_INET", "AF_INET6"])` (`(bas)`),
+  con `PrivateNetwork=true`. No usa el string `CPUQuota` ni `as`.
+- El harness PID 1 debe atestar esas propiedades efectivas. `SELF_TEST`
+  y `NORMALIZE` existentes siguen corriendo en la misma unidad. El corte
+  no emite `Ready`.
+- No se marca `003B-4C`. Falta `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C Ready sigue Unavailable
 
 - El harness PID 1 arranca `.mount` y worker, lee `CPUQuotaPerSecUSec` y

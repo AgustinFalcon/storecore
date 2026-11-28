@@ -1,9 +1,10 @@
 //! Effective Ready attestation for MEDIA-NORMALIZE-003B-4C.
 //!
 //! ADR-001 only allows `Ready` when every live sandbox property matches. This
-//! cut observes `CPUQuota` and `RestrictAddressFamilies`. Absence, a laxer
-//! value, or an unreadable value is [`ReadyAttestation::Unavailable`]. `Ready`
-//! is not a variant until those properties and the rest of ADR-001 match.
+//! cut still has no `Ready` variant: even a finite `CPUQuotaPerSecUSec` and a
+//! deny-list `RestrictAddressFamilies` evaluate to
+//! [`ReadyAttestation::Unavailable`]. Absence, a laxer value, or an unreadable
+//! value is also `Unavailable`.
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReadyAttestation {
