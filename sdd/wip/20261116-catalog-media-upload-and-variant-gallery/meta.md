@@ -21,7 +21,9 @@ como autoridad de media administrada.
 
 Las especificaciones y las 15 tareas siguen vigentes. TASK-001/002/004 están
 integradas; TASK-003 continúa abierto aunque el claim atómico MEDIA-CREATE y los
-subcortes durables previos ya fueron entregados. No se reimplementan.
+subcortes durables previos ya fueron entregados. No se reimplementan. Su
+residual de recuperación técnica de uploads, corpus crash-replay y matriz de
+scope cruzado está en validación.
 
 MEDIA-NORMALIZE-003B-1/2/3 y `003B-4A`/`003B-4B-1`/`003B-4B-2` están
 integrados. PR #320 arranca `003B-4B-3` (`FakeSystemd`, no PID 1). PR #328

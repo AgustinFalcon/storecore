@@ -128,11 +128,45 @@ class JdbcMediaCommandRepository(
         MediaUploadClaimResult.Claimed(mapUploadLease(claimed, leaseOwner))
     }!!
 
+    override fun claimStaleUpload(leaseOwner: UUID, now: Instant, duration: Duration): MediaUploadLease? = isolated.execute {
+        require(!duration.isNegative && !duration.isZero)
+        // Only the draft row is locked here; SKIP LOCKED lets a human draft transaction win without blocking the sweep.
+        val candidate = jdbc.queryForList(
+            """SELECT d.id draft_id,c.upload_id FROM media_upload_commands c
+               JOIN catalog_media_drafts d ON d.id=c.draft_id
+               JOIN media_assets a ON a.id=c.asset_id
+               WHERE c.state='CLAIMED' AND c.lease_until<=GREATEST(clock_timestamp(),?::timestamptz)
+                 AND a.state='AWAITING_BYTES' AND d.state='OPEN' AND d.expires_at>clock_timestamp()
+               ORDER BY c.lease_until,c.draft_id,c.upload_id LIMIT 1 FOR UPDATE OF d SKIP LOCKED""",
+            Timestamp.from(now),
+        ).singleOrNull() ?: return@execute null
+        val draftId = requireNotNull(CatalogMediaDraftId.fromWire((candidate["draft_id"] as UUID).toString()))
+        val uploadId = requireNotNull(UploadId.fromWire((candidate["upload_id"] as UUID).toString()))
+        val draft = jdbc.queryForMap("SELECT state,expires_at FROM catalog_media_drafts WHERE id=?", draftId.value)
+        val row = uploadRow(draftId, uploadId, forUpdate = true) ?: return@execute null
+        val draftCheckedAt = jdbc.queryForObject("SELECT clock_timestamp()", Timestamp::class.java)!!.toInstant()
+        if (CatalogMediaDraftState.fromWire(draft["state"] as? String) != CatalogMediaDraftState.OPEN ||
+            draft.instant("expires_at") <= draftCheckedAt ||
+            MediaCommandState.fromWire(row["command_state"] as? String) != MediaCommandState.CLAIMED ||
+            row.instant("lease_until") > maxOf(now, draftCheckedAt) ||
+            MediaAssetState.fromWire(row["asset_state"] as? String) != MediaAssetState.AWAITING_BYTES
+        ) return@execute null
+        val updated = jdbc.update(
+            """UPDATE media_upload_commands SET lease_owner=?,
+                   lease_until=GREATEST(clock_timestamp(),?::timestamptz)+?*interval '1 millisecond',
+                   fence_version=fence_version+1,updated_at=GREATEST(clock_timestamp(),created_at)
+               WHERE draft_id=? AND upload_id=? AND state='CLAIMED' AND fence_version=?
+                 AND lease_until<=GREATEST(clock_timestamp(),?::timestamptz)""",
+            leaseOwner.toString(), Timestamp.from(now), duration.toMillis(), draftId.value, uploadId.value,
+            (row["fence_version"] as Number).toLong(), Timestamp.from(now),
+        )
+        if (updated != 1) return@execute null
+        mapUploadLease(requireNotNull(uploadRow(draftId, uploadId, forUpdate = false)), leaseOwner)
+    }
+
     override fun confirmStored(lease: MediaUploadLease, lookup: ObjectLookupOutcome.Present, providerKind: MediaProviderKind, now: Instant): Boolean = isolated.execute {
-        if (providerKind == MediaProviderKind.UNKNOWN || providerKind == MediaProviderKind.UNCONFIGURED ||
-            lookup.providerKey != lease.deterministicKey || lookup.digest != lease.snapshot.normalizedDigest ||
-            lookup.size != lease.normalizedSize.value || lookup.metadata.format != lease.format || lookup.metadata.dimensions != lease.dimensions
-        ) return@execute false
+        if (providerKind == MediaProviderKind.UNKNOWN || providerKind == MediaProviderKind.UNCONFIGURED || !lease.isProvenBy(lookup))
+            return@execute false
         val row = lockedLiveUpload(lease, now) ?: return@execute false
         if (row["deterministic_key"] != lookup.providerKey.value) return@execute false
         check(jdbc.update(

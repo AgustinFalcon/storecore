@@ -89,7 +89,14 @@ data class MediaUploadLease(
     val leaseOwner: UUID,
     val leaseUntil: Instant,
     val fenceVersion: Long,
-)
+) {
+    fun isProvenBy(lookup: ObjectLookupOutcome.Present): Boolean =
+        lookup.providerKey == deterministicKey &&
+            lookup.digest == snapshot.normalizedDigest &&
+            lookup.size == normalizedSize.value &&
+            lookup.metadata.format == format &&
+            lookup.metadata.dimensions == dimensions
+}
 
 sealed interface MediaUploadClaimResult {
     data class Claimed(val lease: MediaUploadLease) : MediaUploadClaimResult
@@ -129,6 +136,8 @@ interface MediaCommandRepository {
         now: Instant,
         duration: Duration,
     ): MediaUploadClaimResult
+    /** Technical scope: only an expired upload lease of a draft that is still open and unexpired. */
+    fun claimStaleUpload(leaseOwner: UUID, now: Instant, duration: Duration): MediaUploadLease?
     fun confirmStored(lease: MediaUploadLease, lookup: ObjectLookupOutcome.Present, providerKind: MediaProviderKind, now: Instant): Boolean
     fun retryUpload(lease: MediaUploadLease, now: Instant): Boolean
     fun failUpload(lease: MediaUploadLease, failure: MediaFailureCode, now: Instant): Boolean

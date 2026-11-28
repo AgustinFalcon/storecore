@@ -56,9 +56,12 @@ class MediaUploadWorker(
     }
 
     private fun finalize(lease: MediaUploadLease): MediaUploadRun = when (val lookup = objects.head(lease.deterministicKey)) {
-        is ObjectLookupOutcome.Present -> if (commands.confirmStored(lease, lookup, objects.kind, clock.instant()))
-            MediaUploadRun.Stored(commands.findUpload(lease.snapshot.ownerId, lease.snapshot.draftId, lease.snapshot.uploadId)!!)
-        else MediaUploadRun.Busy
+        is ObjectLookupOutcome.Present -> when {
+            !lease.isProvenBy(lookup) -> fail(lease, MediaFailureCode.SCOPE_CONFLICT)
+            commands.confirmStored(lease, lookup, objects.kind, clock.instant()) ->
+                MediaUploadRun.Stored(commands.findUpload(lease.snapshot.ownerId, lease.snapshot.draftId, lease.snapshot.uploadId)!!)
+            else -> MediaUploadRun.Busy
+        }
         ObjectLookupOutcome.Absent, ObjectLookupOutcome.Unavailable, ObjectLookupOutcome.Unknown -> retry(lease)
         ObjectLookupOutcome.DigestMismatch -> fail(lease, MediaFailureCode.SCOPE_CONFLICT)
     }
@@ -68,6 +71,49 @@ class MediaUploadWorker(
 
     private fun fail(lease: MediaUploadLease, code: MediaFailureCode): MediaUploadRun =
         if (commands.failUpload(lease, code, clock.instant())) MediaUploadRun.Failed else MediaUploadRun.Busy
+}
+
+sealed interface MediaUploadRecoveryRun {
+    data object Idle : MediaUploadRecoveryRun
+    data class Recovered(val snapshot: MediaUploadSnapshot) : MediaUploadRecoveryRun
+    data object AwaitingBytes : MediaUploadRecoveryRun
+    data object Deferred : MediaUploadRecoveryRun
+    data object Failed : MediaUploadRecoveryRun
+    data object LeaseLost : MediaUploadRecoveryRun
+}
+
+/**
+ * Finishes uploads whose claimant died after its lease expired. It never holds bytes, so an absent
+ * object returns to AWAITING_BYTES for the owner to resend; an unreadable store keeps the lease until
+ * it expires and the next sweep fences it again.
+ */
+class MediaUploadRecoveryWorker(
+    private val commands: MediaCommandRepository,
+    private val objects: MediaObjectStore,
+    private val ioGuard: ExternalMediaIoGuard,
+    private val clock: Clock,
+    private val leaseDuration: Duration = Duration.ofMinutes(2),
+) {
+    fun runOne(workerId: UUID): MediaUploadRecoveryRun {
+        ioGuard.requireNoActiveTransaction()
+        val lease = commands.claimStaleUpload(workerId, clock.instant(), leaseDuration) ?: return MediaUploadRecoveryRun.Idle
+        return when (val lookup = objects.head(lease.deterministicKey)) {
+            is ObjectLookupOutcome.Present -> when {
+                !lease.isProvenBy(lookup) -> fail(lease)
+                commands.confirmStored(lease, lookup, objects.kind, clock.instant()) ->
+                    MediaUploadRecoveryRun.Recovered(commands.findUpload(lease.snapshot.ownerId, lease.snapshot.draftId, lease.snapshot.uploadId)!!)
+                else -> MediaUploadRecoveryRun.LeaseLost
+            }
+            ObjectLookupOutcome.Absent ->
+                if (commands.retryUpload(lease, clock.instant())) MediaUploadRecoveryRun.AwaitingBytes else MediaUploadRecoveryRun.LeaseLost
+            ObjectLookupOutcome.DigestMismatch -> fail(lease)
+            ObjectLookupOutcome.Unavailable, ObjectLookupOutcome.Unknown -> MediaUploadRecoveryRun.Deferred
+        }
+    }
+
+    private fun fail(lease: MediaUploadLease): MediaUploadRecoveryRun =
+        if (commands.failUpload(lease, MediaFailureCode.SCOPE_CONFLICT, clock.instant())) MediaUploadRecoveryRun.Failed
+        else MediaUploadRecoveryRun.LeaseLost
 }
 
 sealed interface MediaDeleteRun {

@@ -167,6 +167,24 @@ assets UUID en estados candidatos, para excluir historial retenido del barrido;
 V27/V28 permanecen inmutables. `CLAIMED` de draft es el claim final y atómico
 de alta, no una lease upload: sus referencias publicadas siempre se preservan.
 
+## Subcorte TASK-003: recuperación técnica de uploads
+
+Un claimant que muere entre `putIfAbsent` y Tx-B deja el comando `CLAIMED`.
+`MediaUploadRecoveryWorker` lo retoma con scope técnico, sin actor ni CSRF:
+`claimStaleUpload` sólo elige comandos `CLAIMED` con lease vencida, asset
+`AWAITING_BYTES` y draft `OPEN` no vencido según `clock_timestamp()`. Bloquea
+draft con `SKIP LOCKED`, luego asset y upload; nunca toma producto ni delete.
+Revalida todo después de los locks, incrementa fence y fija una lease nueva.
+
+Fuera de transacción ejecuta `head`. Un objeto probado (key, digest, tamaño,
+formato y dimensiones) confirma Tx-B; uno ausente vuelve a `AWAITING_BYTES`
+para que el owner reenvíe bytes; `DigestMismatch` o un objeto no probado falla
+cerrado con `SCOPE_CONFLICT` sin borrar bytes; `Unavailable`/`Unknown` conserva
+la lease hasta su vencimiento y el siguiente barrido vuelve a fencear. El
+worker nunca inventa bytes. Drafts cerrados o vencidos quedan para el barrido
+de expiración/GC. El scheduling productivo y la revalidación del kill switch
+media dependen de la capability que define TASK-007.
+
 ## Inspección y normalización
 
 - un `OncePerRequestFilter` anterior al `DispatcherServlet` valida Origin,
