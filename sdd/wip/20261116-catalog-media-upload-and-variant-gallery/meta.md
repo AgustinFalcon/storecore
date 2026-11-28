@@ -167,8 +167,9 @@ no cubre `Ready`. PR #462 (head `afaf15d`, merge `c85e495`, Verify
 cierra `003B-4C` ni `Ready`. PR #464 (head `d1e1250`, merge `454da38`,
 Verify `46124265198` 7/7, dos grok-4.7-medium-fast APPROVED) aplica
 `CPUQuotaPerSecUSec` (`t`) y `RestrictAddressFamilies` (`(bas)`) deny
-`AF_INET`/`AF_INET6`; `ReadyAttestation` sigue `Unavailable` y no
-cierra `003B-4C`. PR #326
+`AF_INET`/`AF_INET6`; `ReadyAttestation` sigue `Unavailable` en ese
+merge. El corte `ReadyAttestation::Ready` evalúa cuota 100% y deny-list
+inet en PID 1; no cierra `003B-4C` ni la factory. PR #326
 arranca
 `003B-4B-4` (head `7afcbfa`, merge `2994043`, Verify
 `44940481556` 6/6, dos Grok 4.7 APPROVED) con adapter stdio y capability

@@ -1,5 +1,15 @@
 # Progreso
 
+## 2026-11-28 — arranque 4C ReadyAttestation::Ready
+
+- `ReadyAttestation` agrega el caso `Ready`. `from_wire("READY")` es
+  `Ready`. `from_effective` lo produce cuando `CPUQuotaPerSecUSec` es
+  100% y `RestrictAddressFamilies` niega `AF_INET`/`AF_INET6`.
+- El harness PID 1 JobId `[0x3c;16]` evalúa esas lecturas vivas. Ausencia
+  o valor más laxo sigue `Unavailable`.
+- No se marca `003B-4C`. La factory sigue `Unavailable`. Falta HTTP de
+  media.
+
 ## 2026-11-28 — arranque 4C tipos D-Bus CPUQuota y RestrictAddressFamilies
 
 - `StartTransientUnit` deriva `CPUQuotaPerSecUSec=1000000` (`t`, 100%) y
