@@ -47,10 +47,19 @@ Result: 139 tests, 0 failures, 0 errors, 0 skipped; build successful. Clean inst
 - two independent GPT-6.1 Sol medium reviews: architecture/domain/bug lane and database/security/concurrency lane.
 - hosted PR CI and exact-head review receipts.
 
+### Hosted CI corrective iteration
+
+- PR #466 run `46122669702` completed the full backend suite with 970 tests, 0 failures, 1 error and 1 skipped. The only error was `StoreCoreApplicationTest.contextLoads`: `LoyaltyCheckoutEvidenceService` was registered while the smoke context intentionally disabled identity and `DataSourceAutoConfiguration`, so no `JdbcTemplate` existed.
+- Root cause: `JdbcCartService` already shares the `storecore.identity.enabled` lifecycle, but its newly extracted JDBC collaborator did not. The service now has the same `@ConditionalOnProperty` boundary; no database or checkout behavior was weakened.
+- Regression command: `mvn.cmd -B -f backend/pom.xml "-Dtest=StoreCoreApplicationTest" test`.
+- Regression result: 1 test, 0 failures, 0 errors, 0 skipped; build successful.
+- Post-correction integrated matrix: the complete 96-test D2 matrix above passed again against PostgreSQL 16 with 0 failures, 0 errors and 0 skipped.
+
 ### Corrective history retained
 
 - The first combined run exposed one failure in the new historical replay scenario: the fake provider was still configured to return timeout, so no checkout URL could be attached. The fixture was corrected to return a verified provider success; the focal regression and the complete 96-test matrix then passed.
 - The concurrency matrix was iterated from invalid fixtures to valid security evidence and root SQL-state assertions before reaching 7/7 green. Production V45 did not need to be weakened for those corrections.
+- The first hosted CI run exposed the missing bean lifecycle condition described above. The exact CI failure is retained here; the correction is covered by the previously failing smoke test and by a fresh 96-test D2 matrix.
 
 ### Structural gate
 

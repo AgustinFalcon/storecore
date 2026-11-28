@@ -5,6 +5,7 @@ import com.storecore.commerce.application.CheckoutContextChanged
 import com.storecore.identity.domain.CustomerPrincipal
 import com.storecore.loyalty.application.LoyaltyCheckoutPlan
 import com.storecore.loyalty.domain.*
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.ConnectionCallback
 import org.springframework.stereotype.Service
@@ -13,6 +14,7 @@ import java.util.UUID
 
 /** Joins the existing local checkout transaction; no provider or independent transaction. */
 @Service
+@ConditionalOnProperty(name = ["storecore.identity.enabled"], havingValue = "true", matchIfMissing = true)
 class LoyaltyCheckoutEvidenceService(private val jdbc: JdbcTemplate, private val mapper: ObjectMapper) {
     fun lockCatalog(customer: CustomerPrincipal, variants: List<Long>) {
         jdbc.execute(ConnectionCallback<Unit> { connection ->
