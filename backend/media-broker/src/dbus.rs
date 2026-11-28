@@ -895,7 +895,7 @@ mod tests {
     }
 
     #[test]
-    fn derived_worker_ready_stays_unavailable() {
+    fn derived_worker_ready_from_applied_properties() {
         let job = JobId::create([0xab; 16]).expect("job");
         let runtime = approved_runtime();
         let spec = TransientUnits::derive(
@@ -912,11 +912,11 @@ mod tests {
         assert!(keys.contains(&"RestrictAddressFamilies"));
         assert_eq!(
             crate::ready::ReadyAttestation::from_effective("1000000", "~AF_INET ~AF_INET6"),
-            crate::ready::ReadyAttestation::Unavailable
+            crate::ready::ReadyAttestation::Ready
         );
         assert_eq!(
             crate::ready::ReadyAttestation::from_wire("READY"),
-            crate::ready::ReadyAttestation::Unknown
+            crate::ready::ReadyAttestation::Ready
         );
     }
 
@@ -2393,7 +2393,7 @@ mod tests {
 
     #[test]
     #[ignore = "requires root, systemd PID 1, approved Java/jar, and the system bus"]
-    fn pid1_worker_ready_stays_unavailable() {
+    fn pid1_worker_ready_from_applied_properties() {
         assert_eq!(
             fs::read_to_string("/proc/1/comm")
                 .expect("pid1 comm")
@@ -2433,11 +2433,12 @@ mod tests {
         let address_families = systemctl_property(name, "RestrictAddressFamilies");
         assert_eq!(
             crate::ready::ReadyAttestation::from_effective(&cpu_quota, &address_families),
-            crate::ready::ReadyAttestation::Unavailable
+            crate::ready::ReadyAttestation::Ready,
+            "Ready needs 100% quota and inet deny-list, got {cpu_quota:?} {address_families:?}"
         );
         assert_eq!(
             crate::ready::ReadyAttestation::from_wire("READY"),
-            crate::ready::ReadyAttestation::Unknown
+            crate::ready::ReadyAttestation::Ready
         );
         let stopped_worker = systemd.stop(UnitKind::Worker, &spec).expect("stop worker");
         assert!(matches!(
