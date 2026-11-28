@@ -217,6 +217,23 @@ class StoreCoreCreatedOrderReportPostgresTest(
         assertEquals("DRILL-HIST", sellers.items.single().sku)
     }
 
+    @Test fun `unavailable loyalty evidence keeps the exact legacy gross line fallback`() {
+        TransactionTemplate(DataSourceTransactionManager(source)).executeWithoutResult {
+            val order = order("2002-10-15T12:00:00Z", "310.00", "300.00", "10.00")
+            soldItem(order, 3, "Unclassified Drill", "NO-PROFILE")
+            accreditation(order, "310.00", "2002-11-01T12:00:00Z", "APPROVED")
+            val payment = jdbc.queryForObject("SELECT id FROM payments WHERE order_id=?", Long::class.java, order)!!
+            jdbc.update("""INSERT INTO loyalty_order_snapshots(order_id,payment_id,cart_fingerprint,policy_version,
+                availability,unavailable_reason,net_subtotal_minor,shipping_minor,total_minor,discount_minor,recorded_at)
+                VALUES (?,?,?,'loyalty-policy-v1','UNAVAILABLE','MISSING_PROFILE',30000,1000,31000,0,'2002-10-15T12:00:00Z')""",
+                order, payment, "a".repeat(64))
+        }
+        val found = assertIs<StoreCoreCreatedOrderReadResult.Found>(repository.read("2002-11-01", "2002-12-01"))
+        assertEquals("310.00", found.report.appliedAccreditationsValue()!!.confirmedGross.wire)
+        assertEquals("300.00", found.report.appliedAccreditationsValue()!!.merchandiseSubtotal.wire)
+        assertEquals("3", found.report.bestSellersValue()!!.items.single().grossUnits.wire)
+    }
+
     @Test fun `contradictory applied accreditation fails the aggregate closed`() {
         val order = order("2023-10-15T12:00:00Z", "110.00", "100.00", "10.00")
         soldItem(order, 1, "Contradictory Drill", "DRILL-BAD")

@@ -121,7 +121,7 @@ class LoyaltyCheckoutEvidenceMigrationTest {
         val order=jdbc.queryForObject("""INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total)
             VALUES (?,?,?,?,?,'{}','{}',89400.03,10,89410.03) RETURNING id""",Long::class.java,UUID.randomUUID().toString(),claim,key,"c".repeat(64),customer)!!
         val item=jdbc.queryForObject("""INSERT INTO order_items(order_id,variant_id,product_snapshot,quantity,original_unit_price,effective_unit_price,subtotal)
-            VALUES (?,?,'{}',3,30000.01,30000.01,90000.03) RETURNING id""",Long::class.java,order,variant)!!
+            VALUES (?,?,'{"sku":"EVIDENCE","name":"Evidence item"}',3,30000.01,30000.01,90000.03) RETURNING id""",Long::class.java,order,variant)!!
         val payment=jdbc.queryForObject("INSERT INTO payments(order_id,external_reference,amount) VALUES (?,?,89410.03) RETURNING id",Long::class.java,order,UUID.randomUUID().toString())!!
         jdbc.update("""INSERT INTO loyalty_order_snapshots VALUES (?,? ,?,'loyalty-policy-v1','AVAILABLE',NULL,?,? ,8940003,1000,8941003,60000,7440003,'2026-11-26T00:01:00Z',0,0)""",order,payment,"a".repeat(64),reservation,"b".repeat(64))
         jdbc.update("""INSERT INTO loyalty_order_lines VALUES (?,?,?,?,?,3,3,3000001,3000001,9000003,7500003,1500000,7500003,60000,8940003,7440003,'STANDARD','NONE')""",order,item,cartItem,variant,profile)
@@ -153,6 +153,7 @@ class LoyaltyCheckoutEvidenceMigrationTest {
             bindEvidence(db,reservation,variant,profile)
         }
         val (order,item,payment)=result
+        reconcileProviderAndReporting(jdbc, order, item, payment)
         val source=tx(jdbc) { commerceOrder(it, variant) }
         val moveFailure=assertThrows(DataAccessException::class.java) {
             jdbc.update("UPDATE order_items SET order_id=? WHERE id=?",order,source.second)
@@ -183,6 +184,55 @@ class LoyaltyCheckoutEvidenceMigrationTest {
         }
         assertThrows(DataAccessException::class.java) { jdbc.update("UPDATE loyalty_reservation_states SET state='EXPIRED',revision=3 WHERE reservation_id=?",reservation) }
         assertEquals(600L,jdbc.queryForObject("SELECT sum(held) FROM loyalty_lot_partitions WHERE wallet_id=(SELECT wallet_id FROM loyalty_reservations WHERE id=?)",Long::class.java,reservation))
+    }
+
+    private fun reconcileProviderAndReporting(jdbc: JdbcTemplate, order: Long, item: Long, payment: Long) {
+        val source = jdbc.dataSource!!
+        val provider = "evidence-provider-${UUID.randomUUID()}"
+        val requests = mutableListOf<com.storecore.commerce.application.port.output.OfficialOrderCreateRequest>()
+        val commands = object : com.storecore.commerce.application.port.output.OfficialOrderCommandPort {
+            override fun configured() = true
+            override fun create(request: com.storecore.commerce.application.port.output.OfficialOrderCreateRequest): com.storecore.commerce.domain.CreationObservation {
+                requests.add(request)
+                return com.storecore.commerce.domain.CreationObservation.VerifiedSuccess(provider, "https://www.mercadopago.com.ar/fixture")
+            }
+            override fun search(query: com.storecore.commerce.application.port.output.OfficialOrderSearchQuery): com.storecore.commerce.application.port.output.OfficialOrderSearchResult = error("No search expected")
+        }
+        val attempts = com.storecore.commerce.infrastructure.mporders.MpCheckoutAttemptService(
+            jdbc,
+            org.springframework.transaction.support.TransactionTemplate(org.springframework.jdbc.datasource.DataSourceTransactionManager(source)),
+            commands,
+            com.storecore.commerce.infrastructure.mporders.MpOrdersProperties(adapter="fake", checkoutUrlHosts=listOf("www.mercadopago.com.ar")),
+            com.fasterxml.jackson.databind.ObjectMapper(),
+        )
+        val attempt = attempts.prepare(order, UUID.randomUUID())
+        assertEquals(java.math.BigDecimal("90000.03"), jdbc.queryForObject("SELECT subtotal FROM order_items WHERE id=?", java.math.BigDecimal::class.java, item))
+        assertEquals(java.math.BigDecimal("89400.03"), jdbc.queryForObject("SELECT subtotal FROM orders WHERE id=?", java.math.BigDecimal::class.java, order))
+        assertEquals(java.math.BigDecimal("89410.03"), jdbc.queryForObject("SELECT amount FROM mp_checkout_attempts WHERE id=?", java.math.BigDecimal::class.java, attempt))
+        assertEquals(jdbc.queryForObject("SELECT total FROM orders WHERE id=?", java.math.BigDecimal::class.java, order),
+            jdbc.queryForObject("SELECT amount FROM payments WHERE id=?", java.math.BigDecimal::class.java, payment))
+        attempts.postAndBind(attempt)
+        assertEquals(java.math.BigDecimal("89410.03"), requests.single().amount)
+        jdbc.update("UPDATE mp_checkout_attempts SET state='ACCREDITED',provider_order_id=? WHERE id=?", provider, attempt)
+        jdbc.update("UPDATE payments SET status='APPROVED' WHERE id=?", payment)
+        val inbox = jdbc.queryForObject("""INSERT INTO mp_order_notification_inbox(raw_topic,query_data_id,provider_order_id_candidate,x_request_id,
+            signature_version,signature_result,envelope_redacted,disposition)
+            VALUES ('merchant_order',?,?,?,'v1','ACCEPTED','{}','PROCESSABLE') RETURNING id""", Long::class.java,
+            provider, provider, UUID.randomUUID().toString())!!
+        jdbc.update("""INSERT INTO mp_order_commercial_applications(inbox_id,attempt_id,order_id,provider_order_id,transition,confirmed_amount,confirmed_currency,applied_at)
+            VALUES (?,?,?,?,'PAYMENT_ACCREDITED',89410.03,'ARS','2001-11-01T12:00:00Z')""", inbox, attempt, order, provider)
+        jdbc.update("""INSERT INTO installation_settings(installation_id,business_name,allowed_host,timezone)
+            VALUES (1,'Evidence','localhost','America/Argentina/Buenos_Aires')
+            ON CONFLICT(installation_id) DO UPDATE SET timezone=EXCLUDED.timezone""")
+        val report = com.storecore.channelreporting.infrastructure.JdbcStoreCoreCreatedOrderReportRepository(
+            source, com.storecore.channelreporting.infrastructure.Sha256ReportPeriodHasher(),
+        ).read("2001-11-01", "2001-12-01")
+        assertTrue(report is com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult.Found)
+        report as com.storecore.channelreporting.application.StoreCoreCreatedOrderReadResult.Found
+        assertEquals("89410.03", report.report.appliedAccreditationsValue()!!.confirmedGross.wire)
+        assertEquals("89400.03", report.report.appliedAccreditationsValue()!!.merchandiseSubtotal.wire)
+        assertEquals("10.00", report.report.appliedAccreditationsValue()!!.shippingAmount.wire)
+        assertEquals("3", report.report.bestSellersValue()!!.items.single().grossUnits.wire)
     }
     private fun unavailableEvidence(jdbc: JdbcTemplate, variant: Long) {
         val order=tx(jdbc) { db ->
