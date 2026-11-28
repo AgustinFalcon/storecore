@@ -314,7 +314,10 @@ pub(crate) fn worker_properties(
         ("LimitDATA", Value::from(WORKER_LIMIT_DATA)),
         ("LimitSTACK", Value::from(WORKER_LIMIT_STACK)),
         ("PrivateNetwork", Value::from(true)),
-        ("CPUQuotaPerSecUSec", Value::from(WORKER_CPU_QUOTA_PER_SEC_USEC)),
+        (
+            "CPUQuotaPerSecUSec",
+            Value::from(WORKER_CPU_QUOTA_PER_SEC_USEC),
+        ),
         ("RestrictAddressFamilies", restrict_address_families()),
         ("PrivateTmp", Value::from(true)),
         ("PrivateDevices", Value::from(true)),
@@ -932,7 +935,10 @@ mod tests {
         assert!(restrict_address_families_applied("AF_UNIX AF_NETLINK"));
         assert!(!restrict_address_families_applied(""));
         assert!(!restrict_address_families_applied("~"));
-        assert!(!restrict_address_families_applied("AF_UNIX AF_INET AF_INET6"));
+        assert!(restrict_address_families_applied("~AF_INET AF_INET6"));
+        assert!(!restrict_address_families_applied(
+            "AF_UNIX AF_INET AF_INET6"
+        ));
     }
 
     #[test]
@@ -5019,22 +5025,30 @@ mod tests {
     }
 
     fn restrict_address_families_applied(value: &str) -> bool {
-        let tokens: Vec<String> = value
+        let trimmed = value.trim();
+        if trimmed.is_empty() || trimmed == "~" {
+            return false;
+        }
+        // systemd dump uses one leading `~` for the whole deny-list:
+        // `~AF_INET AF_INET6` means both families are denied.
+        let deny_list = trimmed.starts_with('~');
+        let tokens: Vec<String> = trimmed
+            .trim_start_matches('~')
             .split_whitespace()
             .map(|token| {
                 token
+                    .trim_start_matches('~')
                     .trim_matches(|c| c == '"' || c == '\'')
                     .to_ascii_uppercase()
             })
-            .filter(|token| !token.is_empty() && token != "~")
+            .filter(|token| !token.is_empty())
             .collect();
         if tokens.is_empty() {
             return false;
         }
-        let denies_inet = tokens.iter().any(|token| token == "~AF_INET");
-        let denies_inet6 = tokens.iter().any(|token| token == "~AF_INET6");
-        if denies_inet && denies_inet6 {
-            return true;
+        if deny_list {
+            return tokens.iter().any(|token| token == "AF_INET")
+                && tokens.iter().any(|token| token == "AF_INET6");
         }
         !tokens
             .iter()
