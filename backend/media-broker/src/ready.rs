@@ -33,10 +33,7 @@ impl ReadyAttestation {
 }
 
 fn cpu_quota_absent(value: &str) -> bool {
-    value.is_empty()
-        || value == "~"
-        || value == "infinity"
-        || value.eq_ignore_ascii_case("n/a")
+    value.is_empty() || value == "~" || value == "infinity" || value.eq_ignore_ascii_case("n/a")
 }
 
 fn families_unrestricted(value: &str) -> bool {
