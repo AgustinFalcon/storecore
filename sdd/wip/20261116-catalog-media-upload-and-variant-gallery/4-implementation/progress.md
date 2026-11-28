@@ -7,6 +7,19 @@
   resultado es `Unavailable`. `READY` en el wire es `Unknown`.
 - No se marca `003B-4C`. Falta `Ready` y HTTP de media.
 
+## 2026-11-27 — persist reviews PR #462, 003B-4C sigue abierto
+
+- Merge #462 `c85e4954839dbc7f9200df3253fcc91e06bfd49a` sobre candidato
+  `afaf15dc24c4c1532fb69c9e91ed2f12c6fb4eeb`. Verify exact-head
+  `46094600247` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr462-architecture.md` y
+  `sdd/reviews/20261127-sol-pr462-security.md`.
+- PID 1 evalúa `CPUQuotaPerSecUSec` y `RestrictAddressFamilies`;
+  `ReadyAttestation` queda `Unavailable`. `READY` en el wire es `Unknown`.
+  No se marca `003B-4C`. Faltan `Ready` y HTTP de media.
+
 ## 2026-11-27 — arranque 4C CPUQuota ausente
 
 - PID 1 no aplica `CPUQuota` al worker derivado. El harness arranca

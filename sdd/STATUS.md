@@ -12,6 +12,19 @@ documento no cierra `003B-4C`. Sigue sin `Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C Ready sigue Unavailable PR #462
+
+`master c85e4954839dbc7f9200df3253fcc91e06bfd49a` integra PR #462. Su
+candidato exacto `afaf15dc24c4c1532fb69c9e91ed2f12c6fb4eeb` pasó Verify
+`46094600247` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261127-sol-pr462-architecture.md` y
+`sdd/reviews/20261127-sol-pr462-security.md`. PID 1 evalúa
+`CPUQuotaPerSecUSec` y `RestrictAddressFamilies` efectivos;
+`ReadyAttestation` queda `Unavailable`. `READY` en el wire es `Unknown`.
+El corte no cierra `003B-4C`: sigue sin `Ready`. `003B-4B-3`, `003B-4B-4`,
+`003B-4`, TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C CPUQuota ausente PR #460
 
 `master dd184665922981bfbad8080621e084cbf372d386` integra PR #460. Su
