@@ -1,5 +1,22 @@
 # Progreso
 
+## 2026-11-28 — TASK-003 recuperación técnica y corpus crash-replay en validación
+
+- Auditoría del residual sobre `master@2f407724`: V27–V30, registro/replay,
+  leases/fencing, CAS, locks attach/delete/GC, expiración y alta atómica ya
+  estaban integrados (#299–#304). Faltaba un worker técnico que retome un
+  claimant muerto entre `put` y Tx-B, el corpus PostgreSQL de puntos de crash
+  y la matriz explícita de scope cruzado.
+- `MediaUploadRecoveryWorker` + `claimStaleUpload`: lease vencida, asset
+  `AWAITING_BYTES` y draft `OPEN` vigente; draft `SKIP LOCKED` → asset →
+  upload; fence +1. `head` probado confirma Tx-B; ausente vuelve a
+  `AWAITING_BYTES`; mismatch/no probado falla cerrado; indisponible conserva la
+  lease. Sin migración nueva; V27–V30 inmutables.
+- Evidencia local con Docker/PostgreSQL 16: recuperación/crash-replay `10/10`
+  y matriz de scope `4/4` bajo `SET ROLE storecore_runtime`. CI exact-head y
+  dos reviews siguen pendientes. Sin HTTP, scheduler productivo, proveedor live
+  ni cambios en `003B-4C`/`media-broker`.
+
 ## 2026-11-27 — arranque 4C Ready sigue Unavailable
 
 - El harness PID 1 arranca `.mount` y worker, lee `CPUQuotaPerSecUSec` y

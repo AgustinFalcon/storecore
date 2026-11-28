@@ -7,8 +7,9 @@
   base aprobada `41948a6`; recalcular contra `master`) compatible con todas las
   filas legales de V1, sin reutilizar migraciones publicadas.
 - [ ] TASK-003 Repositorios, CAS, ownership, lease/fencing y workers (en
-  progreso: upload/delete durable, composición CAS y expiración/limpieza
-  durable integrados; alta atómica en implementación).
+  progreso: upload/delete durable, composición CAS, expiración/limpieza
+  durable y alta atómica integrados; recuperación técnica de uploads, corpus
+  crash-replay y matriz de scope cruzado en validación).
 - [x] TASK-004 Puerto privado y adapter determinista de prueba.
 
 ## Corte B — seguridad y API

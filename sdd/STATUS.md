@@ -1,5 +1,13 @@
 # Estado canónico del SDD — StoreCore
 
+## En implementación — 2026-11-28, TASK-003 recuperación técnica
+
+El residual de TASK-003 agrega `MediaUploadRecoveryWorker` para claimants
+muertos entre `put` y Tx-B, el corpus PostgreSQL crash-replay y la matriz de
+scope cruzado. Sin migración nueva, HTTP de media, scheduler productivo ni
+proveedor live. No toca `003B-4C` ni `media-broker`. TASK-003 sigue abierta
+hasta CI exact-head y dos reviews.
+
 ## En implementación — 2026-11-27, 4C sigue abierto
 
 Siguiente corte: `Ready` (sigue `Unavailable`). El reinicio tras
