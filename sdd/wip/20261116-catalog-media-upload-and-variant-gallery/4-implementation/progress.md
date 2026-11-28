@@ -7,6 +7,19 @@
   ambas unidades. `LimitCPU` sigue siendo el techo interno.
 - No se marca `003B-4C`. Faltan `Ready` y HTTP de media.
 
+## 2026-11-27 — persist reviews PR #460, 003B-4C sigue abierto
+
+- Merge #460 `dd184665922981bfbad8080621e084cbf372d386` sobre candidato
+  `cb34813ce124e2f88dcd88ec66e75a0892b07fb3`. Verify exact-head
+  `46084963002` terminó 7/7. Dos reviews independientes
+  grok-4.7-medium-fast (sustituto autorizado tras cuota de
+  gpt-5.6-sol-medium) aprobaron sin P0–P3:
+  `sdd/reviews/20261127-sol-pr460-architecture.md` y
+  `sdd/reviews/20261127-sol-pr460-security.md`.
+- PID 1 no aplica `CPUQuota` (`CPUQuotaPerSecUSec` vacío, `~`,
+  `infinity` o `n/a`). `LimitCPU` sigue siendo el techo interno. No se
+  marca `003B-4C`. Faltan `Ready` y HTTP de media.
+
 ## 2026-11-27 — persist reviews PR #458, 003B-4C sigue abierto
 
 - Merge #458 `9ba69f7886b359b74cb28b940e6c3041ea81a711` sobre candidato

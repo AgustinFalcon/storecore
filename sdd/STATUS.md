@@ -12,6 +12,19 @@ documento no cierra `003B-4C`. Sigue sin `Ready`. `003B-4B-3`, `003B-4B-4`,
 `003B-4C`, `003B-4`, TASK-005 y #7 siguen abiertos. Este corte no
 agrega HTTP de media.
 
+## Master vigente — 2026-11-27, 4C CPUQuota ausente PR #460
+
+`master dd184665922981bfbad8080621e084cbf372d386` integra PR #460. Su
+candidato exacto `cb34813ce124e2f88dcd88ec66e75a0892b07fb3` pasó Verify
+`46084963002` 7/7. Dos reviews independientes grok-4.7-medium-fast
+(sustituto autorizado tras cuota de gpt-5.6-sol-medium) aprobaron sin
+P0–P3: `sdd/reviews/20261127-sol-pr460-architecture.md` y
+`sdd/reviews/20261127-sol-pr460-security.md`. PID 1 no aplica
+`CPUQuota` al worker derivado (`CPUQuotaPerSecUSec` vacío, `~`,
+`infinity` o `n/a`). `LimitCPU` sigue siendo el techo interno. El corte
+no cierra `003B-4C`: falta `Ready`. `003B-4B-3`, `003B-4B-4`, `003B-4`,
+TASK-005 y #7 siguen abiertos. No hay HTTP de media.
+
 ## Master vigente — 2026-11-27, 4C RestrictAddressFamilies ausente PR #458
 
 `master 9ba69f7886b359b74cb28b940e6c3041ea81a711` integra PR #458. Su
