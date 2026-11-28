@@ -2,7 +2,7 @@
 
 ## En implementación — 2026-11-27, 4C sigue abierto
 
-Siguiente corte: `Ready`. El reinicio tras
+Siguiente corte: `Ready` (sigue `Unavailable`). El reinicio tras
 `Allocated`, `InputSealed`, `Starting`, `Running`, `Terminating`,
 `Terminal` y `Quarantined`, inventario Active esperado e inesperado,
 mmap, FD,
