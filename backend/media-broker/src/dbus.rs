@@ -45,7 +45,7 @@ const WORKER_LIMIT_FSIZE: u64 = crate::systemd::MOUNT_BYTES;
 const WORKER_LIMIT_CPU: u64 = WORKER_RUNTIME_MAX_USEC / 1_000_000;
 /// One full CPU. systemd D-Bus exposes `CPUQuotaPerSecUSec` as `t`
 /// (microseconds per second). `1_000_000` is `CPUQuota=100%`. The unit-file
-/// string `CPUQuota` is not a StartTransientUnit property.
+/// string `CPUQuota` is not a `StartTransientUnit` property.
 const WORKER_CPU_QUOTA_PER_SEC_USEC: u64 = 1_000_000;
 /// Address-space ceiling. Derived internally as 32× `IMAGE_IO_V1` heap so
 /// `HotSpot` can map the runtime while remaining bounded. Equal to
@@ -335,7 +335,7 @@ pub(crate) fn worker_properties(
 
 /// systemd D-Bus type `(bas)`: `(allow_list, families)`.
 /// `allow_list=false` denies `AF_INET`/`AF_INET6` (ADR-001) and leaves
-/// `AF_UNIX`/`AF_NETLINK` available for HotSpot under `PrivateNetwork=true`.
+/// `AF_UNIX`/`AF_NETLINK` available for `HotSpot` under `PrivateNetwork=true`.
 fn restrict_address_families() -> Value<'static> {
     Value::from((false, vec!["AF_INET".to_owned(), "AF_INET6".to_owned()]))
 }
