@@ -164,7 +164,8 @@ ni `Ready`. PR #460 (head `cb34813`, merge `dd18466`, Verify
 no cubre `Ready`. PR #462 (head `afaf15d`, merge `c85e495`, Verify
 `46094600247` 7/7, dos grok-4.7-medium-fast APPROVED) atesta
 `ReadyAttestation::Unavailable`; `READY` en el wire es `Unknown`. No
-cierra `003B-4C` ni `Ready`. El corte de tipos D-Bus deriva
+cierra `003B-4C` ni `Ready`. PR #464 (head `d1e1250`, merge `454da38`,
+Verify `46124265198` 7/7, dos grok-4.7-medium-fast APPROVED) aplica
 `CPUQuotaPerSecUSec` (`t`) y `RestrictAddressFamilies` (`(bas)`) deny
 `AF_INET`/`AF_INET6`; `ReadyAttestation` sigue `Unavailable` y no
 cierra `003B-4C`. PR #326
