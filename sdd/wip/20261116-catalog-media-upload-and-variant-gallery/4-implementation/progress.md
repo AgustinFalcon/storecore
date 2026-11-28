@@ -1,11 +1,11 @@
 # Progreso
 
-## 2026-11-27 — arranque 4C RestrictAddressFamilies ausente
+## 2026-11-27 — arranque 4C CPUQuota ausente
 
-- PID 1 no aplica `RestrictAddressFamilies` al worker derivado. El
-  harness arranca `.mount` y worker, lee la propiedad efectiva vacía y
-  detiene ambas unidades.
-- No se marca `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
+- PID 1 no aplica `CPUQuota` al worker derivado. El harness arranca
+  `.mount` y worker, lee `CPUQuotaPerSecUSec` no acotado y detiene
+  ambas unidades. `LimitCPU` sigue siendo el techo interno.
+- No se marca `003B-4C`. Faltan `Ready` y HTTP de media.
 
 ## 2026-11-27 — persist reviews PR #458, 003B-4C sigue abierto
 
@@ -18,6 +18,13 @@
   `sdd/reviews/20261127-sol-pr458-security.md`.
 - PID 1 no aplica `RestrictAddressFamilies` (vacío o `~`). No se marca
   `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
+
+## 2026-11-27 — arranque 4C RestrictAddressFamilies ausente
+
+- PID 1 no aplica `RestrictAddressFamilies` al worker derivado. El
+  harness arranca `.mount` y worker, lee la propiedad efectiva vacía y
+  detiene ambas unidades.
+- No se marca `003B-4C`. Faltan `CPUQuota`, `Ready` y HTTP de media.
 
 ## 2026-11-27 — arranque 4C inventario Active inesperado
 
