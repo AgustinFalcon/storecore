@@ -72,6 +72,163 @@ class MpOrdersCheckoutIntegrationTest(
 ) {
     private lateinit var admin: Session
     private lateinit var customer: Session
+    @Autowired private lateinit var localCarts: com.storecore.commerce.infrastructure.JdbcCartService
+    @Autowired private lateinit var localTransactions: org.springframework.transaction.support.TransactionTemplate
+    @Autowired private lateinit var checkoutEvidence: com.storecore.commerce.infrastructure.LoyaltyCheckoutEvidenceService
+    @Autowired private lateinit var deliveryPolicies: com.storecore.commerce.infrastructure.ManualFulfillmentPolicyReader
+    @Autowired private lateinit var mapper: com.fasterxml.jackson.databind.ObjectMapper
+
+    @Test fun `legacy completed checkout without fingerprint version replays and recovers remote attachment`() {
+        val fixture = localCheckoutFixture()
+        val key = UUID.randomUUID()
+        val cart = localCarts.read(fixture.first)
+        val option = deliveryPolicies.selection(com.storecore.commerce.domain.DeliveryMode.PICKUP, fixture.third)
+        val delivery = com.storecore.commerce.domain.DeliveryPolicySnapshot(option.mode, option.label, option.cost,
+            option.minDays, option.maxDays, option.configurationVersion,
+            com.storecore.commerce.domain.DeliveryDestination.Pickup(option.destination!!), option.instructions)
+        val legacyFingerprint = com.storecore.commerce.infrastructure.sha256(mapper.writeValueAsString(listOf(
+            option.mode.name, fixture.third, null, null, fixture.second, PaymentCurrency.ARS.name)))
+        val requestHash = com.storecore.commerce.infrastructure.sha256(
+            legacyFingerprint + "|" + mapper.writeValueAsString(cart.lines) + "|" + mapper.writeValueAsString(delivery))
+        val payload = mapper.createObjectNode().putNull("addressId").put("commandFingerprint", legacyFingerprint)
+            .set<com.fasterxml.jackson.databind.node.ObjectNode>("delivery", mapper.valueToTree(delivery))
+            .put("currency", PaymentCurrency.ARS.name).put("reservationSagaKey", UUID.randomUUID().toString())
+            .set<com.fasterxml.jackson.databind.node.ObjectNode>("lines", mapper.valueToTree(cart.lines))
+        val lineKeys = payload.putObject("lineKeys")
+        cart.lines.forEach { lineKeys.put(it.sku, UUID.randomUUID().toString()) }
+        val claim = jdbc.queryForObject("INSERT INTO checkout_idempotency_claims(customer_id,checkout_idempotency_key,request_hash,checkout_snapshot,state) VALUES (?,?,?,?::jsonb,'COMPLETED') RETURNING id",
+            Long::class.java, fixture.first.customerId, key, requestHash, payload.toString())!!
+        val subtotal = cart.lines.fold(BigDecimal.ZERO) { total, line -> total + line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)) }
+        val order = jdbc.queryForObject("INSERT INTO orders(order_number,checkout_claim_id,checkout_idempotency_key,checkout_request_hash,customer_id,status,buyer_snapshot,checkout_snapshot,subtotal,shipping_cost,total,currency) VALUES (?,?,?,?,?,'PENDING_PAYMENT','{}',?::jsonb,?,?,?,'ARS') RETURNING id",
+            Long::class.java, "SC-$claim", claim, key, requestHash, fixture.first.customerId, payload.toString(), subtotal, option.cost, subtotal + option.cost)!!
+        cart.lines.forEach { line ->
+            val variant = jdbc.queryForObject("SELECT id FROM product_variants WHERE sku=?", Long::class.java, line.sku)!!
+            jdbc.update("INSERT INTO order_items(order_id,variant_id,product_snapshot,quantity,original_unit_price,discount_amount,effective_unit_price,subtotal) VALUES (?,? ,?::jsonb,?,?,?,?,?)",
+                order, variant, mapper.writeValueAsString(mapOf("sku" to line.sku, "name" to line.name)), line.quantity,
+                line.originalUnitPrice, line.discountAmount, line.effectiveUnitPrice, line.effectiveUnitPrice.multiply(BigDecimal(line.quantity)))
+        }
+        jdbc.update("INSERT INTO payments(order_id,external_reference,status,amount,currency) VALUES (?,?,'PENDING',?,'ARS')", order, "SC-$claim", subtotal + option.cost)
+        jdbc.update("DELETE FROM cart_items WHERE cart_id=(SELECT id FROM carts WHERE customer_id=?)", fixture.first.customerId)
+
+        val replay = localTransactions.execute { localCarts.checkout(fixture.first, key, null, PaymentCurrency.ARS,
+            com.storecore.commerce.domain.DeliveryMode.PICKUP, fixture.third, fixture.second, null) }!!
+        assertEquals(order.toString(), replay.orderId)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_claim_id=?", Int::class.java, claim))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM loyalty_order_snapshots WHERE order_id=?", Int::class.java, order))
+        val providerOrderId = "ORD-LEGACY-${UUID.randomUUID()}"
+        Fakes.createResult.set(
+            CreationObservation.VerifiedSuccess(
+                providerOrderId,
+                "https://www.mercadopago.com.ar/checkout/$providerOrderId",
+            ),
+        )
+        val attached = localCarts.attachRemoteCheckout(replay)
+        assertTrue(!attached.checkoutUrl.isNullOrBlank())
+        assertEquals(1, Fakes.createRequests.size)
+    }
+
+    @Test fun `selected checkout binds held points with exact net amounts and survives unrelated wallet revision`() {
+        val fixture = localCheckoutFixture()
+        val reservation = UUID.randomUUID()
+        val wallet = localTransactions.execute {
+            val walletId = issueCheckoutPoints(fixture.first.customerId)
+            val line = jdbc.query("SELECT i.id,i.variant_id,i.quantity FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=?", { rs, _ ->
+                com.storecore.loyalty.domain.LoyaltyCartLine(rs.getLong("id"), rs.getLong("variant_id"), rs.getLong("quantity"), loyaltyMinor(10000), loyaltyMinor(10000), com.storecore.loyalty.domain.LoyaltyDiscountState.NONE)
+            }, fixture.first.customerId).single()
+            jdbc.update("INSERT INTO catalog_loyalty_price_profiles(variant_id,revision,currency,gross_unit_minor,merchandise_unit_minor,excluded_tax_unit_minor,classification,evidence_kind,source_reference,admin_command_id,recorded_at) VALUES (?,1,'ARS',10000,8000,2000,'STANDARD','MERCHANT_ACCOUNTANT_PROFILE','checkout-profile',?,date_trunc('second',clock_timestamp()))", line.variantId, UUID.randomUUID())
+            checkoutEvidence.lockCatalog(fixture.first, listOf(line.variantId))
+            val fingerprint = com.storecore.loyalty.domain.CartFingerprint.fromWire(fixture.second)!!
+            val candidate = checkoutEvidence.prepare(fixture.first, com.storecore.loyalty.domain.CheckoutLoyaltySelection.None, fingerprint, listOf(line)).candidates.single()
+            val admitted = (com.storecore.loyalty.domain.LoyaltyEvidenceAdmissionStep.admit(line, candidate.source, candidate.latestProfileRevision, com.storecore.loyalty.domain.LoyaltyEvidencePurpose.REDEMPTION) as com.storecore.loyalty.domain.LoyaltyEvidenceAdmission.Available).snapshot
+            val point = com.storecore.loyalty.domain.LoyaltyPoints.fromWire("1")!!
+            val quote = (com.storecore.loyalty.domain.LoyaltyQuoteEvidenceStep.freeze(fingerprint, com.storecore.loyalty.domain.LoyaltyEvidenceRevision.fromWire("0")!!, listOf(admitted), point, point) as com.storecore.loyalty.domain.LoyaltyEvidenceAdmission.Available).snapshot
+            val lines = """[{"cart_item_id":${line.cartItemId},"variant_id":${line.variantId},"profile_id":${candidate.source!!.id},"profile_revision":1,"quantity":2,"original_unit_minor":10000,"effective_unit_minor":10000,"gross_minor":20000,"merchandise_minor":16000,"excluded_tax_minor":4000,"eligible_minor":16000,"classification":"STANDARD","existing_discount_state":"NONE"}]"""
+            jdbc.queryForList("SELECT loyalty_quote_checkout_reservation(?,?,?,?,?,?,?,?,?,?,?, ?,?,?::jsonb)", fixture.first.customerId, fixture.first.sessionId, UUID.randomUUID(), reservation, walletId, 0L, 0L, 1L, 16000L, false, "d".repeat(64), fixture.second, quote.hash.value, lines)
+            walletId
+        }!!
+        // The quote wallet revisions are historical; another valid wallet change must not invalidate the hold.
+        jdbc.update("UPDATE loyalty_wallets SET revision=revision+1 WHERE id=?", wallet)
+        val selection = com.storecore.loyalty.domain.CheckoutLoyaltySelection.fromWire(true, reservation.toString(), "0")
+        val key = UUID.randomUUID()
+        fun checkout() = localTransactions.execute {
+            localCarts.checkout(fixture.first, key, null, PaymentCurrency.ARS, com.storecore.commerce.domain.DeliveryMode.PICKUP,
+                fixture.third, fixture.second, null, selection)
+        }!!
+        val receipt = checkout()
+        assertEquals(BigDecimal("199.00"), jdbc.queryForObject("SELECT subtotal FROM orders WHERE id=?", BigDecimal::class.java, receipt.orderId.toLong()))
+        assertEquals(BigDecimal("199.00"), jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?", BigDecimal::class.java, receipt.orderId.toLong()))
+        assertEquals(BigDecimal("200.00"), jdbc.queryForObject("SELECT subtotal FROM order_items WHERE order_id=?", BigDecimal::class.java, receipt.orderId.toLong()))
+        assertEquals("PAYMENT_PENDING", jdbc.queryForObject("SELECT state FROM loyalty_reservation_states WHERE reservation_id=?", String::class.java, reservation))
+        assertEquals(3L, jdbc.queryForObject("SELECT revision FROM loyalty_wallets WHERE id=?", Long::class.java, wallet))
+        assertEquals(1L, jdbc.queryForObject("SELECT held FROM loyalty_lot_partitions WHERE wallet_id=?", Long::class.java, wallet))
+        assertEquals(receipt, checkout())
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM loyalty_checkout_bindings WHERE reservation_id=?", Int::class.java, reservation))
+        assertTrue(Fakes.createRequests.isEmpty())
+    }
+
+    private fun loyaltyMinor(value: Long) = com.storecore.loyalty.domain.LoyaltyMinorUnits.fromWire(value.toString())!!
+    private fun issueCheckoutPoints(customerId: Long): Long {
+        val wallet = jdbc.queryForObject("INSERT INTO loyalty_wallets(customer_id) VALUES (?) RETURNING id", Long::class.java, customerId)!!
+        val source = UUID.randomUUID()
+        val accepted = jdbc.queryForObject("SELECT date_trunc('second',clock_timestamp())", java.sql.Timestamp::class.java)!!
+        jdbc.update("INSERT INTO loyalty_source_applications(id,wallet_id,source_type,source_id,policy_version,points,accepted_at) VALUES (?,?,'ADMIN_ADJUSTMENT',?,'loyalty-policy-v1',1000,?)", source, wallet, source.toString(), accepted)
+        val ledger = jdbc.queryForObject("INSERT INTO loyalty_ledger(wallet_id,source_application_id,movement,direction,points,recorded_at) VALUES (?,?,'MANUAL_ADJUSTMENT','CREDIT',1000,?) RETURNING id", Long::class.java, wallet, source, accepted)!!
+        val lot = jdbc.queryForObject("INSERT INTO loyalty_lots(wallet_id,ledger_id,issued,accepted_at,expires_at) VALUES (?,?,1000,?,?) RETURNING id", Long::class.java, wallet, ledger, accepted, java.sql.Timestamp.from(accepted.toInstant().plusSeconds(31536000)))!!
+        jdbc.update("INSERT INTO loyalty_lot_partitions(lot_id,wallet_id,issued,free,held,redeemed,expired,reversed) VALUES (?,?,1000,1000,0,0,0,0)", lot, wallet)
+        jdbc.update("INSERT INTO loyalty_allocation_events(id,wallet_id,lot_id,ledger_id,kind,points,recorded_at) VALUES (?,?,?,?,'ISSUE',1000,?)", UUID.randomUUID(), wallet, lot, ledger, accepted)
+        return wallet
+    }
+
+    @Test fun `explicit null local checkout freezes unavailable evidence and exact replay rejects another selection`() {
+        val fixture = localCheckoutFixture()
+        val key = UUID.randomUUID()
+        fun checkout(selection: com.storecore.loyalty.domain.CheckoutLoyaltySelection) = localTransactions.execute {
+            localCarts.checkout(fixture.first, key, null, PaymentCurrency.ARS, com.storecore.commerce.domain.DeliveryMode.PICKUP,
+                fixture.third, fixture.second, null, selection)
+        }!!
+        val first = checkout(com.storecore.loyalty.domain.CheckoutLoyaltySelection.None)
+        assertEquals("UNAVAILABLE", jdbc.queryForObject("SELECT availability FROM loyalty_order_snapshots WHERE order_id=?", String::class.java, first.orderId.toLong()))
+        assertEquals("MISSING_PROFILE", jdbc.queryForObject("SELECT unavailable_reason FROM loyalty_order_snapshots WHERE order_id=?", String::class.java, first.orderId.toLong()))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM loyalty_order_lines WHERE order_id=?", Int::class.java, first.orderId.toLong()))
+        assertEquals(first, checkout(com.storecore.loyalty.domain.CheckoutLoyaltySelection.None))
+        val changed = com.storecore.loyalty.domain.CheckoutLoyaltySelection.fromWire(true, UUID.randomUUID().toString(), "0")
+        org.junit.jupiter.api.Assertions.assertThrows(com.storecore.commerce.application.CheckoutConflict::class.java) { checkout(changed) }
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE customer_id=? AND checkout_idempotency_key=?", Int::class.java, fixture.first.customerId, key))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM cart_items i JOIN carts c ON c.id=i.cart_id WHERE c.customer_id=?", Int::class.java, fixture.first.customerId))
+        assertTrue(Fakes.createRequests.isEmpty(), "local checkout must not call provider")
+    }
+
+    @Test fun `failure after frozen checkout rolls back all local effects and retains cart`() {
+        val fixture = localCheckoutFixture()
+        val key = UUID.randomUUID()
+        val inventoryBefore = jdbc.queryForObject("SELECT sum(b.reserved_quantity) FROM inventory_balances b", Long::class.java)
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
+            localTransactions.executeWithoutResult {
+                localCarts.checkout(fixture.first, key, null, PaymentCurrency.ARS, com.storecore.commerce.domain.DeliveryMode.PICKUP,
+                    fixture.third, fixture.second, null, com.storecore.loyalty.domain.CheckoutLoyaltySelection.None)
+                throw IllegalStateException("injected after snapshot and cart clear")
+            }
+        }
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM checkout_idempotency_claims WHERE checkout_idempotency_key=?", Int::class.java, key))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM orders WHERE checkout_idempotency_key=?", Int::class.java, key))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM loyalty_order_snapshots s JOIN orders o ON o.id=s.order_id WHERE o.customer_id=?", Int::class.java, fixture.first.customerId))
+        assertEquals(inventoryBefore, jdbc.queryForObject("SELECT sum(b.reserved_quantity) FROM inventory_balances b", Long::class.java))
+        assertEquals(fixture.second, localCarts.read(fixture.first).revision)
+        assertTrue(Fakes.createRequests.isEmpty())
+    }
+
+    private fun localCheckoutFixture(): Triple<com.storecore.identity.domain.CustomerPrincipal, String, Int> {
+        val sku = "LOCAL-${UUID.randomUUID()}"
+        putProduct(sku, "Local evidence", available = 5)
+        val added = exchange("/api/v1/customer/cart/items", HttpMethod.PUT, """{"sku":"$sku","quantity":2}""", customer.cookie, customer.csrf)
+        assertEquals(200, added.statusCode.value(), added.body)
+        customer = customer.copy(csrf = added.headers.getFirst("X-CSRF-Token")!!)
+        val principal = jdbc.query("SELECT id,customer_id FROM identity_sessions WHERE customer_id=(SELECT max(id) FROM customers) AND revoked_at IS NULL ORDER BY issued_at DESC LIMIT 1", { rs, _ ->
+            com.storecore.identity.domain.CustomerPrincipal(rs.getObject("id", UUID::class.java), rs.getLong("customer_id"))
+        }).single()
+        val version = jdbc.queryForObject("SELECT config_version FROM module_configurations WHERE module_code='MANUAL_FULFILLMENT'", Int::class.java)!!
+        return Triple(principal, localCarts.read(principal).revision, version)
+    }
 
     @BeforeEach
     fun seed() {
@@ -785,9 +942,11 @@ class MpOrdersCheckoutIntegrationTest(
             assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())
         }
         jdbc.update("UPDATE payments SET status='APPROVED' WHERE order_id=?", orderId)
-        jdbc.update("UPDATE payments SET amount=amount+1 WHERE order_id=?", orderId)
-        assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())
-        jdbc.update("UPDATE payments SET amount=amount-1 WHERE order_id=?", orderId)
+        val frozenAmount = jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?", BigDecimal::class.java, orderId)
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataIntegrityViolationException::class.java) {
+            jdbc.update("UPDATE payments SET amount=amount+1 WHERE order_id=?", orderId)
+        }
+        assertEquals(frozenAmount, jdbc.queryForObject("SELECT amount FROM payments WHERE order_id=?", BigDecimal::class.java, orderId))
         val reservationId = jdbc.queryForObject("SELECT reservation_id FROM inventory_ledger WHERE actor=? AND event_type='SALE' AND channel='WEB'", Long::class.java, "MP_ORDERS:$orderId")!!
         jdbc.update("UPDATE inventory_reservations SET quantity=quantity+1 WHERE id=?", reservationId)
         assertEquals(400, command(orderId, "shipments", "PACKED").statusCode.value())

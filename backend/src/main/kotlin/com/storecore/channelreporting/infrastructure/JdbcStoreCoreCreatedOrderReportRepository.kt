@@ -215,13 +215,38 @@ class JdbcStoreCoreCreatedOrderReportRepository internal constructor(
             ReportArsAmount.fromValue(summary["merchandise_subtotal"] as BigDecimal) ?: return contradictoryPaymentProjection(),
             ReportArsAmount.fromValue(summary["shipping_amount"] as BigDecimal) ?: return contradictoryPaymentProjection(),
         ) ?: return contradictoryPaymentProjection()
+        // Item prices/subtotals remain gross evidence. Only available frozen loyalty lines
+        // supply a net payable amount; historical/unavailable evidence keeps the legacy sum.
         val snapshotContradictions = jdbc.queryForObject(
             paymentAuthorityCte() + """SELECT count(*) FROM (
                 SELECT a.order_id
                 FROM authority a LEFT JOIN order_items oi ON oi.order_id=a.order_id
+                LEFT JOIN loyalty_order_snapshots s ON s.order_id=a.order_id
+                LEFT JOIN loyalty_order_lines l ON l.order_id=a.order_id AND l.order_item_id=oi.id
                 WHERE a.valid_authority IS TRUE
-                GROUP BY a.order_id,a.subtotal
-                HAVING count(oi.id)=0 OR COALESCE(sum(oi.subtotal),0.00)<>a.subtotal
+                GROUP BY a.order_id,a.subtotal,a.shipping_cost,a.order_total,s.order_id,s.availability,
+                    s.net_subtotal_minor,s.shipping_minor,s.total_minor,s.discount_minor,s.final_earning_minor
+                HAVING count(oi.id)=0
+                    OR CASE WHEN s.availability='AVAILABLE' THEN COALESCE(sum(l.payable_minor),0)/100.00
+                            ELSE COALESCE(sum(oi.subtotal),0.00) END<>a.subtotal
+                    OR (s.order_id IS NOT NULL AND (
+                        s.availability NOT IN ('AVAILABLE','UNAVAILABLE')
+                        OR s.net_subtotal_minor::numeric<>a.subtotal*100
+                        OR s.shipping_minor::numeric<>a.shipping_cost*100
+                        OR s.total_minor::numeric<>a.order_total*100
+                        OR (s.availability='UNAVAILABLE' AND (count(l.order_item_id)<>0 OR s.discount_minor<>0))
+                        OR (s.availability='AVAILABLE' AND (
+                            count(l.order_item_id)<>count(oi.id)
+                            OR COALESCE(sum(l.allocated_discount_minor),0)<>s.discount_minor
+                            OR COALESCE(sum(l.final_earning_minor),0)<>s.final_earning_minor
+                            OR count(*) FILTER (WHERE l.variant_id<>oi.variant_id OR l.quantity<>oi.quantity
+                                OR l.original_unit_minor::numeric<>oi.original_unit_price*100
+                                OR l.effective_unit_minor::numeric<>oi.effective_unit_price*100
+                                OR l.gross_minor::numeric<>oi.subtotal*100
+                                OR l.payable_minor::numeric<>l.gross_minor::numeric-l.allocated_discount_minor)<>0
+                            OR (SELECT count(*) FROM loyalty_order_lines extra WHERE extra.order_id=a.order_id)<>count(oi.id)
+                        ))
+                    ))
                 UNION ALL
                 SELECT a.order_id
                 FROM authority a JOIN order_items oi ON oi.order_id=a.order_id

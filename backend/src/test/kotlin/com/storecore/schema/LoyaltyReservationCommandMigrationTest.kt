@@ -38,7 +38,7 @@ class LoyaltyReservationCommandMigrationTest {
 
     @Test fun `latest schema installs quote writer without runtime activation`() {
         val version = owner.queryForObject("SELECT max(version::int) FROM flyway_schema_history WHERE success", Int::class.java)
-        assertEquals(44, version)
+        assertEquals(45, version)
         val signature = "loyalty_quote_reservation(bigint,uuid,uuid,uuid,bigint,bigint,bigint,bigint,bigint,boolean,character varying)"
         assertFalse(owner.queryForObject("SELECT has_function_privilege('storecore_runtime',?,'EXECUTE')", Boolean::class.java, signature)!!)
         assertThrows(DataAccessException::class.java) { runtime.queryForObject(callSql, String::class.java,
